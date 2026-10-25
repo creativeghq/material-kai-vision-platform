@@ -48,7 +48,7 @@ export interface PriceProposal {
 export interface PriceLookupMatch {
   doc_id?: string;
   doc_title: string;
-  doc_type: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | 'unknown';
+  doc_type: 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | 'supplier_cost_list' | 'unknown';
   snippet: string;
   relevance_score: number;
 }
@@ -116,6 +116,7 @@ const DOC_TYPE_LABEL: Record<PriceLookupMatch['doc_type'], string> = {
   discount_rule: 'Discount rule',
   contract_terms: 'Contract terms',
   promotion: 'Promotion',
+  supplier_cost_list: 'Supplier cost list',
   unknown: 'Unclassified',
 };
 
@@ -124,6 +125,7 @@ const DOC_TYPE_COLOR: Record<PriceLookupMatch['doc_type'], string> = {
   discount_rule: 'bg-amber-500/20 text-amber-400',
   contract_terms: 'bg-emerald-500/20 text-emerald-400',
   promotion: 'bg-pink-500/20 text-pink-400',
+  supplier_cost_list: 'bg-muted text-muted-foreground',
   unknown: 'bg-muted text-muted-foreground',
 };
 
@@ -278,7 +280,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
             : customerContactId
               ? `, customer_contact_id="${customerContactId}"`
               : '') +
-          ' and compose a price_proposal chunk with a full reasoning chain. Cite source documents by title. If a customer discount is on file, show the supplier-layer price and the customer-layer price as separate lines in the reasoning chain.',
+          ', then call submit_price_proposal ONCE with the list price and the supplier discount cascade exactly as printed in the documents (do not compute the final price yourself; the platform does). Cite source documents by id and title in the reasoning. If a customer discount is on file, pass the customer id so the platform applies it.',
       ].filter(Boolean).join('\n');
 
       const controller = new AbortController();
@@ -351,6 +353,18 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
               if (chunk.discount_percent != null) setFinalDiscount(String(chunk.discount_percent));
               if (chunk.currency) setFinalCurrency(chunk.currency);
               if (chunk.unit) setFinalUnit(chunk.unit);
+              break;
+            case 'text_delta':
+              if (typeof chunk.delta === 'string') {
+                localText += chunk.delta;
+                setAgentText(localText);
+              }
+              break;
+            case 'final_result':
+              if (!localText && typeof chunk.text === 'string' && chunk.text.trim()) {
+                localText = chunk.text;
+                setAgentText(localText);
+              }
               break;
             case 'text':
             case 'content':
@@ -776,8 +790,8 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
                         <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
                         <span className="font-medium text-sm truncate">{m.doc_title}</span>
                       </div>
-                      <Badge variant="outline" className={`text-xs ${DOC_TYPE_COLOR[m.doc_type]}`}>
-                        {DOC_TYPE_LABEL[m.doc_type]}
+                      <Badge variant="outline" className={`text-xs ${DOC_TYPE_COLOR[m.doc_type] ?? DOC_TYPE_COLOR.unknown}`}>
+                        {DOC_TYPE_LABEL[m.doc_type] ?? DOC_TYPE_LABEL.unknown}
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground whitespace-pre-wrap">

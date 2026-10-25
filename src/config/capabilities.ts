@@ -211,6 +211,7 @@ const UNCREATABLE_RESULT_TYPES = new Set([
   'reviews_list',             // a review you write about yourself is a fake review
   'price_summary',            // competitor prices are observations
   'price_lookup_matches',
+  'price_proposal',
   'job_digest_preview',       // a preview of a digest, not a list of things to add to
   'stock_movements',          // a movement is the RECORD of an adjustment, made by adjusting
   'my_hr_documents',          // HR issues these; an employee cannot add one from chat

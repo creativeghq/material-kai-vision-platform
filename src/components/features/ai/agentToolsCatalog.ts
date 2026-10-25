@@ -1037,6 +1037,11 @@ const KAI_TOOLS: AgentToolEntry[] = [
     desc: 'Pricing lookup from the Pricing KB category (admin-curated price data).',
   },
   {
+    id: 'submit_price_proposal', name: 'Price Proposal', category: 'Admin',
+    adminOnly: true,
+    desc: 'Show the reviewed price proposal for a product: the platform applies the supplier discount cascade and the customer discount to the list price found in the Pricing KB.',
+  },
+  {
     id: 'seo_dataforseo_call', name: 'DataForSEO Escape Hatch', category: 'Admin',
     adminOnly: true,
     desc: 'Call any DataForSEO endpoint by name when no specific tool fits. Advanced.',
@@ -4020,7 +4025,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // got "not available for this agent or your role" for all three as an ADMIN.
     tool_ids: [
       'workspace_capabilities',
-      'dispatch_background_task', 'price_lookup', 'seo_dataforseo_call',
+      'dispatch_background_task', 'price_lookup', 'submit_price_proposal', 'seo_dataforseo_call',
       'checkServerHealth', 'querySentry', 'queryDatabase',
     ],
     quick_starts: [

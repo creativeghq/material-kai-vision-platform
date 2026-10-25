@@ -1081,7 +1081,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Background task dispatch (admin/owner only)
       'workspace_capabilities', 'dispatch_background_task',
       // Price lookup from Pricing KB category (admin/owner only)
-      'price_lookup',
+      'price_lookup', 'submit_price_proposal',
       // Mention monitoring (all users; per-tool credit cost gated inside the tool)
       'track_product_mentions', 'get_mention_summary', 'check_llm_visibility', 'find_negative_mentions',
       'propose_brand_change',
@@ -1327,7 +1327,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'find_hiring_companies', 'find_companies_using_technology', 'find_companies_in_market', 'company_signals', 'manage_signal',
-      'price_lookup', 'product_analysis', 'business_analysis', 'dispatch_background_task',
+      'price_lookup', 'submit_price_proposal', 'product_analysis', 'business_analysis', 'dispatch_background_task',
       // Price monitoring + CRM-from-VAT (Pepper is the product/business agent)
       'track_product_prices', 'get_price_summary', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health',
       // Pepper is a declared OWNER of the crm cluster, and a cluster is the unit the picker
@@ -1402,7 +1402,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // "your customers could have done that themselves on your website".
       'embed_readiness', 'embed_overview',
       'customer_overview', 'supplier_overview', 'product_price_history',
-      'products_in_project', 'projects_using_product', 'price_lookup',
+      'products_in_project', 'projects_using_product', 'price_lookup', 'submit_price_proposal',
       // The rest of the knowledge-graph cluster. Trinity was DECLARED an owner of it while
       // binding half — so "Product provenance", "Brand overview" and "Search by ΚΑΔ" were
       // offered on Trinity and answered "not available for this agent". A cluster is the unit
@@ -2370,6 +2370,7 @@ async function executeAgent(
   const createDispatchBackgroundTaskTool = bgMod?.createDispatchBackgroundTaskTool;
   const createInteriorVideoV2Tool = bgMod?.createInteriorVideoV2Tool;
   const createPriceLookupTool = priceMod?.createPriceLookupTool;
+  const createSubmitPriceProposalTool = priceMod?.createSubmitPriceProposalTool;
   const createPresentationSheetTool = presentationMod?.createPresentationSheetTool;
   const createTrackProductMentionsTool = mentionMod?.createTrackProductMentionsTool;
   const createGetMentionSummaryTool = mentionMod?.createGetMentionSummaryTool;
@@ -3288,6 +3289,9 @@ async function executeAgent(
     // Price lookup from the Pricing KB category (admin-gated)
     if (config.tools.includes('price_lookup') && createPriceLookupTool) {
       tools.push(createPriceLookupTool(workspaceId, onChunk));
+    }
+    if (config.tools.includes('submit_price_proposal') && createSubmitPriceProposalTool) {
+      tools.push(createSubmitPriceProposalTool(workspaceId, onChunk));
     }
 
     // Presentation catalogs (admin-only) — 8 tools driving the catalog builder

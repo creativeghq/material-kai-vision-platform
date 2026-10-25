@@ -585,6 +585,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   quotes_list: 'Quotes',
   // Misc
   price_lookup_matches: 'Price lookup matches',
+  price_proposal: 'Price proposal',
   project_created: 'Project created',
   // video_generated is intentionally NOT here — it has a dedicated handler that maps it into the
   // rich <video> player card (videoData). Registering it would make the generic card shadow that.
@@ -2031,6 +2032,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       generate_3d: 'Rendering in 3D',
       generate_gemini: 'Generating the image',
       price_lookup: 'Checking prices',
+      submit_price_proposal: 'Preparing the price proposal',
       create_quote: 'Drafting the quote',
       list_my_quotes: 'Fetching quotes',
       manage_finance: 'Working through the finances',

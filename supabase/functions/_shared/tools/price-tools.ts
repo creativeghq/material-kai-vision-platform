@@ -27,7 +27,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-type PriceDocType = 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion';
+type PriceDocType = 'price_list' | 'discount_rule' | 'contract_terms' | 'promotion' | 'supplier_cost_list';
 
 interface CustomerDiscount {
   kind: 'company' | 'contact';
@@ -215,7 +215,8 @@ export const createPriceLookupTool = (
           });
         }
 
-        const rawChunks: any[] = data?.chunks || [];
+        // Procurement cost lists feed products.cost; they are confidential and are not a quote price.
+        const rawChunks: any[] = (data?.chunks || []).filter((c: any) => c.price_doc_type !== 'supplier_cost_list');
         const matches: PriceMatch[] = rawChunks.map((c: any) => ({
           doc_id: c.id,
           doc_title: c.document_title || c.title || 'Untitled',
@@ -296,13 +297,13 @@ export const createPriceLookupTool = (
           ? [
               '6. Compose the price in TWO layers: (a) supplier layer — list × (1 - supplier_discount); (b) customer layer — × (1 - customer_discount). Show both lines in the reasoning_chain so the admin can audit.',
               '7. If a conflict exists (specific SKU price vs general rule), prefer specific and flag the conflict.',
-              '8. Emit a `price_proposal` chunk with: list_price, discount_percent (combined effective % after BOTH layers, computed as 1 - (1-supplier)(1-customer)), final_unit_price, currency, unit, quantity_applied, total, source_doc_ids[], reasoning_chain[] (show both layers as separate lines), warnings[], confidence (high|medium|low).',
+              '8. Call submit_price_proposal with: list_price, supplier_discount_percents[] (the cascade exactly as printed, e.g. [30,15,5,3]), the customer ids you were given, currency, unit, quantity, source_doc_ids[], reasoning_chain[] (show both layers as separate lines), warnings[], confidence (high|medium|low). The platform computes the final price and total - do not do the arithmetic yourself.',
               '9. If you cannot determine a reliable LIST PRICE, set confidence="low" and ask the admin to confirm or enter manually. The customer discount alone (without a list price) is not enough.',
             ]
           : [
               '6. If price list and discount both exist: final = list × (1 - discount).',
               '7. If there is a conflict (specific SKU price vs general rule), prefer specific and flag the conflict.',
-              '8. Emit a `price_proposal` chunk with: list_price, discount_percent, final_unit_price, currency, unit, quantity_applied, total, source_doc_ids[], reasoning_chain[], warnings[], confidence (high|medium|low).',
+              '8. Call submit_price_proposal with: list_price, supplier_discount_percents[] (the cascade exactly as printed, e.g. [30,15,5,3]), currency, unit, quantity, source_doc_ids[], reasoning_chain[], warnings[], confidence (high|medium|low). The platform computes the final price and total - do not do the arithmetic yourself.',
               '9. If you cannot determine a reliable price, set confidence="low" and ask the admin to confirm or enter manually.',
             ];
 
@@ -349,7 +350,7 @@ export const createPriceLookupTool = (
     },
     {
       name: 'price_lookup',
-      description: 'Look up a product price from the Pricing Knowledge Base (admin only). Returns structured chunks from price lists, discount rules, contract terms, and promotions — and, when a quote customer is in scope, the customer\'s standing CRM-managed discount. The agent composes the final price by combining the supplier/catalog layer with the customer layer and emits a `price_proposal` chunk with a visible reasoning chain. Use when an admin asks for a price, or when triggered from the product detail page or a quote line.',
+      description: 'Look up a product price from the Pricing Knowledge Base (admin only). Returns structured chunks from price lists, discount rules, contract terms, and promotions — and, when a quote customer is in scope, the customer\'s standing CRM-managed discount. After this call, call submit_price_proposal with the list price and the supplier discount cascade you found; the platform applies the cascade and the customer layer and shows the proposal with its reasoning. Use when an admin asks for a price, or when triggered from the product detail page or a quote line.',
       schema: z.object({
         product_name: z.string().describe('Full product name to look up.'),
         sku: z.string().optional().describe('SKU if known — strongest match signal.'),
@@ -361,6 +362,166 @@ export const createPriceLookupTool = (
         product_id: z.string().optional().describe('Product UUID — passed through to the price_proposal chunk so the UI can commit back to the right product.'),
         customer_company_id: z.string().optional().describe('CRM company UUID of the quote customer (B2B). When set, the tool reads crm_companies.discount_percent and folds the customer-side discount into the reasoning chain. Mutually exclusive with customer_contact_id.'),
         customer_contact_id: z.string().optional().describe('CRM contact UUID of the quote customer (B2C / private). When set, the tool reads crm_contacts.discount_percent and folds the customer-side discount into the reasoning chain. Mutually exclusive with customer_company_id.'),
+      }),
+    },
+  );
+};
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/** LangChain Tool: submit the price proposal the drawer shows (admin-gated). The server does the arithmetic. */
+export const createSubmitPriceProposalTool = (
+  workspaceId: string,
+  onChunk?: (chunk: any) => void,
+) => {
+  return tool(
+    async ({
+      product_name,
+      product_id,
+      list_price,
+      supplier_discount_percents,
+      customer_company_id,
+      customer_contact_id,
+      currency,
+      unit,
+      quantity,
+      source_doc_ids,
+      reasoning_chain,
+      warnings,
+      confidence,
+      effective_through,
+    }) => {
+      try {
+        const warn: string[] = [...(warnings ?? [])];
+        let confidenceOut: 'high' | 'medium' | 'low' = confidence === 'high' || confidence === 'low' ? confidence : 'medium';
+        const capAtMedium = () => { if (confidenceOut === 'high') confidenceOut = 'medium'; };
+
+        // Source documents come from the model: keep only the ones that exist in THIS workspace.
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const ids = Array.from(new Set(source_doc_ids ?? []));
+        let docs: any[] = [];
+        if (ids.length > 0 && workspaceId) {
+          const { data } = await supabase
+            .from('kb_docs')
+            .select('id, title, status, price_doc_type, metadata')
+            .eq('workspace_id', workspaceId)
+            .in('id', ids);
+          docs = data ?? [];
+        }
+        if (docs.length < ids.length) warn.push(`${ids.length - docs.length} cited source document(s) were not found in this workspace and were dropped.`);
+        if (docs.some((d) => d.price_doc_type === 'supplier_cost_list')) {
+          docs = docs.filter((d) => d.price_doc_type !== 'supplier_cost_list');
+          warn.push('A cited procurement cost list was dropped: cost lists are confidential and are not a quote price source.');
+        }
+        if (docs.length === 0) {
+          confidenceOut = 'low';
+          warn.push('No verifiable source document is cited - confirm the price manually.');
+        }
+        if (docs.some((d) => d.status !== 'published')) {
+          capAtMedium();
+          warn.push('A cited source document is not published (archived or draft) - it may be outdated.');
+        }
+
+        const regimes = Array.from(new Set(docs.map((d) => d?.metadata?.vat_regime).filter(Boolean))) as string[];
+        if (regimes.includes('unknown')) {
+          capAtMedium();
+          warn.push('VAT basis of the supplier price is not stated in the source - confirm before quoting.');
+        }
+        if (regimes.some((r) => r === 'eu_non_gr_net' || r === 'non_eu_net')) warn.push('Supplier price is NET with no VAT added (non-Greek supplier).');
+        if (regimes.includes('gr_excl')) warn.push('Greek supplier price excludes VAT (24% is added on top).');
+        if (regimes.includes('gr_incl')) warn.push('Greek supplier price already includes VAT.');
+        if (docs.some((d) => d?.metadata?.supplier)) warn.push("This is the supplier's purchase price, not a customer price - apply your margin before quoting.");
+
+        const isoDay = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+        const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
+        const now = new Date();
+        const cutoffDate = new Date(now);
+        cutoffDate.setUTCMonth(cutoffDate.getUTCMonth() - 18);
+        const [today, cutoff] = [isoDay(now), isoDay(cutoffDate)];
+        const old = docs
+          .map((d) => d?.metadata?.effective_date)
+          .filter((d: unknown): d is string => typeof d === 'string' && ISO_DAY.test(d) && d < cutoff);
+        if (old.length > 0) {
+          capAtMedium();
+          warn.push(`A cited price list is dated ${old.sort()[0]} (more than 18 months old).`);
+        }
+        if (effective_through && ISO_DAY.test(effective_through) && effective_through < today) {
+          capAtMedium();
+          warn.push(`The cited price validity ended on ${effective_through}.`);
+        }
+
+        let price = list_price;
+        const lines: string[] = [`List price ${round2(list_price)} ${currency}${unit ? ` / ${unit}` : ''}`];
+        for (const d of supplier_discount_percents ?? []) {
+          price = price * (1 - d / 100);
+          lines.push(`Supplier discount ${d}% -> ${round2(price)} ${currency}`);
+        }
+        if (customer_company_id || customer_contact_id) {
+          const customer = await loadCustomerDiscount(workspaceId, customer_company_id, customer_contact_id).catch(() => undefined);
+          const pct = customer?.discount_percent;
+          if (customer === undefined || customer === null) {
+            capAtMedium();
+            warn.push('The customer discount could NOT be looked up (unknown customer for this workspace or a lookup error) - it is NOT applied.');
+          } else if (pct != null && pct > 0 && pct < 100) {
+            price = price * (1 - pct / 100);
+            lines.push(`Customer discount ${pct}% (${customer.name}, CRM) -> ${round2(price)} ${currency}`);
+          } else if (pct != null && (pct >= 100 || pct < 0)) {
+            capAtMedium();
+            warn.push(`The customer discount on file (${pct}%) is not a valid percentage - it is NOT applied.`);
+          }
+        }
+        const finalUnit = round2(price);
+        if (!(finalUnit > 0)) {
+          confidenceOut = 'low';
+          warn.push('The computed unit price is not positive - check the discounts.');
+        }
+        const discountPercent = round2((1 - price / list_price) * 100);
+        const total = quantity != null ? round2(finalUnit * quantity) : null;
+
+        const proposal = {
+          type: 'price_proposal',
+          product_id,
+          product_name,
+          list_price: round2(list_price),
+          discount_percent: discountPercent,
+          final_unit_price: finalUnit,
+          currency,
+          unit,
+          quantity_applied: quantity ?? null,
+          total,
+          source_doc_ids: docs.map((d) => d.id),
+          source_titles: docs.map((d) => d.title),
+          reasoning_chain: [...(reasoning_chain ?? []), `Computed by the platform: ${lines.join(' | ')}`],
+          warnings: warn,
+          confidence: confidenceOut,
+          effective_through: effective_through ?? null,
+          timestamp: Date.now(),
+        };
+        onChunk?.(proposal);
+        return JSON.stringify({ success: true, proposal });
+      } catch (error) {
+        console.error('submit_price_proposal error:', error);
+        return JSON.stringify({ success: false, error: error instanceof Error ? error.message : 'Proposal failed' });
+      }
+    },
+    {
+      name: 'submit_price_proposal',
+      description: 'Submit the final price proposal for the admin to review (admin only). Call it ONCE, after price_lookup, with the list price and the supplier discount cascade exactly as printed in the cited documents. The platform verifies the cited documents, applies the supplier cascade and the CRM customer discount, and shows the proposal with its reasoning and warnings. Do not compute the final price yourself.',
+      schema: z.object({
+        product_name: z.string().describe('Product name the proposal is for.'),
+        product_id: z.string().optional().describe('Product UUID if known.'),
+        list_price: z.number().positive().describe('Unit list price as printed in the cited document, before any discount.'),
+        supplier_discount_percents: z.array(z.number().min(0).max(95)).max(6).default([]).describe('Supplier discount cascade as printed, in order, e.g. [30,15,5,3] for "30 15 5 3". Empty when the price is already net.'),
+        customer_company_id: z.string().optional().describe('CRM company UUID of the quote customer; the platform reads its standing discount itself.'),
+        customer_contact_id: z.string().optional().describe('CRM contact UUID of the quote customer (when there is no company).'),
+        currency: z.string().length(3).default('EUR').describe('ISO currency of the printed price.'),
+        unit: z.string().optional().describe('Unit of the printed price (m2, piece, box ...). Omit if the document does not say.'),
+        quantity: z.number().positive().optional().describe('Quote line quantity, for the total.'),
+        source_doc_ids: z.array(z.string()).max(12).default([]).describe('IDs (doc_id from price_lookup matches) of the documents the numbers came from.'),
+        reasoning_chain: z.array(z.string().max(400)).max(12).default([]).describe('Short audit lines: which document, which row, which discount.'),
+        warnings: z.array(z.string().max(300)).max(8).default([]).describe('Conflicts, expired validity, unit mismatches, missing data.'),
+        confidence: z.string().default('medium').describe('One of: high, medium, low.'),
+        effective_through: z.string().optional().describe('Validity end date (YYYY-MM-DD) if the document states one.'),
       }),
     },
   );
