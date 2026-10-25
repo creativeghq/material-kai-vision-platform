@@ -7,6 +7,7 @@ import { CATEGORY_VOCAB } from '@/lib/categoryVocab.generated';
 import { Upload, Loader2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
@@ -31,6 +32,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   const [categories, setCategories] = useState<MaterialCategory[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [publishOnComplete, setPublishOnComplete] = useState(true);
 
   // Load material categories from database
   useEffect(() => {
@@ -169,6 +171,7 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       formData.append('material_category', category); // Material category: tiles, wood, heating, sanitary, etc.
       formData.append('workspace_id', activeWorkspaceId);
       formData.append('title', file.name);
+      formData.append('publish_on_complete', String(publishOnComplete));
 
       const response = await mivaaApi.uploadPDF(formData);
 
@@ -280,6 +283,26 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
             <p className="text-xs text-muted-foreground mt-1">
               Select the material category for products in this PDF
             </p>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <Switch
+              id="pdfuploadsection-publish-on-complete"
+              checked={publishOnComplete}
+              onCheckedChange={setPublishOnComplete}
+              disabled={isUploading}
+              className="mt-0.5"
+            />
+            <div>
+              <label htmlFor="pdfuploadsection-publish-on-complete" className="text-sm font-medium block">
+                Publish products when processing finishes
+              </label>
+              <p className="text-xs text-muted-foreground mt-1">
+                {publishOnComplete
+                  ? 'Products become Active as soon as every product in this PDF has processed. If any product fails, they stay as drafts.'
+                  : 'Products stay as drafts so you can review them before publishing.'}
+              </p>
+            </div>
           </div>
 
           <div className="flex justify-end">
