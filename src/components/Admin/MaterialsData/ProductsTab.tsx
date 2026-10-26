@@ -9,11 +9,12 @@ import {
 } from '@/components/core/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Eye, Loader2, Trash2, FileText, Code, Globe, Package, RefreshCw, Send, Layers } from 'lucide-react';
+import { Eye, Loader2, Trash2, FileText, Code, Globe, Package, RefreshCw, Send, Layers, ClipboardCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { publishProducts, publishCatalogue, productStatusBadge } from '@/services/productPublishService';
+import { fetchEnrichmentReport, describeReport } from '@/services/productEnrichmentService';
 import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/core/filters';
 import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,6 +81,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const [totalCount, setTotalCount] = useState(0);
   const [reembeddingId, setReembeddingId] = useState<string | null>(null);
   const [publishingKey, setPublishingKey] = useState<string | null>(null);
+  const [checkingDocId, setCheckingDocId] = useState<string | null>(null);
   const [readiness, setReadiness] = useState<Map<string, ProductEmbedReadiness>>(new Map());
   const { toast } = useToast();
 
@@ -227,6 +229,22 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const handlePublishCatalogue = (sourceDocumentId: string) => {
     if (!confirm('Publish every draft product from this catalogue? They become visible on public surfaces.')) return;
     void runPublish(`doc:${sourceDocumentId}`, () => publishCatalogue(workspaceId, sourceDocumentId));
+  };
+
+  const handleCheckGaps = async (sourceDocumentId: string) => {
+    setCheckingDocId(sourceDocumentId);
+    try {
+      const report = await fetchEnrichmentReport(workspaceId, sourceDocumentId);
+      toast({ title: 'Catalogue readiness', description: describeReport(report) });
+    } catch (error) {
+      toast({
+        title: 'Could not check this catalogue',
+        description: error instanceof Error ? error.message : 'The gap report failed',
+        variant: 'destructive',
+      });
+    } finally {
+      setCheckingDocId(null);
+    }
   };
 
   const hasActiveFilters = Object.values(filterValues).some((v) =>
@@ -446,6 +464,18 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                           >
                             {publishingKey === product.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                             <span className="ml-1">Publish</span>
+                          </Button>
+                        )}
+                        {product.status === 'draft' && product.source_document_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            title="Check which fields are still empty in this catalogue"
+                            aria-label="Check this catalogue for empty fields"
+                            disabled={checkingDocId !== null}
+                            onClick={() => { void handleCheckGaps(product.source_document_id); }}
+                          >
+                            {checkingDocId === product.source_document_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
                           </Button>
                         )}
                         {product.status === 'draft' && product.source_document_id && (

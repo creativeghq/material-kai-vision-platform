@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (176)
+## 1. Supabase Edge Functions (177)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -414,6 +414,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
+| `enrich-draft-products` | JWT | Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from |
 | `intake-enrich-products` | JWT / kai_* | Drain the products intake marked for enrichment, from a URL we already hold |
 | `ontology-propose-targets` | JWT / kai_* | Propose a target for the invoice terms the ontology cannot resolve |
 

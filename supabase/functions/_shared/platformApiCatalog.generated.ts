@@ -732,6 +732,25 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "enrich-draft-products",
+    "tag": "Warehouse",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from",
+    "description": "Reads only and spends nothing. For a document's draft products (or an explicit list) it returns, per product, the descriptive registry fields that are still empty and the URL we already hold (the product's own link, else its brand's site). Identity fields, cost fields and column-destined fields are never reported as gaps. A product with gaps and no URL is `gaps_no_source`, not a failure.\n\nThe call",
+    "fields": {
+      "action": {
+        "type": "string",
+        "enum": [
+          "report"
+        ],
+        "required": true,
+        "description": "Which operation to run"
+      }
+    }
+  },
+  {
     "name": "finance-assessment",
     "tag": "Finance",
     "methods": [

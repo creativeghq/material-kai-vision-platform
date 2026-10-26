@@ -18456,6 +18456,47 @@
     "response": "{ ok, claimed, enriched, no_source, low_confidence, failed, results, note }"
   },
   {
+    "name": "enrich-draft-products",
+    "tag": "Warehouse",
+    "summary": "Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from",
+    "description": "Reads only and spends nothing. For a document's draft products (or an explicit list) it returns, per product, the descriptive registry fields that are still empty and the URL we already hold (the product's own link, else its brand's site). Identity fields, cost fields and column-destined fields are never reported as gaps. A product with gaps and no URL is `gaps_no_source`, not a failure.\n\nThe caller must be allowed to publish a catalogue (`catalog.import` or `pricing.manage`) in the workspace; a document or workspace the caller cannot reach is 404.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "report",
+        "summary": "Readiness report (the only action so far)",
+        "params": []
+      }
+    ],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "Reconciled against the caller; a mismatch 404s"
+      },
+      {
+        "name": "document_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Report on this document's draft products (send this OR product_ids)"
+      },
+      {
+        "name": "product_ids",
+        "type": "string[] (uuid)",
+        "required": false,
+        "desc": "Report on these products, at most 5000 (send this OR document_id)"
+      }
+    ],
+    "response": "{ summary: { products, nothing_missing, gaps_with_source, gaps_no_source, unclassified }, products: [{ product_id, name, category, gaps, source, verdict }] }"
+  },
+  {
     "name": "real-estate-owner",
     "tag": "Real Estate",
     "summary": "A property owner reading their own property",

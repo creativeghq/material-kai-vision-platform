@@ -76,6 +76,12 @@ export async function scrapeToMarkdown(
     return { error: JSON.stringify({ success: false, error: 'FIRECRAWL_API_KEY is not configured.' }) };
   }
 
+  try {
+    url = await assertSafeUrl(url, { allowSchemes: ['https:'] });
+  } catch (err) {
+    return { error: JSON.stringify({ success: false, error: `Refused URL: ${(err as Error).message}` }) };
+  }
+
   // Invariant 10: debit before the paid call, never after.
   // Tracked: the debit runs before the scrape (invariant 10), so the usage row is written not
   // knowing the outcome — and `ops.silent_zero` skips a row with no `metadata.success`. Without
@@ -100,10 +106,14 @@ export async function scrapeToMarkdown(
       return { error: JSON.stringify({ success: false, error: `Firecrawl error ${response.status}` }) };
     }
     const data = await response.json();
+    if (data?.success === false || !data?.data) {
+      await recordExternalServiceOutcome(supabase, usageLogId, false, 'Firecrawl returned no page');
+      return { error: JSON.stringify({ success: false, error: 'Firecrawl returned no page.' }) };
+    }
     await recordExternalServiceOutcome(supabase, usageLogId, true);
     return {
-      markdown: data.data?.markdown || '',
-      title: data.data?.metadata?.title || '',
+      markdown: data.data.markdown || '',
+      title: data.data.metadata?.title || '',
     };
   } catch (err) {
     clearTimeout(timeoutId);

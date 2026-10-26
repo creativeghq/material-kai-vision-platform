@@ -33533,6 +33533,102 @@
         }
       }
     },
+    "/enrich-draft-products": {
+      "post": {
+        "tags": [
+          "Warehouse"
+        ],
+        "summary": "Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from",
+        "operationId": "post_enrich_draft_products",
+        "description": "Reads only and spends nothing. For a document's draft products (or an explicit list) it returns, per product, the descriptive registry fields that are still empty and the URL we already hold (the product's own link, else its brand's site). Identity fields, cost fields and column-destined fields are never reported as gaps. A product with gaps and no URL is `gaps_no_source`, not a failure.\n\nThe caller must be allowed to publish a catalogue (`catalog.import` or `pricing.manage`) in the workspace; a document or workspace the caller cannot reach is 404.\n\n**Actions** (`action` in the body):\n- `report` — Readiness report (the only action so far)\n\n**Response:** `{ summary: { products, nothing_missing, gaps_with_source, gaps_no_source, unclassified }, products: [{ product_id, name, category, gaps, source, verdict }] }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "report"
+                        ],
+                        "description": "Readiness report (the only action so far)"
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/real-estate-owner": {
       "post": {
         "tags": [

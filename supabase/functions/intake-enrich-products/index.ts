@@ -27,6 +27,7 @@ import { resolveTokenPrice } from '../_shared/ai-logger.ts';
 
 const OP = 'intake_enrichment';
 const MAX_BATCH = 10;
+const MIN_PAGE_CHARS = 200;
 /** Below this the page is not confidently about this product, so nothing is written. */
 const MIN_CONFIDENCE = 0.5;
 const EXTRACTION_MODEL = 'claude-opus-5';
@@ -151,6 +152,10 @@ Deno.serve(withApiLogging('intake-enrich-products', async (req) => {
     const scraped = await scrapeToMarkdown(url, userId, workspaceId, OP);
     if ('error' in scraped) {
       await fail(p, `Could not read ${url}: ${String(scraped.error).slice(0, 300)}`);
+      continue;
+    }
+    if (scraped.markdown.trim().length < MIN_PAGE_CHARS) {
+      await fail(p, `Could not read ${url}: the page came back empty. That is a failed read, not a product with no facts.`);
       continue;
     }
 
