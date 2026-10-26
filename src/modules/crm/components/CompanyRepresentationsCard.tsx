@@ -33,9 +33,14 @@ interface Representation {
   agent: PartyRef | null;
   principal: PartyRef | null;
   contact: PersonRef | null;
+  category: { display_name: string | null; name: string } | null;
 }
+interface CategoryOption { id: string; label: string }
+
+const WHOLE_RANGE = 'all';
 
 const SELECT = `id, kind, territory, last_contact_on, notes, agent_company_id, principal_company_id,
+  category:material_categories(display_name, name),
   agent:crm_companies!crm_company_representations_agent_company_id_fkey(id, name, commercial_title, country_code, industry,
     people:crm_company_contacts(is_primary, contact:crm_contacts(id, name, email, phone, mobile, position))),
   principal:crm_companies!crm_company_representations_principal_company_id_fkey(id, name, commercial_title, country_code, industry),
@@ -96,6 +101,7 @@ function LastContactCell({ rep, last, onSaved, prefix }: {
 }
 
 const kindLabel = (k: RepresentationKind) => REPRESENTATION_KINDS.find((x) => x.value === k)?.label ?? k;
+const rangeLabel = (r: Representation) => (r.category ? r.category.display_name || r.category.name : null);
 const display = (p: PartyRef | null) => (p ? p.commercial_title || p.name : '—');
 const telHref = (n: string) => `tel:${n.replace(/[^\d+]/g, '')}`;
 /** The agency's other people, after the link's lead contact. */
@@ -131,11 +137,23 @@ function AddRepresentationDialog({ open, onOpenChange, side, companyId, workspac
   const [people, setPeople] = useState<PersonRef[]>([]);
   const [contactId, setContactId] = useState<string>('');
   const [kind, setKind] = useState<RepresentationKind>('agent');
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [categoryId, setCategoryId] = useState(WHOLE_RANGE);
   const [saving, setSaving] = useState(false);
   const agencyId = side === 'principal' ? companyId : picked?.id;
 
   useEffect(() => {
-    if (!open) { setQuery(''); setHits([]); setPicked(null); setContactId(''); setKind('agent'); }
+    if (!open) { setQuery(''); setHits([]); setPicked(null); setContactId(''); setKind('agent'); setCategoryId(WHOLE_RANGE); }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    void supabase.from('material_categories').select('id, name, display_name').eq('is_active', true).order('sort_order')
+      .then(({ data }) => {
+        if (live) setCategories((data ?? []).map((c) => ({ id: c.id, label: c.display_name || c.name })));
+      });
+    return () => { live = false; };
   }, [open]);
 
   useEffect(() => {
@@ -173,12 +191,13 @@ function AddRepresentationDialog({ open, onOpenChange, side, companyId, workspac
       principal_company_id: side === 'principal' ? picked.id : companyId,
       contact_id: contactId || null,
       kind,
+      material_category_id: categoryId === WHOLE_RANGE ? null : categoryId,
       territory: 'Greece',
       source: 'operator',
     });
     setSaving(false);
     if (error) {
-      toast({ title: 'Could not save the link', description: error.code === '23505' ? 'These two are already linked.' : getErrorMessage(error), variant: 'destructive' });
+      toast({ title: 'Could not save the link', description: error.code === '23505' ? 'These two are already linked for that range.' : getErrorMessage(error), variant: 'destructive' });
       return;
     }
     onOpenChange(false);
@@ -221,6 +240,17 @@ function AddRepresentationDialog({ open, onOpenChange, side, companyId, workspac
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>{REPRESENTATION_KINDS.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}</SelectContent>
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Range covered</Label>
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={WHOLE_RANGE}>Whole range</SelectItem>
+                {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">One factory can have a different agency for each range, such as air conditioning.</p>
           </div>
           {agencyId && (
             <div className="space-y-2">
@@ -335,6 +365,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                       <TableCell>
                         <HubCellLink to={`/crm/companies/${r.principal_company_id}`}>{display(r.principal)}</HubCellLink>
                         {r.kind !== 'agent' && <Badge variant="neutral" className="ml-2">{kindLabel(r.kind)}</Badge>}
+                        {rangeLabel(r) && <Badge variant="info" className="ml-2">{rangeLabel(r)}</Badge>}
                       </TableCell>
                       <TableCell>{r.principal?.country_code ?? '—'}</TableCell>
                       <TableCell className="max-w-[16rem] text-muted-foreground">{r.principal?.industry ?? '—'}</TableCell>
@@ -371,6 +402,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                   <div className="flex flex-wrap items-center gap-2">
                     <HubCellLink to={`/crm/companies/${r.agent_company_id}`}>{display(r.agent)}</HubCellLink>
                     <Badge variant="neutral">{kindLabel(r.kind)}{r.territory ? ` · ${r.territory}` : ''}</Badge>
+                    <Badge variant="info">{rangeLabel(r) ?? 'Whole range'}</Badge>
                   </div>
                   <PersonCell person={r.contact} />
                   {agencyPeople(r).map((p) => <PersonCell key={p.id} person={p} />)}

@@ -4527,6 +4527,7 @@ export type Database = {
           id: string
           kind: string
           last_contact_on: string | null
+          material_category_id: string | null
           notes: string | null
           principal_company_id: string
           source: string
@@ -4545,6 +4546,7 @@ export type Database = {
           id?: string
           kind?: string
           last_contact_on?: string | null
+          material_category_id?: string | null
           notes?: string | null
           principal_company_id: string
           source?: string
@@ -4563,6 +4565,7 @@ export type Database = {
           id?: string
           kind?: string
           last_contact_on?: string | null
+          material_category_id?: string | null
           notes?: string | null
           principal_company_id?: string
           source?: string
@@ -4585,6 +4588,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "crm_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "crm_company_representations_material_category_id_fkey"
+            columns: ["material_category_id"]
+            isOneToOne: false
+            referencedRelation: "material_categories"
             referencedColumns: ["id"]
           },
           {
