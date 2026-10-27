@@ -53,6 +53,7 @@ import { Product3DModelCard } from '@/components/features/products/Product3DMode
 import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
 import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
 import { ProductSceneCard } from '@/components/features/products/ProductSceneCard';
+import { Product3DVisualsSection } from '@/components/features/products/Product3DVisualsSection';
 import { ProductConfigurator } from '@/components/features/configurator/ProductConfigurator';
 import { ProductOptionsEditor } from '@/components/features/configurator/ProductOptionsEditor';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
@@ -2735,40 +2736,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             );
           })()}
 
-          {/* Readiness first (#341 join 5): it is the checklist for everything below it, and the
-              only surface that says a product needs a model before the SDK can carry it. */}
+          {/* Readiness, model, scene and texture are one block: with no model yet they collapse
+              into a single "3D & visuals" card instead of four empty ones. Own-workspace
+              products only; buyers of someone else's catalog see the viewer, not the upload. */}
           {isOwnProduct && activeWorkspaceId && (
             <div className="mt-6">
-              <ProductEmbedReadinessCard productId={product.id} />
-            </div>
-          )}
-
-          {/* 3D model management (#321) — own-workspace products only. Buyers of
-              someone else's catalog see the viewer, not the upload surface. */}
-          {isOwnProduct && activeWorkspaceId && (
-            <div className="mt-6">
-              <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
-            </div>
-          )}
-
-          {/* How it is lit and framed (#335). After the model and the texture, because it is the
-              setting you adjust once you can see something. */}
-          {isOwnProduct && activeWorkspaceId && (
-            <div className="mt-6">
-              <ProductSceneCard productId={product.id} workspaceId={activeWorkspaceId} />
-            </div>
-          )}
-
-          {/* Material texture (#321). Sits next to the model card because it is the answer for the
-              products that will never have geometry — a tile or a fabric IS the surface. */}
-          {isOwnProduct && activeWorkspaceId && (
-            <div className="mt-6">
-              <ProductMaterialMapsCard
-                productId={product.id}
-                workspaceId={activeWorkspaceId}
-                productName={product.name}
-                sourceImageUrl={images[0]?.url ?? null}
-              />
+              <Product3DVisualsSection productId={product.id}>
+                <div className="space-y-6">
+                  <ProductEmbedReadinessCard productId={product.id} />
+                  <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
+                  <ProductSceneCard productId={product.id} workspaceId={activeWorkspaceId} />
+                  <ProductMaterialMapsCard
+                    productId={product.id}
+                    workspaceId={activeWorkspaceId}
+                    productName={product.name}
+                    sourceImageUrl={images[0]?.url ?? null}
+                  />
+                </div>
+              </Product3DVisualsSection>
             </div>
           )}
 
