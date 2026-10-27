@@ -165,6 +165,45 @@ export const createPriceLookupTool = (
         if (manufacturer) queryParts.push(manufacturer);
         const query = queryParts.join(' ').trim();
 
+        let resolvedPrices: any[] = [];
+        let resolvedError: string | null = null;
+        if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+          try {
+            const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+            const { data: rrows, error: rerr } = await sb.rpc('resolve_purchase_prices', {
+              p_workspace_id: workspaceId,
+              p_query: [product_name, manufacturer, sku].filter(Boolean).join(' '),
+              p_limit: 8,
+            });
+            if (rerr) resolvedError = rerr.message;
+            else resolvedPrices = rrows ?? [];
+          } catch (e) {
+            resolvedError = e instanceof Error ? e.message : String(e);
+          }
+        }
+        const hasResolved = resolvedPrices.length > 0;
+        const resolvedGuidance = hasResolved
+          ? [
+              'RESOLVED PRICES (derived in SQL from the structured price store — use these numbers verbatim, never recompute):',
+              '- status purchase_price / discount_applied: final_net and final_gross are what we pay. Quote them as is and name the supplier, list and price_label.',
+              '- status list_price_conditional_rule or list_price_no_rule: the printed price is a LIST price. Do NOT present it as the purchase price. Show conditional_options (each with its own condition and net_if_applied) and say which condition decides it; if the same supplier has a purchase_price row for the same item, that row wins.',
+              '- Always repeat the warnings array to the admin.',
+            ].join('\n')
+          : null;
+
+        const kbFailure = (msg: string): string =>
+          hasResolved
+            ? JSON.stringify({
+                success: true,
+                kb_search_error: msg,
+                query_used: query,
+                matches: [],
+                resolved_prices: resolvedPrices,
+                resolved_prices_error: resolvedError,
+                guidance: resolvedGuidance,
+              })
+            : JSON.stringify({ success: false, error: msg, matches: [] });
+
         const body: Record<string, any> = {
           query,
           workspace_id: workspaceId,
@@ -197,11 +236,7 @@ export const createPriceLookupTool = (
           if (!response.ok) {
             const errorText = await response.text();
             console.error(`price_lookup: KB search failed: ${response.status} ${errorText}`);
-            return JSON.stringify({
-              success: false,
-              error: `Knowledge Base search failed (${response.status}). Cannot determine price.`,
-              matches: [],
-            });
+            return kbFailure(`Knowledge Base search failed (${response.status}). Cannot determine price from documents.`);
           }
 
           data = await response.json();
@@ -209,20 +244,12 @@ export const createPriceLookupTool = (
           const kbBranch = data?.search_metadata?.branch_status?.kb_docs;
           if (typeof kbBranch === 'string' && kbBranch.startsWith('failed')) {
             console.error(`price_lookup: kb_docs branch failed: ${kbBranch}`);
-            return JSON.stringify({
-              success: false,
-              error: `Knowledge Base search failed (${kbBranch.slice(0, 120)}). This is an error, not "no price on file" — retry before telling the user nothing exists.`,
-              matches: [],
-            });
+            return kbFailure(`Knowledge Base search failed (${kbBranch.slice(0, 120)}). This is an error, not "no price on file" — retry before telling the user nothing exists.`);
           }
         } catch (fetchErr) {
           clearTimeout(timeoutId);
           const isAbort = fetchErr instanceof Error && fetchErr.name === 'AbortError';
-          return JSON.stringify({
-            success: false,
-            error: isAbort ? 'Price lookup timed out.' : `Network error: ${String(fetchErr)}`,
-            matches: [],
-          });
+          return kbFailure(isAbort ? 'Price lookup timed out.' : `Network error: ${String(fetchErr)}`);
         }
 
         // Procurement cost lists feed products.cost; they are confidential and are not a quote price.
@@ -317,11 +344,12 @@ export const createPriceLookupTool = (
               '9. If you cannot determine a reliable price, set confidence="low" and ask the admin to confirm or enter manually.',
             ];
 
-        const guidance = matches.length === 0 && !hasCustomerDiscount
+        const guidance = matches.length === 0 && !hasCustomerDiscount && !hasResolved
           ? 'No matching price documents found and no customer discount on file. Respond: "No pricing information found in the Knowledge Base for this product. Please enter price manually."'
           : matches.length === 0 && hasCustomerDiscount
             ? `No KB price documents matched, but ${customerDiscount!.name} has a ${customerDiscount!.discount_percent}% discount on file. Without a list price you cannot compute a final price. Respond: "No catalog price found in the Knowledge Base — please enter the list price manually. I will apply the ${customerDiscount!.discount_percent}% customer discount on top." Emit confidence="low".`
             : [
+                resolvedGuidance,
                 'Compose a reasoning chain using the matches below.',
                 customerLine,
                 'Steps:',
@@ -335,6 +363,8 @@ export const createPriceLookupTool = (
           success: true,
           query_used: query,
           matches,
+          resolved_prices: resolvedPrices,
+          resolved_prices_error: resolvedError,
           hints,
           guidance,
           customer_discount: customerDiscount,
