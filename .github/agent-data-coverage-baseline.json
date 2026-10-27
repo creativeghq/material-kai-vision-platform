@@ -101,6 +101,7 @@
     "list_granted_catalog_products",
     "list_supplier_products",
     "list_workspace_product_suppliers",
+    "price_supplier_hints",
     "record_payment_fx",
     "refund_credits",
     "resolve_campaign_audience",
