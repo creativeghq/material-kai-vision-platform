@@ -29,6 +29,15 @@ describe('price_lookup → SQL resolver', () => {
     expect(TOOLS).toMatch(/from\('kb_price_rows'\)\s*\.select\('kb_doc_id, doc_slug'\)/);
   });
 
+  it('a supplier named with no matching item answers with that supplier\'s product lines, never a guessed price', () => {
+    expect(TOOLS).toMatch(/rpc\('price_supplier_hints'/);
+    expect(TOOLS).toMatch(/supplier_product_lines:/);
+    const SEARCH = stripComments(
+      readFileSync(join(__dirname, '..', '..', 'supabase/functions/_shared/tools/search-tools.ts'), 'utf8').replace(/\r\n/g, '\n'),
+    );
+    expect(SEARCH).toMatch(/rpc\('price_supplier_hints'/);
+  });
+
   it('a price question to knowledge_base_search is answered from the same resolver, admin only', () => {
     const SEARCH = stripComments(
       readFileSync(join(__dirname, '..', '..', 'supabase/functions/_shared/tools/search-tools.ts'), 'utf8').replace(/\r\n/g, '\n'),

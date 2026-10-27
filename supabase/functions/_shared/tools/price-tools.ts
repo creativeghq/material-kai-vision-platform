@@ -167,6 +167,7 @@ export const createPriceLookupTool = (
 
         let resolvedPrices: any[] = [];
         let resolvedError: string | null = null;
+        let supplierLines: any[] = [];
         if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
           try {
             const sb = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -177,6 +178,10 @@ export const createPriceLookupTool = (
             });
             if (rerr) resolvedError = rerr.message;
             else resolvedPrices = rrows ?? [];
+            if (!rerr && resolvedPrices.length === 0) {
+              const { data: sh } = await sb.rpc('price_supplier_hints', { p_workspace_id: workspaceId, p_query: [product_name, manufacturer, sku].filter(Boolean).join(' ') });
+              supplierLines = sh ?? [];
+            }
           } catch (e) {
             resolvedError = e instanceof Error ? e.message : String(e);
           }
@@ -391,6 +396,10 @@ export const createPriceLookupTool = (
           matches,
           resolved_prices: resolvedPrices,
           resolved_prices_error: resolvedError,
+          supplier_product_lines: supplierLines.length > 0 ? supplierLines : undefined,
+          supplier_product_lines_note: supplierLines.length > 0
+            ? 'The query names a supplier but no price row matched the other words. Do NOT guess a price: list these product lines and ask which product (name or size) is meant.'
+            : undefined,
           hints,
           guidance,
           customer_discount: customerDiscount,
