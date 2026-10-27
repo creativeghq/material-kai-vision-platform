@@ -48,4 +48,12 @@ suite('resolve_purchase_prices · golden items against the live price store', ()
     const rows = await resolve('Mitsubishi FDU 71 VH FDC 71 VNP-W');
     expect(rows.some((r) => /FDU 71 VH/.test(r.item_text) && Number(r.final_gross) === 1715)).toBe(true);
   });
+
+  it.each(['FDU71', 'FDU 71', '71FDU', '71 FDU', 'Mitsibushi 71 FDU', 'mitsubishi fdu71'])(
+    'the same unit is found however "%s" is spelled',
+    async (q) => {
+      const rows = await resolve(q, 5);
+      expect(rows.some((r) => /FDU 71 VH/.test(r.item_text) && Number(r.final_gross) === 1715)).toBe(true);
+    },
+  );
 });
