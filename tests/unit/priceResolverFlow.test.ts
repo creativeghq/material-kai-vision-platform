@@ -24,4 +24,13 @@ describe('price_lookup → SQL resolver', () => {
   it('a list price is never presented as the purchase price', () => {
     expect(LOOKUP).toMatch(/Do NOT present it as the purchase price/);
   });
+
+  it('a price question to knowledge_base_search is answered from the same resolver, admin only', () => {
+    const SEARCH = stripComments(
+      readFileSync(join(__dirname, '..', '..', 'supabase/functions/_shared/tools/search-tools.ts'), 'utf8').replace(/\r\n/g, '\n'),
+    );
+    const block = SEARCH.slice(SEARCH.indexOf("rpc('resolve_purchase_prices'") - 400, SEARCH.indexOf("rpc('resolve_purchase_prices'") + 200);
+    expect(block).toMatch(/if \(isAdmin && /);
+    expect(SEARCH).toMatch(/resolved_prices_note/);
+  });
 });

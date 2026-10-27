@@ -762,6 +762,33 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
             }
           }
 
+          // A supplier price question is answered from the structured price store, in SQL, not
+          // from document text: the agent only presents the numbers. Admin only, like the pricing
+          // category itself.
+          if (isAdmin && (categorySlug === 'pricing' || /(price|prices|pricing|cost|discount)|τιμ|έκπτωση|κόστος|€/i.test(query))) {
+            try {
+              const { data: priced, error: pricedErr } = await supabase.rpc('resolve_purchase_prices', {
+                p_workspace_id: workspaceId,
+                p_query: query,
+                p_limit: 6,
+              });
+              if (pricedErr) {
+                console.warn('[knowledge_base_search] resolve_purchase_prices failed:', pricedErr.message);
+              } else if (priced && priced.length > 0) {
+                results.found = true;
+                (results as Record<string, unknown>).resolved_prices = priced.map((r: any) => ({
+                  supplier: r.supplier, item: r.item_text, price_label: r.price_label, unit: r.unit, currency: r.currency,
+                  list_of: r.effective_date, status: r.status, printed_net: r.printed_net, final_net: r.final_net,
+                  final_gross: r.final_gross, vat_rate: r.vat_rate, options: r.conditional_options, warnings: r.warnings, doc_id: r.doc_id,
+                }));
+                (results as Record<string, unknown>).resolved_prices_note =
+                  'resolved_prices are calculated in SQL from the structured price rows and supplier rules: quote final_net / final_gross verbatim, never compute a discount yourself. status purchase_price or discount_applied is what we pay; list_price_* means the printed figure is only a LIST price - show the options with their conditions and do not present it as the purchase price. Repeat the warnings.';
+              }
+            } catch (e) {
+              console.warn('[knowledge_base_search] resolve_purchase_prices threw:', e);
+            }
+          }
+
           // Same reason as material_search: an empty KB and an unlucky query look identical,
           // and only one of them is worth rewording. 677 published docs sat behind a search the
           // agent had already given up on.
