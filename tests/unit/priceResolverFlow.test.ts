@@ -25,6 +25,10 @@ describe('price_lookup → SQL resolver', () => {
     expect(LOOKUP).toMatch(/Do NOT present it as the purchase price/);
   });
 
+  it('a cited source stays verifiable from the price rows after the documents are deleted', () => {
+    expect(TOOLS).toMatch(/from\('kb_price_rows'\)\s*\.select\('kb_doc_id, doc_slug'\)/);
+  });
+
   it('a price question to knowledge_base_search is answered from the same resolver, admin only', () => {
     const SEARCH = stripComments(
       readFileSync(join(__dirname, '..', '..', 'supabase/functions/_shared/tools/search-tools.ts'), 'utf8').replace(/\r\n/g, '\n'),

@@ -473,6 +473,17 @@ export const createSubmitPriceProposalTool = (
             .eq('workspace_id', workspaceId)
             .in('id', ids);
           docs = data ?? [];
+          const missing = ids.filter((id) => !docs.some((d) => d.id === id));
+          if (missing.length > 0) {
+            const { data: rows } = await supabase
+              .from('kb_price_rows')
+              .select('kb_doc_id, doc_slug')
+              .eq('workspace_id', workspaceId)
+              .in('kb_doc_id', missing)
+              .limit(200);
+            const bySrc = new Map((rows ?? []).map((r: any) => [r.kb_doc_id, r.doc_slug]));
+            for (const [id, slug] of bySrc) docs.push({ id, title: slug, status: 'published', price_doc_type: null, metadata: { retrieval: 'structured' } });
+          }
         }
         if (docs.length < ids.length) warn.push(`${ids.length - docs.length} cited source document(s) were not found in this workspace and were dropped.`);
         if (docs.some((d) => d.price_doc_type === 'supplier_cost_list')) {
