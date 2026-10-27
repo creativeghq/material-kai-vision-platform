@@ -188,9 +188,35 @@ export const createPriceLookupTool = (
               '- status purchase_price / discount_applied: final_net and final_gross are what we pay. Quote them as is and name the supplier, list and price_label.',
               '- status list_price_conditional_rule or list_price_no_rule: the printed price is a LIST price. Do NOT present it as the purchase price. Show conditional_options (each with its own condition and net_if_applied) and say which condition decides it; if the same supplier has a purchase_price row for the same item, that row wins.',
               '- Always repeat the warnings array to the admin.',
+              '- When you call submit_price_proposal, cite resolved_prices[].doc_id in source_doc_ids.',
             ].join('\n')
           : null;
 
+        if (hasResolved) {
+          onChunk?.({
+            type: 'price_resolution',
+            workspace_id: workspaceId,
+            rows: resolvedPrices.slice(0, 5).map((r: any) => ({
+              row_id: r.row_id,
+              doc_id: r.doc_id,
+              supplier: r.supplier,
+              item_text: r.item_text,
+              price_label: r.price_label,
+              unit: r.unit,
+              currency: r.currency,
+              effective_date: r.effective_date,
+              price_role: r.price_role,
+              printed_net: r.printed_net,
+              final_net: r.final_net,
+              final_gross: r.final_gross,
+              vat_rate: r.vat_rate,
+              status: r.status,
+              warnings: r.warnings,
+              conditional_options: r.conditional_options,
+            })),
+            timestamp: Date.now(),
+          });
+        }
         const kbFailure = (msg: string): string =>
           hasResolved
             ? JSON.stringify({
@@ -457,7 +483,7 @@ export const createSubmitPriceProposalTool = (
           confidenceOut = 'low';
           warn.push('No verifiable source document is cited - confirm the price manually.');
         }
-        if (docs.some((d) => d.status !== 'published')) {
+        if (docs.some((d) => d.status !== 'published' && d?.metadata?.retrieval !== 'structured')) {
           capAtMedium();
           warn.push('A cited source document is not published (archived or draft) - it may be outdated.');
         }

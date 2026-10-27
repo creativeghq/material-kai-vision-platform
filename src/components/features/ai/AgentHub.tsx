@@ -586,6 +586,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   // Misc
   price_lookup_matches: 'Price lookup matches',
   price_proposal: 'Price proposal',
+  price_resolution: 'Price and calculation options',
   project_created: 'Project created',
   // video_generated is intentionally NOT here — it has a dedicated handler that maps it into the
   // rich <video> player card (videoData). Registering it would make the generic card shadow that.

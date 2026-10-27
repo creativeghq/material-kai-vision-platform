@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, FileText, Globe2, Loader2, Sparkles, X, Zap } from 'lucide-react';
 
 import { MarketPanel } from './MarketPanel';
+import { PriceResolutionCard, type ResolutionPick, type ResolutionRow } from './PriceResolutionCard';
 import { marketCheck, type MarketCheckResponse } from '@/services/priceMonitoringApi';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
@@ -149,6 +150,8 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
   const [status, setStatus] = useState<string>('');
   const [matches, setMatches] = useState<PriceLookupMatch[]>([]);
   const [proposal, setProposal] = useState<PriceProposal | null>(null);
+  const [resolution, setResolution] = useState<{ rows: ResolutionRow[]; workspaceId: string } | null>(null);
+  const [resolutionPick, setResolutionPick] = useState<ResolutionPick | null>(null);
   const [agentText, setAgentText] = useState('');
   const [priceLookupCallId, setPriceLookupCallId] = useState<string | null>(null);
   const [finalPrice, setFinalPrice] = useState<string>('');
@@ -168,6 +171,8 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
     setStatus('');
     setMatches([]);
     setProposal(null);
+    setResolution(null);
+    setResolutionPick(null);
     setAgentText('');
     setPriceLookupCallId(null);
     setFinalPrice('');
@@ -347,6 +352,11 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
             case 'price_lookup_matches':
               if (Array.isArray(chunk.matches)) setMatches(chunk.matches);
               break;
+            case 'price_resolution':
+              if (Array.isArray(chunk.rows) && typeof chunk.workspace_id === 'string') {
+                setResolution({ rows: chunk.rows, workspaceId: chunk.workspace_id });
+              }
+              break;
             case 'price_proposal':
               setProposal(chunk as PriceProposal);
               if (chunk.final_unit_price != null) setFinalPrice(String(chunk.final_unit_price));
@@ -480,7 +490,9 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
       const proposalList = proposal?.list_price != null ? Number(proposal.list_price) : null;
       const list_price = proposalList != null && proposalList > parsedPrice ? proposalList : null;
 
-      const source_doc_ids = proposal?.source_doc_ids || matches.map((m) => m.doc_id).filter((id): id is string => !!id);
+      const source_doc_ids = resolutionPick?.doc_id
+        ? [resolutionPick.doc_id]
+        : proposal?.source_doc_ids || matches.map((m) => m.doc_id).filter((id): id is string => !!id);
       // Provenance tag for audit. Shape: kb:<mode>:<linkId>
       //   AI mode → kb:ai:<agent_tool_call_logs.id>
       //   Quick   → kb:quick:<first_doc_id>  (no agent call to link to)
@@ -683,6 +695,21 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
                     ? parsedPrice
                     : null
               }
+            />
+          )}
+
+          {resolution && resolution.rows.length > 0 && (
+            <PriceResolutionCard
+              rows={resolution.rows}
+              workspaceId={resolution.workspaceId}
+              onUse={(pick) => {
+                setResolutionPick(pick);
+                setFinalPrice(String(pick.value));
+                setFinalCurrency(pick.currency);
+                if (pick.unit) setFinalUnit(pick.unit);
+                setFinalDiscount('');
+                setNotes(`${pick.basis === 'gross' ? 'Incl. VAT' : 'Net'}: ${pick.summary}`);
+              }}
             />
           )}
 

@@ -269,6 +269,7 @@ const RESULT_TYPE_ROW_KIND: Record<string, RecordKind> = {
   mydata_expense_documents: 'inbound_document',
   mydata_expense_suppliers: 'company',
   price_lookup_matches: 'product',
+  price_resolution: 'product',
   find_products_by_spec_result: 'product',
   related_products_result: 'product',
   products_in_project_result: 'product',
