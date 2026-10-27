@@ -205,6 +205,16 @@ export const createPriceLookupTool = (
           }
 
           data = await response.json();
+
+          const kbBranch = data?.search_metadata?.branch_status?.kb_docs;
+          if (typeof kbBranch === 'string' && kbBranch.startsWith('failed')) {
+            console.error(`price_lookup: kb_docs branch failed: ${kbBranch}`);
+            return JSON.stringify({
+              success: false,
+              error: `Knowledge Base search failed (${kbBranch.slice(0, 120)}). This is an error, not "no price on file" — retry before telling the user nothing exists.`,
+              matches: [],
+            });
+          }
         } catch (fetchErr) {
           clearTimeout(timeoutId);
           const isAbort = fetchErr instanceof Error && fetchErr.name === 'AbortError';
