@@ -737,13 +737,15 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from",
-    "description": "Reads only and spends nothing. For a document's draft products (or an explicit list) it returns, per product, the descriptive registry fields that are still empty and the URL we already hold (the product's own link, else its brand's site). Identity fields, cost fields and column-destined fields are never reported as gaps. A product with gaps and no URL is `gaps_no_source`, not a failure.\n\nThe call",
+    "summary": "Fill the empty fields of draft catalogue products from a page we already hold: readiness report, enrichment run, and the latest outcome per product",
+    "description": "`report` reads only and spends nothing: per draft product, the descriptive registry fields still empty and the URL we already hold (the product's own link, else its brand's site). Identity, cost and column-destined fields are never gaps. A product with gaps and no URL is `gaps_no_source`, not a failure.\n\n`run` (up to 3 products per call) reads the held page, extracts only the missing fields with a",
     "fields": {
       "action": {
         "type": "string",
         "enum": [
-          "report"
+          "report",
+          "run",
+          "status"
         ],
         "required": true,
         "description": "Which operation to run"

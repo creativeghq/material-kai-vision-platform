@@ -33538,9 +33538,9 @@
         "tags": [
           "Warehouse"
         ],
-        "summary": "Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from",
+        "summary": "Fill the empty fields of draft catalogue products from a page we already hold: readiness report, enrichment run, and the latest outcome per product",
         "operationId": "post_enrich_draft_products",
-        "description": "Reads only and spends nothing. For a document's draft products (or an explicit list) it returns, per product, the descriptive registry fields that are still empty and the URL we already hold (the product's own link, else its brand's site). Identity fields, cost fields and column-destined fields are never reported as gaps. A product with gaps and no URL is `gaps_no_source`, not a failure.\n\nThe caller must be allowed to publish a catalogue (`catalog.import` or `pricing.manage`) in the workspace; a document or workspace the caller cannot reach is 404.\n\n**Actions** (`action` in the body):\n- `report` — Readiness report (the only action so far)\n\n**Response:** `{ summary: { products, nothing_missing, gaps_with_source, gaps_no_source, unclassified }, products: [{ product_id, name, category, gaps, source, verdict }] }`",
+        "description": "`report` reads only and spends nothing: per draft product, the descriptive registry fields still empty and the URL we already hold (the product's own link, else its brand's site). Identity, cost and column-destined fields are never gaps. A product with gaps and no URL is `gaps_no_source`, not a failure.\n\n`run` (up to 3 products per call) reads the held page, extracts only the missing fields with a quote for each, and keeps a value only if the quote is on the page, the page names this exact product, and the registry's type, options and unit accept it. Accepted values are written into empty `metadata` keys of a DRAFT product only, then the product is re-canonicalized and its search embedding rebuilt. Nothing is published. The claims are saved before the work is billed to its end, so a retry resumes at the first step that did not finish and never reads or charges twice. Refused with 409 while the catalogue's import job is still running.\n\n`status` returns the latest attempt per product.\n\nThe caller must be allowed to publish a catalogue (`catalog.import` or `pricing.manage`) in the workspace; a document or workspace the caller cannot reach is 404.\n\n**Actions** (`action` in the body):\n- `report` — Readiness report and a credit estimate (spends nothing)\n- `run` — Enrich up to 3 draft products (send product_ids)\n- `status` — Latest enrichment attempt per product (send product_ids)\n\n**Response:** `report: { summary, products, estimate: { products_to_read, credits_ceiling } }. run: { ok, results: [{ product_id, status, reason?, fields? }] }. status: { attempts: [{ product_id, status, reason, promoted_fields, canonicalization_state, embedding_state }] }`",
         "security": [
           {
             "supabaseJwt": []
@@ -33615,7 +33615,37 @@
                         "enum": [
                           "report"
                         ],
-                        "description": "Readiness report (the only action so far)"
+                        "description": "Readiness report and a credit estimate (spends nothing)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "run"
+                        ],
+                        "description": "Enrich up to 3 draft products (send product_ids)"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "status"
+                        ],
+                        "description": "Latest enrichment attempt per product (send product_ids)"
                       }
                     }
                   }

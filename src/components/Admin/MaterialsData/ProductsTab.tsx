@@ -14,7 +14,8 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/core/ui/badge';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { publishProducts, publishCatalogue, productStatusBadge } from '@/services/productPublishService';
-import { fetchEnrichmentReport, describeReport } from '@/services/productEnrichmentService';
+import { fetchEnrichmentStatus, ATTEMPT_LABEL, type EnrichmentAttempt } from '@/services/productEnrichmentService';
+import { EnrichCatalogueDialog } from './EnrichCatalogueDialog';
 import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/core/filters';
 import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
@@ -81,7 +82,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const [totalCount, setTotalCount] = useState(0);
   const [reembeddingId, setReembeddingId] = useState<string | null>(null);
   const [publishingKey, setPublishingKey] = useState<string | null>(null);
-  const [checkingDocId, setCheckingDocId] = useState<string | null>(null);
+  const [enrichDocId, setEnrichDocId] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState<Map<string, EnrichmentAttempt>>(new Map());
   const [readiness, setReadiness] = useState<Map<string, ProductEmbedReadiness>>(new Map());
   const { toast } = useToast();
 
@@ -141,6 +143,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
       readinessFor(rows.map((p) => p.id))
         .then(setReadiness)
         .catch(() => setReadiness(new Map()));
+      fetchEnrichmentStatus(workspaceId, rows.filter((p) => p.status === 'draft').map((p) => p.id))
+        .then(setAttempts)
+        .catch(() => setAttempts(new Map()));
     } catch (error) {
       console.error('Failed to load products:', error);
       toast({
@@ -151,7 +156,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
     } finally {
       setIsLoading(false);
     }
-  }, [buildQuery, filterValues, toast]);
+  }, [buildQuery, filterValues, toast, workspaceId]);
 
   useEffect(() => { setCurrentPage(1); }, [filterValues]);
 
@@ -229,22 +234,6 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
   const handlePublishCatalogue = (sourceDocumentId: string) => {
     if (!confirm('Publish every draft product from this catalogue? They become visible on public surfaces.')) return;
     void runPublish(`doc:${sourceDocumentId}`, () => publishCatalogue(workspaceId, sourceDocumentId));
-  };
-
-  const handleCheckGaps = async (sourceDocumentId: string) => {
-    setCheckingDocId(sourceDocumentId);
-    try {
-      const report = await fetchEnrichmentReport(workspaceId, sourceDocumentId);
-      toast({ title: 'Catalogue readiness', description: describeReport(report) });
-    } catch (error) {
-      toast({
-        title: 'Could not check this catalogue',
-        description: error instanceof Error ? error.message : 'The gap report failed',
-        variant: 'destructive',
-      });
-    } finally {
-      setCheckingDocId(null);
-    }
   };
 
   const hasActiveFilters = Object.values(filterValues).some((v) =>
@@ -365,6 +354,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                   <TableHead>Category</TableHead>
                   <TableHead>Manufacturer</TableHead>
                   <TableHead>Embedding</TableHead>
+                  <TableHead>Web enrichment</TableHead>
                   <TableHead>Sellable online</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -431,6 +421,14 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                         </div>
                       )}
                     </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const a = attempts.get(product.id);
+                        if (!a) return <span className="text-xs text-muted-foreground">—</span>;
+                        const label = ATTEMPT_LABEL[a.status] ?? { label: a.status, tone: 'neutral' as const };
+                        return <Badge variant={label.tone} title={a.reason ?? undefined}>{label.label}</Badge>;
+                      })()}
+                    </TableCell>
                     {/* #341 join 5 — the same derived answer the product panel shows, so a catalogue
                         can be scanned for what is missing instead of opened one product at a time.
                         Plain coloured words, never a filled pill (design system). */}
@@ -472,10 +470,9 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                             size="sm"
                             title="Check which fields are still empty in this catalogue"
                             aria-label="Check this catalogue for empty fields"
-                            disabled={checkingDocId !== null}
-                            onClick={() => { void handleCheckGaps(product.source_document_id); }}
+                            onClick={() => setEnrichDocId(product.source_document_id)}
                           >
-                            {checkingDocId === product.source_document_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardCheck className="h-4 w-4" />}
+                            <ClipboardCheck className="h-4 w-4" />
                           </Button>
                         )}
                         {product.status === 'draft' && product.source_document_id && (
@@ -525,6 +522,13 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
           )}
         </CardContent>
       </Card>
+
+      <EnrichCatalogueDialog
+        workspaceId={workspaceId}
+        documentId={enrichDocId}
+        onClose={() => setEnrichDocId(null)}
+        onFinished={() => { void loadProducts(currentPage); }}
+      />
 
       {selectedProduct && (
         <ProductDetailModal

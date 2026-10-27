@@ -62,7 +62,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'email-contacts-sync-cron', label: 'email-contacts-sync-cron', sublabel: 'Daily cron: push CRM contacts to each workspace\'s Resend audience' },
   { id: 'email-unsubscribe', label: 'email-unsubscribe', sublabel: 'Public one-click marketing email opt-out (RFC 8058 List-Unsubscribe).' },
   { id: 'email-webhooks', label: 'email-webhooks', sublabel: 'Receives Resend delivery event webhooks and updates email_logs.' },
-  { id: 'enrich-draft-products', label: 'enrich-draft-products', sublabel: 'Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from' },
+  { id: 'enrich-draft-products', label: 'enrich-draft-products', sublabel: 'Fill the empty fields of draft catalogue products from a page we already hold: readiness report, enrichment run, latest outcome per product' },
   { id: 'finance-categorize-expenses', label: 'finance-categorize-expenses', sublabel: 'Propose an expense category per supplier, and apply the ones you confirm' },
   { id: 'finance-customer-documents', label: 'finance-customer-documents', sublabel: 'Customer self-service view of their own invoices, receipts and orders' },
   { id: 'finance-document-link', label: 'finance-document-link', sublabel: 'Redirects a document token to a freshly signed link to the PDF.' },

@@ -414,7 +414,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `enrich-draft-products` | JWT | Readiness report for draft catalogue products: which registry fields are empty and whether we hold a URL to read them from |
+| `enrich-draft-products` | JWT | Fill the empty fields of draft catalogue products from a page we already hold: readiness report, enrichment run, and the latest outcome per product |
 | `intake-enrich-products` | JWT / kai_* | Drain the products intake marked for enrichment, from a URL we already hold |
 | `ontology-propose-targets` | JWT / kai_* | Propose a target for the invoice terms the ontology cannot resolve |
 
