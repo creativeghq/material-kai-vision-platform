@@ -8,6 +8,7 @@ import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { supabase } from '@/integrations/supabase/client';
+import { formatMoney } from '@/utils/decimal';
 
 export interface ResolutionOption {
   rule_id: number;
@@ -58,8 +59,8 @@ interface Computed {
   base_is_list: boolean;
 }
 
-const money = (n: number | string | null | undefined) =>
-  n == null || n === '' ? '—' : Number(n).toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const amount = (n: number | string | null | undefined, currency: string | null | undefined) =>
+  n == null || n === '' ? '—' : formatMoney(Number(n), currency || 'EUR');
 
 const optionLabel = (o: ResolutionOption) => {
   const p = o.percents.map((x) => `${o.kind === 'surcharge' ? '+' : '−'}${x}%`).join(' then ');
@@ -153,7 +154,7 @@ const RowCard: React.FC<{
         {isList && (
           <div className="space-y-2">
             <div className="text-xs text-muted-foreground">
-              Printed list price {money(row.printed_net)} {row.currency || 'EUR'}. Choose what applies to this order:
+              Printed list price {amount(row.printed_net, row.currency)}. Choose what applies to this order:
             </div>
             {options.length === 0 && (
               <div className="text-xs text-muted-foreground">No discount rule is on file for this item — confirm the price manually.</div>
@@ -182,11 +183,11 @@ const RowCard: React.FC<{
         <div className="grid grid-cols-2 gap-2 text-sm">
           <div>
             <div className="text-xs text-muted-foreground">Net (ex VAT)</div>
-            <div className="font-medium tabular-nums">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : money(net)} {row.currency || 'EUR'}</div>
+            <div className="font-medium tabular-nums">{busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : amount(net, row.currency)}</div>
           </div>
           <div>
             <div className="text-xs text-muted-foreground">Incl. VAT{row.vat_rate != null ? ` ${Number(row.vat_rate)}%` : ''}</div>
-            <div className="font-medium tabular-nums">{busy ? '…' : money(gross)} {row.currency || 'EUR'}</div>
+            <div className="font-medium tabular-nums">{busy ? '…' : amount(gross, row.currency)}</div>
           </div>
         </div>
 
