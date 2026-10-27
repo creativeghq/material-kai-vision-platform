@@ -38,7 +38,17 @@ import { ProductStockPanel } from '@/components/business/marketplace/ProductStoc
 import { ProductServiceDefaultsPanel } from '@/components/features/products/ProductServiceDefaultsPanel';
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
-import { toMillimetres, formatDimensionsMm, pickPackagingValue } from './productDisplayUnits';
+import { pickPackagingValue } from './productDisplayUnits';
+import {
+  numericSet,
+  formatRange,
+  summariseSkuMap,
+  isNoiseSpecKey,
+  isContactKey,
+  complianceFlagLabel,
+  isAffirmative,
+  DIMENSION_KEYS,
+} from './productSpecDisplay';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
 import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
 import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
@@ -1169,12 +1179,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     }
     return [];
   };
+  const complianceFlagChips: string[] = (() => {
+    const out: string[] = [];
+    for (const bag of [complianceData, allData] as Array<Record<string, unknown> | undefined>) {
+      for (const [k, v] of Object.entries(bag || {})) {
+        const label = complianceFlagLabel(k);
+        if (label && isAffirmative(v)) out.push(label);
+      }
+    }
+    return out;
+  })();
   const certList: string[] = (() => {
     const candidates: string[] = [
       ...extractCertList(complianceData?.certifications),
       ...extractCertList(allData?.certifications),
       ...extractCertList(complianceData?.standards),
       ...extractCertList(allData?.standards),
+      ...complianceFlagChips,
     ];
     const seen = new Set<string>();
     const out: string[] = [];
@@ -1474,6 +1495,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'extraction_timestamp', 'extraction_method', 'confidence_scores',
     'source_page', 'chunk_index', 'product_name', 'name', 'description',
     'long_description', 'image_url', 'images', 'vision_confidence',
+    // Dimensions card
+    ...DIMENSION_KEYS,
   ]);
 
   // Look up a registry field key across the top-level metadata and every known
@@ -1527,7 +1550,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           DialogContent is display:grid with an auto column that otherwise sizes
           to max-content and overflows on mobile); min-w-0 lets children shrink
           and wrap. Tighter padding on mobile. */}
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto overflow-x-hidden grid-cols-1 [&>*]:min-w-0 p-4 sm:p-6">
+      <DialogContent className="max-w-[min(96vw,88rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden grid-cols-1 [&>*]:min-w-0 p-4 sm:p-6">
         {/* Header with Factory/Brand Info + Quick Actions.
             Quote-based platform — no pricing/stock shown. Action buttons live
             in the header so users can quote / save from the first screen. */}
@@ -1622,7 +1645,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         {/* Tabs — end-users see Details / Knowledge / Related.
             Admins additionally see Monitoring / SEO / Pricing after those. */}
         <Tabs defaultValue="details" className="mt-6">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-5 bg-transparent p-0 border-b border-border tabs-underline">
+          <TabsList className="w-full h-auto flex-nowrap justify-start gap-3 overflow-x-auto bg-transparent p-0 border-b border-border tabs-underline [&>*]:shrink-0 [&>*]:whitespace-nowrap">
             {/* End-user tabs (always visible) */}
             <TabsTrigger value="details" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
@@ -2029,20 +2052,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 }
               }
 
-              // Dimensions — shown for non-tile categories that have W/H/D
-              if (uploadCat !== 'tiles' && uploadCat !== 'wood') {
-                const dims = formatDimensionsMm({
-                  w: toMillimetres(allData?.width_mm),
-                  h: toMillimetres(allData?.height_mm),
-                  d: toMillimetres(allData?.depth_mm),
-                });
-                const diamMm = toMillimetres(allData?.diameter_mm);
-                const weightVal = tryExtract(allData?.weight_kg);
-                if (dims) categorySpecRows.push({ label: 'Dimensions', value: dims });
-                if (diamMm !== null) categorySpecRows.push({ label: 'Diameter', value: `${diamMm} mm` });
-                if (weightVal) categorySpecRows.push({ label: 'Weight', value: `${weightVal} kg` });
-              }
-
               // Designer — universal but only if present
               if (Array.isArray(designData?.designers) && designData.designers.length > 0) {
                 categorySpecRows.push({ label: 'Designer', value: designData.designers.join(', ') });
@@ -2414,7 +2423,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it.
-          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial']);
+          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial', 'dimensions']);
+          const CERT_OWNED_KEYS = new Set(['certifications', 'standards']);
           const registrySectionCards = registrySections
             .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))
             .map(section => {
@@ -2426,10 +2436,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   consumedKeys.add(field.key);
                   continue;
                 }
+                if (CERT_OWNED_KEYS.has(field.key) || complianceFlagLabel(field.key)) {
+                  consumedKeys.add(field.key);
+                  continue;
+                }
+                if (isContactKey(field.key) || isNoiseSpecKey(field.key)) continue;
                 const hit = lookupRegistryField(field.key);
                 if (!hit) continue;
                 consumedKeys.add(field.key);
-                data[field.label] = hit.value;
+                data[field.label] = summariseSkuMap(hit.raw) ?? hit.value;
                 if (isLowConfidence(hit.raw)) lowConf.add(field.label);
               }
               if (Object.keys(data).length === 0) return null;
@@ -2490,8 +2505,81 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             );
           };
 
+          // One Dimensions card: every size and weight fact as a big figure; a spread of
+          // values (a range sold in many sizes) reads as min – max with the sizes beneath.
+          const renderDimensionsCard = () => {
+            const tiles: Array<{ label: string; unit: string; text: string; count: number }> = [];
+            const addTile = (label: string, key: string, unit: string) => {
+              const hit = lookupRegistryField(key);
+              const set = hit ? numericSet(hit.raw) : null;
+              if (!set) return;
+              tiles.push({ label, unit, text: formatRange(set, ''), count: set.values.length });
+            };
+            addTile('Width', 'width_mm', 'mm');
+            addTile('Height', 'height_mm', 'mm');
+            addTile('Depth', 'depth_mm', 'mm');
+            addTile('Length', 'length_mm', 'mm');
+            addTile('Diameter', 'diameter_mm', 'mm');
+            addTile('Weight', 'weight_kg', 'kg');
+            const sections = lookupRegistryField('sections');
+            const sizeChips = (() => {
+              const raw = lookupRegistryField('available_sizes')?.raw;
+              const v = (raw && typeof raw === 'object' && !Array.isArray(raw) && 'value' in (raw as Record<string, unknown>))
+                ? (raw as Record<string, unknown>).value : raw;
+              const list = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[,;]/) : [];
+              return list
+                .map(x => String(x).trim())
+                .filter(Boolean)
+                .map(x => { const m = /^(\d{2,4})\.(\d{2,4})$/.exec(x); return m ? `${m[1]} × ${m[2]}` : x; });
+            })();
+            if (tiles.length === 0 && sizeChips.length === 0 && !sections) return null;
+            return (
+              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                    <Ruler className="h-4 w-4" />
+                    Dimensions
+                  </h3>
+                </div>
+                {(tiles.length > 0 || sections) && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {tiles.map(t => (
+                      <div key={t.label} className="rounded-lg bg-muted/30 p-4">
+                        <p className="text-xs text-muted-foreground">{t.label}</p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums leading-tight">
+                          {t.text}
+                          <span className="ml-1 text-sm font-normal text-muted-foreground">{t.unit}</span>
+                        </p>
+                        {t.count > 1 && <p className="mt-1 text-[11px] text-muted-foreground">{t.count} options</p>}
+                      </div>
+                    ))}
+                    {sections && (
+                      <div className="rounded-lg bg-muted/30 p-4">
+                        <p className="text-xs text-muted-foreground">Sections</p>
+                        <p className="mt-1 text-2xl font-semibold tabular-nums leading-tight">{sections.value}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {sizeChips.length > 0 && (
+                  <div className={tiles.length > 0 || sections ? 'mt-4' : ''}>
+                    <p className="text-xs text-muted-foreground mb-2">Available sizes — height × width (mm)</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {sizeChips.map(c => (
+                        <Badge key={c} variant="outline" className="text-[11px] font-semibold tabular-nums px-2.5 py-0.5 bg-muted/40 border-border/50">
+                          {c}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          };
+
           return (
             <div className="space-y-6 mt-6">
+              {renderDimensionsCard()}
               {renderAppearanceCard()}
               {renderDetectedTextCard()}
 
@@ -2549,8 +2637,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               for (const [ik, iv] of Object.entries(obj)) {
                 if (!ik || ik.startsWith('_')) continue;
                 if (consumedKeys.has(ik) || seen.has(ik)) continue;
-                if (withholdKey(ik)) continue;
-                const str = extractValue(iv);
+                if (withholdKey(ik) || isNoiseSpecKey(ik) || isContactKey(ik) || complianceFlagLabel(ik)) continue;
+                const str = summariseSkuMap(iv) ?? extractValue(iv);
                 if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') continue;
                 seen.add(ik);
                 out.push({ key: ik, label: prettyFieldLabel(ik), value: str });
@@ -2567,7 +2655,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             // Walk every top-level metadata key.
             Object.entries(allData || {}).forEach(([k, v]) => {
               if (k.startsWith('_')) return;
-              if (withholdKey(k)) return;
+              if (withholdKey(k) || isNoiseSpecKey(k) || isContactKey(k) || complianceFlagLabel(k)) return;
               const inner = (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>))
                 ? (v as Record<string, unknown>).value
                 : v;
@@ -2589,7 +2677,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               // Flat orphan leaf.
               if (consumedKeys.has(k) || seen.has(k)) return;
-              const str = extractValue(v);
+              const str = summariseSkuMap(v) ?? extractValue(v);
               if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
               seen.add(k);
               leafExtras.push({ key: k, label: prettyFieldLabel(k), value: str });
