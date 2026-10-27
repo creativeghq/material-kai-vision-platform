@@ -5,6 +5,7 @@
  */
 
 import type { DbClient } from '../supabase-client.ts';
+import { reembedProducts } from '../mivaa-admin.ts';
 
 // ── Factory object shape ──────────────────────────────────────────────────────
 
@@ -153,16 +154,40 @@ export async function propagateFactoryFieldsInScope(
     metadata: ((r.metadata ?? {}) as Record<string, unknown>),
   }));
 
+  const before = new Map(products.map((p) => [p.id, p.metadata]));
+  const restale: string[] = [];
   let updated = 0;
   for (const u of planFactoryPropagation(products)) {
-    const { error: updateErr } = await supabase
-      .from('products')
-      .update({ metadata: u.metadata })
-      .eq('id', u.id)
-      .eq('workspace_id', workspaceId);
-    if (!updateErr) updated++;
+    if (await setFactoryKeys(supabase, workspaceId, u.id, u.metadata)) {
+      updated++;
+      if (embeddingNamesChanged(before.get(u.id) ?? {}, u.metadata)) restale.push(u.id);
+    }
   }
+  await reembedProducts(workspaceId, restale);
   return updated;
+}
+
+/** The only metadata keys factory propagation owns. A whole-object update would drop a concurrent edit to any other. */
+const FACTORY_KEYS = ['factory', 'factory_name', 'factory_group_name'] as const;
+
+async function setFactoryKeys(
+  supabase: DbClient,
+  workspaceId: string,
+  productId: string,
+  metadata: Record<string, unknown>,
+): Promise<boolean> {
+  const patch: Record<string, unknown> = {};
+  for (const k of FACTORY_KEYS) if (metadata[k] !== undefined) patch[k] = metadata[k];
+  const { data, error } = await supabase.rpc('set_product_metadata_keys', {
+    p_workspace: workspaceId, p_product: productId, p_patch: patch,
+  });
+  return !error && data === true;
+}
+
+/** factory_name and factory_group_name are part of the text a product is embedded from. */
+function embeddingNamesChanged(before: Record<string, unknown>, after: Record<string, unknown>): boolean {
+  const names = (m: Record<string, unknown>) => `${String(m.factory_name ?? '')}|${String(m.factory_group_name ?? '')}`;
+  return names(before) !== names(after);
 }
 
 /** Write a factory object onto one product of `workspaceId`, syncing the flat fields. */
@@ -192,10 +217,7 @@ export async function writeFactoryToProduct(
     factory_group_name:  merged.factory_group_name  ?? meta.factory_group_name,
   };
 
-  const { error } = await supabase
-    .from('products')
-    .update({ metadata: newMeta })
-    .eq('id', productId)
-    .eq('workspace_id', workspaceId);
-  return !error;
+  if (!(await setFactoryKeys(supabase, workspaceId, productId, newMeta))) return false;
+  if (embeddingNamesChanged(meta, newMeta)) await reembedProducts(workspaceId, [productId]);
+  return true;
 }
