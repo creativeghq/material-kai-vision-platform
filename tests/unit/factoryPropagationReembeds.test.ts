@@ -26,11 +26,16 @@ describe('factory propagation: it writes its own keys and the vector follows the
 
   it('re-embeds after the batch writes, and after the single write, only when a name changed', () => {
     const batch = utils.slice(at(utils, 'export async function propagateFactoryFieldsInScope'));
-    expect(at(batch, 'setFactoryKeys(')).toBeLessThan(at(batch, 'reembedProducts('));
-    expect(at(batch, 'embeddingNamesChanged(')).toBeLessThan(at(batch, 'reembedProducts('));
+    expect(at(batch, 'setFactoryKeys(')).toBeLessThan(at(batch, 'reembedLazily('));
+    expect(at(batch, 'embeddingNamesChanged(')).toBeLessThan(at(batch, 'reembedLazily('));
     const single = utils.slice(at(utils, 'export async function writeFactoryToProduct'));
-    expect(at(single, 'setFactoryKeys(')).toBeLessThan(at(single, 'reembedProducts('));
+    expect(at(single, 'setFactoryKeys(')).toBeLessThan(at(single, 'reembedLazily('));
     expect(single).toContain('embeddingNamesChanged(');
+  });
+
+  it('keeps the pure planners importable without a Deno runtime', () => {
+    expect(utils).not.toMatch(/^import \{[^}]*\} from '\.\.\/mivaa-admin\.ts'/m);
+    expect(utils).toContain("await import('../mivaa-admin.ts')");
   });
 
   it('the re-embed is targeted at exactly the changed products and does not touch chunks', () => {

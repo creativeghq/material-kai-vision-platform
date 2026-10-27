@@ -5,7 +5,6 @@
  */
 
 import type { DbClient } from '../supabase-client.ts';
-import { reembedProducts } from '../mivaa-admin.ts';
 
 // ── Factory object shape ──────────────────────────────────────────────────────
 
@@ -163,7 +162,7 @@ export async function propagateFactoryFieldsInScope(
       if (embeddingNamesChanged(before.get(u.id) ?? {}, u.metadata)) restale.push(u.id);
     }
   }
-  await reembedProducts(workspaceId, restale);
+  await reembedLazily(workspaceId, restale);
   return updated;
 }
 
@@ -182,6 +181,12 @@ async function setFactoryKeys(
     p_workspace: workspaceId, p_product: productId, p_patch: patch,
   });
   return !error && data === true;
+}
+
+/** Loaded on first use: this module's pure planners are imported by tests that have no Deno runtime. */
+async function reembedLazily(workspaceId: string, productIds: string[]): Promise<void> {
+  const { reembedProducts } = await import('../mivaa-admin.ts');
+  await reembedProducts(workspaceId, productIds);
 }
 
 /** factory_name and factory_group_name are part of the text a product is embedded from. */
@@ -218,6 +223,6 @@ export async function writeFactoryToProduct(
   };
 
   if (!(await setFactoryKeys(supabase, workspaceId, productId, newMeta))) return false;
-  if (embeddingNamesChanged(meta, newMeta)) await reembedProducts(workspaceId, [productId]);
+  if (embeddingNamesChanged(meta, newMeta)) await reembedLazily(workspaceId, [productId]);
   return true;
 }
