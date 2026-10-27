@@ -49,11 +49,19 @@ suite('resolve_purchase_prices · golden items against the live price store', ()
     expect(rows.some((r) => /FDU 71 VH/.test(r.item_text) && Number(r.final_gross) === 1715)).toBe(true);
   });
 
-  it.each(['FDU71', 'FDU 71', '71FDU', '71 FDU', 'Mitsibushi 71 FDU', 'mitsubishi fdu71'])(
+  it.each(['FDU71', 'FDU 71', '71FDU', '71 FDU', 'Mitsibushi 71 FDU', 'mitsubishi fdu71', 'FDU71VH', 'FDU-71-VH', '71 VH FDU', 'vh fdu71'])(
     'the same unit is found however "%s" is spelled',
     async (q) => {
       const rows = await resolve(q, 5);
       expect(rows.some((r) => /FDU 71 VH/.test(r.item_text) && Number(r.final_gross) === 1715)).toBe(true);
+    },
+  );
+
+  it.each(['tagina onyx 280x120', 'tagina onyx 120 x 280', '120x280 onyx', 'onyx diamond 120*280'])(
+    'the same tile is found however "%s" is written',
+    async (q) => {
+      const rows = await resolve(q, 5);
+      expect(rows.some((r) => /Onyx Diamond/.test(r.item_text) && /120x280/.test(r.item_text) && Number(r.final_net) === 49)).toBe(true);
     },
   );
 });
