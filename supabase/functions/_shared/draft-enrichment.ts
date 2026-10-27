@@ -83,12 +83,33 @@ export function coerceValue(f: RegistryField, raw: string): { ok: true; value: s
 }
 
 /** The quote must also contain what it is quoted for, so a real sentence cannot vouch for a made-up value. */
+const NEGATION = /\b(no|not|non|never|without|false|none)\b|όχι|οχι|✗|✘|×/u;
+const AFFIRMATION = /\b(yes|true)\b|ναι|✓|✔/u;
+const KNOWN_UNITS = new Set([
+  'mm', 'cm', 'm', 'km', 'in', 'inch', 'ft', 'µm', 'kg', 'g', 'lb', 'lbs', 'oz', 't', 'l', 'ml', '%',
+  'db', 'hz', 'kw', 'w', 'v', 'a', 'mpa', 'n', 'kn', 'm²', 'm2', 'cm²', '°c', '°f',
+]);
+const NAME_UNIT = /_(kg|g|mm|cm|m|db|kw|w|v|hz|l)$/;
+
+/** The unit a registry number is kept in: its own rule, else the suffix its name carries. */
+function expectedUnit(f: RegistryField): string {
+  const rule = f.validation_rules?.unit;
+  if (typeof rule === 'string' && rule.trim()) return rule.toLowerCase().replace(/\s/g, '');
+  return NAME_UNIT.exec(f.name)?.[1] ?? '';
+}
+
 function quoteSupports(f: RegistryField, value: string | number | boolean, quote: string): boolean {
-  if (f.field_type === 'boolean') return true;
   const q = squash(quote);
+  if (f.field_type === 'boolean') {
+    return value === true ? !NEGATION.test(q) : NEGATION.test(q) && !AFFIRMATION.test(q);
+  }
   if (f.field_type === 'number') {
     const digits = String(value).replace('.', '[.,]');
-    return new RegExp(`(?<!\\d[.,]?)${digits}(?![.,]?\\d)`).test(q);
+    const hit = new RegExp(`(?<!\\d[.,]?)${digits}(?![.,]?\\d)\\s*([^\\s\\d.,;:()]+)?`).exec(q);
+    if (!hit) return false;
+    const unit = (hit[1] ?? '').replace(/[.,;:)]+$/, '');
+    const want = expectedUnit(f);
+    return !(want && unit && KNOWN_UNITS.has(unit) && unit !== want);
   }
   return q.includes(squash(String(value)));
 }

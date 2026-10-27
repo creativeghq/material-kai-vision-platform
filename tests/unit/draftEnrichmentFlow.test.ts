@@ -37,6 +37,13 @@ describe('draft enrichment: the order that makes a retry safe', () => {
     expect(at(edge, 'background_jobs')).toBeLessThan(at(edge, 'start_product_enrichment_attempt'));
   });
 
+  it('only the caller that owns the attempt may crawl, and every checkpoint write is checked', () => {
+    expect(at(edge, 'if (!attempt.owned)')).toBeLessThan(at(edge, 'scrapeToMarkdown(row.source.url'));
+    expect(at(edge, 'const saveErr = await finish(')).toBeLessThan(at(edge, 'settleCredits('));
+    expect(edge).toContain(').error;');
+    expect(edge).toContain(': EXTRACTION_CEILING;');
+  });
+
   it('checks the caller can publish in the workspace before doing anything', () => {
     expect(at(edge, "'catalog.import', 'pricing.manage'")).toBeLessThan(at(edge, "callMivaa('/api/internal/product-enrichment/gaps'"));
   });
@@ -56,8 +63,15 @@ describe('draft enrichment: promotion never replaces metadata wholesale', () => 
   });
 
   it('re-checks that a field is still empty and the product is still a draft before it merges', () => {
-    expect(at(promote, 'still_empty(')).toBeLessThan(at(promote, 'io.merge('));
-    expect(at(promote, '!= "draft"')).toBeLessThan(at(promote, 'io.merge('));
+    const fn = promote.slice(at(promote, 'async def promote_attempt'));
+    expect(at(fn, 'io.still_empty(')).toBeLessThan(at(fn, 'io.merge('));
+    expect(at(fn, '!= "draft"')).toBeLessThan(at(fn, 'io.merge('));
+  });
+
+  it('rebuilds the derived data after the merge step whether or not it merged anything', () => {
+    const fn = promote.slice(at(promote, 'async def promote_attempt'));
+    expect(at(fn, 'io.merge(')).toBeLessThan(at(fn, 'io.canonicalize'));
+    expect(fn).not.toMatch(/if not promoted:/);
   });
 
   it('never calls a model or a crawler', () => {

@@ -18510,7 +18510,7 @@
         "desc": "report/status: up to 5000; run: 1 to 3"
       }
     ],
-    "response": "report: { summary, products, estimate: { products_to_read, credits_ceiling } }. run: { ok, results: [{ product_id, status, reason?, fields? }] }. status: { attempts: [{ product_id, status, reason, promoted_fields, canonicalization_state, embedding_state }] }"
+    "response": "report: { summary, products (each with open_attempt: extracted/promoted when an earlier run still has a step to finish), estimate: { products_to_read, credits_ceiling } }. run: { ok, results: [{ product_id, status (in_progress when another run owns the product), reason?, fields? }] }. status: { attempts: [{ product_id, status, reason, promoted_fields, canonicalization_state, embedding_state }] }"
   },
   {
     "name": "real-estate-owner",

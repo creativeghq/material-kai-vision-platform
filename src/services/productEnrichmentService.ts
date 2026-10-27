@@ -10,6 +10,7 @@ export interface EnrichmentReportRow {
   gaps: string[];
   source: { kind: 'product_url' | 'brand_site'; url: string } | null;
   verdict: EnrichmentVerdict;
+  open_attempt: 'extracted' | 'promoted' | null;
 }
 
 export interface EnrichmentReport {
@@ -77,4 +78,6 @@ export const ATTEMPT_LABEL: Record<string, { label: string; tone: 'success' | 'w
   running: { label: 'Running', tone: 'info' },
   extracted: { label: 'Saving', tone: 'info' },
   promoted: { label: 'Needs retry', tone: 'warning' },
+  promoted_pending: { label: 'Needs retry', tone: 'warning' },
+  in_progress: { label: 'In progress', tone: 'info' },
 };

@@ -28,7 +28,11 @@ export const EnrichCatalogueDialog: React.FC<Props> = ({ workspaceId, documentId
   const [done, setDone] = useState(0);
   const stop = useRef(false);
 
-  const targets = (report?.products ?? []).filter((p) => p.verdict === 'gaps_with_source').map((p) => p.product_id);
+  const targets = (report?.products ?? [])
+    .filter((p) => p.verdict === 'gaps_with_source' || p.open_attempt !== null)
+    .map((p) => p.product_id);
+  const handled = new Set(results.filter((r) => r.status !== 'failed' && r.status !== 'in_progress').map((r) => r.product_id));
+  const pending = targets.filter((id) => !handled.has(id));
 
   useEffect(() => {
     setReport(null);
@@ -48,11 +52,11 @@ export const EnrichCatalogueDialog: React.FC<Props> = ({ workspaceId, documentId
     setRunning(true);
     setError(null);
     try {
-      for (let i = 0; i < targets.length && !stop.current; i += RUN_BATCH) {
-        const batch = targets.slice(i, i + RUN_BATCH);
+      for (let i = 0; i < pending.length && !stop.current; i += RUN_BATCH) {
+        const batch = pending.slice(i, i + RUN_BATCH);
         const out = await runEnrichment(workspaceId, batch);
-        setResults((prev) => [...prev, ...out]);
-        setDone(Math.min(i + RUN_BATCH, targets.length));
+        setResults((prev) => [...prev.filter((r) => !batch.includes(r.product_id)), ...out]);
+        setDone((n) => n + out.filter((r) => r.status !== 'failed' && r.status !== 'in_progress').length);
         if (out.some((r) => r.status === 'failed' && /credit/i.test(r.reason ?? ''))) break;
       }
     } catch (e) {
@@ -61,7 +65,7 @@ export const EnrichCatalogueDialog: React.FC<Props> = ({ workspaceId, documentId
       setRunning(false);
       onFinished();
     }
-  }, [targets, workspaceId, onFinished]);
+  }, [pending, workspaceId, onFinished]);
 
   const close = () => { stop.current = true; onClose(); };
 
@@ -87,8 +91,11 @@ export const EnrichCatalogueDialog: React.FC<Props> = ({ workspaceId, documentId
             <p>{describeReport(report)}</p>
             {targets.length > 0 && results.length === 0 && (
               <p className="text-muted-foreground">
-                {targets.length} product(s) will be read. Estimated cost: up to {report.estimate.credits_ceiling} credits
+                {report.estimate.products_to_read} product(s) will be read. Estimated cost: up to {report.estimate.credits_ceiling} credits
                 (a page read and one extraction each; unused credits are refunded).
+                {targets.length - report.estimate.products_to_read > 0
+                  ? ` ${targets.length - report.estimate.products_to_read} unfinished product(s) are completed at no charge.`
+                  : ''}
               </p>
             )}
             {targets.length === 0 && results.length === 0 && (
@@ -122,10 +129,10 @@ export const EnrichCatalogueDialog: React.FC<Props> = ({ workspaceId, documentId
 
         <DialogFooter>
           <Button variant="outline" onClick={close} disabled={running}>Close</Button>
-          {report && targets.length > 0 && done < targets.length && (
+          {report && pending.length > 0 && (
             <Button onClick={() => { void run(); }} disabled={running}>
               {running ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : null}
-              {results.length > 0 ? 'Continue' : `Enrich ${targets.length} product(s)`}
+              {results.length > 0 ? `Continue (${pending.length} left)` : `Enrich ${targets.length} product(s)`}
             </Button>
           )}
         </DialogFooter>

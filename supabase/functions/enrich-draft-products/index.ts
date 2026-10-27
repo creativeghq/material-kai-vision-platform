@@ -132,8 +132,20 @@ Deno.serve(withApiLogging('enrich-draft-products', async (req) => {
   }
 
   if (action === 'report') {
+    const open = new Map<string, string>();
+    const ids = gapReport.products.map((p: any) => p.product_id as string);
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await supabase.from('product_enrichment_attempts').select('product_id, status')
+        .eq('workspace_id', workspaceId).in('status', ['extracted', 'promoted']).in('product_id', ids.slice(i, i + 100));
+      if (error) return json({ error: error.message }, 500);
+      for (const a of data ?? []) open.set(a.product_id, a.status);
+    }
+    const products = gapReport.products.map((p: any) => ({ ...p, open_attempt: open.get(p.product_id) ?? null }));
     const toRead = gapReport.summary.gaps_with_source ?? 0;
-    return json({ ...gapReport, estimate: { products_to_read: toRead, credits_ceiling: toRead * (EXTRACTION_CEILING + CRAWL_CREDITS) } });
+    return json({
+      ...gapReport, products,
+      estimate: { products_to_read: toRead, credits_ceiling: toRead * (EXTRACTION_CEILING + CRAWL_CREDITS) },
+    });
   }
 
   const rows = new Map<string, any>(gapReport.products.map((r) => [r.product_id, r]));
@@ -153,8 +165,9 @@ Deno.serve(withApiLogging('enrich-draft-products', async (req) => {
 
   const systemPrompt = await loadPrompt(supabase, 'tool', 'draft_enrichment');
   const results: any[] = [];
-  const finish = (attemptId: string, patch: Record<string, unknown>) =>
-    supabase.from('product_enrichment_attempts').update(patch).eq('id', attemptId);
+  const finish = async (attemptId: string, patch: Record<string, unknown>) =>
+    (await supabase.from('product_enrichment_attempts')
+      .update({ ...patch, updated_at: new Date().toISOString() }).eq('id', attemptId)).error;
 
   for (const id of productIds!) {
     const row = rows.get(id);
@@ -172,14 +185,26 @@ Deno.serve(withApiLogging('enrich-draft-products', async (req) => {
     let status: string = attempt.status;
 
     if (status === 'running') {
+      if (!attempt.owned) {
+        results.push({ product_id: id, status: 'in_progress', reason: 'Another run is already reading this product.' });
+        continue;
+      }
+      const record = async (patch: Record<string, unknown>, result: Record<string, unknown>) => {
+        const err = await finish(attemptId, patch);
+        results.push(err ? { product_id: id, status: 'failed', reason: `The outcome could not be recorded (${err.message}). Run it again.` } : result);
+      };
       if (row.verdict === 'nothing_missing') {
-        await finish(attemptId, { status: 'nothing_missing', reason: 'every registry field already has a value', canonicalization_state: 'ok', embedding_state: 'ok' });
-        results.push({ product_id: id, status: 'nothing_missing' });
+        await record(
+          { status: 'nothing_missing', reason: 'every registry field already has a value', canonicalization_state: 'ok', embedding_state: 'ok' },
+          { product_id: id, status: 'nothing_missing' },
+        );
         continue;
       }
       if (row.verdict === 'gaps_no_source') {
-        await finish(attemptId, { status: 'no_source', reason: 'No product link and no website on its brand. Searching by name would be a guess.', canonicalization_state: 'ok', embedding_state: 'ok' });
-        results.push({ product_id: id, status: 'no_source' });
+        await record(
+          { status: 'no_source', reason: 'No product link and no website on its brand. Searching by name would be a guess.', canonicalization_state: 'ok', embedding_state: 'ok' },
+          { product_id: id, status: 'no_source' },
+        );
         continue;
       }
 
@@ -212,43 +237,54 @@ Deno.serve(withApiLogging('enrich-draft-products', async (req) => {
         break;
       }
 
-      let reply: any;
+      let res: any;
       try {
-        const res = await generateStructuredWithClaude(userMessage, extractionSchema(fields.map((f) => f.name)), {
+        res = await generateStructuredWithClaude(userMessage, extractionSchema(fields.map((f) => f.name)), {
           model: EXTRACTION_MODEL, systemPrompt, temperature: 0, task: OP, userId, workspaceId,
         });
         if (!res.output) throw new Error('model returned no structured reply');
-        reply = res.output;
-        const price = await resolveTokenPrice(supabase, EXTRACTION_MODEL);
-        const actual = price
-          ? Math.round(((res.usage.inputTokens / 1e6) * price.input + (res.usage.outputTokens / 1e6) * price.output) * price.markup * 100 * 100) / 100
-          : 0;
-        const verdict = acceptClaims(reply, page, fields, identity);
-        const confidence = Number(reply.source_confidence ?? 0);
-        if (verdict.abstained || !(confidence >= MIN_CONFIDENCE)) {
-          await finish(attemptId, {
-            status: 'low_confidence', confidence,
-            reason: `Nothing was written: ${verdict.abstained ?? `confidence ${confidence.toFixed(2)} is below ${MIN_CONFIDENCE}`}.`,
-            canonicalization_state: 'ok', embedding_state: 'ok',
-          });
-          results.push({ product_id: id, status: 'low_confidence', reason: verdict.abstained ?? 'low confidence' });
-        } else if (verdict.claims.length === 0) {
-          await finish(attemptId, {
-            status: 'done', confidence, canonicalization_state: 'ok', embedding_state: 'ok',
-            reason: `The page describes this product and states none of the missing fields${verdict.rejected.length ? ` (${verdict.rejected.length} claim(s) failed validation)` : ''}. That is a finding, not a failure.`,
-          });
-          results.push({ product_id: id, status: 'done', fields: 0, rejected: verdict.rejected });
-        } else {
-          await finish(attemptId, { status: 'extracted', claims: verdict.claims, confidence });
-          status = 'extracted';
-          results.push({ product_id: id, status: 'extracted', rejected: verdict.rejected });
-        }
-        await settleCredits(supabase, userId, workspaceId, EXTRACTION_CEILING, actual, OP, { product_id: id, attempt_id: attemptId });
       } catch (e) {
         await refundCredits(supabase, userId, workspaceId, EXTRACTION_CEILING, OP, { reason: 'extraction_failed', attempt_id: attemptId });
         await fail(`Extraction failed for ${row.source.url}: ${(e instanceof Error ? e.message : String(e)).slice(0, 300)}`);
         continue;
       }
+
+      // The model has run and been paid for from here on. A missing price keeps the whole ceiling
+      // rather than refunding work that happened.
+      const price = await resolveTokenPrice(supabase, EXTRACTION_MODEL);
+      const actual = price
+        ? Math.round(((res.usage.inputTokens / 1e6) * price.input + (res.usage.outputTokens / 1e6) * price.output) * price.markup * 100 * 100) / 100
+        : EXTRACTION_CEILING;
+      const verdict = acceptClaims(res.output, page, fields, identity);
+      const confidence = Number(res.output.source_confidence ?? 0);
+
+      let patch: Record<string, unknown>;
+      let outcome: Record<string, unknown>;
+      if (verdict.abstained || !(confidence >= MIN_CONFIDENCE)) {
+        patch = {
+          status: 'low_confidence', confidence,
+          reason: `Nothing was written: ${verdict.abstained ?? `confidence ${confidence.toFixed(2)} is below ${MIN_CONFIDENCE}`}.`,
+          canonicalization_state: 'ok', embedding_state: 'ok',
+        };
+        outcome = { product_id: id, status: 'low_confidence', reason: verdict.abstained ?? 'low confidence' };
+      } else if (verdict.claims.length === 0) {
+        patch = {
+          status: 'done', confidence, canonicalization_state: 'ok', embedding_state: 'ok',
+          reason: `The page describes this product and states none of the missing fields${verdict.rejected.length ? ` (${verdict.rejected.length} claim(s) failed validation)` : ''}. That is a finding, not a failure.`,
+        };
+        outcome = { product_id: id, status: 'done', fields: 0, rejected: verdict.rejected };
+      } else {
+        patch = { status: 'extracted', claims: verdict.claims, confidence };
+        outcome = { product_id: id, status: 'extracted', rejected: verdict.rejected };
+      }
+      const saveErr = await finish(attemptId, patch);
+      await settleCredits(supabase, userId, workspaceId, EXTRACTION_CEILING, actual, OP, { product_id: id, attempt_id: attemptId });
+      if (saveErr) {
+        results.push({ product_id: id, status: 'failed', reason: `The page was read but the result could not be saved (${saveErr.message}). Run it again.` });
+        continue;
+      }
+      results.push(outcome);
+      if (patch.status === 'extracted') status = 'extracted';
     }
 
     if (status === 'extracted' || status === 'promoted') {

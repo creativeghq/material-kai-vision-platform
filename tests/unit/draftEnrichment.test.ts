@@ -97,3 +97,35 @@ describe('draft enrichment: identity helpers', () => {
     expect(quoteInPage('Frost resistant', 'ab')).toBe(false);
   });
 });
+
+describe('draft enrichment: the quote must agree with the value, not just contain it', () => {
+  const frost = [F('frost_resistant', 'boolean')];
+  const thick = [F('thickness_mm', 'number', { validation_rules: { unit: 'mm' } }), F('weight_kg', 'number')];
+  const p = 'Nova Grey tile NV-6060-G. Frost resistant: no. Not suitable outdoors. Thickness: 2 cm. Weight 12.5 lb. Rectified.';
+  const one = (key: string, value: string, evidence: string, fs: RegistryField[]) =>
+    acceptClaims({ product_match: 'exact', match_evidence: 'Nova Grey tile', values: [{ key, value, evidence }] }, p, fs, identity);
+
+  it('refuses a yes when the quote says no, or negates the sentence', () => {
+    expect(one('frost_resistant', 'yes', 'Frost resistant: no', frost).claims).toEqual([]);
+    expect(one('frost_resistant', 'yes', 'Not suitable outdoors', frost).claims).toEqual([]);
+  });
+
+  it('accepts a no that the quote states, and a bare positive feature line', () => {
+    expect(one('frost_resistant', 'no', 'Frost resistant: no', frost).claims[0]?.value).toBe(false);
+    const badge = 'Nova Grey tile NV-6060-G. Frost resistant. Rectified.';
+    const r = acceptClaims({ product_match: 'exact', match_evidence: 'Nova Grey tile', values: [{ key: 'frost_resistant', value: 'yes', evidence: 'Frost resistant' }] }, badge, frost, identity);
+    expect(r.claims[0]?.value).toBe(true);
+  });
+
+  it('refuses a number whose quoted unit is not the registry unit', () => {
+    const r = one('thickness_mm', '2', 'Thickness: 2 cm', thick);
+    expect(r.claims).toEqual([]);
+    expect(r.rejected[0].why).toBe('quote does not contain the value');
+  });
+
+  it('takes the unit from the field name when the registry has no unit rule', () => {
+    expect(one('weight_kg', '12.5', 'Weight 12.5 lb', thick).claims).toEqual([]);
+    const kg = acceptClaims({ product_match: 'exact', match_evidence: 'Nova Grey tile', values: [{ key: 'weight_kg', value: '12.5', evidence: 'Weight 12.5 kg' }] }, 'Nova Grey tile NV-6060-G. Weight 12.5 kg', thick, identity);
+    expect(kg.claims[0]?.value).toBe(12.5);
+  });
+});
