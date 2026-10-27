@@ -49,6 +49,7 @@ const NOISE_KEYS = new Set([
   'page', 'pages', 'page_range', 'page_number', 'page_numbers', 'start_page', 'end_page',
   'image_indices', 'image_index', 'confidence', 'unit', 'per_variant', 'chunk_index',
   'source', 'source_page', 'material_category', 'zone_intent',
+  'notes', 'note', 'extraction_notes', 'dimensionalaesthetic',
 ]);
 
 /** Extraction bookkeeping — never a property of the product itself. */

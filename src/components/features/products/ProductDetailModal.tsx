@@ -197,6 +197,8 @@ const sizeDedupKey = (s: string): string =>
   normSize(s).replace(/\s*(cm|mm|m)\s*$/i, '').trim().toLowerCase();
 // snake_case_field → "Snake Case Field" for displaying raw metadata keys.
 // Unicode-safe; handles accented chars, Greek letters, hyphens.
+const prettyValue = (s: string): string => (/^[a-z][a-z\s\-/]{0,38}$/.test(s) ? titleCaseDisplay(s) : s);
+
 const prettyFieldLabel = (k: string): string =>
   k.replace(/_/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase());
 
@@ -942,9 +944,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       ? (g as Record<string, unknown>).value : g;
     return inner && typeof inner === 'object' && !Array.isArray(inner) ? inner as Record<string, unknown> : {};
   })();
+  const groutApplies = ['tiles', 'general_materials'].includes(
+    resolveProductCategory(product.metadata, product.type, product.category),
+  );
   const groutBrand = (brand: GroutSuggestion['brand']): string | undefined =>
     extractValue(groutCodesRaw[brand]) ||
-    (groutRecommendations[brand] ? `${formatGroutSuggestion(groutRecommendations[brand])} (AI Suggested)` : undefined);
+    (groutApplies && groutRecommendations[brand] ? `${formatGroutSuggestion(groutRecommendations[brand])} (AI Suggested)` : undefined);
   const groutColorCodes = Object.fromEntries(
     Object.entries(groutCodesRaw).filter(([k]) => !GROUT_CODE_META_KEYS.has(k)),
   );
@@ -1320,6 +1325,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     data: Record<string, unknown>,
     lowConfidenceKeys?: Set<string>,
     icon?: React.ReactNode,
+    compact = false,
   ) => {
     const filteredData = Object.entries(data).filter(([, value]) => {
       const str = renderValue(value);
@@ -1336,7 +1342,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{icon}{title}</h3>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+        <div className={compact ? 'grid grid-cols-1 gap-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3'}>
           {filteredData.map(([key, value]) => {
             const str = renderValue(value);
             const lowConf = lowConfidenceKeys?.has(key) ?? false;
@@ -1367,7 +1373,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 className={`flex items-start justify-between py-2 border-b border-border/20 gap-4 ${lowConfClass}`}
               >
                 <span className="text-xs text-muted-foreground shrink-0">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</span>
-                <span className="text-xs font-semibold text-right">{str}</span>
+                <span className="text-xs font-semibold text-right">{prettyValue(str)}</span>
               </div>
             );
           })}
@@ -2451,7 +2457,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               if (Object.keys(data).length === 0) return null;
               return (
                 <React.Fragment key={section.key}>
-                  {renderMetadataCategory(section.label, data, lowConf, sectionIcon(section.key))}
+                  {renderMetadataCategory(section.label, data, lowConf, sectionIcon(section.key), true)}
                 </React.Fragment>
               );
             })
@@ -2528,10 +2534,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               const v = (raw && typeof raw === 'object' && !Array.isArray(raw) && 'value' in (raw as Record<string, unknown>))
                 ? (raw as Record<string, unknown>).value : raw;
               const list = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[,;]/) : [];
-              return list
-                .map(x => String(x).trim())
-                .filter(Boolean)
-                .map(x => { const m = /^(\d{2,4})\.(\d{2,4})$/.exec(x); return m ? `${m[1]} × ${m[2]}` : x; });
+              const label = (x: unknown): string => {
+                if (x && typeof x === 'object') {
+                  const o = x as Record<string, unknown>;
+                  const h = numericSet(o.height_mm);
+                  const w = numericSet(o.width_mm);
+                  if (h && w) return `${h.min} × ${w.min}`;
+                  return String(o.model ?? o.label ?? o.name ?? o.size ?? '').trim();
+                }
+                const t = String(x).trim();
+                const m = /^(\d{2,4})\.(\d{2,4})$/.exec(t);
+                return m ? `${m[1]} × ${m[2]}` : t;
+              };
+              return Array.from(new Set(list.map(label).filter(Boolean)));
             })();
             if (tiles.length === 0 && sizeChips.length === 0 && !sections) return null;
             return (
@@ -2586,7 +2601,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               {/* All registry-defined spec sections for THIS category, complete.
                   Every field with a value is shown — no category gating drops data. */}
-              {registrySectionCards}
+              {registrySectionCards.length > 0 && (
+                <div className="columns-1 lg:columns-2 gap-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
+                  {registrySectionCards}
+                </div>
+              )}
 
               {/* Commercial — curated (filters SKU/grout to THIS product, adds
                   grout suggestions). Auto-hides if empty. */}

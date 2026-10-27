@@ -20,7 +20,7 @@ describe('productSpecDisplay', () => {
   });
 
   it('classifies extraction bookkeeping and contact keys out of the specs', () => {
-    for (const k of ['page_range', '_start_page', 'image_indices', 'confidence', 'unit']) {
+    for (const k of ['page_range', '_start_page', 'image_indices', 'confidence', 'unit', 'notes', 'dimensionalAesthetic']) {
       expect(isNoiseSpecKey(k)).toBe(true);
     }
     expect(isNoiseSpecKey('heat_output_w')).toBe(false);
