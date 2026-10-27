@@ -105,6 +105,7 @@
     "refund_credits",
     "resolve_campaign_audience",
     "resolve_product_spec",
+    "resolve_purchase_prices",
     "resolve_sourcing_options",
     "search_orders",
     "search_products_by_specs",
