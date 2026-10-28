@@ -1489,7 +1489,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'boxes_per_pallet', 'weight_per_pallet_kg',
     'pallet_dimensions_cm', 'per_variant',
     // Appearance card
-    'color', 'colors_from_vision', 'primary_color_hex',
+    'color', 'colors_from_vision', 'primary_color_hex', 'colour_options',
     'pattern', 'texture', 'textures', 'category', 'subcategory',
     'v_rating', 'color_variation', 'visual_effect', 'vision_description', 'detected_text',
     // Certifications card
@@ -2324,7 +2324,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             const hasAppearanceFields = Object.values(appearance).some(
               v => v && v !== 'N/A' && v !== '',
             );
-            if (patternsList.length === 0 && !hasAppearanceFields) return null;
+            const HEX_OPTION_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/;
+            const colourOptions = (Array.isArray(allData?.colour_options) ? allData.colour_options : [])
+              .map((o: unknown) => o as { code?: unknown; name?: unknown; finish?: unknown; hex?: unknown })
+              .filter(o => typeof o.name === 'string' && typeof o.hex === 'string' && HEX_OPTION_RE.test(o.hex));
+            if (patternsList.length === 0 && !hasAppearanceFields && colourOptions.length === 0) return null;
 
             // Vision-confidence indicator: only shown when confidence is
             // BELOW our trust threshold (<0.7). High-confidence rows render
@@ -2396,6 +2400,29 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 )}
                 {renderChipRow('Colors', colorChips)}
                 {renderChipRow('Observed Shades', shadeChips)}
+                {colourOptions.length > 0 && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Colour options ({colourOptions.length})
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {colourOptions.map(o => (
+                        <div key={`${String(o.code)}-${String(o.name)}`} className="flex items-center gap-2 text-xs">
+                          <span
+                            className="inline-block h-6 w-6 shrink-0 rounded-sm border border-border/50"
+                            style={{ backgroundColor: o.hex as string }}
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate font-semibold">{String(o.name)}</span>
+                            <span className="block text-[11px] text-muted-foreground">
+                              {[o.code ? `code ${String(o.code)}` : '', typeof o.finish === 'string' ? o.finish : ''].filter(Boolean).join(' · ')}
+                            </span>
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {gridFields.length > 0 && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {gridFields.map(([key, value]) => {
