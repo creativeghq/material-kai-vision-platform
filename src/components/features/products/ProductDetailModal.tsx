@@ -50,7 +50,10 @@ import {
   DIMENSION_KEYS,
 } from './productSpecDisplay';
 import { buildModelTable } from './productModelTable';
+import { shapesFromModelTable, type PlaceholderShape } from './productShape';
 import { ProductModelsCard } from './ProductModelsCard';
+import { useProductCertificates, certMatches } from './useProductCertificates';
+import { presentValidity } from './certificateValidity';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
 import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
 import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
@@ -275,6 +278,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     metadata: Record<string, unknown>;
     relationship_type: string;
   }>>([]);
+  const [activeTab, setActiveTab] = useState('details');
+  const recordedCerts = useProductCertificates(product?.id, isOpen);
   // Modal stacking for recommendations — clicking a result opens that product
   const [stackedProductId, setStackedProductId] = useState<string | null>(null);
   const [stackedProduct, setStackedProduct] = useState<Product | null>(null);
@@ -1250,15 +1255,43 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               )}
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {certList.map(cert => (
-                <Badge
-                  key={cert}
-                  variant="outline"
-                  className="text-[11px] font-semibold px-2.5 py-0.5 bg-primary/10 border-primary/30 text-primary"
-                >
-                  {cert}
-                </Badge>
-              ))}
+              {certList.map(cert => {
+                const record = recordedCerts.find(r => certMatches(cert, r.standard));
+                const doc = kbDocs.find(
+                  d => ['certification', 'compliance', 'regulation'].includes(d.relationship_type)
+                    && certMatches(cert, `${d.title} ${d.summary ?? ''}`.trim()),
+                );
+                const chipClass = 'text-[11px] font-semibold px-2.5 py-0.5 bg-primary/10 border-primary/30 text-primary';
+                if (!record && !doc) {
+                  return <Badge key={cert} variant="outline" className={chipClass}>{cert}</Badge>;
+                }
+                const verdict = record ? presentValidity(record.validity) : null;
+                const dot = verdict?.tone === 'success' ? 'bg-green-600'
+                  : verdict?.tone === 'warning' ? 'bg-amber-600'
+                  : verdict?.tone === 'error' ? 'bg-red-600' : 'bg-muted-foreground';
+                const title = record
+                  ? [
+                      verdict?.label,
+                      record.certificate_number && `No. ${record.certificate_number}`,
+                      record.issuer,
+                      record.valid_until && `until ${record.valid_until}`,
+                    ].filter(Boolean).join(' · ')
+                  : `Document: ${doc?.title}`;
+                return (
+                  <button
+                    key={cert}
+                    type="button"
+                    title={`${title} — open in Knowledge`}
+                    onClick={() => setActiveTab('knowledge')}
+                    className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  >
+                    <Badge variant="outline" className={`${chipClass} gap-1.5 cursor-pointer hover:bg-primary/20`}>
+                      {record && <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />}
+                      {cert}
+                    </Badge>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -1560,6 +1593,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   ]);
   modelTable?.consumed.forEach(k => consumedKeys.add(k));
   const modelColumnKeys = new Set(modelTable?.columns.map(c => c.key) ?? []);
+  const placeholderShapes: PlaceholderShape[] = (() => {
+    const fromModels = shapesFromModelTable(modelTable);
+    if (fromModels.length > 0) return fromModels;
+    const smallest = (key: string): number | null => {
+      const hit = lookupRegistryField(key);
+      return hit ? numericSet(hit.raw)?.min ?? null : null;
+    };
+    const w = smallest('width_mm');
+    const h = smallest('height_mm');
+    return w && h ? [{ label: product?.name ?? '', w, h, d: smallest('depth_mm') }] : [];
+  })();
   // One registry section as a card; every field it renders is marked consumed.
   const renderRegistrySection = (section: ReturnType<typeof fieldRegistry.sections>[number]) => {
     const data: Record<string, unknown> = {};
@@ -1689,7 +1733,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
         {/* Tabs — end-users see Details / Knowledge / Related.
             Admins additionally see Monitoring / SEO / Pricing after those. */}
-        <Tabs defaultValue="details" className="mt-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-6">
           <TabsList className="w-full h-auto flex-nowrap justify-start gap-3 overflow-x-auto bg-transparent p-0 border-b border-border tabs-underline [&>*]:shrink-0 [&>*]:whitespace-nowrap">
             {/* End-user tabs (always visible) */}
             <TabsTrigger value="details" className="flex items-center gap-2">
@@ -2808,7 +2852,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               products only; buyers of someone else's catalog see the viewer, not the upload. */}
           {isOwnProduct && activeWorkspaceId && (
             <div className="mt-6">
-              <Product3DVisualsSection productId={product.id}>
+              <Product3DVisualsSection productId={product.id} shapes={placeholderShapes}>
                 <div className="space-y-6">
                   <ProductEmbedReadinessCard productId={product.id} />
                   <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
