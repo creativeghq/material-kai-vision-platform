@@ -1369,7 +1369,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         <div className="mb-5 flex items-center gap-2 border-b border-hairline pb-3">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{icon}{title}</h3>
         </div>
-        <div className={compact ? 'grid grid-cols-1 gap-y-5' : 'grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5'}>
+        <div className={compact ? 'grid grid-cols-1 gap-y-5' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-10 gap-y-5'}>
           {filteredData.map(([key, value]) => {
             const str = renderValue(value);
             const lowConf = lowConfidenceKeys?.has(key) ?? false;
@@ -1397,7 +1397,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div
                 key={key}
                 title={lowConfTitle}
-                className={`min-w-0 ${!compact && str.length > 56 ? 'sm:col-span-2' : ''} ${lowConfClass}`}
+                className={`min-w-0 ${!compact && str.length > 56 ? 'sm:col-span-2 lg:col-span-3' : ''} ${lowConfClass}`}
               >
                 <p className="text-[11px] font-medium text-muted-foreground">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</p>
                 <p className="mt-1 text-sm font-semibold leading-snug break-words">{displayValue(str)}</p>
@@ -1591,9 +1591,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   modelTable?.consumed.forEach(k => consumedKeys.add(k));
   const modelColumnKeys = new Set(modelTable?.columns.map(c => c.key) ?? []);
   // One registry section as a card; every field it renders is marked consumed.
+  const registrySizes = new Map<string, number>();
+  const WIDE_SECTION_FIELDS = 6;
   const renderRegistrySection = (
     section: ReturnType<typeof fieldRegistry.sections>[number],
     extras: Array<{ label: string; value: string }> = [],
+    wide = false,
   ) => {
     const data: Record<string, unknown> = {};
     const lowConf = new Set<string>();
@@ -1615,10 +1618,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       if (isLowConfidence(hit.raw)) lowConf.add(field.label);
     }
     for (const e of extras) if (!(e.label in data)) data[e.label] = e.value;
-    if (Object.keys(data).length === 0) return null;
+    const size = Object.keys(data).length;
+    if (size === 0) return null;
+    registrySizes.set(section.key, size);
     return (
       <React.Fragment key={section.key}>
-        {renderMetadataCategory(section.label, data, lowConf, sectionIcon(section.key), true)}
+        {renderMetadataCategory(section.label, data, lowConf, sectionIcon(section.key), !(wide && size >= WIDE_SECTION_FIELDS))}
       </React.Fragment>
     );
   };
@@ -2535,7 +2540,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             const renderChipRow = (label: string, chips: string[]) => {
               if (chips.length === 0) return null;
               return (
-                <div className="mb-4">
+                <div className="mt-6">
                   <p className="text-xs font-semibold text-muted-foreground mb-2">
                     {label} ({chips.length})
                   </p>
@@ -2597,9 +2602,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </div>
                 )}
                 {renderChipRow('Standard Colours', colorChips)}
-                {renderChipRow('Possible Colors (Under Request)', shadeChips)}
+                {renderChipRow('Customer Colors - Under Request', shadeChips)}
                 {colourOptions.length > 0 && (
-                  <div className="mb-4">
+                  <div className="mt-6">
                     <p className="text-xs font-semibold text-muted-foreground mb-2">
                       Colour Options ({colourOptions.length})
                     </p>
@@ -2754,19 +2759,26 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           const variantsCard = (activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable();
           const certificationsCard = renderCertificationsCard();
 
-          const registrySectionCards = cardSections
-            .map(section => renderRegistrySection(section, extrasFor(section.key)))
-            .filter(Boolean);
+          const otherExtras = [
+            ...extrasFor('other'),
+            ...[...leftovers.keys()]
+              .filter(key => SPECIAL_SECTION_KEYS.has(key) && key !== 'material_properties' && key !== 'appearance')
+              .flatMap(key => extrasFor(key)),
+          ];
+          const registryCards = cardSections
+            .map(section => ({
+              key: section.key,
+              node: renderRegistrySection(section, section.key === 'other' ? otherExtras : extrasFor(section.key), true),
+            }))
+            .filter(c => c.node !== null);
+          const isWideCard = (key: string) => (registrySizes.get(key) ?? 0) >= WIDE_SECTION_FIELDS;
+          const registrySectionCards = registryCards.filter(c => !isWideCard(c.key)).map(c => c.node);
+          const wideRegistryCards = registryCards.filter(c => isWideCard(c.key)).map(c => c.node);
           const cardKeys = new Set(cardSections.map(section => section.key));
           const stragglers = [...leftovers.entries()]
             .filter(([key]) => !cardKeys.has(key) && key !== 'other' && !SPECIAL_SECTION_KEYS.has(key))
             .sort((x, y) => sectionRank(x[0]) - sectionRank(y[0]));
-          const otherFields = [
-            ...(leftovers.get('other') ?? []),
-            ...[...leftovers.entries()]
-              .filter(([key]) => SPECIAL_SECTION_KEYS.has(key) && key !== 'material_properties' && key !== 'appearance')
-              .flatMap(([, f]) => f),
-          ];
+          const otherFields = cardKeys.has('other') ? [] : otherExtras;
           const rowsOf = (fields: Array<{ label: string; value: string }>) =>
             Object.fromEntries(fields.map(f => [f.label, f.value]));
 
@@ -2783,6 +2795,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   {registrySectionCards}
                 </div>
               )}
+              {wideRegistryCards}
 
               {/* Commercial — curated (filters SKU/grout to THIS product, adds
                   grout suggestions). Auto-hides if empty. */}
@@ -2798,7 +2811,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </React.Fragment>
               ))}
               {otherFields.length > 0 &&
-                renderMetadataCategory('Other Specifications', rowsOf(otherFields), undefined, <Database className="h-4 w-4" />)}
+                renderMetadataCategory(sectionLabel('other'), rowsOf(otherFields), undefined, <Database className="h-4 w-4" />)}
             </div>
           );
         })()}
