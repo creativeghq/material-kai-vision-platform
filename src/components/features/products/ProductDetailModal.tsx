@@ -18,7 +18,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Search, Palette, Package, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Search, Palette, Package, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildTestOnRoomUrl, buildProductStudioUrl } from '@/utils/testOnRoom';
 import { Product } from './types';
@@ -1365,11 +1365,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     const HEX_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
     return (
-      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-        <div className="mb-4">
+      <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5 sm:p-6">
+        <div className="mb-5 flex items-center gap-2 border-b border-hairline pb-3">
           <h3 className="text-sm font-semibold text-primary flex items-center gap-2">{icon}{title}</h3>
         </div>
-        <div className={compact ? 'grid grid-cols-1 gap-y-3' : 'grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3'}>
+        <div className={compact ? 'grid grid-cols-1 gap-y-5' : 'grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5'}>
           {filteredData.map(([key, value]) => {
             const str = renderValue(value);
             const lowConf = lowConfidenceKeys?.has(key) ?? false;
@@ -1382,10 +1382,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div
                   key={key}
                   title={lowConfTitle}
-                  className={`border-b border-border/20 pb-2 ${lowConfClass}`}
+                  className={`min-w-0 ${lowConfClass}`}
                 >
                   <p className="text-[11px] font-medium text-muted-foreground">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</p>
-                  <div className="mt-0.5 flex items-center gap-2">
+                  <div className="mt-1 flex items-center gap-2">
                     <span className="inline-block w-4 h-4 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
                     <span className="text-sm font-semibold">{str}</span>
                   </div>
@@ -1397,10 +1397,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div
                 key={key}
                 title={lowConfTitle}
-                className={`border-b border-border/20 pb-2 ${lowConfClass}`}
+                className={`min-w-0 ${!compact && str.length > 56 ? 'sm:col-span-2' : ''} ${lowConfClass}`}
               >
                 <p className="text-[11px] font-medium text-muted-foreground">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</p>
-                <p className="mt-0.5 text-sm font-semibold break-words">{displayValue(str)}</p>
+                <p className="mt-1 text-sm font-semibold leading-snug break-words">{displayValue(str)}</p>
               </div>
             );
           })}
@@ -2493,6 +2493,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             const appearance = {
               ...appearanceBase,
               ...Object.fromEntries(extrasFor('appearance').map(e => [e.label, e.value])),
+              ...(detectedWords.length ? { 'Printed Text': detectedWords.join(', ') } : {}),
             };
             const hasAppearanceFields = Object.values(appearance).some(
               v => v && v !== 'N/A' && v !== '',
@@ -2564,14 +2565,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   )}
                 </div>
                 {gridFields.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-5">
                     {gridFields.map(([key, value]) => {
                       const str = renderValue(value);
                       if (HEX_RE.test(str)) {
                         return (
-                          <div key={key} className="border-b border-border/20 pb-2">
+                          <div key={key} className="min-w-0">
                             <p className="text-[11px] font-medium text-muted-foreground">{key}</p>
-                            <div className="mt-0.5 flex items-center gap-2">
+                            <div className="mt-1 flex items-center gap-2">
                               <span className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
                               <p className="text-sm font-semibold">{str}</p>
                             </div>
@@ -2579,9 +2580,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         );
                       }
                       return (
-                        <div key={key} className="border-b border-border/20 pb-2">
+                        <div key={key} className="min-w-0">
                           <p className="text-[11px] font-medium text-muted-foreground">{key}</p>
-                          <p className="mt-0.5 text-sm font-semibold break-words">{displayValue(str)}</p>
+                          <p className="mt-1 text-sm font-semibold leading-snug break-words">{displayValue(str)}</p>
                         </div>
                       );
                     })}
@@ -2652,34 +2653,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             }
             return out;
           })();
-
-          const renderDetectedTextCard = () => {
-            if (detectedTextRaw.length === 0) return null;
-            return (
-              <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                <div className="mb-3">
-                  <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                    <ScanText className="h-4 w-4" />
-                    Detected Text ({detectedTextRaw.length})
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Text the vision model read off the product image (brand names, codes, dimensions).
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {detectedTextRaw.map(t => (
-                    <Badge
-                      key={t}
-                      variant="outline"
-                      className="text-[11px] font-mono px-2.5 py-0.5 bg-muted/40 border-border/50"
-                    >
-                      {t}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            );
-          };
+          const SIZE_TEXT_RE = /\d\s*[x×]\s*\d|\b\d+(?:[.,]\d+)?\s?(?:mm|cm|m|kg|w|kw|l|bar)\b/i;
+          const CODE_TEXT_RE = /^(?=.*\d)[A-Z0-9][A-Z0-9 ./_-]{3,}$/;
+          const detectedSizes = detectedTextRaw.filter(t => SIZE_TEXT_RE.test(t));
+          const detectedCodes = detectedTextRaw.filter(t => !SIZE_TEXT_RE.test(t) && CODE_TEXT_RE.test(t));
+          const detectedWords = detectedTextRaw.filter(t => !SIZE_TEXT_RE.test(t) && !CODE_TEXT_RE.test(t));
 
           // One Dimensions card: every size and weight fact as a big figure; a spread of
           // values (a range sold in many sizes) reads as min – max with the sizes beneath.
@@ -2719,7 +2697,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               return Array.from(new Set(list.map(label).filter(Boolean)));
             })();
             if (modelTable) sizeChips.length = 0;
-            if (tiles.length === 0 && sizeChips.length === 0 && !sections) return null;
+            if (tiles.length === 0 && sizeChips.length === 0 && !sections && detectedSizes.length === 0) return null;
             return (
               <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
                 <div className="mb-4">
@@ -2748,8 +2726,14 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     )}
                   </div>
                 )}
+                {detectedSizes.length > 0 && (
+                  <div className={tiles.length > 0 || sections ? 'mt-5' : ''}>
+                    <p className="text-[11px] font-medium text-muted-foreground">Marked On The Product</p>
+                    <p className="mt-1 text-sm font-semibold leading-snug break-words">{detectedSizes.join(', ')}</p>
+                  </div>
+                )}
                 {sizeChips.length > 0 && (
-                  <div className={tiles.length > 0 || sections ? 'mt-4' : ''}>
+                  <div className={tiles.length > 0 || sections || detectedSizes.length > 0 ? 'mt-5' : ''}>
                     <p className="text-xs text-muted-foreground mb-2">Available sizes — height × width (mm)</p>
                     <div className="flex flex-wrap gap-1.5">
                       {sizeChips.map(c => (
@@ -2766,8 +2750,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           const dimensionsCard = renderDimensionsCard();
           const appearanceCard = renderAppearanceCard();
-          const detectedTextCard = renderDetectedTextCard();
-          const commercialCard = renderMetadataCategory('Commercial Information', commercial, undefined, <ShoppingCart className="h-4 w-4" />);
+          const commercialCard = renderMetadataCategory('Commercial Information', detectedCodes.length ? { ...commercial, 'Codes On Product': detectedCodes.join(', ') } : commercial, undefined, <ShoppingCart className="h-4 w-4" />);
           const variantsCard = (activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable();
           const certificationsCard = renderCertificationsCard();
 
@@ -2792,7 +2775,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {dimensionsCard}
               {modelTable && <ProductModelsCard table={modelTable} />}
               {appearanceCard}
-              {detectedTextCard}
 
               {/* All registry-defined spec sections for THIS category, complete.
                   Every field with a value is shown — no category gating drops data. */}

@@ -139,6 +139,10 @@ export function describeValue(raw: unknown): string | null {
   if (typeof v === 'string') return v.trim() === '' ? null : v.trim();
   if (Array.isArray(v)) {
     const parts = v.map(describeValue).filter((p): p is string => p !== null);
+    if (parts.length > 1 && parts.every(p => /^-?\d+(?:[.,]\d+)?$/.test(p))) {
+      const n = (p: string) => parseFloat(p.replace(',', '.'));
+      return [...new Set(parts)].sort((a, b) => n(a) - n(b)).join(', ');
+    }
     return parts.length ? parts.join(', ') : null;
   }
   if (typeof v === 'object') {
