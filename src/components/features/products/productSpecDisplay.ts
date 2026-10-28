@@ -124,3 +124,32 @@ export function titleCaseDisplay(input: string): string {
     .map(w => (/^\p{Lu}{2,3}$/u.test(w) || /\d/.test(w) ? w : capitalise(w.toLowerCase())))
     .join(' ');
 }
+
+export function humanKey(k: string): string {
+  const s = k.replace(/_+/g, ' ').trim();
+  return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+/** Any stored value as text: nested objects read "Up to 2000 mm: 2; 2001 to 3000 mm: 3", never [object Object]. */
+export function describeValue(raw: unknown): string | null {
+  const v = unwrap(raw);
+  if (v === null || v === undefined) return null;
+  if (typeof v === 'boolean') return v ? 'True' : 'False';
+  if (typeof v === 'number') return Number.isFinite(v) ? String(v) : null;
+  if (typeof v === 'string') return v.trim() === '' ? null : v.trim();
+  if (Array.isArray(v)) {
+    const parts = v.map(describeValue).filter((p): p is string => p !== null);
+    return parts.length ? parts.join(', ') : null;
+  }
+  if (typeof v === 'object') {
+    const parts = Object.entries(v as Record<string, unknown>)
+      .filter(([k]) => !isNoiseSpecKey(k))
+      .map(([k, x]) => {
+        const d = describeValue(x);
+        return d === null ? null : `${humanKey(k)}: ${d}`;
+      })
+      .filter((p): p is string => p !== null);
+    return parts.length ? parts.join('; ') : null;
+  }
+  return null;
+}

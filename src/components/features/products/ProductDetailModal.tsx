@@ -50,8 +50,9 @@ import {
   DIMENSION_KEYS,
   displayValue,
   titleCaseDisplay,
+  describeValue,
 } from './productSpecDisplay';
-import { buildModelTable } from './productModelTable';
+import { buildModelTable, modelColumnLabel, keyUnit } from './productModelTable';
 import { ProductModelsCard } from './ProductModelsCard';
 import { useProductCertificates, certMatches } from './useProductCertificates';
 import { presentValidity } from './certificateValidity';
@@ -1543,6 +1544,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     commercialData as Record<string, unknown>,
     packagingData as Record<string, unknown>,
     complianceData as Record<string, unknown>,
+    ...Object.values(
+      (allData?.unregistered_spec_fields && typeof allData.unregistered_spec_fields === 'object'
+        ? allData.unregistered_spec_fields
+        : {}) as Record<string, unknown>,
+    ).filter((g): g is Record<string, unknown> => !!g && typeof g === 'object' && !Array.isArray(g)),
   ];
   const lookupRegistryField = (key: string): { value: string; raw: unknown } | null => {
     for (const grp of registryNestedGroups) {
@@ -1600,7 +1606,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       const hit = lookupRegistryField(field.key);
       if (!hit) continue;
       consumedKeys.add(field.key);
-      data[field.label] = summariseSkuMap(hit.raw) ?? hit.value;
+      data[field.label] = summariseSkuMap(hit.raw) ?? describeValue(hit.raw) ?? hit.value;
       if (isLowConfidence(hit.raw)) lowConf.add(field.label);
     }
     if (Object.keys(data).length === 0) return null;
@@ -2705,16 +2711,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             const dynamicGroups: Array<{ key: string; title: string; fields: Array<{ key: string; label: string; value: string }> }> = [];
 
             // Collect the displayable, not-yet-consumed leaf fields of an object.
-            const collectFields = (obj: Record<string, unknown>) => {
+            const keyLabel = (k: string): string => (/[A-Z]/.test(k) || /^\d/.test(k) ? k : modelColumnLabel(k));
+            const collectFields = (obj: Record<string, unknown>, own?: { unit: string }) => {
               const out: Array<{ key: string; label: string; value: string }> = [];
               for (const [ik, iv] of Object.entries(obj)) {
                 if (!ik || ik.startsWith('_')) continue;
-                if (consumedKeys.has(ik) || seen.has(ik)) continue;
+                if (consumedKeys.has(ik) || (!own && seen.has(ik))) continue;
                 if (withholdKey(ik) || isNoiseSpecKey(ik) || isContactKey(ik) || complianceFlagLabel(ik)) continue;
-                const str = summariseSkuMap(iv) ?? extractValue(iv);
-                if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') continue;
-                seen.add(ik);
-                out.push({ key: ik, label: prettyFieldLabel(ik), value: str });
+                const described = summariseSkuMap(iv) ?? describeValue(iv) ?? extractValue(iv);
+                if (!described || described === 'N/A' || described === 'undefined' || described === 'null') continue;
+                const str = own?.unit && /^-?[\d.,]+$/.test(described) ? `${described} ${own.unit}` : described;
+                if (!own) seen.add(ik);
+                out.push({ key: ik, label: keyLabel(ik), value: str });
               }
               return out;
             };
@@ -2733,6 +2741,25 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 ? (v as Record<string, unknown>).value
                 : v;
 
+              // The importer parks fields it cannot place under named groups; each group is read on
+              // its own, so a spec list joins the rest and a per-model table keeps its own card.
+              if (k === 'unregistered_spec_fields' && inner && typeof inner === 'object' && !Array.isArray(inner)) {
+                for (const [gk, gv] of Object.entries(inner as Record<string, unknown>)) {
+                  if (gk.startsWith('_')) continue;
+                  if (gv && typeof gv === 'object' && !Array.isArray(gv)) {
+                    const generic = /^other_spec/.test(gk);
+                    const groupFields = collectFields(gv as Record<string, unknown>, generic ? undefined : { unit: keyUnit(gk) });
+                    if (groupFields.length === 0) continue;
+                    if (generic) leafExtras.push(...groupFields);
+                    else dynamicGroups.push({ key: `parked_${gk}`, title: modelColumnLabel(gk), fields: groupFields });
+                  } else {
+                    const text = describeValue(gv);
+                    if (text) leafExtras.push({ key: gk, label: modelColumnLabel(gk), value: text });
+                  }
+                }
+                return;
+              }
+
               // Nested group (object, not array) → descend.
               if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
                 const fields = collectFields(inner as Record<string, unknown>);
@@ -2750,10 +2777,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
               // Flat orphan leaf.
               if (consumedKeys.has(k) || seen.has(k)) return;
-              const str = summariseSkuMap(v) ?? extractValue(v);
+              const str = summariseSkuMap(v) ?? describeValue(v) ?? extractValue(v);
               if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
               seen.add(k);
-              leafExtras.push({ key: k, label: prettyFieldLabel(k), value: str });
+              leafExtras.push({ key: k, label: keyLabel(k), value: str });
             });
 
             if (dynamicGroups.length === 0 && leafExtras.length === 0) return null;

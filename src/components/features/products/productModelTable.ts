@@ -21,9 +21,15 @@ export interface ModelTable {
 }
 
 const UNIT_SUFFIXES: Array<[RegExp, string]> = [
+  [/_w_per_m$/, 'W/m'], [/_n$/, 'N'],
   [/_mm$/, 'mm'], [/_kg$/, 'kg'], [/_w$/, 'W'], [/_l$/, 'l'], [/_m2$/, 'm²'],
   [/_bar$/, 'bar'], [/_pct$/, '%'], [/_c$/, '°C'], [/_v$/, 'V'],
 ];
+
+export function keyUnit(key: string): string {
+  const k = key.toLowerCase();
+  return UNIT_SUFFIXES.find(([re]) => re.test(k))?.[1] ?? '';
+}
 
 export function modelColumnLabel(key: string): string {
   if (key === 'sku_codes') return 'SKU';

@@ -75,3 +75,36 @@ describe('titleCaseDisplay', () => {
     expect(titleCaseDisplay('matte-black')).toBe('Matte Black');
   });
 });
+
+import { describeValue, humanKey } from '@/components/features/products/productSpecDisplay';
+import { keyUnit, modelColumnLabel } from '@/components/features/products/productModelTable';
+
+describe('describeValue', () => {
+  it('reads a nested object as text, never [object Object]', () => {
+    expect(describeValue({ up_to_2000_mm: 2, '2001_to_3000_mm': 3 })).toBe('Up to 2000 mm: 2; 2001 to 3000 mm: 3');
+    expect(describeValue({ a: { b: 1 } })).toBe('A: B: 1');
+    expect(describeValue({ a: { b: 1 } })).not.toContain('[object');
+  });
+
+  it('reads booleans, lists and wrappers', () => {
+    expect(describeValue(true)).toBe('True');
+    expect(describeValue(['a', 'b'])).toBe('a, b');
+    expect(describeValue({ value: 588, confidence: 0.9 })).toBe('588');
+    expect(describeValue({})).toBeNull();
+    expect(describeValue('  ')).toBeNull();
+  });
+
+  it('turns a key into a sentence', () => {
+    expect(humanKey('up_to_2000_mm')).toBe('Up to 2000 mm');
+  });
+});
+
+describe('unit-aware labels', () => {
+  it('puts the unit in brackets', () => {
+    expect(modelColumnLabel('max_radiator_height_mm')).toBe('Max Radiator Height (mm)');
+    expect(modelColumnLabel('maximum_vertical_load_n')).toBe('Maximum Vertical Load (N)');
+    expect(modelColumnLabel('nominal_heat_output_w_per_m')).toBe('Nominal Heat Output (W/m)');
+    expect(keyUnit('nominal_heat_output_w_per_m')).toBe('W/m');
+    expect(keyUnit('base_plate_cover')).toBe('');
+  });
+});
