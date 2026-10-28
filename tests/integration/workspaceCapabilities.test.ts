@@ -22,7 +22,7 @@ suite('workspace capabilities · TS table vs. the live database', () => {
     await addMember(svc, ws, owner.id, 'owner');
     await addMember(svc, ws, warehouse.id, 'warehouse');
     await addMember(svc, ws, client.id, 'client');
-  });
+  }, 150_000);
 
   afterAll(async () => {
     await teardown(svc, { wsIds: [ws], userIds: [owner?.id, warehouse?.id, client?.id] });

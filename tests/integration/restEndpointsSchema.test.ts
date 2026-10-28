@@ -23,10 +23,21 @@ suite('rest-endpoints.json (a captured snapshot) still matches the live schema P
 
   beforeAll(async () => {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-    const res = await fetch(`${SUPABASE_URL}/rest/v1/`, { headers: { apikey: key, Authorization: `Bearer ${key}` } });
-    if (!res.ok) throw new Error(`GET /rest/v1/ → ${res.status}`);
-    live = await res.json() as Swagger;
-  });
+    let last = '';
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/`, {
+          headers: { apikey: key, Authorization: `Bearer ${key}` },
+          signal: AbortSignal.timeout(40_000),
+        });
+        if (res.ok) { live = await res.json() as Swagger; return; }
+        last = `GET /rest/v1/ → ${res.status}`;
+      } catch (e) {
+        last = String(e);
+      }
+    }
+    throw new Error(last);
+  }, 150_000);
 
   for (const r of resources.filter((x) => x.kind !== 'rpc')) {
     it(`${r.kind} ${r.name}: same columns, same types`, () => {
