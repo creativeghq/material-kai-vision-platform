@@ -1,8 +1,3 @@
-/**
- * A value from the data reaches the product modal through displayValue, never raw.
- * `design radiator`, `wall-mounted` and `electrical` were shown as stored, in three different
- * places, because each render site formatted (or did not) on its own.
- */
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
