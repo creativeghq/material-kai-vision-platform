@@ -43,6 +43,10 @@ const DB_ONLY: Record<string, string> = {
   product_usage_stats: 'referenced by 1 SQL function',
   supplier_credit_note_items: 'referenced by 1 SQL function',
   warehouse_coverage: 'referenced by 1 SQL function',
+  product_configurations:
+    'read by add_configuration_to_quote; quote/order/invoice_items FK into it. Its UI was removed, so dropping it means first dropping those three columns.',
+  product_option_rules:
+    'read by get_configured_product_price; its UI was removed and the table is empty',
 };
 
 /**
