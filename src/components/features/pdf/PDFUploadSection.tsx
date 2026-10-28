@@ -367,9 +367,9 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
               />
             </div>
             <div>
-              <label className="text-sm font-medium block">Replaces an earlier catalogue (optional)</label>
+              <label htmlFor="pdfuploadsection-supersedes" className="text-sm font-medium block">Replaces an earlier catalogue (optional)</label>
               <Select value={supersedesId || 'none'} onValueChange={(v) => setSupersedesId(v === 'none' ? '' : v)} disabled={isUploading}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="pdfuploadsection-supersedes" className="mt-1"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None — this is a new catalogue</SelectItem>
                   {earlierDocs.map((d) => (
@@ -383,9 +383,9 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
             </div>
             {supersedesId && (
               <div>
-                <label className="text-sm font-medium block">Products missing from this edition</label>
+                <label htmlFor="pdfuploadsection-missing-policy" className="text-sm font-medium block">Products missing from this edition</label>
                 <Select value={missingPolicy} onValueChange={setMissingPolicy} disabled={isUploading}>
-                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectTrigger id="pdfuploadsection-missing-policy" className="mt-1"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="keep">Keep, only report them</SelectItem>
                     <SelectItem value="retire">Retire (mark discontinued)</SelectItem>
