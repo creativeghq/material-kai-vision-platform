@@ -121,6 +121,6 @@ export function displayValue(input: string): string {
 export function titleCaseDisplay(input: string): string {
   return splitCompounds(input.trim())
     .split(/\s+/)
-    .map(w => (/^\p{Lu}{2,4}$/u.test(w) || /\d/.test(w) ? w : capitalise(w.toLowerCase())))
+    .map(w => (/^\p{Lu}{2,3}$/u.test(w) || /\d/.test(w) ? w : capitalise(w.toLowerCase())))
     .join(' ');
 }
