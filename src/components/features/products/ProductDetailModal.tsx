@@ -838,7 +838,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return out.sort();
   })();
 
-  const appearance = {
+  const appearanceBase = {
     'Colors': primaryColors,
     'Observed Shades': showObservedShades ? visionColors : undefined,
     'Primary Color': extractValue(appearanceData?.primary_color_hex),  // hex swatch (legacy field — typically empty post-2026-05-04)
@@ -1623,6 +1623,113 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     );
   };
 
+  const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial', 'dimensions', 'material_properties']);
+        const computeLeftovers = () => {
+          // ── Sensitivity (#368 PD-1) ──────────────────────────────────
+          // Everything above this point is gated by SECTION: stock, cost, listings,
+          // movements each ask whether this viewer may see that section. This block is not
+          // a section — it is a walker over whatever keys the product happens to carry, so
+          // section gating does not reach it.
+          const canSeeInternalFields = canSeeCost;
+          const withholdKey = (key: string): boolean => {
+            if (canSeeInternalFields) return false;
+            const verdict = fieldRegistry.isInternalField(key);
+            return verdict !== false;
+          };
+
+          // Groups the registry already rendered above — their leftover inner
+          // fields go to the generic bucket (not a duplicate titled card).
+          const KNOWN_GROUPS = new Set([
+            'design', 'appearance', 'material_properties', 'application',
+            'commercial', 'packaging', 'performance', 'compliance', 'dimensions',
+            '_extraction_metadata',
+          ]);
+          const seen = new Set<string>();
+          const leafExtras: Array<{ key: string; label: string; value: string; hint?: string }> = [];
+
+          // Collect the displayable, not-yet-consumed leaf fields of an object.
+          const keyLabel = (k: string): string => (/[A-Z]/.test(k) || /^\d/.test(k) ? k : modelColumnLabel(k));
+          const collectFields = (obj: Record<string, unknown>, own?: { unit: string }) => {
+            const out: Array<{ key: string; label: string; value: string }> = [];
+            for (const [ik, iv] of Object.entries(obj)) {
+              if (!ik || ik.startsWith('_')) continue;
+              if (consumedKeys.has(ik) || (!own && seen.has(ik))) continue;
+              if (withholdKey(ik) || isNoiseSpecKey(ik) || isContactKey(ik) || complianceFlagLabel(ik)) continue;
+              const described = summariseSkuMap(iv) ?? describeValue(iv) ?? extractValue(iv);
+              if (!described || described === 'N/A' || described === 'undefined' || described === 'null') continue;
+              const str = own?.unit && /^-?[\d.,]+$/.test(described) ? `${described} ${own.unit}` : described;
+              if (!own) seen.add(ik);
+              out.push({ key: ik, label: keyLabel(ik), value: str });
+            }
+            return out;
+          };
+
+          // AI-discovered unknown attributes → generic bucket.
+          const discoveredExtra = allData?._discovered_extra;
+          if (discoveredExtra && typeof discoveredExtra === 'object' && !Array.isArray(discoveredExtra)) {
+            leafExtras.push(...collectFields(discoveredExtra as Record<string, unknown>));
+          }
+
+          // Walk every top-level metadata key.
+          Object.entries(allData || {}).forEach(([k, v]) => {
+            if (k.startsWith('_')) return;
+            if (consumedKeys.has(k) || withholdKey(k) || isNoiseSpecKey(k) || isContactKey(k) || complianceFlagLabel(k)) return;
+            const inner = (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>))
+              ? (v as Record<string, unknown>).value
+              : v;
+
+            // The importer parks fields it cannot place under named groups; each group is read on
+            // its own, so a spec list joins the rest and a per-model table keeps its own card.
+            if (k === 'unregistered_spec_fields' && inner && typeof inner === 'object' && !Array.isArray(inner)) {
+              for (const [gk, gv] of Object.entries(inner as Record<string, unknown>)) {
+                if (gk.startsWith('_')) continue;
+                if (gv && typeof gv === 'object' && !Array.isArray(gv)) {
+                  const generic = /^other_spec/.test(gk);
+                  const groupFields = collectFields(gv as Record<string, unknown>, generic ? undefined : { unit: keyUnit(gk) });
+                  if (groupFields.length === 0) continue;
+                  leafExtras.push(...groupFields.map(f => ({ ...f, hint: generic ? '' : gk })));
+                } else {
+                  const text = describeValue(gv);
+                  if (text) leafExtras.push({ key: gk, label: modelColumnLabel(gk), value: text });
+                }
+              }
+              return;
+            }
+
+            // Nested group (object, not array) → descend.
+            if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
+              const fields = collectFields(inner as Record<string, unknown>);
+              if (fields.length === 0) return;
+              if (KNOWN_GROUPS.has(k)) {
+                // Already-titled above — surface only its leftovers generically.
+                leafExtras.push(...fields);
+              } else {
+                // Brand-new group the registry never heard of → its own card,
+                // headline derived from the data.
+                leafExtras.push(...fields.map(f => ({ ...f, hint: k })));
+              }
+              return;
+            }
+
+            // Flat orphan leaf.
+            if (consumedKeys.has(k) || seen.has(k)) return;
+            const str = summariseSkuMap(v) ?? describeValue(v) ?? extractValue(v);
+            if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
+            seen.add(k);
+            leafExtras.push({ key: k, label: keyLabel(k), value: str });
+          });
+
+          return placeFields(fieldRegistry.snapshot?.fields ?? [], leafExtras);
+        };
+
+  fieldRegistry
+    .sections(resolveProductCategory(product.metadata, product.type, product.category))
+    .filter(section => !SPECIAL_SECTION_KEYS.has(section.key) || section.key === 'material_properties')
+    .forEach(section => renderRegistrySection(section));
+  const leftovers = computeLeftovers();
+  const extrasFor = (key: string): Array<{ label: string; value: string }> =>
+    (leftovers.get(key) ?? []).map(f => ({ label: f.label, value: f.value }));
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       {/* grid-cols-1 caps the implicit grid track to the dialog width (the base
@@ -2260,7 +2367,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               const material = fieldRegistry
                 .sections(resolveProductCategory(product.metadata, product.type, product.category))
                 .find(sec => sec.key === 'material_properties');
-              return material ? renderRegistrySection(material) : null;
+              return material ? renderRegistrySection(material, extrasFor('material_properties')) : null;
             })()}
 
             {/* Pricing & Availability intentionally removed —
@@ -2383,6 +2490,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           // Appearance card — shared across all categories (colors/patterns are universal)
           const renderAppearanceCard = () => {
+            const appearance = {
+              ...appearanceBase,
+              ...Object.fromEntries(extrasFor('appearance').map(e => [e.label, e.value])),
+            };
             const hasAppearanceFields = Object.values(appearance).some(
               v => v && v !== 'N/A' && v !== '',
             );
@@ -2519,9 +2630,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it.
-          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial', 'dimensions', 'material_properties']);
           const cardSections = registrySections.filter(section => !SPECIAL_SECTION_KEYS.has(section.key));
-          cardSections.forEach(section => renderRegistrySection(section));
 
           // ── Detected text (vision OCR) — brand names, codes, dimensions
           // visible on the material image. Skipped when empty.
@@ -2655,104 +2764,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             );
           };
 
-          const computeLeftovers = () => {
-            // ── Sensitivity (#368 PD-1) ──────────────────────────────────
-            // Everything above this point is gated by SECTION: stock, cost, listings,
-            // movements each ask whether this viewer may see that section. This block is not
-            // a section — it is a walker over whatever keys the product happens to carry, so
-            // section gating does not reach it.
-            const canSeeInternalFields = canSeeCost;
-            const withholdKey = (key: string): boolean => {
-              if (canSeeInternalFields) return false;
-              const verdict = fieldRegistry.isInternalField(key);
-              return verdict !== false;
-            };
-
-            // Groups the registry already rendered above — their leftover inner
-            // fields go to the generic bucket (not a duplicate titled card).
-            const KNOWN_GROUPS = new Set([
-              'design', 'appearance', 'material_properties', 'application',
-              'commercial', 'packaging', 'performance', 'compliance', 'dimensions',
-              '_extraction_metadata',
-            ]);
-            const seen = new Set<string>();
-            const leafExtras: Array<{ key: string; label: string; value: string; hint?: string }> = [];
-
-            // Collect the displayable, not-yet-consumed leaf fields of an object.
-            const keyLabel = (k: string): string => (/[A-Z]/.test(k) || /^\d/.test(k) ? k : modelColumnLabel(k));
-            const collectFields = (obj: Record<string, unknown>, own?: { unit: string }) => {
-              const out: Array<{ key: string; label: string; value: string }> = [];
-              for (const [ik, iv] of Object.entries(obj)) {
-                if (!ik || ik.startsWith('_')) continue;
-                if (consumedKeys.has(ik) || (!own && seen.has(ik))) continue;
-                if (withholdKey(ik) || isNoiseSpecKey(ik) || isContactKey(ik) || complianceFlagLabel(ik)) continue;
-                const described = summariseSkuMap(iv) ?? describeValue(iv) ?? extractValue(iv);
-                if (!described || described === 'N/A' || described === 'undefined' || described === 'null') continue;
-                const str = own?.unit && /^-?[\d.,]+$/.test(described) ? `${described} ${own.unit}` : described;
-                if (!own) seen.add(ik);
-                out.push({ key: ik, label: keyLabel(ik), value: str });
-              }
-              return out;
-            };
-
-            // AI-discovered unknown attributes → generic bucket.
-            const discoveredExtra = allData?._discovered_extra;
-            if (discoveredExtra && typeof discoveredExtra === 'object' && !Array.isArray(discoveredExtra)) {
-              leafExtras.push(...collectFields(discoveredExtra as Record<string, unknown>));
-            }
-
-            // Walk every top-level metadata key.
-            Object.entries(allData || {}).forEach(([k, v]) => {
-              if (k.startsWith('_')) return;
-              if (consumedKeys.has(k) || withholdKey(k) || isNoiseSpecKey(k) || isContactKey(k) || complianceFlagLabel(k)) return;
-              const inner = (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>))
-                ? (v as Record<string, unknown>).value
-                : v;
-
-              // The importer parks fields it cannot place under named groups; each group is read on
-              // its own, so a spec list joins the rest and a per-model table keeps its own card.
-              if (k === 'unregistered_spec_fields' && inner && typeof inner === 'object' && !Array.isArray(inner)) {
-                for (const [gk, gv] of Object.entries(inner as Record<string, unknown>)) {
-                  if (gk.startsWith('_')) continue;
-                  if (gv && typeof gv === 'object' && !Array.isArray(gv)) {
-                    const generic = /^other_spec/.test(gk);
-                    const groupFields = collectFields(gv as Record<string, unknown>, generic ? undefined : { unit: keyUnit(gk) });
-                    if (groupFields.length === 0) continue;
-                    leafExtras.push(...groupFields.map(f => ({ ...f, hint: generic ? '' : gk })));
-                  } else {
-                    const text = describeValue(gv);
-                    if (text) leafExtras.push({ key: gk, label: modelColumnLabel(gk), value: text });
-                  }
-                }
-                return;
-              }
-
-              // Nested group (object, not array) → descend.
-              if (inner && typeof inner === 'object' && !Array.isArray(inner)) {
-                const fields = collectFields(inner as Record<string, unknown>);
-                if (fields.length === 0) return;
-                if (KNOWN_GROUPS.has(k)) {
-                  // Already-titled above — surface only its leftovers generically.
-                  leafExtras.push(...fields);
-                } else {
-                  // Brand-new group the registry never heard of → its own card,
-                  // headline derived from the data.
-                  leafExtras.push(...fields.map(f => ({ ...f, hint: k })));
-                }
-                return;
-              }
-
-              // Flat orphan leaf.
-              if (consumedKeys.has(k) || seen.has(k)) return;
-              const str = summariseSkuMap(v) ?? describeValue(v) ?? extractValue(v);
-              if (!str || str === 'N/A' || str === '' || str === 'undefined' || str === 'null') return;
-              seen.add(k);
-              leafExtras.push({ key: k, label: keyLabel(k), value: str });
-            });
-
-            return placeFields(fieldRegistry.snapshot?.fields ?? [], leafExtras);
-          };
-
           const dimensionsCard = renderDimensionsCard();
           const appearanceCard = renderAppearanceCard();
           const detectedTextCard = renderDetectedTextCard();
@@ -2760,10 +2771,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           const variantsCard = (activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable();
           const certificationsCard = renderCertificationsCard();
 
-          const leftovers = computeLeftovers();
-          const toRows = (fields: Array<{ label: string; value: string }>) => fields.map(f => ({ label: f.label, value: f.value }));
           const registrySectionCards = cardSections
-            .map(section => renderRegistrySection(section, toRows(leftovers.get(section.key) ?? [])))
+            .map(section => renderRegistrySection(section, extrasFor(section.key)))
             .filter(Boolean);
           const cardKeys = new Set(cardSections.map(section => section.key));
           const stragglers = [...leftovers.entries()]
@@ -2771,7 +2780,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             .sort((x, y) => sectionRank(x[0]) - sectionRank(y[0]));
           const otherFields = [
             ...(leftovers.get('other') ?? []),
-            ...[...leftovers.entries()].filter(([key]) => SPECIAL_SECTION_KEYS.has(key) && !cardKeys.has(key)).flatMap(([, f]) => f),
+            ...[...leftovers.entries()]
+              .filter(([key]) => SPECIAL_SECTION_KEYS.has(key) && key !== 'material_properties' && key !== 'appearance')
+              .flatMap(([, f]) => f),
           ];
           const rowsOf = (fields: Array<{ label: string; value: string }>) =>
             Object.fromEntries(fields.map(f => [f.label, f.value]));
