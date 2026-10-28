@@ -53,6 +53,8 @@ import {
   describeValue,
 } from './productSpecDisplay';
 import { buildModelTable, modelColumnLabel, keyUnit } from './productModelTable';
+import { placeFields } from './productFieldPlacement';
+import { sectionLabel, sectionRank } from '@/services/fieldRegistryService';
 import { ProductModelsCard } from './ProductModelsCard';
 import { useProductCertificates, certMatches } from './useProductCertificates';
 import { presentValidity } from './certificateValidity';
@@ -2707,8 +2709,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               '_extraction_metadata',
             ]);
             const seen = new Set<string>();
-            const leafExtras: Array<{ key: string; label: string; value: string }> = [];
-            const dynamicGroups: Array<{ key: string; title: string; fields: Array<{ key: string; label: string; value: string }> }> = [];
+            const leafExtras: Array<{ key: string; label: string; value: string; hint?: string }> = [];
 
             // Collect the displayable, not-yet-consumed leaf fields of an object.
             const keyLabel = (k: string): string => (/[A-Z]/.test(k) || /^\d/.test(k) ? k : modelColumnLabel(k));
@@ -2750,8 +2751,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     const generic = /^other_spec/.test(gk);
                     const groupFields = collectFields(gv as Record<string, unknown>, generic ? undefined : { unit: keyUnit(gk) });
                     if (groupFields.length === 0) continue;
-                    if (generic) leafExtras.push(...groupFields);
-                    else dynamicGroups.push({ key: `parked_${gk}`, title: modelColumnLabel(gk), fields: groupFields });
+                    leafExtras.push(...groupFields.map(f => ({ ...f, hint: generic ? '' : gk })));
                   } else {
                     const text = describeValue(gv);
                     if (text) leafExtras.push({ key: gk, label: modelColumnLabel(gk), value: text });
@@ -2770,7 +2770,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 } else {
                   // Brand-new group the registry never heard of → its own card,
                   // headline derived from the data.
-                  dynamicGroups.push({ key: k, title: prettyFieldLabel(k), fields });
+                  leafExtras.push(...fields.map(f => ({ ...f, hint: k })));
                 }
                 return;
               }
@@ -2783,7 +2783,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               leafExtras.push({ key: k, label: keyLabel(k), value: str });
             });
 
-            if (dynamicGroups.length === 0 && leafExtras.length === 0) return null;
+            if (leafExtras.length === 0) return null;
+            const placed = [...placeFields(leafExtras).entries()]
+              .sort((a, b) => (a[0] === 'other' ? 1 : b[0] === 'other' ? -1 : sectionRank(a[0]) - sectionRank(b[0])));
 
             const renderGrid = (fields: Array<{ key: string; label: string; value: string }>) => (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -2800,37 +2802,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             return (
               <div className="space-y-6 mt-6">
-                {/* One card per unknown group — title comes from the data itself */}
-                {dynamicGroups.map(group => (
-                  <div key={group.key} className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
+                {placed.map(([section, fields]) => (
+                  <div key={section} className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
                     <div className="mb-4">
                       <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
                         <Database className="h-4 w-4" />
-                        {group.title}
-                      </h3>
-                    </div>
-                    {renderGrid(group.fields)}
-                  </div>
-                ))}
-
-                {/* Everything else not slotted into a section above */}
-                {leafExtras.length > 0 && (
-                  <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                    <div className="mb-4">
-                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                        <Database className="h-4 w-4" />
-                        Other Specifications
+                        {section === 'other'
+                          ? 'Other Specifications'
+                          : fieldRegistry.sections(resolveProductCategory(product.metadata, product.type, product.category)).some(s => s.key === section)
+                            ? `More ${sectionLabel(section)}`
+                            : sectionLabel(section)}
                         <Badge variant="outline" className="text-[10px] font-normal">
-                          {leafExtras.length}
+                          {fields.length}
                         </Badge>
                       </h3>
-                      <p className="text-[11px] text-muted-foreground mt-1">
-                        Every remaining field found in this product's data, not shown above.
-                      </p>
                     </div>
-                    {renderGrid(leafExtras)}
+                    {renderGrid(fields)}
                   </div>
-                )}
+                ))}
               </div>
             );
           })()}

@@ -152,6 +152,14 @@ export function describeField(field: RegistryField, categoryKey: string): string
   return field.descriptionByCategory?.[categoryKey] || field.description || null;
 }
 
+export function sectionLabel(key: string): string {
+  return SECTION_LABEL.get(key) ?? titleCase(key);
+}
+
+export function sectionRank(key: string): number {
+  return SECTION_ORDER.get(key) ?? SECTION_META.length;
+}
+
 export function sectionsForCategory(
   snapshot: FieldRegistrySnapshot,
   categoryKey: string,
