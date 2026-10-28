@@ -951,7 +951,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       ? (g as Record<string, unknown>).value : g;
     return inner && typeof inner === 'object' && !Array.isArray(inner) ? inner as Record<string, unknown> : {};
   })();
-  const groutApplies = ['tiles', 'general_materials'].includes(
+  // Only a category the product actually states: an absent one resolves to the default (tiles).
+  const statedCategory = product.metadata?.material_category || product.type || product.category;
+  const groutApplies = Boolean(statedCategory) && ['tiles', 'general_materials'].includes(
     resolveProductCategory(product.metadata, product.type, product.category),
   );
   const groutBrand = (brand: GroutSuggestion['brand']): string | undefined =>
