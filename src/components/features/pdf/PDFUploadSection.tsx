@@ -9,6 +9,7 @@ import { Button } from '@/components/core/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { Checkbox } from '@/components/core/ui/checkbox';
+import { Input } from '@/components/core/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { mivaaApi } from '@/services/mivaaApiClient';
@@ -35,6 +36,24 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
   const [isDragging, setIsDragging] = useState(false);
   const [publishOnComplete, setPublishOnComplete] = useState(true);
   const [multiBrand, setMultiBrand] = useState(false);
+  const [editionLabel, setEditionLabel] = useState('');
+  const [supersedesId, setSupersedesId] = useState('');
+  const [missingPolicy, setMissingPolicy] = useState('keep');
+  const [earlierDocs, setEarlierDocs] = useState<Array<{ id: string; filename: string }>>([]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    void (async () => {
+      const { data } = await supabase
+        .from('documents')
+        .select('id, filename')
+        .eq('workspace_id', activeWorkspaceId)
+        .eq('processing_status', 'completed')
+        .order('created_at', { ascending: false })
+        .limit(100);
+      setEarlierDocs((data ?? []) as Array<{ id: string; filename: string }>);
+    })();
+  }, [activeWorkspaceId]);
 
   // Load material categories from database
   useEffect(() => {
@@ -175,6 +194,11 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
       formData.append('title', file.name);
       formData.append('publish_on_complete', String(publishOnComplete));
       formData.append('multi_brand', String(multiBrand));
+      if (editionLabel.trim()) formData.append('edition_label', editionLabel.trim());
+      if (supersedesId) {
+        formData.append('supersedes_document_id', supersedesId);
+        formData.append('missing_policy', missingPolicy);
+      }
 
       const response = await mivaaApi.uploadPDF(formData);
 
@@ -326,6 +350,50 @@ export const PDFUploadSection: React.FC<PDFUploadSectionProps> = ({ onUploadComp
                   : 'Products stay as drafts so you can review them before publishing.'}
               </p>
             </div>
+          </div>
+
+          <div className="space-y-3 border-t border-hairline pt-4">
+            <div>
+              <label htmlFor="pdfuploadsection-edition-label" className="text-sm font-medium block">
+                Edition label (optional)
+              </label>
+              <Input
+                id="pdfuploadsection-edition-label"
+                value={editionLabel}
+                onChange={(e) => setEditionLabel(e.target.value)}
+                disabled={isUploading}
+                placeholder="e.g. 2027"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium block">Replaces an earlier catalogue (optional)</label>
+              <Select value={supersedesId || 'none'} onValueChange={(v) => setSupersedesId(v === 'none' ? '' : v)} disabled={isUploading}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None — this is a new catalogue</SelectItem>
+                  {earlierDocs.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.filename}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Products are matched to the earlier catalogue and nothing is published until you review the changes in Products.
+              </p>
+            </div>
+            {supersedesId && (
+              <div>
+                <label className="text-sm font-medium block">Products missing from this edition</label>
+                <Select value={missingPolicy} onValueChange={setMissingPolicy} disabled={isUploading}>
+                  <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="keep">Keep, only report them</SelectItem>
+                    <SelectItem value="retire">Retire (mark discontinued)</SelectItem>
+                    <SelectItem value="needs_replacement">Retire and list as needing a new source</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end">

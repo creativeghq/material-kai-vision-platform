@@ -16,6 +16,7 @@ import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { publishProducts, publishCatalogue, productStatusBadge } from '@/services/productPublishService';
 import { fetchEnrichmentStatus, ATTEMPT_LABEL, type EnrichmentAttempt } from '@/services/productEnrichmentService';
 import { EnrichCatalogueDialog } from './EnrichCatalogueDialog';
+import { CatalogEditionsPanel } from './CatalogEditionsPanel';
 import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/core/filters';
 import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
@@ -300,6 +301,7 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
 
   return (
     <>
+      <CatalogEditionsPanel workspaceId={workspaceId} onApplied={() => { void loadProducts(currentPage); onStatsUpdate(); }} />
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
