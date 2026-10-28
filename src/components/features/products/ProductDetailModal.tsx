@@ -18,7 +18,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Search, Palette, Package, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Box, Search, Palette, Package, ScanText, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildTestOnRoomUrl, buildProductStudioUrl } from '@/utils/testOnRoom';
 import { Product } from './types';
@@ -52,9 +52,17 @@ import {
   titleCaseDisplay,
 } from './productSpecDisplay';
 import { buildModelTable } from './productModelTable';
+import { shapesFromModelTable, type PlaceholderShape } from './productShape';
 import { ProductModelsCard } from './ProductModelsCard';
 import { useProductCertificates, certMatches } from './useProductCertificates';
 import { presentValidity } from './certificateValidity';
+import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
+import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
+import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
+import { ProductSceneCard } from '@/components/features/products/ProductSceneCard';
+import { Product3DVisualsSection } from '@/components/features/products/Product3DVisualsSection';
+import { ProductConfigurator } from '@/components/features/configurator/ProductConfigurator';
+import { ProductOptionsEditor } from '@/components/features/configurator/ProductOptionsEditor';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -83,6 +91,7 @@ interface ProductDetailModalProps {
   onClose: () => void;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
+  onUseIn3DScene?: (imageUrl: string, productName: string) => void;
   vrGenerating?: boolean;
 }
 
@@ -232,6 +241,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onClose,
   onGenerateVR,
   onGenerateVideo,
+  onUseIn3DScene,
   vrGenerating,
 }) => {
   // Admin diagnostic surfaces (embeddings/relevances, myDATA card, price lookup) gate on
@@ -251,6 +261,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // Bumped whenever the option editor changes something, to remount the configurator preview
   // beneath it — see the comment at its mount point.
+  const [configuratorNonce, setConfiguratorNonce] = useState(0);
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
   const [chunks, setChunks] = useState<any[]>([]);
@@ -1582,6 +1593,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   ]);
   modelTable?.consumed.forEach(k => consumedKeys.add(k));
   const modelColumnKeys = new Set(modelTable?.columns.map(c => c.key) ?? []);
+  const placeholderShapes: PlaceholderShape[] = (() => {
+    const fromModels = shapesFromModelTable(modelTable);
+    if (fromModels.length > 0) return fromModels;
+    const smallest = (key: string): number | null => {
+      const hit = lookupRegistryField(key);
+      return hit ? numericSet(hit.raw)?.min ?? null : null;
+    };
+    const w = smallest('width_mm');
+    const h = smallest('height_mm');
+    return w && h ? [{ label: product?.name ?? '', w, h, d: smallest('depth_mm') }] : [];
+  })();
   // One registry section as a card; every field it renders is marked consumed.
   const renderRegistrySection = (section: ReturnType<typeof fieldRegistry.sections>[number]) => {
     const data: Record<string, unknown> = {};
@@ -2255,6 +2277,23 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 quote-based platform, retail/wholesale/stock aren't tracked.
                 Quick quote/moodboard actions live in the DialogHeader. */}
 
+            {/* Place it in a room — ALWAYS offered, never gated on a handler (#378 F4). */}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1.5 text-xs"
+                onClick={() => {
+                  if (onUseIn3DScene && currentImage?.url) onUseIn3DScene(currentImage.url, product.name);
+                  else navigate(`/room-planner?product=${encodeURIComponent(product.id)}`);
+                  onClose();
+                }}
+              >
+                <Box className="h-3.5 w-3.5" />
+                {onUseIn3DScene ? 'Use in 3D scene' : 'Place in a room'}
+              </Button>
+            </div>
+
             {/* VR / Video — still handler-gated: both SPEND CREDITS and their output has nowhere
                 to land outside the agent chat yet. Exempted by name in gatedPropParity.test.ts
                 rather than passed everywhere, because a button that starts a paid job with no
@@ -2807,6 +2846,43 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
             );
           })()}
+
+          {/* Readiness, model, scene and texture are one block: with no model yet they collapse
+              into a single "3D & visuals" card instead of four empty ones. Own-workspace
+              products only; buyers of someone else's catalog see the viewer, not the upload. */}
+          {isOwnProduct && activeWorkspaceId && (
+            <div className="mt-6">
+              <Product3DVisualsSection productId={product.id} shapes={placeholderShapes}>
+                <div className="space-y-6">
+                  <ProductEmbedReadinessCard productId={product.id} />
+                  <Product3DModelCard productId={product.id} workspaceId={activeWorkspaceId} />
+                  <ProductSceneCard productId={product.id} workspaceId={activeWorkspaceId} />
+                  <ProductMaterialMapsCard
+                    productId={product.id}
+                    workspaceId={activeWorkspaceId}
+                    productName={product.name}
+                    sourceImageUrl={images[0]?.url ?? null}
+                  />
+                </div>
+              </Product3DVisualsSection>
+            </div>
+          )}
+
+          {/* Configurator (#321 M2 / #260 Phase 1). Authoring is owner-only for the same reason the
+              upload card is; the preview sits under it so a change can be seen immediately. The
+              `configuratorNonce` remount is deliberate — the preview holds selection state derived
+              from the option list, and editing that list underneath it would leave a selection
+              pointing at a value that no longer exists. */}
+          {isOwnProduct && activeWorkspaceId && (
+            <div className="mt-6 space-y-4">
+              <ProductOptionsEditor
+                productId={product.id}
+                workspaceId={activeWorkspaceId}
+                onChanged={() => setConfiguratorNonce((n) => n + 1)}
+              />
+              <ProductConfigurator key={configuratorNonce} productId={product.id} />
+            </div>
+          )}
 
       </TabsContent>
 

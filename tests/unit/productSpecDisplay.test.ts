@@ -36,3 +36,42 @@ describe('productSpecDisplay', () => {
     expect(complianceFlagLabel('ip_rating')).toBeNull();
   });
 });
+
+import { displayValue, titleCaseDisplay } from '@/components/features/products/productSpecDisplay';
+
+describe('displayValue', () => {
+  it.each([
+    ['design radiator', 'Design Radiator'],
+    ['wall-mounted', 'Wall Mounted'],
+    ['electrical', 'Electrical'],
+    ['hot water', 'Hot Water'],
+    ['false', 'False'],
+    ['towel_rail', 'Towel Rail'],
+    ['white RAL 9016', 'White RAL 9016'],
+    ['hot water, electric', 'Hot Water, Electric'],
+    ['waterborne detergents', 'Waterborne Detergents'],
+  ])('%s reads %s', (raw, shown) => expect(displayValue(raw)).toBe(shown));
+
+  it.each(['450 mm', '5 years', '230 V / 50 Hz', 'KORADO', 'EN 442', '#F1F0EA', 'https://www.korado.com/x', 'info@korado.cz', 'KRCA 700.600'])(
+    'leaves %s alone', raw => expect(displayValue(raw)).toBe(raw));
+
+  it('keeps a long sentence and only capitalises it', () => {
+    const t = 'integrated connection fittings HM with thermostatic head available for bottom middle connection (KRCM)';
+    expect(displayValue(t)).toBe(t[0].toUpperCase() + t.slice(1));
+  });
+
+  it('never lets a short lowercase value or an underscore through', () => {
+    for (const raw of ['wall-mounted', 'design radiator', 'electric', 'matte black', 'towel_rail', 'floor standing', 'yes']) {
+      expect(displayValue(raw)).not.toMatch(/(^|\s)\p{Ll}{3,}/u);
+      expect(displayValue(raw)).not.toContain('_');
+    }
+  });
+});
+
+describe('titleCaseDisplay', () => {
+  it('keeps acronyms and codes, folds shouted words', () => {
+    expect(titleCaseDisplay('white RAL 9016')).toBe('White RAL 9016');
+    expect(titleCaseDisplay('ANTHRACITE GREY')).toBe('Anthracite Grey');
+    expect(titleCaseDisplay('matte-black')).toBe('Matte Black');
+  });
+});
