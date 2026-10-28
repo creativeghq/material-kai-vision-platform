@@ -39,29 +39,6 @@ export const sceneSettingsService = {
     return { workspace_id: workspaceId, ...SCENE_DEFAULTS, ...(data as object) } as SceneSettings;
   },
 
-  /**
-   * The row for ONE scope, or null when that scope has never been set.
-   *
-   * Deliberately not the resolved answer: an editor has to show whether THIS scope has its own
-   * value or is inheriting, and a resolved value would make "inherited" indistinguishable from
-   * "set to the same thing" — so clearing an override would look like it did nothing.
-   */
-  async forScope(
-    workspaceId: string,
-    scope: { productId?: string | null; embedKeyId?: string | null } = {},
-  ): Promise<SceneSettings | null> {
-    let q = supabase
-      .from('scene_settings')
-      .select('*')
-      .eq('workspace_id', workspaceId)
-      .limit(1);
-    q = scope.productId ? q.eq('product_id', scope.productId) : q.is('product_id', null);
-    q = scope.embedKeyId ? q.eq('embed_key_id', scope.embedKeyId) : q.is('embed_key_id', null);
-    const { data, error } = await q;
-    if (error) throw error;
-    return ((data ?? [])[0] as SceneSettings) ?? null;
-  },
-
   /** Set or update one scope. */
   async save(
     workspaceId: string,

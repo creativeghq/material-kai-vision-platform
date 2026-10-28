@@ -1,6 +1,5 @@
 /** AI-derived material maps for a product (#321 / #260 item 6). */
 import { supabase } from '@/integrations/supabase/client';
-import { MIVAA_API_URL } from '@/config/mivaa';
 
 export interface MaterialMapCandidate {
   id: string;
@@ -46,18 +45,6 @@ export function storagePathFromPublicUrl(url: string, bucket: string): string | 
 }
 
 export const productMaterialMapsService = {
-  /** Every candidate for a product, newest first. The comparison surface. */
-  async listCandidates(productId: string, optionValueId?: string | null): Promise<MaterialMapCandidate[]> {
-    let q = supabase
-      .from('product_material_maps')
-      .select('*')
-      .eq('product_id', productId)
-      .order('created_at', { ascending: false });
-    q = optionValueId ? q.eq('option_value_id', optionValueId) : q.is('option_value_id', null);
-    const { data, error } = await q;
-    if (error) throw error;
-    return (data ?? []) as MaterialMapCandidate[];
-  },
 
   /** What the renderer should use right now, or all-null when nothing is generated. */
   async selectedFor(productId: string, optionValueId?: string | null): Promise<MaterialMapUrls> {
@@ -80,30 +67,6 @@ export const productMaterialMapsService = {
     };
   },
 
-  /**
-   * Selected texture per OPTION VALUE for a product, as `valueId -> albedo url` (#321).
-   *
-   * One query rather than one per option: a product with four fabrics would otherwise fire four
-   * requests every time the configurator mounts.
-   */
-  async selectedByOptionValue(productId: string): Promise<Map<string, string>> {
-    const { data, error } = await supabase
-      .from('product_material_maps')
-      .select('option_value_id, storage_bucket, albedo_path')
-      .eq('product_id', productId)
-      .eq('is_selected', true)
-      .not('option_value_id', 'is', null);
-    if (error) throw error;
-    const out = new Map<string, string>();
-    for (const row of (data ?? []) as Array<{
-      option_value_id: string; storage_bucket: string; albedo_path: string | null;
-    }>) {
-      const url = publicUrl(row.storage_bucket, row.albedo_path);
-      if (url) out.set(row.option_value_id, url);
-    }
-    return out;
-  },
-
   /** Selected albedo per PRODUCT (no option value), as `productId -> url`, in one query (#404). */
   async selectedAlbedoByProduct(productIds: string[]): Promise<Map<string, string>> {
     const out = new Map<string, string>();
@@ -122,109 +85,6 @@ export const productMaterialMapsService = {
       if (url) out.set(row.product_id, url);
     }
     return out;
-  },
-
-  /**
-   * Derive a tileable albedo from the product's own image and record it as a candidate.
-   *
-   * `model_tier` picks the provider through the shared routing, so running this twice with
-   * different tiers IS the bench — two candidates over the same source image, compared by eye.
-   */
-  async generateAlbedo(params: {
-    workspaceId: string;
-    productId: string;
-    optionValueId?: string | null;
-    sourceImageUrl: string;
-    /** What the thing IS — the texture prompt is built from it. */
-    itemName: string;
-    modelTier?: string;
-  }): Promise<MaterialMapCandidate> {
-    const { data, error } = await supabase.functions.invoke('generate-interior-gemini', {
-      body: {
-        mode: 'material-texture',
-        // The REAL product photo. Without it the mode invents a material instead of flattening
-        // this one, which is the difference between a texture of the product and a texture of
-        // something that looks like it.
-        reference_image_url: params.sourceImageUrl,
-        item_name: params.itemName,
-        aspect_ratio: '1:1',
-        model_tier: params.modelTier,
-        workspace_id: params.workspaceId,
-      },
-    });
-    if (error) throw error;
-    const imageUrl: string | undefined = data?.image_url ?? data?.images?.[0]?.url ?? data?.url;
-    if (!data?.success && !imageUrl) {
-      throw new Error(data?.error || 'The texture generator returned no image.');
-    }
-    if (!imageUrl) throw new Error('The texture generator returned no image URL.');
-
-    const bucket = 'generation-images';
-    const path = storagePathFromPublicUrl(imageUrl, bucket);
-    if (!path) {
-      // Refuse rather than store a URL we cannot register. An unregistered file is reaped by the
-      // orphan cron after the grace period and the row survives pointing at nothing.
-      throw new Error('The generated texture is not in the expected bucket, so it cannot be stored safely.');
-    }
-
-    const { data: row, error: insErr } = await supabase
-      .from('product_material_maps')
-      .insert({
-        workspace_id: params.workspaceId,
-        product_id: params.productId,
-        option_value_id: params.optionValueId ?? null,
-        model: data?.model_label ?? data?.model ?? params.modelTier ?? 'gemini',
-        storage_bucket: bucket,
-        albedo_path: path,
-        source_image_url: params.sourceImageUrl,
-      })
-      .select('*')
-      .single();
-    if (insErr) throw insErr;
-
-    const candidate = row as MaterialMapCandidate;
-    // First candidate for this product/option becomes the selected one, so a single generate is
-    // enough to see it in the viewer. Later ones are compared explicitly.
-    const existing = await this.listCandidates(params.productId, params.optionValueId ?? null);
-    if (!existing.some((c) => c.is_selected)) await this.select(candidate.id);
-    return candidate;
-  },
-
-  /**
-   * Derive a normal map for a candidate from its albedo (#321).
-   *
-   * MIVAA, not an edge function and not a model: edge functions have no image decoding, and a
-   * diffusion model asked for a normal map returns a picture that LOOKS like one — RGB that are not
-   * surface directions, so the renderer lights the surface wrongly and it reads as plastic. This is
-   * derived from the albedo the tenant already picked, so it is an approximation of the real image
-   * rather than an invention, and it costs no credits.
-   */
-  async deriveNormal(params: {
-    workspaceId: string;
-    candidate: MaterialMapCandidate;
-    strength?: number;
-  }): Promise<void> {
-    const albedoUrl = publicUrl(params.candidate.storage_bucket, params.candidate.albedo_path);
-    if (!albedoUrl) throw new Error('That candidate has no albedo to derive from.');
-
-    const { data: { session } } = await supabase.auth.getSession();
-    const res = await fetch(`${MIVAA_API_URL}/api/material-maps/normal`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
-      body: JSON.stringify({
-        workspace_id: params.workspaceId,
-        material_map_id: params.candidate.id,
-        albedo_url: albedoUrl,
-        strength: params.strength ?? 1.0,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: res.statusText }));
-      throw new Error(err?.detail || 'Could not derive the normal map.');
-    }
   },
 
   /** Make one candidate the renderer's. The partial unique index enforces one per product/option. */
