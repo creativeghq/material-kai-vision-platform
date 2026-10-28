@@ -1554,6 +1554,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const CERT_OWNED_KEYS = new Set(['certifications', 'standards']);
+  const modelTable = buildModelTable([
+    allData as Record<string, unknown>,
+    allData?._discovered_extra as Record<string, unknown> | undefined,
+  ]);
+  modelTable?.consumed.forEach(k => consumedKeys.add(k));
+  const modelColumnKeys = new Set(modelTable?.columns.map(c => c.key) ?? []);
   // One registry section as a card; every field it renders is marked consumed.
   const renderRegistrySection = (section: ReturnType<typeof fieldRegistry.sections>[number]) => {
     const data: Record<string, unknown> = {};
@@ -1564,7 +1570,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         consumedKeys.add(field.key);
         continue;
       }
-      if (CERT_OWNED_KEYS.has(field.key) || complianceFlagLabel(field.key)) {
+      if (CERT_OWNED_KEYS.has(field.key) || complianceFlagLabel(field.key) || modelColumnKeys.has(field.key)) {
         consumedKeys.add(field.key);
         continue;
       }
@@ -2553,12 +2559,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           // One Dimensions card: every size and weight fact as a big figure; a spread of
           // values (a range sold in many sizes) reads as min – max with the sizes beneath.
-          const modelTable = buildModelTable([allData as Record<string, unknown>, allData?._discovered_extra as Record<string, unknown> | undefined]);
-          modelTable?.consumed.forEach(k => consumedKeys.add(k));
-
           const renderDimensionsCard = () => {
             const tiles: Array<{ label: string; unit: string; text: string; count: number }> = [];
             const addTile = (label: string, key: string, unit: string) => {
+              if (modelColumnKeys.has(key)) return;
               const hit = lookupRegistryField(key);
               const set = hit ? numericSet(hit.raw) : null;
               if (!set) return;
