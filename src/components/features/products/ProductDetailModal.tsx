@@ -173,7 +173,7 @@ const DISPLAY_SENTINEL = '—';
 const GROUT_BRANDS = ['mapei', 'kerakoll', 'isomat', 'technica'] as const;
 const GROUT_CODE_META_KEYS = new Set<string>([...GROUT_BRANDS, 'suppliers', 'details']);
 const titleCaseDisplay = (s: string): string =>
-  s.toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
+  s.replace(/_+/g, ' ').toLowerCase().replace(/\b\p{L}/gu, c => c.toUpperCase());
 const isSentinel = (s: string | undefined): boolean =>
   !s || s === DISPLAY_SENTINEL || s === 'N/A';
 const normColor = (s: string): string =>
@@ -197,7 +197,7 @@ const sizeDedupKey = (s: string): string =>
   normSize(s).replace(/\s*(cm|mm|m)\s*$/i, '').trim().toLowerCase();
 // snake_case_field → "Snake Case Field" for displaying raw metadata keys.
 // Unicode-safe; handles accented chars, Greek letters, hyphens.
-const prettyValue = (s: string): string => (/^[a-z][a-z\s\-/]{0,38}$/.test(s) ? titleCaseDisplay(s) : s);
+const prettyValue = (s: string): string => (/^[a-z][a-z\s\-/_]{0,38}$/.test(s) ? titleCaseDisplay(s) : s);
 
 const prettyFieldLabel = (k: string): string =>
   k.replace(/_/g, ' ').replace(/\b\p{L}/gu, c => c.toUpperCase());
@@ -2362,7 +2362,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               if (chips.length === 0) return null;
               return (
                 <div className="mb-4">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">
                     {label} ({chips.length})
                   </p>
                   <div className="flex flex-wrap gap-1.5">
@@ -2398,12 +2398,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </span>
                   </div>
                 )}
-                {renderChipRow('Colors', colorChips)}
-                {renderChipRow('Observed Shades', shadeChips)}
+                {renderChipRow('Standard Colours', colorChips)}
+                {colourOptions.length === 0 && renderChipRow('Shades Seen in Photos', shadeChips)}
                 {colourOptions.length > 0 && (
                   <div className="mb-4">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Colour options ({colourOptions.length})
+                    <p className="text-xs font-semibold text-muted-foreground mb-2">
+                      Colour Options ({colourOptions.length})
                     </p>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {colourOptions.map(o => (
