@@ -44,7 +44,8 @@ export function modelColumnLabel(key: string): string {
 }
 
 const COLUMN_PRIORITY = ['height_mm', 'width_mm', 'depth_mm', 'length_mm', 'diameter_mm', 'weight_kg'];
-const MODEL_CODE_RE = /^[A-Za-z0-9]{2,8}[ -]?\d{2,4}[./x×]\d{2,4}$/;
+const BARE_SIZE_RE = /^\d{3,4}[./x×]\d{2,4}$/;
+const MODEL_CODE_RE = /^([A-Za-z0-9]{2,8}[ -]?)?\d{2,4}[./x×]\d{2,4}$/;
 
 function scalar(v: unknown): string | null {
   const x = unwrap(v);
@@ -99,6 +100,7 @@ export function buildModelTable(bags: Array<Record<string, unknown> | undefined>
     }
   }
 
+  const hadRecords = rows.size > 0;
   for (const bag of bags) {
     for (const [k, raw] of Object.entries(bag || {})) {
       if (k.startsWith('_') || isNoiseSpecKey(k) || k === 'product_codes') continue;
@@ -108,6 +110,11 @@ export function buildModelTable(bags: Array<Record<string, unknown> | undefined>
       if (entries.length < 2 || entries.some(([, x]) => scalar(x) === null)) continue;
       const hits = entries.filter(([code]) => known.has(code) || MODEL_CODE_RE.test(code)).length;
       if (hits / entries.length < 0.6) continue;
+      if (hadRecords && entries.every(([code]) => BARE_SIZE_RE.test(code))) {
+        // Keyed by size alone, the same models the records above already describe.
+        if (order.includes(k)) consumed.add(k);
+        continue;
+      }
       for (const [code, x] of entries) addCell(code, k, scalar(x) as string);
       consumed.add(k);
     }

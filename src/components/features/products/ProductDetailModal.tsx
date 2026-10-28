@@ -2767,7 +2767,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             // Walk every top-level metadata key.
             Object.entries(allData || {}).forEach(([k, v]) => {
               if (k.startsWith('_')) return;
-              if (withholdKey(k) || isNoiseSpecKey(k) || isContactKey(k) || complianceFlagLabel(k)) return;
+              if (consumedKeys.has(k) || withholdKey(k) || isNoiseSpecKey(k) || isContactKey(k) || complianceFlagLabel(k)) return;
               const inner = (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>))
                 ? (v as Record<string, unknown>).value
                 : v;

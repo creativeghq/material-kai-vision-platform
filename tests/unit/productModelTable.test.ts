@@ -33,6 +33,33 @@ describe('buildModelTable', () => {
     expect(t!.columns.map(c => c.label)).toEqual(['Height (mm)', 'Width (mm)', 'Heat Output 70/55 (W)']);
   });
 
+  it('reads maps keyed by size alone as one table', () => {
+    const t = buildModelTable([
+      {
+        height_mm: { '700.450': '690', '900.600': '900' },
+        width_mm: { '700.450': '450', '900.600': '600' },
+        weight_kg: { '700.450': '5.8', '900.600': '9.4' },
+      },
+    ]);
+    expect(t!.rows.map(r => r.model)).toEqual(['700.450', '900.600']);
+    expect(t!.columns.map(c => c.key)).toEqual(['height_mm', 'width_mm', 'weight_kg']);
+    expect(t!.consumed).toEqual(expect.arrayContaining(['height_mm', 'width_mm', 'weight_kg']));
+  });
+
+  it('does not repeat models the records already describe through size-keyed maps', () => {
+    const t = buildModelTable([
+      {
+        available_sizes: [
+          { model: 'KLM 700.450', width_mm: 450, height_mm: 690 },
+          { model: 'KLME 700.450', width_mm: 450, height_mm: 700 },
+        ],
+        height_mm: { '700.450': '690', '900.600': '900' },
+      },
+    ]);
+    expect(t!.rows.map(r => r.model).sort()).toEqual(['KLM 700.450', 'KLME 700.450']);
+    expect(t!.consumed).toContain('height_mm');
+  });
+
   it('returns null when there are not several models', () => {
     expect(buildModelTable([{ weight_kg: { 'A 700.600': '1' } }])).toBeNull();
     expect(buildModelTable([{ width_mm: [450, 600] }])).toBeNull();
