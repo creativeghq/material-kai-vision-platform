@@ -49,6 +49,8 @@ import {
   isAffirmative,
   DIMENSION_KEYS,
 } from './productSpecDisplay';
+import { buildModelTable } from './productModelTable';
+import { ProductModelsCard } from './ProductModelsCard';
 import { Product3DModelCard } from '@/components/features/products/Product3DModelCard';
 import { ProductEmbedReadinessCard } from '@/components/features/products/ProductEmbedReadinessCard';
 import { ProductMaterialMapsCard } from '@/components/features/products/ProductMaterialMapsCard';
@@ -1551,6 +1553,36 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     return map[key] || <Layers className="h-4 w-4" />;
   };
 
+  const CERT_OWNED_KEYS = new Set(['certifications', 'standards']);
+  // One registry section as a card; every field it renders is marked consumed.
+  const renderRegistrySection = (section: ReturnType<typeof fieldRegistry.sections>[number]) => {
+    const data: Record<string, unknown> = {};
+    const lowConf = new Set<string>();
+    for (const field of section.fields) {
+      // Per-key sensitivity gate; an unresolved verdict (null) withholds.
+      if (fieldRegistry.isInternalField(field.key) !== false) {
+        consumedKeys.add(field.key);
+        continue;
+      }
+      if (CERT_OWNED_KEYS.has(field.key) || complianceFlagLabel(field.key)) {
+        consumedKeys.add(field.key);
+        continue;
+      }
+      if (isContactKey(field.key) || isNoiseSpecKey(field.key)) continue;
+      const hit = lookupRegistryField(field.key);
+      if (!hit) continue;
+      consumedKeys.add(field.key);
+      data[field.label] = summariseSkuMap(hit.raw) ?? hit.value;
+      if (isLowConfidence(hit.raw)) lowConf.add(field.label);
+    }
+    if (Object.keys(data).length === 0) return null;
+    return (
+      <React.Fragment key={section.key}>
+        {renderMetadataCategory(section.label, data, lowConf, sectionIcon(section.key), true)}
+      </React.Fragment>
+    );
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       {/* grid-cols-1 caps the implicit grid track to the dialog width (the base
@@ -2184,6 +2216,13 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               );
             })()}
 
+            {(() => {
+              const material = fieldRegistry
+                .sections(resolveProductCategory(product.metadata, product.type, product.category))
+                .find(sec => sec.key === 'material_properties');
+              return material ? renderRegistrySection(material) : null;
+            })()}
+
             {/* Pricing & Availability intentionally removed —
                 quote-based platform, retail/wholesale/stock aren't tracked.
                 Quick quote/moodboard actions live in the DialogHeader. */}
@@ -2390,6 +2429,30 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </Badge>
                   )}
                 </div>
+                {gridFields.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {gridFields.map(([key, value]) => {
+                      const str = renderValue(value);
+                      if (HEX_RE.test(str)) {
+                        return (
+                          <div key={key} className="bg-muted/30 rounded-lg p-3">
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">{key}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
+                              <p className="text-xs font-semibold">{str}</p>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={key} className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-muted-foreground mb-1">{key}</p>
+                          <p className="text-xs font-semibold">{titleCaseDisplay(str)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
                 {patternsList.length > 0 && (
                   <div className="mb-4 flex items-start gap-3 py-2 border-b border-border/20">
                     <span className="text-xs text-muted-foreground shrink-0 pt-0.5">Patterns</span>
@@ -2399,7 +2462,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </div>
                 )}
                 {renderChipRow('Standard Colours', colorChips)}
-                {colourOptions.length === 0 && renderChipRow('Shades Seen in Photos', shadeChips)}
+                {renderChipRow('Possible Colors (Under Request)', shadeChips)}
                 {colourOptions.length > 0 && (
                   <div className="mb-4">
                     <p className="text-xs font-semibold text-muted-foreground mb-2">
@@ -2423,30 +2486,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </div>
                   </div>
                 )}
-                {gridFields.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {gridFields.map(([key, value]) => {
-                      const str = renderValue(value);
-                      if (HEX_RE.test(str)) {
-                        return (
-                          <div key={key} className="bg-muted/30 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
-                              <p className="text-xs font-semibold">{str}</p>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return (
-                        <div key={key} className="bg-muted/30 rounded-lg p-3">
-                          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">{key}</p>
-                          <p className="text-xs font-semibold">{titleCaseDisplay(str)}</p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
               </div>
             );
           };
@@ -2457,37 +2496,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it.
-          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial', 'dimensions']);
-          const CERT_OWNED_KEYS = new Set(['certifications', 'standards']);
+          const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial', 'dimensions', 'material_properties']);
           const registrySectionCards = registrySections
             .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))
-            .map(section => {
-              const data: Record<string, unknown> = {};
-              const lowConf = new Set<string>();
-              for (const field of section.fields) {
-                // Per-key sensitivity gate; an unresolved verdict (null) withholds.
-                if (fieldRegistry.isInternalField(field.key) !== false) {
-                  consumedKeys.add(field.key);
-                  continue;
-                }
-                if (CERT_OWNED_KEYS.has(field.key) || complianceFlagLabel(field.key)) {
-                  consumedKeys.add(field.key);
-                  continue;
-                }
-                if (isContactKey(field.key) || isNoiseSpecKey(field.key)) continue;
-                const hit = lookupRegistryField(field.key);
-                if (!hit) continue;
-                consumedKeys.add(field.key);
-                data[field.label] = summariseSkuMap(hit.raw) ?? hit.value;
-                if (isLowConfidence(hit.raw)) lowConf.add(field.label);
-              }
-              if (Object.keys(data).length === 0) return null;
-              return (
-                <React.Fragment key={section.key}>
-                  {renderMetadataCategory(section.label, data, lowConf, sectionIcon(section.key), true)}
-                </React.Fragment>
-              );
-            })
+            .map(section => renderRegistrySection(section))
             .filter(Boolean);
 
           // ── Detected text (vision OCR) — brand names, codes, dimensions
@@ -2541,6 +2553,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           // One Dimensions card: every size and weight fact as a big figure; a spread of
           // values (a range sold in many sizes) reads as min – max with the sizes beneath.
+          const modelTable = buildModelTable([allData as Record<string, unknown>, allData?._discovered_extra as Record<string, unknown> | undefined]);
+          modelTable?.consumed.forEach(k => consumedKeys.add(k));
+
           const renderDimensionsCard = () => {
             const tiles: Array<{ label: string; unit: string; text: string; count: number }> = [];
             const addTile = (label: string, key: string, unit: string) => {
@@ -2575,6 +2590,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               };
               return Array.from(new Set(list.map(label).filter(Boolean)));
             })();
+            if (modelTable) sizeChips.length = 0;
             if (tiles.length === 0 && sizeChips.length === 0 && !sections) return null;
             return (
               <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
@@ -2623,6 +2639,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           return (
             <div className="space-y-6 mt-6">
               {renderDimensionsCard()}
+              {modelTable && <ProductModelsCard table={modelTable} />}
               {renderAppearanceCard()}
               {renderDetectedTextCard()}
 
