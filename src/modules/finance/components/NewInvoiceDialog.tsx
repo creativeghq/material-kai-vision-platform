@@ -208,6 +208,8 @@ const taxOptionLabel = (r: TaxRef): string => {
   return `${r.description} (amount)`;
 };
 
+const PRODUCT_SUGGEST_MIN = 3;
+
 const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
   measurement_unit_code: '', selected_attributes: {}, color: '', size: '',
@@ -639,7 +641,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   useEffect(() => {
     if (prodOpenRow === null) return;
     const term = prodSearch.trim();
-    if (term.length < 2) { setProdResults([]); return; }
+    if (term.length < PRODUCT_SUGGEST_MIN) { setProdResults([]); return; }
     const t = setTimeout(async () => {
       const { data } = await supabase.from('products').select('id, name, sku, item_type, metadata').ilike('name', `%${term}%`).limit(8);
       setProdResults(data ?? []);
@@ -714,7 +716,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     });
     setProdOpenRow(null); setProdSearch(''); setProdResults([]);
   };
-  const matchedServices = (term: string) => term.length < 2 ? [] : services.filter((s) => s.name.toLowerCase().includes(term.toLowerCase())).slice(0, 6);
+  const matchedServices = (term: string) => term.length < PRODUCT_SUGGEST_MIN ? [] : services.filter((s) => s.name.toLowerCase().includes(term.toLowerCase())).slice(0, 6);
 
   // Shipping prefills
   const fmtAddr = (a: any) => a ? [a.business_address ?? a.street ?? a.address, a.business_street_number ?? a.street_number, a.business_postal_code ?? a.postal_code, a.business_city ?? a.city].filter(Boolean).join(' ') : '';
@@ -1706,30 +1708,39 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         </button>
                         <div className="flex-1 space-y-1">
                           <div className="relative">
-                            <Input className="h-8 text-sm" placeholder="Description" value={l.description} onChange={(e) => update(idx, { description: e.target.value })} />
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline" onClick={() => { setProdOpenRow(idx); setProdSearch(''); setProdResults([]); }}>
-                              <Package className="h-3 w-3" /> {l.product_id ? 'Linked product' : 'Pick from products'}
-                            </button>
-                            {(l.color || l.size) && <span className="text-[11px] text-muted-foreground">· {[l.color, l.size].filter(Boolean).join(' / ')}</span>}
-                          </div>
-                          {prodOpenRow === idx && (
-                            <div className="rounded-md border border-border/60 bg-popover p-2">
-                              <Input autoFocus className="h-8 text-xs" placeholder="Search products & services…" value={prodSearch} onChange={(e) => setProdSearch(e.target.value)} />
-                              <div className="mt-1 max-h-40 overflow-auto">
+                            <Input
+                              className="h-8 text-sm"
+                              placeholder="Description — type 3+ letters to find a product or service"
+                              value={l.description}
+                              onChange={(e) => {
+                                const v = e.target.value;
+                                update(idx, { description: v });
+                                if (l.product_id || v.trim().length < PRODUCT_SUGGEST_MIN) { setProdOpenRow(null); setProdResults([]); return; }
+                                if (prodOpenRow !== idx) setProdResults([]);
+                                setProdOpenRow(idx); setProdSearch(v);
+                              }}
+                              onBlur={() => setProdOpenRow((cur) => (cur === idx ? null : cur))}
+                              onKeyDown={(e) => { if (e.key === 'Escape') setProdOpenRow(null); }}
+                            />
+                            {prodOpenRow === idx && !l.product_id && (matchedServices(prodSearch.trim()).length > 0 || prodResults.length > 0) && (
+                              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-md border border-border/60 bg-popover p-1 shadow-overlay">
                                 {matchedServices(prodSearch.trim()).map((s) => (
-                                  <button key={`s-${s.id}`} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onClick={() => pickService(idx, s)}>
+                                  <button key={`s-${s.id}`} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickService(idx, s)}>
                                     <span>{s.name}</span><span className="text-[10px] text-muted-foreground">service</span>
                                   </button>
                                 ))}
                                 {prodResults.map((pr) => (
-                                  <button key={pr.id} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onClick={() => pickProduct(idx, pr)}>
+                                  <button key={pr.id} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickProduct(idx, pr)}>
                                     <span>{pr.name}{pr.sku ? ` · ${pr.sku}` : ''}</span><span className="text-[10px] text-muted-foreground">product</span>
                                   </button>
                                 ))}
-                                {prodSearch.length >= 2 && prodResults.length === 0 && matchedServices(prodSearch.trim()).length === 0 && <div className="px-2 py-1 text-xs text-muted-foreground">No matches</div>}
                               </div>
+                            )}
+                          </div>
+                          {(l.product_id || l.color || l.size) && (
+                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              {l.product_id && <span className="inline-flex items-center gap-1 text-primary"><Package className="h-3 w-3" /> Linked product</span>}
+                              {(l.color || l.size) && <span>· {[l.color, l.size].filter(Boolean).join(' / ')}</span>}
                             </div>
                           )}
                         </div>
