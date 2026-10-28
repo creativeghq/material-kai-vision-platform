@@ -19,7 +19,6 @@ interface DemoAgentResultsProps {
   categoryColors?: Record<string, string>;
   onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
-  onUseIn3DScene?: (imageUrl: string, productName: string) => void;
   vrGenerating?: boolean;
 }
 
@@ -37,7 +36,6 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   categoryColors = DEFAULT_CATEGORY_COLORS,
   onGenerateVR,
   onGenerateVideo,
-  onUseIn3DScene,
   vrGenerating,
 }) => {
   const { showPrices } = useShowPrices();
@@ -92,7 +90,6 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           onClose={handleCloseModal}
           onGenerateVR={onGenerateVR}
           onGenerateVideo={onGenerateVideo}
-          onUseIn3DScene={onUseIn3DScene}
           vrGenerating={vrGenerating}
         />
       </div>

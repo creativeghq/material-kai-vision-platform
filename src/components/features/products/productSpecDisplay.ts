@@ -84,3 +84,43 @@ export const DIMENSION_KEYS = [
   'width_mm', 'height_mm', 'depth_mm', 'length_mm', 'diameter_mm', 'thickness_mm',
   'weight_kg', 'sections', 'available_sizes', 'dimensions', 'size',
 ] as const;
+
+const SMALL_WORDS = new Set(['and', 'or', 'of', 'in', 'on', 'for', 'to', 'with', 'the', 'a', 'an', 'at', 'by', 'per']);
+const UNIT_WORDS = new Set([
+  'mm', 'cm', 'm', 'kg', 'g', 'w', 'kw', 'l', 'ml', 'bar', 'pa', 'kpa', 'v', 'hz', 'a',
+  'year', 'years', 'month', 'months', 'day', 'days', 'pcs', 'pc', 'h', 'min',
+]);
+
+const splitCompounds = (s: string): string => s.replace(/_+/g, ' ').replace(/(?<=\p{Ll})-(?=\p{Ll})/gu, ' ');
+const capitalise = (w: string): string => (w ? w[0].toUpperCase() + w.slice(1) : w);
+
+/**
+ * The one way a value from the data reaches the screen: `wall-mounted` reads Wall Mounted,
+ * `design radiator` Design Radiator, `false` False. Long sentences keep their wording and
+ * only gain a capital; codes, units, URLs and tokens already in capitals are left alone.
+ */
+export function displayValue(input: string): string {
+  const s = input.trim();
+  if (!s) return s;
+  if (/:\/\/|^www\.|@|^#|^\d/.test(s)) return s;
+  const parts = s.split(/\s*,\s*/);
+  if (parts.length > 1 && parts.every(p => p.split(/\s+/).length <= 4)) return parts.map(displayValue).join(', ');
+  if (s.split(/\s+/).length > 6 || /[.;:!?]\s/.test(s)) return capitalise(s);
+  const words = splitCompounds(s).split(/\s+/);
+  return words
+    .map((w, i) => {
+      if (!/^\p{Ll}/u.test(w)) return w;
+      if (i > 0 && SMALL_WORDS.has(w)) return w;
+      if (i > 0 && UNIT_WORDS.has(w) && /\d/.test(words[i - 1])) return w;
+      return w.split('/').map(capitalise).join('/');
+    })
+    .join(' ');
+}
+
+/** Colour and pattern names: shouted words are folded to Title Case, acronyms and codes kept (RAL 9016). */
+export function titleCaseDisplay(input: string): string {
+  return splitCompounds(input.trim())
+    .split(/\s+/)
+    .map(w => (/^\p{Lu}{2,4}$/u.test(w) || /\d/.test(w) ? w : capitalise(w.toLowerCase())))
+    .join(' ');
+}

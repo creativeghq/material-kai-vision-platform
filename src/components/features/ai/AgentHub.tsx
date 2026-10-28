@@ -5532,7 +5532,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           result={message.demoData}
           onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
           onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
-          onUseIn3DScene={handleUseProductIn3DScene}
         />
       );
     }

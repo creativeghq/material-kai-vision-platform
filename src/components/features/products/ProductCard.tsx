@@ -10,7 +10,7 @@ import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { ChevronRight, Sun, Smartphone, Wand2, Grid3x3 } from 'lucide-react';
+import { ChevronRight, Sun, Wand2, Grid3x3 } from 'lucide-react';
 import { buildTestOnRoomUrl } from '@/utils/testOnRoom';
 import { AddToQuoteButton } from '@/modules/quotes/components/AddToQuoteButton';
 import { AddToMoodboardButton } from '@/components/business/moodboard/AddToMoodboardButton';
@@ -35,7 +35,6 @@ const asMetaString = (v: unknown): string | undefined => {
 };
 
 const LightingPreviewModal = lazy(() => import('@/components/features/lighting/LightingPreviewModal').catch(() => ({ default: () => null })));
-const ARPreviewModal = lazy(() => import('@/components/features/ar/ARPreviewModal').then(m => ({ default: m.ARPreviewModal })).catch(() => ({ default: () => null })));
 
 interface ProductCardProps {
   product: Product;
@@ -63,7 +62,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   const trackedRef = useRef(false);
   const [showLighting, setShowLighting] = useState(false);
-  const [showAR, setShowAR] = useState(false);
 
   // Track product view when card becomes visible (IntersectionObserver)
   useEffect(() => {
@@ -224,29 +222,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               />
             </div>
 
-            {/* Lighting + AR row */}
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                onClick={(e) => { e.stopPropagation(); setShowLighting(true); }}
-                variant="outline"
-                size="sm"
-                className="text-xs gap-1"
-                title="Preview material under different lighting"
-              >
-                <Sun className="h-3.5 w-3.5" />
-                Lighting
-              </Button>
-              <Button
-                onClick={(e) => { e.stopPropagation(); setShowAR(true); }}
-                variant="outline"
-                size="sm"
-                className="text-xs gap-1"
-                title="View material in AR"
-              >
-                <Smartphone className="h-3.5 w-3.5" />
-                AR view
-              </Button>
-            </div>
+            <Button
+              onClick={(e) => { e.stopPropagation(); setShowLighting(true); }}
+              variant="outline"
+              size="sm"
+              className="w-full text-xs gap-1"
+              title="Preview material under different lighting"
+            >
+              <Sun className="h-3.5 w-3.5" />
+              Lighting
+            </Button>
 
             {/* Test on a room — hands off to the Interior Designer agent with
                 this material pre-pinned; the agent asks for a room photo. */}
@@ -300,15 +285,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
               productName={product.name}
               productCategory={product.category}
               productId={product.id}
-            />
-          )}
-          {showAR && (
-            <ARPreviewModal
-              isOpen={showAR}
-              onClose={() => setShowAR(false)}
-              productId={product.id}
-              productName={product.name}
-              productImage={primaryImage?.url || ''}
             />
           )}
         </Suspense>
