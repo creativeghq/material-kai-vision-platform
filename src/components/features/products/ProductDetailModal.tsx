@@ -1382,12 +1382,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div
                   key={key}
                   title={lowConfTitle}
-                  className={`flex items-center justify-between py-2 border-b border-border/20 ${lowConfClass}`}
+                  className={`border-b border-border/20 pb-2 ${lowConfClass}`}
                 >
-                  <span className="text-xs text-muted-foreground">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</span>
-                  <div className="flex items-center gap-2">
+                  <p className="text-[11px] font-medium text-muted-foreground">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</p>
+                  <div className="mt-0.5 flex items-center gap-2">
                     <span className="inline-block w-4 h-4 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
-                    <span className="text-xs font-semibold">{str}</span>
+                    <span className="text-sm font-semibold">{str}</span>
                   </div>
                 </div>
               );
@@ -1397,10 +1397,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <div
                 key={key}
                 title={lowConfTitle}
-                className={`flex items-start justify-between py-2 border-b border-border/20 gap-4 ${lowConfClass}`}
+                className={`border-b border-border/20 pb-2 ${lowConfClass}`}
               >
-                <span className="text-xs text-muted-foreground shrink-0">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</span>
-                <span className="text-xs font-semibold text-right">{displayValue(str)}</span>
+                <p className="text-[11px] font-medium text-muted-foreground">{key}{lowConf && <span className="ml-1 text-amber-500">·</span>}</p>
+                <p className="mt-0.5 text-sm font-semibold break-words">{displayValue(str)}</p>
               </div>
             );
           })}
@@ -1591,7 +1591,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   modelTable?.consumed.forEach(k => consumedKeys.add(k));
   const modelColumnKeys = new Set(modelTable?.columns.map(c => c.key) ?? []);
   // One registry section as a card; every field it renders is marked consumed.
-  const renderRegistrySection = (section: ReturnType<typeof fieldRegistry.sections>[number]) => {
+  const renderRegistrySection = (
+    section: ReturnType<typeof fieldRegistry.sections>[number],
+    extras: Array<{ label: string; value: string }> = [],
+  ) => {
     const data: Record<string, unknown> = {};
     const lowConf = new Set<string>();
     for (const field of section.fields) {
@@ -1611,6 +1614,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       data[field.label] = summariseSkuMap(hit.raw) ?? describeValue(hit.raw) ?? hit.value;
       if (isLowConfidence(hit.raw)) lowConf.add(field.label);
     }
+    for (const e of extras) if (!(e.label in data)) data[e.label] = e.value;
     if (Object.keys(data).length === 0) return null;
     return (
       <React.Fragment key={section.key}>
@@ -2449,24 +2453,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   )}
                 </div>
                 {gridFields.length > 0 && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                     {gridFields.map(([key, value]) => {
                       const str = renderValue(value);
                       if (HEX_RE.test(str)) {
                         return (
-                          <div key={key} className="bg-muted/30 rounded-lg p-3">
-                            <p className="text-xs font-semibold text-muted-foreground mb-1">{key}</p>
-                            <div className="flex items-center gap-2 mt-1">
+                          <div key={key} className="border-b border-border/20 pb-2">
+                            <p className="text-[11px] font-medium text-muted-foreground">{key}</p>
+                            <div className="mt-0.5 flex items-center gap-2">
                               <span className="inline-block w-5 h-5 rounded border border-border/50 flex-shrink-0" style={{ backgroundColor: str }} />
-                              <p className="text-xs font-semibold">{str}</p>
+                              <p className="text-sm font-semibold">{str}</p>
                             </div>
                           </div>
                         );
                       }
                       return (
-                        <div key={key} className="bg-muted/30 rounded-lg p-3">
-                          <p className="text-xs font-semibold text-muted-foreground mb-1">{key}</p>
-                          <p className="text-xs font-semibold">{displayValue(str)}</p>
+                        <div key={key} className="border-b border-border/20 pb-2">
+                          <p className="text-[11px] font-medium text-muted-foreground">{key}</p>
+                          <p className="mt-0.5 text-sm font-semibold break-words">{displayValue(str)}</p>
                         </div>
                       );
                     })}
@@ -2516,10 +2520,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it.
           const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial', 'dimensions', 'material_properties']);
-          const registrySectionCards = registrySections
-            .filter(section => !SPECIAL_SECTION_KEYS.has(section.key))
-            .map(section => renderRegistrySection(section))
-            .filter(Boolean);
+          const cardSections = registrySections.filter(section => !SPECIAL_SECTION_KEYS.has(section.key));
+          cardSections.forEach(section => renderRegistrySection(section));
 
           // ── Detected text (vision OCR) — brand names, codes, dimensions
           // visible on the material image. Skipped when empty.
@@ -2653,42 +2655,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             );
           };
 
-          return (
-            <div className="space-y-6 mt-6">
-              {renderDimensionsCard()}
-              {modelTable && <ProductModelsCard table={modelTable} />}
-              {renderAppearanceCard()}
-              {renderDetectedTextCard()}
-
-              {/* All registry-defined spec sections for THIS category, complete.
-                  Every field with a value is shown — no category gating drops data. */}
-              {registrySectionCards.length > 0 && (
-                <div className="columns-1 lg:columns-2 gap-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
-                  {registrySectionCards}
-                </div>
-              )}
-
-              {/* Commercial — curated (filters SKU/grout to THIS product, adds
-                  grout suggestions). Auto-hides if empty. */}
-              {renderMetadataCategory('Commercial Information', commercial, undefined, <ShoppingCart className="h-4 w-4" />)}
-
-              {/* Variants table (per-variant SKU + grout) */}
-              {(activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable()}
-
-              {/* Certifications (chips + compliance) — auto-hides if empty */}
-              {renderCertificationsCard()}
-            </div>
-          );
-        })()}
-
-          {/*
-            * ── Dynamic groups + completeness net ───────────────────────────
-            * Fully data-driven. The registry above gives curated headlines for
-            * the 10 known categories. THIS block handles anything the registry
-            * doesn't know about:
-            * • An unknown nested group the extractor invented (e.g.
-            */}
-          {(() => {
+          const computeLeftovers = () => {
             // ── Sensitivity (#368 PD-1) ──────────────────────────────────
             // Everything above this point is gated by SECTION: stock, cost, listings,
             // movements each ask whether this viewer may see that section. This block is not
@@ -2783,46 +2750,66 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               leafExtras.push({ key: k, label: keyLabel(k), value: str });
             });
 
-            if (leafExtras.length === 0) return null;
-            const placed = [...placeFields(fieldRegistry.snapshot?.fields ?? [], leafExtras).entries()]
-              .sort((a, b) => (a[0] === 'other' ? 1 : b[0] === 'other' ? -1 : sectionRank(a[0]) - sectionRank(b[0])));
+            return placeFields(fieldRegistry.snapshot?.fields ?? [], leafExtras);
+          };
 
-            const renderGrid = (fields: Array<{ key: string; label: string; value: string }>) => (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {fields.map(({ key, label, value }) => (
-                  <div key={key} className="bg-muted/30 rounded-lg p-3">
-                    <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-1">
-                      {label}
-                    </p>
-                    <p className="text-xs font-semibold">{displayValue(value)}</p>
-                  </div>
-                ))}
-              </div>
-            );
+          const dimensionsCard = renderDimensionsCard();
+          const appearanceCard = renderAppearanceCard();
+          const detectedTextCard = renderDetectedTextCard();
+          const commercialCard = renderMetadataCategory('Commercial Information', commercial, undefined, <ShoppingCart className="h-4 w-4" />);
+          const variantsCard = (activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable();
+          const certificationsCard = renderCertificationsCard();
 
-            return (
-              <div className="space-y-6 mt-6">
-                {placed.map(([section, fields]) => (
-                  <div key={section} className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-                    <div className="mb-4">
-                      <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                        <Database className="h-4 w-4" />
-                        {section === 'other'
-                          ? 'Other Specifications'
-                          : fieldRegistry.sections(resolveProductCategory(product.metadata, product.type, product.category)).some(s => s.key === section)
-                            ? `More ${sectionLabel(section)}`
-                            : sectionLabel(section)}
-                        <Badge variant="outline" className="text-[10px] font-normal">
-                          {fields.length}
-                        </Badge>
-                      </h3>
-                    </div>
-                    {renderGrid(fields)}
-                  </div>
-                ))}
-              </div>
-            );
-          })()}
+          const leftovers = computeLeftovers();
+          const toRows = (fields: Array<{ label: string; value: string }>) => fields.map(f => ({ label: f.label, value: f.value }));
+          const registrySectionCards = cardSections
+            .map(section => renderRegistrySection(section, toRows(leftovers.get(section.key) ?? [])))
+            .filter(Boolean);
+          const cardKeys = new Set(cardSections.map(section => section.key));
+          const stragglers = [...leftovers.entries()]
+            .filter(([key]) => !cardKeys.has(key) && key !== 'other' && !SPECIAL_SECTION_KEYS.has(key))
+            .sort((x, y) => sectionRank(x[0]) - sectionRank(y[0]));
+          const otherFields = [
+            ...(leftovers.get('other') ?? []),
+            ...[...leftovers.entries()].filter(([key]) => SPECIAL_SECTION_KEYS.has(key) && !cardKeys.has(key)).flatMap(([, f]) => f),
+          ];
+          const rowsOf = (fields: Array<{ label: string; value: string }>) =>
+            Object.fromEntries(fields.map(f => [f.label, f.value]));
+
+          return (
+            <div className="space-y-6 mt-6">
+              {dimensionsCard}
+              {modelTable && <ProductModelsCard table={modelTable} />}
+              {appearanceCard}
+              {detectedTextCard}
+
+              {/* All registry-defined spec sections for THIS category, complete.
+                  Every field with a value is shown — no category gating drops data. */}
+              {registrySectionCards.length > 0 && (
+                <div className="columns-1 lg:columns-2 gap-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
+                  {registrySectionCards}
+                </div>
+              )}
+
+              {/* Commercial — curated (filters SKU/grout to THIS product, adds
+                  grout suggestions). Auto-hides if empty. */}
+              {commercialCard}
+
+              {variantsCard}
+
+              {certificationsCard}
+
+              {stragglers.map(([key, fields]) => (
+                <React.Fragment key={key}>
+                  {renderMetadataCategory(sectionLabel(key), rowsOf(fields), undefined, <Database className="h-4 w-4" />, true)}
+                </React.Fragment>
+              ))}
+              {otherFields.length > 0 &&
+                renderMetadataCategory('Other Specifications', rowsOf(otherFields), undefined, <Database className="h-4 w-4" />)}
+            </div>
+          );
+        })()}
+
 
       </TabsContent>
 
