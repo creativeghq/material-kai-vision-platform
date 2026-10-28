@@ -1,25 +1,8 @@
-const RULES: Array<[string, RegExp]> = [
-  ['compliance', /(^|_)(standard|certif\w*|compliant|compliance|approval|approved|norm|en|din|iso|ce|rohs|fire|reaction)($|_)/],
-  ['packaging', /(^|_)(pack\w*|carton|pallet|box|boxes|crate|per_box|per_pallet)($|_)/],
-  ['care', /(^|_)(clean\w*|maintenance|care|wash\w*)($|_)/],
-  ['installation', /(^|_)(install\w*|mount\w*|bracket\w*|fix\w*|fitting|fittings|hang\w*|anchor\w*|screw\w*|clearance|spacing|connection\w*|pipe|supports?|plug)($|_)/],
-  ['electrical_specs', /(^|_)(volt\w*|current|amp\w*|frequency|hz|ip|element|elements|electric\w*|phase|wattage)($|_)/],
-  ['water_performance', /(^|_)(water|flow|drain\w*|absorption|bar|litres?|liters?|permeab\w*)($|_)/],
-  ['thermal_performance', /(^|_)(heat\w*|thermal|temperature|temp|exponent|insulat\w*|conductiv\w*|delta|kw|u_value|r_value|lambda)($|_)/],
-  ['performance', /(^|_)(load|strength|capacity|rating|class|hardness|slip|wear|force|torque|pressure|resist\w*|durab\w*)($|_)/],
-  ['dimensions', /(^|_)(width|height|depth|length|thickness|diameter|weight|size|sizes|dimension\w*|volume|area)($|_)/],
-  ['appearance', /(^|_)(colou?rs?|finish\w*|gloss\w*|textures?|pattern\w*|shades?|look|surface|ral)($|_)/],
-  ['material_properties', /(^|_)(material\w*|composition|steel|alloy|coating|density|aluminium|aluminum|wood|glass|ceramic)($|_)/],
-  ['application', /(^|_)(use|uses|suitable|suitability|application\w*|rooms?|indoor|outdoor|environment|area_of_use)($|_)/],
-  ['commercial', /(^|_)(warranty|guarantee|price|brand|collection|series|origin|supplier|manufacturer|lead_time|moq)($|_)/],
-  ['features', /(^|_)(included|includes|has|with|feature\w*|option\w*|optional|available|supports?)($|_)/],
-];
-
-/** Which Details section a field no importer declared belongs in, from the words of its key alone. */
-export function inferSection(...hints: string[]): string {
-  const text = hints.join('_').toLowerCase().replace(/([a-z])([A-Z])/g, '$1_$2').replace(/[^a-z0-9]+/g, '_');
-  for (const [section, re] of RULES) if (re.test(text)) return section;
-  return 'other';
+export interface KnownField {
+  name: string;
+  label: string;
+  section: string;
+  description: string | null;
 }
 
 export interface PlacedField {
@@ -29,11 +12,70 @@ export interface PlacedField {
   hint?: string;
 }
 
-/** Buckets leftover fields by inferred section; `other` collects what no rule recognises. */
-export function placeFields(fields: PlacedField[]): Map<string, PlacedField[]> {
+const tokens = (s: string): string[] =>
+  s
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(t => t.length > 1 && !/^\d+$/.test(t))
+    .map(t => (t.length > 3 && t.endsWith('s') ? t.slice(0, -1) : t));
+
+interface Index {
+  docs: Array<{ section: string; toks: Set<string> }>;
+  idf: Map<string, number>;
+}
+
+const indexCache = new WeakMap<KnownField[], Index>();
+
+function indexOf(fields: KnownField[]): Index {
+  const hit = indexCache.get(fields);
+  if (hit) return hit;
+  const docs = fields.map(f => ({
+    section: f.section,
+    toks: new Set([...tokens(f.name), ...tokens(f.label), ...tokens(f.description ?? '')]),
+  }));
+  const df = new Map<string, number>();
+  for (const d of docs) for (const t of d.toks) df.set(t, (df.get(t) ?? 0) + 1);
+  const idf = new Map([...df].map(([t, n]) => [t, Math.log(1 + docs.length / n)]));
+  const built = { docs, idf };
+  indexCache.set(fields, built);
+  return built;
+}
+
+/**
+ * The section whose registered fields share the most (rare) words with this key, or 'other'.
+ * The registry is the vocabulary: a field registered once teaches every later import.
+ */
+export function inferSection(fields: KnownField[], key: string, hint = ''): string {
+  if (fields.length === 0) return 'other';
+  const { docs, idf } = indexOf(fields);
+  const own = new Map<string, number>();
+  for (const t of tokens(key)) own.set(t, 1);
+  for (const t of tokens(hint)) if (!own.has(t)) own.set(t, 0.5);
+  const score = new Map<string, number>();
+  for (const d of docs) {
+    let s = 0;
+    for (const [t, w] of own) if (d.toks.has(t)) s += w * (idf.get(t) ?? 0);
+    if (s > 0) score.set(d.section, (score.get(d.section) ?? 0) + s * s);
+  }
+  let best = 'other';
+  let top = 0;
+  let total = 0;
+  for (const [section, s] of score) {
+    total += s;
+    if (s > top) {
+      top = s;
+      best = section;
+    }
+  }
+  return total > 0 && top / total >= 0.4 ? best : 'other';
+}
+
+/** Buckets leftover fields by the section the registry suggests; unmatched ones stay together. */
+export function placeFields(fields: KnownField[], items: PlacedField[]): Map<string, PlacedField[]> {
   const out = new Map<string, PlacedField[]>();
-  for (const f of fields) {
-    const section = inferSection(f.key, f.hint ?? '');
+  for (const f of items) {
+    const section = inferSection(fields, f.key, f.hint ?? '');
     const list = out.get(section);
     if (list) list.push(f);
     else out.set(section, [f]);

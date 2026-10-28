@@ -2784,7 +2784,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             });
 
             if (leafExtras.length === 0) return null;
-            const placed = [...placeFields(leafExtras).entries()]
+            const placed = [...placeFields(fieldRegistry.snapshot?.fields ?? [], leafExtras).entries()]
               .sort((a, b) => (a[0] === 'other' ? 1 : b[0] === 'other' ? -1 : sectionRank(a[0]) - sectionRank(b[0])));
 
             const renderGrid = (fields: Array<{ key: string; label: string; value: string }>) => (
