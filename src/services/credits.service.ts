@@ -63,6 +63,25 @@ export interface CreditSpendSummary {
   by_category: CreditSpendCategory[];
 }
 
+export interface CreditStatement {
+  period_start: string;
+  period_end: string;
+  starting_balance: number;
+  ending_balance: number;
+  topups: Array<{
+    id: string;
+    created_at: string;
+    description: string | null;
+    amount: number;
+    transaction_type: CreditTransaction['transaction_type'];
+  }>;
+  /** Signed net per operation token: negative = spent, positive = refunded / adjusted. */
+  usage: Array<{ operation_type: string; net: number; txn_count: number }>;
+  daily: Array<{ day: string; spent: number }>;
+  /** Every `YYYY-MM` the account has activity in, newest first. */
+  months: string[];
+}
+
 export interface GrantResult {
   success: boolean;
   new_balance: number;
@@ -145,6 +164,17 @@ export const creditsAPI = {
       txn_count: 0,
       by_category: [],
     };
+  },
+
+  async getStatement(year: number, month: number): Promise<CreditStatement> {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const { data, error } = await supabase.rpc('get_my_credit_statement', {
+      p_year: year,
+      p_month: month,
+      p_tz: tz,
+    });
+    if (error) throw error;
+    return data as unknown as CreditStatement;
   },
 
   /**
@@ -241,6 +271,10 @@ export class CreditsService {
 
   async getSpendSummary(days?: number) {
     return creditsAPI.getSpendSummary(days);
+  }
+
+  async getStatement(year: number, month: number) {
+    return creditsAPI.getStatement(year, month);
   }
 
   async getUsageLogs(limit?: number) {

@@ -37915,6 +37915,10 @@ export type Database = {
         }[]
       }
       get_my_credit_spend_summary: { Args: { p_days?: number }; Returns: Json }
+      get_my_credit_statement: {
+        Args: { p_month: number; p_tz?: string; p_year: number }
+        Returns: Json
+      }
       get_next_pending_chunk: {
         Args: { session_id_param: string }
         Returns: {

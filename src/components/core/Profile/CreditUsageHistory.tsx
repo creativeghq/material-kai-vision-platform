@@ -1,33 +1,25 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { formatDate as formatDateValue } from '@/utils/datetime';
-import { History, Loader2, TrendingDown, ArrowDownRight, ArrowUpRight, Users } from 'lucide-react';
+import { Download, Loader2, Users } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { TablePagination } from '@/components/core/ui/table-pagination';
 import { useAuth } from '@/contexts/AuthContext';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import {
   CreditsService,
   creditOperationCategory,
   type CreditSpendCategoryLabel,
-  type CreditTransaction,
-  type CreditSpendSummary,
+  type CreditStatement,
 } from '@/services/credits.service';
 import { workspaceCreditsService, type WorkspaceCreditStatus } from '@/services/workspaceCreditsService';
+import { downloadCsv, toCsv } from '@/modules/finance/services/accountingExportService';
 
 const creditsService = new CreditsService();
 
-const PAGE_SIZE = 20;
-
-const WINDOWS: { label: string; days: number }[] = [
-  { label: '7 days', days: 7 },
-  { label: '30 days', days: 30 },
-  { label: '90 days', days: 90 },
-];
-
-// Category → tailwind accent for the breakdown bars / badges. Keyed by the category
-// union, so a new category cannot ship without a colour and quietly render as "Other".
+// Keyed by the category union, so a new category cannot ship without a colour and quietly render as "Other".
 const CATEGORY_COLOR: Record<CreditSpendCategoryLabel, string> = {
   'AI Assistant': 'bg-violet-500',
   'SEO Toolkit': 'bg-orange-500',
@@ -58,49 +50,38 @@ const CATEGORY_COLOR: Record<CreditSpendCategoryLabel, string> = {
   Other: 'bg-muted-foreground/50',
 };
 
-// Now carries the year as well — a credit ledger spanning a year boundary was ambiguous without it.
-const formatDate = (dateString: string) => formatDateValue(dateString, { withTime: true });
+const TOPUP_LABEL: Record<string, string> = {
+  purchase: 'Credit purchase',
+  bonus: 'Bonus credits',
+  monthly_grant: 'Monthly grant',
+};
+
+const formatDay = (value: string) => formatDateValue(value);
+const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmt(Math.abs(n))}`;
+const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const monthLabel = (key: string) => {
+  const [y, m] = key.split('-').map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+};
+
+interface StatementRow {
+  key: string;
+  date: string;
+  description: string;
+  amount: number;
+  dot?: string;
+}
 
 export const CreditUsageHistory: React.FC = () => {
   const { user } = useAuth();
   const { activeWorkspaceId } = useWorkspace();
   const [pool, setPool] = useState<WorkspaceCreditStatus | null>(null);
-  const [windowDays, setWindowDays] = useState(30);
-  const [summary, setSummary] = useState<CreditSpendSummary | null>(null);
-  const [summaryLoading, setSummaryLoading] = useState(true);
-
-  const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
-  const [listLoading, setListLoading] = useState(true);
-  // Server-side pagination: only the current page is fetched, `total` comes from the query count.
-  const [page, setPage] = useState(1);
-  const [total, setTotal] = useState(0);
-
-  const loadSummary = useCallback(async () => {
-    if (!user) return;
-    setSummaryLoading(true);
-    try {
-      const result = await creditsService.getSpendSummary(windowDays);
-      setSummary(result);
-    } catch (error) {
-      console.error('Error loading spend summary:', error);
-    } finally {
-      setSummaryLoading(false);
-    }
-  }, [user, windowDays]);
-
-  const loadPage = useCallback(async () => {
-    if (!user) return;
-    setListLoading(true);
-    try {
-      const { data, count } = await creditsService.getTransactions(PAGE_SIZE, (page - 1) * PAGE_SIZE);
-      setTransactions(data || []);
-      setTotal(count || 0);
-    } catch (error) {
-      console.error('Error loading transactions:', error);
-    } finally {
-      setListLoading(false);
-    }
-  }, [user, page]);
+  const [month, setMonth] = useState(() => monthKey(new Date()));
+  const [statement, setStatement] = useState<CreditStatement | null>(null);
+  const [months, setMonths] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,19 +98,99 @@ export const CreditUsageHistory: React.FC = () => {
   }, [activeWorkspaceId]);
 
   useEffect(() => {
-    loadSummary();
-  }, [loadSummary]);
+    if (!user) return;
+    let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    const [y, m] = month.split('-').map(Number);
+    creditsService.getStatement(y, m)
+      .then((s) => {
+        if (cancelled) return;
+        setStatement(s);
+        setMonths(s.months);
+      })
+      .catch((error) => {
+        console.error('Error loading credit statement:', error);
+        if (!cancelled) setFailed(true);
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [user, month]);
 
-  useEffect(() => {
-    loadPage();
-  }, [loadPage]);
+  const monthOptions = useMemo(
+    () => Array.from(new Set([monthKey(new Date()), ...months])).sort().reverse(),
+    [months],
+  );
 
-  const topCategory = summary?.by_category?.[0];
-  const maxCategorySpend = topCategory?.total_spent || 1;
+  const periodRange = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const first = new Date(y, m - 1, 1);
+    const last = new Date(y, m, 0);
+    const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+    return `${first.toLocaleDateString(undefined, opts)} – ${last.toLocaleDateString(undefined, opts)}`;
+  }, [month]);
+
+  const rows = useMemo<StatementRow[]>(() => {
+    if (!statement) return [];
+    const topups = statement.topups.map((t) => ({
+      key: t.id,
+      date: formatDay(t.created_at),
+      description: t.description || TOPUP_LABEL[t.transaction_type] || 'Credits added',
+      amount: Number(t.amount),
+    }));
+    const byCategory = new Map<CreditSpendCategoryLabel, { net: number; count: number }>();
+    for (const u of statement.usage) {
+      const label = creditOperationCategory(u.operation_type);
+      const cur = byCategory.get(label) ?? { net: 0, count: 0 };
+      byCategory.set(label, { net: cur.net + Number(u.net), count: cur.count + Number(u.txn_count) });
+    }
+    const usage = Array.from(byCategory.entries())
+      .filter(([, v]) => Math.abs(v.net) >= 0.005)
+      .sort((a, b) => a[1].net - b[1].net)
+      .map(([label, v]) => ({
+        key: `usage-${label}`,
+        date: periodRange,
+        description: v.net < 0
+          ? `${label} — ${v.count.toLocaleString()} ${v.count === 1 ? 'operation' : 'operations'}`
+          : `${label} — refunds & adjustments`,
+        amount: v.net,
+        dot: CATEGORY_COLOR[label] || CATEGORY_COLOR.Other,
+      }));
+    return [...topups, ...usage];
+  }, [statement, periodRange]);
+
+  const totals = useMemo(() => {
+    const added = rows.filter((r) => r.amount > 0).reduce((s, r) => s + r.amount, 0);
+    const spent = rows.filter((r) => r.amount < 0).reduce((s, r) => s - r.amount, 0);
+    return { added, spent };
+  }, [rows]);
+
+  const chart = useMemo(() => {
+    const [y, m] = month.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const byDay = new Map((statement?.daily ?? []).map((d) => [d.day, Number(d.spent)]));
+    const bars = Array.from({ length: daysInMonth }, (_, i) => {
+      const day = `${month}-${String(i + 1).padStart(2, '0')}`;
+      return { day: i + 1, spent: byDay.get(day) ?? 0 };
+    });
+    return { bars, max: Math.max(...bars.map((b) => b.spent)) };
+  }, [statement, month]);
+
+  const handleDownload = () => {
+    if (!statement) return;
+    const csv = toCsv(
+      ['Date', 'Description', 'Amount (credits)'],
+      [
+        ['', 'Starting balance', statement.starting_balance.toFixed(2)],
+        ...rows.map((r) => [r.date, r.description, r.amount.toFixed(2)]),
+        ['', 'Ending balance', statement.ending_balance.toFixed(2)],
+      ],
+    );
+    downloadCsv(`credit-statement-${month}.csv`, csv);
+  };
 
   return (
     <div className="space-y-6">
-      {/* Workspace shared-pool banner — shown when the active workspace is on shared credits */}
       {pool && (
         <Card className="rounded-2xl border-primary/30 bg-primary/5">
           <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -154,188 +215,137 @@ export const CreditUsageHistory: React.FC = () => {
         </Card>
       )}
 
-      {/* Spend summary */}
       <Card className="rounded-2xl">
         <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingDown className="h-4 w-4 text-primary" />
-                Spend Summary
-              </CardTitle>
-              <CardDescription>Where your credits went over the selected period</CardDescription>
+              <CardTitle>Statement</CardTitle>
+              <CardDescription>Credits added and spent, month by month</CardDescription>
             </div>
-            <div className="flex gap-1 rounded-full bg-muted p-1">
-              {WINDOWS.map((w) => (
-                <button
-                  key={w.days}
-                  type="button"
-                  onClick={() => setWindowDays(w.days)}
-                  className={`px-3 py-1 text-xs font-medium transition-colors ${
-                    windowDays === w.days
-                      ? 'bg-background text-foreground shadow-sm'
-                      : 'text-muted-foreground hover:text-foreground'
-                  }`}
-                >
-                  {w.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2">
+              <Select value={month} onValueChange={setMonth}>
+                <SelectTrigger className="w-44" aria-label="Statement month">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((k) => (
+                    <SelectItem key={k} value={k}>{monthLabel(k)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleDownload}
+                disabled={!statement || loading}
+                aria-label="Download statement as CSV"
+                title="Download CSV"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-5">
-          {summaryLoading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
+        <CardContent className="p-0">
+          {loading ? (
+            <div className="flex items-center justify-center py-10 text-muted-foreground">
               <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : failed || !statement ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">
+              Could not load this statement. Try another month or refresh.
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div>
-                  <div className="text-2xl font-bold text-red-500">
-                    {(summary?.total_spent ?? 0).toFixed(2)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Credits spent</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-green-500">
-                    {(summary?.total_added ?? 0).toFixed(2)}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Credits added / refunded</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold">{summary?.txn_count ?? 0}</div>
-                  <div className="text-xs text-muted-foreground">Charged operations</div>
-                </div>
+              <div className="flex items-center justify-between border-t border-hairline bg-surface-sunken px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Ending balance</span>
+                <span className="font-semibold tabular-nums">{fmt(statement.ending_balance)}</span>
               </div>
-
-              {summary && summary.by_category.length > 0 ? (
-                <div className="space-y-3 border-t border-border pt-4">
-                  {(() => {
-                    // Roll raw operation_types up into friendly categories.
-                    const grouped = new Map<CreditSpendCategoryLabel, number>();
-                    for (const c of summary.by_category) {
-                      const label = creditOperationCategory(c.operation_type);
-                      grouped.set(label, (grouped.get(label) || 0) + Number(c.total_spent));
-                    }
-                    const rows = Array.from(grouped.entries()).sort((a, b) => b[1] - a[1]);
-                    const maxVal = Math.max(rows[0]?.[1] || maxCategorySpend, 1);
-                    return rows.map(([label, total]) => (
-                      <div key={label} className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="flex items-center gap-2">
-                            <span className={`h-2.5 w-2.5 rounded-full ${CATEGORY_COLOR[label] || CATEGORY_COLOR.Other}`} />
-                            {label}
-                          </span>
-                          <span className="font-semibold tabular-nums">{total.toFixed(2)}</span>
-                        </div>
-                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                          <div
-                            className={`h-full rounded-full ${CATEGORY_COLOR[label] || CATEGORY_COLOR.Other}`}
-                            style={{ width: `${Math.max((total / maxVal) * 100, 2)}%` }}
-                          />
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              ) : (
-                <p className="border-t border-border pt-4 text-sm text-muted-foreground">
-                  No credits spent in this period.
-                </p>
-              )}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-44">Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount (credits)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={3} className="py-8 text-center text-sm text-muted-foreground">
+                        No credit activity in {monthLabel(month)}.
+                      </TableCell>
+                    </TableRow>
+                  ) : rows.map((r) => (
+                    <TableRow key={r.key}>
+                      <TableCell className="whitespace-nowrap text-xs text-muted-foreground">{r.date}</TableCell>
+                      <TableCell className="text-sm">
+                        <span className="flex items-center gap-2">
+                          {r.dot && <span className={`h-2 w-2 shrink-0 rounded-full ${r.dot}`} />}
+                          <span className="min-w-0 truncate">{r.description}</span>
+                        </span>
+                      </TableCell>
+                      <TableCell
+                        className={`text-right text-sm font-semibold tabular-nums ${
+                          r.amount < 0 ? 'text-red-500' : 'text-green-500'
+                        }`}
+                      >
+                        {signed(r.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+              <div className="flex items-center justify-between border-t border-hairline bg-surface-sunken px-4 py-2.5 text-sm">
+                <span className="text-muted-foreground">Starting balance</span>
+                <span className="font-semibold tabular-nums">{fmt(statement.starting_balance)}</span>
+              </div>
             </>
           )}
         </CardContent>
       </Card>
 
-      {/* Recent activity */}
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <History className="h-4 w-4 text-primary" />
-            Recent Activity
-          </CardTitle>
-          <CardDescription>Every credit charge, refund, and top-up, newest first</CardDescription>
+          <CardTitle>Daily spend</CardTitle>
+          <CardDescription>{monthLabel(month)}</CardDescription>
         </CardHeader>
-        <CardContent className="p-0">
-          {listLoading ? (
-            <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="h-5 w-5 animate-spin" />
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+            <div>
+              <div className="text-2xl font-bold tabular-nums text-red-500">{fmt(totals.spent)}</div>
+              <div className="text-xs text-muted-foreground">Credits spent</div>
             </div>
-          ) : transactions.length === 0 ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">
-              No activity yet. Your credit charges will show up here.
+            <div>
+              <div className="text-2xl font-bold tabular-nums text-green-500">{fmt(totals.added)}</div>
+              <div className="text-xs text-muted-foreground">Added / refunded</div>
             </div>
-          ) : (
-            <>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Activity</TableHead>
-                    <TableHead className="hidden sm:table-cell">Category</TableHead>
-                    <TableHead className="hidden md:table-cell">When</TableHead>
-                    <TableHead className="text-right">Amount</TableHead>
-                    <TableHead className="hidden text-right sm:table-cell">Balance</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.map((t) => {
-                    const isSpend = Number(t.amount) < 0;
-                    const category = creditOperationCategory(t.operation_token);
-                    return (
-                      <TableRow key={t.id}>
-                        <TableCell className="max-w-[22rem]">
-                          <div className="flex items-center gap-2.5">
-                            <span
-                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
-                                isSpend ? 'bg-red-500/10 text-red-500' : 'bg-green-500/10 text-green-500'
-                              }`}
-                            >
-                              {isSpend ? <ArrowDownRight className="h-3.5 w-3.5" /> : <ArrowUpRight className="h-3.5 w-3.5" />}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-medium">{t.description || category}</div>
-                              {/* Category + timestamp collapse into this cell on small screens,
-                                  where their own columns are hidden. */}
-                              <div className="text-xs text-muted-foreground sm:hidden">
-                                {category} · {formatDate(t.created_at)}
-                              </div>
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell">
-                          <span className="text-xs text-muted-foreground capitalize">
-                            {category}
-                          </span>
-                        </TableCell>
-                        <TableCell className="hidden whitespace-nowrap text-xs text-muted-foreground md:table-cell">
-                          {formatDate(t.created_at)}
-                        </TableCell>
-                        <TableCell
-                          className={`text-right text-sm font-semibold tabular-nums ${
-                            isSpend ? 'text-red-500' : 'text-green-500'
-                          }`}
-                        >
-                          {isSpend ? '' : '+'}{Number(t.amount).toFixed(2)}
-                        </TableCell>
-                        <TableCell className="hidden text-right text-xs text-muted-foreground tabular-nums sm:table-cell">
-                          {(t.balance_after ?? 0).toFixed(2)}
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              <TablePagination
-                page={page}
-                total={total}
-                pageSize={PAGE_SIZE}
-                onPageChange={setPage}
-                label="transactions"
-              />
-            </>
-          )}
+            <div>
+              <div className="text-2xl font-bold tabular-nums">
+                {(statement?.usage ?? []).reduce((s, u) => s + Number(u.txn_count), 0).toLocaleString()}
+              </div>
+              <div className="text-xs text-muted-foreground">Charged operations</div>
+            </div>
+          </div>
+          <div className="flex h-40 items-end gap-0.5 border-b border-hairline" role="img" aria-label="Credits spent per day">
+            {chart.bars.map((b) => (
+              <div
+                key={b.day}
+                className="flex h-full flex-1 items-end"
+                title={`${monthLabel(month).split(' ')[0]} ${b.day}: ${fmt(b.spent)} credits`}
+              >
+                <div
+                  className="w-full rounded-t-sm bg-primary"
+                  style={{ height: b.spent > 0 ? `${Math.max((b.spent / chart.max) * 100, 2)}%` : 0 }}
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between text-[11px] text-muted-foreground tabular-nums">
+            <span>1</span>
+            <span>Peak day {fmt(chart.max)}</span>
+            <span>{chart.bars.length}</span>
+          </div>
         </CardContent>
       </Card>
     </div>

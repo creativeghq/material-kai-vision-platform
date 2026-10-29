@@ -120,10 +120,9 @@ describe('credit spend categories', () => {
     }
   });
 
-  it('categorises the ledger list from the same token as the summary', () => {
-    // Both surfaces on this screen must answer the same way about the same row.
-    expect(readSource(LEDGER_UI), 'Recent Activity must categorise from operation_token')
-      .toContain('creditOperationCategory(t.operation_token)');
+  it('categorises the statement from the server-normalised token', () => {
+    expect(readSource(LEDGER_UI), 'the statement must categorise from the RPC operation token')
+      .toContain('creditOperationCategory(u.operation_type)');
     expect(strippedSource(LEDGER_UI), 'the raw operation_type still reaches the categoriser')
       .not.toContain('metadata?.operation_type');
   });
