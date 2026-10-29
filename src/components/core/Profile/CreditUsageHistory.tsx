@@ -15,6 +15,7 @@ import {
   type CreditStatement,
 } from '@/services/credits.service';
 import { workspaceCreditsService, type WorkspaceCreditStatus } from '@/services/workspaceCreditsService';
+import { formatNumber } from '@/utils/decimal';
 import { downloadCsv, toCsv } from '@/modules/finance/services/accountingExportService';
 
 const creditsService = new CreditsService();
@@ -57,12 +58,12 @@ const TOPUP_LABEL: Record<string, string> = {
 };
 
 const formatDay = (value: string) => formatDateValue(value);
-const fmt = (n: number) => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const fmt = (n: number) => n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${fmt(Math.abs(n))}`;
 const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 const monthLabel = (key: string) => {
   const [y, m] = key.split('-').map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  return new Date(y, m - 1, 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 };
 
 interface StatementRow {
@@ -127,7 +128,7 @@ export const CreditUsageHistory: React.FC = () => {
     const first = new Date(y, m - 1, 1);
     const last = new Date(y, m, 0);
     const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
-    return `${first.toLocaleDateString(undefined, opts)} – ${last.toLocaleDateString(undefined, opts)}`;
+    return `${first.toLocaleDateString('en-US', opts)} – ${last.toLocaleDateString('en-US', opts)}`;
   }, [month]);
 
   const rows = useMemo<StatementRow[]>(() => {
@@ -151,7 +152,7 @@ export const CreditUsageHistory: React.FC = () => {
         key: `usage-${label}`,
         date: periodRange,
         description: v.net < 0
-          ? `${label} — ${v.count.toLocaleString()} ${v.count === 1 ? 'operation' : 'operations'}`
+          ? `${label} — ${formatNumber(v.count)} ${v.count === 1 ? 'operation' : 'operations'}`
           : `${label} — refunds & adjustments`,
         amount: v.net,
         dot: CATEGORY_COLOR[label] || CATEGORY_COLOR.Other,
@@ -322,7 +323,7 @@ export const CreditUsageHistory: React.FC = () => {
             </div>
             <div>
               <div className="text-2xl font-bold tabular-nums">
-                {(statement?.usage ?? []).reduce((s, u) => s + Number(u.txn_count), 0).toLocaleString()}
+                {formatNumber((statement?.usage ?? []).reduce((s, u) => s + Number(u.txn_count), 0))}
               </div>
               <div className="text-xs text-muted-foreground">Charged operations</div>
             </div>
