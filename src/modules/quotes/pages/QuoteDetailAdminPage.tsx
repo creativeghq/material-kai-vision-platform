@@ -1237,6 +1237,17 @@ export const QuoteDetailPage: React.FC = () => {
                           <span className="font-semibold">Grand Total</span>
                           <span className="font-bold text-lg">€{pricingGrandTotal.toFixed(2)}</span>
                         </div>
+                        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Switch
+                            checked={!!quote.show_prices_incl_vat}
+                            disabled={quote.status === 'accepted' || quote.status === 'rejected'}
+                            onCheckedChange={async (v) => {
+                              await quotesService.updateQuote(quote.id, { show_prices_incl_vat: v });
+                              await loadQuoteDetails();
+                            }}
+                          />
+                          PDF shows prices incl. VAT (final total only)
+                        </label>
                       </div>
                     </div>
 

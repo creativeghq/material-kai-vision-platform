@@ -136,6 +136,7 @@ export interface BrandedTotals {
   vat_amount: number;
   grand_total: number;
   cash_discount_pct?: number;
+  final_only?: boolean;
   gross_subtotal?: number;        // value BEFORE discount (Σ price×qty) — proforma breakdown
   discount_total?: number;        // Σ line discounts
   currency: string;
@@ -390,7 +391,7 @@ function drawTableHeader(page: PDFPage, g: Geom, y: number, cols: ColumnSpec[], 
   const ty = y - g.HEADER_ROW_H / 2 - 3;
   let x = g.TABLE_MARGIN;
   for (const col of cols) {
-    const label = col.key === 'total' && pricesIncludeVat ? 'Total' : col.label;
+    const label = pricesIncludeVat && col.key === 'total' ? 'Total' : pricesIncludeVat && col.key === 'price' ? 'Price incl. VAT' : col.label;
     if (label) drawInCell(page, label, x, col.width, ty, 8, fontBold, COLOR_WHITE, col.align);
     x += col.width;
   }
@@ -477,6 +478,10 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
   };
   y -= 28;
   page.drawLine({ start: { x: labelX, y: y + 16 }, end: { x: rightEdge, y: y + 16 }, thickness: 1, color: COLOR_DARK });
+  if (totals.final_only) {
+    line('TOTAL (incl. VAT)', formatCurrency(totals.grand_total, cur), true);
+    return;
+  }
 
   // Detailed proforma breakdown when the line-level discount data is present:
   //   Value before discount → Discount → Net value → VAT → Total payable.

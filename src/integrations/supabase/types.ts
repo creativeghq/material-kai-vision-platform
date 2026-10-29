@@ -26622,6 +26622,7 @@ export type Database = {
           currency: string | null
           custom_request_text: string | null
           terms: string | null
+          show_prices_incl_vat: boolean
           customer_address_unit_id: string | null
           customer_company_id: string | null
           customer_contact_id: string | null
@@ -26669,6 +26670,7 @@ export type Database = {
           currency?: string | null
           custom_request_text?: string | null
           terms?: string | null
+          show_prices_incl_vat?: boolean
           customer_address_unit_id?: string | null
           customer_company_id?: string | null
           customer_contact_id?: string | null
@@ -26716,6 +26718,7 @@ export type Database = {
           currency?: string | null
           custom_request_text?: string | null
           terms?: string | null
+          show_prices_incl_vat?: boolean
           customer_address_unit_id?: string | null
           customer_company_id?: string | null
           customer_contact_id?: string | null

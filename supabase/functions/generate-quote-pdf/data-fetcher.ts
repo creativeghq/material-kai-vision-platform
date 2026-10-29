@@ -172,6 +172,7 @@ export async function fetchQuoteData(
     status: quote.status,
     notes: quote.notes,
     terms: quote.terms ?? null,
+    show_prices_incl_vat: quote.show_prices_incl_vat === true,
     subtotal: parseFloat(quote.subtotal) || 0,
     vat_rate: parseFloat(quote.vat_rate) || 24,
     vat_amount: parseFloat(quote.vat_amount) || 0,

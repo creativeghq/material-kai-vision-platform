@@ -25,6 +25,7 @@ export interface QuoteData {
   status: string;
   notes?: string;
   terms?: string | null;
+  show_prices_incl_vat?: boolean;
   subtotal: number;
   vat_rate: number;
   vat_amount: number;

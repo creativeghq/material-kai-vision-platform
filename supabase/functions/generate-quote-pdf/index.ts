@@ -13,7 +13,12 @@ import { renderBrandedDocument, type BrandedDoc, type BrandedDocItem } from '../
 
 /** Map a quote + resolved branding into the shared branded-document model. */
 function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): BrandedDoc {
-  const items: BrandedDocItem[] = quote.items.map((it) => ({
+  const gross = quote.show_prices_incl_vat === true;
+  const vatFactor = 1 + Number(quote.vat_rate ?? 0) / 100;
+  const items: BrandedDocItem[] = quote.items.map((it) => {
+    const net = it.discounted_price ?? it.unit_price;
+    const unitGross = gross && net != null ? Math.round(Number(net) * vatFactor * 100) / 100 : null;
+    return {
     image_key: it.image_url ? it.id : null,
     name: it.product_name,
     description: it.description,
@@ -25,13 +30,14 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
       || ([it.selected_size, it.selected_color].filter(Boolean).join(' · ') || null),
     quantity: it.quantity,
     unit: it.unit,
-    unit_price: it.unit_price,
-    discounted_price: it.discounted_price,
-    line_total: it.line_total,
+    unit_price: gross ? unitGross : it.unit_price,
+    discounted_price: gross ? null : it.discounted_price,
+    line_total: gross && unitGross != null ? Math.round(unitGross * Number(it.quantity ?? 1) * 100) / 100 : it.line_total,
     pricing_status: it.pricing_status,
     installation_requirements: it.installation_requirements,
     delivery_date: it.delivery_date,
-  }));
+  };
+  });
   const anyPriced = items.some((i) => Number(i.line_total ?? 0) > 0);
   return {
     doc_label: 'QUOTE',
@@ -63,7 +69,9 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
     notes: quote.notes ?? null,
     terms: quote.terms ?? null,
     sections: [{ items }],
+    prices_include_vat: gross,
     totals: anyPriced ? {
+      final_only: gross,
       subtotal: quote.subtotal,
       vat_rate: quote.vat_rate,
       vat_amount: quote.vat_amount,
@@ -77,7 +85,7 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
 }
 
 // Bump when renderBrandedDocument's output changes: a stored PDF is reused while its fingerprint matches.
-const RENDER_REVISION = '2026-10-21';
+const RENDER_REVISION = '2026-10-29';
 
 async function documentFingerprint(doc: BrandedDoc, assetPaths: (string | null)[]): Promise<string> {
   const input = new TextEncoder().encode(JSON.stringify({ r: RENDER_REVISION, doc, assetPaths }));
