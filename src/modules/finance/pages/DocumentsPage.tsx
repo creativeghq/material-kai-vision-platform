@@ -8,7 +8,7 @@
 import { UploadSupplierInvoiceButton } from '@/modules/finance/components/UploadSupplierInvoiceButton';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, ChevronRight, Send, Building2, CreditCard } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, ChevronRight, Send, Building2, CreditCard, Code2 } from 'lucide-react';
 import { CardTerminalPaymentDialog } from '@/modules/finance/components/CardTerminalPaymentDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
@@ -66,6 +66,8 @@ import { TablePagination, paginate, clampPage } from '@/components/core/ui/table
 import { FilterBar, scopedFilterValue, useFilters, type DateRangeValue } from '@/components/core/filters';
 import { buildDocumentFilters, type DocFilterType } from '@/modules/finance/components/documentFilters';
 import { formatDate } from '@/utils/datetime';
+import { edgeErrorMessage } from '@/utils/edgeError';
+import { saveTextFile } from '@/utils/saveTextFile';
 import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
 import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
 
@@ -1252,6 +1254,15 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
     catch (err: any) { toast({ title: 'PDF failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
+  const genEn16931 = async (id: string) => {
+    setBusy(id);
+    try {
+      const { file_name, xml } = await financeService.fetchInvoiceEn16931(id, 'credit_note');
+      saveTextFile(file_name, xml);
+    } catch (err: any) {
+      toast({ title: 'EN 16931 file not available', description: await edgeErrorMessage(err), variant: 'destructive' });
+    } finally { setBusy(null); }
+  };
   /**
    * Retransmit to myDATA.
    *
@@ -1312,6 +1323,9 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
             )}
             <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => genPdf(cn.id)} title="Download PDF">
               {busy === cn.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileText className="h-3.5 w-3.5" />}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => genEn16931(cn.id)} title="Download EN 16931 XML">
+              <Code2 className="h-3.5 w-3.5" />
             </Button>
           </td>
         </tr>

@@ -871,9 +871,11 @@ const _financeServiceCore = {
     return { pdf_url: data?.pdf_url ?? null, pdf_storage_path: data?.pdf_storage_path ?? null };
   },
 
-  /** The EN 16931 UBL file for an invoice, built from the same derivation as the myDATA envelope. */
-  async fetchInvoiceEn16931(invoiceId: string): Promise<{ file_name: string; xml: string; warnings: string[] }> {
-    const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', { body: { invoice_id: invoiceId, format: 'en16931' } });
+  /** The EN 16931 UBL file for an invoice or credit note, built from the same derivation as the myDATA envelope. */
+  async fetchInvoiceEn16931(id: string, kind: 'invoice' | 'credit_note' = 'invoice'): Promise<{ file_name: string; xml: string; warnings: string[] }> {
+    const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', {
+      body: { ...(kind === 'invoice' ? { invoice_id: id } : { credit_note_id: id }), format: 'en16931' },
+    });
     if (error) throw error;
     if (!data?.xml) throw new Error(data?.error || 'EN 16931 file not available');
     return { file_name: data.file_name, xml: data.xml, warnings: data.warnings ?? [] };

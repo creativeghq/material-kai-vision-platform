@@ -10,6 +10,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
+import { saveTextFile } from '@/utils/saveTextFile';
 import { MoreVertical, Eye, CreditCard, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
@@ -150,11 +151,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
   const downloadEn16931 = async () => {
     try {
       const { file_name, xml, warnings } = await financeService.fetchInvoiceEn16931(invoiceId);
-      const url = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
-      const a = document.createElement('a');
-      a.href = url; a.download = file_name;
-      document.body.appendChild(a); a.click(); a.remove();
-      URL.revokeObjectURL(url);
+      saveTextFile(file_name, xml);
       if (warnings.length) toast({ title: 'Downloaded with notes', description: warnings.join(' ') });
     } catch (err: any) {
       toast({ title: 'EN 16931 file not available', description: await edgeErrorMessage(err), variant: 'destructive' });
