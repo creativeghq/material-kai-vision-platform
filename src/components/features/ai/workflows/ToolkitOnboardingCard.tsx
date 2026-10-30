@@ -63,6 +63,7 @@ export const ToolkitOnboardingCard: React.FC<Props> = ({ toolkits, mode, agentNa
     <div className={cn(
       'rounded-xl border border-primary/30 bg-primary/5 overflow-hidden',
       mode === 'just_enabled' ? 'mb-3' : 'my-6 mx-auto max-w-2xl',
+      'w-full min-w-0',
     )}>
       <div className="px-4 py-3 border-b border-primary/20 flex items-center gap-2">
         <Sparkles className="h-4 w-4 text-primary shrink-0" />

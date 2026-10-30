@@ -10,7 +10,7 @@ import {
   Send,
   Mic,
   Paperclip,
-  MessageSquare,
+  History,
   User,
   Download,
   Sparkles,
@@ -6095,7 +6095,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             title="Conversations (⌘K)"
             aria-label="Conversations"
           >
-            <MessageSquare className="h-4 w-4" />
+            <History className="h-4 w-4" />
+            <span className="sm:hidden">History</span>
             <span className="hidden sm:inline">Conversations</span>
             <kbd className="hidden rounded border border-hairline bg-surface-sunken px-1.5 py-0.5 font-mono text-[10px] text-muted-foreground md:inline">⌘K</kbd>
           </Button>
@@ -6108,7 +6109,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             aria-label="New conversation"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">New</span>
+            <span>New</span>
           </Button>
         </div>
         {/* Active moodboard context — products added from the agent land here */}
