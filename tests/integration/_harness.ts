@@ -48,7 +48,7 @@ export async function createUser(svc: SupabaseClient, label: string, rid: string
     const { data, error } = await svc.auth.admin.createUser({ email, password, email_confirm: true });
     if (data?.user) { userId = data.user.id; break; }
     // A bodiless failure often DID create the user; the retry then finds it — sign-in below resolves the id.
-    if (attempt > 0 && /already been registered/i.test(error?.message ?? '')) break;
+    if (/already been registered/i.test(error?.message ?? '')) break;
     if (!transientAuthError(error?.message) || attempt === 3) throw new Error(`createUser(${label}): ${error?.message}`);
   }
   const client = anonClient();

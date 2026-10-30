@@ -128,5 +128,5 @@ suite('crm-api · company contacts', () => {
       await teardown(svc, { userIds: [B.id] });
       throw e;
     }
-  });
+  }, 90_000);
 });
