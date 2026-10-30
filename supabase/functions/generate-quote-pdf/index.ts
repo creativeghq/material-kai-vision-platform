@@ -32,7 +32,8 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
     unit: it.unit,
     unit_price: gross ? unitGross : it.unit_price,
     discounted_price: gross ? null : it.discounted_price,
-    line_total: gross && unitGross != null ? Math.round(unitGross * Number(it.quantity ?? 1) * 100) / 100 : it.line_total,
+    // VAT on the stored net line, not rounded-unit × qty, so the lines sum to the derived grand total.
+    line_total: gross && unitGross != null ? Math.round(Number(it.line_total) * vatFactor * 100) / 100 : it.line_total,
     pricing_status: it.pricing_status,
     installation_requirements: it.installation_requirements,
     delivery_date: it.delivery_date,
@@ -85,7 +86,7 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
 }
 
 // Bump when renderBrandedDocument's output changes: a stored PDF is reused while its fingerprint matches.
-const RENDER_REVISION = '2026-10-29';
+const RENDER_REVISION = '2026-10-30';
 
 async function documentFingerprint(doc: BrandedDoc, assetPaths: (string | null)[]): Promise<string> {
   const input = new TextEncoder().encode(JSON.stringify({ r: RENDER_REVISION, doc, assetPaths }));
