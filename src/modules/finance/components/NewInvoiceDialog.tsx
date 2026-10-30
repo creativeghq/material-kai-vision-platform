@@ -510,6 +510,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setUnits(mu.map((u) => ({ code: u.code, description: u.description })));
       setPaymentMethods(pm.map((p) => ({ code: p.code, description: p.description })));
       setIssuer(fs.data ?? null);
+      setSubmitNow((fs.data as any)?.auto_send_to_aade !== false);
       // Prefill the invoice Notes with the workspace default (editable per-invoice).
       if ((fs.data as any)?.default_invoice_notes) setNotes(String((fs.data as any).default_invoice_notes));
       financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));

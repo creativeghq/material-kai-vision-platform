@@ -34,6 +34,7 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
   const [fs, setFs] = useState<Record<string, any>>({});
   const [enabled, setEnabled] = useState(true);
   const [togglingEnabled, setTogglingEnabled] = useState(false);
+  const [togglingAuto, setTogglingAuto] = useState(false);
   const [status, setStatus] = useState<{ master_key_configured: boolean; is_sandbox: boolean; connector_slug: string } | null>(null);
 
   useEffect(() => {
@@ -67,6 +68,19 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setTogglingEnabled(false); }
+  };
+
+  const toggleAutoSend = async (v: boolean) => {
+    setTogglingAuto(true);
+    try {
+      const { error } = await supabase.from('finance_settings')
+        .upsert({ workspace_id: workspaceId, auto_send_to_aade: v, updated_at: new Date().toISOString() }, { onConflict: 'workspace_id' });
+      if (error) throw error;
+      setFs((cur) => ({ ...cur, auto_send_to_aade: v }));
+      toast({ title: v ? 'Invoices are sent to AADE when created' : 'Automatic sending to AADE is off' });
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setTogglingAuto(false); }
   };
 
   if (loading) {
@@ -110,6 +124,17 @@ export const EInvoicingCard: React.FC<Props> = ({ workspaceId, onGoToIdentity })
           <div className="flex items-center gap-2">
             {togglingEnabled && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
             <Switch checked={enabled} disabled={togglingEnabled} onCheckedChange={toggleEnabled} />
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
+          <div>
+            <div className="text-sm font-medium">Send to AADE automatically when an invoice is created</div>
+            <p className="text-xs text-muted-foreground">Applies to every invoice that is issued, from any screen. Drafts are never sent. On by default.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {togglingAuto && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+            <Switch checked={fs.auto_send_to_aade !== false} disabled={togglingAuto || !enabled} onCheckedChange={toggleAutoSend} />
           </div>
         </div>
 

@@ -1217,6 +1217,15 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
         if (issueErr) return json({ error: `mark_invoice_issued failed: ${issueErr.message}` }, 500);
         // Notify + email the customer via the seeded flow (fire-and-forget).
         await emitDocumentIssued(supabase, invoiceId);
+        // An invoice that has just been created (issued) goes to AADE too, unless the workspace
+        // turned that off. Drafts never reach this branch.
+        if (!body.submit_fiscal) {
+          const { data: ws } = await supabase.from('invoices').select('workspace_id').eq('id', invoiceId).maybeSingle();
+          const { data: fsAuto } = ws?.workspace_id
+            ? await supabase.from('finance_settings').select('auto_send_to_aade').eq('workspace_id', ws.workspace_id).maybeSingle()
+            : { data: null };
+          if ((fsAuto as any)?.auto_send_to_aade !== false) body.submit_fiscal = true;
+        }
       }
     }
 

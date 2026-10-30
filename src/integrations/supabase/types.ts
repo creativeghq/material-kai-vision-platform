@@ -8911,6 +8911,7 @@ export type Database = {
           invoice_template_footer_path: string | null
           invoice_template_id: string
           business_activities: Json
+          auto_send_to_aade: boolean
           main_activity: string | null
           min_order_value: number | null
           negative_margin_policy: string
@@ -9031,6 +9032,7 @@ export type Database = {
           invoice_template_footer_path?: string | null
           invoice_template_id?: string
           business_activities?: Json
+          auto_send_to_aade?: boolean
           main_activity?: string | null
           min_order_value?: number | null
           negative_margin_policy?: string
@@ -9151,6 +9153,7 @@ export type Database = {
           invoice_template_footer_path?: string | null
           invoice_template_id?: string
           business_activities?: Json
+          auto_send_to_aade?: boolean
           main_activity?: string | null
           min_order_value?: number | null
           negative_margin_policy?: string

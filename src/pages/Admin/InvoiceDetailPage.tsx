@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { FINANCE_BASE, FINANCE_TAB } from '@/modules/finance/routes';
+import { supabase } from '@/integrations/supabase/client';
 import { humanizeLabel } from '@/utils/humanize';
 import {
   Loader2,
@@ -131,6 +132,10 @@ const InvoiceDetailPage: React.FC = () => {
     try {
       await financeService.markInvoiceIssued(invoice.id);
       toast({ title: 'Invoice Issued' });
+      // Issuing is "created, not draft": the workspace setting decides whether AADE gets it now.
+      const { data: fsRow } = await supabase.from('finance_settings')
+        .select('auto_send_to_aade').eq('workspace_id', (invoice as any).workspace_id).maybeSingle();
+      if ((fsRow as any)?.auto_send_to_aade !== false) { await handleSubmitFiscal(); return; }
       await load();
     } catch (err: any) {
       toast({ title: 'Issue Failed', description: err.message, variant: 'destructive' });
