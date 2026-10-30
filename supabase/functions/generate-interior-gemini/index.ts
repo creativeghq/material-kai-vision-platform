@@ -261,6 +261,8 @@ interface GenerateInteriorRequest {
   room_type?: string;
   style?: string;
   sqm?: number;
+  /** floor-plan-render only: which room to photograph and from where. */
+  room_view?: string;
   aspect_ratio?: ImageAspectRatio;
   model_tier?: 'fast' | 'pro' | 'grok' | 'chatgpt';
   // Material references (multi-reference generation)
@@ -944,10 +946,16 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       } else {
         // Single image: floor plan → perspective render, or style reference → new design
-        const renderPrompt = await buildFloorPlanRenderPrompt(supabase, body.style, body.prompt);
+        const basePrompt = await buildFloorPlanRenderPrompt(supabase, body.style, body.prompt);
+        const roomView = typeof body.room_view === 'string' ? body.room_view.trim().slice(0, 1200) : '';
+        const renderPrompt = roomView
+          ? `${basePrompt}
+
+VIEW OVERRIDE — the camera position above is replaced. Photograph this specific room from inside, at eye level, keeping its walls, doors, windows and furniture arrangement as shown in the attached image: ${roomView}`
+          : basePrompt;
         const result = await generateImageWithGemini(
           { text: renderPrompt, images: [sourceBuffer] },
-          { model, aspectRatio: '1:1' },
+          { model, aspectRatio: body.aspect_ratio ?? '1:1' },
         );
         imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
       }
