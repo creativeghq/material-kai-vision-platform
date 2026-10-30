@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark, Ruler, ShieldCheck, Gavel, ArrowUpRight, ScrollText } from 'lucide-react';
+import { Save, Upload, Loader2, ImageIcon, Mail, Send, ExternalLink, Info, SlidersHorizontal, Building2, FileText, Tag, CreditCard, Wrench, Users, Tags, Store, FileSignature, Landmark, Ruler, ShieldCheck, ArrowUpRight, ScrollText } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { CostCodesPanel } from '@/components/business/costCodes/CostCodesPanel';
@@ -63,7 +63,6 @@ const SETTINGS_SECTIONS = [
   { value: 'documents', label: 'Documents', icon: FileText },
   { value: 'einvoicing', label: 'e-Invoicing', icon: FileSignature },
   { value: 'compliance', label: 'Compliance', icon: ShieldCheck },
-  { value: 'approvals', label: 'Approvals', icon: Gavel },
   { value: 'pricing', label: 'Pricing', icon: Tag },
   { value: 'categories', label: 'Categories', icon: Tags },
   { value: 'costcodes', label: 'Cost Codes', icon: Ruler },
@@ -110,7 +109,9 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   const rawSection = searchParams.get('section');
   const legacyPane = rawSection ? LEGACY_SECTION_PANE[rawSection] : undefined;
   const [activeTab, setActiveTab] = useState(
-    () => (legacyPane ? 'banks' : SETTINGS_SECTIONS.some((s) => s.value === rawSection) ? rawSection! : 'general'),
+    () => (legacyPane ? 'banks'
+      : rawSection === 'approvals' ? 'team'
+      : SETTINGS_SECTIONS.some((s) => s.value === rawSection) ? rawSection! : 'general'),
   );
   const rawPane = searchParams.get('pane');
   const [moneyPane, setMoneyPane] = useState<MoneyPane>(
@@ -293,13 +294,6 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           <PsdaReadinessCard workspaceId={workspaceId} />
         </TabsContent>
 
-        {/* Credit holds, margin authority and till variances share one spine, because they
-            are the same three questions: is this allowed, who may wave it through, and who
-            signed. */}
-        <TabsContent value="approvals" className="mt-0 space-y-4">
-          <ApprovalsCard workspaceId={workspaceId} />
-        </TabsContent>
-
         <TabsContent value="pricing" className="mt-0 space-y-4">
           <PendingDiscountApprovalsCard workspaceId={workspaceId} />
           <PricingRulesCard workspaceId={workspaceId} />
@@ -324,6 +318,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
 
         <TabsContent value="team" className="mt-0 space-y-4">
           <TeamPanel workspaceId={workspaceId} workspaceName={activeWorkspace?.name} />
+          <ApprovalsCard workspaceId={workspaceId} />
           {/* The operator/root workspace mints & sells credits — it doesn't buy into a pool. */}
           {!isOperator && <WorkspaceCreditsCard workspaceId={workspaceId} />}
         </TabsContent>
