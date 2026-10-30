@@ -21,7 +21,7 @@ export function en16931Evidence(row: Row | null | undefined): En16931Evidence | 
   const origin = fetched ? NOT_DELIVERED : 'Delivered as a structured EN 16931 document.';
 
   if (check?.verdict === 'agrees') {
-    return { tone: 'success', headline: 'EN 16931 file agrees with AADE', detail: `Supplier VAT, totals, MARK and line count match what AADE reported. ${origin}` };
+    return { tone: 'success', headline: 'EN 16931 file agrees with AADE', detail: `Supplier VAT, totals and MARK match what AADE reported. ${origin}` };
   }
   if (check?.verdict === 'differs') {
     const what = check.differences?.length ? check.differences.join(', ') : 'unspecified fields';

@@ -120,10 +120,9 @@ export interface MyDataRowFacts {
   total_vat: number | null;
   total_gross: number | null;
   mark: string | null;
-  line_count: number;
 }
 
-export type En16931Check = { verdict: 'agrees' | 'differs'; differences: string[] };
+export type En16931Check = { verdict: 'agrees' | 'differs'; differences: string[]; rules: number };
 
 const close = (a: number | null, b: number | null) => a !== null && b !== null && Math.abs(a - b) <= 0.01;
 
@@ -134,6 +133,5 @@ export function checkAgainstMyData(parsed: ParsedEn16931, row: MyDataRowFacts): 
   if (row.total_vat !== null && !close(parsed.totals.vat, row.total_vat)) differences.push('VAT total');
   if (row.total_gross !== null && !close(parsed.totals.gross, row.total_gross)) differences.push('gross total');
   if (row.mark && parsed.mark && row.mark !== parsed.mark) differences.push('MARK');
-  if (row.line_count > 0 && row.line_count !== parsed.lines.length) differences.push('line count');
-  return { verdict: differences.length ? 'differs' : 'agrees', differences };
+  return { verdict: differences.length ? 'differs' : 'agrees', differences, rules: 2 };
 }

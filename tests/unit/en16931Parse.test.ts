@@ -27,7 +27,7 @@ const XML = `<Invoice xmlns:cac="x" xmlns:cbc="y" xmlns="z">
   </cac:InvoiceLine>
 </Invoice>`;
 
-const ROW = { issuer_vat: '084087688', total_net: 150.78, total_vat: 36.19, total_gross: 186.97, mark: '400015286109842', line_count: 1 };
+const ROW = { issuer_vat: '084087688', total_net: 150.78, total_vat: 36.19, total_gross: 186.97, mark: '400015286109842' };
 
 describe('parseEn16931', () => {
   const p = parseEn16931(XML)!;
@@ -51,9 +51,13 @@ describe('parseEn16931', () => {
   });
 
   it('agrees with a matching myDATA row and names each difference otherwise', () => {
-    expect(checkAgainstMyData(p, ROW)).toEqual({ verdict: 'agrees', differences: [] });
-    const bad = checkAgainstMyData(p, { ...ROW, total_gross: 190, mark: '1', line_count: 3 });
+    expect(checkAgainstMyData(p, ROW)).toEqual({ verdict: 'agrees', differences: [], rules: 2 });
+    const bad = checkAgainstMyData(p, { ...ROW, total_gross: 190, mark: '1' });
     expect(bad.verdict).toBe('differs');
-    expect(bad.differences).toEqual(['gross total', 'MARK', 'line count']);
+    expect(bad.differences).toEqual(['gross total', 'MARK']);
+  });
+
+  it('does not treat a different line count as a difference: AADE rows are often value-only', () => {
+    expect(checkAgainstMyData({ ...p, lines: [...p.lines, ...p.lines, ...p.lines] }, ROW).verdict).toBe('agrees');
   });
 });

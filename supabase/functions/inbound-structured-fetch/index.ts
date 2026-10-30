@@ -73,13 +73,13 @@ async function parsedFor(admin: SupabaseClient, workspaceId: string, id: string,
   const parsed = parseEn16931(xml);
   if (!parsed) return { en16931_parse_error: 'unreadable' };
   const { data } = await admin.from('inbound_documents')
-    .select('issuer_vat, total_net, total_vat, total_gross, mark, lines')
+    .select('issuer_vat, total_net, total_vat, total_gross, mark')
     .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
   const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
   const check = data
     ? checkAgainstMyData(parsed, {
       issuer_vat: data.issuer_vat, total_net: num(data.total_net), total_vat: num(data.total_vat),
-      total_gross: num(data.total_gross), mark: data.mark, line_count: Array.isArray(data.lines) ? data.lines.length : 0,
+      total_gross: num(data.total_gross), mark: data.mark,
     })
     : null;
   return { en16931_parsed: parsed, en16931_check: check };
@@ -88,7 +88,7 @@ async function parsedFor(admin: SupabaseClient, workspaceId: string, id: string,
 async function reparseStored(admin: SupabaseClient, workspaceId: string, limit: number) {
   const { data, error } = await admin.from('inbound_documents')
     .select('id, raw').eq('workspace_id', workspaceId).eq('delivery_channel', 'provider_link')
-    .is('raw->en16931_parsed', null).not('raw->>en16931_xml', 'is', null).limit(limit);
+    .is('raw->en16931_check->>rules', null).not('raw->>en16931_xml', 'is', null).limit(limit);
   if (error) throw new HttpError(500, `could not list documents: ${error.message}`);
   let parsed = 0, differs = 0, failed = 0;
   for (const r of data ?? []) {
