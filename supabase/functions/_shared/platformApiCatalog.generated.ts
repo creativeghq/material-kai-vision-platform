@@ -898,6 +898,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "regenerate": {
         "type": "boolean",
         "description": "Force re-render even if a cached PDF exists."
+      },
+      "format": {
+        "type": "string",
+        "description": "Pass en16931 to get the invoice or credit note as EN 16931 UBL 2.1 XML instead of a PDF. 422 with the reasons when the d"
       }
     }
   },

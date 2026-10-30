@@ -3323,7 +3323,7 @@
         ],
         "summary": "Render a legal invoice, credit note, or delivery note as a PDF",
         "operationId": "post_finance_invoice_pdf",
-        "description": "Generates an A4 PDF for an invoice, credit note, or delivery note using pdf-lib with embedded Noto Sans for Greek/Latin rendering. Caches the PDF in pdf-documents storage and returns a 7-day signed URL. Supports GR/EN language selection per-document.\n\n**Response:** `{ok, pdf_url, pdf_storage_path, cached?}`",
+        "description": "Generates an A4 PDF for an invoice, credit note, or delivery note using pdf-lib with embedded Noto Sans for Greek/Latin rendering. Caches the PDF in pdf-documents storage and returns a 7-day signed URL. Supports GR/EN language selection per-document.\n\n**Response:** `{ok, pdf_url, pdf_storage_path, cached?} or, with format=en16931, {format, file_name, xml, warnings}`",
         "security": [
           {
             "supabaseJwt": []
@@ -3406,6 +3406,10 @@
                   "regenerate": {
                     "type": "boolean",
                     "description": "Force re-render even if a cached PDF exists."
+                  },
+                  "format": {
+                    "type": "string",
+                    "description": "Pass en16931 to get the invoice or credit note as EN 16931 UBL 2.1 XML instead of a PDF. 422 with the reasons when the document carries something EN 16931 cannot express. (string (en16931))"
                   }
                 }
               }

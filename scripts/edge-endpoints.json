@@ -1453,9 +1453,15 @@
         "type": "boolean",
         "required": false,
         "desc": "Force re-render even if a cached PDF exists."
+      },
+      {
+        "name": "format",
+        "type": "string (en16931)",
+        "required": false,
+        "desc": "Pass en16931 to get the invoice or credit note as EN 16931 UBL 2.1 XML instead of a PDF. 422 with the reasons when the document carries something EN 16931 cannot express."
       }
     ],
-    "response": "{ok, pdf_url, pdf_storage_path, cached?}"
+    "response": "{ok, pdf_url, pdf_storage_path, cached?} or, with format=en16931, {format, file_name, xml, warnings}"
   },
   {
     "name": "finance-issue-invoice",
