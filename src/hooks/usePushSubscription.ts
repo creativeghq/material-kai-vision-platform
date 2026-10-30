@@ -82,7 +82,8 @@ export function usePushSubscription() {
       const reg = await navigator.serviceWorker.getRegistration();
       const sub = reg ? await reg.pushManager.getSubscription() : null;
       if (sub) {
-        await supabase.from('push_subscriptions').update({ is_active: false }).eq('endpoint', sub.endpoint);
+        const { error: offErr } = await supabase.from('push_subscriptions').update({ is_active: false }).eq('endpoint', sub.endpoint);
+        if (offErr) throw new Error(offErr.message);
         await sub.unsubscribe();
       }
       await refresh();

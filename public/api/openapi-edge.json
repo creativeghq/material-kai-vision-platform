@@ -12384,7 +12384,7 @@
         ],
         "summary": "Dispatches browser push notifications (VAPID) and signed webhook deliveries with retry.",
         "operationId": "post_notification_dispatcher",
-        "description": "Action-discriminated handler for two notification channels. `send-push`: sends Web Push notifications to browser subscriptions using VAPID keys (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`). `send-webhook`: delivers a JSON payload to configured webhook endpoints with optional HMAC-SHA256 signing, up to 3 retries with configurable delay, and updates `webhook_endpoints` success/failure timestamps. `get-vapid-key`: returns the public VAPID key for service-worker subscription registration.\n\n**Actions** (`action` in the body):\n- `send-push` — Send a Web Push notification to one or more browser subscriptions. → `{success:number, failed:number, results:[]}`\n- `send-webhook` — Deliver a JSON payload to webhook endpoints with retry and optional HMAC signing. → `{success:number, failed:number, results:[]}`\n- `get-vapid-key` — Return the VAPID public key for service-worker push subscription registration. → `{configured:boolean, publicKey?:string}`\n\n**Response:** `{}`",
+        "description": "Action-discriminated handler for two notification channels. `send-push`: sends Web Push notifications to browser subscriptions using VAPID keys (`VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY`). `send-webhook`: delivers a JSON payload to configured webhook endpoints with optional HMAC-SHA256 signing, up to 3 retries with configurable delay, and updates `webhook_endpoints` success/failure timestamps. `get-vapid-key`: returns the public VAPID key for service-worker subscription registration.\n\n**Actions** (`action` in the body):\n- `send-push` — Send a Web Push notification to one or more browser subscriptions. → `{success:number, failed:number, results:[]}`\n- `send-webhook` — Deliver a JSON payload to webhook endpoints with retry and optional HMAC signing. → `{success:number, failed:number, results:[]}`\n- `get-vapid-key` — Return the VAPID public key for service-worker push subscription registration. → `{configured:boolean, publicKey?:string}`\n- `list-push-audience` — Operator only: list users with an active push subscription and their device counts. → `{users:[{user_id, name, email, devices}]}`\n- `broadcast-push` — Operator only: send a push notification to all subscribed users or a chosen subset. → `{recipients, devices, delivered, failed, reason}`\n\n**Response:** `{}`",
         "security": [
           {
             "supabaseJwt": []
@@ -12521,6 +12521,64 @@
                       }
                     },
                     "description": "Returns: {configured:boolean, publicKey?:string}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "list-push-audience"
+                        ],
+                        "description": "Operator only: list users with an active push subscription and their device counts."
+                      }
+                    },
+                    "description": "Returns: {users:[{user_id, name, email, devices}]}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "title",
+                      "body",
+                      "audience"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "broadcast-push"
+                        ],
+                        "description": "Operator only: send a push notification to all subscribed users or a chosen subset."
+                      },
+                      "title": {
+                        "type": "string",
+                        "description": "Max 80 characters"
+                      },
+                      "body": {
+                        "type": "string",
+                        "description": "Max 240 characters"
+                      },
+                      "audience": {
+                        "type": "string",
+                        "description": "Recipients are resolved server-side from push_subscriptions (one of: 'all'|'selected')"
+                      },
+                      "user_ids": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "description": "Required when audience is 'selected'"
+                      },
+                      "url": {
+                        "type": "string",
+                        "description": "In-app path to open on tap, e.g. /finance"
+                      }
+                    },
+                    "description": "Returns: {recipients, devices, delivered, failed, reason}"
                   }
                 ],
                 "discriminator": {

@@ -3291,7 +3291,9 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "enum": [
           "send-push",
           "send-webhook",
-          "get-vapid-key"
+          "get-vapid-key",
+          "list-push-audience",
+          "broadcast-push"
         ],
         "required": true,
         "description": "Which operation to run"
@@ -3311,6 +3313,26 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "payload": {
         "type": "object",
         "description": "JSON payload to POST to each webhook"
+      },
+      "title": {
+        "type": "string",
+        "description": "Max 80 characters"
+      },
+      "body": {
+        "type": "string",
+        "description": "Max 240 characters"
+      },
+      "audience": {
+        "type": "string",
+        "description": "Recipients are resolved server-side from push_subscriptions (one of: 'all'|'selected')"
+      },
+      "user_ids": {
+        "type": "array",
+        "description": "Required when audience is 'selected'"
+      },
+      "url": {
+        "type": "string",
+        "description": "In-app path to open on tap, e.g. /finance"
       }
     }
   },

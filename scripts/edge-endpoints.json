@@ -6020,6 +6020,49 @@
         "summary": "Return the VAPID public key for service-worker push subscription registration.",
         "params": [],
         "response": "{configured:boolean, publicKey?:string}"
+      },
+      {
+        "name": "list-push-audience",
+        "summary": "Operator only: list users with an active push subscription and their device counts.",
+        "params": [],
+        "response": "{users:[{user_id, name, email, devices}]}"
+      },
+      {
+        "name": "broadcast-push",
+        "summary": "Operator only: send a push notification to all subscribed users or a chosen subset.",
+        "params": [
+          {
+            "name": "title",
+            "type": "string",
+            "required": true,
+            "desc": "Max 80 characters"
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "required": true,
+            "desc": "Max 240 characters"
+          },
+          {
+            "name": "audience",
+            "type": "'all'|'selected'",
+            "required": true,
+            "desc": "Recipients are resolved server-side from push_subscriptions"
+          },
+          {
+            "name": "user_ids",
+            "type": "string[]",
+            "required": false,
+            "desc": "Required when audience is 'selected'"
+          },
+          {
+            "name": "url",
+            "type": "string",
+            "required": false,
+            "desc": "In-app path to open on tap, e.g. /finance"
+          }
+        ],
+        "response": "{recipients, devices, delivered, failed, reason}"
       }
     ],
     "request": [
@@ -6027,7 +6070,7 @@
         "name": "action",
         "type": "string",
         "required": true,
-        "desc": "One of: send-push, send-webhook, get-vapid-key"
+        "desc": "One of: send-push, send-webhook, get-vapid-key, list-push-audience, broadcast-push"
       }
     ],
     "response": "{}"
