@@ -867,16 +867,27 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     } catch { logoImg = null; }
   }
 
+  // The meta column sizes itself to its longest value ("Domestic Payments Account" is wider than
+  // the old fixed 95pt label gutter and printed over its own label), and the issuer block wraps
+  // to the space that leaves instead of running under it.
+  const metaValW = Math.max(0, ...metaRows.map(([, v]) => bold.widthOfTextAtSize(v, 9)));
+  const metaLabelW = Math.max(0, ...metaRows.map(([k]) => font.widthOfTextAtSize(k, 8.5)));
+  const metaLabelRight = right - Math.max(95, metaValW + 12);
+  const issuerMaxW = Math.max(170, metaLabelRight - metaLabelW - M - 16);
   const drawIssuerBlock = (x: number, topY: number, withLogo = true): number => {
     let yc = topY;
     if (withLogo && logoImg) { page.drawImage(logoImg, { x, y: yc - logoH, width: logoW, height: logoH }); yc -= logoH + 8; }
-    text(issuerName, x, yc - 12, 15, bold, INK); yc -= 16;
-    for (const l of issuerLines) { text(l, x, yc, 8.5, font, MUTED); yc -= 11; }
+    const nameLines = wrap(issuerName, bold, 15, issuerMaxW);
+    for (const nl of nameLines) { text(nl, x, yc - 12, 15, bold, INK); yc -= 18; }
+    yc -= 4;
+    for (const l of issuerLines) {
+      for (const wl of wrap(l, font, 8.5, issuerMaxW)) { text(wl, x, yc, 8.5, font, MUTED); yc -= 11; }
+    }
     return yc;
   };
   const drawMeta = (topY: number): number => {
     let my = topY;
-    for (const [k, v] of metaRows) { textR(k, right - 95, my, 8.5, font, MUTED); textR(v, right, my, 9, bold); my -= 12; }
+    for (const [k, v] of metaRows) { textR(k, metaLabelRight, my, 8.5, font, MUTED); textR(v, right, my, 9, bold); my -= 12; }
     return my;
   };
 
@@ -1142,7 +1153,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
       if (anyOtherTaxes) textR(lineOther > 0 ? money(lineOther) : '—', xOtherTax, y, 8);
       textR(money(Math.round((net + vat + lineOther) * 100) / 100), xTotal, y, 8);
       y -= rowHC;
-      page.drawLine({ start: { x: M, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.4, color: LINE });
+      page.drawLine({ start: { x: M, y: y + 9 }, end: { x: right, y: y + 9 }, thickness: 0.4, color: LINE });
       continue;
     }
 
@@ -1166,7 +1177,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     if (anyOtherTaxes) textR(lineOther > 0 ? money(lineOther) : '—', xOtherTax, y, 8.5);
     textR(money(Math.round((net + vat + lineOther) * 100) / 100), xTotal, y, 8.5);
     y -= rowH;
-    page.drawLine({ start: { x: M, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.4, color: LINE });
+    page.drawLine({ start: { x: M, y: y + 8.5 }, end: { x: right, y: y + 8.5 }, thickness: 0.4, color: LINE });
   }
 
   // ── VAT-exemption grounds ──

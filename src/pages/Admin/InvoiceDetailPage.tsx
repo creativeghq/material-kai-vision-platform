@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { FINANCE_BASE } from '@/modules/finance/routes';
+import { FINANCE_BASE, FINANCE_TAB } from '@/modules/finance/routes';
+import { humanizeLabel } from '@/utils/humanize';
 import {
   Loader2,
   FileText,
@@ -129,10 +130,10 @@ const InvoiceDetailPage: React.FC = () => {
     if (!invoice) return;
     try {
       await financeService.markInvoiceIssued(invoice.id);
-      toast({ title: 'Invoice issued' });
+      toast({ title: 'Invoice Issued' });
       await load();
     } catch (err: any) {
-      toast({ title: 'Issue failed', description: err.message, variant: 'destructive' });
+      toast({ title: 'Issue Failed', description: err.message, variant: 'destructive' });
     }
   };
 
@@ -143,12 +144,12 @@ const InvoiceDetailPage: React.FC = () => {
       const res = await fiscalConnectorService.submitInvoice(invoice.id);
       const f: any = res?.fiscal;
       if (!f) {
-        toast({ title: 'No fiscal response', variant: 'destructive' });
+        toast({ title: 'No Fiscal Response', variant: 'destructive' });
       } else if (f.ok === false) {
         // not_configured / no_binding / build error — surfaced verbatim
-        toast({ title: 'Not submitted', description: f.error, variant: 'destructive' });
+        toast({ title: 'Not Submitted', description: f.error, variant: 'destructive' });
       } else if (f.skipped) {
-        toast({ title: 'Already transmitted', description: 'This invoice has a myDATA MARK already.' });
+        toast({ title: 'Already Transmitted', description: 'This invoice has a myDATA MARK already.' });
       } else if (f.status === 'accepted') {
         toast({ title: 'Transmitted to myDATA', description: `MARK ${f.mark}` });
       } else if (f.status === 'offline') {
@@ -160,7 +161,7 @@ const InvoiceDetailPage: React.FC = () => {
       }
       await load();
     } catch (err: any) {
-      toast({ title: 'Submit failed', description: err?.message, variant: 'destructive' });
+      toast({ title: 'Submit Failed', description: err?.message, variant: 'destructive' });
     } finally {
       setFiscalBusy(false);
     }
@@ -208,8 +209,8 @@ const InvoiceDetailPage: React.FC = () => {
     <div className="px-3 sm:px-6 space-y-6 py-6">
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
-          <Link to={financeBase} aria-label="Back to finance">
-            <Button variant="ghost" size="sm" className="-ml-2" aria-label="Back to finance">
+          <Link to={`${financeBase}?tab=${FINANCE_TAB.invoices}`} aria-label="Back to Invoices">
+            <Button variant="ghost" size="sm" className="-ml-2" aria-label="Back to Invoices">
               <ArrowLeft className="h-4 w-4" />
             </Button>
           </Link>
@@ -218,7 +219,7 @@ const InvoiceDetailPage: React.FC = () => {
               <FileText className="h-5 w-5 text-muted-foreground" />
               <h1 className="text-xl font-semibold">{invoice.internal_number}</h1>
               <Badge variant={invoice.status === 'overdue' ? 'destructive' : invoice.status === 'paid' ? 'default' : 'outline'}>
-                {invoice.status}
+                {humanizeLabel(invoice.status)}
               </Badge>
               {(invoice as any).has_shipping && (
                 <Badge variant="secondary" className="gap-1"><Truck className="h-3 w-3" /> With shipping</Badge>
@@ -227,7 +228,7 @@ const InvoiceDetailPage: React.FC = () => {
             <p className="mt-1 text-sm text-muted-foreground">
               {invoice.issued_at
                 ? `Issued ${formatDate(invoice.issued_at)}`
-                : 'Not issued yet'}
+                : 'Not Issued Yet'}
               {invoice.due_at && ` · Due ${formatDate(invoice.due_at)}`}
               {Number((invoice as any).branch_code ?? 0) > 0 && ` · Establishment #${(invoice as any).branch_code}`}
               {(invoice as any).series && ` · Series ${(invoice as any).series}`}
@@ -262,7 +263,7 @@ const InvoiceDetailPage: React.FC = () => {
         <div className="flex gap-2">
           {invoice.status === 'draft' && (
             <Button onClick={handleIssue}>
-              <CheckCircle2 className="mr-2 h-4 w-4" /> Mark issued
+              <CheckCircle2 className="mr-2 h-4 w-4" /> Mark Issued
             </Button>
           )}
           <Button onClick={() => setPreviewOpen(true)} variant="outline">
@@ -273,18 +274,24 @@ const InvoiceDetailPage: React.FC = () => {
             {pdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
             Download PDF
           </Button>
-          {(invoice as any).fiscal_status !== 'accepted' && invoice.status !== 'draft' && (
-            <Button onClick={handleSubmitFiscal} variant="outline" disabled={fiscalBusy}>
-              {fiscalBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-              Submit to myDATA
-            </Button>
+          {invoice.status !== 'draft' && (
+            (invoice as any).fiscal_status === 'accepted' ? (
+              <Button variant="outline" disabled title="This invoice already has its myDATA MARK">
+                <ShieldCheck className="mr-2 h-4 w-4" /> Sent to AADE
+              </Button>
+            ) : (
+              <Button onClick={handleSubmitFiscal} variant="outline" disabled={fiscalBusy}>
+                {fiscalBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
+                Send to AADE
+              </Button>
+            )
           )}
           {/* `isActionable` adds status !== 'draft'. Gating only on void/credit_noted let a
               PUBLIC card-pay link be minted for an unissued document, let "Record payment"
               open against a draft (whose row the payment dialog's picker excludes, so the
               money booked as unallocated credit), and let "Credit note" open a dialog whose
               picker excludes drafts — empty, with no explanation. The only action a draft
-              offers is "Mark issued". */}
+              offers is "Mark Issued". */}
           {isActionable && Number(invoice.amount_due) > 0 && (
             <Button
               onClick={async () => {
@@ -295,9 +302,9 @@ const InvoiceDetailPage: React.FC = () => {
                   setPayLink(res.pay_link);
                   try {
                     await navigator.clipboard.writeText(res.pay_link);
-                    toast({ title: 'Pay link copied', description: 'Send this to the customer to collect payment by card.' });
+                    toast({ title: 'Pay Link Copied', description: 'Send this to the customer to collect payment by card.' });
                   } catch {
-                    toast({ title: 'Pay link ready', description: res.pay_link });
+                    toast({ title: 'Pay Link Ready', description: res.pay_link });
                   }
                 } catch (err: any) {
                   toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
@@ -319,7 +326,7 @@ const InvoiceDetailPage: React.FC = () => {
           )}
           {isActionable && (
             <Button onClick={() => setCreditNoteDialogOpen(true)} variant="outline">
-              Credit note
+              Credit Note
             </Button>
           )}
         </div>
@@ -417,8 +424,8 @@ const InvoiceDetailPage: React.FC = () => {
                 <th className="px-4 py-2 text-left">Description</th>
                 <th className="px-4 py-2 text-left">SKU</th>
                 <th className="px-4 py-2 text-right">Qty</th>
-                <th className="px-4 py-2 text-right">Unit price</th>
-                <th className="px-4 py-2 text-right">Line total</th>
+                <th className="px-4 py-2 text-right">Unit Price</th>
+                <th className="px-4 py-2 text-right">Line Total</th>
                 <th className="px-4 py-2 text-right">Cost (snap)</th>
                 <th className="px-4 py-2 text-right">Margin</th>
               </tr>
@@ -521,7 +528,7 @@ const InvoiceDetailPage: React.FC = () => {
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Account</th>
                 <th className="px-4 py-2 text-left">Reference</th>
-                <th className="px-4 py-2 text-right">Amount allocated</th>
+                <th className="px-4 py-2 text-right">Amount Allocated</th>
                 <th className="px-4 py-2 text-right w-24">Receipt</th>
               </tr>
             </thead>
@@ -595,7 +602,7 @@ const InvoiceDetailPage: React.FC = () => {
                       ) : (
                         <Button size="sm" variant="ghost" className="h-6 text-[11px]"
                           onClick={() => setReturnFor({ id: cn.id, number: cn.credit_note_number ?? null })}>
-                          Receive goods
+                          Receive Goods
                         </Button>
                       )}
                     </td>
@@ -658,7 +665,7 @@ const InvoiceDetailPage: React.FC = () => {
                   stalled document this is the only actionable thing on the card. */}
               {f.fiscal_error && f.fiscal_status !== 'accepted' && (
                 <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
-                  <p className="text-xs font-medium text-destructive">Provider response</p>
+                  <p className="text-xs font-medium text-destructive">Provider Response</p>
                   <p className="mt-1 text-xs text-muted-foreground break-words">{f.fiscal_error}</p>
                 </div>
               )}

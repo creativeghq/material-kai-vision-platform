@@ -473,6 +473,28 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
     // re-render that yields the same ids must not re-fetch.
   }, [visibleInvoiceIds.join(',')]);
 
+  // Who each visible invoice was issued to — names for the page only, one query per party kind.
+  const [partyNames, setPartyNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (type !== 'invoices') return;
+    const page_ = paginate(rows, page);
+    const companyIds = [...new Set(page_.map((i) => (i as any).customer_company_id).filter(Boolean))] as string[];
+    const contactIds = [...new Set(page_.map((i) => (i as any).customer_contact_id).filter(Boolean))] as string[];
+    if (!companyIds.length && !contactIds.length) return;
+    let cancelled = false;
+    void Promise.all([
+      companyIds.length ? supabase.from('crm_companies').select('id, name').in('id', companyIds) : Promise.resolve({ data: [] as any[] }),
+      contactIds.length ? supabase.from('crm_contacts').select('id, name, first_name, last_name').in('id', contactIds) : Promise.resolve({ data: [] as any[] }),
+    ]).then(([co, ct]) => {
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      for (const c of co.data ?? []) next[c.id] = c.name;
+      for (const c of ct.data ?? []) next[c.id] = c.name || [c.first_name, c.last_name].filter(Boolean).join(' ');
+      setPartyNames((prev) => ({ ...prev, ...next }));
+    });
+    return () => { cancelled = true; };
+  }, [type, visibleInvoiceIds.join(',')]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Issuing/dismissing a document shrinks the list — clamp so the last page never goes blank.
   useEffect(() => { setPage((p) => clampPage(p, activeRows.length)); }, [activeRows.length]);
 
@@ -698,6 +720,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                     <thead className="border-b border-border/60 text-xs text-muted-foreground">
                       <tr>
                         <th className="px-4 py-2 text-left">Number</th>
+                        <th className="px-4 py-2 text-left">Customer</th>
                         <th className="px-4 py-2 text-left">Date</th>
                         <th className="px-4 py-2 text-left">Category</th>
                         <th className="px-4 py-2 text-right">Total</th>
@@ -710,7 +733,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                     </thead>
                     <tbody>
                       {rows.length === 0 && (
-                        <tr><td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">No {DOC_LABEL[type].toLowerCase()} yet.</td></tr>
+                        <tr><td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">No {DOC_LABEL[type].toLowerCase()} yet.</td></tr>
                       )}
                       {paginate(rows, page).map((i) => (
                         <tr
@@ -723,6 +746,9 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                         >
                           <td className="px-4 py-2 font-mono text-xs">
                             <button type="button" onClick={(e) => { e.stopPropagation(); navigate(`${financeBase}/invoices/${i.id}`); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{i.internal_number}</button>
+                          </td>
+                          <td className="px-4 py-2 max-w-[260px] truncate" title={partyNames[(i as any).customer_company_id ?? (i as any).customer_contact_id] ?? undefined}>
+                            {partyNames[(i as any).customer_company_id ?? (i as any).customer_contact_id] ?? <span className="text-muted-foreground">—</span>}
                           </td>
                           <td className="px-4 py-2">{i.issued_at ? formatDate(i.issued_at) : <span className="text-muted-foreground">Draft</span>}</td>
                           <td className="px-4 py-2" onClick={(e) => e.stopPropagation()}>

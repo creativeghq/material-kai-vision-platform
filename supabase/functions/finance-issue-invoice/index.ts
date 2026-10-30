@@ -1448,6 +1448,27 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
       .eq('id', invoiceId)
       .single();
 
+    // A transmission that was asked for and did not land is told to the people who can act on it,
+    // through the seeded `fiscal_document_rejected` flow — a toast alone is gone the moment it closes.
+    const fiscalFailed = body.submit_fiscal && fiscalResult
+      && (fiscalResult.ok === false || fiscalResult.status === 'rejected');
+    if (fiscalFailed && finalInvoice) {
+      const num = (finalInvoice as any).legal_number ?? (finalInvoice as any).internal_number ?? invoiceId;
+      const why = fiscalResult.error ?? fiscalResult.errorMessage ?? fiscalResult.errorCode ?? 'The provider did not accept it.';
+      await emitFlowEventToWorkspaceRoles(
+        (finalInvoice as any).workspace_id, ['owner', 'admin', 'accountant'], 'fiscal_document_rejected',
+        (uid) => ({
+          type: 'fiscal_document_rejected',
+          user_id: uid,
+          reason: 'not_sent',
+          title: `Invoice ${num} was not sent to myDATA`,
+          body: `Invoice ${num} is issued but did not reach AADE: ${why} Open it and press Send to myDATA once it is resolved.`,
+          action_url: `/finance/invoices/${invoiceId}`,
+          workspace_id: (finalInvoice as any).workspace_id,
+        }),
+      ).catch(() => {});
+    }
+
     return json({
       ok: true,
       invoice_id: invoiceId,

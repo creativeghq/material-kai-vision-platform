@@ -354,7 +354,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [printOnlineCode, setPrintOnlineCode] = useState(true);
   const [infoBox, setInfoBox] = useState('');
   const [logoMode, setLogoMode] = useState<'auto' | 'none'>('auto');
-  const [submitNow, setSubmitNow] = useState(false);
+  const [submitNow, setSubmitNow] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [moveStock, setMoveStock] = useState(true);
   const [nextNumber, setNextNumber] = useState<{ series: string | null; number: number | null } | null>(null);
@@ -434,7 +434,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
-    setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(false); setSendEmail(false); setNextNumber(null);
+    setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(true); setSendEmail(false); setNextNumber(null);
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat(''); setDocTaxes([]);
     setLines(initialItems && initialItems.length ? initialItems.map((it) => emptyLine(it)) : [emptyLine()]);
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
@@ -2224,7 +2224,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             <FormSection title="Document & delivery options">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
                 <label htmlFor="newinvoice-submit-mydata" className="flex items-center justify-between cursor-pointer">
-                  <span>Submit to myDATA on issue</span>
+                  <span>Send to AADE on Issue</span>
                   <Checkbox id="newinvoice-submit-mydata" className="h-4 w-4 rounded" checked={submitNow} onCheckedChange={(v) => setSubmitNow(v === true)} />
                 </label>
                 <label htmlFor="newinvoice-print-qr" className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><Checkbox id="newinvoice-print-qr" className="h-4 w-4 rounded" checked={printOnlineCode} onCheckedChange={(v) => setPrintOnlineCode(v === true)} /></label>
