@@ -350,7 +350,7 @@ const FinancePage: React.FC = () => {
       setPnlOverview(null);
       setPnlMonths([]);
       setPnlSegments(null);
-      setPnlError(err instanceof Error ? err.message : String(err));
+      setPnlError((err as { message?: string } | null)?.message ?? 'The query failed.');
     } finally {
       setPnlLoading(false);
     }
