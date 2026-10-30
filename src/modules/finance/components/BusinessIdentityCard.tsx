@@ -74,6 +74,8 @@ const MAIN_ACTIVITIES = [
   { group: 'Services', items: ['Architect/Engineer/Contractor', 'Lawyer/Notary', 'Accounting services', 'Psychologists/Therapists', 'Technical trade (Electrician/Plumber/etc.)', 'Healthcare professional', 'Tourism/Accommodation', 'NGO', 'Other'] },
 ];
 
+export interface Kad { code: string; description: string; description_en: string; primary: boolean }
+
 const ALL_TEXT_FIELDS = [...BILLING, ...CUSTOMER_CONTACT, ...PERSONAL];
 
 interface Props {
@@ -96,7 +98,29 @@ function buildPatch(workspaceId: string, data: Record<string, any>): Record<stri
   patch.business_company_type = data.business_company_type ?? null;
   patch.business_seasonal = !!data.business_seasonal;
   patch.main_activity = data.main_activity ?? null;
+  patch.business_activities = ((data.business_activities ?? []) as Kad[])
+    .filter((k) => k.code.trim() || k.description.trim())
+    .map((k) => ({ code: k.code.trim(), description: k.description.trim(), description_en: k.description_en.trim() || k.description.trim(), primary: !!k.primary }));
   return patch;
+}
+
+/** ΑΑΔΕ activities win by code; KADs typed by hand that ΑΑΔΕ does not list are kept. */
+function mergeKads(cur: Kad[] | undefined, aade: { code: string | null; description: string | null }[], primaryCode: string | null, primaryEn: string | null): Kad[] {
+  const byCode = new Map<string, Kad>();
+  for (const k of cur ?? []) byCode.set(k.code, { ...k, primary: false });
+  for (const a of aade) {
+    if (!a.code) continue;
+    const prev = byCode.get(a.code);
+    byCode.set(a.code, {
+      code: a.code,
+      description: a.description ?? prev?.description ?? '',
+      description_en: (a.code === primaryCode ? primaryEn : null) ?? prev?.description_en ?? a.description ?? '',
+      primary: a.code === primaryCode,
+    });
+  }
+  const out = Array.from(byCode.values());
+  if (out.length && !out.some((k) => k.primary)) out[0].primary = true;
+  return out;
 }
 
 export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding = false, onSaved }) => {
@@ -135,6 +159,7 @@ export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding 
 
   const set = (k: string, v: any) => { setData((d) => ({ ...d, [k]: v })); setDirty(true); };
   const setMany = (fn: (d: Record<string, any>) => Record<string, any>) => { setData(fn); setDirty(true); };
+  const kads = (Array.isArray(data.business_activities) ? data.business_activities : []) as Kad[];
 
   const persist = useCallback(async (snapshot: Record<string, any>) => {
     // Accounts are managed in Settings → Accounts (single source), not here.
@@ -212,6 +237,7 @@ export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding 
           // Non-bilingual (single-slot) fields.
           business_street_number: pick(d.business_street_number, r.postal_address_no),
           business_postal_code: pick(d.business_postal_code, r.postal_zip_code),
+          business_activities: mergeKads(d.business_activities, res.activities, primaryAct?.code ?? null, en?.primary_activity_descr ?? null),
           business_country: d.business_country || 'Greece',
           business_country_en: d.business_country_en || 'Greece',
           business_country_code: d.business_country_code || 'GR',
@@ -365,6 +391,26 @@ export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding 
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label>Activities (KAD)</Label>
+                <Button size="sm" variant="outline" onClick={() => set('business_activities', [...kads, { code: '', description: '', description_en: '', primary: kads.length === 0 }])}>Add KAD</Button>
+              </div>
+              <p className="text-xs text-muted-foreground">Prefill from ΑΑΔΕ fills every registered KAD. The primary one prints by default; pick another per invoice.</p>
+              {kads.map((k, i) => {
+                const upd = (patch: Partial<Kad>) => set('business_activities', kads.map((x, j) => (j === i ? { ...x, ...patch } : patch.primary ? { ...x, primary: false } : x)));
+                return (
+                  <div key={i} className="grid grid-cols-[6rem_1fr_1fr_auto_auto] items-center gap-2">
+                    <Input className="h-8 font-mono text-xs" placeholder="KAD" value={k.code} onChange={(e) => upd({ code: e.target.value })} />
+                    <Input className="h-8 text-xs" placeholder="Description (GR)" value={k.description} onChange={(e) => upd({ description: e.target.value })} />
+                    <Input className="h-8 text-xs" placeholder="Description (EN)" value={k.description_en} onChange={(e) => upd({ description_en: e.target.value })} />
+                    <label className="flex items-center gap-1 text-xs"><input type="radio" checked={k.primary} onChange={() => upd({ primary: true })} /> Primary</label>
+                    <Button size="sm" variant="ghost" className="h-8 px-2 text-xs" onClick={() => set('business_activities', kads.filter((_, j) => j !== i))}>Remove</Button>
+                  </div>
+                );
+              })}
             </div>
 
             {/* Logo lives here now (the separate "Bank & Logo" tab was retired — bank

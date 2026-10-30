@@ -314,6 +314,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // Header
   const [documentType, setDocumentType] = useState('1.1');
   const [docTypePinned, setDocTypePinned] = useState(false);
+  const [activityCode, setActivityCode] = useState('');
   const [currency, setCurrency] = useState('EUR');
   const [vatRate, setVatRate] = useState('24');
   const [paymentTermsDays, setPaymentTermsDays] = useState('30');
@@ -428,7 +429,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // below loads its address. Otherwise start blank.
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
     setClientDialogOpen(false);
-    setDocumentType(initialDocType || '1.1'); setDocTypePinned(false); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
+    setDocumentType(initialDocType || '1.1'); setDocTypePinned(false); setActivityCode(''); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(todayLocalISO()); setNotes(initialNotes ?? '');
     setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
@@ -928,6 +929,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
    * It only ever moves BETWEEN the four codes it owns. An operator who has deliberately chosen a
    * 9.3 delivery note or a 1.6 supplemental keeps it: proposing is not overriding.
    */
+  const kadOptions = useMemo(() => (Array.isArray(issuer?.business_activities) ? issuer.business_activities : []) as { code: string; description: string; description_en: string; primary: boolean }[], [issuer]);
+  // Null = the workspace default. The primary KAD IS the default, so picking it stores nothing.
+  const chosenKad = useMemo(() => {
+    const k = kadOptions.find((x) => x.code === activityCode);
+    return k && !k.primary ? { code: k.code, description: k.description, description_en: k.description_en } : null;
+  }, [kadOptions, activityCode]);
   const supplyKind = useMemo(() => supplyKindOf(lines), [lines]);
   const saleRegime = useMemo(
     () => saleRegimeForCountry(customerAddr?.country_code ?? null, !buyerIsConsumer),
@@ -1073,6 +1080,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         expense_classification_type: isExpenseDoc ? (expenseType || null) : null,
         expense_classification_category: isExpenseDoc ? (expenseCategory || null) : null,
         doc_language: docLanguage,
+        activity_kad: chosenKad,
         template_id: snapshotTemplateId, template_colors: snapshotTemplateColors,
         customer_address_unit_id: addrUnitId,
         has_shipping: hasShipping,
@@ -1283,7 +1291,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   }, [issueDate, paymentTermsDays]);
   const previewData = useMemo(() => buildInvoiceRenderData({
     invoice: {
-      doc_language: 'en', currency, document_type: documentType,
+      doc_language: 'en', currency, document_type: documentType, activity_kad: chosenKad,
       internal_number: nextNumber?.number != null ? `${nextNumber.series ?? ''}${nextNumber.number}` : 'DRAFT',
       issued_at: issueDate || null, due_at: dueDatePreview, related_document: relatedDocument || null,
       vat_rate: parseDecimalOr(vatRate, 0),
@@ -1334,7 +1342,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         })
         .filter((r) => r.tax_type > 0 && r.tax_amount !== 0)
       : null,
-  }), [issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr, selfBillSupplierId, selfBillSupplierRow, docTaxes, docTaxAmountOf, refsForTaxType]);
+  }), [chosenKad, issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr, selfBillSupplierId, selfBillSupplierRow, docTaxes, docTaxAmountOf, refsForTaxType]);
 
   const itemCount = useMemo(() => lines.filter((l) => l.description.trim()).length, [lines]);
 
@@ -1587,6 +1595,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Input id="ni-related" className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="e.g. related invoice no. or myDATA MARK" />
               </FormField>
               {/* Document language selector deferred until translations launch — invoices are English-only for now. */}
+              {kadOptions.length > 1 && (
+                <FormField label="Activity (KAD) printed on the document" htmlFor="ni-kad" className="sm:col-span-2">
+                  <Select value={activityCode || kadOptions.find((k) => k.primary)?.code || ''} onValueChange={setActivityCode}>
+                    <SelectTrigger id="ni-kad" className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>{kadOptions.map((k) => <SelectItem key={k.code} value={k.code}>{k.code} — {k.description_en || k.description}{k.primary ? ' (default)' : ''}</SelectItem>)}</SelectContent>
+                  </Select>
+                </FormField>
+              )}
               {branches.length > 1 && (
                 <FormField label="Establishment" htmlFor="ni-branch" className="sm:col-span-2">
                   <Select value={branchCode} onValueChange={setBranchCode}>

@@ -8910,6 +8910,7 @@ export type Database = {
           invoice_template_cover_path: string | null
           invoice_template_footer_path: string | null
           invoice_template_id: string
+          business_activities: Json
           main_activity: string | null
           min_order_value: number | null
           negative_margin_policy: string
@@ -9029,6 +9030,7 @@ export type Database = {
           invoice_template_cover_path?: string | null
           invoice_template_footer_path?: string | null
           invoice_template_id?: string
+          business_activities?: Json
           main_activity?: string | null
           min_order_value?: number | null
           negative_margin_policy?: string
@@ -9148,6 +9150,7 @@ export type Database = {
           invoice_template_cover_path?: string | null
           invoice_template_footer_path?: string | null
           invoice_template_id?: string
+          business_activities?: Json
           main_activity?: string | null
           min_order_value?: number | null
           negative_margin_policy?: string
@@ -13122,6 +13125,7 @@ export type Database = {
           customer_contact_id: string | null
           deposit_pct: number | null
           digital_transaction_fee: number
+          activity_kad: Json | null
           doc_language: string
           document_type: string | null
           due_at: string | null
@@ -13228,6 +13232,7 @@ export type Database = {
           customer_contact_id?: string | null
           deposit_pct?: number | null
           digital_transaction_fee?: number
+          activity_kad?: Json | null
           doc_language?: string
           document_type?: string | null
           due_at?: string | null
@@ -13334,6 +13339,7 @@ export type Database = {
           customer_contact_id?: string | null
           deposit_pct?: number | null
           digital_transaction_fee?: number
+          activity_kad?: Json | null
           doc_language?: string
           document_type?: string | null
           due_at?: string | null

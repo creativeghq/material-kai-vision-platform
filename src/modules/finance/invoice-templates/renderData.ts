@@ -108,6 +108,12 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const bizCity = en ? (fs?.business_city_en || fs?.business_city) : fs?.business_city;
   const bizTaxOffice = en ? (fs?.business_tax_office_en || fs?.business_tax_office) : fs?.business_tax_office;
   const bizProfession = en ? (fs?.business_profession_en || fs?.business_profession) : fs?.business_profession;
+  // A KAD chosen on the invoice replaces the workspace default for this document only.
+  const kadPick = inv.activity_kad as { code?: string; description?: string; description_en?: string } | null | undefined;
+  const kadDesc = kadPick ? (en ? (kadPick.description_en || kadPick.description) : kadPick.description) : '';
+  const activityText = kadPick && (kadPick.code || kadDesc)
+    ? [kadPick.code, kadDesc].filter(Boolean).join(' – ')
+    : (bizProfession || fs?.main_activity || '');
   const issuerLines = [
     [bizAddress, fs?.business_street_number].filter(Boolean).join(' '),
     [fs?.business_postal_code, bizCity].filter(Boolean).join(' '),
@@ -117,7 +123,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     // `main_activity` picklist stands in only for a workspace that never filled the free-text
     // field. Printing both gave the document two lines labelled "Activity", which reads as an
     // error rather than as extra detail.
-    bizProfession || fs?.main_activity ? `${L.profession}: ${bizProfession || fs?.main_activity}` : '',
+    activityText ? `${L.profession}: ${activityText}` : '',
     [fs?.business_phone ? `${L.phone} ${fs.business_phone}` : '', fs?.business_email || ''].filter(Boolean).join('  ·  '),
     fs?.business_website ? `${L.website}: ${fs.business_website}` : '',
     fs?.business_gemi ? `${L.registry}: ${fs.business_gemi}` : '',
