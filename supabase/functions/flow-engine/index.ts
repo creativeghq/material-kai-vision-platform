@@ -616,7 +616,31 @@ async function executeAction(
         is_read: false,
       });
       if (error) throw new Error(`Notification failed: ${error.message}`);
-      return { output: { created: true } };
+
+      // Phone push is one more delivery of the same notification, for users who opted in.
+      let pushed: unknown = null;
+      try {
+        const { data: subs } = await supabase
+          .from('push_subscriptions')
+          .select('endpoint, p256dh_key, auth_key')
+          .eq('user_id', notifUserId)
+          .eq('is_active', true);
+        if (subs && subs.length > 0) {
+          const actionUrl = typeof resolved.action_url === 'string' && resolved.action_url.startsWith('/') && !resolved.action_url.startsWith('//')
+            ? resolved.action_url : '/';
+          const { data: pushRes } = await supabase.functions.invoke('notification-dispatcher', {
+            body: {
+              action: 'send-push',
+              subscriptions: subs,
+              notification: { title: notifTitle, body: notifBody.includes('{{') ? '' : notifBody, data: { url: actionUrl } },
+            },
+          });
+          pushed = pushRes ?? null;
+        }
+      } catch (pushErr) {
+        console.error('[flow-engine] push mirror failed (bell was delivered):', pushErr);
+      }
+      return { output: { created: true, push: pushed } };
     }
 
     case 'send_price_alert': {

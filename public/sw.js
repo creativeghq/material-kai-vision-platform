@@ -17,7 +17,7 @@
  * clear caches, and (via the controllerchange handler in main.tsx) reload open
  * tabs into the new build.
  */
-const SW_VERSION = '2026-10-30.1';
+const SW_VERSION = '2026-10-30.2';
 
 self.addEventListener('install', () => {
   // Activate this worker immediately instead of waiting for old tabs to close.
@@ -64,7 +64,8 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const path = (event.notification.data && event.notification.data.url) || '/';
+  const d = event.notification.data || {};
+  const path = d.url || d.action_url || '/';
   const target = new URL(path, self.location.origin).href;
   event.waitUntil(
     (async () => {

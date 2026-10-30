@@ -13129,6 +13129,7 @@ export type Database = {
           deposit_pct: number | null
           digital_transaction_fee: number
           activity_kad: Json | null
+          chosen_series_id: string | null
           doc_language: string
           document_type: string | null
           due_at: string | null
@@ -13236,6 +13237,7 @@ export type Database = {
           deposit_pct?: number | null
           digital_transaction_fee?: number
           activity_kad?: Json | null
+          chosen_series_id?: string | null
           doc_language?: string
           document_type?: string | null
           due_at?: string | null
@@ -13343,6 +13345,7 @@ export type Database = {
           deposit_pct?: number | null
           digital_transaction_fee?: number
           activity_kad?: Json | null
+          chosen_series_id?: string | null
           doc_language?: string
           document_type?: string | null
           due_at?: string | null

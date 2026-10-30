@@ -5,7 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Bell, Loader2 } from 'lucide-react';
+import { MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -16,7 +16,6 @@ import { MessagingLogsTab } from '../components/MessagingLogsTab';
 import { MessagingAnalyticsTab } from '../components/MessagingAnalyticsTab';
 import { MessagingCampaignsTab } from '../components/MessagingCampaignsTab';
 import { MessagingOptoutsTab } from '../components/MessagingOptoutsTab';
-import { PushNotificationsTab } from '../components/PushNotificationsTab';
 import { messagingService } from '../services';
 import { useToast } from '@/hooks/use-toast';
 import { formatNumber } from '@/utils/decimal';
@@ -240,10 +239,6 @@ export const MessagingManagement: React.FC = () => {
               <Users className="h-4 w-4 mr-2" />
               Opt-Outs
             </TabsTrigger>
-            <TabsTrigger value="push">
-              <Bell className="h-4 w-4 mr-2" />
-              Push Notifications
-            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="channels" className="space-y-4">
@@ -270,9 +265,6 @@ export const MessagingManagement: React.FC = () => {
             <MessagingOptoutsTab />
           </TabsContent>
 
-          <TabsContent value="push" className="space-y-4">
-            <PushNotificationsTab />
-          </TabsContent>
         </Tabs>
       </div>
     </div>

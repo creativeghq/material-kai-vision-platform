@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Bell, Building2, Phone, ClipboardList,
+  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Building2, Phone, ClipboardList,
 } from 'lucide-react';
 import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -18,12 +18,11 @@ import { MessagingCampaignsTab } from '@/modules/messaging/components/MessagingC
 import { MessagingLogsTab } from '@/modules/messaging/components/MessagingLogsTab';
 import { MessagingAnalyticsTab } from '@/modules/messaging/components/MessagingAnalyticsTab';
 import { MessagingOptoutsTab } from '@/modules/messaging/components/MessagingOptoutsTab';
-import { PushNotificationsTab } from '@/modules/messaging/components/PushNotificationsTab';
 
 type SectionId =
   | 'accounts' | 'workspace-accounts' | 'analytics'
   | 'whatsapp' | 'wa-numbers' | 'wa-templates' | 'wa-forms' | 'wa-campaigns' | 'wa-logs' | 'wa-analytics'
-  | 'wa-optouts' | 'wa-push';
+  | 'wa-optouts';
 
 const DEFAULT_SECTION: SectionId = 'accounts';
 
@@ -43,7 +42,6 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
   'wa-logs': MessagingLogsTab,
   'wa-analytics': MessagingAnalyticsTab,
   'wa-optouts': MessagingOptoutsTab,
-  'wa-push': PushNotificationsTab,
 };
 
 export const SocialHubPanel: React.FC = () => {
@@ -75,7 +73,6 @@ export const SocialHubPanel: React.FC = () => {
         { id: 'wa-logs', label: 'Message log', icon: MessageCircle },
         { id: 'wa-analytics', label: 'WhatsApp analytics', icon: BarChart3 },
         { id: 'wa-optouts', label: 'Opt-outs', icon: Users },
-        { id: 'wa-push', label: 'Push notifications', icon: Bell },
       );
     }
     return out;

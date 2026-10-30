@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/po
 import { useToast } from '@/hooks/use-toast';
 import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { supabase } from '@/integrations/supabase/client';
+import { productDetailService } from '@/services/productDetailService';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { invoicingSetupService, type FinanceBranch, type RefRow } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
@@ -357,7 +358,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [submitNow, setSubmitNow] = useState(true);
   const [sendEmail, setSendEmail] = useState(false);
   const [moveStock, setMoveStock] = useState(true);
-  const [nextNumber, setNextNumber] = useState<{ series: string | null; number: number | null } | null>(null);
+  const [autoNext, setAutoNext] = useState<{ series: string | null; number: number | null } | null>(null);
+  const [seriesOptions, setSeriesOptions] = useState<Array<{ id: string; series: string; next_number: number }>>([]);
+  const [chosenSeriesId, setChosenSeriesId] = useState('auto');
+  const nextNumber = useMemo(() => {
+    const c = seriesOptions.find((o) => o.id === chosenSeriesId);
+    return c ? { series: c.series, number: c.next_number } : autoNext;
+  }, [seriesOptions, chosenSeriesId, autoNext]);
 
   // Catalogs
   const [docTypes, setDocTypes] = useState<{ code: string; description: string }[]>([]);
@@ -434,7 +441,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
-    setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(true); setSendEmail(false); setNextNumber(null);
+    setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(true); setSendEmail(false); setAutoNext(null); setChosenSeriesId('auto');
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat(''); setDocTaxes([]);
     setLines(initialItems && initialItems.length ? initialItems.map((it) => emptyLine(it)) : [emptyLine()]);
     setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
@@ -627,7 +634,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const { data: br } = await supabase.from('finance_branches').select('id').eq('workspace_id', workspaceId).eq('branch_code', parseInt(branchCode, 10) || 0).maybeSingle();
       // A self-billed document draws from the SUPPLIER's single range, and an ordinary one must
       // never draw from it — previewing the wrong series prints a number the issue then contradicts.
-      const base = supabase.from('document_series').select('series, next_number, branch_id').eq('workspace_id', workspaceId).eq('is_active', true);
+      const base = supabase.from('document_series').select('id, series, next_number, branch_id').eq('workspace_id', workspaceId).eq('is_active', true);
       const { data: rows } = selfBillSupplierId
         ? await base.eq('self_billed_supplier_company_id', selfBillSupplierId)
         : await base.eq('doc_code', documentType).is('self_billed_supplier_company_id', null);
@@ -635,7 +642,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const match = selfBillSupplierId
         ? list[0]
         : (list.find((r: any) => r.branch_id === (br as any)?.id) ?? list.find((r: any) => r.branch_id === null));
-      setNextNumber(match ? { series: (match as any).series, number: (match as any).next_number } : null);
+      setAutoNext(match ? { series: (match as any).series, number: (match as any).next_number } : null);
+      setChosenSeriesId('auto');
+      setSeriesOptions(selfBillSupplierId ? [] : list
+        .filter((r: any) => r.branch_id === null || r.branch_id === (br as any)?.id)
+        .map((r: any) => ({ id: r.id as string, series: r.series as string, next_number: r.next_number as number })));
     })();
   }, [open, workspaceId, documentType, branchCode, selfBillSupplierId]);
 
@@ -690,6 +701,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const row = Array.isArray(data) ? data[0] : data;
       if (row?.suggested_sell != null) price = String(row.suggested_sell);
     } catch { /* price optional */ }
+    // Cost is internal and optional; an unknown or foreign-currency cost stays blank rather than
+    // landing as a wrong margin.
+    const pc = (await productDetailService.costs([p.id])).get(p.id);
+    const cost = pc?.cost != null && (!pc.cost_currency || pc.cost_currency === currency) ? String(pc.cost) : '';
     update(idx, {
       product_id: p.id,
       item_type: (p as { item_type?: string | null }).item_type ?? 'good',
@@ -700,6 +715,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       color: projected.selected_color ?? '',
       size: projected.selected_size ?? '',
       ...(price ? { unit_price: price } : {}),
+      ...(cost && !lines[idx]?.unit_cost.trim() ? { unit_cost: cost } : {}),
       expanded: true,
     });
     setProdOpenRow(null); setProdSearch(''); setProdResults([]);
@@ -1082,6 +1098,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         expense_classification_category: isExpenseDoc ? (expenseCategory || null) : null,
         doc_language: docLanguage,
         activity_kad: chosenKad,
+        chosen_series_id: chosenSeriesId !== 'auto' ? chosenSeriesId : null,
         template_id: snapshotTemplateId, template_colors: snapshotTemplateColors,
         customer_address_unit_id: addrUnitId,
         has_shipping: hasShipping,
@@ -1588,6 +1605,15 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <p className="text-[11px] text-muted-foreground">
                   {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series — auto-numbered (set series in Settings → Documents)'}
                 </p>
+                {seriesOptions.length > 1 && (
+                  <Select value={chosenSeriesId} onValueChange={setChosenSeriesId}>
+                    <SelectTrigger aria-label="Numbering Series" className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="auto">Automatic</SelectItem>
+                      {seriesOptions.map((o) => <SelectItem key={o.id} value={o.id}>Series {o.series} · next {o.next_number}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                )}
               </FormField>
               <FormField label="Date issued" htmlFor="ni-issue-date">
                 <Input id="ni-issue-date" type="date" className="h-9" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
