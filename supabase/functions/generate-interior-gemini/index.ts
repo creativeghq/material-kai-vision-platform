@@ -960,9 +960,11 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       }
       const planBuffer = await fetchImageBuffer(body.reference_image_url);
       const planPrompt = await buildFloorPlan3DPrompt(supabase, body.style, body.prompt);
+      // A plan is rarely square: take the output shape from the plan so the building is not cropped.
+      const planShape = await measureSource(body.reference_image_url);
       const result = await generateImageWithGemini(
         { text: planPrompt, images: [planBuffer] },
-        { model, aspectRatio: '1:1' },
+        { model, aspectRatio: body.aspect_ratio ?? planShape.aspectRatio },
       );
       imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
     }
