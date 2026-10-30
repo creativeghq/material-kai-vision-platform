@@ -319,7 +319,6 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [paymentTermsDays, setPaymentTermsDays] = useState('30');
   const [issueDate, setIssueDate] = useState(() => todayLocalISO());
   const [notes, setNotes] = useState('');
-  const [issueNow, setIssueNow] = useState(true);
   const [categoryId, setCategoryId] = useState('');
   const [branchCode, setBranchCode] = useState('0');
   const [docLanguage, setDocLanguage] = useState<'el' | 'en'>('en');
@@ -430,7 +429,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
     setClientDialogOpen(false);
     setDocumentType(initialDocType || '1.1'); setDocTypePinned(false); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
-    setIssueDate(todayLocalISO()); setNotes(initialNotes ?? ''); setIssueNow(true);
+    setIssueDate(todayLocalISO()); setNotes(initialNotes ?? '');
     setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
@@ -979,7 +978,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (def?.wh && code.split('.')[0] === '2') setWithholdingCode((cur) => cur || def.wh!);
   };
 
-  const handleSave = async () => {
+  const handleSave = async (draftOnly = false) => {
+    const issuing = !draftOnly;
     // A self-billed document has no customer — the counterpart is us. It needs the supplier
     // instead, and the flag without one is the arrangement αυτοτιμολόγηση cannot be.
     if (selfPricing && !selfBillSupplierId) {
@@ -1218,10 +1218,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       // The date the operator picked, not today (#351 B3). It was offered, honoured in the
       // preview, and then thrown away — so revenue and VAT could land in a different period than
       // the one approved on screen.
-      if (issueNow) await financeService.markInvoiceIssued(invoice.id, issueDate || null);
+      if (issuing) await financeService.markInvoiceIssued(invoice.id, issueDate || null);
 
       // Optional post-create actions chosen on the form.
-      if (submitNow && issueNow) {
+      if (submitNow && issuing) {
         try {
           const sub = await fiscalConnectorService.submitInvoice(invoice.id);
           // Credit exhaustion at issue: the invoice is issued but the myDATA transmission
@@ -1264,7 +1264,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         }
       }
 
-      toast({ title: 'Invoice created', description: (draftNumber as string) ?? undefined });
+      toast({ title: draftOnly ? 'Draft saved' : 'Invoice created', description: (draftNumber as string) ?? undefined });
       onCreated(invoice.id);
     } catch (err: any) {
       toast({ title: 'Failed', description: err.message ?? 'Error', variant: 'destructive' });
@@ -1708,12 +1708,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </div>
               </div>
               <div className="space-y-2">
+                <div className="flex items-center gap-2 px-2 text-[11px] text-muted-foreground">
+                  <span className="w-4" /><span className="flex-1">Description</span>
+                  <span className="w-16 text-right">Qty</span><span className="w-24 text-right">Price</span>
+                  <span className="w-20 text-right">Discount €</span><span className="w-20 text-right">VAT</span>
+                  <span className="w-20 text-right">Net</span><span className="w-24 text-right">Total incl. VAT</span>
+                  {lines.length > 1 && <span className="w-3.5" />}
+                </div>
                 {lines.map((l, idx) => {
                   const lineNet = lineNetOf(l);
+                  const linePct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
                   return (
                     <div key={idx} className="rounded-md border border-border/60">
                       <div className="flex items-start gap-2 p-2">
-                        <button type="button" className="mt-2 text-muted-foreground" onClick={() => update(idx, { expanded: !l.expanded })}>
+                        <button type="button" tabIndex={-1} className="mt-2 text-muted-foreground" onClick={() => update(idx, { expanded: !l.expanded })}>
                           {l.expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </button>
                         <div className="flex-1 space-y-1">
@@ -1735,12 +1743,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             {prodOpenRow === idx && !l.product_id && (matchedServices(prodSearch.trim()).length > 0 || prodResults.length > 0) && (
                               <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-md border border-border/60 bg-popover p-1 shadow-overlay">
                                 {matchedServices(prodSearch.trim()).map((s) => (
-                                  <button key={`s-${s.id}`} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickService(idx, s)}>
+                                  <button key={`s-${s.id}`} type="button" tabIndex={-1} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickService(idx, s)}>
                                     <span>{s.name}</span><span className="text-[10px] text-muted-foreground">service</span>
                                   </button>
                                 ))}
                                 {prodResults.map((pr) => (
-                                  <button key={pr.id} type="button" className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickProduct(idx, pr)}>
+                                  <button key={pr.id} type="button" tabIndex={-1} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickProduct(idx, pr)}>
                                     <span>{pr.name}{pr.sku ? ` · ${pr.sku}` : ''}</span><span className="text-[10px] text-muted-foreground">product</span>
                                   </button>
                                 ))}
@@ -1756,9 +1764,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         </div>
                         <div className="w-16"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
                         <div className="w-24"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
-                        <div className="w-20"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="Disc." title="Discount amount" /></div>
+                        <div className="w-20"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" title="Discount amount (€) taken off this line" /></div>
+                        <div className="w-20">
+                          <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
+                            <SelectTrigger className="h-8 px-2 text-xs" title="VAT rate for this line"><SelectValue>{linePct}%</SelectValue></SelectTrigger>
+                            <SelectContent><SelectItem value="none">Default ({vatRate}%)</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
                         <div className="w-20 pt-2 text-right text-sm tabular-nums">{lineNet.toFixed(2)}</div>
-                        {lines.length > 1 && <button type="button" className="mt-2 text-muted-foreground hover:text-destructive" onClick={() => removeLine(idx)}><Trash2 className="h-3.5 w-3.5" /></button>}
+                        <div className="w-24 pt-2 text-right text-sm font-medium tabular-nums" title="Line total including VAT">{(lineNet * (1 + linePct / 100)).toFixed(2)}</div>
+                        {lines.length > 1 && <button type="button" tabIndex={-1} className="mt-2 text-muted-foreground hover:text-destructive" onClick={() => removeLine(idx)}><Trash2 className="h-3.5 w-3.5" /></button>}
                       </div>
                       {l.expanded && (
                         <div className="grid grid-cols-2 gap-2 border-t border-border/40 bg-muted/20 p-3 sm:grid-cols-3">
@@ -2192,19 +2207,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* Document & delivery options (Ρυθμίσεις Παραστατικού) */}
             <FormSection title="Document & delivery options">
               <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                {/* Disabled unless "Issue now" is on, because the save path runs this only when
-                    BOTH are true (`if (submitNow && issueNow)`). The two checkboxes live in
-                    different parts of the form with no coupling, so ticking this one alone
-                    produced a draft that was never transmitted, with no warning that half the
-                    choice had been dropped. */}
-                <label htmlFor="newinvoice-submit-mydata" className={`flex items-center justify-between ${issueNow ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}>
-                  <span>
-                    Submit to myDATA on issue
-                    {!issueNow && (
-                      <span className="ml-1 text-[10px] text-muted-foreground">— needs &ldquo;Issue now&rdquo;; a draft cannot be transmitted</span>
-                    )}
-                  </span>
-                  <Checkbox id="newinvoice-submit-mydata" className="h-4 w-4 rounded" disabled={!issueNow} checked={submitNow && issueNow} onCheckedChange={(v) => setSubmitNow(v === true)} />
+                <label htmlFor="newinvoice-submit-mydata" className="flex items-center justify-between cursor-pointer">
+                  <span>Submit to myDATA on issue</span>
+                  <Checkbox id="newinvoice-submit-mydata" className="h-4 w-4 rounded" checked={submitNow} onCheckedChange={(v) => setSubmitNow(v === true)} />
                 </label>
                 <label htmlFor="newinvoice-print-qr" className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><Checkbox id="newinvoice-print-qr" className="h-4 w-4 rounded" checked={printOnlineCode} onCheckedChange={(v) => setPrintOnlineCode(v === true)} /></label>
                 <label htmlFor="newinvoice-include-myf" className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><Checkbox id="newinvoice-include-myf" className="h-4 w-4 rounded" checked={includeInMyf} onCheckedChange={(v) => setIncludeInMyf(v === true)} /></label>
@@ -2242,17 +2247,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         </div>
 
         <DialogFooter className="border-t border-border/60 px-5 py-3 shrink-0 sm:justify-start">
-          <label className="mr-auto flex items-center gap-2 text-sm" title="Assigns the legal number + date on create">
-            <Checkbox className="h-4 w-4 rounded" checked={issueNow} onCheckedChange={(v) => setIssueNow(v === true)} />
-            Issue now
-          </label>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
+          <Button variant="outline" className="mr-auto" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="outline" onClick={() => setShowPreview(true)} disabled={busy}><Eye className="h-4 w-4 mr-1.5" /> Preview</Button>
+          <Button variant="outline" onClick={() => handleSave(true)} disabled={busy || docTypes.length === 0} title="Save without a legal number — open it later to edit and issue">Save draft</Button>
           {/* #443: an unclassifiable delivery destination blocks the same way a buyer-risk
               hard block does. A wrong VAT rate is a valid percentage — nothing downstream can
               catch it, and it reaches AADE that way. */}
           <Button
-            onClick={handleSave}
+            onClick={() => handleSave(false)}
             disabled={busy || buyerRisk.hardBlocked || vatDestinationBlocked || creditBlocked || docTypes.length === 0}
             title={
               docTypes.length === 0
