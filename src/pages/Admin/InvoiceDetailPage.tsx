@@ -34,6 +34,7 @@ import { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
 import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
+import { LinkedRecordsPanel } from '@/components/core/hub';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 import { WholesaleCardNotice } from '@/modules/finance/components/WholesaleCardNotice';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
@@ -711,6 +712,8 @@ const InvoiceDetailPage: React.FC = () => {
           </Card>
         );
       })()}
+
+      <LinkedRecordsPanel kind="invoice" id={invoice.id} refreshKey={(invoice as { project_id?: string | null }).project_id} />
 
       {/* The platform's one Record Payment form, preset to this invoice. Foreign-currency
           settlement lives in it now, so this page no longer needs a copy of the form to have it. */}

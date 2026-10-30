@@ -14,7 +14,7 @@ const MENU = 'src/modules/finance/components/InvoiceActionsMenu.tsx';
 describe('#378 L2 — the invoice can name its job', () => {
   it('the action exists on the invoice itself', () => {
     const menu = src(MENU);
-    expect(menu).toMatch(/Attach to a job/);
+    expect(menu).toMatch(/Link to a project/);
     expect(menu).toMatch(/<OrderLinkPicker/);
   });
 

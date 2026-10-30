@@ -207,7 +207,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
       // legitimate — an invoice attached to the wrong job has to be detachable.
       const projectId = jobLink.kind === 'project' ? jobLink.projectId : null;
       await financeService.updateInvoice(invoiceId, { project_id: projectId } as never);
-      toast({ title: projectId ? 'Invoice attached to the job' : 'Invoice detached from the job' });
+      toast({ title: projectId ? 'Invoice linked to the project' : 'Invoice unlinked from the project' });
       setJobOpen(false);
       onChanged?.();
     } catch (e) {
@@ -292,7 +292,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DropdownMenuItem onClick={openHistory}><History className="h-4 w-4 mr-2" /> History</DropdownMenuItem>
         {!isAccountant && <DropdownMenuItem onClick={openDesc}><Pencil className="h-4 w-4 mr-2" /> Change description</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openCat}><Tag className="h-4 w-4 mr-2" /> Change category</DropdownMenuItem>}
-        {!isAccountant && <DropdownMenuItem onClick={openJob}><Briefcase className="h-4 w-4 mr-2" /> Attach to a job</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={openJob}><Briefcase className="h-4 w-4 mr-2" /> Link to a project</DropdownMenuItem>}
         <DropdownMenuItem onClick={copyLink}><Copy className="h-4 w-4 mr-2" /> Copy link</DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -362,7 +362,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     <Dialog open={jobOpen} onOpenChange={setJobOpen}>
       <DialogContent className="sm:max-w-md" onClick={(e) => e.stopPropagation()}>
         <DialogHeader>
-          <DialogTitle>Attach to a job</DialogTitle>
+          <DialogTitle>Link to a project</DialogTitle>
           <DialogDescription className="sr-only">Choose the project this invoice belongs to.</DialogDescription>
         </DialogHeader>
         {jobWorkspaceId ? (

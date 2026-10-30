@@ -16,6 +16,7 @@ export {
   HubPropertyList,
 } from './HubRecordLayout';
 export { HubRecordPage } from './HubRecordPage';
+export { LinkedRecordsPanel } from './LinkedRecordsPanel';
 
 export { HubTimeline, HubTimelineGroup, HubTimelineItem } from './HubTimeline';
 
