@@ -174,7 +174,7 @@ describe('the printed document names every charge it transmits', () => {
 
   it('falls back to the bucket name only when a row was filed without a label', () => {
     const data = build([{ tax_type: 4, tax_category: 1, tax_amount: 2, reduces_payable: false, label: null }]);
-    expect(data.totals.extras.map((e) => e.label)).toContain('Stamp duty');
+    expect(data.totals.extras.map((e) => e.label)).toContain('Stamp Duty');
   });
 
   it('a zero-amount row is printed by neither renderer', () => {
@@ -219,6 +219,6 @@ describe('the printed document names every charge it transmits', () => {
     // The line-mode path is untouched; this is what every existing invoice uses.
     const labels = build(null).totals.extras.map((e) => e.label);
     expect(labels).toContain('Fees');
-    expect(labels).toContain('Other taxes');
+    expect(labels).toContain('Other Taxes');
   });
 });

@@ -62,7 +62,7 @@ describe('the printed payment method is sent, and it names the code that is tran
   it('labels the FALLBACK method when the document records none — 5, on credit', () => {
     const d = doc(invoice());
     expect(d.paymentMethods[0].type).toBe(5);
-    expect(d.providerAdditionalInvoiceDetails.additionalDetails.paymentMethodInvoiceLabel).toBe('On credit');
+    expect(d.providerAdditionalInvoiceDetails.additionalDetails.paymentMethodInvoiceLabel).toBe('On Credit');
   });
 
   it('follows the document language for the printed name', () => {
