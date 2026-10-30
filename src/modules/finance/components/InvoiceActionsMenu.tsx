@@ -147,6 +147,20 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     }
   };
 
+  const downloadEn16931 = async () => {
+    try {
+      const { file_name, xml, warnings } = await financeService.fetchInvoiceEn16931(invoiceId);
+      const url = URL.createObjectURL(new Blob([xml], { type: 'application/xml' }));
+      const a = document.createElement('a');
+      a.href = url; a.download = file_name;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      if (warnings.length) toast({ title: 'Downloaded with notes', description: warnings.join(' ') });
+    } catch (err: any) {
+      toast({ title: 'EN 16931 file not available', description: await edgeErrorMessage(err), variant: 'destructive' });
+    }
+  };
+
   const sendEmail = async () => {
     try {
       const { data, error } = await financeService.sendInvoiceEmail(invoiceId);
@@ -277,6 +291,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> Open</DropdownMenuItem>
         {canOperateFinance && <DropdownMenuItem onClick={() => go('?action=payment')}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
         <DropdownMenuItem onClick={downloadPdf}><Download className="h-4 w-4 mr-2" /> Download PDF</DropdownMenuItem>
+        <DropdownMenuItem onClick={downloadEn16931}><Download className="h-4 w-4 mr-2" /> Download EN 16931 XML</DropdownMenuItem>
 
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-[10px] uppercase text-muted-foreground">myDATA</DropdownMenuLabel>

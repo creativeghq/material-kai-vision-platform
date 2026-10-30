@@ -312,7 +312,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     } catch (e) {
       return json({ error: `Could not build the document: ${e instanceof Error ? e.message : String(e)}` }, 422);
     }
-    if (!result.ok) return json({ error: 'This document cannot be expressed as EN 16931', refusals: result.refusals }, 422);
+    if (!result.ok) return json({ error: `This document cannot be expressed as EN 16931: ${result.refusals.join('; ')}`, refusals: result.refusals }, 422);
     return json({ format: 'en16931', file_name: result.fileName, xml: result.xml, warnings: result.warnings });
   }
 

@@ -10,12 +10,18 @@ describe('which stored links have a structured twin', () => {
       .toBe('https://www.invoiceportal.gr/invoices/2026-AB/EN16931');
   });
 
-  it('names no twin for providers that serve only a viewer and a PDF', () => {
+  it('maps the other probed providers, subdomains included', () => {
+    expect(structuredUrlFor('https://einvoice.impact.gr/p/EL099117147/AA/BB')).toBe('https://einvoice.impact.gr/p/EL099117147/AA/BB/EN16931');
+    expect(structuredUrlFor('https://einvoice.s1ecos.gr/p/EL094177099/AA/BB')).toBe('https://einvoice.s1ecos.gr/p/EL094177099/AA/BB/EN16931');
+    expect(structuredUrlFor('https://epsilondigital21.epsilonnet.gr/fd/abc:185')).toBe('https://epsilondigital21.epsilonnet.gr/fd/abc:185/EN16931');
+    expect(structuredUrlFor('https://vs.gr/iv/invoice/download/a/b')).toBe('https://vs.gr/iv/invoice/download/a/b/EN16931');
+    expect(structuredUrlFor('https://srv2.parochos.gr/fd/abc:2')).toBe('https://srv2.parochos.gr/fd/abc:2/EN16931');
+    expect(structuredUrlFor('https://www.eskap.gr/invoice/abc')).toBe('https://www.eskap.gr/invoice/abc/EN16931');
+  });
+
+  it('names no twin for a provider that answered with only a viewer, or for AADE', () => {
     for (const u of [
-      'https://einvoice.impact.gr/p/EL099117147/AA/BB',
-      'https://einvoice.s1ecos.gr/p/EL094177099/AA/BB',
       'https://e-invoicing.gr/edocuments/ViewInvoice/-1/abc',
-      'https://epsilondigital21.epsilonnet.gr/fd/abc:185',
       'https://mydatapi.aade.gr/x',
     ]) expect(structuredUrlFor(u), u).toBeNull();
   });
@@ -23,6 +29,8 @@ describe('which stored links have a structured twin', () => {
   it('refuses a non-https link, a look-alike host and junk', () => {
     expect(structuredUrlFor('http://invoiceportal.gr/invoices/1')).toBeNull();
     expect(structuredUrlFor('https://invoiceportal.gr.evil.example/invoices/1')).toBeNull();
+    expect(structuredUrlFor('https://notvs.gr/iv/1')).toBeNull();
+    expect(structuredUrlFor('https://evilepsilonnet.gr/fd/1')).toBeNull();
     expect(structuredUrlFor('https://evil.example/invoiceportal.gr/invoices/1')).toBeNull();
     expect(structuredUrlFor('not a url')).toBeNull();
     expect(structuredUrlFor(null)).toBeNull();

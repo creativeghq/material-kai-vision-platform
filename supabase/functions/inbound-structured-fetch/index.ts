@@ -3,7 +3,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
-import { structuredUrlFor, readEn16931Header } from '../_shared/finance/structured-providers.ts';
+import { STRUCTURED_PROVIDERS, structuredUrlFor, readEn16931Header } from '../_shared/finance/structured-providers.ts';
 import { parseEn16931, checkAgainstMyData } from '../_shared/finance/en16931-parse.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 
@@ -156,7 +156,7 @@ Deno.serve(withApiLogging('inbound-structured-fetch', async (req: Request) => {
   const { data, error } = await admin.from('inbound_documents')
     .select('id, download_url, checked_at:raw->>en16931_checked_at')
     .eq('workspace_id', workspaceId).is('source_format', null)
-    .ilike('download_url', 'https://%invoiceportal.gr/%')
+    .or(STRUCTURED_PROVIDERS.flatMap((p) => [`download_url.ilike.https://${p.host}/%`, `download_url.ilike.https://%.${p.host}/%`]).join(','))
     .order('issue_date', { ascending: false }).limit(1000);
   if (error) throw new HttpError(500, `could not list documents: ${error.message}`);
 
@@ -167,14 +167,15 @@ Deno.serve(withApiLogging('inbound-structured-fetch', async (req: Request) => {
     .filter((x): x is { c: Candidate; url: string } => x.url !== null);
 
   const tally: Record<Outcome | 'failed', number> = { fetched: 0, not_structured: 0, unreachable: 0, failed: 0 };
-  let lastHit = 0;
+  const lastHitByHost = new Map<string, number>();
   const started = Date.now();
   let processed = 0;
   for (const { c, url } of due.slice(0, limit)) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
-    const wait = SAME_HOST_GAP_MS - (Date.now() - lastHit);
+    const host = new URL(url).hostname;
+    const wait = SAME_HOST_GAP_MS - (Date.now() - (lastHitByHost.get(host) ?? 0));
     if (wait > 0) await sleep(wait);
-    lastHit = Date.now();
+    lastHitByHost.set(host, Date.now());
     processed++;
     try {
       tally[await readOne(admin, workspaceId, c, url)]++;

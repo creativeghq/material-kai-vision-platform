@@ -170,6 +170,10 @@ export interface InboundDocument {
   uid: string | null;
   authentication_code: string | null;
   qr_code_url: string | null;
+  /** Present on the full row only (`getFull`); the list never selects them. */
+  source_format?: string | null;
+  delivery_channel?: string | null;
+  raw?: Record<string, unknown> | null;
   /** The issuer's own rendered document, when their provider publishes one. */
   download_url: string | null;
   issuer_country: string | null;

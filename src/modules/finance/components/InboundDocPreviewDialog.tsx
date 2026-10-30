@@ -9,6 +9,8 @@
 import React from 'react';
 import { ExternalLink, QrCode, Truck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Badge } from '@/components/core/ui/badge';
+import { en16931Evidence } from '@/modules/finance/utils/en16931Evidence';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { MydataTypeLabel } from '@/modules/finance/components/MydataTypeLabel';
 import { inboundService, type InboundAddress, type InboundDocLine, type InboundDocument, type InboundDocumentDetail, type IssuerProfile } from '@/modules/finance/services/inboundService';
@@ -83,6 +85,8 @@ export const InboundDocPreviewDialog: React.FC<{
       .catch(() => { /* keep the list row; the line table simply renders empty */ });
     return () => { live = false; };
   }, [open, doc.id]);
+
+  const evidence = en16931Evidence(full);
 
   /**
    * The MERGED answer: this document's own lines, or the delivery note's when the document names
@@ -233,6 +237,15 @@ export const InboundDocPreviewDialog: React.FC<{
             )}
           </div>
         </div>
+
+        {evidence && (
+          <div className="rounded-md border border-border/60 px-3 py-2">
+            <div className="flex items-center gap-2">
+              <Badge variant={evidence.tone}>{evidence.headline}</Badge>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{evidence.detail}</p>
+          </div>
+        )}
 
         {/* The receiving side. The issuer half of this pair moved into the header block above —
             keeping both would have printed the same name and address twice. */}
