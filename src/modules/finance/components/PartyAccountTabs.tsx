@@ -1,6 +1,6 @@
 /** The Account tab of a CRM party record (company or person), behind ONE tab strip. */
 import React from 'react';
-import { Banknote, Inbox as InboxIcon, ShieldCheck, ShoppingBag, ShoppingCart, type LucideIcon } from 'lucide-react';
+import { Banknote, FileText, Inbox as InboxIcon, ShieldCheck, ShoppingBag, ShoppingCart, type LucideIcon } from 'lucide-react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
@@ -11,6 +11,7 @@ import {
 import { CustomerFinanceRulesCard } from '@/modules/finance/components/CustomerFinanceRulesCard';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { PartyInboundDocsCard } from '@/modules/finance/components/PartyInboundDocsCard';
+import { PartyIssuedInvoicesCard } from '@/modules/finance/components/PartyIssuedInvoicesCard';
 import { OpeningBalanceCard } from '@/modules/finance/components/OpeningBalanceCard';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import type { PartySide } from '@/modules/finance/services/partyBalancesService';
@@ -85,6 +86,13 @@ export const PartyAccountTabs: React.FC<Props> = ({
       ),
     },
   ];
+
+  if (roles.customer || !roles.supplier) {
+    sections.push({
+      id: 'issued-invoices', label: 'Issued Invoices', icon: FileText,
+      node: <PartyIssuedInvoicesCard workspaceId={workspaceId} companyId={companyId} contactId={contactId} />,
+    });
+  }
 
   // What this supplier filed against us on myDATA. Rows that are not in Expenses yet say so:
   // until one is added they are in neither Payables nor the P&L.
