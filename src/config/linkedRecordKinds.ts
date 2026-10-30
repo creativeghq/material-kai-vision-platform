@@ -1,7 +1,3 @@
-/**
- * The record kinds `get_linked_records` can return, and where each one opens. A kind with no
- * standalone page has `route: null` and renders as plain text rather than a link to a list.
- */
 import {
   Building2,
   Contact,
