@@ -216,8 +216,8 @@ const InvoiceDetailPage: React.FC = () => {
 
   return (
     <div className="px-3 sm:px-6 space-y-6 py-6">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
           <Link to={`${financeBase}?tab=${FINANCE_TAB.invoices}`} aria-label="Back to Invoices">
             <Button variant="ghost" size="sm" className="-ml-2" aria-label="Back to Invoices">
               <ArrowLeft className="h-4 w-4" />
@@ -258,7 +258,7 @@ const InvoiceDetailPage: React.FC = () => {
                 the job is internal reporting, not a fiscal field. */}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {canEditProject && (
             <Button onClick={() => setProjectOpen(true)} variant="outline">
               <FolderOpen className="mr-2 h-4 w-4" />
