@@ -15,7 +15,9 @@ import {
   Copy,
   ShieldCheck,
   Truck,
+  FolderOpen,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -58,6 +60,7 @@ const InvoiceDetailPage: React.FC = () => {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [projectSaving, setProjectSaving] = useState(false);
+  const [projectOpen, setProjectOpen] = useState(false);
   // Attributing revenue to a job is a finance decision, gated the same way the project's own
   // Finance tab is. Everyone else sees the invoice without the control.
   const { can, isWorkspaceManager } = usePermissions();
@@ -252,20 +255,15 @@ const InvoiceDetailPage: React.FC = () => {
                 no income — and until now it could only be set from inside the project, which is
                 the direction someone looking at an invoice does not have. Editable after issue:
                 the job is internal reporting, not a fiscal field. */}
-            {canEditProject && (
-              <div className="mt-2">
-                <ProjectLinkField
-                  workspaceId={(invoice as any).workspace_id}
-                  projectId={(invoice as any).project_id ?? null}
-                  onChange={handleProjectChange}
-                  disabled={projectSaving}
-                  compact
-                />
-              </div>
-            )}
           </div>
         </div>
         <div className="flex gap-2">
+          {canEditProject && (
+            <Button onClick={() => setProjectOpen(true)} variant="outline">
+              <FolderOpen className="mr-2 h-4 w-4" />
+              {(invoice as any).project_id ? 'Project' : 'Link to Project'}
+            </Button>
+          )}
           {invoice.status === 'draft' && (
             <Button onClick={handleIssue}>
               <CheckCircle2 className="mr-2 h-4 w-4" /> Mark Issued
@@ -341,6 +339,20 @@ const InvoiceDetailPage: React.FC = () => {
           to this invoice, NOT by the A.1098 retail-receipt-then-credit-note workaround. Running
           both files two documents for one sale. */}
       <WholesaleCardNotice invoiceId={invoiceId ?? null} />
+
+      <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Link to Project</DialogTitle>
+          </DialogHeader>
+          <ProjectLinkField
+            workspaceId={(invoice as any).workspace_id}
+            projectId={(invoice as any).project_id ?? null}
+            onChange={async (id) => { await handleProjectChange(id); setProjectOpen(false); }}
+            disabled={projectSaving}
+          />
+        </DialogContent>
+      </Dialog>
 
       {payLink && (
         <Card className="border-primary/30 bg-primary/5">
