@@ -45,6 +45,7 @@ export interface InboundPosition {
   due_from: string;
   documents: number;
   structured: number;
+  structured_fetched: number;
   pulled_from_mydata: number;
   booked: number;
   without_receipt_date: number;

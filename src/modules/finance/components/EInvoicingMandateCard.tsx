@@ -194,7 +194,8 @@ export const EInvoicingMandateCard: React.FC<{ workspaceId: string }> = ({ works
                   </Badge>
                   <span className="tabular-nums">
                     since {formatDate(inbound.due_from)}: {inbound.documents} received ·{' '}
-                    {inbound.structured} structured · {inbound.pulled_from_mydata} pulled ·{' '}
+                    {inbound.structured} structured delivered · {inbound.structured_fetched} fetched from links ·{' '}
+                    {inbound.pulled_from_mydata} pulled ·{' '}
                     {inbound.without_receipt_date} with no receipt date
                   </span>
                 </div>

@@ -2295,6 +2295,25 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "inbound-structured-fetch",
+    "tag": "Finance",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Fetch the EN 16931 file a supplier's e-invoice provider serves beside its viewer",
+    "description": "For inbound myDATA documents whose download_url is on a provider known to serve an EN 16931 UBL file (invoiceportal.gr today), fetches that file through the SSRF guard, confirms it IS an EN 16931 document by root element and customization id, and stores it on the row with source_format en16931_ubl and delivery_channel provider_link. A file we go and fetch is a PULL, not a delivery: it is counted s",
+    "fields": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Checked against the caller's membership."
+      },
+      "limit": {
+        "type": "integer",
+        "description": "Documents per run, 1-100 (default 25)."
+      }
+    }
+  },
+  {
     "name": "inbox-api",
     "tag": "Messaging",
     "methods": [

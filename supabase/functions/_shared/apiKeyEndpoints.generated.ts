@@ -47,6 +47,7 @@ export const API_KEY_ENDPOINTS: ReadonlySet<string> = new Set([
   'generate-vr-world',
   'gsc-api',
   'hr-api',
+  'inbound-structured-fetch',
   'inbox-api',
   'installation-guide-appearance',
   'installation-guide-extract',
