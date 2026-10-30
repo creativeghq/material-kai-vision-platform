@@ -16,7 +16,8 @@ import {
 } from 'jsr:@negrel/webpush@^0.5.0';
 import { decodeBase64Url, encodeBase64Url } from 'jsr:@std/encoding@^1/base64url';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, isAdminAccess } from '../_shared/auth.ts';
+import { authenticate, isAdminAccess, callerIsPlatformOperator } from '../_shared/auth.ts';
+import { resolveSecret } from '../_shared/secrets.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 
@@ -37,6 +38,15 @@ interface WebhookEndpoint {
     retry_delay_seconds: number;
   };
 }
+
+function serviceClient() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  );
+}
+
+const MAX_BROADCAST_USERS = 5000;
 
 // PUSH NOTIFICATION HANDLER
 
@@ -109,9 +119,15 @@ async function sendPushNotifications(
     badge?: string;
   }
 ): Promise<{ success: number; failed: number; skipped?: number; reason?: string; results: any[] }> {
-  const vapidPublicKey = Deno.env.get('VAPID_PUBLIC_KEY') || '';
-  const vapidPrivateKey = Deno.env.get('VAPID_PRIVATE_KEY') || '';
-  const vapidSubject = Deno.env.get('VAPID_SUBJECT') || 'mailto:admin@materialkai.com';
+  const db = serviceClient();
+  const [pubS, prvS, subjS] = await Promise.all([
+    resolveSecret(db, 'VAPID_PUBLIC_KEY'),
+    resolveSecret(db, 'VAPID_PRIVATE_KEY'),
+    resolveSecret(db, 'VAPID_SUBJECT'),
+  ]);
+  const vapidPublicKey = pubS.value ?? '';
+  const vapidPrivateKey = prvS.value ?? '';
+  const vapidSubject = subjS.value ?? 'mailto:admin@materialkai.com';
 
   // Not configured → clean skip, don't crash the whole dispatch.
   if (!vapidPublicKey || !vapidPrivateKey) {
@@ -178,11 +194,7 @@ async function sendPushNotifications(
   // endpoint since the caller passes only endpoint/keys, not the row id.
   if (deadEndpoints.length > 0) {
     try {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-      await supabase
+      await db
         .from('push_subscriptions')
         .update({ is_active: false, updated_at: new Date().toISOString() })
         .in('endpoint', deadEndpoints);
@@ -379,20 +391,89 @@ serve(withApiLogging('notification-dispatcher', async (req) => {
       }
 
       case 'get-vapid-key': {
-        const vapidPublicKey = () => Deno.env.get('VAPID_PUBLIC_KEY') || '';
-        if (!vapidPublicKey()) {
-          return new Response(
-            JSON.stringify({ configured: false }),
-            {
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            }
-          );
-        }
+        const pub = (await resolveSecret(serviceClient(), 'VAPID_PUBLIC_KEY')).value;
         return new Response(
-          JSON.stringify({ configured: true, publicKey: vapidPublicKey() }),
-          {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
+          JSON.stringify(pub ? { configured: true, publicKey: pub } : { configured: false }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        );
+      }
+
+      case 'list-push-audience': {
+        if (!isAdminAccess(auth) && !(await callerIsPlatformOperator(auth))) throw new HttpError(403, 'Forbidden');
+        const db = serviceClient();
+        const { data: subs, error } = await db
+          .from('push_subscriptions')
+          .select('user_id')
+          .eq('is_active', true)
+          .limit(MAX_BROADCAST_USERS);
+        if (error) throw new Error(error.message);
+        const devices = new Map<string, number>();
+        for (const s of subs ?? []) devices.set(s.user_id, (devices.get(s.user_id) ?? 0) + 1);
+        const ids = [...devices.keys()];
+        const { data: profiles } = ids.length
+          ? await db.from('user_profiles').select('user_id, full_name, email').in('user_id', ids)
+          : { data: [] as Array<{ user_id: string; full_name: string | null; email: string | null }> };
+        const users = ids.map((id) => {
+          const p = (profiles ?? []).find((x) => x.user_id === id);
+          return { user_id: id, name: p?.full_name ?? null, email: p?.email ?? null, devices: devices.get(id) ?? 0 };
+        });
+        return new Response(JSON.stringify({ users }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      case 'broadcast-push': {
+        // Operator only. The recipient list is resolved HERE from push_subscriptions — the
+        // caller names users, never endpoints, so this cannot be pointed at a URL (SSRF).
+        const operator = isAdminAccess(auth) || (await callerIsPlatformOperator(auth));
+        if (!operator) throw new HttpError(403, 'Forbidden');
+        const title = String(body.title ?? '').trim();
+        const text = String(body.body ?? '').trim();
+        const audience = body.audience === 'all' ? 'all' : body.audience === 'selected' ? 'selected' : null;
+        if (!title || title.length > 80) throw new HttpError(400, 'Title is required (max 80 characters)');
+        if (!text || text.length > 240) throw new HttpError(400, 'Message is required (max 240 characters)');
+        if (!audience) throw new HttpError(400, 'audience must be "all" or "selected"');
+        const rawUrl = typeof body.url === 'string' ? body.url.trim() : '';
+        if (rawUrl && !(rawUrl.startsWith('/') && !rawUrl.startsWith('//'))) {
+          throw new HttpError(400, 'Link must be a path inside the app, e.g. /finance');
+        }
+        const userIds: string[] = Array.isArray(body.user_ids)
+          ? [...new Set((body.user_ids as unknown[]).filter((v): v is string => typeof v === 'string'))]
+          : [];
+        if (audience === 'selected' && userIds.length === 0) throw new HttpError(400, 'Choose at least one user');
+        if (userIds.length > MAX_BROADCAST_USERS) throw new HttpError(400, 'Too many users selected');
+
+        const db = serviceClient();
+        let q = db
+          .from('push_subscriptions')
+          .select('user_id, endpoint, p256dh_key, auth_key')
+          .eq('is_active', true)
+          .limit(MAX_BROADCAST_USERS);
+        if (audience === 'selected') q = q.in('user_id', userIds);
+        const { data: subs, error: subsErr } = await q;
+        if (subsErr) throw new Error(subsErr.message);
+        const rows = subs ?? [];
+        const recipientUsers = new Set(rows.map((r) => r.user_id)).size;
+
+        const result = rows.length
+          ? await sendPushNotifications(rows, {
+              title, body: text, icon: '/android-chrome-192x192.png', badge: '/favicon-32x32.png',
+              data: { url: rawUrl || '/', timestamp: new Date().toISOString() },
+            })
+          : { success: 0, failed: 0, skipped: 0, reason: undefined as string | undefined, results: [] };
+
+        await db.from('push_broadcasts').insert({
+          sent_by: auth.userId ?? null,
+          title, body: text, url: rawUrl || null, audience,
+          recipient_users: recipientUsers, delivered: result.success, failed: result.failed,
+        });
+
+        return new Response(
+          JSON.stringify({
+            recipients: recipientUsers, devices: rows.length,
+            delivered: result.success, failed: result.failed, reason: result.reason ?? null,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
         );
       }
 

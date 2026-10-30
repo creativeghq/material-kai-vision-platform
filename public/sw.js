@@ -17,7 +17,7 @@
  * clear caches, and (via the controllerchange handler in main.tsx) reload open
  * tabs into the new build.
  */
-const SW_VERSION = '2026-06-21.1';
+const SW_VERSION = '2026-10-30.1';
 
 self.addEventListener('install', () => {
   // Activate this worker immediately instead of waiting for old tabs to close.
@@ -42,4 +42,41 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', () => {
   // Intentionally empty: required for installability, but pass-through.
+});
+
+self.addEventListener('push', (event) => {
+  let n = null;
+  try {
+    n = event.data ? event.data.json().notification : null;
+  } catch {
+    n = null;
+  }
+  if (!n || !n.title) return;
+  event.waitUntil(
+    self.registration.showNotification(n.title, {
+      body: n.body || '',
+      icon: n.icon || '/android-chrome-192x192.png',
+      badge: n.badge || '/favicon-32x32.png',
+      data: n.data || {},
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const path = (event.notification.data && event.notification.data.url) || '/';
+  const target = new URL(path, self.location.origin).href;
+  event.waitUntil(
+    (async () => {
+      const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const w of wins) {
+        if (w.url.startsWith(self.location.origin) && 'focus' in w) {
+          await w.focus();
+          if ('navigate' in w) await w.navigate(target);
+          return;
+        }
+      }
+      await self.clients.openWindow(target);
+    })(),
+  );
 });

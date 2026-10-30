@@ -22,6 +22,7 @@ import {
   Send,
   BookOpen,
   KeyRound,
+  Bell,
 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
@@ -75,6 +76,7 @@ import { SearchAnalyticsDashboard } from '../SearchAnalyticsDashboard';
 import { SEODashboardPanel } from '@/components/business/seo-toolkit/SEODashboard';
 import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
 import { ModuleSubscribersPanel } from './ModuleSubscribersPanel';
+import { PushBroadcastPanel } from './PushBroadcastPanel';
 import { InboxAIPanel } from './InboxAIPanel';
 import { CapabilityLedgerPanel } from './CapabilityLedgerPanel';
 import { ChannelsCostPanel } from './ChannelsCostPanel';
@@ -115,7 +117,7 @@ interface AgentChatStats {
 const VALID_OPERATIONS_TABS = new Set([
   'system-health', 'data-processing', 'performance', 'agent-chat',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
-  'seo-toolkit', 'factory-onboarding', 'keys', 'modules',
+  'seo-toolkit', 'factory-onboarding', 'keys', 'modules', 'push',
 ]);
 
 const OperationsDashboardInner: React.FC = () => {
@@ -631,6 +633,10 @@ const OperationsDashboardInner: React.FC = () => {
               <CreditCard className="h-4 w-4 mr-2" />
               Modules
             </TabsTrigger>
+            <TabsTrigger value="push">
+              <Bell className="h-4 w-4 mr-2" />
+              Notifications
+            </TabsTrigger>
           </TabsList>
 
           {/* System Health Tab */}
@@ -644,6 +650,10 @@ const OperationsDashboardInner: React.FC = () => {
             <GenerationProviderHealth />
             {/* Storage audit — orphan objects per bucket + run cleanup, across all buckets (PDFs, images, sheets, quotes, etc.) */}
             <StorageAuditPanel />
+          </TabsContent>
+
+          <TabsContent value="push" className="space-y-4">
+            <PushBroadcastPanel />
           </TabsContent>
 
           {/* Module add-ons — per-workspace activation + add-on MRR (operator view). */}

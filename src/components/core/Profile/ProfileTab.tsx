@@ -20,6 +20,7 @@ import { primeDisplayProfile } from '@/services/displayProfilesService';
 import { PROFESSIONAL_TYPE_LABELS } from '@/lib/materialCategories';
 import { BusinessSection } from '@/components/core/Profile/BusinessSection';
 import { AppearanceSection } from '@/components/core/Profile/AppearanceSection';
+import { PushNotificationsCard } from '@/components/core/Profile/PushNotificationsCard';
 import { MarketplaceParticipationCard } from '@/components/core/Profile/MarketplaceParticipationCard';
 import { SupplierIdentityClaimCard } from '@/components/core/Profile/SupplierIdentityClaimCard';
 import { ProfileHero, type ProfileHeroStat, type ProfileStrengthItem } from '@/components/core/Profile/ProfileHero';
@@ -1467,6 +1468,8 @@ export const ProfileTab: React.FC = () => {
           </CardContent>
         </Card>
         )}
+
+        <PushNotificationsCard />
 
         <AppearanceSection />
       </div>
