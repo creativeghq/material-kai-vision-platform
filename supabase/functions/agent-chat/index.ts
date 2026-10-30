@@ -3125,7 +3125,7 @@ async function executeAgent(
     // operations — Replicate models can't preserve furniture positions or follow exact
     // edit instructions, so they'd just produce off-prompt full redesigns.
     const GEMINI_ONLY_MODES = [
-      'floor-plan-render', 'copy-style', 'floor-plan-text', 'image-edit',
+      'floor-plan-render', 'floor-plan-3d', 'copy-style', 'floor-plan-text', 'image-edit',
       'product-shot', 'product-lifestyle', 'material-texture', 'unstage',
     ];
     if (!generationMode || !GEMINI_ONLY_MODES.includes(generationMode)) {

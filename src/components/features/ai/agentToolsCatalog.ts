@@ -3300,10 +3300,23 @@ export const TOOLKITS: ToolkitDefinition[] = [
       },
       {
         label: 'Floor plan → 3D',
-        description: 'Turn an attached 2D floor plan into a photorealistic 3D interior',
+        description: 'Turn an attached 2D floor plan into one top-down 3D view of the whole home',
         icon: 'LayoutTemplate',
         imageRequired: true,
-        prompt: 'Render this floor plan as a photorealistic 3D interior.',
+        prompt: 'Build a top-down 3D of this whole floor plan.',
+        promptTemplate: 'Build ONE top-down 3D cutaway of this entire floor plan, keeping the walls and room layout of the plan, with every room furnished and finished. {{notes}}',
+        generation: { imageKeys: ['plan'], mode: 'floor-plan-3d' },
+        form: [
+          { key: 'plan', label: '2D floor plan', kind: 'image', required: true, help: 'Upload a top-down 2D floor-plan image.' },
+          { key: 'notes', label: 'Rooms, style and materials (optional)', kind: 'textarea', placeholder: 'e.g. living room oak floor, kitchen marble worktop, warm minimal' },
+        ],
+      },
+      {
+        label: 'Floor plan → room view',
+        description: 'Render an attached 2D floor plan as an eye-level interior photo of one space',
+        icon: 'LayoutTemplate',
+        imageRequired: true,
+        prompt: 'Render this floor plan as a photorealistic eye-level interior.',
         promptTemplate: 'Render this 2D floor plan as a photorealistic eye-level perspective interior showing how the rooms look from inside, with realistic materials and natural lighting. {{notes}}',
         generation: { imageKeys: ['plan'], mode: 'floor-plan-render' },
         form: [

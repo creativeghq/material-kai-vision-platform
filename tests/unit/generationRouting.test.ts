@@ -9,7 +9,7 @@ import {
 const TIERS: GenerationTier[] = ['fast', 'pro', 'grok', 'chatgpt'];
 const ALL_MODES = [
   'text-to-image', 'image-edit', 'redesign', 'copy-style',
-  'floor-plan-render', 'floor-plan-text', 'materials-selection-board',
+  'floor-plan-render', 'floor-plan-3d', 'floor-plan-text', 'materials-selection-board',
   'product-shot', 'product-lifestyle', 'material-texture',
 ];
 const PRODUCT_MODES = ['product-shot', 'product-lifestyle', 'material-texture'];
@@ -75,7 +75,7 @@ describe('generation routing', () => {
   });
 
   it('collapses ChatGPT to Gemini exactly where Grok collapses — diagram modes and multi-reference', () => {
-    for (const mode of ['floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'unstage']) {
+    for (const mode of ['floor-plan-render', 'floor-plan-3d', 'floor-plan-text', 'materials-selection-board', 'unstage']) {
       const r = resolveGenerationRouting(mode, 'chatgpt');
       expect(r.provider, mode).toBe('gemini');
       expect(r.credits, mode).toBe(GENERATION_CREDIT_COSTS[r.modelLabel]);
@@ -121,7 +121,7 @@ describe('generation routing', () => {
   it('does NOT bill Grok for the diagram/board modes it cannot serve', () => {
     // Every branch for these calls Gemini unconditionally. Charging the Grok rate for
     // a Gemini render is a valid number, so nothing else can catch it.
-    for (const mode of ['floor-plan-render', 'floor-plan-text', 'materials-selection-board']) {
+    for (const mode of ['floor-plan-render', 'floor-plan-3d', 'floor-plan-text', 'materials-selection-board']) {
       const r = resolveGenerationRouting(mode, 'grok');
       expect(r.provider, mode).toBe('gemini');
       expect(r.modelLabel.startsWith('gemini-'), `${mode} → ${r.modelLabel}`).toBe(true);

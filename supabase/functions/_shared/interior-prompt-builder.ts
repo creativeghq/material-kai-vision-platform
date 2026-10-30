@@ -166,6 +166,25 @@ export async function buildFloorPlanRenderPrompt(
 }
 
 /**
+ * Floor plan image → ONE top-down 3D cutaway of the whole plan. `userPrompt` carries the room
+ * list and per-room finishes; the plan's walls are the geometry the model must keep.
+ */
+export async function buildFloorPlan3DPrompt(
+  db: DbClient, style?: string, userPrompt?: string,
+): Promise<string> {
+  const styleDesc = await styleDescription(db, style);
+  const styleName = style ? style.charAt(0).toUpperCase() + style.slice(1) : 'Modern Contemporary';
+  return renderPromptTemplate(
+    await getGenerationPrompt(db, 'interior_floorplan_3d'),
+    {
+      style_tag: `Style: ${styleName} — ${styleDesc}.`,
+      room_brief: userPrompt?.trim() || 'Furnish each room appropriately for its function.',
+      technical_tag: await getGenerationPrompt(db, 'interior_technical_tag'),
+    },
+  );
+}
+
+/**
  * Build a text-only floor plan generation prompt (Phase 7 — no input image).
  * Step 1 of the two-step pipeline: generates a clean 2D floor plan diagram.
  */

@@ -20,6 +20,7 @@ The platform has two image-generation tools — \`generate_gemini\` (precise edi
 |---|---|---|
 | "Remove the sofa and add a mid-century armchair" | \`generate_gemini\` mode=\`image-edit\` | Precise object-level edit; preserves room geometry |
 | "Render my floor plan as a photo-real room" | \`generate_gemini\` mode=\`floor-plan-render\` | Only Gemini preserves plan topology |
+| "Show my whole floor plan in 3D" / "all the rooms from above" | \`generate_gemini\` mode=\`floor-plan-3d\`, ONE call | One top-down cutaway built on the plan's own walls. Put the room list and finishes in \`prompt\`; never loop \`floor-plan-render\` per room |
 | "Empty this room" / "remove the furniture" / "show it unfurnished" | \`generate_gemini\` mode=\`unstage\` | Removes every movable item and rebuilds the floor and wall behind it; architecture, camera and lighting unchanged |
 | "Stage this **empty** room with modern furniture" | \`virtual_staging\` | Produces before/after with the \`VirtualStagingViewer\` slider |
 | "Stage this **furnished** room" / "restage my living room" | \`generate_gemini\` mode=\`unstage\`, **then** \`virtual_staging\` on the result | The stager furnishes bare space and fights anything already in the photo — see step 5 |

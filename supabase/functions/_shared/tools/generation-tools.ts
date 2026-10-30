@@ -367,6 +367,10 @@ export const createGeminiGenerationTool = (
           if (!referenceImageUrl && !hasUploadedImage && (/floor\s*plan|2d\s*plan|floor\s*map|room\s*layout.*diagram|draw.*layout|create.*plan|generate.*plan/i.test(prompt || '') || sqm)) {
             resolvedMode = 'floor-plan-text';
 
+          // Floor plan image + whole-home / from-above language → one top-down 3D of the plan
+          } else if ((referenceImageUrl || hasUploadedImage) && /floor\s*plan/i.test(prompt || '') && /3d|top[\s-]*down|from above|bird|isometric|dollhouse|doll\s*house|whole|entire|all (the )?(rooms|areas)/i.test(prompt || '')) {
+            resolvedMode = 'floor-plan-3d';
+
           // Floor plan image → perspective render (explicit floor plan keyword)
           } else if ((referenceImageUrl || hasUploadedImage) && /floor\s*plan|render.*layout|convert.*plan/i.test(prompt || '')) {
             resolvedMode = 'floor-plan-render';
@@ -465,7 +469,7 @@ export const createGeminiGenerationTool = (
 
         // floor-plan-render: the plan being rendered is the base, same as every other mode
         let floorPlanImageUrl: string | undefined;
-        if (resolvedMode === 'floor-plan-render') {
+        if (resolvedMode === 'floor-plan-render' || resolvedMode === 'floor-plan-3d') {
           const candidateUrl = resolvedReferenceUrl || slotBaseImage;
           if (candidateUrl?.startsWith('data:')) {
             floorPlanImageUrl = await uploadDataUrl(candidateUrl) ?? candidateUrl;
@@ -619,6 +623,7 @@ export const createGeminiGenerationTool = (
           'redesign': 'redesigned the room with structure preserved',
           'copy-style': 'applied the inspiration style to your room',
           'floor-plan-render': 'rendered your floor plan',
+          'floor-plan-3d': 'built a top-down 3D of your whole floor plan',
           'floor-plan-text': 'created your floor plan',
           'materials-selection-board': 'created your materials board',
           'unstage': 'emptied the room',
@@ -699,7 +704,8 @@ Mode routing (auto-detected if not set explicitly):
 - copy-style (2 images: Image 1=inspiration, Image 2=your room) → Gemini Vision extracts full design spec from inspiration → Flux Depth Pro applies it to the room. Zero spatial bleed.
 - image-edit (targeted change: "change floor to marble", "add a plant", "warmer lighting") → Gemini image editing on the uploaded or most recently generated image
 - unstage ("empty this room", "remove the furniture", "declutter", "clear it out", "show it unfurnished") → returns the SAME room with every movable object removed and the revealed floor/walls filled in. Architecture, camera and lighting are unchanged. This is the step that turns a FURNISHED photo into an input the staging and redesign flows can use — if the user wants a furnished room staged or redesigned in a different style, unstage first, then run the staging/redesign on the result.
-- floor-plan-render (floor plan image uploaded) → photorealistic eye-level perspective render
+- floor-plan-render (floor plan image uploaded) → photorealistic eye-level perspective render of ONE space
+- floor-plan-3d (floor plan image + the user wants the WHOLE home / all rooms / "from above" / "3D plan" / "dollhouse") → ONE top-down 3D cutaway of the entire plan, built on the plan's own walls. Call it ONCE with the full room list and each room's finishes in \`prompt\`; NEVER loop floor-plan-render per room to approximate it, that produces unrelated eye-level pictures instead of the plan
 - floor-plan-text (no image, user describes layout or provides sqm) → 2D floor plan diagram
 - text-to-image (no images, pure text description) → new room generation
 - materials-selection-board → professional materials board from a generated design
@@ -723,7 +729,7 @@ a call that will be refused.`,
         prompt: z.string().describe('Design description or edit instruction (e.g. "change the floor to marble and make walls warmer")'),
         roomType: z.string().optional().describe('ALWAYS extract from user message when present. Room type: bedroom, living_room, kitchen, bathroom, dining_room, home_office, hallway, studio, outdoor, kids_room, basement'),
         style: z.string().optional().describe('ALWAYS extract from user message when present. Design style: modern, minimalist, scandinavian, industrial, luxury, bohemian, traditional, mediterranean, japandi, art_deco, rustic, coastal'),
-        mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-text', 'materials-selection-board', 'product-shot', 'product-lifestyle', 'material-texture', 'unstage']).optional().describe('Generation mode. redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. unstage=REMOVE all furniture and decor, returning the same room empty (use before staging or redesigning a furnished photo). product-shot=one product on seamless white. product-lifestyle=product staged in a room. material-texture=seamless tileable swatch. Omit to auto-detect.'),
+        mode: z.enum(['text-to-image', 'image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-3d', 'floor-plan-text', 'materials-selection-board', 'product-shot', 'product-lifestyle', 'material-texture', 'unstage']).optional().describe('Generation mode. floor-plan-3d=whole floor plan as one top-down 3D cutaway (1 plan image). redesign=Flux Depth Pro full redesign (1 image). copy-style=Flux Depth Pro copy aesthetic from inspiration (2 images). image-edit=Gemini targeted change. unstage=REMOVE all furniture and decor, returning the same room empty (use before staging or redesigning a furnished photo). product-shot=one product on seamless white. product-lifestyle=product staged in a room. material-texture=seamless tileable swatch. Omit to auto-detect.'),
         referenceImageUrl: z.string().optional().describe('URL of image to edit, floor plan to render, or the product/swatch photo for the product modes. Leave empty when user has uploaded an image — it is used automatically.'),
         baseImageIndex: z.number().int().optional().describe('1-based index of the attached image that is the PHOTO TO EDIT — the room whose pixels must survive. Default with two attachments is image 2 ("Your Room" in the composer). Pass it when the user attached them the other way round, e.g. "here is a tile, put it in this room" with the tile first: baseImageIndex=2.'),
         referenceImageIndex: z.number().int().optional().describe('1-based index of the attached image that is the MATERIAL or STYLE reference — a tile, a swatch, an inspiration photo. Default with two attachments is image 1. Its pixels are sent to the model alongside the room, so a specific tile is applied as that tile, not as a description of one.'),

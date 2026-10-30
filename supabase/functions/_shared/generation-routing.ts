@@ -55,6 +55,7 @@ function usesFlux(mode: string, useGrok: boolean): boolean {
  */
 const GROK_UNSUPPORTED_MODES = new Set([
   'floor-plan-render',
+  'floor-plan-3d',
   'floor-plan-text',
   'materials-selection-board',
   // `unstage` removes every movable object and must inpaint the floor and wall that were

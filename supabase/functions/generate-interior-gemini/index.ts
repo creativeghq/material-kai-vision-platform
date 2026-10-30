@@ -20,6 +20,7 @@ import { aspectRatioOfImage, readImageSize, type ImageSize } from '../_shared/im
 import {
   buildNarrativePrompt,
   buildFloorPlanRenderPrompt,
+  buildFloorPlan3DPrompt,
   buildFloorPlanDiagramPrompt,
   buildDualReferenceStylePrompt,
 } from '../_shared/interior-prompt-builder.ts';
@@ -250,7 +251,7 @@ async function callFluxDepthPro(
 // Credit costs and provider routing now live in _shared/generation-routing.ts so the
 // billed model and the invoked model come from one derivation.
 
-type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture' | 'unstage';
+type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-3d' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture' | 'unstage';
 type BoardMode = 'presentation-board' | 'selection-board' | 'photorealistic-render';
 
 interface GenerateInteriorRequest {
@@ -516,7 +517,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // generate_gemini tool, AgentHub's edit modal, projectsService, productMaterialMapsService
   // and generate-vr-world all land here. The gate goes HERE and not in the agent's prompt
   // because three of those five callers never involve a model turn at all.
-  const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'unstage'];
+  const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-3d', 'unstage'];
   const gatedSources = EDIT_MODES.includes(mode)
     ? [body.reference_image_url, body.style_reference_url].filter((u): u is string => typeof u === 'string' && !!u)
     : [];
@@ -952,6 +953,20 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       }
     }
 
+    // ── floor-plan-3d: the WHOLE plan as one top-down 3D cutaway, built on the plan's own walls ──
+    else if (mode === 'floor-plan-3d') {
+      if (!body.reference_image_url) {
+        return jsonResponse({ success: false, error: 'reference_image_url required for floor-plan-3d mode' }, 400);
+      }
+      const planBuffer = await fetchImageBuffer(body.reference_image_url);
+      const planPrompt = await buildFloorPlan3DPrompt(supabase, body.style, body.prompt);
+      const result = await generateImageWithGemini(
+        { text: planPrompt, images: [planBuffer] },
+        { model, aspectRatio: '1:1' },
+      );
+      imageUrl = await uploadToStorage(supabase, result.base64, result.mimeType, jobId, uploadCtx);
+    }
+
     // ── Mode 4: floor-plan-text (text → 2D floor plan diagram) ─────────────
     else if (mode === 'floor-plan-text') {
       const diagramPrompt = await buildFloorPlanDiagramPrompt(supabase, {
@@ -1070,6 +1085,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       'redesign': 'image_to_image',
       'copy-style': 'image_to_image',
       'floor-plan-render': 'image_to_image',
+      'floor-plan-3d': 'image_to_image',
       'product-shot': 'image_to_image',
       // A reference image plus a prompt-driven board layout — neither pure branch fits.
       'materials-selection-board': 'hybrid',
