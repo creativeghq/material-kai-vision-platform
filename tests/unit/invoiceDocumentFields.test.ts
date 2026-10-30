@@ -199,8 +199,8 @@ describe('document header and fiscal footer', () => {
       payment_method_code: 4,
     }, []);
     const meta = META(data);
-    expect(meta['Document type']).toBe('1.1');
-    expect(meta['Payment method']).toBe('Cheque');
+    expect(meta['Document Type']).toBe('1.1');
+    expect(meta['Payment Method']).toBe('Cheque');
     expect(meta.Time).toBeTruthy();
     // The date and time come from the same instant, rendered in the operator's locale.
     expect(meta.Date).toBeTruthy();

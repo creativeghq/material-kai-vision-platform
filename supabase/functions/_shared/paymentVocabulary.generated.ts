@@ -36,12 +36,12 @@ export type MydataPaymentCode = (typeof MYDATA_PAYMENT_CODE)[keyof typeof MYDATA
  * this is the one place the English-only-UI rule does not apply.
  */
 export const MYDATA_PAYMENT_METHOD_LABELS: Record<number, { en: string; el: string }> = {
-  1: { en: 'Domestic payments account', el: 'Επαγ. Λογαριασμός Πληρωμών Ημεδαπής' },
-  2: { en: 'Foreign payments account', el: 'Επαγ. Λογαριασμός Πληρωμών Αλλοδαπής' },
+  1: { en: 'Domestic Payments Account', el: 'Επαγ. Λογαριασμός Πληρωμών Ημεδαπής' },
+  2: { en: 'Foreign Payments Account', el: 'Επαγ. Λογαριασμός Πληρωμών Αλλοδαπής' },
   3: { en: 'Cash', el: 'Μετρητά' },
   4: { en: 'Cheque', el: 'Επιταγή' },
-  5: { en: 'On credit', el: 'Επί Πιστώσει' },
-  6: { en: 'Web banking', el: 'Web Banking' },
+  5: { en: 'On Credit', el: 'Επί Πιστώσει' },
+  6: { en: 'Web Banking', el: 'Web Banking' },
   7: { en: 'POS / e-POS', el: 'POS / e-POS' },
   8: { en: 'IRIS', el: 'IRIS' },
 };

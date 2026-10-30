@@ -25,6 +25,8 @@ import {
 } from '../_shared/finance/invoice-party.ts';
 import { normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { mydataExemptionLabel } from '../_shared/finance/vat-exemptions.ts';
+import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb } from '../_shared/fiscal/invoice-builder.ts';
+import { serialiseEn16931Ubl } from '../_shared/fiscal/en16931-ubl.ts';
 import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
 
 /** #374 Phase 6 — attach each line's full chosen variant, derived by SQL `variant_label`. */
@@ -114,45 +116,45 @@ const LABELS: Record<Lang, Record<string, string>> = {
     receipt: 'RETAIL RECEIPT', creditNote: 'CREDIT NOTE', deliveryNote: 'DELIVERY NOTE',
     receivingNote: 'GOODS RECEIPT NOTE',
     retailCreditNote: 'RETAIL CREDIT NOTE',
-    issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax office', profession: 'Activity',
+    issuer: 'ISSUER', customer: 'CUSTOMER', vatNo: 'VAT No.', taxOffice: 'Tax Office', profession: 'Activity',
     selfBilled: 'SELF-BILLED',
-    selfBilledBy: 'Self-billed by',
-    selfBilledSupplierUnavailable: 'Self-billed document: supplier identity unavailable',
+    selfBilledBy: 'Self-Billed by',
+    selfBilledSupplierUnavailable: 'Self-Billed Document: Supplier Identity Unavailable',
     phone: 'Tel.', email: 'Email', establishment: 'Establishment',
     number: 'Number', series: 'Series', date: 'Date', due: 'Due',
-    descr: 'Description', qty: 'Qty', unit: 'Unit', unitPrice: 'Unit price', net: 'Net',
+    descr: 'Description', qty: 'Qty', unit: 'Unit', unitPrice: 'Unit Price', net: 'Net',
     vatPct: 'VAT%', vatAmt: 'VAT', lineTotal: 'Total',
-    vatAnalysis: 'VAT analysis', subtotalNet: 'Net total', totalVat: 'Total VAT',
-    price: 'Price', discount: 'Discount', priceAfterDiscount: 'Price after Discount',
+    vatAnalysis: 'VAT Analysis', subtotalNet: 'Net Total', totalVat: 'Total VAT',
+    price: 'Price', discount: 'Discount', priceAfterDiscount: 'Price After Discount',
     withheld: 'Withholding', total: 'Total', paid: 'Paid', due2: 'Balance',
-    prevBalance: 'Previous balance', prevCredit: 'Previous credit', totalWithPrev: 'Total outstanding',
-    vatSuspended: 'VAT payment suspended', payOnline: 'Pay / View online', scanToPay: 'Scan to pay online',
-    fees: 'Fees', stamp: 'Stamp duty', otherTaxes: 'Other taxes', deductions: 'Deductions',
-    digitalFee: 'Digital transaction fee', related: 'Related doc',
-    paymentMethod: 'Payment method', bank: 'Bank account', registry: 'Reg. no.', website: 'Website',
-    empa: 'EPR reg. (AMP)',
-    rfCode: 'Bank transfer code (RF)', rfNote: 'Pay by bank transfer using this code as the payment reference — no IBAN needed.',
-    mark: 'MARK', uid: 'UID', verify: 'Scan for the filed document',
-    movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading place', deliveryPlace: 'Delivery place',
+    prevBalance: 'Previous Balance', prevCredit: 'Previous Credit', totalWithPrev: 'Total Outstanding',
+    vatSuspended: 'VAT Payment Suspended', payOnline: 'Pay / View Online', scanToPay: 'Scan to Pay Online',
+    fees: 'Fees', stamp: 'Stamp Duty', otherTaxes: 'Other Taxes', deductions: 'Deductions',
+    digitalFee: 'Digital Transaction Fee', related: 'Related Doc',
+    paymentMethod: 'Payment Method', bank: 'Bank Account', registry: 'Reg. No.', website: 'Website',
+    empa: 'EPR Reg. (AMP)',
+    rfCode: 'Bank Transfer Code (RF)', rfNote: 'Pay by Bank Transfer Using This Code As the Payment Reference — No IBAN Needed.',
+    mark: 'MARK', uid: 'UID', verify: 'Scan for the Filed Document',
+    movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading Place', deliveryPlace: 'Delivery Place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
-    paymentReceipt: 'PAYMENT RECEIPT', received: 'Received', method: 'Payment method',
-    appliedTo: 'Applied to', reference: 'Reference', thankYou: 'Thank you for your payment.',
-    contact: 'Contact', office: 'Registered office', value: 'Value', amountPaid: 'Amount paid',
-    inWords: 'In words', receivedBy: 'Received by', newBalance: 'New balance', serial: 'No.', code: 'Code',
+    paymentReceipt: 'PAYMENT RECEIPT', received: 'Received', method: 'Payment Method',
+    appliedTo: 'Applied to', reference: 'Reference', thankYou: 'Thank You for Your Payment.',
+    contact: 'Contact', office: 'Registered Office', value: 'Value', amountPaid: 'Amount Paid',
+    inWords: 'In Words', receivedBy: 'Received by', newBalance: 'New Balance', serial: 'No.', code: 'Code',
     orderDetails: 'ORDER DETAILS', billTo: 'BILL TO', shipTo: 'SHIP TO',
-    itemCode: 'Item code', itemDescr: 'Description', itemComment: 'Comment',
-    order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order note',
+    itemCode: 'Item Code', itemDescr: 'Description', itemComment: 'Comment',
+    order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order Note',
     receiptDetails: 'RECEIPT DETAILS', paidTo: 'PAID TO', settledDocs: 'SETTLEMENT DETAILS',
-    lineNo: '#', lineDiscount: 'Discount', lineOtherTaxes: 'Other taxes', totalValue: 'Total value',
-    authCode: 'Auth code', docType: 'Document type', time: 'Time',
+    lineNo: '#', lineDiscount: 'Discount', lineOtherTaxes: 'Other Taxes', totalValue: 'Total Value',
+    authCode: 'Auth Code', docType: 'Document Type', time: 'Time',
     transmittedVia: 'Transmitted via', posPayment: 'CARD / IRIS PAYMENT',
-    posTxn: 'Payment identity', posTerminal: 'Terminal', posSignature: 'Provider signature',
-    correlated: 'Correlated documents', currency: 'Currency', fxRate: 'Exchange rate',
-    payable: 'Payable amount', charges: 'Charges', exemptionNote: 'VAT exemption ground',
+    posTxn: 'Payment Identity', posTerminal: 'Terminal', posSignature: 'Provider Signature',
+    correlated: 'Correlated Documents', currency: 'Currency', fxRate: 'Exchange Rate',
+    payable: 'Payable Amount', charges: 'Charges', exemptionNote: 'VAT Exemption Ground',
     deliveryInfo: 'DELIVERY INFORMATION',
-    document: 'Document', supplierBill: 'Supplier bill', onAccount: 'Payment on account',
-    allocated: 'Allocated', unallocated: 'On account', remarks: 'Remarks',
-    preInvoice: 'PRE-INVOICE', preInvoiceNote: 'Not a tax document.',
+    document: 'Document', supplierBill: 'Supplier Bill', onAccount: 'Payment on Account',
+    allocated: 'Allocated', unallocated: 'On Account', remarks: 'Remarks',
+    preInvoice: 'PRE-INVOICE', preInvoiceNote: 'Not a Tax Document.',
   },
 };
 
@@ -250,9 +252,11 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   let kind: 'invoice' | 'credit_note' | 'delivery_note' | 'payment_receipt' = 'invoice';
   let docId = '';
   let regenerate = false;
+  let en16931 = false;
   try {
     const body = await req.json();
     regenerate = !!body.regenerate;
+    en16931 = body.format === 'en16931';
     if (body.credit_note_id) { kind = 'credit_note'; docId = body.credit_note_id; }
     else if (body.delivery_note_id) { kind = 'delivery_note'; docId = body.delivery_note_id; }
     else if (body.payment_id) { kind = 'payment_receipt'; docId = body.payment_id; }
@@ -293,6 +297,23 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
   if (!internal && !(await userHasWorkspaceCapability(supabase, authUserId, row.workspace_id,
     kind === 'delivery_note' ? ['finance.manage', 'sales.portal', 'warehouse.manage'] : ['finance.manage', 'sales.portal']))) {
     return json({ error: 'Not authorized for this document' }, 403);
+  }
+
+  if (en16931) {
+    if (kind !== 'invoice' && kind !== 'credit_note') {
+      return json({ error: 'format en16931 covers invoices and credit notes' }, 400);
+    }
+    let result;
+    try {
+      const input = kind === 'invoice'
+        ? await buildInvoiceInputFromDb(supabase, docId)
+        : await buildCreditNoteInputFromDb(supabase, docId);
+      result = serialiseEn16931Ubl(input);
+    } catch (e) {
+      return json({ error: `Could not build the document: ${e instanceof Error ? e.message : String(e)}` }, 422);
+    }
+    if (!result.ok) return json({ error: 'This document cannot be expressed as EN 16931', refusals: result.refusals }, 422);
+    return json({ format: 'en16931', file_name: result.fileName, xml: result.xml, warnings: result.warnings });
   }
 
   // Both cache branches below verify the object is REALLY there before claiming a

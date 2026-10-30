@@ -477,7 +477,7 @@ const InvoiceDetailPage: React.FC = () => {
         const rows: [string, any][] = [
           // AADE 8.12 via the one table — the literal that used to sit here was that list
           // rotated by two, so code 7 (POS / e-POS) read as "Domestic account".
-          ['Payment method', inv.payment_method_code ? mydataPaymentLabel(inv.payment_method_code) : null],
+          ['Payment Method', inv.payment_method_code ? mydataPaymentLabel(inv.payment_method_code) : null],
           ['Payment note', inv.payment_method_info],
           ['Related document', inv.related_document],
           ['Digital transaction fee', Number(inv.digital_transaction_fee) > 0 ? formatMoney(inv.digital_transaction_fee, inv.currency) : null],

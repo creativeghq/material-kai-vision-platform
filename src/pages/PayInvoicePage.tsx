@@ -802,7 +802,7 @@ const PayInvoicePage: React.FC = () => {
 
             {payOptions.length === 1 && isTransfer && (
               <p className="flex items-center gap-2 text-sm font-medium">
-                <Landmark className="h-4 w-4 text-primary" /> Payment method: direct bank transfer
+                <Landmark className="h-4 w-4 text-primary" /> Payment Method: direct bank transfer
               </p>
             )}
 
