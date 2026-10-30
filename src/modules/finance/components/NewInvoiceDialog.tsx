@@ -313,6 +313,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   // Header
   const [documentType, setDocumentType] = useState('1.1');
+  const [docTypePinned, setDocTypePinned] = useState(false);
   const [currency, setCurrency] = useState('EUR');
   const [vatRate, setVatRate] = useState('24');
   const [paymentTermsDays, setPaymentTermsDays] = useState('30');
@@ -428,7 +429,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     // below loads its address. Otherwise start blank.
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
     setClientDialogOpen(false);
-    setDocumentType(initialDocType || '1.1'); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
+    setDocumentType(initialDocType || '1.1'); setDocTypePinned(false); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(todayLocalISO()); setNotes(initialNotes ?? ''); setIssueNow(true);
     setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
@@ -946,7 +947,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const AUTO_DOC_CODES = ['1.1', '2.1', '11.1', '11.2', '1.2', '1.3', '2.2', '2.3'];
 
   useEffect(() => {
-    if (!AUTO_DOC_CODES.includes(documentType)) return;
+    if (docTypePinned || !AUTO_DOC_CODES.includes(documentType)) return;
     if (documentType !== proposedDocType) setDocumentType(proposedDocType);
   }, [proposedDocType]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1503,29 +1504,38 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     SERVICE gets that one, and leaving it out is how every retail service went out
                     as a sale of goods. */}
                 <div className="flex flex-wrap items-center gap-2">
-                  {((buyerIsConsumer
+                  {(() => {
+                    const chips = ((buyerIsConsumer
                       ? [['11.1', 'Receipt'], ['11.2', 'Service receipt'], ['9.3', 'Delivery note']]
                       : [['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery note']]) as ReadonlyArray<readonly [string, string]>)
-                    .filter(([code]) => docTypes.some((t) => t.code === code))
-                    .map(([code, label]) => (
+                      .filter(([code]) => docTypes.some((t) => t.code === code));
+                    // A chip is a document FAMILY: it stays lit while a more specific type of
+                    // its family (1.2, 2.3, …) is picked from the dropdown beside it.
+                    const activeChip = (chips.find(([c]) => c === documentType) ?? chips.find(([c]) => c.split('.')[0] === documentType.split('.')[0]))?.[0];
+                    return chips.map(([code, label]) => (
                       <button
                         key={code}
                         type="button"
-                        onClick={() => { setDocumentType(code); applyDocDefault(code); }}
-                        className={`px-3.5 py-1.5 text-sm font-medium transition-colors ${documentType === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
+                        onClick={() => { setDocTypePinned(false); setDocumentType(code); applyDocDefault(code); }}
+                        className={`px-3.5 py-1.5 text-sm font-medium transition-colors ${activeChip === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
                       >
                         {label}
                       </button>
-                    ))}
+                    ));
+                  })()}
                   {(() => {
-                    // Restrict the long tail to receipts + movement docs for consumers.
+                    // Restrict the long tail to receipts + movement docs for consumers, and list
+                    // the family of the selected chip first so Sales/Service show their own types.
+                    const family = documentType.split('.')[0];
                     const tail = docTypes
                       .filter((t) => !buyerIsConsumer || t.code.startsWith('11') || t.code.startsWith('9'));
+                    const groups = groupDocTypes(tail).sort((a, b) => Number(b.family === family) - Number(a.family === family));
+                    const isChipCode = COMMON_DOC_CODES.includes(documentType) || (buyerIsConsumer && documentType === '11.2');
                     return (
-                      <Select value={COMMON_DOC_CODES.includes(documentType) ? '' : documentType} onValueChange={(v) => { setDocumentType(v); applyDocDefault(v); }}>
+                      <Select value={isChipCode ? '' : documentType} onValueChange={(v) => { setDocTypePinned(true); setDocumentType(v); applyDocDefault(v); }}>
                         <SelectTrigger className="h-9 w-auto gap-1 rounded-full px-3.5 text-sm font-medium"><SelectValue placeholder="More types…" /></SelectTrigger>
                         <SelectContent>
-                          {groupDocTypes(tail).map((g) => (
+                          {groups.map((g) => (
                             <React.Fragment key={g.family}>
                               <div className="px-2 py-1 text-[10px] font-semibold uppercase text-muted-foreground">{g.label}</div>
                               {g.items.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}
