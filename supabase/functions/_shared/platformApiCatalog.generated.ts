@@ -2310,6 +2310,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "limit": {
         "type": "integer",
         "description": "Documents per run, 1-100 (default 25)."
+      },
+      "reparse": {
+        "type": "boolean",
+        "description": "Parse already-stored EN 16931 files that have no parsed copy yet instead of fetching; no network call."
       }
     }
   },

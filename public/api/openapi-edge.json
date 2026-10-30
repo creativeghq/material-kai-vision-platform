@@ -31807,7 +31807,7 @@
         ],
         "summary": "Fetch the EN 16931 file a supplier's e-invoice provider serves beside its viewer",
         "operationId": "post_inbound_structured_fetch",
-        "description": "For inbound myDATA documents whose download_url is on a provider known to serve an EN 16931 UBL file (invoiceportal.gr today), fetches that file through the SSRF guard, confirms it IS an EN 16931 document by root element and customization id, and stores it on the row with source_format en16931_ubl and delivery_channel provider_link. A file we go and fetch is a PULL, not a delivery: it is counted separately in inbound_einvoice_position and never as the structured document the acceptance duty asks for. Read-only against the supplier; never sets received_at, books a bill or touches stock. Pages are fetched sequentially with a per-host gap; a run stops at its time budget and reports remaining; a link that did not answer is rechecked after 7 days.\n\n**Response:** {processed, remaining, fetched, not_structured, unreachable, failed} (`application/json`)",
+        "description": "For inbound myDATA documents whose download_url is on a provider known to serve an EN 16931 UBL file (invoiceportal.gr today), fetches that file through the SSRF guard, confirms it IS an EN 16931 document by root element and customization id, and stores it on the row with source_format en16931_ubl and delivery_channel provider_link. A file we go and fetch is a PULL, not a delivery: it is counted separately in inbound_einvoice_position and never as the structured document the acceptance duty asks for. Read-only against the supplier; never sets received_at, books a bill or touches stock. Pages are fetched sequentially with a per-host gap; a run stops at its time budget and reports remaining; a link that did not answer is rechecked after 7 days.\n\n**Response:** {processed, remaining, fetched, not_structured, unreachable, failed}, or {parsed, differs, failed} when reparse is set (`application/json`)",
         "security": [
           {
             "supabaseJwt": []
@@ -31883,6 +31883,11 @@
                     "type": "integer",
                     "nullable": true,
                     "description": "Documents per run, 1-100 (default 25)."
+                  },
+                  "reparse": {
+                    "type": "boolean",
+                    "nullable": true,
+                    "description": "Parse already-stored EN 16931 files that have no parsed copy yet instead of fetching; no network call."
                   }
                 },
                 "required": [

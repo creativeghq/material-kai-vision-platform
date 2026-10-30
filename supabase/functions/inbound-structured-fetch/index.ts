@@ -4,6 +4,7 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { structuredUrlFor, readEn16931Header } from '../_shared/finance/structured-providers.ts';
+import { parseEn16931, checkAgainstMyData } from '../_shared/finance/en16931-parse.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -12,7 +13,7 @@ const TIME_BUDGET_MS = 90_000;
 const SAME_HOST_GAP_MS = 2_000;
 const RECHECK_AFTER_DAYS = 7;
 
-interface Body { workspace_id?: string; limit?: number }
+interface Body { workspace_id?: string; limit?: number; reparse?: boolean }
 interface Candidate { id: string; download_url: string; checked_at: string | null }
 type Outcome = 'fetched' | 'not_structured' | 'unreachable';
 
@@ -68,6 +69,40 @@ async function fetchXml(rawUrl: string): Promise<{ xml: string } | { why: string
   return { why: 'too many redirects', unreachable: true };
 }
 
+async function parsedFor(admin: SupabaseClient, workspaceId: string, id: string, xml: string): Promise<Record<string, unknown>> {
+  const parsed = parseEn16931(xml);
+  if (!parsed) return { en16931_parse_error: 'unreadable' };
+  const { data } = await admin.from('inbound_documents')
+    .select('issuer_vat, total_net, total_vat, total_gross, mark, lines')
+    .eq('id', id).eq('workspace_id', workspaceId).maybeSingle();
+  const num = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  const check = data
+    ? checkAgainstMyData(parsed, {
+      issuer_vat: data.issuer_vat, total_net: num(data.total_net), total_vat: num(data.total_vat),
+      total_gross: num(data.total_gross), mark: data.mark, line_count: Array.isArray(data.lines) ? data.lines.length : 0,
+    })
+    : null;
+  return { en16931_parsed: parsed, en16931_check: check };
+}
+
+async function reparseStored(admin: SupabaseClient, workspaceId: string, limit: number) {
+  const { data, error } = await admin.from('inbound_documents')
+    .select('id, raw').eq('workspace_id', workspaceId).eq('delivery_channel', 'provider_link')
+    .is('raw->en16931_parsed', null).not('raw->>en16931_xml', 'is', null).limit(limit);
+  if (error) throw new HttpError(500, `could not list documents: ${error.message}`);
+  let parsed = 0, differs = 0, failed = 0;
+  for (const r of data ?? []) {
+    const raw = (r.raw ?? {}) as Record<string, unknown>;
+    const extra = await parsedFor(admin, workspaceId, r.id, String(raw.en16931_xml));
+    const { error: upErr } = await admin.from('inbound_documents')
+      .update({ raw: { ...raw, ...extra } }).eq('id', r.id).eq('workspace_id', workspaceId);
+    if (upErr || 'en16931_parse_error' in extra) { failed++; continue; }
+    parsed++;
+    if ((extra.en16931_check as { verdict?: string } | null)?.verdict === 'differs') differs++;
+  }
+  return { parsed, differs, failed };
+}
+
 async function readOne(admin: SupabaseClient, workspaceId: string, c: Candidate, structuredUrl: string): Promise<Outcome> {
   const got = await fetchXml(structuredUrl);
   const { data: row, error: readErr } = await admin.from('inbound_documents')
@@ -81,7 +116,7 @@ async function readOne(admin: SupabaseClient, workspaceId: string, c: Candidate,
       .update({
         source_format: 'en16931_ubl',
         delivery_channel: 'provider_link',
-        raw: { ...raw, en16931_xml: got.xml, en16931_fetched_at: now, en16931_checked_at: now },
+        raw: { ...raw, en16931_xml: got.xml, en16931_fetched_at: now, en16931_checked_at: now, ...(await parsedFor(admin, workspaceId, c.id, got.xml)) },
       })
       .eq('id', c.id).eq('workspace_id', workspaceId).is('source_format', null);
     if (error) throw new Error(error.message);
@@ -117,6 +152,7 @@ Deno.serve(withApiLogging('inbound-structured-fetch', async (req: Request) => {
   }
 
   const limit = Math.min(Math.max(Number(body.limit) || 25, 1), 100);
+  if (body.reparse) return json(await reparseStored(admin, workspaceId, limit));
   const { data, error } = await admin.from('inbound_documents')
     .select('id, download_url, checked_at:raw->>en16931_checked_at')
     .eq('workspace_id', workspaceId).is('source_format', null)
