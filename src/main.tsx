@@ -28,12 +28,12 @@ initializeGlobalErrorHandlers();
 // Auto-recover from stale chunk references. After a new deploy the hashed chunk
 // filenames change; a browser still holding the previous index.html will 404 on a lazy
 // import ("Failed to fetch dynamically imported module") and otherwise hit the
-// critical error boundary. Reload once to pull the fresh index + chunks. The 15s
+// critical error boundary. Reload once to pull the fresh index + chunks. The 5-minute
 // guard prevents a reload loop if the failure is genuine (not a stale deploy).
 window.addEventListener('vite:preloadError', (e) => {
   try {
     const last = Number(sessionStorage.getItem('mk-chunk-reload-at') || 0);
-    if (Date.now() - last < 15000) return;
+    if (Date.now() - last < 300000) return;
     sessionStorage.setItem('mk-chunk-reload-at', String(Date.now()));
     e.preventDefault();
     window.location.reload();

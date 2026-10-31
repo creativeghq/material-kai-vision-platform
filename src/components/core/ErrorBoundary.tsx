@@ -32,11 +32,11 @@ interface State {
 const CHUNK_ERROR = /dynamically imported module|importing a module script failed|Unexpected token '<'/i;
 const isChunkError = (e: Error | null): boolean => !!e && CHUNK_ERROR.test(e.message);
 
-/** One guarded reload per 15s, shared with main.tsx so the two cannot loop each other. */
+/** One guarded reload per 5 minutes, shared with main.tsx so the two cannot loop each other. */
 function reloadOnceForNewDeploy(): boolean {
   try {
     const last = Number(sessionStorage.getItem('mk-chunk-reload-at') || 0);
-    if (Date.now() - last < 15000) return false;
+    if (Date.now() - last < 300000) return false;
     sessionStorage.setItem('mk-chunk-reload-at', String(Date.now()));
   } catch {
     return false;

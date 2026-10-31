@@ -14,15 +14,25 @@ const KIND_LABEL: Record<ClientTimelineItem['kind'], string> = {
 
 export const ClientTimelinePanel: React.FC<{ projectId: string }> = ({ projectId }) => {
   const [items, setItems] = useState<ClientTimelineItem[] | null>(null);
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setItems(null);
+    setFailed(false);
     projectsService.getClientTimeline(projectId)
       .then((r) => { if (!cancelled) setItems(r); })
-      .catch(() => { if (!cancelled) setItems([]); });
+      .catch(() => { if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
   }, [projectId]);
 
+  if (failed) {
+    return (
+      <p className="text-sm text-amber-800 dark:text-amber-300">
+        Recent activity could not be loaded. It is unknown, not empty.
+      </p>
+    );
+  }
   if (!items || items.length === 0) return null;
 
   return (

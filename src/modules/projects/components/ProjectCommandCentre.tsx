@@ -108,7 +108,7 @@ const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[] | null; on
   }));
   const hasCash = cash.some((c) => c.Billed !== 0 || c['Supplier bills'] !== 0);
   const labour = series.labour_by_week.map((w) => ({
-    week: new Date(w.week).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+    week: new Date(`${w.week.slice(0, 10)}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
     Hours: Math.round((w.minutes / 60) * 10) / 10,
   }));
   const hasLabour = labour.some((l) => l.Hours > 0);
@@ -175,7 +175,7 @@ const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[] | null; on
         ) : snaps.length >= 2 ? (
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={snaps.map((s) => ({
-              day: new Date(s.snapshot_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+              day: new Date(`${s.snapshot_date}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
               Actual: s.actual_cost,
               'Actual + on order': s.actual_cost + s.committed_cost,
               Budget: s.budget_cost > 0 ? s.budget_cost : null,

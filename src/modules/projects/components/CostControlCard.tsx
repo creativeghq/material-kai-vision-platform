@@ -35,17 +35,19 @@ export const CostControlCard: React.FC<{
 }> = ({ projectId, currency = 'EUR', reloadToken }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<CostControlRow[] | null>(null);
+  const [failed, setFailed] = useState(false);
   const [editing, setEditing] = useState<CostControlRow | null>(null);
   const [lines, setLines] = useState<{ kind: CostLineKind; rows: CostLine[] } | null>(null);
   const [loadingKind, setLoadingKind] = useState<CostLineKind | null>(null);
   const money = (v: number) => formatMoney(v, currency);
 
   const load = useCallback(async () => {
+    setFailed(false);
     try {
       setRows(await projectsService.getCostControl(projectId));
     } catch (e) {
       toast({ title: 'Failed to load cost control', description: (e as Error).message, variant: 'destructive' });
-      setRows([]);
+      setFailed(true);
     }
   }, [projectId, toast]);
 
@@ -81,7 +83,12 @@ export const CostControlCard: React.FC<{
         </p>
       </CardHeader>
       <CardContent className="space-y-4">
-        {rows === null ? (
+        {failed ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-amber-800 dark:text-amber-300">Cost control could not be loaded. Its figures are unknown, not zero.</p>
+            <Button size="sm" variant="outline" onClick={() => void load()}>Retry</Button>
+          </div>
+        ) : rows === null ? (
           <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
           <HubEmptyState

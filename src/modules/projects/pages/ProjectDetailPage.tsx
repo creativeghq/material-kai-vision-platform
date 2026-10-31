@@ -193,6 +193,7 @@ export const ProjectDetailPage: React.FC = () => {
   const availableTabs = PROJECT_TABS.filter((t) => {
     if (t === 'finance') return canFinance;
     if (t === 'billing') return isManager;
+    if (t === 'quotes') return isTeam || collabRole === 'client';
     return isTeam || !OWNER_ONLY_TABS.has(t);
   });
   // Validated against what THIS viewer gets, so `?tab=timeline` on a collaborator's link falls
