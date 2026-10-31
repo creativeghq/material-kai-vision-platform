@@ -1696,10 +1696,10 @@ class ProjectsService {
       .from('project_cost_snapshots')
       .select('snapshot_date, actual_cost, committed_cost, billed_revenue, budget_cost')
       .eq('project_id', projectId)
-      .order('snapshot_date', { ascending: true })
+      .order('snapshot_date', { ascending: false })
       .limit(365);
     if (error) throw error;
-    return ((data ?? []) as any[]).map((r) => ({
+    return ((data ?? []) as any[]).reverse().map((r) => ({
       snapshot_date: r.snapshot_date as string,
       actual_cost: Number(r.actual_cost),
       committed_cost: Number(r.committed_cost),

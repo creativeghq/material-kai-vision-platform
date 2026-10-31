@@ -441,7 +441,8 @@ const CertifyDialog: React.FC<{
         try {
           const r = await raiseProjectApproval({
             workspaceId, subject: 'project_application', table: 'project_applications',
-            id: row.id, amount: n(row.gross_valuation), reason: `Application ${row.reference ?? ''}`.trim(),
+            id: row.id, amount: n(row.gross_valuation),
+            reason: `Application ${row.reference ?? ''} — to certify ${formatMoney(value, currency)} against a claim of ${formatMoney(n(row.gross_valuation), currency)}`.trim(),
           });
           toast({
             title: r === 'raised' ? 'Approval requested' : 'Already waiting for approval',

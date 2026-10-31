@@ -39,13 +39,13 @@ export const ProjectCommandCentre: React.FC<{
 }> = ({ projectId, onOpenSection }) => {
   const [data, setData] = useState<CommandCentreData | null>(null);
   const [failed, setFailed] = useState(false);
-  const [snaps, setSnaps] = useState<CostSnapshot[]>([]);
+  const [snaps, setSnaps] = useState<CostSnapshot[] | null>([]);
 
   useEffect(() => {
     let cancelled = false;
     projectsService.getCostSnapshots(projectId)
       .then((s) => { if (!cancelled) setSnaps(s); })
-      .catch(() => { if (!cancelled) setSnaps([]); });
+      .catch(() => { if (!cancelled) setSnaps(null); });
     return () => { cancelled = true; };
   }, [projectId]);
 
@@ -95,7 +95,7 @@ const Stat: React.FC<{ label: string; value: string; hint?: string }> = ({ label
   </div>
 );
 
-const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[]; onOpenSection: (tab: string) => void }> = ({ data, snaps, onOpenSection }) => {
+const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[] | null; onOpenSection: (tab: string) => void }> = ({ data, snaps, onOpenSection }) => {
   const pnl = data.dashboard.pnl ?? {};
   const currency: string = pnl.currencies?.[0] ?? data.dashboard.budget_currency ?? 'EUR';
   const money: Money = (v) => formatMoney(v ?? 0, currency);
@@ -168,7 +168,11 @@ const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[]; onOpenSec
 
       <div>
         <p className="mb-2 text-xs text-muted-foreground">Cost to date plus open orders, against the cost budget — one point a day</p>
-        {snaps.length >= 2 ? (
+        {snaps === null ? (
+          <p className="text-sm text-amber-800 dark:text-amber-300">
+            The cost history could not be loaded. It is unknown, not empty.
+          </p>
+        ) : snaps.length >= 2 ? (
           <ResponsiveContainer width="100%" height={200}>
             <LineChart data={snaps.map((s) => ({
               day: new Date(s.snapshot_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
