@@ -37,12 +37,14 @@ interface RoomsTabProps {
   budgetCurrency: string;
   /** Collaborators see the room list but can't add/delete rooms. */
   isOwner?: boolean;
+  /** A room's budget is money -- shown only to whoever already sees project finance. */
+  showBudget?: boolean;
 }
 
 import { formatMoney } from '@/utils/decimal';
 import { RoomGeometryModal, roomGeometrySummary } from '../RoomGeometryModal';
 
-export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, isOwner = true }) => {
+export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, isOwner = true, showBudget = isOwner }) => {
   const { toast } = useToast();
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,7 +188,7 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
                   )}
                 </div>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                  {r.budget_amount && (
+                  {showBudget && r.budget_amount && (
                     <span>{formatMoney(Number(r.budget_amount), budgetCurrency)}</span>
                   )}
                   {r.deadline && (
