@@ -282,11 +282,15 @@ export const projectRequestsService = {
    * Record the decision on an approval request. The DB refuses a decision on any other kind, so
    * "approved" can never end up on a plain question.
    */
-  async setApproval(request: ProjectRequest, decision: 'approved' | 'declined'): Promise<void> {
-    const { error } = await (supabase as any)
-      .from('project_requests')
-      .update({ approval_decision: decision, status: 'resolved' })
-      .eq('id', request.id);
+  async setApproval(request: ProjectRequest, decision: 'approved' | 'declined', asGuest = false): Promise<void> {
+    const { error } = asGuest
+      ? await (supabase as any).rpc('collaborator_decide_request', {
+          p_request_id: request.id, p_decision: decision, p_note: null,
+        })
+      : await (supabase as any)
+          .from('project_requests')
+          .update({ approval_decision: decision, status: 'resolved' })
+          .eq('id', request.id);
     if (error) throw error;
 
     if (request.raised_by) {

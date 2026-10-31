@@ -27,7 +27,9 @@ import {
   type ApprovalPolicy, type ApprovalRequest, type ApprovalSubject, type ApprovalAction,
 } from '@/modules/finance/services/approvalService';
 
-const SUBJECTS: ApprovalSubject[] = ['credit_hold', 'margin_floor', 'pos_variance'];
+const SUBJECTS: ApprovalSubject[] = [
+  'credit_hold', 'margin_floor', 'pos_variance', 'project_variation', 'project_application',
+];
 const ACTIONS: ApprovalAction[] = ['warn', 'block', 'approve'];
 
 const ACTION_HELP: Record<ApprovalAction, string> = {

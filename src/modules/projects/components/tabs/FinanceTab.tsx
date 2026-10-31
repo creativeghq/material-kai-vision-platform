@@ -22,6 +22,7 @@ import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { JobCostCard } from '../JobCostCard';
 import { PricedScheduleCard } from '../PricedScheduleCard';
 import { CvrCard } from '../CvrCard';
+import { CostControlCard } from '../CostControlCard';
 import { VariationsCard } from '../VariationsCard';
 import { SelectionsPanel } from '../SelectionsPanel';
 import { ApplicationsCard } from '../ApplicationsCard';
@@ -165,6 +166,7 @@ export const FinanceTab: React.FC<{ projectId: string; projectName?: string }> =
           whether the job is making money. It reads get_project_cvr, which itself selects from
           get_project_cost_by_code, so the cost half has one derivation shared with JobCostCard. */}
       <CvrCard projectId={projectId} currency={currency} reloadToken={cvrToken} />
+      <CostControlCard projectId={projectId} currency={currency} reloadToken={cvrToken} />
       {/* #431 -- the customer picks against a frozen allowance and the difference becomes a
           change order. It sits above the variation register because that is where it lands. */}
       {activeWorkspaceId && (

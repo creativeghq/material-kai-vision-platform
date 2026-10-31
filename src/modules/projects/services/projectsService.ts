@@ -182,7 +182,7 @@ export interface ProjectCollaborator {
   email: string;
   user_id: string | null;
   share_token: string;
-  role: 'client' | 'editor';
+  role: CollaboratorRole;
   invited_by: string;
   invited_at: string;
   accepted_at: string | null;
@@ -359,6 +359,21 @@ export interface ProjectDelivery {
   amount_net: number | null;
   currency: string | null;
   is_late: boolean;
+}
+
+export type CollaboratorRole = 'client' | 'editor' | 'architect' | 'subcontractor';
+
+export interface ClientTimelineItem { kind: 'request' | 'inspection' | 'snag'; id: string; title: string; status: string; at: string }
+export interface CostSnapshot { snapshot_date: string; actual_cost: number; committed_cost: number; billed_revenue: number; budget_cost: number }
+export interface CostControlRow {
+  cost_code_id: string | null; code: string | null; name: string | null; total_value: number; budget_cost: number;
+  actual_cost: number; committed_cost: number; etc_override: number | null; etc_effective: number;
+  forecast_cost: number; variance: number | null;
+}
+export type CostLineKind = 'supplier_bills' | 'purchase_orders' | 'expenses' | 'time' | 'invoices';
+export interface CostLine {
+  id: string; date: string | null; label: string; counterparty: string | null; amount: number | null;
+  hours?: number | null; currency: string | null; status: string | null;
 }
 
 export type CommandCentreFlagKey =
@@ -1654,6 +1669,76 @@ class ProjectsService {
     return parseProjectPnl(data);
   }
 
+  async myCollaboratorRole(projectId: string): Promise<CollaboratorRole | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { data, error } = await (supabase as any)
+      .from('project_collaborators')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .is('revoked_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return (data?.role ?? null) as CollaboratorRole | null;
+  }
+
+  async getClientTimeline(projectId: string): Promise<ClientTimelineItem[]> {
+    const { data, error } = await (supabase as any).rpc('get_project_client_timeline', { p_project_id: projectId });
+    if (error) throw error;
+    return (data ?? []) as ClientTimelineItem[];
+  }
+
+  async getCostSnapshots(projectId: string): Promise<CostSnapshot[]> {
+    const { data, error } = await (supabase as any)
+      .from('project_cost_snapshots')
+      .select('snapshot_date, actual_cost, committed_cost, billed_revenue, budget_cost')
+      .eq('project_id', projectId)
+      .order('snapshot_date', { ascending: true })
+      .limit(365);
+    if (error) throw error;
+    return ((data ?? []) as any[]).map((r) => ({
+      snapshot_date: r.snapshot_date as string,
+      actual_cost: Number(r.actual_cost),
+      committed_cost: Number(r.committed_cost),
+      billed_revenue: Number(r.billed_revenue),
+      budget_cost: Number(r.budget_cost),
+    }));
+  }
+
+  async getCostControl(projectId: string): Promise<CostControlRow[]> {
+    const { data, error } = await (supabase as any).rpc('get_project_cost_control', { p_project_id: projectId });
+    if (error) throw error;
+    return (((data ?? {}) as any).rows ?? []).map((r: any) => ({
+      cost_code_id: r.cost_code_id ?? null,
+      code: r.code ?? null,
+      name: r.name ?? null,
+      total_value: Number(r.total_value ?? 0),
+      budget_cost: Number(r.budget_cost ?? 0),
+      actual_cost: Number(r.actual_cost ?? 0),
+      committed_cost: Number(r.committed_cost ?? 0),
+      etc_override: r.etc_override == null ? null : Number(r.etc_override),
+      etc_effective: Number(r.etc_effective ?? 0),
+      forecast_cost: Number(r.forecast_cost ?? 0),
+      variance: r.variance == null ? null : Number(r.variance),
+    }));
+  }
+
+  async setCostBudget(projectId: string, costCodeId: string | null, budget: number, etc: number | null): Promise<void> {
+    const { error } = await (supabase as any).rpc('set_project_cost_budget', {
+      p_project_id: projectId, p_cost_code_id: costCodeId, p_budget_cost: budget, p_estimate_to_complete: etc,
+    });
+    if (error) throw error;
+  }
+
+  async getCostLines(projectId: string, kind: CostLineKind): Promise<CostLine[]> {
+    const { data, error } = await (supabase as any).rpc('get_project_cost_lines', { p_project_id: projectId, p_kind: kind });
+    if (error) throw error;
+    return (data ?? []) as CostLine[];
+  }
+
   async getProjectCommandCentre(projectId: string): Promise<ProjectCommandCentre> {
     const { data, error } = await (supabase as any)
       .rpc('get_project_command_centre', { p_project_id: projectId, p_today: todayLocalISO() });
@@ -1855,6 +1940,7 @@ class ProjectsService {
     project_id: string;
     email: string;
     message?: string;
+    role?: CollaboratorRole;
   }): Promise<ProjectCollaborator> {
     const email = input.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -1881,6 +1967,7 @@ class ProjectsService {
         project_id: input.project_id,
         email,
         invited_by: user.id,
+        role: input.role ?? 'client',
         message: input.message?.trim() || null,
       })
       .select()

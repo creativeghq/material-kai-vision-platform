@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
+import { isApprovalRefusal, raiseProjectApproval } from '../services/projectApprovals';
 import {
   variationsService, VARIATION_DIRECTIONS, VARIATION_ORIGINS, isVariationMoney,
   type ProjectVariation, type VariationDirection, type VariationOrigin, type VariationStatus,
@@ -56,13 +57,28 @@ export const VariationsCard: React.FC<Props> = ({
 
   useEffect(() => { void load(); }, [load]);
 
-  const act = async (label: string, fn: () => Promise<unknown>) => {
+  const act = async (label: string, fn: () => Promise<unknown>, approval?: ProjectVariation) => {
     setBusy(true);
     try {
       await fn();
       await load();
       onChanged?.();
     } catch (e) {
+      if (approval && workspaceId && isApprovalRefusal(e)) {
+        try {
+          const r = await raiseProjectApproval({
+            workspaceId, subject: 'project_variation', table: 'project_variations',
+            id: approval.id, amount: approval.value, reason: `Variation ${approval.reference ?? ''} ${approval.title}`.trim(),
+          });
+          toast({
+            title: r === 'raised' ? 'Approval requested' : 'Already waiting for approval',
+            description: 'An approver signs it under Finance → Approvals; then approve the variation again.',
+          });
+        } catch (err) {
+          toast({ title: label, description: (err as Error).message, variant: 'destructive' });
+        }
+        return;
+      }
       toast({ title: label, description: (e as Error).message, variant: 'destructive' });
     } finally {
       setBusy(false);
@@ -170,7 +186,7 @@ export const VariationsCard: React.FC<Props> = ({
                           {(v.status === 'draft' || v.status === 'submitted') && (
                             <>
                               <Button size="sm" variant="ghost" title="Approve" disabled={busy}
-                                onClick={() => void act('Could not approve', () => variationsService.setStatus(v.id, 'approved'))}>
+                                onClick={() => void act('Could not approve', () => variationsService.setStatus(v.id, 'approved'), v)}>
                                 <Check className="h-3.5 w-3.5" />
                               </Button>
                               <Button size="sm" variant="ghost" title="Reject" disabled={busy}

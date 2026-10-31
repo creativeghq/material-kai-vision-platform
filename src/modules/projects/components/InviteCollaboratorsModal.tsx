@@ -18,9 +18,16 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
-import { projectsService, type ProjectCollaborator } from '../services/projectsService';
+import { projectsService, type CollaboratorRole, type ProjectCollaborator } from '../services/projectsService';
+
+const ROLE_OPTIONS: Array<{ value: CollaboratorRole; label: string; hint: string }> = [
+  { value: 'client', label: 'Client', hint: 'Sees quotes, moodboards, documents and the progress; can ask questions and sign approvals.' },
+  { value: 'architect', label: 'Architect', hint: 'No prices. Sees only the requests they raise or are assigned; can raise RFIs and submittals.' },
+  { value: 'subcontractor', label: 'Subcontractor', hint: 'No prices. Sees only the requests they raise or are assigned; can raise RFIs and submittals.' },
+];
 
 interface InviteCollaboratorsModalProps {
   projectId: string;
@@ -40,6 +47,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
+  const [role, setRole] = useState<CollaboratorRole>('client');
   const [sending, setSending] = useState(false);
 
   const load = useCallback(async () => {
@@ -66,6 +74,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
         project_id: projectId,
         email: email.trim(),
         message: message.trim() || undefined,
+        role,
       });
       toast({ title: 'Invitation sent', description: `${email} will receive an email shortly.` });
       setEmail('');
@@ -123,7 +132,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
     <Dialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Invite Clients to View This Project</DialogTitle>
+          <DialogTitle>Invite People to This Project</DialogTitle>
           <DialogDescription>
             Invitees get an email with a link. They sign in with just their email — no password.
             They see the project overview, rooms, moodboards, sheets, and any tasks you've marked client-visible.
@@ -143,6 +152,16 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
                 disabled={sending}
                 className="mt-1"
               />
+            </div>
+            <div>
+              <Label className="text-xs">Role</Label>
+              <Select value={role} onValueChange={(v) => setRole(v as CollaboratorRole)} disabled={sending}>
+                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {ROLE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-muted-foreground">{ROLE_OPTIONS.find((o) => o.value === role)?.hint}</p>
             </div>
             <div>
               <Label className="text-xs">Personal message (optional)</Label>

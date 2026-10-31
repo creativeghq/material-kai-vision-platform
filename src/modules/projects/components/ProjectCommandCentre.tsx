@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { AlertTriangle, ArrowRight, Gauge, Loader2 } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -8,6 +8,7 @@ import { formatMoney } from '@/utils/decimal';
 import {
   projectsService,
   type CommandCentreFlagKey,
+  type CostSnapshot,
   type ProjectCommandCentre as CommandCentreData,
 } from '../services/projectsService';
 
@@ -38,6 +39,15 @@ export const ProjectCommandCentre: React.FC<{
 }> = ({ projectId, onOpenSection }) => {
   const [data, setData] = useState<CommandCentreData | null>(null);
   const [failed, setFailed] = useState(false);
+  const [snaps, setSnaps] = useState<CostSnapshot[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    projectsService.getCostSnapshots(projectId)
+      .then((s) => { if (!cancelled) setSnaps(s); })
+      .catch(() => { if (!cancelled) setSnaps([]); });
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +80,7 @@ export const ProjectCommandCentre: React.FC<{
         ) : !data ? (
           <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : (
-          <Body data={data} onOpenSection={onOpenSection} />
+          <Body data={data} snaps={snaps} onOpenSection={onOpenSection} />
         )}
       </CardContent>
     </Card>
@@ -85,7 +95,7 @@ const Stat: React.FC<{ label: string; value: string; hint?: string }> = ({ label
   </div>
 );
 
-const Body: React.FC<{ data: CommandCentreData; onOpenSection: (tab: string) => void }> = ({ data, onOpenSection }) => {
+const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[]; onOpenSection: (tab: string) => void }> = ({ data, snaps, onOpenSection }) => {
   const pnl = data.dashboard.pnl ?? {};
   const currency: string = pnl.currencies?.[0] ?? data.dashboard.budget_currency ?? 'EUR';
   const money: Money = (v) => formatMoney(v ?? 0, currency);
@@ -154,6 +164,33 @@ const Body: React.FC<{ data: CommandCentreData; onOpenSection: (tab: string) => 
             <span className={`tabular-nums font-medium ${i.alert ? 'text-destructive' : ''}`}>{i.count}</span>
           </button>
         ))}
+      </div>
+
+      <div>
+        <p className="mb-2 text-xs text-muted-foreground">Cost to date plus open orders, against the cost budget — one point a day</p>
+        {snaps.length >= 2 ? (
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={snaps.map((s) => ({
+              day: new Date(s.snapshot_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
+              Actual: s.actual_cost,
+              'Actual + on order': s.actual_cost + s.committed_cost,
+              Budget: s.budget_cost > 0 ? s.budget_cost : null,
+            }))}>
+              <CartesianGrid vertical={false} stroke="hsl(var(--hairline))" />
+              <XAxis dataKey="day" tickLine={false} axisLine={false} fontSize={11} />
+              <YAxis tickLine={false} axisLine={false} fontSize={11} width={48} tickFormatter={(v) => `${Math.round(v / 1000)}k`} />
+              <Tooltip formatter={(v: number) => money(v)} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="Actual" stroke="hsl(var(--chart-1))" dot={false} strokeWidth={2} />
+              <Line type="monotone" dataKey="Actual + on order" stroke="hsl(var(--chart-2))" dot={false} strokeWidth={2} />
+              <Line type="stepAfter" dataKey="Budget" stroke="hsl(var(--chart-3))" dot={false} strokeDasharray="4 3" connectNulls />
+            </LineChart>
+          </ResponsiveContainer>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            The cost curve starts with the first nightly snapshot — {snaps.length === 1 ? 'one point is recorded so far; a second appears tomorrow.' : 'none is recorded yet.'}
+          </p>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

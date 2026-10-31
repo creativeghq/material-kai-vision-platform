@@ -25,16 +25,19 @@ import {
 import {
   projectDocumentsService, type ProjectDocumentWithRevisions,
 } from '../../services/projectDocumentsService';
-import { projectsService } from '../../services/projectsService';
+import { projectsService, type CollaboratorRole } from '../../services/projectsService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { AmendRequestDialog } from '../AmendRequestDialog';
+import { ClientTimelinePanel } from '../ClientTimelinePanel';
 
 export const RequestsTab: React.FC<{
   projectId: string;
   isOwner: boolean;
+  /** Set for a guest; decides which kinds they may raise and whether they can sign an approval. */
+  collabRole?: CollaboratorRole | null;
   /** `?request=` from the notification's action_url — the thread to open on arrival. */
   focusRequestId?: string | null;
-}> = ({ projectId, isOwner, focusRequestId }) => {
+}> = ({ projectId, isOwner, collabRole = null, focusRequestId }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [requests, setRequests] = useState<ProjectRequestWithMessages[]>([]);
@@ -109,7 +112,7 @@ export const RequestsTab: React.FC<{
   };
 
   const decide = async (request: ProjectRequestWithMessages, decision: 'approved' | 'declined') => {
-    try { await projectRequestsService.setApproval(request, decision); await load(); }
+    try { await projectRequestsService.setApproval(request, decision, !isOwner); await load(); }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
@@ -137,6 +140,8 @@ export const RequestsTab: React.FC<{
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
 
   return (
+    <div className="space-y-4">
+    {!isOwner && <ClientTimelinePanel projectId={projectId} />}
     <Card className="dashboard-card">
       <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
         <div>
@@ -299,7 +304,7 @@ export const RequestsTab: React.FC<{
                         </div>
                       )}
 
-                      {isOwner && r.kind === 'approval_request' && !r.approval_decision && (
+                      {(isOwner || collabRole === 'client' || collabRole === 'editor') && r.kind === 'approval_request' && !r.approval_decision && (
                         <div className="flex gap-2">
                           <Button size="sm" variant="outline" onClick={() => decide(r, 'approved')}>
                             <Check className="h-3.5 w-3.5 mr-1" /> Approve
@@ -351,7 +356,7 @@ export const RequestsTab: React.FC<{
 
       {creating && (
         <NewRequestDialog
-          projectId={projectId} isOwner={isOwner} assignees={assignees}
+          projectId={projectId} isOwner={isOwner} collabRole={collabRole} assignees={assignees}
           onClose={() => setCreating(false)}
           onSaved={() => { setCreating(false); void load(); }}
         />
@@ -365,15 +370,16 @@ export const RequestsTab: React.FC<{
         />
       )}
     </Card>
+    </div>
   );
 };
 
 
 const NewRequestDialog: React.FC<{
-  projectId: string; isOwner: boolean;
+  projectId: string; isOwner: boolean; collabRole: CollaboratorRole | null;
   assignees: Array<{ id: string; name: string }>;
   onClose: () => void; onSaved: () => void;
-}> = ({ projectId, isOwner, assignees, onClose, onSaved }) => {
+}> = ({ projectId, isOwner, collabRole, assignees, onClose, onSaved }) => {
   const { toast } = useToast();
   const [title, setTitle] = useState('');
   // #413: `assignee_id` existed on the row and on the service and was omitted from the create
@@ -422,9 +428,10 @@ const NewRequestDialog: React.FC<{
   // not offered either. RFIs and submittals are withheld from them for a different reason: those
   // go UP to the design team on the project's behalf, and a client raising one would put a
   // numbered commitment into the register that nobody on the team agreed to.
+  const guestDesigner = collabRole === 'architect' || collabRole === 'subcontractor';
   const kinds = isOwner
     ? REQUEST_KINDS
-    : REQUEST_KINDS.filter((k) => k !== 'approval_request' && !isTeamFacing(k));
+    : REQUEST_KINDS.filter((k) => k !== 'approval_request' && (!isTeamFacing(k) || (guestDesigner && (k === 'rfi' || k === 'submittal'))));
 
   const teamFacing = isTeamFacing(kind);
 
@@ -440,7 +447,7 @@ const NewRequestDialog: React.FC<{
         // A team-facing request is internal by default and the checkbox is not offered for it —
         // an RFI is a question about a problem in the architect's information, and publishing the
         // project's open problems to the customer is not what raising one means.
-        client_visible: teamFacing ? false : (isOwner ? clientVisible : true),
+        client_visible: teamFacing && !guestDesigner ? false : (isOwner ? clientVisible : true),
         due_at: dueAt || null,
         drawing_revision_id: revisionId || null,
         assignee_id: assigneeId || null,

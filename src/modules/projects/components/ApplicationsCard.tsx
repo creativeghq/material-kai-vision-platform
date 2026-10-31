@@ -18,6 +18,7 @@ import {
   type ApplicationRow, type ApplicationStatus, type RetentionTerms, type RetentionPosition,
 } from '../services/applicationsService';
 import { RetentionTermsDialog } from './RetentionTermsDialog';
+import { isApprovalRefusal, raiseProjectApproval } from '../services/projectApprovals';
 
 interface Props {
   projectId: string;
@@ -325,7 +326,7 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
 
       {certifying && (
         <CertifyDialog
-          row={certifying} currency={currency}
+          row={certifying} currency={currency} workspaceId={workspaceId}
           onClose={() => setCertifying(null)}
           onSaved={() => { setCertifying(null); void load(); }}
         />
@@ -418,8 +419,8 @@ const NewApplicationDialog: React.FC<{
 };
 
 const CertifyDialog: React.FC<{
-  row: ApplicationRow; currency: string; onClose: () => void; onSaved: () => void;
-}> = ({ row, currency, onClose, onSaved }) => {
+  row: ApplicationRow; currency: string; workspaceId: string | null; onClose: () => void; onSaved: () => void;
+}> = ({ row, currency, workspaceId, onClose, onSaved }) => {
   const { toast } = useToast();
   const [amount, setAmount] = useState(String(n(row.net_due)));
   const [saving, setSaving] = useState(false);
@@ -436,6 +437,24 @@ const CertifyDialog: React.FC<{
       await applicationsService.certify(row.id, value);
       onSaved();
     } catch (e) {
+      if (workspaceId && isApprovalRefusal(e)) {
+        try {
+          const r = await raiseProjectApproval({
+            workspaceId, subject: 'project_application', table: 'project_applications',
+            id: row.id, amount: n(row.gross_valuation), reason: `Application ${row.reference ?? ''}`.trim(),
+          });
+          toast({
+            title: r === 'raised' ? 'Approval requested' : 'Already waiting for approval',
+            description: 'An approver signs it under Finance → Approvals; then record the certified amount again.',
+          });
+          onClose();
+          return;
+        } catch (err) {
+          toast({ title: 'Could not request approval', description: (err as Error).message, variant: 'destructive' });
+          setSaving(false);
+          return;
+        }
+      }
       toast({ title: 'Could not record it', description: (e as Error).message, variant: 'destructive' });
       setSaving(false);
     }

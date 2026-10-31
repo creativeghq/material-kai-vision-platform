@@ -59,6 +59,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import {
   projectsService,
+  type CollaboratorRole,
   type ProjectCoverCandidate,
   type ProjectMember,
   type ProjectWithClient,
@@ -174,6 +175,7 @@ export const ProjectDetailPage: React.FC = () => {
   // cover panel resolve the same picture. Re-read when a board is added or removed.
   const [coverCandidate, setCoverCandidate] = useState<ProjectCoverCandidate | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
+  const [collabRole, setCollabRole] = useState<CollaboratorRole | null>(null);
 
   // Three viewers: the owner, a teammate (project_members), and a client (project_collaborators,
   // read-only). The team gets the working surface; transfer and delete stay with the owner.
@@ -230,14 +232,16 @@ export const ProjectDetailPage: React.FC = () => {
     if (!id) return;
     try {
       setLoading(true);
-      const [data, team] = await Promise.all([
+      const [data, team, role] = await Promise.all([
         projectsService.getProject(id),
         projectsService.listProjectMembers(id).catch(() => {
           toast({ title: 'Could not load the project team', description: 'You may see a read-only view until you reload.', variant: 'destructive' });
           return [] as ProjectMember[];
         }),
+        projectsService.myCollaboratorRole(id).catch(() => null),
       ]);
       setMembers(team);
+      setCollabRole(role);
       if (!data) {
         toast({ title: 'Project not found', variant: 'destructive' });
         navigate('/projects');
@@ -471,7 +475,7 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isTeam} /></TabsContent>
           <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isTeam} /></TabsContent>
           <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isTeam} /></TabsContent>
-          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isTeam} focusRequestId={sp.get('request')} /></TabsContent>
+          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isTeam} collabRole={collabRole} focusRequestId={sp.get('request')} /></TabsContent>
           {isTeam && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isTeam} subjectName={project.name} /></ModuleTabGate></TabsContent>}
           {isTeam && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
               </div>
