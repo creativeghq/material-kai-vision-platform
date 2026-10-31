@@ -63,6 +63,7 @@ import { ProductPricingCard } from '@/components/business/marketplace/ProductPri
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ProductDocumentSearch } from '@/components/features/products/ProductDocumentSearch';
 import { ProductCertificates } from '@/components/features/products/ProductCertificates';
+import { ProductSkuTables } from '@/components/features/products/ProductSkuTables';
 import { ProductDocumentDownload } from '@/components/features/products/ProductDocumentDownload';
 import { ProductDatasheetButton } from '@/components/features/products/ProductDatasheetButton';
 import { useToast } from '@/hooks/use-toast';
@@ -2802,6 +2803,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               {commercialCard}
 
               {variantsCard}
+
+              <ProductSkuTables productId={product.id} colourOptions={allData?.colour_options} canSeeInternal={canSeeCost} />
 
               {certificationsCard}
 
