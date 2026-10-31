@@ -15,6 +15,8 @@ import { quoteUrl } from '@/modules/quotes/routes';
 
 interface QuotesTabProps {
   projectId: string;
+  /** A guest gets the customer view of a quote and cannot create one. */
+  canManage?: boolean;
 }
 
 interface QuoteRow {
@@ -42,7 +44,7 @@ interface ChainGroup {
 // dashes only null/undefined, so €0.00 now reads as €0.00.
 import { formatMoney } from '@/utils/decimal';
 
-export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
+export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId, canManage = true }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);
@@ -107,8 +109,8 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
         <HubEmptyState
           icon={FileText}
           title="No quotes attached to this project yet"
-          description="A quote created here is filed under this project, so its budget tracks against actual."
-          action={<Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" /> New quote</Button>}
+          description={canManage ? 'A quote created here is filed under this project, so its budget tracks against actual.' : 'Quotes sent to you for this project appear here.'}
+          action={canManage ? <Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" /> New quote</Button> : undefined}
         />
         {createModal}
       </Card>
@@ -117,9 +119,11 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" /> New quote</Button>
-      </div>
+      {canManage && (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => setCreating(true)}><Plus className="h-4 w-4 mr-1" /> New quote</Button>
+        </div>
+      )}
       {createModal}
       {chains.map(chain => {
         const hasRevisions = chain.revisions.length > 1;
@@ -136,7 +140,7 @@ export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId }) => {
                 {chain.revisions.map(q => (
                   <button
                     key={q.id}
-                    onClick={() => navigate(`/quotes/manage/${q.id}`)}
+                    onClick={() => navigate(canManage ? `/quotes/manage/${q.id}` : `/quotes/${q.id}`)}
                     className="w-full text-left p-4 hover:bg-muted/40 transition-colors flex items-center gap-3"
                   >
                     <FileText className="h-4 w-4 text-primary shrink-0" />

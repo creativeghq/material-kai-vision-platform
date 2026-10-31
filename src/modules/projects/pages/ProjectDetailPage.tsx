@@ -458,7 +458,7 @@ export const ProjectDetailPage: React.FC = () => {
           {isTeam && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isTeam} /></TabsContent>}
           {isTeam && <TabsContent value="purchases"><PurchaseItemsTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} /></TabsContent>}
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
-          <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} /></ModuleTabGate></TabsContent>
+          <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} canManage={isTeam} /></ModuleTabGate></TabsContent>
           {isManager && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><BillingTab projectId={project.id} /></ModuleTabGate></TabsContent>}
           {canFinance && <TabsContent value="finance"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Orders, invoices and payments for this project."><FinanceTab projectId={project.id} projectName={project.name} /></ModuleTabGate></TabsContent>}
           <TabsContent value="sheets"><SheetsTab projectId={project.id} isOwner={isTeam} /></TabsContent>
