@@ -7,6 +7,21 @@ import './index.css';
 import { initializeGlobalErrorHandlers } from './utils/globalErrorHandler';
 import { NOISE_PATTERNS, isNoiseMessage, rebuildConsoleMessage } from './utils/sentryConsoleMessage';
 
+function tolerateTranslatedDom(): void {
+  if (typeof Node !== 'function' || !Node.prototype) return;
+  const origRemove = Node.prototype.removeChild;
+  Node.prototype.removeChild = function removeChild<T extends Node>(this: Node, child: T): T {
+    if (child.parentNode !== this) return child;
+    return origRemove.call(this, child) as T;
+  };
+  const origInsert = Node.prototype.insertBefore;
+  Node.prototype.insertBefore = function insertBefore<T extends Node>(this: Node, node: T, ref: Node | null): T {
+    if (ref && ref.parentNode !== this) return origInsert.call(this, node, null) as T;
+    return origInsert.call(this, node, ref) as T;
+  };
+}
+tolerateTranslatedDom();
+
 // Initialize global error handlers (sends errors to backend database)
 initializeGlobalErrorHandlers();
 
