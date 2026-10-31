@@ -94,7 +94,12 @@ describe('the register UI', () => {
   it('hides the client-visibility switch on a team-facing request', () => {
     // Offering it would invite somebody to publish an RFI to the customer by accident.
     expect(TAB).toContain('isOwner && !teamFacing');
-    expect(TAB).toContain('client_visible: teamFacing ? false');
+    expect(TAB).toContain('client_visible: teamFacing && !guestDesigner ? false');
+  });
+
+  it('lets only an architect or subcontractor guest raise one, and only visible to the team they report to', () => {
+    expect(TAB).toContain("const guestDesigner = collabRole === 'architect' || collabRole === 'subcontractor'");
+    expect(TAB).toContain("(guestDesigner && (k === 'rfi' || k === 'submittal'))");
   });
 
   it('closes a submittal by recording the verdict, never by the status dropdown', () => {
