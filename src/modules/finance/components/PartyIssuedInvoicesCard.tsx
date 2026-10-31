@@ -59,7 +59,7 @@ export const PartyIssuedInvoicesCard: React.FC<{
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3 space-y-0">
         <CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Issued Invoices</CardTitle>
-        <p className="mt-0.5 text-xs text-muted-foreground">Invoices issued to this customer, newest first.</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">Invoices we issued to them, newest first.</p>
       </CardHeader>
       <CardContent className="p-0">
         {error ? (
@@ -69,7 +69,7 @@ export const PartyIssuedInvoicesCard: React.FC<{
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : rows.length === 0 ? (
-          <HubEmptyState icon={FileText} title="No invoices issued to this customer yet" />
+          <HubEmptyState icon={FileText} title="No invoices issued to them yet" />
         ) : (
           <Table>
             <TableHeader>

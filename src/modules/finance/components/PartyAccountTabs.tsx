@@ -87,18 +87,16 @@ export const PartyAccountTabs: React.FC<Props> = ({
     },
   ];
 
-  if (roles.customer || !roles.supplier) {
-    sections.push({
-      id: 'issued-invoices', label: 'Issued Invoices', icon: FileText,
-      node: <PartyIssuedInvoicesCard workspaceId={workspaceId} companyId={companyId} contactId={contactId} />,
-    });
-  }
+  sections.push({
+    id: 'issued-invoices', label: 'Issued Invoices', icon: FileText,
+    node: <PartyIssuedInvoicesCard workspaceId={workspaceId} companyId={companyId} contactId={contactId} />,
+  });
 
   // What this supplier filed against us on myDATA. Rows that are not in Expenses yet say so:
   // until one is added they are in neither Payables nor the P&L.
   if (companyId && roles.supplier) {
     sections.push({
-      id: 'invoices', label: 'Invoices', icon: InboxIcon,
+      id: 'invoices', label: 'Received Invoices', icon: InboxIcon,
       node: (
         <PartyInboundDocsCard
           workspaceId={workspaceId}
