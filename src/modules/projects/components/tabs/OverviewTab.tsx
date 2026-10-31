@@ -32,6 +32,7 @@ import {
 import { ProjectCoverPanel } from '../ProjectCoverPanel';
 import { assigneeKey, NO_ASSIGNEE, useProjectTasks } from '../tasks/useProjectTasks';
 import { ProjectCostPanel } from '../ProjectCostPanel';
+import { ProjectCommandCentre } from '../ProjectCommandCentre';
 import { ProjectVisitsPanel } from '../ProjectVisitsPanel';
 import { ProjectTeamPanel } from '../ProjectTeamPanel';
 
@@ -194,6 +195,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
+          {canFinance && onOpenSection && <ProjectCommandCentre projectId={project.id} onOpenSection={onOpenSection} />}
           {canFinance && onOpenSection && <ProjectCostPanel projectId={project.id} onOpenSection={onOpenSection} />}
 
           {/* Rooms summary — switches between simple badge list and per-room budget rollup

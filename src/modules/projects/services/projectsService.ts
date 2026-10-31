@@ -361,6 +361,33 @@ export interface ProjectDelivery {
   is_late: boolean;
 }
 
+export type CommandCentreFlagKey =
+  | 'negative_forecast_margin' | 'over_budget' | 'billed_exceeds_contract'
+  | 'pending_variations_exposure' | 'certified_unpaid_overdue' | 'late_deliveries'
+  | 'critical_snags_open' | 'overdue_requests' | 'mixed_currencies';
+
+/** `get_project_command_centre` — every figure and every verdict is derived in SQL. */
+export interface ProjectCommandCentre {
+  dashboard: Record<string, any>;
+  contract: {
+    contracted: number; variations_approved: number; variations_pending: number;
+    variations_pending_count: number; total: number;
+  };
+  certified: number;
+  retention: { held: number; released: number; outstanding: number };
+  open_items: {
+    rfis: number; submittals: number; overdue_requests: number; snags: number;
+    critical_snags: number; inspections: number; tasks: number; overdue_tasks: number;
+    late_deliveries: number;
+  };
+  series: {
+    billed_by_month: Array<{ month: string; amount: number }>;
+    bills_by_month: Array<{ month: string; amount: number }>;
+    labour_by_week: Array<{ week: string; minutes: number }>;
+  };
+  flags: Array<{ key: CommandCentreFlagKey; severity: 'high' | 'medium' | 'info'; value: number }>;
+}
+
 export interface ProjectDashboard {
   pnl: ProjectPnl;
   budget_amount: number | null;
@@ -1625,6 +1652,13 @@ class ProjectsService {
     const { data, error } = await (supabase as any).rpc('get_project_pnl', { p_project_id: projectId });
     if (error) throw error;
     return parseProjectPnl(data);
+  }
+
+  async getProjectCommandCentre(projectId: string): Promise<ProjectCommandCentre> {
+    const { data, error } = await (supabase as any)
+      .rpc('get_project_command_centre', { p_project_id: projectId, p_today: todayLocalISO() });
+    if (error) throw error;
+    return data as ProjectCommandCentre;
   }
 
   async getProjectDashboard(projectId: string): Promise<ProjectDashboard> {
