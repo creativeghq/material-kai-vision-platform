@@ -29,6 +29,22 @@ interface State {
   errorId: string | null;
 }
 
+const CHUNK_ERROR = /dynamically imported module|importing a module script failed|Unexpected token '<'/i;
+const isChunkError = (e: Error | null): boolean => !!e && CHUNK_ERROR.test(e.message);
+
+/** One guarded reload per 15s, shared with main.tsx so the two cannot loop each other. */
+function reloadOnceForNewDeploy(): boolean {
+  try {
+    const last = Number(sessionStorage.getItem('mk-chunk-reload-at') || 0);
+    if (Date.now() - last < 15000) return false;
+    sessionStorage.setItem('mk-chunk-reload-at', String(Date.now()));
+  } catch {
+    return false;
+  }
+  window.location.reload();
+  return true;
+}
+
 export class ErrorBoundary extends Component<Props, State> {
   private retryCount = 0;
   private maxRetries = 3;
@@ -53,7 +69,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error details
+    // A page opened before a deploy asks for a file that no longer exists; a reload fetches the new build.
+    if (isChunkError(error) && reloadOnceForNewDeploy()) return;
+
     console.error('ErrorBoundary caught an error:', error, errorInfo);
 
     this.setState({
@@ -217,9 +235,15 @@ export class ErrorBoundary extends Component<Props, State> {
               * captured by Sentry and by `logger.error` above, which is where it belongs and who
               * can act on it; the screen gets the id that finds it.
               */}
+            {isChunkError(error) && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                The app was updated while this page was open. Reload to continue.
+              </p>
+            )}
             {errorId && (
               <p className="mt-2 text-sm text-muted-foreground">
                 Reference: <span className="font-mono">{errorId}</span>
+                {error && <> · {error.name} · {name || 'page'}</>}
               </p>
             )}
             {process.env.NODE_ENV === 'development' && error && (

@@ -6,6 +6,7 @@
  */
 
 import { MIVAA_API_URL } from '@/config/mivaa';
+import { supabase } from '@/integrations/supabase/client';
 
 export enum LogLevel {
   DEBUG = 0,
@@ -318,18 +319,18 @@ class LoggerService {
         user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
       };
 
-      // Send to MIVAA backend (non-blocking)
-      const backendUrl = MIVAA_API_URL;
-      fetch(`${backendUrl}/api/admin/logs/frontend`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(logData),
-        keepalive: true,
-      }).catch(() => {
-        // Silently fail - don't want logging to break the app
-      });
+      // The backend's auth layer answers 401 to a request with no token, so an unsent bearer
+      // meant no browser error was ever recorded. A signed-out visitor still goes to Sentry only.
+      void supabase.auth.getSession().then(({ data }) => {
+        const token = data.session?.access_token;
+        if (!token) return;
+        return fetch(`${MIVAA_API_URL}/api/admin/logs/frontend`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(logData),
+          keepalive: true,
+        });
+      }).catch(() => {});
     } catch (_error) {
       // Don't let logging errors break the app
     }

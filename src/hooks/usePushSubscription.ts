@@ -33,9 +33,13 @@ export function usePushSubscription() {
       return;
     }
     if (Notification.permission === 'denied') { setState('denied'); return; }
-    const reg = await navigator.serviceWorker.getRegistration();
-    const sub = reg ? await reg.pushManager.getSubscription() : null;
-    setState(sub && Notification.permission === 'granted' ? 'on' : 'off');
+    try {
+      const reg = await navigator.serviceWorker.getRegistration();
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      setState(sub && Notification.permission === 'granted' ? 'on' : 'off');
+    } catch {
+      setState('unsupported');
+    }
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
