@@ -107,4 +107,10 @@ describe('product item tables', () => {
     expect(t && filterRows(t, { ...NO_FILTER, query: '1,008' })).toHaveLength(1);
     expect(t && filterRows(t, { ...NO_FILTER, query: '1008' })).toHaveLength(1);
   });
+
+  it('carries the needs-review flag from the table metadata', () => {
+    expect(toSkuTable(raw())?.needsReview).toBe(false);
+    expect(toSkuTable(raw({ metadata: { title: 'T', needs_review: true } }))?.needsReview).toBe(true);
+    expect(toSkuTable(raw({ metadata: { title: 'T', needs_review: 'yes' } }))?.needsReview).toBe(false);
+  });
 });

@@ -20,6 +20,7 @@ export interface SkuTable {
   id: string;
   title: string;
   source: string | null;
+  needsReview: boolean;
   columns: SkuColumn[];
   rows: Cell[][];
 }
@@ -106,6 +107,7 @@ export function toSkuTable(raw: RawProductTable, canSeeInternal = false): SkuTab
     id: raw.id,
     title: titleOf(raw) ?? 'Item table',
     source: typeof meta.source === 'string' ? meta.source : null,
+    needsReview: meta.needs_review === true,
     columns,
     rows,
   };

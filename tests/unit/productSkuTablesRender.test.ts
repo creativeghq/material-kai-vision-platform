@@ -64,4 +64,11 @@ describe('the item table card', () => {
     expect(long).toContain('80' + '1029');
     expect(long).not.toContain('80' + '1030');
   });
+
+  it('says so when a table was flagged for review', () => {
+    const t = toSkuTable({ id: 'r', headers: ['Item code'], table_data: { rows: [['1']] }, extractor: 'pymupdf-text', metadata: { title: 'T', needs_review: true } });
+    if (!t) throw new Error('table did not parse');
+    expect(renderToStaticMarkup(createElement(SkuTableCard, { table: t, hexByName: {} }))).toContain('Needs review');
+    expect(render(5)).not.toContain('Needs review');
+  });
 });
