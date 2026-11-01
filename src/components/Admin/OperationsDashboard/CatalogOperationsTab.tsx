@@ -23,6 +23,7 @@ import {
   type CatalogViewEventRow,
   type CatalogAccessLogRow,
 } from '@/services/catalogsService';
+import { IngestionQualityPanel } from './IngestionQualityPanel';
 import { buildCatalogOperationsFilters } from './catalogOperationsFilters';
 import { formatDate, toLocalISODate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
@@ -178,6 +179,8 @@ export const CatalogOperationsTab: React.FC = () => {
         <Stat icon={Activity} label="Gate attempts" value={totals.gate_attempts} />
         <Stat icon={ShieldAlert} label="Denied" value={totals.gate_denials} variant={totals.gate_denials > 0 ? 'destructive' : 'default'} />
       </div>
+
+      <IngestionQualityPanel />
 
       <FilterBar
         groups={filterGroups}

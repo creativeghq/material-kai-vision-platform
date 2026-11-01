@@ -92,6 +92,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   payment_received: CheckCircle2,
   payment_reversed: Undo2,
   payment_sent: CheckCircle2,
+  ingestion_audit_failed: ShieldAlert,
   'expense.booked': ReceiptText,
   'expense.settled_outside': BadgeCheck,
   'credit_note.received': Undo2,

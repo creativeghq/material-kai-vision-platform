@@ -250,6 +250,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'payment_sent', group: 'Finance',
     label: 'Payment Sent', description: 'A payment was recorded and sent to a supplier', icon: 'CheckCircle2', color: 'emerald',
     defaultData: { label: 'Payment Sent', category: 'trigger', triggerType: 'payment_sent', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'ingestion_audit_failed', group: 'Catalogs',
+    label: 'Ingestion audit needs attention', description: 'A processed document failed or needs review against what its PDF says', icon: 'ShieldAlert', color: 'red',
+    defaultData: { label: 'Ingestion audit needs attention', category: 'trigger', triggerType: 'ingestion_audit_failed', config: {} } as TriggerNodeData },
   // Expense cards (trip / monthly / …)
   { type: 'triggerNode', category: 'trigger', subType: 'expense_card_submitted', group: 'Finance',
     label: 'Expense Card Submitted', description: 'A team member submitted an expense card for review', icon: 'ClipboardCheck', color: 'blue',
