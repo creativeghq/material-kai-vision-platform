@@ -65,6 +65,13 @@ export const PURPOSE_LABEL: Record<AiCrawlBot['purpose'], string> = {
 export const FORWARD_UA_PATTERN =
   'bot|crawler|spider|gpt|claude|anthropic|perplexity|meta-external|mistral|cohere|duckassist|gemini';
 
+/** Every ai_crawler_bot() needle: these are always sent. Other bots are only the heartbeat, so they are sampled. */
+export const AI_UA_PATTERN =
+  'oai-searchbot|chatgpt-user|gptbot|claude|anthropic-ai|perplexity|google-cloudvertexbot|gemini-deep-research|' +
+  'meta-external|facebookbot|mistralai-user|duckassistbot|amazonbot|applebot|bytespider|ccbot|cohere|youbot|diffbot';
+
+export const HEARTBEAT_SAMPLE = 20;
+
 export function ingestUrl(supabaseUrl: string, websiteId: string): string {
   return `${supabaseUrl.replace(/\/+$/, '')}/functions/v1/ai-crawler-ingest?website=${encodeURIComponent(websiteId)}`;
 }
@@ -73,6 +80,8 @@ export function ingestUrl(supabaseUrl: string, websiteId: string): string {
 export function workerScript(url: string): string {
   return `const INGEST_URL = ${JSON.stringify(url)};
 const FORWARD = /${FORWARD_UA_PATTERN}/i;
+const AI = /${AI_UA_PATTERN}/i;
+const SAMPLE = ${HEARTBEAT_SAMPLE};
 
 async function sign(secret, message) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
@@ -84,8 +93,9 @@ export default {
   async fetch(request, env, ctx) {
     const response = await fetch(request);
     const ua = request.headers.get('user-agent') || '';
-    if (FORWARD.test(ua)) {
-      const body = JSON.stringify({ events: [{
+    const ai = AI.test(ua);
+    if (ai || (FORWARD.test(ua) && Math.random() < 1 / SAMPLE)) {
+      const body = JSON.stringify({ seen: ai ? 1 : SAMPLE, events: [{
         ts: new Date().toISOString(),
         path: new URL(request.url).pathname,
         ua,

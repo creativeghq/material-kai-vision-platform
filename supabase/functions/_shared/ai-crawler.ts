@@ -70,6 +70,12 @@ export function parseIngestBody(body: unknown): CrawlerEvent[] {
   return out;
 }
 
+/** Requests a delivery stands for: a sampled heartbeat says `seen: 20`; older Workers send one request per event. */
+export function ingestSeen(body: unknown, events: readonly CrawlerEvent[]): number {
+  const seen = (body as { seen?: unknown })?.seen;
+  return Number.isInteger(seen) && (seen as number) >= 1 && (seen as number) <= 1000 ? seen as number : events.length;
+}
+
 /** Vendors that publish their crawler IP ranges. A bot not listed here is stored with `verified: null`. */
 export const PUBLISHED_RANGES: readonly { needle: string; url: string }[] = [
   { needle: 'oai-searchbot', url: 'https://openai.com/searchbot.json' },

@@ -4,7 +4,7 @@ import { serviceClient } from '../_shared/supabase-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import {
-  INGEST_MAX_BYTES, parseIngestBody, verifyCrawlerIp, verifyIngestSignature,
+  INGEST_MAX_BYTES, ingestSeen, parseIngestBody, verifyCrawlerIp, verifyIngestSignature,
 } from '../_shared/ai-crawler.ts';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,7 +48,7 @@ Deno.serve(withApiLogging('ai-crawler-ingest', async (req) => {
   const rows = await Promise.all(events.map(async (e) => ({ ...e, verified: await verifyCrawlerIp(e.ua, e.ip) })));
 
   const { data: stored, error: rpcErr } = await db.rpc('ingest_ai_crawler_hits', {
-    p_website_id: websiteId, p_rows: rows, p_seen: events.length,
+    p_website_id: websiteId, p_rows: rows, p_seen: ingestSeen(body, events),
   });
   if (rpcErr) throw dbFailure('ingest_ai_crawler_hits failed', rpcErr.message);
 

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
-  AI_REFERRAL_SOURCE_REGEX, ipInCidr, parseIngestBody, signIngestBody, verifyCrawlerIp, verifyIngestSignature,
+  AI_REFERRAL_SOURCE_REGEX, ingestSeen, ipInCidr, parseIngestBody, signIngestBody, verifyCrawlerIp, verifyIngestSignature,
 } from '../../supabase/functions/_shared/ai-crawler';
-import { FORWARD_UA_PATTERN, ingestUrl, workerScript } from '../../src/components/core/Profile/seo/aiCrawlers';
+import { AI_UA_PATTERN, FORWARD_UA_PATTERN, HEARTBEAT_SAMPLE, ingestUrl, workerScript } from '../../src/components/core/Profile/seo/aiCrawlers';
 import { stripComments } from '../helpers/stripComments';
 
 const SECRET = 'kcw_' + 'a'.repeat(48);
@@ -102,6 +102,23 @@ describe('the Worker forwards everything the SQL classifier can store', () => {
     const re = new RegExp(FORWARD_UA_PATTERN, 'i');
     for (const ua of [...SQL_BOT_UAS, 'Mozilla/5.0 (compatible; Googlebot/2.1)']) expect(re.test(ua), ua).toBe(true);
     expect(re.test('Mozilla/5.0 (Windows NT 10.0) Chrome/130.0')).toBe(false);
+  });
+
+  it('always sends every stored AI crawler and samples only the heartbeat bots', () => {
+    const ai = new RegExp(AI_UA_PATTERN, 'i');
+    for (const ua of SQL_BOT_UAS) expect(ai.test(ua), ua).toBe(true);
+    expect(ai.test('Mozilla/5.0 (compatible; Googlebot/2.1)')).toBe(false);
+    expect(workerScript('https://x').includes(`seen: ai ? 1 : SAMPLE`)).toBe(true);
+    expect(HEARTBEAT_SAMPLE).toBeGreaterThan(1);
+  });
+
+  it('counts a sampled delivery by its stated weight, bounded, and an old Worker by its events', () => {
+    const ev = parseIngestBody({ ts: new Date().toISOString(), path: '/', ua: 'Googlebot' });
+    expect(ingestSeen({ seen: 20 }, ev)).toBe(20);
+    expect(ingestSeen({}, ev)).toBe(1);
+    expect(ingestSeen({ seen: 0 }, ev)).toBe(1);
+    expect(ingestSeen({ seen: 5000 }, ev)).toBe(1);
+    expect(ingestSeen({ seen: '20' }, ev)).toBe(1);
   });
 
   it('signs with the headers and message shape the function verifies', () => {
