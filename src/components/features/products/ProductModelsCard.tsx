@@ -1,7 +1,17 @@
 import React, { useMemo, useState } from 'react';
-import { Layers } from 'lucide-react';
+import { Layers, Search } from 'lucide-react';
+import { Badge } from '@/components/core/ui/badge';
+import { Button } from '@/components/core/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/core/ui/table';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import type { ModelTable } from './productModelTable';
+
+const FOLDED_ROWS = 30;
+const FILTER_MIN_ROWS = 8;
 
 interface ProductModelsCardProps {
   table: ModelTable;
@@ -9,63 +19,78 @@ interface ProductModelsCardProps {
 
 export const ProductModelsCard: React.FC<ProductModelsCardProps> = ({ table }) => {
   const [query, setQuery] = useState('');
+  const [expanded, setExpanded] = useState(false);
   const rows = useMemo(() => {
     const q = query.trim().toLowerCase();
     return q ? table.rows.filter(r => r.model.toLowerCase().includes(q)) : table.rows;
   }, [table.rows, query]);
+  const filtering = query.trim() !== '';
+  const shown = expanded || filtering ? rows : rows.slice(0, FOLDED_ROWS);
 
   return (
-    <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-          <Layers className="h-4 w-4" />
-          Models ({table.rows.length})
-        </h3>
-        {table.rows.length > 8 && (
-          <Input
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Find a model"
-            className="h-8 w-44 text-xs"
-          />
+    <Card>
+      <CardHeader className="space-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="flex items-center gap-2 text-sm">
+            <Layers className="h-4 w-4" />
+            Models
+          </CardTitle>
+          <Badge variant="neutral">{table.rows.length === 1 ? '1 model' : `${table.rows.length} models`}</Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {table.rows.length > FILTER_MIN_ROWS && (
+          <div className="relative min-w-[12rem]">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Find a model"
+              aria-label="Search models"
+              className="h-9 pl-8"
+            />
+          </div>
         )}
-      </div>
-      <div className="table-scroll max-h-[28rem] overflow-y-auto -mx-6 -mb-6">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 z-10 bg-surface-sunken [&_th]:border-b [&_th]:border-hairline">
-            <tr className="text-[11px] font-semibold text-muted-foreground">
-              <th className="text-left px-6 py-2.5 whitespace-nowrap">Model</th>
-              {table.columns.map(c => (
-                <th key={c.key} className={`px-3 py-2.5 whitespace-nowrap ${c.numeric ? 'text-right' : 'text-left'}`}>
-                  {c.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map(r => (
-              <tr key={r.model} className="border-b border-hairline hover:bg-surface-hover transition-colors">
-                <td className="px-6 py-2 font-mono font-semibold whitespace-nowrap">{r.model}</td>
-                {table.columns.map(c => (
-                  <td
-                    key={c.key}
-                    className={`px-3 py-2 whitespace-nowrap ${c.numeric ? 'text-right tabular-nums' : 'text-left text-muted-foreground'}`}
-                  >
-                    {r.cells[c.key] ?? '—'}
-                  </td>
+
+        {rows.length === 0 ? (
+          <HubEmptyState
+            variant="filtered"
+            icon={Search}
+            title={`No model matches “${query}”`}
+            action={<Button variant="outline" size="sm" onClick={() => setQuery('')}>Clear search</Button>}
+          />
+        ) : (
+          <>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Model</TableHead>
+                  {table.columns.map(c => (
+                    <TableHead key={c.key} className={c.numeric ? 'text-right' : undefined}>{c.label}</TableHead>
+                  ))}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {shown.map(r => (
+                  <TableRow key={r.model}>
+                    <TableCell className="font-medium">{r.model}</TableCell>
+                    {table.columns.map(c => (
+                      <TableCell key={c.key} className={c.numeric ? 'text-right tabular-nums' : undefined}>
+                        {r.cells[c.key] ?? <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                    ))}
+                  </TableRow>
                 ))}
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr>
-                <td colSpan={table.columns.length + 1} className="px-6 py-4 text-muted-foreground">
-                  No model matches “{query}”.
-                </td>
-              </tr>
+              </TableBody>
+            </Table>
+            {!filtering && rows.length > FOLDED_ROWS && (
+              <Button variant="ghost" size="sm" aria-expanded={expanded} onClick={() => setExpanded(e => !e)}>
+                {expanded ? 'Show fewer' : `Show all ${rows.length} models`}
+              </Button>
             )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+          </>
+        )}
+      </CardContent>
+    </Card>
   );
 };

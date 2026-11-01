@@ -108,3 +108,19 @@ describe('unit-aware labels', () => {
     expect(keyUnit('base_plate_cover')).toBe('');
   });
 });
+
+import { stripOcrMarkup } from '@/components/features/products/productSpecDisplay';
+
+describe('OCR markup and camelCase keys', () => {
+  it('drops the LaTeX the OCR wraps around asterisks and units, keeping the text', () => {
+    expect(stripOcrMarkup('$ ^{*} $ Vendita su ordinazione.')).toBe('* Vendita su ordinazione.');
+    expect(stripOcrMarkup('5 \\, mm $')).toBe('5 mm');
+    expect(stripOcrMarkup('} $ Disponibile solo su ordinazione.')).toBe('Disponibile solo su ordinazione.');
+    expect(describeValue(['} $', '5 mm'])).toBe('5 mm');
+  });
+
+  it('reads a camelCase key as words', () => {
+    expect(describeValue({ rValue: ['R10', 'R11'], barefootRampTest: 'A' })).toBe('R Value: R10, R11; Barefoot Ramp Test: A');
+    expect(isNoiseSpecKey('key_features')).toBe(true);
+  });
+});

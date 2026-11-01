@@ -1686,7 +1686,10 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           const leafExtras: Array<{ key: string; label: string; value: string; hint?: string }> = [];
 
           // Collect the displayable, not-yet-consumed leaf fields of an object.
-          const keyLabel = (k: string): string => (/[A-Z]/.test(k) || /^\d/.test(k) ? k : modelColumnLabel(k));
+          const keyLabel = (k: string): string => {
+            if (/\p{Ll}\p{Lu}/u.test(k)) return modelColumnLabel(k.replace(/(?<=\p{Ll})(?=\p{Lu})/gu, '_').toLowerCase());
+            return /[A-Z]/.test(k) || /^\d/.test(k) ? k : modelColumnLabel(k);
+          };
           const collectFields = (obj: Record<string, unknown>, own?: { unit: string }) => {
             const out: Array<{ key: string; label: string; value: string }> = [];
             for (const [ik, iv] of Object.entries(obj)) {

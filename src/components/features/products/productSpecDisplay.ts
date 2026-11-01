@@ -50,6 +50,8 @@ const NOISE_KEYS = new Set([
   'image_indices', 'image_index', 'confidence', 'unit', 'per_variant', 'chunk_index',
   'source', 'source_page', 'material_category', 'zone_intent',
   'notes', 'note', 'extraction_notes', 'dimensionalaesthetic',
+  // Every list item / table cell of the product's chunks (sizes, packaging lines, OCR math), never vetted.
+  'key_features',
 ]);
 
 /** Extraction bookkeeping — never a property of the product itself. */
@@ -126,8 +128,18 @@ export function titleCaseDisplay(input: string): string {
 }
 
 export function humanKey(k: string): string {
-  const s = k.replace(/_+/g, ' ').trim();
+  const s = k.replace(/(?<=\p{Ll})(?=\p{Lu})/gu, ' ').replace(/_+/g, ' ').trim();
   return s ? s[0].toUpperCase() + s.slice(1) : s;
+}
+
+/** OCR renders `*`, units and spacing as LaTeX (`$ ^{*} $`, `5 \, mm $`); keep the text, drop the markup. */
+export function stripOcrMarkup(input: string): string {
+  return input
+    .replace(/\\[,;:! ]/g, ' ')
+    .replace(/\^\{([^}]*)\}/g, '$1')
+    .replace(/[${}]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 /** Any stored value as text: nested objects read "Up to 2000 mm: 2; 2001 to 3000 mm: 3", never [object Object]. */
@@ -136,7 +148,10 @@ export function describeValue(raw: unknown): string | null {
   if (v === null || v === undefined) return null;
   if (typeof v === 'boolean') return v ? 'True' : 'False';
   if (typeof v === 'number') return Number.isFinite(v) ? String(v) : null;
-  if (typeof v === 'string') return v.trim() === '' ? null : v.trim();
+  if (typeof v === 'string') {
+    const t = stripOcrMarkup(v);
+    return /[\p{L}\p{N}]/u.test(t) ? t : null;
+  }
   if (Array.isArray(v)) {
     const parts = v.map(describeValue).filter((p): p is string => p !== null);
     if (parts.length > 1 && parts.every(p => /^-?\d+(?:[.,]\d+)?$/.test(p))) {
