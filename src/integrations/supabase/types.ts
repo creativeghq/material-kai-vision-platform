@@ -39603,6 +39603,10 @@ export type Database = {
         Returns: string
       }
       product_edge_tokens: { Args: { vals: string[] }; Returns: string[] }
+      product_image_order: {
+        Args: { p_product_id: string }
+        Returns: { image_id: string; image_url: string; position: number }[]
+      }
       product_m2_per_piece: { Args: { p_product_id: string }; Returns: number }
       product_net_mass_kg: {
         Args: { p_product_id: string; p_quantity: number; p_unit?: string }

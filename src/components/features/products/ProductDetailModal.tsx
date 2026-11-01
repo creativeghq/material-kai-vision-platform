@@ -327,6 +327,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         console.log('[ProductDetailModal] Loading images for product:', product.id, product.name);
 
         // Fetch images from image_product_associations table (created during PDF processing)
+        const orderReq = supabase.rpc('product_image_order', { p_product_id: product.id });
         const { data: imageRelations, error } = await supabase
           .from('image_product_associations')
           .select(`
@@ -364,6 +365,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               relationship_score: rel.overall_score,
               relationship_type: rel.reasoning || 'associated',
             }));
+          // SQL decides the order (usable size before score) so the gallery opens on the cover.
+          const { data: order } = await orderReq;
+          const rank = new Map<string, number>((order ?? []).map(o => [o.image_id, o.position]));
+          if (rank.size > 0) {
+            loadedImages.sort((a, b) => (rank.get(a.id) ?? Infinity) - (rank.get(b.id) ?? Infinity));
+          }
 
           console.log('[ProductDetailModal] Loaded images:', loadedImages.length);
           setImages(loadedImages);
@@ -2091,11 +2098,11 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               </div>
             ) : images.length > 0 ? (
               <>
-                <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border group">
+                <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border group flex items-center justify-center">
                   <img
                     src={currentImage?.url}
                     alt={product.name}
-                    className="w-full h-full object-contain"
+                    className="max-w-full max-h-full object-contain"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = 'none';
