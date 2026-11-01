@@ -102,6 +102,7 @@ jobs:
       functions: ${{ steps.changed-functions.outputs.functions_changed }}
       shared: ${{ steps.changed-functions.outputs.shared_changed }}
       tests: ${{ steps.filter.outputs.tests }}
+      capabilities: ${{ steps.filter.outputs.capabilities }}
       changed_functions: ${{ steps.changed-functions.outputs.list }}
       changed_functions_count: ${{ steps.changed-functions.outputs.count }}
     steps:
@@ -173,6 +174,9 @@ jobs:
               - 'vercel.json'
             tests:
               - 'tests/**'
+            # Frontend file, backend effect: sync-capability-matrix rewrites live SQL from it.
+            capabilities:
+              - 'src/auth/roleCapabilities.ts'
 
       - name: 🧭 Resolve the frontend verdict
         id: areas
@@ -1017,12 +1021,12 @@ jobs:
   # cleanup_test_artifacts is the backstop. The tenancy suite self-SKIPs unless
   # BOTH SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY are set, so a missing
   # secret degrades to "contract test only" instead of a red deploy.
-  # A test-only commit deploys nothing, so both deploy jobs skip and the two result
-  # checks below are false — gate on changes.tests as well, or an edited suite would
-  # skip silently and report green having never run.
+  # Every suite calls the BACKEND, so a frontend-only push does not run them (fe-smoke covers
+  # it). They run when what they exercise moved: deployed functions, the suites themselves, or
+  # the capability table that sync-capability-matrix writes to live SQL.
   integration-tests:
-    needs: [changes, deploy-frontend, deploy-functions, sync-capability-matrix]
-    if: ${{ always() && (needs.deploy-frontend.result == 'success' || needs.deploy-functions.result == 'success' || needs.changes.outputs.tests == 'true') }}
+    needs: [changes, deploy-functions, sync-capability-matrix]
+    if: ${{ always() && (needs.deploy-functions.result == 'success' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.capabilities == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
