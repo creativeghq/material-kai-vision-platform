@@ -81,7 +81,11 @@ export function ProductDocumentSearch(
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void run(); } }}
-          placeholder="Ask this product's documents — reaction to fire, slip rating, cleaning…"
+          placeholder={searchableDocCount === 0
+            ? (unreviewedDocCount > 0
+              ? 'Search opens once a document below is published'
+              : 'No documents attached to search')
+            : "Ask this product's documents — reaction to fire, slip rating, cleaning…"}
           aria-label="Search this product's attached documents"
           disabled={searchableDocCount === 0}
         />
@@ -94,9 +98,8 @@ export function ProductDocumentSearch(
       {outcome.kind === 'awaiting_review' && (
         <p className="text-sm text-muted-foreground">
           {outcome.count === 1 ? '1 document is' : `${outcome.count} documents are`} attached to
-          this product but still in draft. Catalogue documents are held unpublished until someone
-          reviews them, and retrieval cannot reach them until they are — so this is not a
-          statement that they say nothing.
+          this product but still in draft. Catalogue documents are held until someone reviews
+          them, and the search cannot reach a draft — review it below and publish it.
         </p>
       )}
 

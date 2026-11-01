@@ -35,3 +35,9 @@ export function certMatches(chip: string, other: string): boolean {
   if (a.length < 4 || b.length < 4) return a === b && a.length > 0;
   return a.includes(b) || b.includes(a);
 }
+
+/** Whether a document's text names this standard; short keys never match, as above. */
+export function mentionsStandard(text: string | null | undefined, standard: string): boolean {
+  const key = certKey(standard);
+  return !!text && key.length >= 4 && certKey(text).includes(key);
+}

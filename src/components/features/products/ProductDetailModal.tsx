@@ -18,7 +18,8 @@ import { Badge } from '@/components/core/ui/badge';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Search, Palette, Package, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3 } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Search, Palette, Package, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildTestOnRoomUrl, buildProductStudioUrl } from '@/utils/testOnRoom';
 import { Product } from './types';
@@ -56,7 +57,7 @@ import { buildModelTable, modelColumnLabel, keyUnit } from './productModelTable'
 import { placeFields } from './productFieldPlacement';
 import { sectionLabel, sectionRank } from '@/services/fieldRegistryService';
 import { ProductModelsCard } from './ProductModelsCard';
-import { useProductCertificates, certMatches } from './useProductCertificates';
+import { useProductCertificates, certMatches, mentionsStandard } from './useProductCertificates';
 import { presentValidity } from './certificateValidity';
 import { ProductPriceBreaksCard } from '@/components/business/marketplace/ProductPriceBreaksCard';
 import { ProductPricingCard } from '@/components/business/marketplace/ProductPricingCard';
@@ -268,7 +269,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     summary?: string | null;
     metadata: Record<string, unknown>;
     relationship_type: string;
+    status: string;
   }>>([]);
+  const [kbReload, setKbReload] = useState(0);
+  const [publishingDocId, setPublishingDocId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('details');
   const recordedCerts = useProductCertificates(product?.id, isOpen);
   // Modal stacking for recommendations — clicking a result opens that product
@@ -462,8 +466,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         // Catalogue-derived docs are born draft by design (#31 M17-2), and retrieval
         // cannot reach them. Dropping them silently reads as "no documents".
         setKbDraftCount(attached.filter((row: any) => row.kb_docs.status !== 'published').length);
+        // Drafts are listed too (marked), so a held document is visible rather than absent.
         const loaded = attached
-          .filter((row: any) => row.kb_docs.status === 'published')
           .map((row: any) => ({
             id: row.kb_docs.id,
             title: row.kb_docs.title,
@@ -472,6 +476,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             summary: row.kb_docs.summary,
             metadata: row.kb_docs.metadata || {},
             relationship_type: row.relationship_type,
+            status: row.kb_docs.status,
           }));
         setKbDocs(loaded);
       } catch (err) {
@@ -480,7 +485,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       }
     };
     loadKbDocs();
-  }, [product?.id, isOpen]);
+  }, [product?.id, isOpen, kbReload]);
 
   // AI grout suggestions — must be a hook so it lives before the conditional return
   const groutRecommendations = React.useMemo(() => {
@@ -1216,6 +1221,34 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   })();
   const certSource = extractValue(complianceData?.certifications_source);
 
+  const findCertificateDoc = (standard: string) => kbDocs.find(
+    d => ['certification', 'compliance', 'regulation'].includes(d.relationship_type)
+      && (certMatches(standard, `${d.title} ${d.summary ?? ''}`.trim())
+        || mentionsStandard(d.content_markdown || d.content, standard)),
+  );
+
+  const openKnowledgeDoc = (docId?: string | null) => {
+    setActiveTab('knowledge');
+    if (!docId) return;
+    window.setTimeout(() => {
+      document.getElementById(`kb-doc-${docId}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
+
+  const publishKbDoc = async (docId: string, title: string) => {
+    if (!window.confirm(`Publish "${title}"?
+
+It becomes searchable from this product and by the agents. Its visibility stays as it is (private documents are not on the public knowledge base).`)) return;
+    setPublishingDocId(docId);
+    const { error } = await supabase.from('kb_docs').update({ status: 'published' }).eq('id', docId);
+    setPublishingDocId(null);
+    if (error) {
+      toast({ title: 'Document not published', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setKbReload(n => n + 1);
+  };
+
   // Remaining fields that still render as a normal key/value card.
   const certifications = {
     'Eco Friendly': extractValue(allData?.eco_friendly) || extractValue(complianceData?.eco_friendly),
@@ -1250,10 +1283,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             <div className="flex flex-wrap gap-1.5">
               {certList.map(cert => {
                 const record = recordedCerts.find(r => certMatches(cert, r.standard));
-                const doc = kbDocs.find(
-                  d => ['certification', 'compliance', 'regulation'].includes(d.relationship_type)
-                    && certMatches(cert, `${d.title} ${d.summary ?? ''}`.trim()),
-                );
+                const doc = findCertificateDoc(cert);
                 const chipClass = 'text-[11px] font-semibold px-2.5 py-0.5 bg-primary/10 border-primary/30 text-primary';
                 if (!record && !doc) {
                   return <Badge key={cert} variant="outline" className={chipClass}>{cert}</Badge>;
@@ -1275,7 +1305,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     key={cert}
                     type="button"
                     title={`${title} — open in Knowledge`}
-                    onClick={() => setActiveTab('knowledge')}
+                    onClick={() => openKnowledgeDoc(doc?.id)}
                     className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                   >
                     <Badge variant="outline" className={`${chipClass} gap-1.5 cursor-pointer hover:bg-primary/20`}>
@@ -1630,6 +1660,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   const SPECIAL_SECTION_KEYS = new Set(['appearance', 'certifications', 'compliance', 'packaging', 'commercial', 'dimensions', 'material_properties']);
+  // Rendered inside the Specifications card rather than as a card of their own.
+  const MERGED_INTO_SPECS = new Set(['thermal_performance']);
         const computeLeftovers = () => {
           // ── Sensitivity (#368 PD-1) ──────────────────────────────────
           // Everything above this point is gated by SECTION: stock, cost, listings,
@@ -1825,6 +1857,60 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 category={resolveUploadCategory(product.metadata?.material_category || product.type || product.category)}
                 materialType={asMetaString(product.metadata?.material_category)}
               />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-xs gap-1.5">
+                    More
+                    <ChevronDown className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      navigate(buildTestOnRoomUrl({ productId: product.id, productName: product.name, productImage: currentImage?.url }));
+                      onClose();
+                    }}
+                  >
+                    <Wand2 className="h-3.5 w-3.5 mr-2" />
+                    Test on a room
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    title="See this product tiled on a room surface at its real size — no credits"
+                    onSelect={() => { navigate(`/visualizer?product=${product.id}`); onClose(); }}
+                  >
+                    <Grid3x3 className="h-3.5 w-3.5 mr-2" />
+                    See it on a surface
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      navigate(buildProductStudioUrl({
+                        productId: product.id,
+                        productName: product.name,
+                        productImage: currentImage?.url,
+                        mode: 'product-shot',
+                      }));
+                      onClose();
+                    }}
+                  >
+                    <Package className="h-3.5 w-3.5 mr-2" />
+                    Catalog shot
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={() => {
+                      navigate(buildProductStudioUrl({
+                        productId: product.id,
+                        productName: product.name,
+                        productImage: currentImage?.url,
+                        mode: 'product-lifestyle',
+                      }));
+                      onClose();
+                    }}
+                  >
+                    <Palette className="h-3.5 w-3.5 mr-2" />
+                    Stage in a room
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
           {/* Description moved to Details tab — avoids duplication with the
@@ -2370,10 +2456,15 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             })()}
 
             {(() => {
-              const material = fieldRegistry
-                .sections(resolveProductCategory(product.metadata, product.type, product.category))
-                .find(sec => sec.key === 'material_properties');
-              return material ? renderRegistrySection(material, extrasFor('material_properties')) : null;
+              const sections = fieldRegistry.sections(resolveProductCategory(product.metadata, product.type, product.category));
+              const application = sections.find(sec => sec.key === 'application');
+              const material = sections.find(sec => sec.key === 'material_properties');
+              return (
+                <>
+                  {application && renderRegistrySection(application, extrasFor('application'))}
+                  {material && renderRegistrySection(material, extrasFor('material_properties'))}
+                </>
+              );
             })()}
 
             {/* Pricing & Availability intentionally removed —
@@ -2412,74 +2503,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               </div>
             )}
 
-            {/* Test on a room — always available; pre-pins this material into
-                the Interior Designer agent, which then asks for a room photo. */}
-            <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5 text-xs"
-                onClick={() => {
-                  navigate(buildTestOnRoomUrl({ productId: product.id, productName: product.name, productImage: currentImage?.url }));
-                  onClose();
-                }}
-              >
-                <Wand2 className="h-3.5 w-3.5" />
-                Test on a room
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5 text-xs"
-                title="See this product tiled on a room surface at its real size — no credits"
-                onClick={() => { navigate(`/visualizer?product=${product.id}`); onClose(); }}
-              >
-                <Grid3x3 className="h-3.5 w-3.5" />
-                See it on a surface
-              </Button>
-
-              {/*
-                * Build with this product — the other direction.
-                * "Test on a room" applies this material TO the user's photo; these
-                * photograph the PRODUCT ITSELF. All three modes have existed in
-                * generate_gemini since it shipped, each with its own prompt builder,
-                * and nothing in the product could reach them until now.
-                */}
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5 text-xs"
-                onClick={() => {
-                  navigate(buildProductStudioUrl({
-                    productId: product.id,
-                    productName: product.name,
-                    productImage: currentImage?.url,
-                    mode: 'product-shot',
-                  }));
-                  onClose();
-                }}
-              >
-                <Package className="h-3.5 w-3.5" />
-                Catalog shot
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5 text-xs"
-                onClick={() => {
-                  navigate(buildProductStudioUrl({
-                    productId: product.id,
-                    productName: product.name,
-                    productImage: currentImage?.url,
-                    mode: 'product-lifestyle',
-                  }));
-                  onClose();
-                }}
-              >
-                <Palette className="h-3.5 w-3.5" />
-                Stage in a room
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -2637,7 +2660,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it.
-          const cardSections = registrySections.filter(section => !SPECIAL_SECTION_KEYS.has(section.key));
+          const mergedIntoSpecs = registrySections.filter(section => MERGED_INTO_SPECS.has(section.key));
+          const specsSection = registrySections.find(section => section.key === 'other');
+          const cardSections = registrySections
+            .filter(section => !SPECIAL_SECTION_KEYS.has(section.key) && !MERGED_INTO_SPECS.has(section.key) && section.key !== 'application')
+            .map(section => section.key === 'other'
+              ? { ...section, fields: [...mergedIntoSpecs.flatMap(m => m.fields), ...section.fields] }
+              : section);
+          if (!specsSection && mergedIntoSpecs.length > 0) {
+            cardSections.push({ ...mergedIntoSpecs[0], key: 'other', label: sectionLabel('other'), fields: mergedIntoSpecs.flatMap(m => m.fields) });
+          }
 
           // ── Detected text (vision OCR) — brand names, codes, dimensions
           // visible on the material image. Skipped when empty.
@@ -2761,6 +2793,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           const certificationsCard = renderCertificationsCard();
 
           const otherExtras = [
+            ...[...MERGED_INTO_SPECS].flatMap(key => extrasFor(key)),
             ...extrasFor('other'),
             ...[...leftovers.keys()]
               .filter(key => SPECIAL_SECTION_KEYS.has(key) && key !== 'material_properties' && key !== 'appearance')
@@ -2777,7 +2810,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           const wideRegistryCards = registryCards.filter(c => isWideCard(c.key)).map(c => c.node);
           const cardKeys = new Set(cardSections.map(section => section.key));
           const stragglers = [...leftovers.entries()]
-            .filter(([key]) => !cardKeys.has(key) && key !== 'other' && !SPECIAL_SECTION_KEYS.has(key))
+            .filter(([key]) => !cardKeys.has(key) && key !== 'other' && key !== 'application' && !SPECIAL_SECTION_KEYS.has(key) && !MERGED_INTO_SPECS.has(key))
             .sort((x, y) => sectionRank(x[0]) - sectionRank(y[0]));
           const otherFields = cardKeys.has('other') ? [] : otherExtras;
           const rowsOf = (fields: Array<{ label: string; value: string }>) =>
@@ -2838,11 +2871,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             productId={product.id}
             canEdit={canEditCertificates}
             suggestedStandards={certList}
+            findSourceDoc={(standard, kbDocId) => {
+              const doc = (kbDocId && kbDocs.find(d => d.id === kbDocId)) || findCertificateDoc(standard);
+              return doc ? { id: doc.id, title: doc.title } : null;
+            }}
+            onOpenDoc={openKnowledgeDoc}
           />
           <ProductDocumentSearch
             productId={product.id}
             workspaceId={activeWorkspaceId}
-            searchableDocCount={kbDocs.length}
+            searchableDocCount={kbDocs.length - kbDraftCount}
             unreviewedDocCount={kbDraftCount}
           />
           {kbDocs.length === 0 ? (
@@ -2892,16 +2930,33 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       {prettyFieldLabel(groupKey)}
                     </h4>
                     {groups[groupKey].map(doc => (
-                      <Card key={doc.id} className="dashboard-card rounded-2xl border-0 shadow-sm">
+                      <Card key={doc.id} id={`kb-doc-${doc.id}`} className="dashboard-card rounded-2xl border-0 shadow-sm scroll-mt-4">
                         <CardHeader className="pb-3">
                           <div className="flex items-start justify-between gap-2">
                             <CardTitle className="flex items-center gap-2">
                               <BookOpen className="h-4 w-4" />
                               {doc.title}
+                              {doc.status !== 'published' && (
+                                <Badge variant="warning" title="Held for review — the document search cannot reach it until it is published">
+                                  Draft
+                                </Badge>
+                              )}
                             </CardTitle>
-                            {isOwnProduct && (doc.metadata as any)?.source_document_id && (
-                              <ProductDocumentDownload productId={product.id} kbDocId={doc.id} />
-                            )}
+                            <div className="flex items-center gap-2">
+                              {doc.status !== 'published' && canEditCertificates && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={publishingDocId === doc.id}
+                                  onClick={() => void publishKbDoc(doc.id, doc.title)}
+                                >
+                                  {publishingDocId === doc.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Publish'}
+                                </Button>
+                              )}
+                              {isOwnProduct && (doc.metadata as any)?.source_document_id && (
+                                <ProductDocumentDownload productId={product.id} kbDocId={doc.id} />
+                              )}
+                            </div>
                           </div>
                         </CardHeader>
                         <CardContent>

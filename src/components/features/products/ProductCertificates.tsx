@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
+import { FileText, Pencil, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -22,6 +22,7 @@ interface CertificateRow {
   valid_from: string | null;
   valid_until: string | null;
   validity: string | null;
+  kb_doc_id: string | null;
   notes: string | null;
 }
 
@@ -44,9 +45,14 @@ interface Props {
   productId: string;
   canEdit?: boolean;
   suggestedStandards?: string[];
+  /** The attached document backing a certificate: its recorded kb_doc_id, else one that names the standard. */
+  findSourceDoc?: (standard: string, kbDocId: string | null) => { id: string; title: string } | null;
+  onOpenDoc?: (docId: string) => void;
 }
 
-export function ProductCertificates({ productId, canEdit = false, suggestedStandards = [] }: Props) {
+export function ProductCertificates({
+  productId, canEdit = false, suggestedStandards = [], findSourceDoc, onOpenDoc,
+}: Props) {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const [draft, setDraft] = useState<CertificateDraft | null>(null);
   const [candidates, setCandidates] = useState<Candidate[]>([]);
@@ -151,6 +157,20 @@ export function ProductCertificates({ productId, canEdit = false, suggestedStand
                       {row.scope && (
                         <span className="block text-xs text-muted-foreground">{row.scope}</span>
                       )}
+                      {(() => {
+                        const doc = findSourceDoc?.(row.standard, row.kb_doc_id);
+                        if (!doc) return null;
+                        return (
+                          <button
+                            type="button"
+                            className="mt-0.5 flex items-center gap-1 text-xs font-normal text-primary hover:underline"
+                            onClick={() => onOpenDoc?.(doc.id)}
+                          >
+                            <FileText className="h-3 w-3" />
+                            {doc.title}
+                          </button>
+                        );
+                      })()}
                     </td>
                     <td className="hidden sm:table-cell px-3 py-2">{row.result ?? '—'}</td>
                     <td className="hidden md:table-cell px-3 py-2">{row.certificate_number ?? '—'}</td>
