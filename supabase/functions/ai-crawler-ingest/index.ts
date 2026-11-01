@@ -9,6 +9,12 @@ import {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// A Supabase outage answers with a Cloudflare HTML page; embedding it made every delivery its own Sentry issue.
+function dbFailure(step: string, message: string): Error {
+  if (message.trimStart().startsWith('<')) return new HttpError(503, `${step}: database unavailable (HTML response)`);
+  return new Error(`${step}: ${message.slice(0, 300)}`);
+}
+
 Deno.serve(withApiLogging('ai-crawler-ingest', async (req) => {
   if (req.method !== 'POST') throw new HttpError(405, 'POST only');
   await bootstrapForFunction();
@@ -24,7 +30,7 @@ Deno.serve(withApiLogging('ai-crawler-ingest', async (req) => {
   const db = serviceClient();
   const { data: source, error } = await db.from('website_crawler_sources')
     .select('secret').eq('website_id', websiteId).maybeSingle();
-  if (error) throw new Error(`crawler source lookup failed: ${error.message}`);
+  if (error) throw dbFailure('crawler source lookup failed', error.message);
   if (!source) throw new HttpError(404, 'Not found');
 
   const ok = await verifyIngestSignature(
@@ -44,7 +50,7 @@ Deno.serve(withApiLogging('ai-crawler-ingest', async (req) => {
   const { data: stored, error: rpcErr } = await db.rpc('ingest_ai_crawler_hits', {
     p_website_id: websiteId, p_rows: rows, p_seen: events.length,
   });
-  if (rpcErr) throw new Error(`ingest_ai_crawler_hits failed: ${rpcErr.message}`);
+  if (rpcErr) throw dbFailure('ingest_ai_crawler_hits failed', rpcErr.message);
 
   return new Response(JSON.stringify({ received: events.length, stored: stored ?? 0 }), {
     status: 200, headers: { 'Content-Type': 'application/json' },
