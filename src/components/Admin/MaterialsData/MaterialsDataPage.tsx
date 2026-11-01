@@ -16,6 +16,8 @@ import { EmbeddingsTab } from './EmbeddingsTab';
 import { RelationsTab } from './RelationsTab';
 import { supabase } from '@/integrations/supabase/client';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export const MaterialsDataPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeWorkspaceId } = useWorkspace();
@@ -25,6 +27,10 @@ export const MaterialsDataPage: React.FC = () => {
   // per-product row, the mention dashboard's "Open"). The param was never read, so every
   // one of those links silently showed the entire catalog instead.
   const productIdFilter = searchParams.get('productId') || '';
+  // source_job_id is a uuid column: a typed product name sent as `eq` is a 22P02 on every tab.
+  const jobIdTyped = jobIdFilter.trim();
+  const jobIdInvalid = jobIdTyped !== '' && !UUID_RE.test(jobIdTyped);
+  const appliedJobId = jobIdInvalid ? '' : jobIdTyped;
   const [stats, setStats] = useState({
     products: 0,
     chunks: 0,
@@ -161,6 +167,11 @@ export const MaterialsDataPage: React.FC = () => {
               </Button>
             )}
           </div>
+          {jobIdInvalid && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Not a job ID, so this filter is not applied. To find a product by name, use the search box in the Products tab.
+            </p>
+          )}
         </Card>
 
         {/* Main Content */}
@@ -189,23 +200,23 @@ export const MaterialsDataPage: React.FC = () => {
           </TabsList>
 
           <TabsContent value="products" className="mt-6">
-            <ProductsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} productIdFilter={productIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
+            <ProductsTab workspaceId={workspaceId} jobIdFilter={appliedJobId} productIdFilter={productIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="chunks" className="mt-6">
-            <ChunksTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
+            <ChunksTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="images" className="mt-6">
-            <ImagesTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
+            <ImagesTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="embeddings" className="mt-6">
-            <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
+            <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
           <TabsContent value="relations" className="mt-6">
-            <RelationsTab workspaceId={workspaceId} jobIdFilter={jobIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
+            <RelationsTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
         </Tabs>
       </div>
