@@ -13,7 +13,6 @@ import { PropertyDiscoveryTab } from '@/modules/real-estate/components/PropertyD
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/core/ui/avatar';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -50,10 +49,11 @@ import {
 } from '@/utils/productMetadata';
 import { onEnterOrSpace } from '@/utils/a11y';
 import { httpUrlOrNull } from '@/utils/safeUrl';
+import { getOptimizedImageUrl } from '@/utils/imageUrl';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const PER_PAGE = 20;
+const PER_PAGE = 24;
 
 type ProductMode = 'browse' | 'smart';
 
@@ -118,23 +118,6 @@ interface RawProduct {
 
 // ─── Skeletons ────────────────────────────────────────────────────────────────
 
-function SkeletonRows({ count = 6 }: { count?: number }) {
-  return (
-    <div className="border border-border rounded-lg overflow-hidden divide-y divide-border">
-      {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="flex items-center gap-3 px-4 py-3">
-          <div className="w-10 h-10 rounded-md skeleton shrink-0" />
-          <div className="flex-1 space-y-1.5">
-            <div className="h-3 w-48 skeleton rounded" />
-            <div className="h-2.5 w-32 skeleton rounded" />
-          </div>
-          <div className="h-4 w-16 skeleton rounded" />
-        </div>
-      ))}
-    </div>
-  );
-}
-
 function Empty({ icon: Icon, text }: { icon: React.ComponentType<{ className?: string }>; text: string }) {
   return (
     <div className="text-center py-16 text-muted-foreground">
@@ -194,9 +177,9 @@ function Pagination({ page, total, onPage }: { page: number; total: number; onPa
   );
 }
 
-// ─── Product Row ──────────────────────────────────────────────────────────────
+// ─── Product Grid ─────────────────────────────────────────────────────────────
 
-function ProductRow({ product, onView, surplus, price }: {
+function ProductTile({ product, onView, surplus, price }: {
   product: RawProduct; onView: (p: RawProduct) => void;
   surplus?: { price: number; currency: string };
   price?: CatalogPrice;
@@ -204,155 +187,146 @@ function ProductRow({ product, onView, surplus, price }: {
   const color = CAT_COLORS[product.detectedCat] ?? CAT_COLORS.other;
   const rawCat = getMaterialCategory(product.metadata);
   const displayCat = rawCat ? rawCat.replace(/_/g, ' ') : catLabel(product.detectedCat);
+  const [imgFailed, setImgFailed] = useState(false);
 
   return (
     <div
       role="button"
       tabIndex={0}
       onKeyDown={onEnterOrSpace(() => onView(product))}
-      className="flex items-center px-3 sm:px-4 py-3 hover:bg-muted/30 transition-colors cursor-pointer group gap-2 sm:gap-3"
       onClick={() => onView(product)}
+      className="dashboard-card panel-interactive group flex flex-col overflow-hidden cursor-pointer"
     >
-      {/* Thumbnail + name */}
-      <div className="flex items-center gap-3 min-w-0 flex-1">
-        <div className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0 rounded-md flex items-center justify-center bg-muted/40 overflow-hidden">
-          {product.imageUrl ? (
-            <img
-              src={product.imageUrl}
-              alt={product.name}
-              loading="lazy"
-              className="w-full h-full object-cover"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            <Package className="h-4 w-4 text-muted-foreground/50 group-hover:text-primary transition-colors" />
+      <div className="relative aspect-square bg-surface-sunken overflow-hidden">
+        {product.imageUrl && !imgFailed ? (
+          <img
+            src={getOptimizedImageUrl(product.imageUrl, 'preview')}
+            alt={product.name}
+            loading="lazy"
+            className="w-full h-full object-cover"
+            onError={() => setImgFailed(true)}
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Package className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
+
+        <div className="absolute top-2 left-2 flex flex-wrap gap-1">
+          {product.status === 'draft' && (
+            <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-5" title="Not published — only your workspace sees this product.">
+              Draft
+            </Badge>
+          )}
+          {surplus && (
+            <Badge variant="success" className="text-[10px] px-1.5 py-0 h-5" title="Available as surplus on the Marketplace">
+              Surplus €{surplus.price}
+            </Badge>
           )}
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">
-            {product.name}
-          </p>
-          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-            {product.status === 'draft' && (
-              <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-4" title="Not published — only your workspace sees this product.">
-                Draft
-              </Badge>
-            )}
-            {product.factoryName !== 'Unknown' && (
-              <p className="text-[11px] text-muted-foreground truncate">{product.factoryName}</p>
-            )}
-          </div>
+
+        <div
+          role="presentation"
+          onClick={(e) => e.stopPropagation()}
+          className="absolute top-2 right-2 flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 transition-opacity"
+        >
+          <AddToMoodboardButton
+            productId={product.id}
+            productName={product.name}
+            productImage={product.imageUrl ?? undefined}
+            variant="outline"
+            size="sm"
+            showText={false}
+            className="h-7 w-7 p-0 bg-card shadow-overlay"
+          />
+          <AddToQuoteButton
+            productId={product.id}
+            productName={product.name}
+            productImage={product.imageUrl ?? undefined}
+            variant="outline"
+            size="sm"
+            showText={false}
+            className="h-7 w-7 p-0 bg-card shadow-overlay"
+          />
         </div>
       </div>
 
-      {/* Category */}
-      <div className="hidden xs:flex items-center gap-1.5 shrink-0">
-        <span
-          className="text-[10px] font-normal capitalize"
-          style={{ color }}
-        >
-          {displayCat}
-        </span>
-        {surplus && (
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 rounded font-normal border-emerald-500/50 text-emerald-500" title="Available as surplus on the Marketplace">
-            Surplus €{surplus.price}
-          </Badge>
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <span className="text-[11px] capitalize truncate" style={{ color }}>{displayCat}</span>
+        <p className="text-sm font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+          {product.name}
+        </p>
+        {product.factoryName !== 'Unknown' && (
+          <p className="text-xs text-muted-foreground truncate">{product.factoryName}</p>
         )}
-      </div>
 
-      {/* Price. A member of the owning workspace sees retail; a sub-account sees its own price.
-          Cost and margin stay behind `pricing.manage` and are never in this list. An unpriced
-          product is an em dash with a reason on hover — never a 0, which reads as free. */}
-      <div className="hidden sm:block shrink-0 text-right tabular-nums">
-        {price?.price != null ? (
-          <>
-            <span className="text-sm font-medium text-foreground">
-              {price.currency === 'EUR' ? '€' : `${price.currency} `}{price.price.toFixed(2)}
+        {/* An unpriced product is an em dash with a reason on hover — never a 0, which reads as free. */}
+        <div className="mt-auto pt-2 flex items-baseline justify-between gap-2 tabular-nums">
+          {price?.price != null ? (
+            <>
+              <span className="text-sm font-semibold text-foreground">
+                {price.currency === 'EUR' ? '€' : `${price.currency} `}{price.price.toFixed(2)}
+                {price.discount_pct > 0 && (
+                  <span className="ml-1 text-[10px] font-normal text-primary">−{price.discount_pct}%</span>
+                )}
+              </span>
+              <span className="text-[10px] text-muted-foreground">
+                {price.kind === 'your_price' ? 'Your price' : 'Retail'}
+              </span>
+            </>
+          ) : (
+            <span
+              className="text-sm text-muted-foreground"
+              title={price ? 'No price has been set for this product in this workspace.' : 'Price not loaded.'}
+            >
+              —
             </span>
-            {price.discount_pct > 0 && (
-              <span className="ml-1 text-[10px] font-normal text-primary">−{price.discount_pct}%</span>
-            )}
-            <span className="block text-[10px] font-normal text-muted-foreground">
-              {price.kind === 'your_price' ? 'Your price' : 'Retail'}
-            </span>
-          </>
-        ) : (
-          <span
-            className="text-sm text-muted-foreground"
-            title={price ? 'No price has been set for this product in this workspace.' : 'Price not loaded.'}
-          >
-            —
-          </span>
-        )}
-      </div>
-
-      {/* Actions */}
-      <div className="flex items-center justify-end gap-1 shrink-0" role="presentation" onClick={(e) => e.stopPropagation()}>
-        <AddToMoodboardButton
-          productId={product.id}
-          productName={product.name}
-          variant="ghost"
-          size="sm"
-          showText={false}
-          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        />
-        <AddToQuoteButton
-          productId={product.id}
-          productName={product.name}
-          variant="ghost"
-          size="sm"
-          showText={false}
-          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-        />
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-6 px-2 text-[11px] rounded opacity-0 group-hover:opacity-100 transition-opacity"
-          onClick={() => onView(product)}
-        >
-          View
-        </Button>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── Product List with pagination ────────────────────────────────────────────
+const PRODUCT_GRID = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4';
 
-function ProductList({ products, onView, surplus }: { products: RawProduct[]; onView: (p: RawProduct) => void; surplus?: Record<string, { price: number; currency: string }> }) {
+function ProductGrid({ products, onView, surplus }: { products: RawProduct[]; onView: (p: RawProduct) => void; surplus?: Record<string, { price: number; currency: string }> }) {
   const [page, setPage] = useState(1);
   const { activeWorkspaceId } = useWorkspace();
   const totalPages = Math.ceil(products.length / PER_PAGE);
   const paged = products.slice((page - 1) * PER_PAGE, page * PER_PAGE);
   // The VISIBLE page only: a price is resolved per viewer through the one ladder, and
-  // resolving the whole filtered list would be a per-product call for rows nobody is looking at.
+  // resolving the whole filtered list would be a per-product call for tiles nobody is looking at.
   const pagedIds = useMemo(() => paged.map((p) => p.id), [paged]);
   const { byProduct: prices } = useCatalogPrices(activeWorkspaceId, pagedIds);
 
-  // Reset page when filtered list changes
   React.useEffect(() => { setPage(1); }, [products.length]);
 
   return (
     <div>
-      <div className="border border-border rounded-lg overflow-hidden">
-        <div
-          className="grid px-4 py-2 bg-muted/40 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border"
-          style={{ gridTemplateColumns: '1fr 130px 110px 120px' }}
-        >
-          <span>Product</span>
-          <span>Category</span>
-          <span className="text-right">Price</span>
-          <span className="text-right">Actions</span>
-        </div>
-        <div className="divide-y divide-border">
-          {paged.map((p) => (
-            <ProductRow key={p.id} product={p} onView={onView} surplus={surplus?.[p.id]} price={prices[p.id]} />
-          ))}
-        </div>
+      <div className={PRODUCT_GRID}>
+        {paged.map((p) => (
+          <ProductTile key={p.id} product={p} onView={onView} surplus={surplus?.[p.id]} price={prices[p.id]} />
+        ))}
       </div>
       <Pagination page={page} total={totalPages} onPage={setPage} />
+    </div>
+  );
+}
+
+function ProductGridSkeleton({ count = 10 }: { count?: number }) {
+  return (
+    <div className={PRODUCT_GRID}>
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="dashboard-card overflow-hidden">
+          <div className="aspect-square skeleton" />
+          <div className="p-3 space-y-2">
+            <div className="h-2.5 w-16 skeleton rounded" />
+            <div className="h-3 w-3/4 skeleton rounded" />
+            <div className="h-2.5 w-1/2 skeleton rounded" />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -790,13 +764,13 @@ export const DiscoverPage: React.FC = () => {
                 </FilterBar>
 
                 {loading ? (
-                  <SkeletonRows count={8} />
+                  <ProductGridSkeleton />
                 ) : productsError ? (
                   <Empty icon={Package} text={`The catalogue could not be loaded: ${productsError}`} />
                 ) : filteredProducts.length === 0 ? (
                   <Empty icon={Package} text="No materials found." />
                 ) : (
-                  <ProductList products={filteredProducts} onView={openProduct} surplus={surplus} />
+                  <ProductGrid products={filteredProducts} onView={openProduct} surplus={surplus} />
                 )}
               </>
             )}
