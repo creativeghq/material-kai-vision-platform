@@ -101,6 +101,8 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
             { value: 'region_crop', label: 'Region crop' },
             { value: 'full_render', label: 'Full page render' },
             { value: 'vision_guided', label: 'Vision guided' },
+            { value: 'manufacturer_original', label: 'Manufacturer original' },
+            { value: 'restored', label: 'Restored' },
           ],
         },
         { key: 'page_number', type: 'range', label: 'Page', column: 'page_number', min: 1, max: 500, step: 1 },
