@@ -4,7 +4,7 @@ import {
   Layers, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
   Sparkles, LayoutList, Home,
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useCatalogPrices, type CatalogPrice } from '@/hooks/useCatalogPrices';
@@ -234,9 +234,16 @@ function ProductRow({ product, onView, surplus, price }: {
           <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">
             {product.name}
           </p>
-          {product.factoryName !== 'Unknown' && (
-            <p className="text-[11px] text-muted-foreground truncate mt-0.5">{product.factoryName}</p>
-          )}
+          <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+            {product.status === 'draft' && (
+              <Badge variant="warning" className="text-[10px] px-1.5 py-0 h-4" title="Not published — only your workspace sees this product.">
+                Draft
+              </Badge>
+            )}
+            {product.factoryName !== 'Unknown' && (
+              <p className="text-[11px] text-muted-foreground truncate">{product.factoryName}</p>
+            )}
+          </div>
         </div>
       </div>
 
@@ -362,6 +369,11 @@ function ProductList({ products, onView, surplus }: { products: RawProduct[]; on
 const DISCOVER_TABS = ['profiles', 'products', 'marketplace', 'properties'] as const;
 type DiscoverTab = (typeof DISCOVER_TABS)[number];
 
+/** `#products` wins over `?tab=products`; both are accepted links. */
+function requestedTab(hash: string, search: URLSearchParams): string | null {
+  return hash.replace(/^#/, '') || search.get('tab');
+}
+
 function resolveTab(raw: string | null, canMarketplace: boolean, realEstate: boolean): DiscoverTab {
   const fallback: DiscoverTab = canMarketplace ? 'profiles' : 'products';
   if (!raw || !(DISCOVER_TABS as readonly string[]).includes(raw)) return fallback;
@@ -392,6 +404,8 @@ export const DiscoverPage: React.FC = () => {
   const [products, setProducts] = useState<RawProduct[]>([]);
   const fieldRegistry = useFieldRegistry();
   const [searchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Sorting is a separate control from filtering — it never belongs in the filter modal.
@@ -400,8 +414,13 @@ export const DiscoverPage: React.FC = () => {
   // Controlled so a deep-link (?tab=products&factory=…) can open the right tab. Gated and
   // retired tabs coerce to one that exists — see resolveTab.
   const [activeTab, setActiveTab] = useState<DiscoverTab>(() =>
-    resolveTab(searchParams.get('tab'), canMarketplace, realEstateEnabled),
+    resolveTab(requestedTab(location.hash, searchParams), canMarketplace, realEstateEnabled),
   );
+
+  const changeTab = useCallback((tab: DiscoverTab) => {
+    setActiveTab(tab);
+    navigate({ search: location.search, hash: tab }, { replace: true });
+  }, [navigate, location.search]);
 
   // Products tab has two modes: "browse" (the filterable catalog list) and "smart" (the
   // 7-vector fusion search moved here from the old /search page). `?mode=smart&q=…` deep-links
@@ -416,6 +435,7 @@ export const DiscoverPage: React.FC = () => {
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [productsError, setProductsError] = useState<string | null>(null);
   // product_id → cheapest active surplus listing, for the "Surplus €X" badge.
   const [surplus, setSurplus] = useState<Record<string, { price: number; currency: string }>>({});
 
@@ -476,7 +496,9 @@ export const DiscoverPage: React.FC = () => {
   async function loadProducts() {
     // search_catalogue, not `.from('products')`: the base table's RLS is workspace
     // membership, so a direct read shows a signed-up architect only their own company.
-    const { data } = await supabase.rpc('search_catalogue', { p_limit: 300 });
+    const { data, error } = await supabase.rpc('search_catalogue', { p_limit: 300 });
+    if (error) { setProductsError(error.message); return; }
+    setProductsError(null);
     if (!data) return;
 
     setProducts(data.map(toRawProduct));
@@ -543,16 +565,16 @@ export const DiscoverPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, products]);
 
-  // Deep-link: /discover?tab=<name> opens that tab. The `factory` query param is a separate
+  // Deep-link: /discover#<name> or /discover?tab=<name> opens that tab. The `factory` query param is a separate
   // half of the same link, consumed by `productInitial` below to seed the Products brand facet.
   // realEstateEnabled is a dep because it resolves async — ?tab=properties must survive the flip.
   useEffect(() => {
-    const t = searchParams.get('tab');
+    const t = requestedTab(location.hash, searchParams);
     if (t) setActiveTab(resolveTab(t, canMarketplace, realEstateEnabled));
     const m = searchParams.get('mode');
     if (m === 'smart') setProductMode('smart');
     else if (m === 'browse') setProductMode('browse');
-  }, [searchParams, canMarketplace, realEstateEnabled]);
+  }, [searchParams, location.hash, canMarketplace, realEstateEnabled]);
 
   const profileGroups = useMemo(() => buildProfileFilters(creators), [creators]);
   const productFacets = useMemo(
@@ -603,7 +625,7 @@ export const DiscoverPage: React.FC = () => {
       />
 
       <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4 sm:space-y-6">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DiscoverTab)}>
+        <Tabs value={activeTab} onValueChange={(v) => changeTab(v as DiscoverTab)}>
           {/* Network-discovery tabs are marketplace-only; Products is always available. When the
               user only has Products, drop the single-tab bar entirely. */}
           {canMarketplace && (
@@ -769,6 +791,8 @@ export const DiscoverPage: React.FC = () => {
 
                 {loading ? (
                   <SkeletonRows count={8} />
+                ) : productsError ? (
+                  <Empty icon={Package} text={`The catalogue could not be loaded: ${productsError}`} />
                 ) : filteredProducts.length === 0 ? (
                   <Empty icon={Package} text="No materials found." />
                 ) : (

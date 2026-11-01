@@ -40395,6 +40395,7 @@ export type Database = {
           name: string
           review_count: number
           sku: string
+          status: string
           workspace_id: string
         }[]
       }
