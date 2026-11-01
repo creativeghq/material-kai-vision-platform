@@ -30,7 +30,7 @@ const MAX_BATCH = 10;
 const MIN_PAGE_CHARS = 200;
 /** Below this the page is not confidently about this product, so nothing is written. */
 const MIN_CONFIDENCE = 0.5;
-const EXTRACTION_MODEL = 'claude-opus-5';
+const EXTRACTION_MODEL = 'claude-opus-5-5';
 const EXTRACTION_CEILING = 20;
 const MAX_PAGE_CHARS = 60_000;
 

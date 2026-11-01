@@ -42,7 +42,7 @@ describe('update_article handler — source guards', () => {
   it('loads its prompt from the database and constrains the reply with a JSON schema', () => {
     expect(fn).toMatch(/getToolPrompt\(supabase, 'seo_article_updater'\)/);
     expect(fn).toMatch(/model: UPDATE_MODEL/);
-    expect(SRC).toMatch(/UPDATE_MODEL = 'claude-sonnet-5'/);
+    expect(SRC).toMatch(/UPDATE_MODEL = 'claude-sonnet-5-5'/);
     expect(fn).toMatch(/output_config: \{ (effort: 'low', )?format: \{ type: 'json_schema'/);
     expect(fn).toMatch(/stop_reason === 'refusal' \|\| res\.stop_reason === 'max_tokens'/);
   });

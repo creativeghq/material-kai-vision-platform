@@ -371,7 +371,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'product_id', type: 'string', optional: true, description: 'Product UUID, for a product enrolment.' },
       { name: 'subject', type: 'string', optional: true, description: 'A tracked brand or keyword — its name, or its tracked-subject UUID. Use this for anything that is not a catalog product.' },
-      { name: 'models', type: 'array', optional: true, description: 'Subset of the tier configured for this subject. Cheap: claude-haiku-4-5, gemini-2.0-flash, sonar. Frontier: claude-opus-5, gemini-3.1-pro, sonar-pro.' },
+      { name: 'models', type: 'array', optional: true, description: 'Subset of the tier configured for this subject. Cheap: claude-haiku-5-5, gemini-2.0-flash, sonar. Frontier: claude-opus-5-5, gemini-3.1-pro, sonar-pro.' },
       { name: 'force_run', type: 'boolean', optional: true, description: 'If true, fires a new probe run instead of reading the latest snapshot.' },
     ],
   },
@@ -608,7 +608,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'task_prompt', type: 'string', optional: false, description: 'The complete task description — be detailed, include all context the background agent will need.' },
       { name: 'reason', type: 'string', optional: false, description: 'One sentence explaining WHY you are dispatching this to the background (e.g., "requires processing 500 products which would exceed the response time limit").' },
-      { name: 'model_override', type: 'string', optional: true, description: 'Specific model to use, e.g. claude-opus-5, claude-haiku-4-5. Omit to use default.' },
+      { name: 'model_override', type: 'string', optional: true, description: 'Specific model to use, e.g. claude-opus-5-5, claude-haiku-5-5. Omit to use default.' },
       { name: 'context_snippet', type: 'string', optional: true, description: 'Relevant excerpt from the current conversation for context (max 500 chars).' },
     ],
   },

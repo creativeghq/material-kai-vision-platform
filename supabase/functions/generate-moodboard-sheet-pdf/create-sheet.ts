@@ -8,7 +8,7 @@
 import { getGenerationPrompt } from '../_shared/prompt-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../_shared/ai-logger.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import { snapshotSheetAssets } from '../_shared/sheets/asset-refs.ts';
 
@@ -16,6 +16,7 @@ import { snapshotSheetAssets } from '../_shared/sheets/asset-refs.ts';
 export type { SheetType } from '../_shared/sheetVocabulary.generated.ts';
 // Also imported: a re-export does not bind the name locally.
 import type { SheetType } from '../_shared/sheetVocabulary.generated.ts';
+import { shapeClaudeRequest } from '../_shared/claude-models.ts';
 
 type SupabaseClient = DbClient;
 
@@ -359,8 +360,8 @@ async function autoDetectCallouts(
         'x-api-key': ANTHROPIC_API_KEY,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
+      body: JSON.stringify(shapeClaudeRequest({
+        model: 'claude-haiku-5-5',
         max_tokens: 1500,
         messages: [{
           role: 'user',
@@ -372,7 +373,7 @@ async function autoDetectCallouts(
             },
           ],
         }],
-      }),
+      })),
     });
   } catch (fetchErr) {
     console.warn('[autoDetectCallouts] anthropic fetch failed:', fetchErr instanceof Error ? fetchErr.message : fetchErr);
@@ -384,17 +385,17 @@ async function autoDetectCallouts(
   try {
     const inputTokens = data?.usage?.input_tokens ?? 0;
     const outputTokens = data?.usage?.output_tokens ?? 0;
-    // 0.80/4.00 was a literal for a row that names claude-haiku-4-5, whose real rate is
-    // 1.00/5.00 — under-reporting this call by a fifth. One derivation, from ai_model_pricing.
-    const price = await resolveTokenPrice(supabase as any, 'claude-haiku-4-5');
-    const inputCost = price ? (inputTokens / 1_000_000) * price.input : null;
-    const outputCost = price ? (outputTokens / 1_000_000) * price.output : null;
+    // The rate comes from ai_model_pricing, never a literal.
+    const price = await resolveTokenPrice(supabase as any, 'claude-haiku-5-5');
+    const costParts = price ? tokenCostParts(price, inputTokens, outputTokens) : null;
+    const inputCost = costParts?.input ?? null;
+    const outputCost = costParts?.output ?? null;
     // null, never 0: an unpriced model is a gap in ai_model_pricing, not a free call.
     const rawCost = price ? inputCost! + outputCost! : null;
     (supabase as any).from('ai_usage_logs').insert({
       user_id: userId,
       operation_type: 'presentation_sheet_auto_detect_callouts',
-      model_name: 'claude-haiku-4-5',
+      model_name: 'claude-haiku-5-5',
       api_provider: 'anthropic',
       input_tokens: inputTokens, output_tokens: outputTokens,
       input_cost_usd: inputCost, output_cost_usd: outputCost,

@@ -20,7 +20,7 @@ import {
 } from './suggestion-rules.ts';
 import { findOutdated, type LinkedPageState } from './update-rules.ts';
 
-export const UPDATE_MODEL = 'claude-sonnet-5';
+export const UPDATE_MODEL = 'claude-sonnet-5-5';
 const MAX_INPUT_TOKENS = 30000;
 const MAX_OUTPUT_TOKENS = 6000;
 const MAX_LINKED_PAGES = 20;

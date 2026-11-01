@@ -6,8 +6,8 @@ import { blankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 
-/** Retired ids. `claude-haiku-4-5` is deliberately absent — it is the current Haiku. */
-const RETIRED = /claude-(?:opus-4-(?:6|7|8)|sonnet-4-(?:5|6|7)|3(?:-[a-z0-9-]+)?|2|instant)\b/g;
+/** Retired or superseded ids. The current tier is Opus 5.5 / Sonnet 5.5 / Haiku 5.5. */
+const RETIRED = /claude-(?:opus-4-(?:6|7|8)|sonnet-4-(?:5|6|7)|sonnet-4-2025\d+|opus-5(?![-.\d])|sonnet-5(?![-.\d])|haiku-4-5|3(?:-[a-z0-9-]+)?|2|instant)\b/g;
 
 const ROOTS = ['src', 'supabase/functions', 'scripts', 'api'];
 const SKIP_DIRS = new Set(['node_modules', '.deno', 'dist', '.git', 'coverage']);
@@ -15,6 +15,11 @@ const SKIP_DIRS = new Set(['node_modules', '.deno', 'dist', '.git', 'coverage'])
 const ALLOWED = new Set<string>([
   // The retired-id list itself.
   'tests/unit/claudeModelGeneration.test.ts',
+  // What each model accepts — it names the one model that still takes sampling parameters.
+  'supabase/functions/_shared/claude-models.ts',
+  // Price tables keep the superseded rates so rows logged on those models still price.
+  'src/components/Admin/OperationsDashboard/constants.ts',
+  'src/services/credits.service.ts',
 ]);
 
 function walk(dir: string, out: string[] = []): string[] {
@@ -52,8 +57,8 @@ describe('Claude model generation', () => {
     }
     expect(
       hits,
-      'Retired Claude model ids in live code. Use claude-opus-5 / claude-sonnet-5 / '
-      + 'claude-haiku-4-5 (Haiku 4.5 IS current):\n  ' + hits.join('\n  '),
+      'Retired Claude model ids in live code. Use claude-opus-5-5 / claude-sonnet-5-5 / '
+      + 'claude-haiku-5-5:\n  ' + hits.join('\n  '),
     ).toEqual([]);
   });
 });

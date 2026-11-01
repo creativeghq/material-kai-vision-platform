@@ -109,7 +109,7 @@ async function resolveSearatesCreds(svc: any, workspaceId: string): Promise<Sear
 
 const QUOTE_MODES = ['fcl', 'lcl', 'air'];
 
-const FORECAST_MODEL = () => Deno.env.get('STOCK_FORECAST_MODEL') || 'claude-sonnet-5';
+const FORECAST_MODEL = () => Deno.env.get('STOCK_FORECAST_MODEL') || 'claude-sonnet-5-5';
 
 /**
  * Force a tool call and return its structured input.

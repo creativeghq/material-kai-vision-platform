@@ -358,7 +358,7 @@ export class MivaaApiClient {
   }
 
   /**
-   * Analyze image using Claude Opus 4.8 vision (with Anthropic tool_use
+   * Analyze image using Claude Opus 5.5 vision (with Anthropic tool_use
    * schema-locked output via the `emit_vision_analysis` tool defined in
    * mivaa-pdf-extractor/app/models/vision_analysis.py).
    *

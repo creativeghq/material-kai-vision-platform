@@ -13,7 +13,7 @@ type SB = any;
 
 const CACHE_TTL_DAYS = 15;
 const FALLBACK_TTL_HOURS = 12; // self-heal: re-attempt AI sooner when a fallback was cached
-const INSIGHTS_MODEL = 'claude-haiku-4-5';
+const INSIGHTS_MODEL = 'claude-haiku-5-5';
 
 const TONES = ['info', 'positive', 'warning', 'tip'] as const;
 type Tone = typeof TONES[number];

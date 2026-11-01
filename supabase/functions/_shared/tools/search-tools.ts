@@ -25,10 +25,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
 import { rerankResults, type RerankCandidate } from '../rerank.ts';
-import { resolveTokenPrice } from '../ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../ai-logger.ts';
 // One wording for every untrusted block (security invariant 9).
 import { wrapUntrusted, UNTRUSTED_FIELDS_NOTE } from '../untrusted.ts';
 import { clipText } from '../tool-result-shape.ts';
+import { CLAUDE_HAIKU, langchainThinking } from '../claude-models.ts';
 
 /** Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place. */
 const RERANKABLE_KEYS = ['results', 'chunks', 'products'] as const;
@@ -1017,9 +1018,9 @@ export const createInspirationUrlTool = (
         // Step 2: Extract design tokens using Claude
         const { ChatAnthropic } = await import('npm:@langchain/anthropic@1.5.6');
         const analysisModel = new ChatAnthropic({
-          model: 'claude-haiku-4-5',
-          temperature: 0.2,
+          model: CLAUDE_HAIKU,
           maxTokens: 1500,
+          ...langchainThinking(CLAUDE_HAIKU),
         });
 
         const focusInstruction = focus !== 'all'
@@ -1064,11 +1065,8 @@ ${scrapeResult.markdown.substring(0, 8000)}
               .map((b: any) => b.text)
               .join('\n');
 
-        // Cost log for the Haiku pass. The rate comes from ai_model_pricing, not from here:
-        // this block said 0.80/4.00 while claude-haiku-4-5 is 1.00/5.00, so it under-reported
-        // by a fifth. The firecrawl scrape is debited
-        // 1 credit, but the Haiku call costs ~$0.005-0.015 on top and must not be absorbed
-        // silently.
+        // Cost log for the Haiku pass; the rate comes from ai_model_pricing, never a literal.
+        // The firecrawl scrape is debited 1 credit, and the Haiku call must not be absorbed silently.
         try {
           const usage = (analysisResponse as any).usage_metadata
             ?? (analysisResponse as any).response_metadata?.usage
@@ -1076,10 +1074,9 @@ ${scrapeResult.markdown.substring(0, 8000)}
           const inputTokens = usage.input_tokens ?? usage.inputTokens ?? 0;
           const outputTokens = usage.output_tokens ?? usage.outputTokens ?? 0;
           if (inputTokens > 0 || outputTokens > 0) {
-            const price = await resolveTokenPrice(supabase, 'claude-haiku-4-5');
-            if (!price) throw new Error('no ai_model_pricing row for claude-haiku-4-5');
-            const inputCost = (inputTokens / 1_000_000) * price.input;
-            const outputCost = (outputTokens / 1_000_000) * price.output;
+            const price = await resolveTokenPrice(supabase, 'claude-haiku-5-5');
+            if (!price) throw new Error('no ai_model_pricing row for claude-haiku-5-5');
+            const { input: inputCost, output: outputCost } = tokenCostParts(price, inputTokens, outputTokens);
             const rawCost = inputCost + outputCost;
             const billedCost = rawCost * price.markup;
             const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;
@@ -1095,7 +1092,7 @@ ${scrapeResult.markdown.substring(0, 8000)}
             await supabase.from('ai_usage_logs').insert({
               user_id: userId,
               operation_type: 'analyze_inspiration_url_haiku',
-              model_name: 'claude-haiku-4-5',
+              model_name: 'claude-haiku-5-5',
               api_provider: 'anthropic',
               input_tokens: inputTokens,
               output_tokens: outputTokens,

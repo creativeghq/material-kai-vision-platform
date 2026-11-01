@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { debitOrRefuse, debitOrRefuseTracked, recordExternalServiceOutcome } from '../credit-utils.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
-import { resolveTokenPrice } from '../ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../ai-logger.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
 import { assertSafeUrl } from '../ssrf-guard.ts';
 // One wording for every untrusted block (security invariant 9).
@@ -32,7 +32,7 @@ const MAX_CONTENT_CHARS = 15_000;
 
 /** The model the extraction pass runs on. One name, so the price lookup and the usage row
  *  cannot come to different answers. */
-const EXTRACTION_MODEL = 'claude-opus-5';
+const EXTRACTION_MODEL = 'claude-opus-5-5';
 
 /**
  * Reserve ceiling for one extraction pass, in credits (1 credit = $0.01 of billed cost).
@@ -189,8 +189,7 @@ async function settleExtractionCost(response: any, userId: string, workspaceId: 
       return;
     }
 
-    const inputCost = (inputTokens / 1_000_000) * price.input;
-    const outputCost = (outputTokens / 1_000_000) * price.output;
+    const { input: inputCost, output: outputCost } = tokenCostParts(price, inputTokens, outputTokens);
     const rawCost = inputCost + outputCost;
     const billedCost = rawCost * price.markup;
     const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;

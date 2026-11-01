@@ -18,7 +18,7 @@ import { refundStage, reserveStage, settleStage, tokenCeiling, tokenCredits, typ
 import { serpValue } from './untrusted.ts';
 import { clampAtWord, keepKnownLinks } from './page-review-rules.ts';
 
-export const PAGE_REVIEW_MODEL = 'claude-sonnet-5';
+export const PAGE_REVIEW_MODEL = 'claude-sonnet-5-5';
 const MAX_INPUT_TOKENS = 16000;
 const MAX_OUTPUT_TOKENS = 3000;
 const MAX_PAGE_CHARS = 20000;

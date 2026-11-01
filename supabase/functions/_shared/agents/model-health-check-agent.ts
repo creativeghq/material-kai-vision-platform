@@ -178,7 +178,7 @@ export class ModelHealthCheckAgent implements AgentRunner {
   readonly name         = 'Model Health Check';
   readonly description  = 'Probes registered generation models for reachability and records the verdict on generation_models';
   readonly defaultTools = [];
-  readonly defaultModel = 'claude-haiku-4-5';
+  readonly defaultModel = 'claude-haiku-5-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, agentConfig, input, log, heartbeat } = ctx;

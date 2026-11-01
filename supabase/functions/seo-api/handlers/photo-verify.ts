@@ -8,7 +8,7 @@ import { PHOTO_CHECK_VERSION, type PageImage, type PhotoSeen } from '../../_shar
 import { serpValue } from './untrusted.ts';
 import { imageSize } from './image-size.ts';
 
-export const PHOTO_VERIFY_MODEL = 'claude-sonnet-5';
+export const PHOTO_VERIFY_MODEL = 'claude-sonnet-5-5';
 export const PHOTO_VERIFY_MAX_INPUT_TOKENS = 2500;
 export const PHOTO_VERIFY_MAX_OUTPUT_TOKENS = 300;
 

@@ -26,7 +26,7 @@ import {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-export const SUGGESTION_MODEL = 'claude-sonnet-5';
+export const SUGGESTION_MODEL = 'claude-sonnet-5-5';
 const MAX_INPUT_TOKENS = 30000;
 const MAX_OUTPUT_TOKENS = 8000;
 const MAX_LINKED_PAGES = 12;

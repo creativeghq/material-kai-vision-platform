@@ -8,7 +8,7 @@ import { resolveSecret } from '../../_shared/secrets.ts';
 import { applyReviewEdits, type ReviewEdit } from './site-assets.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 
-export const GRAMMAR_MODEL = 'claude-sonnet-5';
+export const GRAMMAR_MODEL = 'claude-sonnet-5-5';
 const GRAMMAR_MAX_INPUT_TOKENS = 12000;
 const GRAMMAR_MAX_OUTPUT_TOKENS = 8000;
 const MAX_SENTENCES = 60;

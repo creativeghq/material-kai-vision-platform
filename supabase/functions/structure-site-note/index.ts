@@ -212,7 +212,7 @@ Deno.serve(withApiLogging('structure-site-note', async (req: Request) => {
   let res: Awaited<ReturnType<typeof callClaudeMessages>>;
   try {
     res = await callClaudeMessages({
-      model: 'claude-sonnet-5',
+      model: 'claude-sonnet-5-5',
       max_tokens: 2048,
       system: prompt,
       tools: [SITE_NOTE_TOOL],

@@ -179,7 +179,7 @@ Deno.serve(withApiLogging('takeoff-from-drawing', async (req: Request) => {
   const prompt = await loadPrompt(admin, 'extraction', 'drawing_takeoff');
 
   const res = await callClaudeMessages({
-    model: 'claude-sonnet-5',
+    model: 'claude-sonnet-5-5',
     max_tokens: 4096,
     system: prompt,
     tools: [TAKEOFF_TOOL],

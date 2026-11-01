@@ -7,7 +7,7 @@ import type { KeywordResearchResult } from '../../_shared/seo-types.ts';
 import { serpValue } from './untrusted.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 
-export const COVERAGE_MODEL = 'claude-sonnet-5';
+export const COVERAGE_MODEL = 'claude-sonnet-5-5';
 const COVERAGE_MAX_INPUT_TOKENS = 16000;
 const COVERAGE_MAX_OUTPUT_TOKENS = 2000;
 const SOURCES = ['ai_answer', 'reader_question', 'guides', 'paa'];

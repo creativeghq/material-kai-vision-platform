@@ -11,9 +11,10 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
+import { shapeClaudeRequest } from '../_shared/claude-models.ts';
+import { resolveTokenPrice, tokenCostUsd } from '../_shared/ai-logger.ts';
 
-const MODEL = () => Deno.env.get('ONTOLOGY_AI_MODEL') || 'claude-sonnet-5';
-const PRICE = { input: 3.0, output: 15.0 };
+const MODEL = () => Deno.env.get('ONTOLOGY_AI_MODEL') || 'claude-sonnet-5-5';
 /** A batch, not the whole list: 180 terms in one turn is one answer nobody can review. */
 const MAX_TERMS = 25;
 const CEILING = 8;
@@ -131,11 +132,11 @@ Deno.serve(withApiLogging('ontology-propose-targets', async (req) => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
+      body: JSON.stringify(shapeClaudeRequest({
         model, max_tokens: 2000, tools: [TOOL],
         tool_choice: { type: 'tool', name: TOOL.name },
         messages: [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
     data = await res.json();
@@ -188,8 +189,9 @@ Deno.serve(withApiLogging('ontology-propose-targets', async (req) => {
 
   const inTok = Number(data?.usage?.input_tokens ?? 0);
   const outTok = Number(data?.usage?.output_tokens ?? 0);
-  const billedUsd = ((inTok / 1e6) * PRICE.input + (outTok / 1e6) * PRICE.output) * MARKUP_MULTIPLIER;
-  const credits = Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
+  const price = await resolveTokenPrice(supabase, model);
+  const billedUsd = price ? tokenCostUsd(price, inTok, outTok) * MARKUP_MULTIPLIER : null;
+  const credits = billedUsd === null ? 1 : Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
   try {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId, workspace_id: workspaceId, module_slug: 'stock',

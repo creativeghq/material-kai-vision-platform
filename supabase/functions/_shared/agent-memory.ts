@@ -2,9 +2,10 @@
 
 import { resolveSecret } from './secrets.ts';
 import { loadPrompt } from './prompt-utils.ts';
+import { shapeClaudeRequest } from './claude-models.ts';
 
 // Distilling is a Haiku job: short input, tiny structured output, runs on every turn.
-const DISTILL_MODEL = 'claude-haiku-4-5';
+const DISTILL_MODEL = 'claude-haiku-5-5';
 const DISTILL_MAX_TOKENS = 1024;
 
 /** Turns shorter than this carry nothing worth a model call ("ok", "thanks", "yes"). */
@@ -328,14 +329,14 @@ export class AgentMemory {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({
+        body: JSON.stringify(shapeClaudeRequest({
           model: DISTILL_MODEL,
           max_tokens: DISTILL_MAX_TOKENS,
           system: distillSystem,
           tools: [DISTILL_TOOL],
           tool_choice: { type: 'tool', name: DISTILL_TOOL.name },
           messages: [{ role: 'user', content: buildDistillPrompt(userInput, args.agentResponse, existing, args.priorTurns) }],
-        }),
+        })),
       });
       if (!res.ok) {
         console.error(`[agent-memory] distill call failed: ${res.status} ${await res.text().catch(() => '')}`);

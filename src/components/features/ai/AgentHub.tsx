@@ -209,7 +209,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'interior-designer',
@@ -218,7 +218,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-violet-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'product-business',
@@ -227,7 +227,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-amber-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'marketing',
@@ -236,7 +236,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-emerald-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'property-advisor',
@@ -245,7 +245,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-teal-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'erp',
@@ -254,7 +254,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-rose-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'social-media',
@@ -263,7 +263,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-sky-500',
     requiredRole: 'member',
     available: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'demo',
@@ -272,7 +272,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-cyan-500',
     requiredRole: 'admin',
     available: true,
-    defaultModel: 'anthropic/claude-haiku-4-5',
+    defaultModel: 'anthropic/claude-haiku-5-5',
   },
   // Registered in agent_definitions but not runnable yet — execution_kind
   // 'sandbox' with no edge function. Shown disabled so the full roster is
@@ -285,7 +285,7 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'member',
     available: false,
     comingSoon: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   {
     id: 'qa-reviewer',
@@ -295,7 +295,7 @@ const AGENTS: AgentDefinition[] = [
     requiredRole: 'member',
     available: false,
     comingSoon: true,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
   // Hidden: the generalist that JARVIS falls back to, and the target of legacy
   // `?agent=kai` deep-links. Not shown in the picker (available:false) — users
@@ -307,7 +307,7 @@ const AGENTS: AgentDefinition[] = [
     color: 'text-blue-500',
     requiredRole: 'member',
     available: false,
-    defaultModel: 'anthropic/claude-opus-5',
+    defaultModel: 'anthropic/claude-opus-5-5',
   },
 ];
 
@@ -1089,7 +1089,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const renderedResultCardRef = useRef(false);
   // Initialize with JARVIS (orchestrator) default model
   const [selectedModel, setSelectedModel] = useState<string>(
-    AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-5',
+    AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-5-5',
   );
   const [messages, setMessages] = useState<Message[]>([]);
   /**

@@ -134,7 +134,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
       userPrompt,
       CAPTION_RESULT,
       {
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-5-5',
         systemPrompt,
         maxTokens: 1500,
         task: 'social_content_generation',
@@ -168,7 +168,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
           status: 'draft',
           credits_used: debitResult.credits_debited,
           credits_breakdown: { caption: debitResult.credits_debited },
-          generation_model: 'claude-haiku-4-5',
+          generation_model: 'claude-haiku-5-5',
           metadata: { topic, tone, all_captions: captions, brand_check: brandCheck },
         })
         .select('id')

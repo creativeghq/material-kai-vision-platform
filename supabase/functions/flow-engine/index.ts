@@ -862,7 +862,7 @@ async function executeAction(
           // key also came off Deno.env, which the platform_secrets bootstrap cannot populate on
           // edge, so a DB-only key failed every flow that used this action.
           const data = await callClaudeMessages({
-            model: 'claude-haiku-4-5',
+            model: 'claude-haiku-5-5',
             max_tokens: 4096,
             system: systemPrompt,
             // Basic web_search variant on purpose: web_search_20260209 needs Opus 4.6+ or

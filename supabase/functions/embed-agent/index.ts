@@ -13,7 +13,7 @@ import { generateWithClaude } from '../_shared/ai-client.ts';
 // The prompt comes from the DB and there is no fallback, by design.
 import { getSharedReplyStyle, loadPrompt } from '../_shared/prompt-utils.ts';
 // The ONE USD source, so this does not become a second opinion about what a model costs.
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostUsd } from '../_shared/ai-logger.ts';
 
 /**
  * Ceiling on the JSON a visitor may hand a tool.
@@ -305,8 +305,7 @@ Deno.serve(withApiLogging((req) => {
       // `input`/`output` are per MILLION tokens, straight off `ai_model_pricing`. The RAW cost,
       // not the marked-up one: this ceiling protects the platform's own API bill.
       const usd = price
-        ? (answer.usage.inputTokens / 1_000_000) * price.input
-          + (answer.usage.outputTokens / 1_000_000) * price.output
+        ? tokenCostUsd(price, answer.usage.inputTokens, answer.usage.outputTokens)
         : Number(keyRow.daily_usd_cap ?? 1);
       await supabase.rpc('embed_spend_record', { p_key_id: auth.ctx.keyId, p_usd: usd });
 

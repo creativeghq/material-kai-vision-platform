@@ -13,7 +13,7 @@ import type { DbClient } from '../supabase-client.ts';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { LogLevel } from './types.ts';
 import { CancelledError } from './types.ts';
-import { resolveTokenPrice } from '../ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../ai-logger.ts';
 
 // Re-export LangGraph utilities so agents that import from './base-agent.ts' continue to work.
 export type { LangGraphRunOptions, LangGraphRunOutput } from '../langgraph-core.ts';
@@ -70,8 +70,7 @@ export async function logAgentAiUsage(
   try {
     const pricing = (await resolveTokenPrice(supabase, args.model))
       ?? { input: 0, output: 0 };
-    const inputCost  = (args.inputTokens  / 1_000_000) * pricing.input;
-    const outputCost = (args.outputTokens / 1_000_000) * pricing.output;
+    const { input: inputCost, output: outputCost } = tokenCostParts(pricing, args.inputTokens, args.outputTokens);
     const rawCost    = inputCost + outputCost;
     const provider   = args.model.startsWith('claude-') ? 'anthropic'
       : args.model.startsWith('gemini-') ? 'google'

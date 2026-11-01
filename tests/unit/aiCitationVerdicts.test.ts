@@ -81,7 +81,7 @@ describe('a rate with no denominator is not zero', () => {
 
 describe('formatting', () => {
   it('names an assistant by its vendor, not its model string', () => {
-    expect(modelLabel('claude-haiku-4-5-20251001')).toBe('Claude');
+    expect(modelLabel('claude-haiku-5-5')).toBe('Claude');
     expect(modelLabel('gpt-5-mini')).toBe('ChatGPT');
     expect(modelLabel('sonar')).toBe('Perplexity');
     expect(modelLabel('gemini-2.0-flash')).toBe('Gemini');
@@ -117,7 +117,7 @@ describe('an engine that never ran still gets a card', () => {
   it('a rostered assistant with no probes is not_collected, not absent', async () => {
     const { withRosterEngines } = await import('@/components/core/Profile/seo/aiCitations');
     const out = withRosterEngines([], [
-      { model: 'claude-haiku-4-5-20251001', enabled: true },
+      { model: 'claude-haiku-5-5', enabled: true },
       { model: 'gemini-2.0-flash', enabled: false },
     ]);
     expect(out).toHaveLength(2);

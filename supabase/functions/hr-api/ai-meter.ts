@@ -9,24 +9,14 @@
 //      because each is a separate metered call whose token count reflects the real work.
 import { HttpError } from '../_shared/api-logger.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
+import { shapeClaudeRequest } from '../_shared/claude-models.ts';
+import { resolveTokenPrice, tokenCostParts } from '../_shared/ai-logger.ts';
 
 export interface ClaudeUsage { input_tokens: number; output_tokens: number; }
 export interface ClaudeToolResult { input: any; usage: ClaudeUsage; model: string; }
 
-// Per-1M-token provider pricing, matched by model family. Mirrors ai_model_pricing (token_based)
-// and _shared/ai-client.ts. Family-matched so an HR_JOB_AI_MODEL pin like `claude-sonnet-5`
-// still resolves against the `claude-sonnet` row.
-const FAMILY_PRICING: Array<{ match: string; input: number; output: number }> = [
-  { match: 'claude-opus',   input:  5.0, output: 25.0 },
-  { match: 'claude-sonnet', input:  3.0, output: 15.0 },
-  { match: 'claude-haiku',  input:  1.0, output:  5.0 },
-];
-function priceFor(model: string): { input: number; output: number } {
-  const m = model.toLowerCase();
-  return FAMILY_PRICING.find((p) => m.includes(p.match)) ?? { input: 3.0, output: 15.0 };
-}
 
-const HR_MODEL = () => Deno.env.get('HR_JOB_AI_MODEL') || 'claude-sonnet-5';
+const HR_MODEL = () => Deno.env.get('HR_JOB_AI_MODEL') || 'claude-sonnet-5-5';
 
 /**
  * Call Claude with a forced tool and return the structured input + token usage.
@@ -39,11 +29,11 @@ export async function callClaudeTool(contentBlocks: any[], tool: any, maxTokens 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({
+    body: JSON.stringify(shapeClaudeRequest({
       model, max_tokens: maxTokens,
       tools: [tool], tool_choice: { type: 'tool', name: tool.name },
       messages: [{ role: 'user', content: contentBlocks }],
-    }),
+    })),
   });
   if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
   const data = await res.json();
@@ -95,13 +85,17 @@ export async function meterHrAi(supabase: any, opts: {
   userId: string; workspaceId: string; operationType: string; model: string;
   usage: ClaudeUsage; description: string; metadata?: any; reservedCredits?: number;
 }): Promise<number> {
-  const p = priceFor(opts.model);
   const inTok = opts.usage.input_tokens, outTok = opts.usage.output_tokens;
-  const rawInput = (inTok / 1_000_000) * p.input;
-  const rawOutput = (outTok / 1_000_000) * p.output;
-  const rawUsd = rawInput + rawOutput;
-  const billedUsd = rawUsd * MARKUP_MULTIPLIER;
-  const credits = Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
+  // An unpriced model keeps the reserved ceiling rather than inventing a rate.
+  const p = await resolveTokenPrice(supabase, opts.model);
+  const parts = p ? tokenCostParts(p, inTok, outTok) : null;
+  const rawInput = parts?.input ?? null;
+  const rawOutput = parts?.output ?? null;
+  const rawUsd = parts ? parts.input + parts.output : null;
+  const billedUsd = rawUsd === null ? null : rawUsd * MARKUP_MULTIPLIER;
+  const credits = billedUsd === null
+    ? (opts.reservedCredits ?? 1)
+    : Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
 
   // 1) Dashboard-facing usage log — fire-and-forget (never block the op on a logging failure).
   try {
@@ -109,7 +103,8 @@ export async function meterHrAi(supabase: any, opts: {
       user_id: opts.userId, workspace_id: opts.workspaceId, module_slug: 'hr',
       operation_type: opts.operationType, model_name: opts.model,
       input_tokens: inTok, output_tokens: outTok,
-      input_cost_usd: rawInput * MARKUP_MULTIPLIER, output_cost_usd: rawOutput * MARKUP_MULTIPLIER,
+      input_cost_usd: rawInput === null ? null : rawInput * MARKUP_MULTIPLIER,
+      output_cost_usd: rawOutput === null ? null : rawOutput * MARKUP_MULTIPLIER,
       raw_cost_usd: rawUsd, markup_multiplier: MARKUP_MULTIPLIER, billed_cost_usd: billedUsd,
       credits_debited: credits,
       // Written after a completed Claude call — see ai-client.ts for why the key matters.

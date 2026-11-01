@@ -100,7 +100,7 @@ describe('the output ceiling leaves room for the turn to answer', () => {
 
   it('the background-agent runner has the same ceiling', () => {
     // `buildLLM` in langgraph-core builds the model for kai-task-agent, which runs
-    // claude-opus-5 — so it carries the identical hazard, and its own `|| ''` at the end of
+    // claude-opus-5-5 — so it carries the identical hazard, and its own `|| ''` at the end of
     // runLangGraphAgent turns a thought-away budget into the same empty answer. One instance
     // fixed and its twin left at 4096 is how this comes back somewhere nobody is looking.
     const core = code('supabase/functions/_shared/langgraph-core.ts');

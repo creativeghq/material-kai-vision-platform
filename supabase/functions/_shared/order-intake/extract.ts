@@ -5,7 +5,7 @@ import { loadPrompt } from '../prompt-utils.ts';
 import type { DbClient } from '../supabase-client.ts';
 
 /** Cheap first pass. Haiku, because most inbound mail is not an order. */
-const CLASSIFY_MODEL = 'claude-haiku-4-5-20251001';
+const CLASSIFY_MODEL = 'claude-haiku-5-5';
 
 const classifySchema = z.object({
   intent: z.enum(['order', 'amendment', 'other']).describe(

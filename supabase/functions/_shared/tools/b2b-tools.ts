@@ -39,7 +39,7 @@ import { describeAnthropicFailure } from './anthropic-failure.ts';
 /** Transient upstream, not a bad request: wait and retry rather than change anything. */
 const retryableStatus = (status: number) => status === 429 || status === 529 || status >= 500;
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
-import { resolveTokenPrice } from '../ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../ai-logger.ts';
 import { getToolPrompt } from '../prompt-utils.ts';
 import { describeGroups, groupKeys, loadVocabulary, resolveMarket, termsInGroup, type VocabularyTerm } from '../vocabularies.ts';
 import {
@@ -58,6 +58,7 @@ import { extractContactDetails } from '../contact-extract.ts';
 import { FACILITY_SECTORS, lookupDomainAge, searchIndustrialFacilities, type FacilitySector } from '../eea-facilities.ts';
 // One wording for every untrusted block (security invariant 9).
 import { wrapUntrusted } from '../untrusted.ts';
+import { langchainToolChoice, shapeClaudeRequest, toolInstruction } from '../claude-models.ts';
 
 /**
  * Entry affordability gate for a paid B2B tool: reserve the tool's expected cost
@@ -137,10 +138,10 @@ export async function validateEmailWithZeroBounce(
 }
 
 /** Opus 5 at effort:low, measured against Sonnet 5 on the identical 6-company Polish sweep. */
-const SEARCH_MODEL = 'claude-opus-5';
+const SEARCH_MODEL = 'claude-opus-5-5';
 /** The model the website-analysis pass runs on. Named so the price lookup and the usage row
  *  cannot name two different models, which is exactly what they did. */
-const ANALYSIS_MODEL = 'claude-opus-5';
+const ANALYSIS_MODEL = 'claude-opus-5-5';
 
 /** Apollo circuit breaker. */
 let apolloUnavailableUntil = 0;
@@ -347,7 +348,7 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
         'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(shapeClaudeRequest({
         model: SEARCH_MODEL,
         max_tokens: 8000,
         // effort:low is the SETTING THAT WORKS, not a cost compromise: at high effort the model
@@ -365,7 +366,7 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
           RECORD_COMPANIES_TOOL,
         ],
         messages: [{ role: 'user', content: rendered.query }],
-      }),
+      })),
     });
 
     if (!response.ok) {
@@ -401,8 +402,7 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
       if (!searchPrice) {
         console.warn(`[b2b] no ai_model_pricing row for ${SEARCH_MODEL} — not charging for an unpriced call`);
       } else {
-        const inputCost = (inputTokens / 1_000_000) * searchPrice.input;
-        const outputCost = (outputTokens / 1_000_000) * searchPrice.output;
+        const { input: inputCost, output: outputCost } = tokenCostParts(searchPrice, inputTokens, outputTokens);
         const webSearchSurcharge = searchBudget * 0.01;
         const rawCost = inputCost + outputCost + webSearchSurcharge;
         const billedCost = rawCost * searchPrice.markup;
@@ -825,9 +825,7 @@ export const createCompanyWebsiteScrapeTool = (
           const analysisModel = new ChatAnthropic({
             model: ANALYSIS_MODEL,
             maxTokens: 2048,
-          }).bindTools([COMPANY_PROFILE_TOOL], {
-            tool_choice: { type: 'tool', name: COMPANY_PROFILE_TOOL.name },
-          });
+          }).bindTools([COMPANY_PROFILE_TOOL], langchainToolChoice(ANALYSIS_MODEL, COMPANY_PROFILE_TOOL.name));
 
           // Load prompt from database (editable via /admin/ai-configs)
           const scraperPrompt = await getToolPrompt(supabase, 'company_website_scraper');
@@ -836,7 +834,9 @@ export const createCompanyWebsiteScrapeTool = (
 
 Sections to extract: ${extractSections.join(', ')}
 
-${fenceUntrustedPage(markdown.substring(0, 15000))}`;
+${fenceUntrustedPage(markdown.substring(0, 15000))}
+
+${toolInstruction(COMPANY_PROFILE_TOOL.name)}`;
 
           const analysisResponse = await analysisModel.invoke([
             { role: 'user', content: analysisPrompt }
@@ -858,8 +858,7 @@ ${fenceUntrustedPage(markdown.substring(0, 15000))}`;
                 console.warn(`[b2b] no ai_model_pricing row for ${ANALYSIS_MODEL} — not charging for an unpriced call`);
                 return;
               }
-              const inputCost = (inputTokens / 1_000_000) * price.input;
-              const outputCost = (outputTokens / 1_000_000) * price.output;
+              const { input: inputCost, output: outputCost } = tokenCostParts(price, inputTokens, outputTokens);
               const rawCost = inputCost + outputCost;
               const billedCost = rawCost * price.markup;
               const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;

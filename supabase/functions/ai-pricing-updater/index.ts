@@ -19,8 +19,9 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     fallback_prices: {
       // 15.00/75.00 here was Opus-3-era pricing — 3x the real rate, in the very
       // function whose job is keeping prices honest.
-      'claude-opus-5':     { input:  5.00, output: 25.00 },
-      'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
+      'claude-opus-5-5':   { input:  4.00, output: 20.00 },
+      'claude-sonnet-5-5': { input:  2.00, output: 10.00 },
+      'claude-haiku-5-5':  { input:  0.10, output:  0.50 },
     },
   },
   // OpenAI is deliberately absent (2026-08-23). The provider was removed from the

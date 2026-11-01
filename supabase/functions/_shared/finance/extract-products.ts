@@ -1,5 +1,5 @@
 // Shared — AI extraction of clean, sellable product attributes from raw supplier
-// expense-line descriptions (myDATA inbound docs). Cheapest model (Haiku 4.5).
+// expense-line descriptions (myDATA inbound docs). Cheapest model (Haiku 5.5).
 // AI usage (tokens/model/cost) is auto-logged to ai_usage_logs by the ai-client under
 // task='expense_product_extraction'. Credit/entitlement gating is the CALLER's job.
 import { generateStructuredWithClaude, z } from '../ai-client.ts';
@@ -26,7 +26,7 @@ const Schema = z.object({
   })),
 });
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = 'claude-haiku-5-5';
 
 /** Lines per model call, and the output ceiling for one such call. */
 const BATCH_LINES = 15;

@@ -14,7 +14,12 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   // it made every figure on this dashboard read THREE TIMES the real spend. An
   // over-report is a plausible number, so nothing raised; the same wrong pair had
   // been copied into credits.service.ts, ai-pricing-updater and base-agent.ts.
+  'claude-opus-5-5':   { input:  4.00, output: 20.00 },
+  'claude-sonnet-5-5': { input:  2.00, output: 10.00 },
+  'claude-haiku-5-5':  { input:  0.10, output:  0.50 },
+  // Superseded on 2026-11-01; kept so rows logged before then still price at their own rate.
   'claude-opus-5':     { input:  5.00, output: 25.00 },
+  'claude-sonnet-5':   { input:  2.00, output: 10.00 },
   'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
 
   'text-embedding-3-small': { input: 0.02, output: 0.00 },
@@ -26,11 +31,12 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
 
 export const MODEL_CONFIGS: ModelConfig[] = [
   // Claude Models — canonical 3 latest-tier
-  { id: 'claude-opus-5',              name: 'Claude Opus 5',     provider: 'anthropic', model: 'claude-opus-5',              inputCostPer1M:  5.00, outputCostPer1M: 25.00, speed: 'medium', usedFor: ['PDF Processing', 'Product Discovery', 'Agent Chat', 'High-stakes Validation', 'Consensus Extraction'], totalInputTokens: 0, totalOutputTokens: 0 },
-  { id: 'claude-haiku-4-5',  name: 'Claude Haiku 4.5',  provider: 'anthropic', model: 'claude-haiku-4-5',  inputCostPer1M:  1.00, outputCostPer1M:  5.00, speed: 'fast',   usedFor: ['Background Agents', 'Query Parsing', 'Reranking'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'claude-opus-5-5',   name: 'Claude Opus 5.5',   provider: 'anthropic', model: 'claude-opus-5-5',   inputCostPer1M:  4.00, outputCostPer1M: 20.00, speed: 'medium', usedFor: ['PDF Processing', 'Product Discovery', 'Agent Chat', 'Vision Analysis', 'Consensus Extraction'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5', provider: 'anthropic', model: 'claude-sonnet-5-5', inputCostPer1M:  2.00, outputCostPer1M: 10.00, speed: 'medium', usedFor: ['Vision Second Reader', 'Chunk Classification'], totalInputTokens: 0, totalOutputTokens: 0 },
+  { id: 'claude-haiku-5-5',  name: 'Claude Haiku 5.5',  provider: 'anthropic', model: 'claude-haiku-5-5',  inputCostPer1M:  0.10, outputCostPer1M:  0.50, speed: 'fast',   usedFor: ['Metadata Extraction', 'Background Agents', 'Query Parsing', 'Reranking'], totalInputTokens: 0, totalOutputTokens: 0 },
 
 
-  // Image classification + vision analysis both run on Claude Opus 5
+  // Image classification + vision analysis both run on Claude Opus 5.5
   // (already listed under Anthropic above).
 
   // Vision/Embedding Models (SLIG on Modal — siglip2-base-patch16-512, 768D)

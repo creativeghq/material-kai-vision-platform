@@ -12,7 +12,7 @@ import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { APPEARANCE_READ_SCHEMA, sanitizeAppearance } from '../_shared/installationGuideSchema.generated.ts';
 
 const BUCKET = 'pdf-documents';
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 const SERVICE = 'installation-guide-appearance';
 const MAX_IMAGE_BYTES = 4_500_000;
 const READABLE = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];

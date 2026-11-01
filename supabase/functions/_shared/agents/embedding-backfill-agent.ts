@@ -27,7 +27,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
   readonly name         = 'Embedding Backfill';
   readonly description  = 'Repairs products/chunks/images whose embeddings silently failed at creation';
   readonly defaultTools: string[] = [];
-  readonly defaultModel = 'claude-haiku-4-5';
+  readonly defaultModel = 'claude-haiku-5-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, agentConfig, input, log, heartbeat, mivaaGatewayUrl, mivaaApiKey } = ctx;

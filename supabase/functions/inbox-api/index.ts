@@ -89,7 +89,7 @@ import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
 import { CRM_VAT_COLUMN, normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { describeAttachmentForAssistant, enrichInboundAttachments } from '../_shared/inbox-attachment-intelligence.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../_shared/credit-reserve.ts';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostUsd } from '../_shared/ai-logger.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { getAgentSystemPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
@@ -1079,7 +1079,7 @@ async function maybeAutoLabel(db: DbClient, threadId: string): Promise<void> {
             .join('\n');
           const labelList = aiRules.map((l) => `- id ${l.id} · ${l.name}: ${l.ai_instruction}`).join('\n');
           const res = await callClaudeMessages({
-            model: 'claude-haiku-4-5',
+            model: 'claude-haiku-5-5',
             max_tokens: 200,
             system: await loadPrompt(db, 'tool', 'inbox_auto_label'),
             tools: [AUTO_LABEL_TOOL],
@@ -3069,7 +3069,7 @@ async function handleJwtAction(
       let raw = '';
       try {
         const res = await callClaudeMessages({
-          model: 'claude-haiku-4-5',
+          model: 'claude-haiku-5-5',
           max_tokens: 60,
           temperature: 0.3,
           system,
@@ -4378,7 +4378,7 @@ async function handleJwtAction(
 
       // Settle against what MIVAA actually spent. An unpriced model releases the reservation.
       const usage = (result.usage ?? {}) as { input_tokens?: number; output_tokens?: number };
-      const modelUsed = String(result.model ?? 'claude-haiku-4-5');
+      const modelUsed = String(result.model ?? 'claude-haiku-5-5');
       const inTok = Number(usage.input_tokens ?? 0);
       const outTok = Number(usage.output_tokens ?? 0);
       if (inTok + outTok === 0) {
@@ -4388,7 +4388,7 @@ async function handleJwtAction(
         if (!price) {
           await refundCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType, { reason: 'unpriced_model' });
         } else {
-          const raw = (inTok / 1_000_000) * price.input + (outTok / 1_000_000) * price.output;
+          const raw = tokenCostUsd(price, inTok, outTok);
           const credits = Math.round(raw * price.markup * 100 * 100) / 100;
           await settleCredits(db, userId, workspaceId, SPREADSHEET_CEILING, credits, opType, { thread_id: threadId, message_id: chosen.messageId });
         }
@@ -6716,7 +6716,7 @@ async function readConversationSentiment(
   try {
     const body = await callClaudeMessages({
       // Haiku: this runs on every thread open and every assistant reply.
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-haiku-5-5',
       max_tokens: 700,
       tools: [TOOL],
       // FORCED (invariant 9): the verdict drives a stored field and a UI state.

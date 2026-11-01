@@ -52,7 +52,7 @@ describe('agent model routing', () => {
     // getModelForAgent picks the client, getModelNameForAgent picks the string that gets
     // PRICED. They drifting apart means a turn is billed against a model it did not run on.
     expect(SRC).toMatch(/return shouldRouteToHaiku\(agentId\) \? modelHaiku : modelOpus;/);
-    expect(SRC).toMatch(/return shouldRouteToHaiku\(agentId\) \? 'claude-haiku-4-5' : MAIN_MODEL;/);
+    expect(SRC).toMatch(/return shouldRouteToHaiku\(agentId\) \? 'claude-haiku-5-5' : MAIN_MODEL;/);
     expect(SRC, 'modelOpus must be constructed from MAIN_MODEL, not a literal')
       .toMatch(/modelOpus = new ChatAnthropic\(\{\s*model: MAIN_MODEL,/);
   });

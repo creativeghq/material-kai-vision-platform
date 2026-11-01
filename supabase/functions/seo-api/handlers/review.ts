@@ -11,7 +11,7 @@ import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet
 const REVIEW_MAX_INPUT_TOKENS = 14000;
 const REVIEW_CONCURRENCY = 4;
 const REVIEW_MAX_OUTPUT_TOKENS = 6000;
-const CONSISTENCY_MODEL = 'claude-sonnet-5';
+const CONSISTENCY_MODEL = 'claude-sonnet-5-5';
 const CONSISTENCY_MAX_INPUT_TOKENS = 20000;
 const KINDS = [
   'unsupported_claim', 'wrong_fact', 'arithmetic', 'relationship_claim', 'language', 'loanword',

@@ -6,13 +6,14 @@ import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../_shared/ai-logger.ts';
+import { shapeClaudeRequest } from '../_shared/claude-models.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 const MAX_MATERIALS = 200;
 
 // Admin-editable at /admin/ai-configs (prompt_type='generation'). Two rows, one
@@ -205,7 +206,7 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
         'x-api-key': ANTHROPIC_API_KEY(),
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({
+      body: JSON.stringify(shapeClaudeRequest({
         model: MODEL,
         max_tokens: 8000,
         tools: [TRANSLATE_TOOL],
@@ -217,7 +218,7 @@ Deno.serve(withApiLogging('catalog-translate-pdf', async (req) => {
             { type: 'text', text: userText },
           ],
         }],
-      }),
+      })),
     });
 
     if (!resp.ok) {
@@ -360,8 +361,9 @@ async function logCost(supabase: any, userId: string | undefined, workspaceId: s
   // ai_model_pricing", which is the instruction to maintain two copies of one number — and the
   // model it named has no row in that table at all, so it was aligned with nothing.
   const price = await resolveTokenPrice(supabase, MODEL);
-  const inputCost = price ? (inputTokens / 1_000_000) * price.input : null;
-  const outputCost = price ? (outputTokens / 1_000_000) * price.output : null;
+  const costParts = price ? tokenCostParts(price, inputTokens, outputTokens) : null;
+  const inputCost = costParts?.input ?? null;
+  const outputCost = costParts?.output ?? null;
   // null, never 0 — an unpriced model is a gap in ai_model_pricing, not a free call, and
   // `ops.silent_zero` can only see the difference if we keep it.
   const rawCost = price ? inputCost! + outputCost! : null;

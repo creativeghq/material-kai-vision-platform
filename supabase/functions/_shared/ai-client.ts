@@ -56,7 +56,8 @@ import { createAlibaba } from 'npm:@ai-sdk/alibaba@1';
 import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
-import { resolveTokenPrice, resolveUnitPrice } from './ai-logger.ts';
+import { resolveTokenPrice, resolveUnitPrice, tokenCostParts } from './ai-logger.ts';
+import { CLAUDE_OPUS, aiSdkClaudeOptions, shapeClaudeRequest } from './claude-models.ts';
 import { fetchImageGuarded, readCapped } from './fetch-image.ts';
 import { resolveSecret } from './secrets.ts';
 import { assertTransferAllowed, isEeaEndpoint } from './residency-gate.ts';
@@ -135,10 +136,8 @@ async function _logTrackedCall(opts: {
       // ai_model_pricing, not a free call. `ops.silent_zero` can then see it.
       console.warn(`[ai-client] no price row for model "${opts.model}" — cost logged as null`);
     }
-    const rawCost = price
-      ? (opts.inputTokens / 1_000_000) * price.input +
-        (opts.outputTokens / 1_000_000) * price.output
-      : null;
+    const parts = price ? tokenCostParts(price, opts.inputTokens, opts.outputTokens) : null;
+    const rawCost = parts ? parts.input + parts.output : null;
     const markup = price?.markup ?? _MARKUP;
     const billedCost = rawCost === null ? null : rawCost * markup;
 
@@ -168,8 +167,8 @@ async function _logTrackedCall(opts: {
       raw_cost_usd: rawCost,
       billed_cost_usd: billedCost,
       markup_multiplier: markup,
-      input_cost_usd: price ? (opts.inputTokens / 1_000_000) * price.input * markup : null,
-      output_cost_usd: price ? (opts.outputTokens / 1_000_000) * price.output * markup : null,
+      input_cost_usd: parts ? parts.input * markup : null,
+      output_cost_usd: parts ? parts.output * markup : null,
       // DECLARE THE OUTCOME. `ops.silent_zero_provider` judges a provider only on rows
       // carrying `success`, and skips any row without it — correctly, since a row that
       // never claimed to succeed is not evidence that it failed. This chokepoint set it
@@ -302,7 +301,7 @@ const klingai = new Proxy(function () {}, {
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
-const DEFAULT_CLAUDE_MODEL = 'claude-opus-5';
+const DEFAULT_CLAUDE_MODEL = CLAUDE_OPUS;
 
 // ── Billing identity for the per-unit models ───────────────────────────────
 // `generation_models.id` values, NOT the provider strings this file passes to the SDKs. They
@@ -612,6 +611,7 @@ export async function generateWithClaude(
   try {
     const result = await generateText({
       model: anthropic(modelId),
+      providerOptions: aiSdkClaudeOptions(modelId),
       system: config?.systemPrompt,
       prompt,
       temperature: config?.temperature ?? 0.7,
@@ -678,6 +678,7 @@ export async function generateWithClaudeTools(
   try {
     const result = await generateText({
       model: anthropic(modelId),
+      providerOptions: aiSdkClaudeOptions(modelId),
       system: config.systemPrompt,
       prompt,
       temperature: config.temperature ?? 0.4,
@@ -733,6 +734,7 @@ export async function generateStructuredWithClaude<T>(
   try {
     const result = await generateText({
       model: anthropic(modelId),
+      providerOptions: aiSdkClaudeOptions(modelId),
       system: config?.systemPrompt,
       prompt,
       temperature: config?.temperature ?? 0.3,
@@ -957,7 +959,7 @@ export async function callClaudeMessages(
         'x-api-key': apiKey!,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify({ ...body, model: modelId }),
+      body: JSON.stringify(shapeClaudeRequest({ ...body, model: modelId })),
       signal: AbortSignal.timeout(config.timeoutMs ?? 60_000),
     });
   } catch (e) {

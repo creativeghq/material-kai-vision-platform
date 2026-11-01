@@ -5,7 +5,7 @@ import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
 import { debitExternalServiceCredits, getServicePricing } from '../_shared/credit-utils.ts';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../_shared/ai-logger.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 // Prompts come from the database. `PromptNotConfigured` ("add the row") stays distinct from
 // `PromptStoreUnavailable` ("the DB is down") so the caller can tell the operator which it is.
@@ -122,8 +122,7 @@ async function priceCall(
   if (surchargeService && !svc) {
     console.error(`[company-enrich] no price row for service '${surchargeService}' — surcharge not billed`);
   }
-  const inputCost = (inTok / 1_000_000) * price.input;
-  const outputCost = (outTok / 1_000_000) * price.output;
+  const { input: inputCost, output: outputCost } = tokenCostParts(price, inTok, outTok);
   const surcharge = (svc?.cost_per_unit ?? 0) * units;
   const rawCost = inputCost + outputCost + surcharge;
   const billedCost = rawCost * price.markup;
@@ -275,7 +274,7 @@ async function enrichViaWebSearch(
   // Opus 4.6+ or Sonnet 4.6+, and this path is deliberately Haiku. Bumping the tool without
   // the model is a 400, not a no-op (#400 W7).
   const research = await anthropic({
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-5-5',
     max_tokens: 2048,
     tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
     messages: [{ role: 'user', content: researchQuery }],
@@ -289,7 +288,7 @@ async function enrichViaWebSearch(
   let fields: Partial<EnrichFields> = {};
   try {
     const extract = await anthropic({
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       max_tokens: 1024,
       tools: [EXTRACT_TOOL],
       tool_choice: { type: 'tool', name: 'record_business_info' },
@@ -310,15 +309,15 @@ async function enrichViaWebSearch(
 
   // Cost log + debit — rates from ai_model_pricing, never from a constant here. 4 web searches.
   try {
-    const p = await priceCall(admin, 'claude-haiku-4-5', inTok, outTok, 'anthropic-web-search', 4);
-    if (!p) console.error('[company-enrich] no price row for claude-haiku-4-5 — the reserved ceiling is kept');
+    const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 4);
+    if (!p) console.error('[company-enrich] no price row for claude-haiku-5-5 — the reserved ceiling is kept');
     await bill.debit(p?.credits ?? null, 'company_enrich_web_search', `Business info web search (${name})`,
       { name, country: countryName });
     await admin.from('ai_usage_logs').insert({
       user_id: userId,
       workspace_id: workspaceId,
       operation_type: 'company_enrich_web_search',
-      model_name: 'claude-haiku-4-5',
+      model_name: 'claude-haiku-5-5',
       input_tokens: inTok,
       output_tokens: outTok,
       input_cost_usd: p?.inputCost ?? null,
@@ -530,7 +529,7 @@ async function findCompetitorsViaWebSearch(
 
     let inTok = 0, outTok = 0;
     const research = await anthropic({
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       max_tokens: 2560,
       tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }],
       messages: [{ role: 'user', content: researchQuery }],
@@ -543,7 +542,7 @@ async function findCompetitorsViaWebSearch(
     let list: any[] = [];
     try {
       const extract = await anthropic({
-        model: 'claude-haiku-4-5',
+        model: 'claude-haiku-5-5',
         max_tokens: 1536,
         tools: [COMPETITORS_TOOL],
         tool_choice: { type: 'tool', name: 'record_competitors' },
@@ -562,8 +561,8 @@ async function findCompetitorsViaWebSearch(
 
     // Cost log + debit (2 Haiku calls + 5 web searches). Rates from ai_model_pricing.
     try {
-      const p = await priceCall(admin, 'claude-haiku-4-5', inTok, outTok, 'anthropic-web-search', 5);
-      if (!p) console.error('[company-enrich] no price row for claude-haiku-4-5 — the reserved ceiling is kept');
+      const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 5);
+      if (!p) console.error('[company-enrich] no price row for claude-haiku-5-5 — the reserved ceiling is kept');
       await bill.debit(p?.credits ?? null, 'find_competitors_web_search',
         `Competitor discovery (${seed.name ?? seed.industry ?? 'company'})`,
         { name: seed.name, industry: seed.industry, country: seed.country });
@@ -571,7 +570,7 @@ async function findCompetitorsViaWebSearch(
         user_id: userId,
         workspace_id: workspaceId,
         operation_type: 'find_competitors_web_search',
-        model_name: 'claude-haiku-4-5',
+        model_name: 'claude-haiku-5-5',
         input_tokens: inTok,
         output_tokens: outTok,
         input_cost_usd: p?.inputCost ?? null,
@@ -853,7 +852,7 @@ async function identifyViaWebSearch(
   let inTok = 0, outTok = 0;
 
   const research = await anthropic({
-    model: 'claude-haiku-4-5',
+    model: 'claude-haiku-5-5',
     max_tokens: 2048,
     tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 4 }],
     messages: [{
@@ -869,7 +868,7 @@ async function identifyViaWebSearch(
   let result: IdentifiedCounterparty | null = null;
   try {
     const extract = await anthropic({
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       max_tokens: 1024,
       tools: [IDENTIFY_TOOL],
       tool_choice: { type: 'tool', name: 'record_counterparty_identity' },
@@ -889,8 +888,8 @@ async function identifyViaWebSearch(
   }
 
   try {
-    const p = await priceCall(admin, 'claude-haiku-4-5', inTok, outTok, 'anthropic-web-search', 4);
-    if (!p) console.error('[company-enrich] no price row for claude-haiku-4-5 — the reserved ceiling is kept');
+    const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 4);
+    if (!p) console.error('[company-enrich] no price row for claude-haiku-5-5 — the reserved ceiling is kept');
     await bill.debit(p?.credits ?? null, 'counterparty_identify_web_search',
       `Counterparty identification (${seed.displayName})`,
       { display_name: seed.displayName, country: seed.countryName });
@@ -898,7 +897,7 @@ async function identifyViaWebSearch(
       user_id: userId,
       workspace_id: workspaceId,
       operation_type: 'counterparty_identify_web_search',
-      model_name: 'claude-haiku-4-5',
+      model_name: 'claude-haiku-5-5',
       input_tokens: inTok,
       output_tokens: outTok,
       input_cost_usd: p?.inputCost ?? null,

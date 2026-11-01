@@ -97,7 +97,7 @@ export async function extractSupplierInvoice(
     : { type: 'image', source: { type: 'base64', media_type: mime.toLowerCase(), data } };
 
   const res = await callClaudeMessages({
-    model: 'claude-sonnet-5',
+    model: 'claude-sonnet-5-5',
     max_tokens: 8000,
     system: prompt,
     tools: [INVOICE_TOOL],

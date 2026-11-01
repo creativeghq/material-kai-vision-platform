@@ -16,7 +16,7 @@ import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const LESSON_MODEL = 'claude-sonnet-5';
+const LESSON_MODEL = 'claude-sonnet-5-5';
 const LESSON_MAX_INPUT_TOKENS = 14000;
 const LESSON_MAX_OUTPUT_TOKENS = 8000;
 const CATEGORIES = ['wording', 'greek', 'fact', 'claim_about_us', 'price', 'photo', 'link', 'coverage', 'structure', 'other'];

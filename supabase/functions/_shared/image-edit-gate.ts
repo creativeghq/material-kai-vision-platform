@@ -3,7 +3,7 @@ import type { DbClient } from './supabase-client.ts';
 import { getToolPrompt } from './prompt-utils.ts';
 import { callClaudeMessages, type ClaudeMessagesResponse } from './ai-client.ts';
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = 'claude-haiku-5-5';
 const MAX_TOKENS = 512;
 const TIMEOUT_MS = 15_000;
 /** A source image far bigger than this is downscaled by the API anyway; cap the fetch. */

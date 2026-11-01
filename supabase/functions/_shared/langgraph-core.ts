@@ -2,6 +2,7 @@
 
 import type { LogLevel } from './agents/types.ts';
 import { shapeForModel } from './tool-result-shape.ts';
+import { langchainThinking } from './claude-models.ts';
 // Type-only — erased at compile time, so the lazy `npm:` imports below still do the actual
 // loading. Without it `BaseMessage` is only the runtime binding destructured inside the
 // function, and using it as a type is an error the edge typecheck gate reports.
@@ -81,7 +82,7 @@ export async function buildLLM(opts: LangGraphRunOptions): Promise<any> {
   // thinking with `display` omitted, so those blocks spend the budget and carry no text. At 4096
   // a run could return with nothing, and line 367 below turns that into `|| ''`: the same empty
   // answer that read as a crash in agent-chat (conversation de92b987, 2026-09-15).
-  return new ChatAnthropic({ model, anthropicApiKey, maxTokens: 8192 });
+  return new ChatAnthropic({ model, anthropicApiKey, maxTokens: 8192, ...langchainThinking(model) });
 }
 
 // ── Self-contained background agent runner ────────────────────────────────────

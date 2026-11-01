@@ -30,7 +30,7 @@ export class SocialAnalyticsSyncAgent implements AgentRunner {
   readonly name         = 'Social Analytics Sync';
   readonly description  = 'Syncs post performance metrics from Zernio every 2 hours';
   readonly defaultTools = [];
-  readonly defaultModel = 'claude-haiku-4-5';
+  readonly defaultModel = 'claude-haiku-5-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, agentConfig, input, log, heartbeat } = ctx;

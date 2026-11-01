@@ -29,7 +29,7 @@ const run = (over: Partial<Parameters<typeof summarizeCase>[1][number]> = {}) =>
   tools_called: ['seo_my_rankings'],
   credits: 10,
   latency_ms: 20_000,
-  model: 'claude-sonnet-5',
+  model: 'claude-sonnet-5-5',
   routed_agent: 'edith',
   reply: 'Your brand ranks #1 for materialshub.',
   ...over,

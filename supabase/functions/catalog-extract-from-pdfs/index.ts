@@ -12,7 +12,8 @@ import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../_shared/ai-logger.ts';
+import { shapeClaudeRequest } from '../_shared/claude-models.ts';
 
 // Per-request extraction ceilings (#363 `EE-17`). One Sonnet vision pass per PDF is the cost
 // lever, but memory is the hard limit: each PDF is fully buffered AND base64-encoded before it
@@ -26,7 +27,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY') || '';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 
 // Admin-editable at /admin/ai-configs (prompt_type='generation', category='catalog_extract').
 // This literal is the fallback used only if the DB row is missing. Variables:
@@ -260,7 +261,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
             'x-api-key': ANTHROPIC_API_KEY(),
             'anthropic-version': '2023-06-01',
           },
-          body: JSON.stringify({
+          body: JSON.stringify(shapeClaudeRequest({
             model: MODEL,
             max_tokens: 2500,
             tools: [EXTRACT_TOOL],
@@ -272,7 +273,7 @@ Deno.serve(withApiLogging('catalog-extract-from-pdfs', async (req) => {
                 { type: 'text', text: userText },
               ],
             }],
-          }),
+          })),
         });
 
         if (!resp.ok) {
@@ -421,8 +422,9 @@ async function logCost(supabase: any, userId: string | undefined, workspaceId: s
   // ai_model_pricing", which is the instruction to maintain two copies of one number — and the
   // model it named has no row in that table at all, so it was aligned with nothing.
   const price = await resolveTokenPrice(supabase, MODEL);
-  const inputCost = price ? (inputTokens / 1_000_000) * price.input : null;
-  const outputCost = price ? (outputTokens / 1_000_000) * price.output : null;
+  const costParts = price ? tokenCostParts(price, inputTokens, outputTokens) : null;
+  const inputCost = costParts?.input ?? null;
+  const outputCost = costParts?.output ?? null;
   // null, never 0 — an unpriced model is a gap in ai_model_pricing, not a free call, and
   // `ops.silent_zero` can only see the difference if we keep it.
   const rawCost = price ? inputCost! + outputCost! : null;

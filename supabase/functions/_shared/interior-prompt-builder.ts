@@ -106,7 +106,7 @@ ${editContext}`.trim();
       task: 'interior_prompt_build',
       userId: params.user_id,
       workspaceId: params.workspace_id,
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       systemPrompt,
       maxTokens: 250,
       temperature: 0.8,

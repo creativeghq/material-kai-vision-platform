@@ -3,8 +3,9 @@
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
-import { resolveTokenPrice } from '../ai-logger.ts';
+import { resolveTokenPrice, tokenCostUsd } from '../ai-logger.ts';
 import { getSharedReplyStyle } from '../prompt-utils.ts';
+import { shapeClaudeRequest } from '../claude-models.ts';
 
 // Up-front credit ceiling reserved before the Opus loop, then settled down to the actual
 // token-based cost after the run (surplus refunded, overage charged best-effort). Admin-triggered,
@@ -125,8 +126,8 @@ function makeWebSearchTool(anthropicApiKey: string) {
           'anthropic-version': '2023-06-01',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          model: 'claude-opus-5',
+        body: JSON.stringify(shapeClaudeRequest({
+          model: 'claude-opus-5-5',
           max_tokens: 4000,
           output_config: { effort: 'low' },
           system:
@@ -135,7 +136,7 @@ function makeWebSearchTool(anthropicApiKey: string) {
             + 'it in. Never invent a URL.',
           tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: budget }],
           messages: [{ role: 'user', content: query }],
-        }),
+        })),
       });
       if (!res.ok) throw new Error(`web_search failed: ${res.status}`);
       const data = await res.json();
@@ -234,7 +235,7 @@ export class KaiTaskAgent implements AgentRunner {
   readonly name         = 'KAI Background Task';
   readonly description  = 'Executes any natural-language task dispatched from KAI chat — research, enrichment, analysis, and more.';
   readonly defaultTools = ['material_search', 'knowledge_base_search', 'web_search', 'web_fetch'];
-  readonly defaultModel = 'claude-opus-5';
+  readonly defaultModel = 'claude-opus-5-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const {
@@ -366,7 +367,7 @@ export class KaiTaskAgent implements AgentRunner {
       console.warn(`[kai-task] no ai_model_pricing row for ${model} — releasing the reservation unsettled`);
       await refundCredits(supabase, billUserId, billWorkspaceId, KAI_TASK_CREDIT_CEILING, 'kai_task_agent', { reason: 'unpriced_model' });
     } else {
-      const rawUsd = (result.inputTokens / 1_000_000) * price.input + (result.outputTokens / 1_000_000) * price.output;
+      const rawUsd = tokenCostUsd(price, result.inputTokens, result.outputTokens);
       actualCredits = Math.max(1, Math.ceil(rawUsd * price.markup * 100)); // 1 credit = $0.01
       await settleCredits(supabase, billUserId, billWorkspaceId, KAI_TASK_CREDIT_CEILING, actualCredits, 'kai_task_agent', { run_id: run.id });
     }

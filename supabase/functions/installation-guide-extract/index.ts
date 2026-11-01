@@ -13,7 +13,7 @@ import {
 } from '../_shared/installationGuideSchema.generated.ts';
 
 const BUCKET = 'pdf-documents';
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 const MAX_PAGES = 60;
 const MAX_PAGE_BYTES = 1_500_000;
 const PAGES_PER_STEP_PASS = 6;

@@ -585,7 +585,7 @@
         ],
         "summary": "Reorder search results by relevance to a query",
         "operationId": "post_ai_rerank",
-        "description": "Cross-encoder style reranking over candidates the caller already holds. Fuses the platform's six per-aspect embedding scores (visual/colour/texture/style/material/understanding) into one ordering using claude-haiku-4-5. Degrades to the SOURCE ORDER on every failure path - fewer than 2 candidates, no API key, model error, or a model reply naming ids that were not sent - and reports which happened in `reranked`/`reason`, so a caller never mistakes an unranked list for a ranked one. Ranks by id rather than index, so a shifted candidate list cannot silently reorder the wrong results. The same logic runs in-process for the agent's material_search, visual_search and knowledge_base_search tools; this endpoint is for callers outside the agent runtime. Prompt is editable at /admin/ai-configs (prompts.category='ai_rerank').\n\n**Response:** `{results:[...], reranked:boolean, reason?:string, explanations?:{[id]:string}, model:string}`",
+        "description": "Cross-encoder style reranking over candidates the caller already holds. Fuses the platform's six per-aspect embedding scores (visual/colour/texture/style/material/understanding) into one ordering using claude-haiku-5-5. Degrades to the SOURCE ORDER on every failure path - fewer than 2 candidates, no API key, model error, or a model reply naming ids that were not sent - and reports which happened in `reranked`/`reason`, so a caller never mistakes an unranked list for a ranked one. Ranks by id rather than index, so a shifted candidate list cannot silently reorder the wrong results. The same logic runs in-process for the agent's material_search, visual_search and knowledge_base_search tools; this endpoint is for callers outside the agent runtime. Prompt is editable at /admin/ai-configs (prompts.category='ai_rerank').\n\n**Response:** `{results:[...], reranked:boolean, reason?:string, explanations?:{[id]:string}, model:string}`",
         "security": [
           {
             "supabaseJwt": []
@@ -671,7 +671,7 @@
                   },
                   "model": {
                     "type": "string",
-                    "description": "Override the model (default claude-haiku-4-5)"
+                    "description": "Override the model (default claude-haiku-5-5)"
                   }
                 },
                 "required": [

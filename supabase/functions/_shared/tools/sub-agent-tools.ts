@@ -28,11 +28,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 // Import createSearchTool from search-tools (needed by research/business/product sub-agents)
 import { createSearchTool } from './search-tools.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
-import { resolveTokenPrice } from '../ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../ai-logger.ts';
 
 /** The model these sub-agents run on. Named once so the price lookup and the usage row
  *  cannot drift apart — they were two literals before, and one of them was wrong. */
-const SUB_AGENT_MODEL = 'claude-opus-5';
+const SUB_AGENT_MODEL = 'claude-opus-5-5';
 
 // Reserve ceiling for one Opus sub-agent pass (~$0.40; credits = billed_usd * 100).
 // The exact usage is settled back after the call.
@@ -67,8 +67,7 @@ async function logSubAgentUsage(opName: string, response: any, userId: string | 
       await refundCredits(supabase, userId, workspaceId, reservedCredits, opName, { reason: 'unpriced_model' });
       return;
     }
-    const inputCost = (inputTokens / 1_000_000) * price.input;
-    const outputCost = (outputTokens / 1_000_000) * price.output;
+    const { input: inputCost, output: outputCost } = tokenCostParts(price, inputTokens, outputTokens);
     const rawCost = inputCost + outputCost;
     const billedCost = rawCost * price.markup;
     const creditsToDebit = Math.round(billedCost * 100 * 100) / 100;

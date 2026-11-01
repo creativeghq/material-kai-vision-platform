@@ -199,7 +199,7 @@ export const AIPerformanceTab: React.FC = () => {
       {/* Page Header */}
       <SectionHeader
         title="AI Performance"
-        subtitle="Monitoring all AI models — Claude Opus 4.8 (vision + classification), Claude Sonnet 4.6 (chunking), Claude Haiku 4.5, and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure."
+        subtitle="Monitoring all AI models — Claude Opus 5.5 (vision + classification), Claude Sonnet 5.5 (second reader + chunking), Claude Haiku 5.5 (extraction + background), and embedding models (SigLIP, Voyage AI). Track costs, tokens, success rates, and performance metrics across your entire AI infrastructure."
       />
 
       {/* AI Models Summary Cards */}

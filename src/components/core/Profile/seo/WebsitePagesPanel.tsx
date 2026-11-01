@@ -25,7 +25,7 @@ import { SeoMetricTile } from './SeoMetricTile';
 import type { SeoMetricDescriptor } from './seoMetrics';
 
 const PAGE_SIZE = 50;
-/** The reserve ceiling in seo-api page_review (16k in / 3k out on Sonnet 5); the settle charges the real cost. */
+/** The reserve ceiling in seo-api page_review (16k in / 3k out on Sonnet 5.5); the settle charges the real cost. */
 const REVIEW_MAX_CREDITS = 10;
 
 const SUMMARY_TILES: SeoMetricDescriptor[] = [

@@ -157,7 +157,7 @@ Return null for any field whose input is null or empty. Do NOT add, guess, or in
 ${JSON.stringify(src, null, 2)}`,
       schema,
       {
-        model: 'claude-haiku-4-5-20251001',
+        model: 'claude-haiku-5-5',
         temperature: 0,
         task: 'aade_field_translation',
         userId: billedTo.userId,

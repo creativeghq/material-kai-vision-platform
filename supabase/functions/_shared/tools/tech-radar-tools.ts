@@ -21,7 +21,7 @@ const { createClient } = await import('npm:@supabase/supabase-js@2');
 
 const ANTHROPIC_API_KEY = () => Deno.env.get('ANTHROPIC_API_KEY');
 
-const RESEARCH_MODEL = 'claude-sonnet-5';   // tech judgement benefits from reasoning
+const RESEARCH_MODEL = 'claude-sonnet-5-5';   // tech judgement benefits from reasoning
 // Credit ceiling reserved before the (2× Sonnet + web_search) review, settled to actual after.
 // Injected on kai/Pepper for ALL users, so it must be metered (previously credits_debited=0).
 const REVIEW_CREDIT_CEILING = 40;
@@ -58,6 +58,7 @@ export interface TechRadarFinding {
 import { serviceClient as svcClient } from '../supabase-client.ts';
 // One wording for every untrusted block (security invariant 9).
 import { wrapUntrusted } from '../untrusted.ts';
+import { shapeClaudeRequest } from '../claude-models.ts';
 
 export { svcClient };
 async function sha1Hex(input: string): Promise<string> {
@@ -157,15 +158,15 @@ export async function researchSolution(
   const r1 = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     // web_search_20260209 is GA and takes no beta header. It needs Opus 4.6+ or
-    // Sonnet 4.6+, which RESEARCH_MODEL is — the two Haiku 4.5 call sites cannot
+    // Sonnet 4.6+, which RESEARCH_MODEL is — the two Haiku call sites cannot
     // follow and stay on the basic variant deliberately (#400 W7).
     headers: anthropicHeaders(),
-    body: JSON.stringify({
+    body: JSON.stringify(shapeClaudeRequest({
       model: RESEARCH_MODEL,
       max_tokens: 4096,
       tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: maxWebUses }],
       messages: [{ role: 'user', content: researchPrompt }],
-    }),
+    })),
   });
   if (!r1.ok) throw new Error(`web_search pass failed: ${r1.status} ${(await r1.text()).slice(0, 200)}`);
   const d1 = await r1.json();
@@ -177,7 +178,7 @@ export async function researchSolution(
   const r2 = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: anthropicHeaders(),
-    body: JSON.stringify({
+    body: JSON.stringify(shapeClaudeRequest({
       model: RESEARCH_MODEL,
       max_tokens: 4096,
       tools: [SUBMIT_FINDINGS_TOOL],
@@ -195,7 +196,7 @@ export async function researchSolution(
           `'assess' or 'trial'; reserve 'adopt' for clear wins and 'hold' for things to avoid ` +
           `or where the current approach should stay. Skip anything not materially better than today.`,
       }],
-    }),
+    })),
   });
   if (!r2.ok) throw new Error(`structuring pass failed: ${r2.status} ${(await r2.text()).slice(0, 200)}`);
   const d2 = await r2.json();

@@ -18,6 +18,7 @@ import { roleHasCapability, type Capability } from '../_shared/roleCapabilities.
 import { checkAgentAttachments } from '../_shared/agentAttachmentLimits.generated.ts';
 import { inlineImagesForModel } from '../_shared/model-images.ts';
 import { describeProviderFailure } from '../_shared/provider-failure.ts';
+import { CLAUDE_HAIKU, langchainThinking, rejectsForcedToolChoice } from '../_shared/claude-models.ts';
 import { captureException } from '../_shared/sentry.ts';
 // Type-only — erased at compile time, so it costs nothing at boot. The implementation is
 // loaded inside initRuntime() alongside the other lazy modules.
@@ -160,9 +161,9 @@ async function initRuntime() {
   buildAgentStateAnnotation();
 
   modelHaiku = new ChatAnthropic({
-    model: 'claude-haiku-4-5',
-    temperature: 0.7,
+    model: CLAUDE_HAIKU,
     maxTokens: 4096,
+    ...langchainThinking(CLAUDE_HAIKU),
     apiKey: ANTHROPIC_API_KEY,
   });
   // Opus 5, not 4.8 (the A/B is recorded on shouldRouteToHaiku below). No `temperature`:
@@ -186,6 +187,24 @@ async function initRuntime() {
 // here wrote by regex and read by `order by created_at desc`, and had promoted exactly one
 // memory across 800+ real runs.
 let longTermMemory: AgentMemoryType;
+
+const FIRST_STEP_TOOL_INSTRUCTION =
+  'Start this turn by calling one of your tools. Do not answer in prose before you have called one.';
+
+function withoutThinkingBlocks(message: any): any {
+  if (!Array.isArray(message?.content)) return message;
+  const kept = message.content.filter((b: any) => b?.type !== 'thinking' && b?.type !== 'redacted_thinking');
+  if (kept.length === message.content.length) return message;
+  // An assistant turn that only thought must still say something, or the request is a 400.
+  return new AIMessage({
+    content: kept.length || message.tool_calls?.length ? kept : '(no reply)',
+    tool_calls: message.tool_calls,
+    additional_kwargs: message.additional_kwargs,
+    response_metadata: message.response_metadata,
+    usage_metadata: message.usage_metadata,
+    id: message.id,
+  });
+}
 
 /**
  * LangGraph State Annotation
@@ -282,6 +301,14 @@ function createAgentGraph(
   abortSignal?: AbortSignal,
 ) {
 
+  // A thinking block replayed after the bound tool set changes (load_toolkit adds, generation
+  // tools drop) is a 400 on the 5.5 models, so once it changes the earlier blocks go.
+  let boundToolKey: string | null = null;
+  let toolSetChanged = false;
+  // Where forcing is a 400 the first-step tool call is asked for in the prompt instead. Fixed for
+  // the whole turn: changing the system prompt between steps is itself a prefix edit.
+  const forcedInPrompt = !!forceToolCall && rejectsForcedToolChoice(model.model);
+
   // Agent node: calls the model
   async function agentNode(state: AgentState): Promise<Partial<AgentState>> {
     // The client has gone. Stop before spending another model call (#352 A16).
@@ -306,8 +333,14 @@ function createAgentGraph(
       ? tools.filter((t: any) => !GENERATION_TOOLS.includes(t.name))
       : tools;
     const modelWithTools = availableTools.length > 0
-      ? model.bindTools(availableTools, (forceToolCall && state.iteration === 0) ? { tool_choice: 'any' } : undefined)
+      ? model.bindTools(
+        availableTools,
+        (forceToolCall && state.iteration === 0 && !forcedInPrompt) ? { tool_choice: 'any' } : undefined,
+      )
       : model;
+    const toolKey = availableTools.map((t: any) => t.name).join(',');
+    if (boundToolKey !== null && toolKey !== boundToolKey) toolSetChanged = true;
+    boundToolKey = toolKey;
     const invokeStartTime = Date.now();
 
     // The system prompt reaches Anthropic through exactly ONE path: a SystemMessage
@@ -316,18 +349,21 @@ function createAgentGraph(
     // object (model, stop_sequences, stream, max_tokens, tools, tool_choice, thinking,
     // context_management, container, betas, output_format, mcp_servers) — every other
     // call option is silently dropped.
+    const systemText = forcedInPrompt ? `${state.systemPrompt}\n\n${FIRST_STEP_TOOL_INSTRUCTION}` : state.systemPrompt;
     const systemMessage = new SystemMessage({
       content: [
-        { type: 'text', text: state.systemPrompt, cache_control: { type: 'ephemeral' } },
+        { type: 'text', text: systemText, cache_control: { type: 'ephemeral' } },
       ],
     });
+    const history = toolSetChanged ? state.messages.map(withoutThinkingBlocks) : state.messages;
+
     // STREAMED, not invoked. `invoke()` resolves only when the whole completion is finished,
     // so the user saw nothing at all while the model wrote — on a multi-iteration turn that is
     // one silent gap per iteration, and turn latency here runs to a measured 181s. Streaming
     // does not make the turn shorter; it makes the first token arrive in about a second, which
     // is the part people actually experience.
     const stream = await modelWithTools.stream(
-      [systemMessage, ...state.messages],
+      [systemMessage, ...history],
       abortSignal ? { signal: abortSignal } : undefined,
     );
     let response: any = null;
@@ -882,12 +918,12 @@ function shouldRouteToHaiku(agentId: string): boolean {
 
 /** Models an INTERNAL caller may pin for a turn, for measurement. */
 /** The model every substantive turn runs on. */
-const MAIN_MODEL = 'claude-opus-5';
+const MAIN_MODEL = 'claude-opus-5-5';
 
 const MODEL_OVERRIDE_ALLOWED = new Set([
-  'claude-haiku-4-5',
-  'claude-opus-5',
-  'claude-sonnet-5',
+  'claude-haiku-5-5',
+  'claude-opus-5-5',
+  'claude-sonnet-5-5',
 ]);
 
 const _modelByName = new Map<string, ChatAnthropicModel>();
@@ -905,6 +941,7 @@ function getModelByName(name: string): ChatAnthropicModel {
       // measured against a budget the router's own model does not have.
       maxTokens: 8192,
       apiKey: ANTHROPIC_API_KEY,
+      ...langchainThinking(name),
     });
     _modelByName.set(name, m);
   }
@@ -926,7 +963,7 @@ function getModelNameForAgent(agentId: string, modelOverride?: string | null): s
   // logs the router's model would price the run against the wrong rate and make the
   // comparison the pin exists to enable meaningless.
   if (modelOverride) return modelOverride;
-  return shouldRouteToHaiku(agentId) ? 'claude-haiku-4-5' : MAIN_MODEL;
+  return shouldRouteToHaiku(agentId) ? 'claude-haiku-5-5' : MAIN_MODEL;
 }
 
 // ── Orchestrator routing (Agent Fabric) ──────────────────────────────

@@ -4,17 +4,10 @@
 // and log to ai_usage_logs (module_slug='real-estate') so the op shows on the Operations dashboard.
 import { HttpError } from '../_shared/api-logger.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
+import { shapeClaudeRequest } from '../_shared/claude-models.ts';
+import { resolveTokenPrice, tokenCostUsd } from '../_shared/ai-logger.ts';
 
-const FAMILY_PRICING: Array<{ match: string; input: number; output: number }> = [
-  { match: 'claude-opus', input: 15.0, output: 75.0 },
-  { match: 'claude-sonnet', input: 3.0, output: 15.0 },
-  { match: 'claude-haiku', input: 1.0, output: 5.0 },
-];
-function priceFor(model: string) {
-  const m = model.toLowerCase();
-  return FAMILY_PRICING.find((p) => m.includes(p.match)) ?? { input: 3.0, output: 15.0 };
-}
-const RE_MODEL = () => Deno.env.get('REAL_ESTATE_AI_MODEL') || 'claude-sonnet-5';
+const RE_MODEL = () => Deno.env.get('REAL_ESTATE_AI_MODEL') || 'claude-sonnet-5-5';
 const DRAFT_CEILING = 5; // conservative credit reservation for one listing-copy generation
 
 /** Reserve a credit ceiling up front (throws 402 if the pool/balance can't cover it). */
@@ -90,11 +83,11 @@ export async function draftListingCopy(
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
+      body: JSON.stringify(shapeClaudeRequest({
         model, max_tokens: 1200,
         tools: [LISTING_COPY_TOOL], tool_choice: { type: 'tool', name: LISTING_COPY_TOOL.name },
         messages: [{ role: 'user', content: prompt }],
-      }),
+      })),
     });
     if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
     data = await res.json();
@@ -108,10 +101,11 @@ export async function draftListingCopy(
   if (!block?.input) { await refund(supabase, userId, workspaceId, DRAFT_CEILING, { reason: 'no_output' }); throw new HttpError(502, 'AI returned no result'); }
 
   const inTok = Number(data?.usage?.input_tokens ?? 0), outTok = Number(data?.usage?.output_tokens ?? 0);
-  const p = priceFor(model);
-  const rawUsd = (inTok / 1e6) * p.input + (outTok / 1e6) * p.output;
-  const billedUsd = rawUsd * MARKUP_MULTIPLIER;
-  const credits = Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
+  // An unpriced model keeps the reserved ceiling rather than inventing a rate.
+  const p = await resolveTokenPrice(supabase, model);
+  const rawUsd = p ? tokenCostUsd(p, inTok, outTok) : null;
+  const billedUsd = rawUsd === null ? null : rawUsd * MARKUP_MULTIPLIER;
+  const credits = billedUsd === null ? DRAFT_CEILING : Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
 
   // Log + settle (refund ceiling − actual).
   try {
@@ -189,7 +183,7 @@ export async function analyzePropertyPhotos(
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model, max_tokens: 1500, tools: [PHOTO_TOOL], tool_choice: { type: 'tool', name: PHOTO_TOOL.name }, messages: [{ role: 'user', content: blocks }] }),
+      body: JSON.stringify(shapeClaudeRequest({ model, max_tokens: 1500, tools: [PHOTO_TOOL], tool_choice: { type: 'tool', name: PHOTO_TOOL.name }, messages: [{ role: 'user', content: blocks }] })),
     });
     if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
     data = await res.json();
@@ -201,10 +195,11 @@ export async function analyzePropertyPhotos(
   if (!block?.input) { await refund(supabase, userId, workspaceId, PHOTO_CEILING, { reason: 'no_output' }); throw new HttpError(502, 'AI returned no result'); }
 
   const inTok = Number(data?.usage?.input_tokens ?? 0), outTok = Number(data?.usage?.output_tokens ?? 0);
-  const p = priceFor(model);
-  const rawUsd = (inTok / 1e6) * p.input + (outTok / 1e6) * p.output;
-  const billedUsd = rawUsd * MARKUP_MULTIPLIER;
-  const credits = Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
+  // An unpriced model keeps the reserved ceiling rather than inventing a rate.
+  const p = await resolveTokenPrice(supabase, model);
+  const rawUsd = p ? tokenCostUsd(p, inTok, outTok) : null;
+  const billedUsd = rawUsd === null ? null : rawUsd * MARKUP_MULTIPLIER;
+  const credits = billedUsd === null ? PHOTO_CEILING : Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
   try {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId, workspace_id: workspaceId, module_slug: 'real-estate',

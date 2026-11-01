@@ -23,6 +23,7 @@ const NO_SAMPLING_MODEL_PREFIXES = [
   'claude-opus-4-8',
   'claude-opus-4-7',
   'claude-sonnet-5',
+  'claude-haiku-5',
 ];
 
 const SAMPLING_PARAMS = ['temperature', 'top_p', 'topP', 'top_k', 'topK'];

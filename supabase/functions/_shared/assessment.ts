@@ -22,7 +22,7 @@ export type { AssessmentSubject };
  * press rather than anything on a hot path. It is also a model `ai_model_pricing` carries a rate
  * for; a model with no row settles as UNPRICED, and unpriced is not free.
  */
-export const ASSESSMENT_MODEL = 'claude-opus-5';
+export const ASSESSMENT_MODEL = 'claude-opus-5-5';
 
 /**
  * Credit ceiling reserved up front. Shape of a run: ~5k input tokens and ~1.5k output, about 9

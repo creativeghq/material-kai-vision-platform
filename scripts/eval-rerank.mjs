@@ -38,7 +38,7 @@ if (!Number.isFinite(LIMIT) || LIMIT < 1) {
 const JSON_OUT = argOf('--json', null);
 
 const VOYAGE_RERANK_MODEL = process.env.VOYAGE_RERANK_MODEL || 'rerank-3-lite';
-const CLAUDE_RERANK_MODEL = process.env.CLAUDE_RERANK_MODEL || 'claude-haiku-4-5';
+const CLAUDE_RERANK_MODEL = process.env.CLAUDE_RERANK_MODEL || 'claude-haiku-5-5';
 const CANDIDATE_POOL = 40;
 
 function die(msg) {

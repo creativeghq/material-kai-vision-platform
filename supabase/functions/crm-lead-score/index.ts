@@ -10,15 +10,11 @@ import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { MARKUP_MULTIPLIER, CREDITS_PER_USD } from '../_shared/pricing-constants.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
+import { shapeClaudeRequest } from '../_shared/claude-models.ts';
+import { resolveTokenPrice, tokenCostUsd } from '../_shared/ai-logger.ts';
 
 
-const FAMILY_PRICING: Array<{ match: string; input: number; output: number }> = [
-  { match: 'claude-opus', input: 15.0, output: 75.0 },
-  { match: 'claude-sonnet', input: 3.0, output: 15.0 },
-  { match: 'claude-haiku', input: 1.0, output: 5.0 },
-];
-const priceFor = (m: string) => FAMILY_PRICING.find((p) => m.toLowerCase().includes(p.match)) ?? { input: 3.0, output: 15.0 };
-const MODEL = () => Deno.env.get('CRM_AI_MODEL') || 'claude-sonnet-5';
+const MODEL = () => Deno.env.get('CRM_AI_MODEL') || 'claude-sonnet-5-5';
 const CEILING = 3;
 
 const TOOL = {
@@ -128,7 +124,7 @@ Deno.serve(withApiLogging('crm-lead-score', async (req) => {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model, max_tokens: 300, tools: [TOOL], tool_choice: { type: 'tool', name: TOOL.name }, messages: [{ role: 'user', content: prompt }] }),
+      body: JSON.stringify(shapeClaudeRequest({ model, max_tokens: 300, tools: [TOOL], tool_choice: { type: 'tool', name: TOOL.name }, messages: [{ role: 'user', content: prompt }] })),
     });
     if (!res.ok) throw new HttpError(502, `AI request failed (${res.status})`);
     data = await res.json();
@@ -141,10 +137,11 @@ Deno.serve(withApiLogging('crm-lead-score', async (req) => {
   if (!block?.input) { await refund(supabase, userId, workspaceId, CEILING, { reason: 'no_output' }); return json({ error: 'AI returned no result' }, 502); }
 
   const inTok = Number(data?.usage?.input_tokens ?? 0), outTok = Number(data?.usage?.output_tokens ?? 0);
-  const p = priceFor(model);
-  const rawUsd = (inTok / 1e6) * p.input + (outTok / 1e6) * p.output;
-  const billedUsd = rawUsd * MARKUP_MULTIPLIER;
-  const credits = Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
+  // An unpriced model keeps the reserved ceiling rather than inventing a rate.
+  const p = await resolveTokenPrice(supabase, model);
+  const rawUsd = p ? tokenCostUsd(p, inTok, outTok) : null;
+  const billedUsd = rawUsd === null ? null : rawUsd * MARKUP_MULTIPLIER;
+  const credits = billedUsd === null ? CEILING : Math.max(1, Math.ceil(billedUsd * CREDITS_PER_USD));
   try {
     await supabase.from('ai_usage_logs').insert({
       user_id: userId, workspace_id: workspaceId, module_slug: 'crm', operation_type: 'crm_lead_score', model_name: model,

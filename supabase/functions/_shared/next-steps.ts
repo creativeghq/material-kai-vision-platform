@@ -16,7 +16,7 @@ export interface NextStepsUsage {
   modelName: string;
 }
 
-const MODEL = 'claude-haiku-4-5';
+const MODEL = 'claude-haiku-5-5';
 const MAX_TOKENS = 400;
 const MAX_STEPS = 3;
 /** Enough of a tool payload to reason about; never the whole thing (a product list is huge). */

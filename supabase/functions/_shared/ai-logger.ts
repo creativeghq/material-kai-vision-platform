@@ -7,7 +7,42 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 // `ai_model_pricing` is the ONLY token-price source in this runtime — there is deliberately no
 // literal fallback table (#365 AD-17). Cached per-worker for 5 minutes so per-call logging stays
 // cheap; a miss resolves to null, never to a plausible number.
-export interface TokenPrice { input: number; output: number; markup: number }
+export interface TokenPrice {
+  input: number;
+  output: number;
+  markup: number;
+  /** A prompt longer than this is billed at the long-context rates (Haiku 5.5: 100K). */
+  longThreshold?: number;
+  longInput?: number;
+  longOutput?: number;
+}
+
+/**
+ * USD for one call, split by side. The rate card is picked by the length of the whole prompt,
+ * so pass `cachedPromptTokens` where the provider reported cache reads/writes separately.
+ */
+export type TokenRates = Pick<TokenPrice, 'input' | 'output' | 'longThreshold' | 'longInput' | 'longOutput'>;
+
+export function tokenCostParts(
+  price: TokenRates,
+  inputTokens: number,
+  outputTokens: number,
+  cachedPromptTokens = 0,
+): { input: number; output: number } {
+  const promptTokens = Math.max(0, inputTokens) + Math.max(0, cachedPromptTokens);
+  const long = !!price.longThreshold && promptTokens > price.longThreshold;
+  const inRate = long ? (price.longInput || price.input) : price.input;
+  const outRate = long ? (price.longOutput || price.output) : price.output;
+  return {
+    input: (Math.max(0, inputTokens) / 1_000_000) * inRate,
+    output: (Math.max(0, outputTokens) / 1_000_000) * outRate,
+  };
+}
+
+export function tokenCostUsd(price: TokenRates, inputTokens: number, outputTokens: number, cachedPromptTokens = 0): number {
+  const { input, output } = tokenCostParts(price, inputTokens, outputTokens, cachedPromptTokens);
+  return input + output;
+}
 const DEFAULT_MARKUP = 1.5;
 const DB_PRICE_TTL_MS = 5 * 60 * 1000;
 let _dbPriceCache: { data: Record<string, TokenPrice>; expiresAt: number } | null = null;
@@ -21,7 +56,7 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
       try {
         const { data, error } = await supabase
           .from('ai_model_pricing')
-          .select('model_key, input_price_per_million, output_price_per_million, markup_multiplier')
+          .select('model_key, input_price_per_million, output_price_per_million, markup_multiplier, long_context_threshold_tokens, long_context_input_price_per_million, long_context_output_price_per_million')
           .eq('billing_type', 'token_based')
           .eq('is_active', true);
         if (error || !data) return _dbPriceCache?.data || {};
@@ -32,6 +67,9 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
             input: Number(r.input_price_per_million) || 0,
             output: Number(r.output_price_per_million) || 0,
             markup: Number(r.markup_multiplier) || DEFAULT_MARKUP,
+            longThreshold: Number(r.long_context_threshold_tokens) || undefined,
+            longInput: Number(r.long_context_input_price_per_million) || undefined,
+            longOutput: Number(r.long_context_output_price_per_million) || undefined,
           };
         }
         _dbPriceCache = { data: map, expiresAt: Date.now() + DB_PRICE_TTL_MS };
@@ -61,8 +99,8 @@ export async function resolveTokenPrice(
     const dbPricing = await getDbTokenPricing(supabase);
     const exact = dbPricing[modelLower];
     if (exact) return exact;
-    // Substring fallback, in either direction — this is what lets `claude-haiku-4-5-20251001`
-    // price through the `claude-haiku-4-5` row. It resolves to a REAL row, not to a literal, so
+    // Substring fallback, in either direction — this is what lets a dated id
+    // (`claude-haiku-4-5-20251001`) price through its undated row. It resolves to a REAL row, not to a literal, so
     // it is a lookup and not a second source. `get_ai_model_usage_coverage()` reports which models
     // reach their price this way, because the coupling is invisible and one rename from breaking.
     for (const [key, val] of Object.entries(dbPricing)) {
@@ -88,9 +126,7 @@ export async function creditsForTokens(
 ): Promise<{ credits: number; rawUsd: number; billedUsd: number; markup: number } | null> {
   const price = await resolveTokenPrice(supabase, model);
   if (!price) return null;
-  const rawUsd =
-    (Math.max(0, inputTokens) / 1_000_000) * price.input +
-    (Math.max(0, outputTokens) / 1_000_000) * price.output;
+  const rawUsd = tokenCostUsd(price, inputTokens, outputTokens);
   const billedUsd = rawUsd * price.markup;
   return {
     // CREDITS_PER_USD is 100 and lives in pricing-constants; expressed here as the same
@@ -280,8 +316,7 @@ export class AICallLogger {
     // `unbilled_reason` so the row says why the number is missing. (#365 AD-17)
     if (!pricing) return null;
 
-    return (inputTokens / 1_000_000) * pricing.input
-         + (outputTokens / 1_000_000) * pricing.output;
+    return tokenCostUsd(pricing, inputTokens, outputTokens);
   }
 
   /**

@@ -26,7 +26,7 @@ import { ANON_BLUEPRINT_ITEM_COLUMNS, foldItemPricingForAnon } from '../_shared/
 import { resolveWorkspacePrincipal } from '../_shared/workspace-principal.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostUsd } from '../_shared/ai-logger.ts';
 import { PLACE_SPACE_SCHEMA, validatePlaceSpace } from '../_shared/place-space.ts';
 import { normalizeShopOrigin, storeExternalIds } from '../_shared/shop-origin.ts';
 
@@ -1196,8 +1196,7 @@ Deno.serve(withApiLogging((req) => {
 
       const price = await resolveTokenPrice(supabase, PLACE_SPACE_MODEL);
       const usd = price
-        ? (Number(response.usage?.input_tokens ?? 0) / 1_000_000) * price.input
-          + (Number(response.usage?.output_tokens ?? 0) / 1_000_000) * price.output
+        ? tokenCostUsd(price, Number(response.usage?.input_tokens ?? 0), Number(response.usage?.output_tokens ?? 0))
         : Number(keyRow.daily_usd_cap ?? 1);
       await supabase.rpc('embed_spend_record', { p_key_id: auth.ctx.keyId, p_usd: usd });
 

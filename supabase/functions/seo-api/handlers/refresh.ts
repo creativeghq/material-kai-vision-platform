@@ -20,7 +20,7 @@ import {
   type ArticleSuggestion, type SuggestionItem,
 } from './suggestion-rules.ts';
 
-export const REFRESH_MODEL = 'claude-sonnet-5';
+export const REFRESH_MODEL = 'claude-sonnet-5-5';
 const MAX_INPUT_TOKENS = 40000;
 const MAX_OUTPUT_TOKENS = 8000;
 const RESEARCH_MAX_AGE_DAYS = 30;

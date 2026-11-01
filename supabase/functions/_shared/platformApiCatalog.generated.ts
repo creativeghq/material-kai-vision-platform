@@ -88,7 +88,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Reorder search results by relevance to a query",
-    "description": "Cross-encoder style reranking over candidates the caller already holds. Fuses the platform's six per-aspect embedding scores (visual/colour/texture/style/material/understanding) into one ordering using claude-haiku-4-5. Degrades to the SOURCE ORDER on every failure path - fewer than 2 candidates, no API key, model error, or a model reply naming ids that were not sent - and reports which happened i",
+    "description": "Cross-encoder style reranking over candidates the caller already holds. Fuses the platform's six per-aspect embedding scores (visual/colour/texture/style/material/understanding) into one ordering using claude-haiku-5-5. Degrades to the SOURCE ORDER on every failure path - fewer than 2 candidates, no API key, model error, or a model reply naming ids that were not sent - and reports which happened i",
     "fields": {
       "query": {
         "type": "string",
@@ -110,7 +110,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       },
       "model": {
         "type": "string",
-        "description": "Override the model (default claude-haiku-4-5)"
+        "description": "Override the model (default claude-haiku-5-5)"
       }
     }
   },

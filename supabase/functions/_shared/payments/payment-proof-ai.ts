@@ -7,7 +7,7 @@ import { emitFlowEventToWorkspaceRoles } from '../flow-events.ts';
 import { nameKey } from '../revolut/reconcile.ts';
 import { compareProofToOrder, parseProofExtraction, type ProofVerdict } from './payment-proof-checks.ts';
 
-const MODEL = 'claude-sonnet-5';
+const MODEL = 'claude-sonnet-5-5';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const nullable = (type: string) => ({ type: [type, 'null'] });

@@ -14,7 +14,7 @@ const server = Deno.serve({ port: PORT, onListen: () => {} }, async (req) => {
   return new Response(
     sse([
       { type: 'message_start', message: {
-        id: 'msg_smoke', type: 'message', role: 'assistant', model: 'claude-opus-5', content: [],
+        id: 'msg_smoke', type: 'message', role: 'assistant', model: 'claude-opus-5-5', content: [],
         usage: { input_tokens: 11, output_tokens: 1, cache_read_input_tokens: 5, cache_creation_input_tokens: 6 } } },
       { type: 'content_block_start', index: 0, content_block: { type: 'text', text: '' } },
       { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: 'po' } },
@@ -58,7 +58,7 @@ try {
   });
 
   const model = new ChatAnthropic({
-    model: 'claude-opus-5',
+    model: 'claude-opus-5-5',
     apiKey: 'sk-smoke',
     maxTokens: 32,
     clientOptions: { baseURL: `http://localhost:${PORT}` },

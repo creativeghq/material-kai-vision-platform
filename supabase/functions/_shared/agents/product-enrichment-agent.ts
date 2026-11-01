@@ -26,7 +26,7 @@ export class ProductEnrichmentAgent implements AgentRunner {
   // nothing reads the list; the identical lie in kai-task-agent, where the model DID read it,
   // is how a research task with no working tools produced a fabricated report.
   readonly defaultTools: string[] = [];
-  readonly defaultModel = 'claude-haiku-4-5';
+  readonly defaultModel = 'claude-haiku-5-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, agentConfig, input, log, heartbeat } = ctx;

@@ -17,7 +17,7 @@ import { authenticate } from '../_shared/auth.ts';
 import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { generateWithClaude } from '../_shared/ai-client.ts';
 
-const MODEL = 'claude-haiku-4-5-20251001';
+const MODEL = 'claude-haiku-5-5';
 /** Below this, a "summary" is just the reviews again, and it identifies the reviewers. */
 const MIN_REVIEWS = 3;
 const COOLDOWN_MS = 60 * 60 * 1000;

@@ -2,7 +2,7 @@
 
 import { getToolPrompt } from './prompt-utils.ts';
 import { reserveCredits, refundCredits, settleCredits } from './credit-reserve.ts';
-import { resolveTokenPrice } from './ai-logger.ts';
+import { resolveTokenPrice, tokenCostUsd } from './ai-logger.ts';
 import { callClaudeMessages, transcribeAudioWithGemini } from './ai-client.ts';
 import { ingestSupplierDocument, INVOICE_MIME } from './finance/invoice-extraction.ts';
 import { INBOX_DOCUMENT_KINDS, type InboxDocumentKind } from './inboxDocumentKinds.generated.ts';
@@ -16,7 +16,7 @@ type Db = any;
 
 /** One name each, so the price lookup and the usage row cannot come to different answers. */
 export const TRANSCRIPTION_MODEL = 'gemini-3.5-flash';
-export const CLASSIFICATION_MODEL = 'claude-haiku-4-5';
+export const CLASSIFICATION_MODEL = 'claude-haiku-5-5';
 /** The `prompts.category` AND the `ai_usage_logs.operation_type` of each pass. */
 export const TRANSCRIPTION_TASK = 'inbox_audio_transcription';
 export const CLASSIFICATION_TASK = 'inbox_document_classification';
@@ -196,7 +196,7 @@ export async function settleAgainstUsage(
     await refundCredits(db, args.userId, args.workspaceId, args.ceiling, args.task, { reason: 'unpriced_model', ...args.meta });
     return;
   }
-  const rawCost = (inputTokens / 1_000_000) * price.input + (outputTokens / 1_000_000) * price.output;
+  const rawCost = tokenCostUsd(price, inputTokens, outputTokens);
   const credits = Math.round(rawCost * price.markup * 100 * 100) / 100;
   await settleCredits(db, args.userId, args.workspaceId, args.ceiling, credits, args.task, args.meta);
 }

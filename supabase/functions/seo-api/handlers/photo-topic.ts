@@ -6,7 +6,7 @@ import { getToolPrompt } from '../../_shared/prompt-utils.ts';
 import { serpValue } from './untrusted.ts';
 import type { PhotoUsage } from './photo-verify.ts';
 
-export const PHOTO_TOPIC_MODEL = 'claude-sonnet-5';
+export const PHOTO_TOPIC_MODEL = 'claude-sonnet-5-5';
 export const PHOTO_TOPIC_MAX_INPUT_TOKENS = 12000;
 /** Descriptions past this many characters are not sent, so the call stays inside its reserved ceiling; those photos are withheld. */
 const MAX_LIST_CHARS = 9000;

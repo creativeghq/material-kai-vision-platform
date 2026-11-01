@@ -174,7 +174,7 @@ export class FactoryEnrichmentAgent implements AgentRunner {
   readonly name         = 'Factory Enrichment';
   readonly description  = 'Enriches incomplete factory metadata using Apollo.io, Firecrawl, and Hunter.io';
   readonly defaultTools = [];
-  readonly defaultModel = 'claude-haiku-4-5';
+  readonly defaultModel = 'claude-haiku-5-5';
 
   async run(ctx: AgentRunContext): Promise<AgentRunResult> {
     const { supabase, agentConfig, input, log, heartbeat } = ctx;

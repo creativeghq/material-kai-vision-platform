@@ -21,16 +21,17 @@ const { compareResearchSources } = await import('../research-validation.ts');
 import { debitOrRefuse } from '../credit-utils.ts';
 import { describeAnthropicFailure } from './anthropic-failure.ts';
 import { reserveCredits, refundCredits } from '../credit-reserve.ts';
-import { resolveTokenPrice } from '../ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts } from '../ai-logger.ts';
 import { assertSafeUrl } from '../ssrf-guard.ts';
 // One wording for every untrusted block (security invariant 9).
 import { wrapUntrusted } from '../untrusted.ts';
+import { shapeClaudeRequest } from '../claude-models.ts';
 
 /**
  * The model that runs the search turn. NO `temperature` anywhere in this file, and do not add one:
  * sampling parameters were REMOVED on Opus 4.7+ and Sonnet 5, and a non-default value is a 400.
  */
-const SEARCH_MODEL = 'claude-opus-5';
+const SEARCH_MODEL = 'claude-opus-5-5';
 
 /** Per-search-use surcharge Anthropic charges for the server-side web_search tool. */
 const WEB_SEARCH_USE_USD = 0.01;
@@ -148,7 +149,7 @@ export const createWebSearchTool = (
             'anthropic-version': '2023-06-01',
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
+          body: JSON.stringify(shapeClaudeRequest({
             model: SEARCH_MODEL,
             max_tokens: 8000,
             // effort:low for the same measured reason b2b_manufacturer_search uses it: at high
@@ -165,7 +166,7 @@ export const createWebSearchTool = (
               { type: 'web_search_20260209', name: 'web_search', max_uses: searchBudget, ...domainFilter },
             ],
             messages: [{ role: 'user', content: query }],
-          }),
+          })),
         });
       } catch (err) {
         await refundCredits(supabase, userId, workspaceId ?? undefined, SEARCH_CEILING, 'web_search', { reason: 'network_error' });
@@ -311,8 +312,7 @@ async function settleSearchCost(
       return;
     }
 
-    const inputCost = (inputTokens / 1_000_000) * price.input;
-    const outputCost = (outputTokens / 1_000_000) * price.output;
+    const { input: inputCost, output: outputCost } = tokenCostParts(price, inputTokens, outputTokens);
     const searchCost = searchesUsed * WEB_SEARCH_USE_USD;
     const rawCost = inputCost + outputCost + searchCost;
     const billedCost = rawCost * price.markup;

@@ -188,7 +188,7 @@ async function scan(body: Body, admin: any, uid: string): Promise<Response> {
     : { type: 'image', source: { type: 'base64', media_type: mime, data: clean } };
 
   const res = await callClaudeMessages({
-    model: 'claude-sonnet-5',
+    model: 'claude-sonnet-5-5',
     max_tokens: 1024,
     system: prompt,
     tools: [RECEIPT_TOOL],

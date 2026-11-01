@@ -147,7 +147,7 @@ Deno.serve(withApiLogging('scan-drawing-title-block', async (req: Request) => {
     : { type: 'image', source: { type: 'base64', media_type: mime, data: clean } };
 
   const res = await callClaudeMessages({
-    model: 'claude-sonnet-5',
+    model: 'claude-sonnet-5-5',
     max_tokens: 1024,
     system: prompt,
     tools: [TITLE_BLOCK_TOOL],

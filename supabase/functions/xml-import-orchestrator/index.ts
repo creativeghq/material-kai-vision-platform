@@ -280,7 +280,7 @@ async function suggestFieldMappings(
 
   try {
     const data = await callClaudeMessages({
-      model: 'claude-haiku-4-5',
+      model: 'claude-haiku-5-5',
       max_tokens: 2000,
       messages: [{ role: 'user', content: prompt }],
       // Forced tool_choice (#363 `EE-16`, invariant 9): this verdict drives a DB write.

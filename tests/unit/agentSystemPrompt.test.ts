@@ -140,7 +140,7 @@ describe('the agent system prompt travels as a message', () => {
       // and had to wrap. The PROPERTY is "it streams, with the system message first" — pinning
       // the one-line layout instead made a reformat look like a regression, which is the shape
       // that gets a guard deleted rather than understood.
-    ).toMatch(/await modelWithTools\.stream\(\s*\[systemMessage, \.\.\.state\.messages\]/);
+    ).toMatch(/await modelWithTools\.stream\(\s*\[systemMessage, \.\.\.(?:state\.messages|history)\]/);
 
     expect(
       text.includes('modelWithTools.invoke('),

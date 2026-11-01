@@ -6,7 +6,7 @@ import { getToolPrompt } from '../../_shared/prompt-utils.ts';
 import { applyReviewEdits, type ReviewEdit } from './site-assets.ts';
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 
-export const LEXICON_MODEL = 'claude-sonnet-5';
+export const LEXICON_MODEL = 'claude-sonnet-5-5';
 const LEXICON_MAX_INPUT_TOKENS = 12000;
 const LEXICON_MAX_OUTPUT_TOKENS = 4000;
 const MAX_SENTENCES = 80;
