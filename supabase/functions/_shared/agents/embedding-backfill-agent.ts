@@ -22,6 +22,9 @@ const ASPECT_DEFICIENT_OR =
   'has_style_slig.is.null,has_style_slig.eq.false,' +
   'has_material_slig.is.null,has_material_slig.eq.false';
 
+/** An entity that failed this many ticks is reported as `stuck` and no longer re-sent every 15 minutes. */
+const STUCK_ATTEMPTS = 3;
+
 export class EmbeddingBackfillAgent implements AgentRunner {
   readonly agentType    = 'embedding-backfill';
   readonly name         = 'Embedding Backfill';
@@ -77,6 +80,15 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       return res.json();
     };
 
+    // A legitimately empty aspect (no texture in a spec-sheet fragment) never sets its flag.
+    const stuckFilter = async (entityType: string, deficiency: string): Promise<string | null> => {
+      const { data } = await supabase.from('embedding_backfill_state').select('entity_id')
+        .eq('entity_type', entityType).eq('deficiency', deficiency)
+        .is('resolved_at', null).gte('attempts', STUCK_ATTEMPTS);
+      const ids = (data ?? []).map((r: any) => r.entity_id as string);
+      return ids.length ? `(${ids.join(',')})` : null;
+    };
+
     const families: FamilyResult[] = [];
 
     // ── 1. PRODUCT TEXT — ID-targeted + per-row stuck tracking (the live path) ──
@@ -93,6 +105,8 @@ export class EmbeddingBackfillAgent implements AgentRunner {
         .order('created_at', { ascending: false })
         .limit(maxProducts);
       if (sinceIso) q = q.gte('created_at', sinceIso);
+      const stuckProducts = await stuckFilter('product', 'product_text');
+      if (stuckProducts) q = q.not('id', 'in', stuckProducts);
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const ids = (rows ?? []).map((r: any) => r.id as string);
@@ -171,6 +185,8 @@ export class EmbeddingBackfillAgent implements AgentRunner {
         .order('created_at', { ascending: false })
         .limit(maxImages);
       if (sinceIso) aq = aq.gte('created_at', sinceIso);
+      const stuckImages = await stuckFilter('image', 'aspects');
+      if (stuckImages) aq = aq.not('id', 'in', stuckImages);
       const { data: rows, error } = await aq;
       if (error) throw new Error(error.message);
       const ids = (rows ?? []).map((r: any) => r.id as string);
@@ -217,7 +233,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
     let stuck = 0;
     try {
       const { count } = await supabase.from('embedding_backfill_state').select('entity_id', { count: 'exact', head: true })
-        .is('resolved_at', null).gte('attempts', 3);
+        .is('resolved_at', null).gte('attempts', STUCK_ATTEMPTS);
       stuck = count ?? 0;
     } catch { /* non-fatal */ }
 
