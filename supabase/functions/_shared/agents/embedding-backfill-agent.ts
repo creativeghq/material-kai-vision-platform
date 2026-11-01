@@ -166,7 +166,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       if (!count) {
         families.push({ family: 'understanding', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
       } else {
-        const summary = await callMivaa('/api/admin/understanding-embeddings/backfill', { max_images: maxImages, batch_size: 25 });
+        const summary = await callMivaa('/api/admin/understanding-embeddings/backfill', { max_images: maxImages, batch_size: 25, skip_settling_documents: true });
         families.push({ family: 'understanding', scanned: Number(summary?.scanned ?? 0), fixed: Number(summary?.reembedded ?? 0), failed: Number(summary?.failed ?? 0), status: 'ok' });
         await log('info', 'understanding backfill', { summary });
       }
@@ -178,10 +178,17 @@ export class EmbeddingBackfillAgent implements AgentRunner {
     // ── 4. ASPECTS — ID-targeted; only images whose understanding already landed ──
     await heartbeat();
     try {
+      // An image of a still-settling ingestion must never be sent: it would be counted failed, then stuck.
+      const { data: settling, error: settlingErr } = await supabase.rpc('ingestion_settling_document_ids');
+      if (settlingErr) throw new Error(settlingErr.message);
+      const settlingIds = ((settling ?? []) as string[]).filter(Boolean);
+      const outsideSettling = settlingIds.length
+        ? `,or(document_id.is.null,document_id.not.in.(${settlingIds.join(',')}))`
+        : '';
       let aq = supabase.from('document_images').select('id')
         .eq('has_slig_embedding', true)
         .eq('has_understanding_embedding', true)
-        .or(ASPECT_DEFICIENT_OR)
+        .or(`and(or(${ASPECT_DEFICIENT_OR})${outsideSettling})`)
         .order('created_at', { ascending: false })
         .limit(maxImages);
       if (sinceIso) aq = aq.gte('created_at', sinceIso);
@@ -220,7 +227,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       if (!count) {
         families.push({ family: 'classification', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
       } else {
-        const summary = await callMivaa('/api/admin/images/classification-backfill', { max_images: maxImages, batch_size: 10 });
+        const summary = await callMivaa('/api/admin/images/classification-backfill', { max_images: maxImages, batch_size: 10, skip_settling_documents: true });
         families.push({ family: 'classification', scanned: Number(summary?.scanned ?? 0), fixed: Number(summary?.embedded ?? 0), failed: Number(summary?.failed ?? 0), status: 'ok' });
         await log('info', 'classification backfill', { summary });
       }
