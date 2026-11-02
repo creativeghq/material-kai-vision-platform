@@ -4,7 +4,7 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { jsonResponse } from '../../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate, listUserWorkspaceIds, userCanAccessWorkspace } from '../../_shared/auth.ts';
+import { authenticate, listWorkspaceIdsWithCapability, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertSafeUrl } from '../../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -118,7 +118,7 @@ async function assertMoodboardOwner(
 /**
  * The catalogue a pin is matched against. Moodboards carry no workspace, so: the moodboard's
  * project's workspace, else the caller's active-workspace hint, else their only workspace —
- * each accepted only when the caller is an active member of it (invariant 1).
+ * each accepted only where the caller's role holds moodboards.use (invariant 1).
  */
 async function resolveMatchWorkspace(
   supabase: DbClient,
@@ -129,10 +129,10 @@ async function resolveMatchWorkspace(
   const { data: mb } = await supabase.from('moodboards').select('project_id').eq('id', moodboardId).maybeSingle();
   if (mb?.project_id) {
     const { data: proj } = await supabase.from('projects').select('workspace_id').eq('id', mb.project_id).maybeSingle();
-    if (proj?.workspace_id && await userCanAccessWorkspace(supabase, userId, proj.workspace_id)) return proj.workspace_id;
+    if (proj?.workspace_id && await userHasWorkspaceCapability(supabase, userId, proj.workspace_id, 'moodboards.use')) return proj.workspace_id;
   }
-  if (typeof hint === 'string' && hint && await userCanAccessWorkspace(supabase, userId, hint)) return hint;
-  const memberships = await listUserWorkspaceIds(supabase, userId);
+  if (typeof hint === 'string' && hint && await userHasWorkspaceCapability(supabase, userId, hint, 'moodboards.use')) return hint;
+  const memberships = await listWorkspaceIdsWithCapability(supabase, userId, 'moodboards.use').catch(() => [] as string[]);
   return memberships.length === 1 ? memberships[0] : null;
 }
 
