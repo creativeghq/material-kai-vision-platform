@@ -71,3 +71,11 @@ export function financeTabUrl(tab: typeof FINANCE_TAB[keyof typeof FINANCE_TAB])
 export function deliveryNoteUrl(id: string): string {
   return `${FINANCE_BASE}/delivery-notes/${id}`;
 }
+
+export function creditNoteUrl(id: string): string {
+  return `${FINANCE_BASE}/credit-notes/${id}`;
+}
+
+export function creditNoteDraftUrl(id: string): string {
+  return `${FINANCE_BASE}/credit-notes/drafts/${id}`;
+}

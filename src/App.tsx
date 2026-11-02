@@ -73,6 +73,8 @@ const LeadDetailPage = lazy(() => import('./modules/crm/pages/LeadDetailPage').t
 const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
 const DeliveryNoteDetailPage = lazy(() => import('./modules/finance/pages/DeliveryNoteDetailPage'));
+const CreditNoteDetailPage = lazy(() => import('./modules/finance/pages/CreditNoteDetailPage'));
+const CreditNoteDraftPage = lazy(() => import('./modules/finance/pages/CreditNoteDetailPage').then(m => ({ default: m.CreditNoteDraftPage })));
 const OrderDetailPage = lazy(() => import('./pages/Admin/OrderDetailPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
 const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
@@ -531,6 +533,30 @@ const App = () => (
                       <CapabilityGuard capability="finance.manage">
                         <Layout>
                           <InvoiceDetailPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/finance/credit-notes/drafts/:id"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="finance.manage">
+                        <Layout>
+                          <CreditNoteDraftPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/finance/credit-notes/:id"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="finance.manage">
+                        <Layout>
+                          <CreditNoteDetailPage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>

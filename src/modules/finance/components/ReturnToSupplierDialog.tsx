@@ -37,7 +37,6 @@ const sameUnit = (l: SupplierReturnLine, unit: string | null | undefined) => {
   return !doc || !unit || normalizeUnit(doc) === normalizeUnit(unit);
 };
 
-/** Most that may go back: invoiced − returned, received here − returned, and what is on hand now. */
 function capFor(line: SupplierReturnLine, itemId: string, warehouse: WarehousePick[]): number | null {
   const caps: number[] = [];
   if (line.returnable != null) caps.push(line.returnable);
@@ -71,7 +70,6 @@ export const ReturnToSupplierDialog: React.FC<{
       let ls: SupplierReturnLine[];
       try { ls = await inboundService.supplierReturnLines(doc.id); }
       catch { if (live) setFailed(true); return; }
-      // Only a line never received from THIS document needs the whole warehouse to pick from.
       let wh: WarehousePick[] = [];
       if (ls.some((l) => l.stock.length === 0)) {
         try { wh = await deliveryNotesService.listWarehouse(workspaceId); }
@@ -82,8 +80,6 @@ export const ReturnToSupplierDialog: React.FC<{
       setWarehouse(wh);
       const init: Record<number, RowState> = {};
       for (const l of ls) {
-        // The item it came in through is the item it goes out of; a line never received here
-        // moves no stock unless the operator names one (it may have arrived on the order).
         const source = l.stock.find((s) => sameUnit(l, s.unit) && s.received - s.returned > 0);
         const itemId = source?.item_id ?? NO_STOCK;
         const cap = capFor(l, itemId, wh);
@@ -227,7 +223,6 @@ export const ReturnToSupplierDialog: React.FC<{
                               {s.name} · received {s.received}{s.returned ? `, back ${s.returned}` : ''} · on hand {s.on_hand}
                             </SelectItem>
                           ))}
-                          {/* Never received from THIS document — e.g. it came in on the purchase order. */}
                           {l.stock.length === 0 && warehouse.filter((w) => sameUnit(l, w.unit)).map((w) => (
                             <SelectItem key={w.id} value={w.id}>{w.name}{w.sku ? ` (${w.sku})` : ''} · on hand {w.qty_on_hand ?? 0}</SelectItem>
                           ))}

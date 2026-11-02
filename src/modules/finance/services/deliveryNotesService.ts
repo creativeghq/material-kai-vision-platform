@@ -58,6 +58,16 @@ export function deliveryNoteRelation(d: DeliveryNote): { label: string; to: stri
   return d.related_document ? { label: d.related_document, to: null } : null;
 }
 
+export interface SupplierReturnCredit {
+  doc_id: string;
+  doc_type: string;
+  doc_number: string | null;
+  issue_date: string | null;
+  total_gross: number | null;
+  currency: string | null;
+  match: 'correlated' | 'possible';
+}
+
 /** One note with everything its page and its edit form read. */
 export interface DeliveryNoteDetail extends DeliveryNote {
   branch_code: number;
@@ -174,6 +184,13 @@ export const deliveryNotesService = {
     const items = [...(row.delivery_note_items ?? [])]
       .sort((a, b) => (a.source_line_number ?? 0) - (b.source_line_number ?? 0) || a.created_at.localeCompare(b.created_at));
     return { ...row, company_name: companyName, items };
+  },
+
+  /** `correlated` = AADE says it corrects the returned invoice; `possible` = a later 5.2 from that supplier. */
+  async supplierCredits(noteId: string): Promise<SupplierReturnCredit[]> {
+    const { data, error } = await supabase.rpc('supplier_return_credits' as never, { p_note_id: noteId } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as SupplierReturnCredit[];
   },
 
   /** Rewrite a DRAFT's header and lines. Refused once issued; a return is re-checked against its caps. */

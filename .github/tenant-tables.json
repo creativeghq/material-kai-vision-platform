@@ -36,6 +36,7 @@
     "company_assets",
     "contract_signatures",
     "contracts",
+    "credit_note_drafts",
     "credit_notes",
     "crm_activities",
     "crm_address_units",

@@ -1,8 +1,8 @@
 /**
- * New credit note from the Credit-notes list. Pick the invoice it corrects, then credit
- * its specific lines (full or partial quantity). The note is created against the invoice,
- * nets its balance, and optionally transmits. Falls back to a whole-amount credit for legacy
- * invoices that have no stored line items.
+ * New credit note, or an edit of a DRAFT one (`draftId`). Pick the invoice it corrects, then
+ * credit its specific lines (full or partial quantity). Save it as a draft, or issue it — only
+ * issuing numbers it, nets the invoice and optionally transmits. Falls back to a whole-amount
+ * credit for legacy invoices that have no stored line items.
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, VAT_CATEGORIES, type Invoice } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
+import { creditNoteDraftsService, type CreditLine } from '@/modules/finance/services/creditNoteDraftsService';
 
 interface InvItem {
   id: string; description: string; sku: string | null; unit: string | null; product_id: string | null;
@@ -37,11 +38,13 @@ const pctOfLine = (cat: number | null, net: number, vat: number) => {
 const catOfPct = (pct: number) => VAT_CATEGORIES.find((v) => v.pct === pct)?.code ?? null;
 
 export const NewCreditNoteDialog: React.FC<{
-  workspaceId: string; open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void;
+  workspaceId: string; open: boolean; onOpenChange: (v: boolean) => void;
+  onCreated: (result?: { creditNoteId?: string; draftId?: string }) => void;
+  draftId?: string | null;
   /** Credit THIS invoice: opened from the invoice itself, so its picker starts on it and its
    *  lines are loaded straight away. A prefill — the invoice can still be changed. */
   presetInvoiceId?: string;
-}> = ({ workspaceId, open, onOpenChange, onCreated, presetInvoiceId }) => {
+}> = ({ workspaceId, open, onOpenChange, onCreated, presetInvoiceId, draftId }) => {
   const { toast } = useToast();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [invoiceId, setInvoiceId] = useState('');
@@ -59,9 +62,32 @@ export const NewCreditNoteDialog: React.FC<{
     if (!open) return;
     setInvoiceId(''); setAmount(''); setReason(''); setSubmitFiscal(false); setItems([]); setLineState({});
     setCredited({}); setCreditedTotal(0);
+    const draftLoad = draftId ? creditNoteDraftsService.get(draftId).catch(() => null) : Promise.resolve(null);
     financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'paid', 'overdue'], limit: 300 })
       .then((rows) => { setInvoices(rows); return rows; })
       .catch(() => { setInvoices([]); return [] as Invoice[]; })
+      .then(async (rows) => {
+        const draft = await draftLoad;
+        if (!draftId) return rows;
+        if (!draft || draft.issued_credit_note_id) {
+          toast({ title: 'This draft could not be loaded', description: 'It may already have been issued.', variant: 'destructive' });
+          return rows;
+        }
+        setReason(draft.reason);
+        await pick(draft.invoice_id, rows);
+        const byItem = new Map<string, CreditLine>(
+          draft.lines.filter((l) => l.source_invoice_item_id).map((l) => [l.source_invoice_item_id as string, l] as const),
+        );
+        if (byItem.size > 0) {
+          setLineState((cur) => Object.fromEntries(Object.entries(cur).map(([id, st]) => {
+            const l = byItem.get(id);
+            return [id, l ? { include: true, creditQty: String(l.quantity) } : { ...st, include: false }];
+          })));
+        } else {
+          setAmount(String(round2(draft.lines.reduce((t, l) => t + Number(l.net_value) + Number(l.vat_amount), 0))));
+        }
+        return [] as Invoice[];
+      })
       // Opened from an invoice → select it once its row is in hand, which also loads its lines.
       // The rows are passed IN. `pick` used to read the `invoices` state, but this callback
       // closes over the render that scheduled the fetch — where `invoices` is still [] — so
@@ -69,7 +95,8 @@ export const NewCreditNoteDialog: React.FC<{
       // "Transmit to myDATA (5.1)" defaulted OFF even for a MARKed invoice, and the fallback
       // Amount was left blank.
       .then((rows) => { if (presetInvoiceId && rows.some((i) => i.id === presetInvoiceId)) void pick(presetInvoiceId, rows); });
-  }, [open, workspaceId, presetInvoiceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workspaceId, presetInvoiceId, draftId]);
 
   const invoice = useMemo(() => invoices.find((i) => i.id === invoiceId), [invoices, invoiceId]);
 
@@ -171,7 +198,7 @@ export const NewCreditNoteDialog: React.FC<{
   /** What is still creditable. The server refuses anything past it; the form must not offer it. */
   const headroom = invoice ? round2(Math.max(0, Number(invoice.total) - creditedTotal)) : 0;
 
-  const save = async () => {
+  const save = async (mode: 'draft' | 'issue' = 'issue') => {
     if (!invoiceId) { toast({ title: 'Pick an invoice', variant: 'destructive' }); return; }
     if (!reason.trim()) { toast({ title: 'Reason required', variant: 'destructive' }); return; }
     if (hasItems && computed.lines.length === 0) { toast({ title: 'Select at least one line to credit', variant: 'destructive' }); return; }
@@ -188,13 +215,36 @@ export const NewCreditNoteDialog: React.FC<{
     }
     setBusy(true);
     try {
-      await financeService.createCreditNote({
+      const correlated = !!(invoice as any)?.fiscal_mark;
+      if (mode === 'draft' || draftId) {
+        const lines = hasItems
+          ? computed.lines
+          : await financeService.creditLinesForAmount(invoiceId, effectiveTotal, reason.trim());
+        const id = await creditNoteDraftsService.save({ id: draftId, invoiceId, lines, reason: reason.trim(), correlated });
+        if (mode === 'draft') {
+          toast({ title: 'Draft saved', description: 'Nothing is numbered or netted until you issue it.' });
+          onCreated({ draftId: id }); onOpenChange(false);
+          return;
+        }
+        const cnId = await creditNoteDraftsService.issue(id);
+        let fiscalError: string | undefined;
+        if (submitFiscal) {
+          try { await financeService.submitCreditNoteFiscal(cnId); }
+          catch (e: any) { fiscalError = e?.message ?? 'myDATA transmission failed'; }
+        }
+        toast(fiscalError
+          ? { title: 'Credit note issued — NOT transmitted', description: `${fiscalError} Send it to myDATA from its page.`, variant: 'destructive' }
+          : { title: 'Credit note issued' });
+        onCreated({ creditNoteId: cnId }); onOpenChange(false);
+        return;
+      }
+      const r = await financeService.createCreditNote({
         invoiceId, amount: effectiveTotal, currency: invoice?.currency, reason: reason.trim(),
-        correlated: !!(invoice as any)?.fiscal_mark, submitFiscal,
+        correlated, submitFiscal,
         lines: hasItems ? computed.lines : undefined,
       });
       toast({ title: 'Credit note issued' });
-      onCreated(); onOpenChange(false);
+      onCreated({ creditNoteId: r.credit_note_id }); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setBusy(false); }
@@ -203,7 +253,7 @@ export const NewCreditNoteDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>New Credit Note</DialogTitle><DialogDescription className="sr-only">Issue a credit note against an existing invoice.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{draftId ? 'Edit credit note draft' : 'New Credit Note'}</DialogTitle><DialogDescription className="sr-only">Issue a credit note against an existing invoice.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
             <Label>Against invoice *</Label>
@@ -301,7 +351,8 @@ export const NewCreditNoteDialog: React.FC<{
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
-          <Button onClick={save} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue credit note · {formatMoney(effectiveTotal, cur)}</Button>
+          <Button variant="outline" onClick={() => void save('draft')} disabled={busy}>Save draft</Button>
+          <Button onClick={() => void save('issue')} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue credit note · {formatMoney(effectiveTotal, cur)}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

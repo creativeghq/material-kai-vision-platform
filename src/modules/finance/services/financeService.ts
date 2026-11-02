@@ -2878,28 +2878,7 @@ const _financeServiceCore = {
       return { credit_note_id: cnId as string, fiscal_submitted: fiscalSubmitted, fiscal_error: fiscalError };
     }
 
-    const { data: inv } = await supabase
-      .from('invoices')
-      .select('vat_rate')
-      .eq('id', input.invoiceId)
-      .single();
-    const rate = Number((inv as any)?.vat_rate ?? 24);
-    const net = round2(extractNet(input.amount, rate));
-    const vat = round2(input.amount - net);
-    // myDATA VAT category — EXACT rate→category map via the shared vatMath helper
-    // (matches supabase/functions/_shared/fiscal/invoice-builder.ts). A `>=` ladder
-    // here mislabelled the reduced-island rates 17/9/4.
-    const vatCat = vatCategory(rate);
-
-    const lines = [{
-      description: input.reason || 'Credit',
-      quantity: 1,
-      unit_price: net,
-      net_value: net,
-      vat_percent: rate,
-      vat_category: vatCat,
-      vat_amount: vat,
-    }];
+    const lines = await this.creditLinesForAmount(input.invoiceId, input.amount, input.reason);
 
     const { data: cnId, error } = await supabase.rpc('issue_credit_note', {
       p_invoice_id: input.invoiceId,
@@ -2919,6 +2898,32 @@ const _financeServiceCore = {
       catch (e: any) { fiscalError = e?.message ?? 'myDATA transmission failed'; }
     }
     return { credit_note_id: cnId as string, fiscal_submitted: fiscalSubmitted, fiscal_error: fiscalError };
+  },
+
+  /** The single whole-amount line for an invoice with no stored lines, at the invoice's VAT rate. */
+  async creditLinesForAmount(invoiceId: string, amount: number, reason: string) {
+    const { data: inv, error } = await supabase
+      .from('invoices')
+      .select('vat_rate')
+      .eq('id', invoiceId)
+      .single();
+    if (error) throw error;
+    const rate = Number((inv as any)?.vat_rate ?? 24);
+    const net = round2(extractNet(amount, rate));
+    const vat = round2(amount - net);
+    // myDATA VAT category — EXACT rate→category map via the shared vatMath helper
+    // (matches supabase/functions/_shared/fiscal/invoice-builder.ts). A `>=` ladder
+    // here mislabelled the reduced-island rates 17/9/4.
+    const vatCat = vatCategory(rate);
+    return [{
+      description: reason || 'Credit',
+      quantity: 1,
+      unit_price: net,
+      net_value: net,
+      vat_percent: rate,
+      vat_category: vatCat,
+      vat_amount: vat,
+    }];
   },
 
   /** Transmit an existing credit note to the workspace's legal connector (myDATA 5.1). */

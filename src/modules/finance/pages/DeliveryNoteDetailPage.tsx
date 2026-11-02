@@ -1,4 +1,3 @@
-/** One delivery note: read it, edit it while it is a draft, issue it, then transmit it. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { FileText, Loader2, Pencil, Send, Truck } from 'lucide-react';
@@ -11,7 +10,8 @@ import { formatDate } from '@/utils/datetime';
 import { humanizeLabel } from '@/utils/humanize';
 import { unitSuffix } from '@/lib/units';
 import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
-import { deliveryNotesService, deliveryNoteRelation, type DeliveryNoteDetail } from '@/modules/finance/services/deliveryNotesService';
+import { deliveryNotesService, deliveryNoteRelation, type DeliveryNoteDetail, type SupplierReturnCredit } from '@/modules/finance/services/deliveryNotesService';
+import { formatMoney } from '@/modules/finance/services/financeService';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { movePurposeLabel, movementDocTypeLabel } from '@/services/fiscal/fiscalVocabulary';
 
@@ -20,6 +20,58 @@ const STATUS_VARIANT: Record<string, 'neutral' | 'info' | 'success' | 'error'> =
 };
 
 const address = (parts: (string | null | undefined)[]) => parts.filter((x) => x && String(x).trim()).join(', ');
+
+/** A return's money: the SUPPLIER issues the 5.1 against their invoice; we never credit ourselves. */
+const SupplierCreditPanel: React.FC<{ noteId: string }> = ({ noteId }) => {
+  const [credits, setCredits] = useState<SupplierReturnCredit[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    deliveryNotesService.supplierCredits(noteId)
+      .then((c) => { if (live) setCredits(c); })
+      .catch(() => { if (live) setFailed(true); });
+    return () => { live = false; };
+  }, [noteId]);
+
+  const received = (credits ?? []).filter((c) => c.match === 'correlated');
+  const possible = (credits ?? []).filter((c) => c.match === 'possible');
+  return (
+    <HubPanel title="Supplier's credit note">
+      {failed ? (
+        <p className="text-xs text-destructive">Could not check — this is a loading failure, not "none received".</p>
+      ) : credits === null ? (
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      ) : (
+        <div className="space-y-2 text-sm">
+          {received.length === 0 && (
+            <p className="text-xs">
+              <Badge variant="warning">Not received yet</Badge>
+              <span className="mt-1.5 block text-muted-foreground">
+                The supplier issues it (a 5.1 against their invoice) and it arrives through myDATA. Nothing for you to issue.
+              </span>
+            </p>
+          )}
+          {received.map((c) => (
+            <div key={c.doc_id}>
+              <Badge variant="success">Received</Badge>
+              <div className="mt-1 text-xs">
+                {c.doc_type} {c.doc_number} · {c.issue_date ? formatDate(c.issue_date) : '—'}
+                {c.total_gross != null && <> · <span className="tabular-nums">{formatMoney(Number(c.total_gross), c.currency ?? 'EUR')}</span></>}
+              </div>
+            </div>
+          ))}
+          {possible.length > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Possibly ({possible.length}): uncorrelated 5.2 from this supplier since the return —{' '}
+              {possible.map((c) => `${c.doc_number ?? '—'} (${c.total_gross != null ? formatMoney(Number(c.total_gross), c.currency ?? 'EUR') : '—'})`).join(', ')}
+            </div>
+          )}
+          <Link className="block text-xs text-primary hover:underline" to={financeTabUrl(FINANCE_TAB.expenses)}>Open Expenses</Link>
+        </div>
+      )}
+    </HubPanel>
+  );
+};
 
 export const DeliveryNoteDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -186,12 +238,7 @@ export const DeliveryNoteDetailPage: React.FC = () => {
         </HubPanel>
       }
       right={isReturn ? (
-        <HubPanel title="How this return works">
-          <p className="text-xs text-muted-foreground">
-            Issuing takes the linked lines out of stock. The money comes back on the supplier&apos;s own credit note,
-            which arrives through myDATA.
-          </p>
-        </HubPanel>
+        <SupplierCreditPanel noteId={note.id} />
       ) : undefined}
     >
       <Card>

@@ -25,7 +25,8 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { financeService, formatMoney, type Invoice, type CreditNote, type SupplierCreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
-import { FINANCE_BASE, FINANCE_TAB, deliveryNoteUrl, financeTabUrl } from '@/modules/finance/routes';
+import { FINANCE_BASE, FINANCE_TAB, creditNoteDraftUrl, creditNoteUrl, deliveryNoteUrl, financeTabUrl } from '@/modules/finance/routes';
+import { creditNoteDraftsService, invoiceLabel, type CreditNoteDraft } from '@/modules/finance/services/creditNoteDraftsService';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { Layers } from 'lucide-react';
 import { RecordExpenseDocumentDialog } from '@/modules/finance/components/RecordExpenseDocumentDialog';
@@ -842,7 +843,12 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           workspaceId={activeWorkspaceId}
           open={newCreditNoteOpen}
           onOpenChange={setNewCreditNoteOpen}
-          onCreated={() => { setNewCreditNoteOpen(false); load(); }}
+          onCreated={(r) => {
+            setNewCreditNoteOpen(false);
+            if (r?.draftId) navigate(creditNoteDraftUrl(r.draftId));
+            else if (r?.creditNoteId) navigate(creditNoteUrl(r.creditNoteId));
+            else load();
+          }}
         />
       )}
       {activeWorkspaceId && categoryKind && (
@@ -1280,7 +1286,37 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
 
 const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onChanged?: () => void }> = ({ rows, financeBase, onChanged }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
+  // Drafts are not credit notes yet (no number, no money effect), so they live in their own table.
+  const [drafts, setDrafts] = React.useState<CreditNoteDraft[]>([]);
+  const [draftsFailed, setDraftsFailed] = React.useState(false);
+  const [invoiceRefs, setInvoiceRefs] = React.useState<Record<string, { label: string; party: string | null }>>({});
+  React.useEffect(() => {
+    if (!activeWorkspaceId) return;
+    let live = true;
+    creditNoteDraftsService.list(activeWorkspaceId)
+      .then((d) => { if (live) { setDrafts(d); setDraftsFailed(false); } })
+      .catch(() => { if (live) setDraftsFailed(true); });
+    return () => { live = false; };
+  }, [activeWorkspaceId, rows]);
+  React.useEffect(() => {
+    const ids = [...new Set(rows.map((r: any) => r.invoice_id).filter(Boolean))] as string[];
+    if (!ids.length) { setInvoiceRefs({}); return; }
+    let live = true;
+    (async () => {
+      const { data: invs } = await supabase.from('invoices').select('id, internal_number, legal_number, customer_company_id').in('id', ids);
+      const companyIds = [...new Set((invs ?? []).map((i: any) => i.customer_company_id).filter(Boolean))] as string[];
+      const { data: cos } = companyIds.length
+        ? await supabase.from('crm_companies').select('id, name').in('id', companyIds)
+        : { data: [] as { id: string; name: string | null }[] };
+      const names = new Map(((cos ?? []) as { id: string; name: string | null }[]).map((c) => [c.id, c.name]));
+      const refs: Record<string, { label: string; party: string | null }> = {};
+      for (const i of (invs ?? []) as any[]) refs[i.id] = { label: invoiceLabel(i), party: names.get(i.customer_company_id) ?? null };
+      if (live) setInvoiceRefs(refs);
+    })();
+    return () => { live = false; };
+  }, [rows]);
   const [busy, setBusy] = React.useState<string | null>(null);
   const [refund, setRefund] = React.useState<CreditNote | null>(null);
   const genPdf = async (id: string) => {
@@ -1332,18 +1368,52 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
       </tr>
     </thead>
     <tbody>
-      {rows.length === 0 && (
-        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No credit notes yet.</td></tr>
+      {draftsFailed && (
+        <tr><td colSpan={8} className="px-4 py-2 text-xs text-destructive">Drafts could not be loaded — this list may be missing credit notes you started.</td></tr>
       )}
+      {rows.length === 0 && drafts.length === 0 && (
+        <tr><td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">No credit notes yet. Credit one from an invoice, or press New.</td></tr>
+      )}
+      {drafts.map((d) => {
+        const total = d.lines.reduce((t, l) => t + Number(l.net_value ?? 0) + Number(l.vat_amount ?? 0), 0);
+        return (
+          <tr key={`draft-${d.id}`} className="cursor-pointer border-b border-border/30 hover:bg-muted/30" onClick={(e) => { if (!isInteractiveClick(e)) navigate(creditNoteDraftUrl(d.id)); }}>
+            <td className="px-4 py-2 font-mono text-xs">
+              <button type="button" onClick={(e) => { e.stopPropagation(); navigate(creditNoteDraftUrl(d.id)); }} className="rounded text-left text-muted-foreground hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">draft</button>
+            </td>
+            <td className="px-4 py-2 text-muted-foreground">—</td>
+            <td className="px-4 py-2"><span className="text-xs text-muted-foreground">Draft</span></td>
+            <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{d.reason}</td>
+            <td className="px-4 py-2 text-right font-medium">{formatMoney(total, d.invoice?.currency ?? 'EUR')}</td>
+            <td className="px-4 py-2 text-center text-muted-foreground">—</td>
+            <td className="px-4 py-2 text-xs">
+              <Link to={`${financeBase}/invoices/${d.invoice_id}`} className="text-primary hover:underline">{invoiceLabel(d.invoice)}</Link>
+              {d.party_name && <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">{d.party_name}</div>}
+            </td>
+            <td className="px-4 py-2 text-right">
+              <Button size="sm" variant="outline" onClick={() => navigate(creditNoteDraftUrl(d.id))}>Open</Button>
+            </td>
+          </tr>
+        );
+      })}
       {rows.map((cn: any) => (
-        <tr key={cn.id} className="border-b border-border/30">
-          <td className="px-4 py-2 font-mono text-xs">{cn.credit_note_number}</td>
+        <tr key={cn.id} className="cursor-pointer border-b border-border/30 hover:bg-muted/30" onClick={(e) => { if (!isInteractiveClick(e)) navigate(creditNoteUrl(cn.id)); }}>
+          <td className="px-4 py-2 font-mono text-xs">
+            <button type="button" onClick={(e) => { e.stopPropagation(); navigate(creditNoteUrl(cn.id)); }} className="rounded text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{cn.credit_note_number}</button>
+          </td>
           <td className="px-4 py-2">{cn.issued_at ? formatDate(cn.issued_at) : '—'}</td>
           <td className="px-4 py-2"><span className="text-xs text-muted-foreground">{cn.document_type ?? '—'}</span></td>
           <td className="px-4 py-2 text-muted-foreground truncate max-w-[220px]">{cn.reason ?? '—'}</td>
           <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
           <td className="px-4 py-2 text-center"><FiscalCell status={cn.fiscal_status} error={(cn as any).fiscal_error} /></td>
-          <td className="px-4 py-2">{cn.invoice_id ? <Link to={`${financeBase}/invoices/${cn.invoice_id}`} className="text-primary hover:underline text-xs">open</Link> : '—'}</td>
+          <td className="px-4 py-2 text-xs">
+            {cn.invoice_id
+              ? <>
+                  <Link to={`${financeBase}/invoices/${cn.invoice_id}`} className="text-primary hover:underline">{invoiceRefs[cn.invoice_id]?.label ?? 'Invoice'}</Link>
+                  {invoiceRefs[cn.invoice_id]?.party && <div className="text-[10px] text-muted-foreground truncate max-w-[180px]">{invoiceRefs[cn.invoice_id]?.party}</div>}
+                </>
+              : '—'}
+          </td>
           <td className="px-4 py-2 text-right">
             {!transmitted(cn.fiscal_status) && (
               <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => submitFiscal(cn.id)}
