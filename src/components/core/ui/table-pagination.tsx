@@ -40,7 +40,7 @@ export const TablePagination: React.FC<TablePaginationProps> = ({
   return (
     <div
       className={[
-        'flex flex-col gap-3 border-t border-border/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
+        'flex flex-col gap-3 border-t border-hairline px-4 py-3 sm:flex-row sm:items-center sm:justify-between',
         className ?? '',
       ].join(' ')}
     >

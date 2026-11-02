@@ -15,7 +15,7 @@ import { FilterBar, applyFiltersToQuery, type FilterValues } from '@/components/
 import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { SmartPagination } from '@/components/core/ui/smart-pagination';
+import { TablePagination } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
 import {
   Dialog,
@@ -229,16 +229,13 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
             </Table>
           )}
 
-          {/* Pagination */}
-          {totalCount > ITEMS_PER_PAGE && (
-            <div className="mt-6">
-              <SmartPagination
-                currentPage={currentPage}
-                totalPages={Math.ceil(totalCount / ITEMS_PER_PAGE)}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
+          <TablePagination
+            page={currentPage}
+            total={totalCount}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={setCurrentPage}
+            label="embeddings"
+          />
         </CardContent>
       </Card>
 

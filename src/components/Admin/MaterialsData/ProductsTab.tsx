@@ -22,7 +22,7 @@ import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductDetailModal } from './ProductDetailModal';
-import { SmartPagination } from '@/components/core/ui/smart-pagination';
+import { TablePagination } from '@/components/core/ui/table-pagination';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { formatDate } from '@/utils/datetime';
 import {
@@ -512,16 +512,13 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
             </Table>
           )}
 
-          {/* Pagination */}
-          {totalCount > ITEMS_PER_PAGE && (
-            <div className="mt-6">
-              <SmartPagination
-                currentPage={currentPage}
-                totalPages={Math.ceil(totalCount / ITEMS_PER_PAGE)}
-                onPageChange={setCurrentPage}
-              />
-            </div>
-          )}
+          <TablePagination
+            page={currentPage}
+            total={totalCount}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={setCurrentPage}
+            label="products"
+          />
         </CardContent>
       </Card>
 
