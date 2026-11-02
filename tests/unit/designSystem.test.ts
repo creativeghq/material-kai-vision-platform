@@ -340,11 +340,17 @@ describe('design system — the latin-only display face never renders a record n
   it('DialogTitle renders in the UI face — a modal title is where record names live', () => {
     const dialog = blankComments(readFileSync(join(UI, 'dialog.tsx'), 'utf8'));
     const title = dialog.slice(dialog.indexOf('const DialogTitle'));
+    const body = title.slice(0, title.indexOf('DialogTitle.displayName'));
     expect(
-      /font-display/.test(title.slice(0, title.indexOf('DialogTitle.displayName'))),
+      /font-display/.test(body),
       'The primitive styles ~118 modal titles that interpolate a value — supplier names, party ' +
         'names, product names. It is a chrome heading (the h3–h6 rule), so it is sans.',
     ).toBe(false);
+    expect(
+      /\bfont-sans\b/.test(body),
+      'Radix renders the title as an h2, and index.css gives h1/h2 the display face, so leaving ' +
+        'the family unset IS the display face. The primitive must set font-sans itself.',
+    ).toBe(true);
   });
 
   it('no DialogTitle instance opts back into the display face', () => {

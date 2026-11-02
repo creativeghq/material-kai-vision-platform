@@ -45,6 +45,7 @@ import {
   formatRange,
   summariseSkuMap,
   isNoiseSpecKey,
+  isProvenanceRecord,
   isContactKey,
   complianceFlagLabel,
   isAffirmative,
@@ -833,7 +834,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     'Textures': visionTexturesList.length > 0 ? visionTexturesList.join(', ') : undefined,
     'Shade Variation': extractValue(appearanceData?.v_rating ?? appearanceData?.color_variation),
     'Visual Effect': extractValue(appearanceData?.visual_effect),
-    'Visual Description': extractValue(appearanceData?.vision_description),
   };
 
 
@@ -1600,10 +1600,9 @@ It becomes searchable from this product and by the agents. Its visibility stays 
   // One registry section as a card; every field it renders is marked consumed.
   const registrySizes = new Map<string, number>();
   const WIDE_SECTION_FIELDS = 6;
-  const renderRegistrySection = (
+  const registrySectionData = (
     section: ReturnType<typeof fieldRegistry.sections>[number],
     extras: Array<{ label: string; value: string }> = [],
-    wide = false,
   ) => {
     const data: Record<string, unknown> = {};
     const lowConf = new Set<string>();
@@ -1628,6 +1627,14 @@ It becomes searchable from this product and by the agents. Its visibility stays 
       if (isLowConfidence(hit.raw)) lowConf.add(field.label);
     }
     for (const e of extras) if (!(e.label in data)) data[e.label] = e.value;
+    return { data, lowConf };
+  };
+  const renderRegistrySection = (
+    section: ReturnType<typeof fieldRegistry.sections>[number],
+    extras: Array<{ label: string; value: string }> = [],
+    wide = false,
+  ) => {
+    const { data, lowConf } = registrySectionData(section, extras);
     const size = Object.keys(data).length;
     if (size === 0) return null;
     registrySizes.set(section.key, size);
@@ -1674,7 +1681,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
             for (const [ik, iv] of Object.entries(obj)) {
               if (!ik || ik.startsWith('_')) continue;
               if (consumedKeys.has(ik) || (!own && seen.has(ik))) continue;
-              if (withholdKey(ik) || isNoiseSpecKey(ik) || isContactKey(ik) || complianceFlagLabel(ik)) continue;
+              if (withholdKey(ik) || isNoiseSpecKey(ik) || isContactKey(ik) || complianceFlagLabel(ik) || isProvenanceRecord(iv)) continue;
               const described = summariseSkuMap(iv) ?? describeValue(iv) ?? extractValue(iv);
               if (!described || described === 'N/A' || described === 'undefined' || described === 'null') continue;
               const str = own?.unit && /^-?[\d.,]+$/.test(described) ? `${described} ${own.unit}` : described;
@@ -1693,7 +1700,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           // Walk every top-level metadata key.
           Object.entries(allData || {}).forEach(([k, v]) => {
             if (k.startsWith('_')) return;
-            if (consumedKeys.has(k) || withholdKey(k) || isNoiseSpecKey(k) || isContactKey(k) || complianceFlagLabel(k)) return;
+            if (consumedKeys.has(k) || withholdKey(k) || isNoiseSpecKey(k) || isContactKey(k) || complianceFlagLabel(k) || isProvenanceRecord(v)) return;
             const inner = (v && typeof v === 'object' && 'value' in (v as Record<string, unknown>))
               ? (v as Record<string, unknown>).value
               : v;
@@ -1749,6 +1756,22 @@ It becomes searchable from this product and by the agents. Its visibility stays 
   const leftovers = computeLeftovers();
   const extrasFor = (key: string): Array<{ label: string; value: string }> =>
     (leftovers.get(key) ?? []).map(f => ({ label: f.label, value: f.value }));
+  // The general specification rows ('other' + merged sections + unplaced extras) live in Key Specifications.
+  const generalSpecRows = (() => {
+    const sections = fieldRegistry.sections(resolveProductCategory(product.metadata, product.type, product.category));
+    const extras = [
+      ...[...MERGED_INTO_SPECS].flatMap(key => extrasFor(key)),
+      ...extrasFor('other'),
+      ...[...leftovers.keys()]
+        .filter(key => SPECIAL_SECTION_KEYS.has(key) && key !== 'material_properties' && key !== 'appearance')
+        .flatMap(key => extrasFor(key)),
+    ];
+    const generalSections = sections.filter(s => s.key === 'other' || MERGED_INTO_SPECS.has(s.key));
+    const data: Record<string, unknown> = {};
+    for (const s of generalSections) Object.assign(data, registrySectionData(s).data);
+    for (const e of extras) if (!(e.label in data)) data[e.label] = e.value;
+    return Object.entries(data).map(([label, value]) => ({ label, value }));
+  })();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -1756,11 +1779,11 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           DialogContent is display:grid with an auto column that otherwise sizes
           to max-content and overflows on mobile); min-w-0 lets children shrink
           and wrap. Tighter padding on mobile. */}
-      <DialogContent className="max-w-[min(96vw,88rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden grid-cols-1 [&>*]:min-w-0 p-4 sm:p-6">
+      <DialogContent onOpenAutoFocus={(e) => e.preventDefault()} className="focus:outline-none focus-visible:outline-none focus-visible:ring-0 max-w-[min(96vw,88rem)] max-h-[90vh] overflow-y-auto overflow-x-hidden grid-cols-1 [&>*]:min-w-0 p-4 sm:p-6">
         {/* Header with Factory/Brand Info + Quick Actions.
             Quote-based platform — no pricing/stock shown. Action buttons live
             in the header so users can quote / save from the first screen. */}
-        <DialogHeader className="border-b pb-4">
+        <DialogHeader className="border-b pb-4 text-left">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
             <div className="min-w-0 sm:flex-1">
               <div className="flex items-center gap-2 mb-2 min-w-0">
@@ -1790,7 +1813,8 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               </DialogTitle>
               {(() => {
                 // The collection only when it says something the name does not; the SKU only when there is one.
-                const showCollection = !!collection && normalizeMatch(collection) !== productNameNorm;
+                const bareCollection = normalizeMatch(collection || '').replace(/\b(COLLECTION|SERIES|LINE|RANGE)\b/g, '').replace(/\s+/g, ' ').trim();
+                const showCollection = !!collection && bareCollection !== '' && bareCollection !== productNameNorm;
                 const sku = safeString(product.sku);
                 if (!showCollection && !sku) return null;
                 return (
@@ -1804,7 +1828,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               {/* Key facets at a glance — same computed values as the spec cards below. */}
               <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                 {material && material !== '—' && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-sm border border-border bg-muted px-2.5 py-1">
                     <span className="text-muted-foreground">Material</span><span className="font-medium text-foreground">{material}</span>
                   </span>
                 )}
@@ -1812,31 +1836,27 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                   const options = Array.isArray(allData?.colour_options) ? allData.colour_options.length : 0;
                   const count = Math.max(options, primaryColors.split(',').filter(c => c.trim()).length);
                   return (
-                    <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
+                    <span className="inline-flex items-center gap-1.5 text-xs rounded-sm border border-border bg-muted px-2.5 py-1">
                       <span className="text-muted-foreground">Colour</span>
                       <span className="font-medium text-foreground">{count > 1 ? `${count} colours` : primaryColors.split(',')[0].trim()}</span>
                     </span>
                   );
                 })()}
                 {finish && finish !== '—' && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-sm border border-border bg-muted px-2.5 py-1">
                     <span className="text-muted-foreground">Finish</span><span className="font-medium text-foreground">{finish}</span>
                   </span>
                 )}
                 {formatList.length === 0 && size && size !== 'N/A' && size !== '—' && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
+                  <span className="inline-flex items-center gap-1.5 text-xs rounded-sm border border-border bg-muted px-2.5 py-1">
                     <span className="text-muted-foreground">Size</span><span className="font-medium text-foreground">{String(size).split(',')[0].trim()}</span>
                   </span>
                 )}
               </div>
-              {formatList.length > 0 && (
-                <div className="mt-3">
-                  <TileFormatRow formats={formatList} maxBoxPx={44} />
-                </div>
-              )}
             </div>
-            {/* Quick actions — full-width on mobile (below the title), compact on the right from sm up */}
-            <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pr-8 sm:pr-0">
+            {/* Actions, then the formats under them: the right column balances the name on the left. */}
+            <div className="flex flex-col gap-4 flex-shrink-0 sm:items-end">
+            <div className="flex flex-wrap items-center gap-2 pr-8">
               <AddToQuoteButton
                 productId={product.id}
                 productName={product.name}
@@ -1911,6 +1931,13 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            </div>
+              {formatList.length > 0 && (
+                <div className="flex items-end gap-3 sm:pr-8">
+                  <span className="text-xs text-muted-foreground pb-0.5">Formats</span>
+                  <TileFormatRow formats={formatList} maxBoxPx={44} />
+                </div>
+              )}
             </div>
           </div>
           {/* Description moved to Details tab — avoids duplication with the
@@ -2034,13 +2061,13 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                     <>
                       <button
                         onClick={handlePrevImage}
-                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-muted"
+                        className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-sm bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-muted"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </button>
                       <button
                         onClick={handleNextImage}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-muted"
+                        className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-sm bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm hover:bg-muted"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </button>
@@ -2063,7 +2090,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                       {/* Left arrow */}
                       <button
                         onClick={() => scrollBy(-1)}
-                        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity shadow-sm hover:bg-muted"
+                        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-sm bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity shadow-sm hover:bg-muted"
                       >
                         <ChevronLeft className="h-3.5 w-3.5" />
                       </button>
@@ -2091,7 +2118,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                       {/* Right arrow */}
                       <button
                         onClick={() => scrollBy(1)}
-                        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-full bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity shadow-sm hover:bg-muted"
+                        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 rounded-sm bg-background/90 border border-border/50 flex items-center justify-center opacity-0 group-hover/thumbs:opacity-100 transition-opacity shadow-sm hover:bg-muted"
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
                       </button>
@@ -2111,7 +2138,10 @@ It becomes searchable from this product and by the agents. Its visibility stays 
             {/* The product's own description only; raw catalogue chunks are never shown as one. */}
             {(() => {
               const longDesc = safeString((product as unknown as Record<string, unknown>).long_description);
-              const fullDesc = longDesc || safeString(product.description) || recordDescription;
+              const ownDesc = longDesc || safeString(product.description) || recordDescription;
+              // What the photos show leads, then the catalogue's own words, under one heading.
+              const visualDesc = safeString(extractValue(appearanceData?.vision_description));
+              const fullDesc = [visualDesc, ownDesc].filter(Boolean).join(' ');
               if (!fullDesc) return null;
               return (
                 <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
@@ -2328,6 +2358,10 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               }
 
               // Reference fields captured at intake. Shown here so they are not write-only.
+              const shownLabels = new Set([...universalRows, ...categorySpecRows].map(r => r.label));
+              for (const r of generalSpecRows) {
+                if (!shownLabels.has(r.label)) categorySpecRows.push({ label: r.label, value: typeof r.value === 'string' ? r.value : String(r.value) });
+              }
               const productUrl = (product as any)?.product_url as string | null | undefined;
               if (productUrl) categorySpecRows.push({ label: 'Link', value: String(productUrl) });
               const productNotes = (product as any)?.notes as string | null | undefined;
@@ -2618,16 +2652,9 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           // metadata. Special sections rendered by dedicated cards below are
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it.
-          const mergedIntoSpecs = registrySections.filter(section => MERGED_INTO_SPECS.has(section.key));
-          const specsSection = registrySections.find(section => section.key === 'other');
           const cardSections = registrySections
-            .filter(section => !SPECIAL_SECTION_KEYS.has(section.key) && !MERGED_INTO_SPECS.has(section.key) && section.key !== 'application')
-            .map(section => section.key === 'other'
-              ? { ...section, fields: [...mergedIntoSpecs.flatMap(m => m.fields), ...section.fields] }
-              : section);
-          if (!specsSection && mergedIntoSpecs.length > 0) {
-            cardSections.push({ ...mergedIntoSpecs[0], key: 'other', label: sectionLabel('other'), fields: mergedIntoSpecs.flatMap(m => m.fields) });
-          }
+            .filter(section => !SPECIAL_SECTION_KEYS.has(section.key) && !MERGED_INTO_SPECS.has(section.key)
+              && section.key !== 'application' && section.key !== 'other');
 
           // ── Detected text (vision OCR) — brand names, codes, dimensions
           // visible on the material image. Skipped when empty.
@@ -2750,17 +2777,10 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           const variantsCard = (activeSectionKeys.has('commercial') || sectionUploadCat === 'tiles') && renderVariantsTable();
           const certificationsCard = renderCertificationsCard();
 
-          const otherExtras = [
-            ...[...MERGED_INTO_SPECS].flatMap(key => extrasFor(key)),
-            ...extrasFor('other'),
-            ...[...leftovers.keys()]
-              .filter(key => SPECIAL_SECTION_KEYS.has(key) && key !== 'material_properties' && key !== 'appearance')
-              .flatMap(key => extrasFor(key)),
-          ];
           const registryCards = cardSections
             .map(section => ({
               key: section.key,
-              node: renderRegistrySection(section, section.key === 'other' ? otherExtras : extrasFor(section.key), true),
+              node: renderRegistrySection(section, extrasFor(section.key), true),
             }))
             .filter(c => c.node !== null);
           const isWideCard = (key: string) => (registrySizes.get(key) ?? 0) >= WIDE_SECTION_FIELDS;
@@ -2770,7 +2790,6 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           const stragglers = [...leftovers.entries()]
             .filter(([key]) => !cardKeys.has(key) && key !== 'other' && key !== 'application' && !SPECIAL_SECTION_KEYS.has(key) && !MERGED_INTO_SPECS.has(key))
             .sort((x, y) => sectionRank(x[0]) - sectionRank(y[0]));
-          const otherFields = cardKeys.has('other') ? [] : otherExtras;
           const rowsOf = (fields: Array<{ label: string; value: string }>) =>
             Object.fromEntries(fields.map(f => [f.label, f.value]));
 
@@ -2804,8 +2823,6 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                   {renderMetadataCategory(sectionLabel(key), rowsOf(fields), undefined, <Database className="h-4 w-4" />, true)}
                 </React.Fragment>
               ))}
-              {otherFields.length > 0 &&
-                renderMetadataCategory(sectionLabel('other'), rowsOf(otherFields), undefined, <Database className="h-4 w-4" />)}
             </div>
           );
         })()}

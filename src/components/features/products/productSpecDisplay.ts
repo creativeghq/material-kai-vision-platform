@@ -54,12 +54,25 @@ const NOISE_KEYS = new Set([
   'sku_count', 'discontinued_item_count', 'made_to_order_item_count',
   // Every list item / table cell of the product's chunks (sizes, packaging lines, OCR math), never vetted.
   'key_features',
+  // Where the maker's site was found and what it holds; read by ingestion, not a product property.
+  'site_manifest',
 ]);
 
 /** Extraction bookkeeping — never a property of the product itself. */
 export function isNoiseSpecKey(key: string): boolean {
   const k = key.toLowerCase();
-  return NOISE_KEYS.has(k) || k.startsWith('_') || /(^|_)pages?($|_)/.test(k) || k.endsWith('_source');
+  return NOISE_KEYS.has(k) || k.startsWith('_') || /(^|_)pages?($|_)/.test(k) || k.endsWith('_source')
+    || k.startsWith('merged_') || k.startsWith('also_in_') || k.endsWith('_from_index');
+}
+
+const PROVENANCE_STAMPS = ['model', 'at', 'run_at', 'job_id'];
+const RECORD_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+/** A record of a pipeline step (stamped with a model or a time), or anything carrying internal record ids. */
+export function isProvenanceRecord(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'object' && !Array.isArray(value) && PROVENANCE_STAMPS.some(k => k in (value as Record<string, unknown>))) return true;
+  return RECORD_ID.test(typeof value === 'string' ? value : JSON.stringify(value));
 }
 
 /** Contact details of the manufacturer, not specifications of the product. */

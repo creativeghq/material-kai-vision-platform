@@ -98,7 +98,7 @@ const DialogTitle = React.forwardRef<
       // is also where record NAMES live — "Receive into warehouse — {issuer}". Aleo is latin-only,
       // and CSS font matching is per character, so a Greek name under font-display renders half
       // slab-serif and half sans inside one line. Overrides via className still win.
-      'text-lg font-semibold leading-none tracking-tight',
+      'font-sans text-lg font-semibold leading-none tracking-tight',
       className,
     )}
     {...props}

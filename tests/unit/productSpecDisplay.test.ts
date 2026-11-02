@@ -4,6 +4,7 @@ import {
   formatRange,
   summariseSkuMap,
   isNoiseSpecKey,
+  isProvenanceRecord,
   isContactKey,
   complianceFlagLabel,
 } from '@/components/features/products/productSpecDisplay';
@@ -122,5 +123,14 @@ describe('OCR markup and camelCase keys', () => {
   it('reads a camelCase key as words', () => {
     expect(describeValue({ rValue: ['R10', 'R11'], barefootRampTest: 'A' })).toBe('R Value: R10, R11; Barefoot Ramp Test: A');
     expect(isNoiseSpecKey('key_features')).toBe(true);
+  });
+
+  it('never shows a pipeline record or an internal record id as a product property', () => {
+    expect(isProvenanceRecord({ at: '2026-11-02T15:08:15Z', kept: { colours: ['beige'] }, model: 'claude-sonnet-5-5' })).toBe(true);
+    expect(isProvenanceRecord([{ id: '326d4680-98fb-4e17-9b1f-6199bbfac210', name: 'Reality 25x50' }])).toBe(true);
+    expect(isProvenanceRecord({ formats: ['60x120'], shape: 'Rectangular' })).toBe(false);
+    expect(isProvenanceRecord('Matte')).toBe(false);
+    for (const k of ['merged_from', 'also_in_documents', 'formats_from_index', 'site_manifest']) expect(isNoiseSpecKey(k)).toBe(true);
+    expect(isNoiseSpecKey('available_formats')).toBe(false);
   });
 });
