@@ -12780,9 +12780,21 @@
         "type": "uuid",
         "required": false,
         "desc": "Workspace to summarise (query param on GET, body on POST). Defaults as described above."
+      },
+      {
+        "name": "view",
+        "type": "string",
+        "required": false,
+        "desc": "notifications = the caller's own platform notifications newer than since (for native desktop banners) instead of the pulse."
+      },
+      {
+        "name": "since",
+        "type": "string",
+        "required": false,
+        "desc": "ISO timestamp cursor for view=notifications. Omitted = start from now (returns no backlog). Use the returned cursor next time."
       }
     ],
-    "response": "{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], workspaces: [{id, name}] }"
+    "response": "{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], layout: {…widget design, from widget_layouts}, workspaces: [{id, name}] } — items: [{title, subtitle, status, date, value?, currency?, tone, url}]. view=notifications: { ok, notifications: [{id, type, title, body, action_url, created_at}], cursor }"
   },
   {
     "name": "dataforseo-reconcile",

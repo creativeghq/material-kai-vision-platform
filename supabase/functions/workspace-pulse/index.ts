@@ -18,7 +18,10 @@ Deno.serve(withApiLogging('workspace-pulse', async (req: Request) => {
   const userId = auth.userId;
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
 
-  let requested = new URL(req.url).searchParams.get('workspace_id');
+  const params = new URL(req.url).searchParams;
+  if (params.get('view') === 'notifications') return notifications(token, userId, params.get('since'));
+
+  let requested = params.get('workspace_id');
   if (!requested && req.method === 'POST') {
     try { requested = ((await req.json()) as { workspace_id?: string }).workspace_id ?? null; } catch { /* empty body */ }
   }
@@ -56,3 +59,32 @@ Deno.serve(withApiLogging('workspace-pulse', async (req: Request) => {
 
   return json({ ok: true, ...(data as Record<string, unknown>), workspaces });
 }));
+
+/**
+ * The caller's own platform notifications newer than `since`, oldest first, for the desktop app to
+ * show as native banners. No `since` = start now (a first launch must not replay the backlog).
+ */
+async function notifications(token: string, userId: string, since: string | null): Promise<Response> {
+  const now = new Date().toISOString();
+  if (!since) return json({ ok: true, notifications: [], cursor: now });
+  if (Number.isNaN(Date.parse(since))) throw new HttpError(400, 'since must be an ISO timestamp');
+
+  const fence = keyWorkspaceFence();
+  let query = callerDbClient(token, userId, fence)
+    .from('user_notifications')
+    .select('id, type, title, body, action_url, created_at')
+    .eq('user_id', userId)
+    .gt('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(20);
+  // A key bound to one workspace must not surface notifications about another.
+  if (fence) query = query.or(`metadata->>workspace_id.is.null,metadata->>workspace_id.eq.${fence}`);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('[workspace-pulse] notifications read failed:', error.message);
+    return json({ ok: false, error: 'Could not read notifications right now' }, 502);
+  }
+  const rows = (data ?? []) as Array<{ created_at: string }>;
+  return json({ ok: true, notifications: rows, cursor: rows.length ? rows[rows.length - 1].created_at : since });
+}

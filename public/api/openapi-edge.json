@@ -23075,7 +23075,7 @@
         ],
         "summary": "Glanceable per-section summary for the desktop widget",
         "operationId": "get_workspace_pulse",
-        "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by get_workspace_pulse, which reuses dashboard_workspace_snapshot and get_deal_forecast. Workspace: the workspace_id param, else the key's bound workspace, else the caller's most recently joined one; another tenant's id is a 404.\n\n**Response:** `{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], workspaces: [{id, name}] }`",
+        "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by get_workspace_pulse, which reuses dashboard_workspace_snapshot and get_deal_forecast. Workspace: the workspace_id param, else the key's bound workspace, else the caller's most recently joined one; another tenant's id is a 404.\n\n**Response:** `{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], layout: {…widget design, from widget_layouts}, workspaces: [{id, name}] } — items: [{title, subtitle, status, date, value?, currency?, tone, url}]. view=notifications: { ok, notifications: [{id, type, title, body, action_url, created_at}], cursor }`",
         "security": [
           {
             "supabaseJwt": []
@@ -23143,7 +23143,7 @@
         ],
         "summary": "Glanceable per-section summary for the desktop widget",
         "operationId": "post_workspace_pulse",
-        "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by get_workspace_pulse, which reuses dashboard_workspace_snapshot and get_deal_forecast. Workspace: the workspace_id param, else the key's bound workspace, else the caller's most recently joined one; another tenant's id is a 404.\n\n**Response:** `{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], workspaces: [{id, name}] }`",
+        "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by get_workspace_pulse, which reuses dashboard_workspace_snapshot and get_deal_forecast. Workspace: the workspace_id param, else the key's bound workspace, else the caller's most recently joined one; another tenant's id is a 404.\n\n**Response:** `{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], layout: {…widget design, from widget_layouts}, workspaces: [{id, name}] } — items: [{title, subtitle, status, date, value?, currency?, tone, url}]. view=notifications: { ok, notifications: [{id, type, title, body, action_url, created_at}], cursor }`",
         "security": [
           {
             "supabaseJwt": []
@@ -23214,6 +23214,14 @@
                   "workspace_id": {
                     "type": "string",
                     "description": "Workspace to summarise (query param on GET, body on POST). Defaults as described above. (uuid)"
+                  },
+                  "view": {
+                    "type": "string",
+                    "description": "notifications = the caller's own platform notifications newer than since (for native desktop banners) instead of the pulse."
+                  },
+                  "since": {
+                    "type": "string",
+                    "description": "ISO timestamp cursor for view=notifications. Omitted = start from now (returns no backlog). Use the returned cursor next time."
                   }
                 }
               }

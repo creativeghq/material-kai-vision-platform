@@ -5037,6 +5037,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "workspace_id": {
         "type": "string",
         "description": "Workspace to summarise (query param on GET, body on POST). Defaults as described above. (uuid)"
+      },
+      "view": {
+        "type": "string",
+        "description": "notifications = the caller's own platform notifications newer than since (for native desktop banners) instead of the pul"
+      },
+      "since": {
+        "type": "string",
+        "description": "ISO timestamp cursor for view=notifications. Omitted = start from now (returns no backlog). Use the returned cursor next"
       }
     }
   },
