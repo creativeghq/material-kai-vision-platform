@@ -1140,7 +1140,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         {rows.map((d) => (
           <tr key={d.id} className="border-b border-border/30">
             <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
-            <td className="px-4 py-2"><span className="text-[10px] text-muted-foreground">{d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</span></td>
+            <td className="px-4 py-2"><span className="text-[10px] text-muted-foreground">{d.return_of_inbound_document_id ? 'Return to supplier' : d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</span></td>
             <td className="px-4 py-2">{d.issued_at ? formatDate(d.issued_at) : formatDate(d.created_at)}</td>
             <td className="px-4 py-2"><JobCell job={deliveryNoteJob(d)} /></td>
             <td className="px-4 py-2 text-center">
@@ -1187,7 +1187,8 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                     <Truck className="h-3.5 w-3.5" />
                   </Button>
                 )}
-                {!readOnly && d.status === 'issued' && d.kind === 'dispatch' && (
+                {/* A return is refunded by the SUPPLIER's credit note; invoicing it would bill them for their own goods. */}
+                {!readOnly && d.status === 'issued' && d.kind === 'dispatch' && !d.return_of_inbound_document_id && (
                   <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => toInvoice(d.id)}>
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Create invoice'}
                   </Button>

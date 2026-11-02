@@ -16,7 +16,7 @@ const HOOK = join(FINANCE, 'useInboundDocActions.tsx');
  * Handlers whose ABSENCE removes or disables an entry. Listed rather than derived, so adding a
  * gated entry to the menu is a deliberate two-line change: the entry, and this list.
  */
-const GATING_PROPS = ['onAddLineDetail', 'onOpenPayments', 'onCreateOrder', 'onReceiveStock'] as const;
+const GATING_PROPS = ['onAddLineDetail', 'onOpenPayments', 'onCreateOrder', 'onReceiveStock', 'onReturnToSupplier'] as const;
 
 function walk(dir: string, out: string[] = []): string[] {
   let entries: string[];

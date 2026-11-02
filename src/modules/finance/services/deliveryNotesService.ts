@@ -24,6 +24,8 @@ export interface DeliveryNote {
    *  own registered document, not an erasure of the first one. */
   fiscal_cancellation_mark: string | null;
   fiscal_cancelled_at: string | null;
+  /** Set on a return to supplier: the received document whose goods go back. */
+  return_of_inbound_document_id?: string | null;
   created_at: string;
   /** Embedded order — read-only, for `deliveryNoteJob`. Never written. */
   orders?: { project_id: string | null; projects?: { name: string | null } | { name: string | null }[] | null } | null;

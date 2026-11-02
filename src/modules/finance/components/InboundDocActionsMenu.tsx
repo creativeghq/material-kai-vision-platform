@@ -8,7 +8,7 @@
  */
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, ListPlus, PackagePlus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2, Send, FileUp, FileText, CheckCircle2 } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, PackageMinus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2, Send, FileUp, FileText, CheckCircle2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/utils/decimal';
 import { inboundService } from '@/modules/finance/services/inboundService';
@@ -59,13 +59,15 @@ interface Props {
    */
   onOpenPayments?: () => void;
   onReceiveStock: () => void;
+  /** Draft a return note to the issuer. Absent → not offered. */
+  onReturnToSupplier?: () => void;
   /** Opens the complete-the-document editor. Absent where the surface cannot host a dialog. */
   onAddLineDetail?: () => void;
   onDismiss: () => void;
   onChanged?: () => void;
 }
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onSendPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onAddLineDetail, onDismiss, onSettle, onUnsettle, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onSendPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onReturnToSupplier, onAddLineDetail, onDismiss, onSettle, onUnsettle, onChanged }) => {
   const settledOutside = !!(doc as { settled_outside_at?: string | null }).settled_outside_at;
   const navigate = useNavigate();
 
@@ -120,6 +122,15 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   const hasIssuer = !!(doc.issuer_vat || doc.issuer_name);
   /** Already a CRM company — adding again would only make a duplicate to merge later. */
   const inCrm = !!crmCompanyId;
+  const returnBlockedReason = isCancelled
+    ? voidWhy
+    : isPayroll || docFamily(doc.doc_type) === '5'
+      ? 'Only a purchase can be returned.'
+      : needsDetail
+        ? 'This document has no itemised lines yet — add the detail first.'
+        : !inCrm
+          ? 'Add the issuer to CRM first — the return note is addressed to them.'
+          : null;
 
   // Read-only view of the document exactly as AADE holds it.
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -234,6 +245,14 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             title={needsDetail ? 'This document has no itemised lines yet — add the detail first.' : undefined}
           >
             <PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse
+          </DropdownMenuItem>
+          {/* The return note is addressed to the issuer, so they must be a CRM party first. */}
+          <DropdownMenuItem
+            onClick={onReturnToSupplier}
+            disabled={!onReturnToSupplier || returnBlockedReason !== null}
+            title={returnBlockedReason ?? undefined}
+          >
+            <PackageMinus className="h-4 w-4 mr-2" /> Return to supplier&hellip;
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

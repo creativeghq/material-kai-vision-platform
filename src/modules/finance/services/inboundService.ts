@@ -227,6 +227,22 @@ export interface InboundLineOutstanding {
   outstanding: number;
 }
 
+/** One itemised line of a received document, as `supplier_return_lines` derives it. */
+export interface SupplierReturnLine {
+  line_number: number;
+  description: string;
+  item_code: string | null;
+  /** AADE measurement-unit code, as the document carries it. */
+  measurement_unit: string | null;
+  /** NULL when the document states no quantity — then nothing caps the return. */
+  invoiced: number | null;
+  returned: number;
+  returnable: number | null;
+  /** Stock items this line was received into from THIS document. Empty = never received here. */
+  stock: { item_id: string; name: string; unit: string | null; on_hand: number; received: number; returned: number }[];
+  open_draft_id: string | null;
+}
+
 /**
  * How many documents the Expenses inbox holds in memory. It filters and pages client-side, so
  * this is the whole world as far as that surface is concerned — anything past it is unreachable,
@@ -639,6 +655,30 @@ export const inboundService = {
     } as never);
     if (error) throw error;
     return (data ?? []) as unknown as InboundLineOutstanding[];
+  },
+
+  /** What of this document can still go back to the supplier, per line — the caps the draft RPC enforces. */
+  async supplierReturnLines(docId: string): Promise<SupplierReturnLine[]> {
+    const { data, error } = await supabase.rpc('supplier_return_lines' as never, { p_doc_id: docId } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as SupplierReturnLine[];
+  },
+
+  /**
+   * A DRAFT Δελτίο Αποστολής (purpose 5, Return) addressed to the issuer. Nothing moves until it is
+   * issued, which takes each linked line out of its stock item. Resumes an open draft instead of
+   * cutting a second one.
+   */
+  async createSupplierReturnDraft(
+    docId: string,
+    lines: { line_number: number; quantity: number; warehouse_item_id: string | null; unit: string | null }[],
+    reason: string,
+  ): Promise<string> {
+    const { data, error } = await supabase.rpc('create_supplier_return_draft' as never, {
+      p_doc_id: docId, p_lines: lines, p_reason: reason || null,
+    } as never);
+    if (error) throw error;
+    return data as unknown as string;
   },
 
   /** Mark the AI-extracted pending rows for this document as handled, so the pending queue

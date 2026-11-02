@@ -7,6 +7,7 @@ import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDoc
 import { CompleteLinesDialog } from '@/modules/finance/components/CompleteLinesDialog';
 import { ExpensePaymentsDialog } from '@/modules/finance/components/ExpensePaymentsDialog';
 import { ReceiveToWarehouseDialog } from '@/modules/finance/components/ReceiveToWarehouseDialog';
+import { ReturnToSupplierDialog } from '@/modules/finance/components/ReturnToSupplierDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { SettleExpenseDialog } from '@/modules/finance/components/SettleExpenseDialog';
 import { NewOrderModal } from '@/modules/finance/components/OrdersPanel';
@@ -50,6 +51,7 @@ export function useInboundDocActions({
   const { toast } = useToast();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [receiveDoc, setReceiveDoc] = useState<InboundDocument | null>(null);
+  const [returnDoc, setReturnDoc] = useState<InboundDocument | null>(null);
   /** Value-only lines being completed (issue #377, Phase 1b). */
   const [detailDoc, setDetailDoc] = useState<InboundDocument | null>(null);
   /** Being paid before it is an expense — the conversion happens when that form saves. */
@@ -132,6 +134,7 @@ export function useInboundDocActions({
       // amount there, so this is the only way to reach what is actually outstanding.
       onOpenPayments={doc.created_supplier_bill_id ? () => openPayments(doc.created_supplier_bill_id!) : undefined}
       onReceiveStock={() => setReceiveDoc(doc)}
+      onReturnToSupplier={() => setReturnDoc(doc)}
       onAddLineDetail={() => setDetailDoc(doc)}
       onDismiss={() => dismiss(doc.id)}
       onSettle={() => setSettleDoc(doc)}
@@ -181,6 +184,14 @@ export function useInboundDocActions({
           workspaceId={workspaceId}
           onOpenChange={(v) => { if (!v) setReceiveDoc(null); }}
           onDone={() => { setReceiveDoc(null); onChanged(); }}
+        />
+      )}
+      {returnDoc && workspaceId && (
+        <ReturnToSupplierDialog
+          doc={returnDoc}
+          workspaceId={workspaceId}
+          onOpenChange={(v) => { if (!v) setReturnDoc(null); }}
+          onDone={() => { setReturnDoc(null); onChanged(); }}
         />
       )}
       {orderDoc && workspaceId && (
