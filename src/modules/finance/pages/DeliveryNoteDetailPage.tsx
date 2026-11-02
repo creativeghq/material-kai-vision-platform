@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FileText, Loader2, Pencil, Send, Truck } from 'lucide-react';
+import { FileText, Loader2, Pencil, Truck } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -13,6 +13,8 @@ import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/rout
 import { deliveryNotesService, deliveryNoteRelation, type DeliveryNoteDetail, type SupplierReturnCredit } from '@/modules/finance/services/deliveryNotesService';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
+import { FiscalRecordPanel, useFiscalAuthCode } from '@/modules/finance/components/FiscalRecordPanel';
+import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 import { movePurposeLabel, movementDocTypeLabel } from '@/services/fiscal/fiscalVocabulary';
 
 const STATUS_VARIANT: Record<string, 'neutral' | 'info' | 'success' | 'error'> = {
@@ -80,6 +82,7 @@ export const DeliveryNoteDetailPage: React.FC = () => {
   const [note, setNote] = useState<DeliveryNoteDetail | null | 'missing'>(null);
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const authCode = useFiscalAuthCode('delivery_notes', id ?? '', note && note !== 'missing' ? note.fiscal_mark : null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -123,17 +126,17 @@ export const DeliveryNoteDetailPage: React.FC = () => {
 
   const issue = () => run('issue', async () => {
     const r = await deliveryNotesService.issue(note.id);
-    toast({
-      title: `Issued ${r.delivery_note_number ?? ''}`.trim(),
-      description: r.skipped > 0
-        ? `${r.moved} line(s) moved stock. Not linked to a stock item, so nothing moved: ${r.skipped_lines.join(', ')}.`
-        : `${r.moved} line(s) moved stock.`,
-    });
+    const sent = await transmitAfterIssue('delivery_note', note.id, note.workspace_id);
+    const t = issuedToast(`Delivery note ${r.delivery_note_number ?? ''}`.trim(), sent);
+    const stock = r.skipped > 0
+      ? `${r.moved} line(s) moved stock; not linked to a stock item: ${r.skipped_lines.join(', ')}.`
+      : `${r.moved} line(s) moved stock.`;
+    toast({ ...t, description: [t.description, stock].filter(Boolean).join(' ') });
     await load();
   });
   const sendFiscal = () => run('fiscal', async () => {
-    const r = await deliveryNotesService.submitFiscal(note.id);
-    toast({ title: r?.fiscal?.mark ? `Sent to myDATA · MARK ${r.fiscal.mark}` : 'Sent to myDATA' });
+    const t = issuedToast('Delivery note', await transmitAfterIssue('delivery_note', note.id, note.workspace_id));
+    toast(t.variant ? t : { title: 'Sent to myDATA', description: t.description });
     await load();
   });
   const pdf = () => run('pdf', async () => {
@@ -165,17 +168,12 @@ export const DeliveryNoteDetailPage: React.FC = () => {
           {isDraft && (
             <Button size="sm" onClick={issue} disabled={!!busy}>
               {busy === 'issue' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Truck className="mr-1.5 h-4 w-4" />}
-              Issue ({note.kind === 'receipt' ? 'add to stock' : 'take out of stock'})
+              Issue &amp; send to myDATA
             </Button>
           )}
           {!isDraft && (
             <Button variant="outline" size="sm" onClick={pdf} disabled={!!busy}>
               {busy === 'pdf' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileText className="mr-1.5 h-4 w-4" />}PDF
-            </Button>
-          )}
-          {note.status === 'issued' && note.kind === 'dispatch' && note.fiscal_status !== 'accepted' && (
-            <Button size="sm" onClick={sendFiscal} disabled={!!busy}>
-              {busy === 'fiscal' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}Send to myDATA
             </Button>
           )}
           {/* A return is refunded by the supplier's credit note, never invoiced. */}
@@ -221,25 +219,27 @@ export const DeliveryNoteDetailPage: React.FC = () => {
             <HubProperty label="Transport date">{note.transport_date ? formatDate(note.transport_date) : null}</HubProperty>
             <HubProperty label="Vehicle">{note.vehicle_number}</HubProperty>
             <HubProperty label="Loading place">
-              {address([note.ship_from_street, note.ship_from_number, note.ship_from_postal, note.ship_from_city]) || (
-                <span className="text-muted-foreground">Your business address</span>
-              )}
+              {address([note.ship_from_street, note.ship_from_number, note.ship_from_postal, note.ship_from_city]) || note.default_loading_place}
             </HubProperty>
             <HubProperty label="Delivery place">
-              {address([note.ship_to_street, note.ship_to_number, note.ship_to_postal, note.ship_to_city]) || (
-                <span className="text-muted-foreground">{note.customer_company_id ? "The company's address" : null}</span>
-              )}
+              {address([note.ship_to_street, note.ship_to_number, note.ship_to_postal, note.ship_to_city]) || note.default_delivery_place}
             </HubProperty>
-            <HubProperty label="MARK">{note.fiscal_mark ? <span className="font-mono text-xs">{note.fiscal_mark}</span> : null}</HubProperty>
-            {note.fiscal_error && (
-              <HubProperty label="myDATA error"><span className="text-destructive">{note.fiscal_error}</span></HubProperty>
-            )}
           </HubPropertyList>
         </HubPanel>
       }
-      right={isReturn ? (
-        <SupplierCreditPanel noteId={note.id} />
-      ) : undefined}
+      right={isDraft && !isReturn ? undefined : (
+        <>
+          {!isDraft && (
+            <FiscalRecordPanel
+              record={note}
+              authenticationCode={authCode}
+              onSend={note.status === 'issued' ? sendFiscal : undefined}
+              sending={busy === 'fiscal'}
+            />
+          )}
+          {isReturn && <SupplierCreditPanel noteId={note.id} />}
+        </>
+      )}
     >
       <Card>
         <CardHeader><CardTitle>Lines</CardTitle></CardHeader>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { FileMinus, FileText, Loader2, PackageCheck, Pencil, Send, Trash2 } from 'lucide-react';
+import { FileMinus, FileText, Loader2, PackageCheck, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -14,6 +14,8 @@ import {
 } from '@/modules/finance/services/creditNoteDraftsService';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { ReceiveReturnDialog } from '@/modules/finance/components/ReceiveReturnDialog';
+import { FiscalRecordPanel, useFiscalAuthCode } from '@/modules/finance/components/FiscalRecordPanel';
+import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 
 const isTransmitted = (s: string | null) => s === 'accepted' || s === 'offline';
 const crumbs = (title: string) => [
@@ -128,7 +130,7 @@ export const CreditNoteDraftPage: React.FC = () => {
     setBusy('issue');
     try {
       const cnId = await creditNoteDraftsService.issue(draft.id);
-      toast({ title: 'Credit note issued', description: 'Numbered and netted against the invoice. Send it to myDATA from its page.' });
+      toast(issuedToast('Credit note', await transmitAfterIssue('credit_note', cnId, draft.workspace_id)));
       navigate(creditNoteUrl(cnId), { replace: true });
     } catch (err) {
       toast({ title: 'Could not issue', description: (err as { message?: string })?.message, variant: 'destructive' });
@@ -151,7 +153,7 @@ export const CreditNoteDraftPage: React.FC = () => {
         <>
           <Button variant="outline" size="sm" onClick={() => setEditing(true)}><Pencil className="mr-1.5 h-4 w-4" />Edit</Button>
           <Button size="sm" onClick={() => void issue()} disabled={!!busy}>
-            {busy === 'issue' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileMinus className="mr-1.5 h-4 w-4" />}Issue
+            {busy === 'issue' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <FileMinus className="mr-1.5 h-4 w-4" />}Issue &amp; send to myDATA
           </Button>
           <Button variant="ghost" size="icon" aria-label="Delete draft" onClick={() => void remove()} disabled={!!busy}><Trash2 className="h-4 w-4" /></Button>
         </>
@@ -192,6 +194,7 @@ export const CreditNoteDetailPage: React.FC = () => {
   const [cn, setCn] = useState<CreditNoteRecord | null | 'missing'>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [receiving, setReceiving] = useState(false);
+  const authCode = useFiscalAuthCode('credit_notes', id ?? '', cn && cn !== 'missing' ? cn.fiscal_mark : null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -228,15 +231,6 @@ export const CreditNoteDetailPage: React.FC = () => {
           {!cn.goods_returned_at && (
             <Button variant="outline" size="sm" onClick={() => setReceiving(true)}><PackageCheck className="mr-1.5 h-4 w-4" />Receive returned goods</Button>
           )}
-          {!transmitted && (
-            <Button size="sm" disabled={!!busy} onClick={() => void run('fiscal', async () => {
-              await financeService.submitCreditNoteFiscal(cn.id);
-              toast({ title: 'Sent to myDATA' });
-              await load();
-            })}>
-              {busy === 'fiscal' ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />}Send to myDATA
-            </Button>
-          )}
         </>
       }
       overlays={
@@ -246,6 +240,18 @@ export const CreditNoteDetailPage: React.FC = () => {
           open={receiving}
           onOpenChange={setReceiving}
           onDone={() => { setReceiving(false); void load(); }}
+        />
+      }
+      right={
+        <FiscalRecordPanel
+          record={cn}
+          authenticationCode={authCode}
+          sending={busy === 'fiscal'}
+          onSend={() => void run('fiscal', async () => {
+            const t = issuedToast('Credit note', await transmitAfterIssue('credit_note', cn.id, cn.workspace_id));
+            toast(t.variant ? t : { title: 'Sent to myDATA', description: t.description });
+            await load();
+          })}
         />
       }
       left={
@@ -262,9 +268,7 @@ export const CreditNoteDetailPage: React.FC = () => {
             <HubProperty label="Issued">{cn.issued_at ? formatDate(cn.issued_at) : null}</HubProperty>
             <HubProperty label="Reason">{cn.reason}</HubProperty>
             <HubProperty label="Correlated MARK">{cn.correlated_mark ? <span className="font-mono text-xs">{cn.correlated_mark}</span> : null}</HubProperty>
-            <HubProperty label="MARK">{cn.fiscal_mark ? <span className="font-mono text-xs">{cn.fiscal_mark}</span> : null}</HubProperty>
             <HubProperty label="Goods returned">{cn.goods_returned_at ? formatDate(cn.goods_returned_at) : <span className="text-muted-foreground">Nothing received back</span>}</HubProperty>
-            {cn.fiscal_error && <HubProperty label="myDATA error"><span className="text-destructive">{cn.fiscal_error}</span></HubProperty>}
           </HubPropertyList>
         </HubPanel>
       }

@@ -86,7 +86,13 @@ export interface DeliveryNoteDetail extends DeliveryNote {
   to_weigh: boolean;
   packagings: { packagingType: number; quantity: number; otherPackagingTypeTitle?: string }[] | null;
   fiscal_error: string | null;
+  fiscal_uid: string | null;
+  fiscal_submitted_at: string | null;
+  fiscal_qr_url: string | null;
+  fiscal_aade_qr_url: string | null;
   company_name: string | null;
+  default_loading_place: string | null;
+  default_delivery_place: string | null;
   items: (DeliveryLineInput & { id: string; source_line_number: number | null })[];
 }
 
@@ -175,15 +181,28 @@ export const deliveryNotesService = {
       delivery_note_items: (DeliveryNoteDetail['items'][number] & { created_at: string })[];
     };
     // No FK from customer_company_id to crm_companies, so it cannot be embedded.
+    const place = (street?: string | null, num?: string | null, postal?: string | null, city?: string | null) =>
+      [[street, num].filter(Boolean).join(' '), [postal, city].filter(Boolean).join(' ')].filter(Boolean).join(', ') || null;
     let companyName: string | null = null;
+    let deliveryPlace: string | null = null;
     if (row.customer_company_id) {
-      const { data: c, error: cErr } = await supabase.from('crm_companies').select('name').eq('id', row.customer_company_id).maybeSingle();
+      const { data: c, error: cErr } = await supabase.from('crm_companies')
+        .select('name, street, street_number, postal_code, city, billing_street, billing_street_number, billing_postal_code, billing_city')
+        .eq('id', row.customer_company_id).maybeSingle();
       if (cErr) throw cErr;
-      companyName = (c as { name: string | null } | null)?.name ?? null;
+      const co = c as Record<string, string | null> | null;
+      companyName = co?.name ?? null;
+      deliveryPlace = place(co?.billing_street ?? co?.street, co?.billing_street_number ?? co?.street_number,
+        co?.billing_postal_code ?? co?.postal_code, co?.billing_city ?? co?.city);
     }
+    const { data: fs } = await supabase.from('finance_settings')
+      .select('business_address, business_street_number, business_postal_code, business_city')
+      .eq('workspace_id', row.workspace_id).maybeSingle();
+    const biz = fs as Record<string, string | null> | null;
+    const loadingPlace = place(biz?.business_address, biz?.business_street_number, biz?.business_postal_code, biz?.business_city);
     const items = [...(row.delivery_note_items ?? [])]
       .sort((a, b) => (a.source_line_number ?? 0) - (b.source_line_number ?? 0) || a.created_at.localeCompare(b.created_at));
-    return { ...row, company_name: companyName, items };
+    return { ...row, company_name: companyName, default_loading_place: loadingPlace, default_delivery_place: deliveryPlace, items };
   },
 
   /** `correlated` = AADE says it corrects the returned invoice; `possible` = a later 5.2 from that supplier. */

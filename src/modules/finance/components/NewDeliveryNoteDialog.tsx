@@ -27,6 +27,7 @@ import {
 } from '@/services/fiscal/fiscalVocabulary';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
+import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 
 export const NewDeliveryNoteDialog: React.FC<{
   workspaceId: string;
@@ -246,8 +247,12 @@ export const NewDeliveryNoteDialog: React.FC<{
           });
           return;
         }
+        toast(issuedToast('Delivery note', await transmitAfterIssue('delivery_note', id, workspaceId)));
+        onCreated(id);
+        onOpenChange(false);
+        return;
       }
-      toast({ title: issue ? 'Delivery note issued' : editing ? 'Changes saved' : 'Draft saved' });
+      toast({ title: editing ? 'Changes saved' : 'Draft saved' });
       onCreated(id);
       onOpenChange(false);
     } catch (err: any) {
@@ -496,7 +501,7 @@ export const NewDeliveryNoteDialog: React.FC<{
         <DialogFooter>
           <Button variant="outline" onClick={() => submit(false)} disabled={busy || loadFailed}>{editing ? 'Save changes' : 'Save draft'}</Button>
           <Button onClick={() => submit(true)} disabled={busy || loadFailed}>
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {editing ? 'Save & issue' : 'Issue'} ({kind === 'receipt' ? 'add to stock' : 'decrement stock'})
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {editing ? 'Save, issue & send' : 'Issue & send'} to myDATA
           </Button>
         </DialogFooter>
       </DialogContent>

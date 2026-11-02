@@ -95,6 +95,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     mark: 'ΜΑΡΚ', uid: 'UID', verify: 'Σαρώστε για το διαβιβασμένο παραστατικό',
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
     vehicle: 'Όχημα', purpose: 'Σκοπός', notes: 'Σημειώσεις', page: 'Σελίδα', of: 'από',
+    recipient: 'ΛΗΠΤΗΣ', totalQty: 'Σύνολο ποσότητας', transportDate: 'Ημ/νία μεταφοράς',
     paymentReceipt: 'ΑΠΟΔΕΙΞΗ ΕΙΣΠΡΑΞΗΣ', received: 'Εισπράχθηκε', method: 'Τρόπος πληρωμής',
     appliedTo: 'Εξόφληση', reference: 'Αναφορά', thankYou: 'Ευχαριστούμε για την πληρωμή σας.',
     contact: 'Επικοινωνία', office: 'Έδρα', value: 'Αξία', amountPaid: 'Ποσό πληρωμής',
@@ -140,6 +141,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     mark: 'MARK', uid: 'UID', verify: 'Scan for the Filed Document',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading Place', deliveryPlace: 'Delivery Place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
+    recipient: 'RECIPIENT', totalQty: 'Total quantity', transportDate: 'Transport date',
     paymentReceipt: 'PAYMENT RECEIPT', received: 'Received', method: 'Payment Method',
     appliedTo: 'Applied to', reference: 'Reference', thankYou: 'Thank You for Your Payment.',
     contact: 'Contact', office: 'Registered Office', value: 'Value', amountPaid: 'Amount Paid',
@@ -462,6 +464,8 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
         document_type: row.mydata_document_type ?? (row.kind === 'receipt' ? '10.2' : '9.3'),
         total: 0, currency: 'EUR',
         has_shipping: true, vat_rate: 0,
+        // A movement document prices nothing: printed as quantities only, never as zero money.
+        _movement_only: true,
       };
     }
 
@@ -719,6 +723,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   const fiscalQr = String(inv.fiscal_qr_url || inv.fiscal_aade_qr_url || '') || null;
   const L = LABELS[lang];
   const isCommercial = spec.headerStyle === 'commercial';
+  const movementOnly = !!inv._movement_only;
 
   /**
    * The movement purpose as the customer's copy must state it — ONE builder for both layouts.
@@ -1020,7 +1025,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     const hasDelivery = deliveryLines.length > 0;
     const colW = hasDelivery ? (right - M) / 2 - 10 : right - M;
     const topY = y;
-    text(L.customer, M, y, 9, bold, MUTED);
+    text(movementOnly ? L.recipient : L.customer, M, y, 9, bold, MUTED);
     y -= 13;
     for (const cl of wrap(custName, bold, 11, colW)) { text(cl, M, y, 11, bold); y -= 13; }
     for (const l of custLines) {
@@ -1057,11 +1062,20 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   const xNet = xVatPct - W.vatPct;
   const xDisc = xNet - W.net;
   const xPrice = anyDiscount ? xDisc - W.disc : xDisc;
-  const xUnit = xPrice - W.price - W.unit;
+  const xUnit = movementOnly ? right - 34 : xPrice - W.price - W.unit;
   const xQty = xUnit - 4;
   const xDescr = M + W.no + 4;
   const descrW = xQty - W.qty - xDescr - 6;
   const drawHead = () => {
+    if (movementOnly) {
+      page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 16, color: HEADBG });
+      text(L.lineNo, M + 2, y, 8, bold);
+      text(L.descr, xDescr, y, 8, bold);
+      textR(L.qty, xQty, y, 8, bold);
+      text(L.unit, xUnit, y, 8, bold);
+      y -= 18;
+      return;
+    }
     if (isCommercial) {
       page.drawRectangle({ x: M, y: y - 3, width: right - M, height: 15, color: HEADBG });
       text(L.itemCode, M + 2, y, 7.5, bold);
@@ -1111,6 +1125,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     return i < 0 ? '' : `(${i + 1})`;
   };
   let totNet = 0, totOtherTaxes = 0;
+  const qtyByUnit = new Map<string, number>();
   let lineNo = 0;
   // myDATA VAT category → percent (used when a line carries an explicit category).
   const VAT_PCT_BY_CAT: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
@@ -1136,7 +1151,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     vatByRate[key] = vatByRate[key] || { net: 0, vat: 0 };
     vatByRate[key].net += net; vatByRate[key].vat += vat;
 
-    if (isCommercial) {
+    if (isCommercial && !movementOnly) {
       const detailC = [variantOf(it), it.line_comments].filter(Boolean).join(' — ');
       const unitLabelC = it.unit ?? (it.measurement_unit_code != null ? UNIT_LABEL[Number(it.measurement_unit_code)] : '') ?? '';
       const codeLines = wrap(String(it.sku ?? '—'), font, 8, 64);
@@ -1172,13 +1187,16 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     const unitLabel = it.unit ?? (it.measurement_unit_code != null ? UNIT_LABEL[Number(it.measurement_unit_code)] : '') ?? '';
     textR(qty, xQty, y, 8.5);
     text(unitLabel, xUnit, y, 8.5);
-    textR(money(it.unit_price ?? 0), xPrice, y, 8.5);
-    if (anyDiscount) textR(lineDisc > 0 ? `- ${money(lineDisc)}` : '—', xDisc, y, 8.5);
-    textR(money(net), xNet, y, 8.5);
-    textR(`${pct}%${exemptionMarker(exCode)}`, xVatPct, y, 8.5);
-    textR(money(vat), xVatAmt, y, 8.5);
-    if (anyOtherTaxes) textR(lineOther > 0 ? money(lineOther) : '—', xOtherTax, y, 8.5);
-    textR(money(Math.round((net + vat + lineOther) * 100) / 100), xTotal, y, 8.5);
+    qtyByUnit.set(unitLabel, (qtyByUnit.get(unitLabel) ?? 0) + qty);
+    if (!movementOnly) {
+      textR(money(it.unit_price ?? 0), xPrice, y, 8.5);
+      if (anyDiscount) textR(lineDisc > 0 ? `- ${money(lineDisc)}` : '—', xDisc, y, 8.5);
+      textR(money(net), xNet, y, 8.5);
+      textR(`${pct}%${exemptionMarker(exCode)}`, xVatPct, y, 8.5);
+      textR(money(vat), xVatAmt, y, 8.5);
+      if (anyOtherTaxes) textR(lineOther > 0 ? money(lineOther) : '—', xOtherTax, y, 8.5);
+      textR(money(Math.round((net + vat + lineOther) * 100) / 100), xTotal, y, 8.5);
+    }
     y -= rowH;
     page.drawLine({ start: { x: M, y: y + 8.5 }, end: { x: right, y: y + 8.5 }, thickness: 0.4, color: LINE });
   }
@@ -1198,246 +1216,259 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     }
   }
 
-  // ── Totals + VAT analysis ──
-  if (y < M + 170) newPage();
-  y -= 14;
-
-  // The cash (paid-upfront) discount is an order-level figure that is NOT distributed to the
-  // lines, so the per-rate aggregates above are pre-discount and every printed figure derived
-  // from them has to be scaled by the same factor. This block used to print the per-rate rows
-  // BEFORE cashFactor was even computed — pre-discount rows sitting beside post-discount
-  // totals on the same document — and separately rounded its own running VAT sum for the
-  // total instead of summing the rows it had just printed. Both are fixed by deriving everything
-  const cashPct = Number(inv.cash_discount_pct ?? 0);
-  const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
-  const r2n = (n: number) => Math.round(n * 100) / 100;
-  const vatRows = Object.entries(vatByRate)
-    .map(([pct, agg]) => {
-      const net = r2n(agg.net * cashFactor);
-      const vat = r2n(agg.vat * cashFactor);
-      return { pct: Number(pct), net, vat, total: r2n(net + vat) };
-    })
-    .sort((a, b) => b.pct - a.pct);
-  const netAfter = r2n(vatRows.reduce((t, v) => t + v.net, 0));
-  const vatAfter = r2n(vatRows.reduce((t, v) => t + v.vat, 0));
-
-  // The per-rate table. It was two lines of grey text on a document whose entire purpose is
-  // letting a reader verify the VAT, so it is a real table now — and it foots, because the
-  // total is the sum of these printed rows rather than a separately-rounded parallel sum.
-  const drawVatTable = (x: number, topY: number): number => {
-    let ty = topY;
-    text(L.vatAnalysis, x, ty, 8, bold, MUTED); ty -= 12;
-    const colW = [34, 62, 56, 62];
-    const edges = colW.reduce<number[]>((acc, w) => [...acc, (acc[acc.length - 1] ?? x) + w], []);
-    const heads = [L.vatPct, L.net, L.vatAmt, L.totalValue];
-    for (let i = 0; i < heads.length; i++) {
-      if (i === 0) text(heads[i], x, ty, 7, bold, MUTED);
-      else textR(heads[i], edges[i], ty, 7, bold, MUTED);
+  if (movementOnly) {
+    y -= 4;
+    for (const [unitLabel, q] of qtyByUnit) {
+      text(L.totalQty, xDescr, y, 8.5, bold);
+      textR(Math.round(q * 1000) / 1000, xQty, y, 8.5, bold);
+      text(unitLabel, xUnit, y, 8.5, bold);
+      y -= 13;
     }
-    ty -= 3;
-    page.drawLine({ start: { x, y: ty }, end: { x: edges[3], y: ty }, thickness: 0.4, color: LINE });
-    ty -= 10;
-    for (const v of vatRows) {
-      text(`${v.pct}%`, x, ty, 8, font, INK);
-      textR(money(v.net), edges[1], ty, 8);
-      textR(money(v.vat), edges[2], ty, 8);
-      textR(money(v.total), edges[3], ty, 8);
-      ty -= 11;
-    }
-    if (vatRows.length > 1) {
-      ty += 3;
+    y -= 8;
+  } else {
+    // ── Totals + VAT analysis ──
+    if (y < M + 170) newPage();
+    y -= 14;
+
+    // The cash (paid-upfront) discount is an order-level figure that is NOT distributed to the
+    // lines, so the per-rate aggregates above are pre-discount and every printed figure derived
+    // from them has to be scaled by the same factor. This block used to print the per-rate rows
+    // BEFORE cashFactor was even computed — pre-discount rows sitting beside post-discount
+    // totals on the same document — and separately rounded its own running VAT sum for the
+    // total instead of summing the rows it had just printed. Both are fixed by deriving everything
+    const cashPct = Number(inv.cash_discount_pct ?? 0);
+    const cashFactor = cashPct > 0 && cashPct < 100 ? 1 - cashPct / 100 : 1;
+    const r2n = (n: number) => Math.round(n * 100) / 100;
+    const vatRows = Object.entries(vatByRate)
+      .map(([pct, agg]) => {
+        const net = r2n(agg.net * cashFactor);
+        const vat = r2n(agg.vat * cashFactor);
+        return { pct: Number(pct), net, vat, total: r2n(net + vat) };
+      })
+      .sort((a, b) => b.pct - a.pct);
+    const netAfter = r2n(vatRows.reduce((t, v) => t + v.net, 0));
+    const vatAfter = r2n(vatRows.reduce((t, v) => t + v.vat, 0));
+
+    // The per-rate table. It was two lines of grey text on a document whose entire purpose is
+    // letting a reader verify the VAT, so it is a real table now — and it foots, because the
+    // total is the sum of these printed rows rather than a separately-rounded parallel sum.
+    const drawVatTable = (x: number, topY: number): number => {
+      let ty = topY;
+      text(L.vatAnalysis, x, ty, 8, bold, MUTED); ty -= 12;
+      const colW = [34, 62, 56, 62];
+      const edges = colW.reduce<number[]>((acc, w) => [...acc, (acc[acc.length - 1] ?? x) + w], []);
+      const heads = [L.vatPct, L.net, L.vatAmt, L.totalValue];
+      for (let i = 0; i < heads.length; i++) {
+        if (i === 0) text(heads[i], x, ty, 7, bold, MUTED);
+        else textR(heads[i], edges[i], ty, 7, bold, MUTED);
+      }
+      ty -= 3;
       page.drawLine({ start: { x, y: ty }, end: { x: edges[3], y: ty }, thickness: 0.4, color: LINE });
-      ty -= 11;
-      text(L.total, x, ty, 8, bold, INK);
-      textR(money(netAfter), edges[1], ty, 8, bold);
-      textR(money(vatAfter), edges[2], ty, 8, bold);
-      textR(money(r2n(netAfter + vatAfter)), edges[3], ty, 8, bold);
-      ty -= 11;
-    }
-    return ty;
-  };
+      ty -= 10;
+      for (const v of vatRows) {
+        text(`${v.pct}%`, x, ty, 8, font, INK);
+        textR(money(v.net), edges[1], ty, 8);
+        textR(money(v.vat), edges[2], ty, 8);
+        textR(money(v.total), edges[3], ty, 8);
+        ty -= 11;
+      }
+      if (vatRows.length > 1) {
+        ty += 3;
+        page.drawLine({ start: { x, y: ty }, end: { x: edges[3], y: ty }, thickness: 0.4, color: LINE });
+        ty -= 11;
+        text(L.total, x, ty, 8, bold, INK);
+        textR(money(netAfter), edges[1], ty, 8, bold);
+        textR(money(vatAfter), edges[2], ty, 8, bold);
+        textR(money(r2n(netAfter + vatAfter)), edges[3], ty, 8, bold);
+        ty -= 11;
+      }
+      return ty;
+    };
 
-  // Charges, itemised on the left. They enter the totals column as ONE line, because listing
-  // them in both places puts the same figures on the document twice.
-  const fees = Number(inv.total_fees_amount ?? 0), stamp = Number(inv.total_stamp_duty_amount ?? 0);
-  // Header total when the document carries one, else the sum of the per-line amounts.
-  const otherTax = Number(inv.total_other_taxes_amount ?? 0) || r2n(totOtherTaxes);
-  const deductions = Number(inv.total_deductions_amount ?? 0);
-  const digitalFee = Number(inv.digital_transaction_fee ?? 0);
-  const withheld = Number(inv.total_withheld_amount ?? 0);
-  const chargeRows: [string, number][] = [];
-  const docTaxRows = d.documentTaxes ?? [];
-  if (docTaxRows.length) {
-    // DOCUMENT MODE — one row per declared charge, named as it was declared and transmitted.
-    // A row whose `reduces_payable` flag cancels its natural effect is declared but not
-    // charged, so it does not appear in a column the reader adds up.
-    for (const t of docTaxRows) {
-      const taxType = Number(t.tax_type);
-      const deductive = taxType === 1 || taxType === 5;
-      const counts = deductive ? !!t.reduces_payable : !t.reduces_payable;
-      if (!counts) continue;
-      const fallback = taxType === 1 ? L.withheld
-        : taxType === 2 ? L.fees
-        : taxType === 3 ? L.otherTaxes
-        : taxType === 4 ? L.stamp
-        : L.deductions;
-      const amount = Math.abs(Number(t.tax_amount ?? 0));
-      if (!amount) continue;
-      chargeRows.push([String(t.label ?? '').trim() || fallback, deductive ? -amount : amount]);
-    }
-    if (digitalFee > 0) chargeRows.push([L.digitalFee, digitalFee]);
-  } else {
-    if (fees > 0) chargeRows.push([L.fees, fees]);
-    if (stamp > 0) chargeRows.push([L.stamp, stamp]);
-    if (otherTax > 0) chargeRows.push([L.otherTaxes, otherTax]);
-    if (digitalFee > 0) chargeRows.push([L.digitalFee, digitalFee]);
-    if (deductions > 0) chargeRows.push([L.deductions, -deductions]);
-    if (withheld > 0) chargeRows.push([L.withheld, -withheld]);
-  }
-  const chargesNet = r2n(chargeRows.reduce((t, [, v]) => t + v, 0));
-  const CHARGES_W = 190;
-  const drawCharges = (x: number, topY: number): number => {
-    if (!chargeRows.length) return topY;
-    let ty = topY;
-    text(L.charges, x, ty, 8, bold, MUTED); ty -= 12;
-    // Reserve the widest amount in the block, so every label wraps against the same edge and
-    // the money column stays a column.
-    const moneyW = Math.max(...chargeRows.map(([, v]) => font.widthOfTextAtSize(money(Math.abs(v)), 8)));
-    const labelW = CHARGES_W - moneyW - 10;
-    for (const [label, value] of chargeRows) {
-      const lines = wrap(`${value < 0 ? '(-)' : '(+)'} ${label}`, font, 8, labelW);
-      text(lines[0], x, ty, 8, font, MUTED);
-      textR(money(Math.abs(value)), x + CHARGES_W, ty, 8, font, MUTED);
-      ty -= 11;
-      // Continuation lines are indented past the (+)/(-) marker so the sign reads as belonging
-      // to the whole charge rather than to the first fragment of its name.
-      for (const cont of lines.slice(1)) { text(`    ${cont}`, x, ty, 8, font, MUTED); ty -= 10; }
-    }
-    return ty - 4;
-  };
-
-  // Left column: the VAT table always; the commercial template stacks its notes beneath it
-  // (the reference's bottom-left Παρατηρήσεις).
-  let vy = y;
-  if (vatRows.length) vy = drawVatTable(M, vy) - 6;
-  vy = drawCharges(M, vy);
-  if (isCommercial) {
-    if (effNotes) {
-      text(L.notes, M, vy, 8, bold, MUTED); vy -= 13;
-      for (const nl of wrap(effNotes, font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
-    }
-    if (inv.order_notes) {
-      vy -= 3;
-      text(L.orderNotes, M, vy, 8, bold, colors.accent); vy -= 12;
-      for (const nl of wrap(String(inv.order_notes), font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
-    }
-  }
-
-  // Totals (right box)
-  const boxX = right - 220;
-  const totalsTop = y + 10;
-  const row = (k: string, v: string, b = false) => {
-    if (isCommercial) {
-      // Reference layout: label left-aligned in the totals column, value right, hairline under.
-      text(k, boxX, y, b ? 10 : 9, b ? bold : font, INK);
-      textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
-      page.drawLine({ start: { x: boxX, y: y - 6 }, end: { x: right, y: y - 6 }, thickness: 0.4, color: LINE });
-      y -= 20;
-      return;
-    }
-    textR(k, right - 110, y, b ? 10 : 9, b ? bold : font, b ? INK : MUTED);
-    textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
-    y -= b ? 16 : 13;
-  };
-  // Universal breakdown: Price / Discount / Price after Discount / Currency / VAT.
-  // `netAfter` and `vatAfter` are the sums of the printed VAT-analysis rows (see above).
-  if (cashFactor < 1) {
-    row(L.price, money(totNet));
-    row(L.discount, `- ${money(r2n(totNet - netAfter))}`);
-    row(L.priceAfterDiscount, money(netAfter));
-  } else {
-    row(L.subtotalNet, money(netAfter));
-  }
-  row(L.currency, currency);
-  // Only meaningful on a foreign-currency document: the rate the figures were converted at.
-  const fxRate = Number(inv.exchange_rate ?? inv.fx_rate_to_base ?? 0);
-  const fxBase = fs?.base_currency ?? 'EUR';
-  if (currency !== fxBase && fxRate > 0) row(L.fxRate, `1 ${currency} = ${fxRate} ${fxBase}`);
-  row(L.totalVat, money(vatAfter));
-  // The stored total is authoritative (it is the myDATA/MARK figure). The fallback — for a
-  // document that never stored one — is built from the SAME post-discount figures printed
-  // above, not from the raw pre-discount line sums, which disagreed with them.
-  // In DOCUMENT mode a row flagged `reducesPayable` is declared at its full amount in the
-  // bucket total AND left out of the payable, so re-adding the buckets here would contradict
-  // the charge list printed on the left. `tax_payable_delta` is that number, derived in SQL.
-  const taxDelta = docTaxRows.length
-    ? Number(inv.tax_payable_delta ?? 0) + digitalFee
-    : fees + stamp + otherTax + digitalFee - withheld - deductions;
-  const grand = Number(inv.total ?? r2n(netAfter + vatAfter + taxDelta));
-  if (chargesNet !== 0) row(L.charges, `${chargesNet < 0 ? '- ' : ''}${money(Math.abs(chargesNet))}`);
-  // Grand total — presentation per template.
-  if (isCommercial) {
-    // Large amount-due like the reference receipt (the preceding row already ruled off).
-    text(L.total, boxX, y - 10, 10, bold, INK);
-    textR(money(grand), right, y - 16, 22, bold, INK);
-    y -= 28;
-  } else if (spec.totalsBoxStyle === 'accent') {
-    page.drawRectangle({ x: boxX, y: y - 4, width: right - boxX, height: 18, color: colors.accent });
-    textR(L.total, right - 110, y + 1, 10, bold, WHITE);
-    textR(money(grand), right, y + 1, 11, bold, WHITE);
-    y -= 20;
-  } else if (spec.totalsBoxStyle === 'accent-text') {
-    // Modern: accent rule + accent-colored amount-due text (no filled box).
-    page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: colors.accent });
-    y -= 4;
-    textR(L.total, right - 110, y, 10, bold, colors.accent);
-    textR(money(grand), right, y, 11, bold, colors.accent);
-    y -= 16;
-  } else {
-    page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
-    y -= 4;
-    row(L.total, money(grand), true);
-  }
-  // Amount paid / balance due (mirrors the HTML preview).
-  const amountPaid = Number(inv.amount_paid ?? 0);
-  const amountDue = Number(inv.amount_due ?? grand);
-  // The payable bar earns its place when it says something the grand total does not — either
-  // the template gives the total no visual weight of its own, or part of it is already paid so
-  // the two numbers genuinely differ. On `commercial` (22pt amount) and `accent` (filled box)
-  // with nothing paid it would be the same figure twice in a row.
-  const templateEmphasisesTotal = isCommercial || spec.totalsBoxStyle === 'accent';
-  const showPayableBar = !templateEmphasisesTotal || amountPaid > 0;
-  if (amountPaid > 0) {
-    row(L.paid, `- ${money(amountPaid)}`);
-    // The bar below carries the balance; a "Balance" row here would repeat it one line apart.
-    if (!showPayableBar) row(L.due2, money(amountDue), true);
-  }
-  if (showPayableBar) {
-    page.drawRectangle({ x: boxX, y: y - 6, width: right - boxX, height: 20, color: colors.accent });
-    text(L.payable, boxX + 6, y, 9, bold, WHITE);
-    textR(money(amountDue), right - 6, y - 1, 12, bold, WHITE);
-    y -= 26;
-  }
-  // ── Carry-forward (informational) ──
-  // Sits BELOW the grand total and never feeds it: `grand` is the myDATA/MARK figure for this
-  // document alone. This block only tells the customer what they already owed on top of it.
-  if (typeof priorBalance === 'number' && Math.abs(priorBalance) >= 0.01) {
-    const thisDue = Number(inv.amount_due ?? grand);
-    page.drawLine({ start: { x: boxX, y: y + 5 }, end: { x: right, y: y + 5 }, thickness: 0.4, color: LINE });
-    y -= 3;
-    if (priorBalance > 0) {
-      row(L.prevBalance, money(priorBalance));
-      row(L.totalWithPrev, money(Math.round((thisDue + priorBalance) * 100) / 100), true);
+    // Charges, itemised on the left. They enter the totals column as ONE line, because listing
+    // them in both places puts the same figures on the document twice.
+    const fees = Number(inv.total_fees_amount ?? 0), stamp = Number(inv.total_stamp_duty_amount ?? 0);
+    // Header total when the document carries one, else the sum of the per-line amounts.
+    const otherTax = Number(inv.total_other_taxes_amount ?? 0) || r2n(totOtherTaxes);
+    const deductions = Number(inv.total_deductions_amount ?? 0);
+    const digitalFee = Number(inv.digital_transaction_fee ?? 0);
+    const withheld = Number(inv.total_withheld_amount ?? 0);
+    const chargeRows: [string, number][] = [];
+    const docTaxRows = d.documentTaxes ?? [];
+    if (docTaxRows.length) {
+      // DOCUMENT MODE — one row per declared charge, named as it was declared and transmitted.
+      // A row whose `reduces_payable` flag cancels its natural effect is declared but not
+      // charged, so it does not appear in a column the reader adds up.
+      for (const t of docTaxRows) {
+        const taxType = Number(t.tax_type);
+        const deductive = taxType === 1 || taxType === 5;
+        const counts = deductive ? !!t.reduces_payable : !t.reduces_payable;
+        if (!counts) continue;
+        const fallback = taxType === 1 ? L.withheld
+          : taxType === 2 ? L.fees
+          : taxType === 3 ? L.otherTaxes
+          : taxType === 4 ? L.stamp
+          : L.deductions;
+        const amount = Math.abs(Number(t.tax_amount ?? 0));
+        if (!amount) continue;
+        chargeRows.push([String(t.label ?? '').trim() || fallback, deductive ? -amount : amount]);
+      }
+      if (digitalFee > 0) chargeRows.push([L.digitalFee, digitalFee]);
     } else {
-      // Customer is in credit — show it as a credit, and never print a negative "total due".
-      row(L.prevCredit, `- ${money(Math.abs(priorBalance))}`);
-      row(L.totalWithPrev, money(Math.max(0, Math.round((thisDue + priorBalance) * 100) / 100)), true);
+      if (fees > 0) chargeRows.push([L.fees, fees]);
+      if (stamp > 0) chargeRows.push([L.stamp, stamp]);
+      if (otherTax > 0) chargeRows.push([L.otherTaxes, otherTax]);
+      if (digitalFee > 0) chargeRows.push([L.digitalFee, digitalFee]);
+      if (deductions > 0) chargeRows.push([L.deductions, -deductions]);
+      if (withheld > 0) chargeRows.push([L.withheld, -withheld]);
     }
+    const chargesNet = r2n(chargeRows.reduce((t, [, v]) => t + v, 0));
+    const CHARGES_W = 190;
+    const drawCharges = (x: number, topY: number): number => {
+      if (!chargeRows.length) return topY;
+      let ty = topY;
+      text(L.charges, x, ty, 8, bold, MUTED); ty -= 12;
+      // Reserve the widest amount in the block, so every label wraps against the same edge and
+      // the money column stays a column.
+      const moneyW = Math.max(...chargeRows.map(([, v]) => font.widthOfTextAtSize(money(Math.abs(v)), 8)));
+      const labelW = CHARGES_W - moneyW - 10;
+      for (const [label, value] of chargeRows) {
+        const lines = wrap(`${value < 0 ? '(-)' : '(+)'} ${label}`, font, 8, labelW);
+        text(lines[0], x, ty, 8, font, MUTED);
+        textR(money(Math.abs(value)), x + CHARGES_W, ty, 8, font, MUTED);
+        ty -= 11;
+        // Continuation lines are indented past the (+)/(-) marker so the sign reads as belonging
+        // to the whole charge rather than to the first fragment of its name.
+        for (const cont of lines.slice(1)) { text(`    ${cont}`, x, ty, 8, font, MUTED); ty -= 10; }
+      }
+      return ty - 4;
+    };
+
+    // Left column: the VAT table always; the commercial template stacks its notes beneath it
+    // (the reference's bottom-left Παρατηρήσεις).
+    let vy = y;
+    if (vatRows.length) vy = drawVatTable(M, vy) - 6;
+    vy = drawCharges(M, vy);
+    if (isCommercial) {
+      if (effNotes) {
+        text(L.notes, M, vy, 8, bold, MUTED); vy -= 13;
+        for (const nl of wrap(effNotes, font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
+      }
+      if (inv.order_notes) {
+        vy -= 3;
+        text(L.orderNotes, M, vy, 8, bold, colors.accent); vy -= 12;
+        for (const nl of wrap(String(inv.order_notes), font, 8.5, right - M - 240)) { text(nl, M, vy, 8.5, font, MUTED); vy -= 11; }
+      }
+    }
+
+    // Totals (right box)
+    const boxX = right - 220;
+    const totalsTop = y + 10;
+    const row = (k: string, v: string, b = false) => {
+      if (isCommercial) {
+        // Reference layout: label left-aligned in the totals column, value right, hairline under.
+        text(k, boxX, y, b ? 10 : 9, b ? bold : font, INK);
+        textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
+        page.drawLine({ start: { x: boxX, y: y - 6 }, end: { x: right, y: y - 6 }, thickness: 0.4, color: LINE });
+        y -= 20;
+        return;
+      }
+      textR(k, right - 110, y, b ? 10 : 9, b ? bold : font, b ? INK : MUTED);
+      textR(v, right, y, b ? 11 : 9.5, b ? bold : font);
+      y -= b ? 16 : 13;
+    };
+    // Universal breakdown: Price / Discount / Price after Discount / Currency / VAT.
+    // `netAfter` and `vatAfter` are the sums of the printed VAT-analysis rows (see above).
+    if (cashFactor < 1) {
+      row(L.price, money(totNet));
+      row(L.discount, `- ${money(r2n(totNet - netAfter))}`);
+      row(L.priceAfterDiscount, money(netAfter));
+    } else {
+      row(L.subtotalNet, money(netAfter));
+    }
+    row(L.currency, currency);
+    // Only meaningful on a foreign-currency document: the rate the figures were converted at.
+    const fxRate = Number(inv.exchange_rate ?? inv.fx_rate_to_base ?? 0);
+    const fxBase = fs?.base_currency ?? 'EUR';
+    if (currency !== fxBase && fxRate > 0) row(L.fxRate, `1 ${currency} = ${fxRate} ${fxBase}`);
+    row(L.totalVat, money(vatAfter));
+    // The stored total is authoritative (it is the myDATA/MARK figure). The fallback — for a
+    // document that never stored one — is built from the SAME post-discount figures printed
+    // above, not from the raw pre-discount line sums, which disagreed with them.
+    // In DOCUMENT mode a row flagged `reducesPayable` is declared at its full amount in the
+    // bucket total AND left out of the payable, so re-adding the buckets here would contradict
+    // the charge list printed on the left. `tax_payable_delta` is that number, derived in SQL.
+    const taxDelta = docTaxRows.length
+      ? Number(inv.tax_payable_delta ?? 0) + digitalFee
+      : fees + stamp + otherTax + digitalFee - withheld - deductions;
+    const grand = Number(inv.total ?? r2n(netAfter + vatAfter + taxDelta));
+    if (chargesNet !== 0) row(L.charges, `${chargesNet < 0 ? '- ' : ''}${money(Math.abs(chargesNet))}`);
+    // Grand total — presentation per template.
+    if (isCommercial) {
+      // Large amount-due like the reference receipt (the preceding row already ruled off).
+      text(L.total, boxX, y - 10, 10, bold, INK);
+      textR(money(grand), right, y - 16, 22, bold, INK);
+      y -= 28;
+    } else if (spec.totalsBoxStyle === 'accent') {
+      page.drawRectangle({ x: boxX, y: y - 4, width: right - boxX, height: 18, color: colors.accent });
+      textR(L.total, right - 110, y + 1, 10, bold, WHITE);
+      textR(money(grand), right, y + 1, 11, bold, WHITE);
+      y -= 20;
+    } else if (spec.totalsBoxStyle === 'accent-text') {
+      // Modern: accent rule + accent-colored amount-due text (no filled box).
+      page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: colors.accent });
+      y -= 4;
+      textR(L.total, right - 110, y, 10, bold, colors.accent);
+      textR(money(grand), right, y, 11, bold, colors.accent);
+      y -= 16;
+    } else {
+      page.drawLine({ start: { x: boxX, y: y + 4 }, end: { x: right, y: y + 4 }, thickness: 0.7, color: LINE });
+      y -= 4;
+      row(L.total, money(grand), true);
+    }
+    // Amount paid / balance due (mirrors the HTML preview).
+    const amountPaid = Number(inv.amount_paid ?? 0);
+    const amountDue = Number(inv.amount_due ?? grand);
+    // The payable bar earns its place when it says something the grand total does not — either
+    // the template gives the total no visual weight of its own, or part of it is already paid so
+    // the two numbers genuinely differ. On `commercial` (22pt amount) and `accent` (filled box)
+    // with nothing paid it would be the same figure twice in a row.
+    const templateEmphasisesTotal = isCommercial || spec.totalsBoxStyle === 'accent';
+    const showPayableBar = !templateEmphasisesTotal || amountPaid > 0;
+    if (amountPaid > 0) {
+      row(L.paid, `- ${money(amountPaid)}`);
+      // The bar below carries the balance; a "Balance" row here would repeat it one line apart.
+      if (!showPayableBar) row(L.due2, money(amountDue), true);
+    }
+    if (showPayableBar) {
+      y -= 8;
+      page.drawRectangle({ x: boxX, y: y - 6, width: right - boxX, height: 20, color: colors.accent });
+      text(L.payable, boxX + 6, y, 9, bold, WHITE);
+      textR(money(amountDue), right - 6, y - 1, 12, bold, WHITE);
+      y -= 26;
+    }
+    // ── Carry-forward (informational) ──
+    // Sits BELOW the grand total and never feeds it: `grand` is the myDATA/MARK figure for this
+    // document alone. This block only tells the customer what they already owed on top of it.
+    if (typeof priorBalance === 'number' && Math.abs(priorBalance) >= 0.01) {
+      const thisDue = Number(inv.amount_due ?? grand);
+      page.drawLine({ start: { x: boxX, y: y + 5 }, end: { x: right, y: y + 5 }, thickness: 0.4, color: LINE });
+      y -= 3;
+      if (priorBalance > 0) {
+        row(L.prevBalance, money(priorBalance));
+        row(L.totalWithPrev, money(Math.round((thisDue + priorBalance) * 100) / 100), true);
+      } else {
+        // Customer is in credit — show it as a credit, and never print a negative "total due".
+        row(L.prevCredit, `- ${money(Math.abs(priorBalance))}`);
+        row(L.totalWithPrev, money(Math.max(0, Math.round((thisDue + priorBalance) * 100) / 100)), true);
+      }
+    }
+    if (spec.totalsBoxStyle === 'boxed') {
+      page.drawRectangle({ x: boxX - 8, y: y - 2, width: (right - boxX) + 14, height: totalsTop - (y - 2), borderColor: LINE, borderWidth: 1 });
+    }
+    y = Math.min(y, vy) - 6;
+
   }
-  if (spec.totalsBoxStyle === 'boxed') {
-    page.drawRectangle({ x: boxX - 8, y: y - 2, width: (right - boxX) + 14, height: totalsTop - (y - 2), borderColor: LINE, borderWidth: 1 });
-  }
-  y = Math.min(y, vy) - 6;
 
   // ── VAT-suspension / reverse-charge legal note ──
   // When ΦΠΑ is suspended (e.g. art. 39a), the paper document must say so — the flag was
@@ -1475,7 +1506,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   //    IBAN by hand means a reference we then have to match on text — the path that produces
   //    unmatched money in the feed. Whichever is listed first is the one most people use, so the
   //    one that settles itself goes first. The IBANs stay: RF is Greek-domestic and EUR-only.
-  if (rfCode && !selfBilledId) {
+  if (rfCode && !selfBilledId && !movementOnly) {
     if (y < M + 60) newPage();
     const rfColor = spec.headerStyle === 'sidebar' ? colors.accent : MUTED;
     text(`${L.rfCode}: ${rfCode}`, M, y, 9, bold, rfColor); y -= 11;
@@ -1483,7 +1514,7 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     y -= 4;
   }
 
-  if (payBits.length || accountLines.length) {
+  if (!movementOnly && (payBits.length || accountLines.length)) {
     if (y < M + 110) newPage();
     // Sidebar (Modern) prints bank details in the accent color, like the design reference.
     const bankColor = spec.headerStyle === 'sidebar' ? colors.accent : MUTED;
@@ -1513,13 +1544,21 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
   }
 
   // ── Movement block (9.3 / invoice-with-shipping) ── (commercial shows ship-to in header columns)
-  if (!isCommercial && inv.has_shipping) {
+  if ((!isCommercial || movementOnly) && inv.has_shipping) {
     if (y < M + 120) newPage();
     page.drawLine({ start: { x: M, y }, end: { x: right, y }, thickness: 0.5, color: LINE }); y -= 14;
     text(L.movement, M, y, 9, bold, MUTED); y -= 13;
+    const place = (street: any, num: any, postal: any, city: any) =>
+      [[street, num].filter(Boolean).join(' '), [postal, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    const loadingAt = place(inv.ship_from_street || inv.ship_from, inv.ship_from_number, inv.ship_from_postal, inv.ship_from_city)
+      || (movementOnly ? place(fs?.business_address, fs?.business_street_number, fs?.business_postal_code, fs?.business_city) : '');
+    const deliveryAt = place(inv.ship_to_street || inv.ship_to, inv.ship_to_number, inv.ship_to_postal, inv.ship_to_city)
+      || (movementOnly ? place(customer?.billing_street ?? customer?.street, customer?.billing_street_number ?? customer?.street_number,
+        customer?.billing_postal_code ?? customer?.postal_code, customer?.billing_city ?? customer?.city) : '');
     const mv = [
-      inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
-      inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
+      loadingAt ? `${L.loadingPlace}: ${loadingAt}` : '',
+      deliveryAt ? `${L.deliveryPlace}: ${deliveryAt}` : '',
+      inv.transport_date ? `${L.transportDate}: ${String(inv.transport_date).slice(0, 10)}` : '',
       inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
       // The NAME, not the bare code, plus the free text behind code 19 — the twin of the same
       // line in renderData.ts.

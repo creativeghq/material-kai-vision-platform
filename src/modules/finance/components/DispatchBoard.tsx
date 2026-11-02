@@ -22,6 +22,8 @@ import {
   HubCellEmpty, HubCellLink, HubEmptyState, HubFilterSelect, HubResetFilters, HubSortButton, HubToolbar,
   HUB_FILTER_ALL, useHubTable, type HubTableField,
 } from '@/components/core/hub';
+import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
+
 type BucketKey = 'overdue' | 'today' | 'next7' | 'later' | 'undated';
 const BUCKET_LABEL: Record<BucketKey, string> = {
   overdue: 'Overdue', today: 'Today', next7: 'Next 7 days', later: 'Later', undated: 'No ship date',
@@ -133,6 +135,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
       } else {
         toast({ title: 'Shipped · stock decremented', description: `Order ${o.internal_number} dispatched.` });
       }
+      toast(issuedToast('Dispatch note', await transmitAfterIssue('delivery_note', o.dispatch.id, workspaceId)));
       await load();
     } catch (err: any) {
       toast({ title: 'Failed to issue', description: err?.message, variant: 'destructive' });

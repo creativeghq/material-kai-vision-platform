@@ -56,6 +56,10 @@ export interface CreditNoteRecord {
   fiscal_mark: string | null;
   fiscal_status: string | null;
   fiscal_error: string | null;
+  fiscal_uid: string | null;
+  fiscal_submitted_at: string | null;
+  fiscal_qr_url: string | null;
+  fiscal_aade_qr_url: string | null;
   correlated_mark: string | null;
   goods_returned_at: string | null;
   invoice: InvoiceRef | null;

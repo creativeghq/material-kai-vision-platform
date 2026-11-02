@@ -17,7 +17,7 @@ describe('the PDF prints RF above the bank details', () => {
     // Anchored on the condition's START, not its exact text: this guards the ORDER of the two
     // blocks, and it should not fail because the RF block grew a second condition.
     const rfBlock = pdf.search(/if \(rfCode\b/);
-    const bankBlock = pdf.indexOf('if (payBits.length || accountLines.length) {');
+    const bankBlock = pdf.search(/if \([^{]*payBits\.length \|\| accountLines\.length\)/);
     expect(rfBlock).toBeGreaterThan(-1);
     expect(bankBlock).toBeGreaterThan(-1);
     expect(rfBlock, 'RF must render before the IBAN block').toBeLessThan(bankBlock);

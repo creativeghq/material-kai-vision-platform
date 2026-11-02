@@ -289,7 +289,7 @@ describe('the printed document says what the transmitted one says', () => {
    */
   it('PDF prints no bank details, RF code or pay link on a self-billed document', () => {
     expect(PDF).toMatch(/const accounts: any\[\] = \(!selfBilledId &&/);
-    expect(PDF).toMatch(/if \(rfCode && !selfBilledId\)/);
+    expect(PDF).toMatch(/if \(rfCode && !selfBilledId\b/);
     expect(PDF).toMatch(/if \(payUrl && !selfBilledId\)/);
   });
 

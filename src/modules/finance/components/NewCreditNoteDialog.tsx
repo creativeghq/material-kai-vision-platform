@@ -12,13 +12,13 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { Switch } from '@/components/core/ui/switch';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { financeService, formatMoney, round2, VAT_CATEGORIES, type Invoice } from '@/modules/finance/services/financeService';
 import { parseDecimalOr } from '@/utils/decimal';
 import { creditNoteDraftsService, type CreditLine } from '@/modules/finance/services/creditNoteDraftsService';
+import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 
 interface InvItem {
   id: string; description: string; sku: string | null; unit: string | null; product_id: string | null;
@@ -55,12 +55,11 @@ export const NewCreditNoteDialog: React.FC<{
   const [itemsLoading, setItemsLoading] = useState(false);
   const [amount, setAmount] = useState('');     // legacy fallback (no line items)
   const [reason, setReason] = useState('');
-  const [submitFiscal, setSubmitFiscal] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
-    setInvoiceId(''); setAmount(''); setReason(''); setSubmitFiscal(false); setItems([]); setLineState({});
+    setInvoiceId(''); setAmount(''); setReason(''); setItems([]); setLineState({});
     setCredited({}); setCreditedTotal(0);
     const draftLoad = draftId ? creditNoteDraftsService.get(draftId).catch(() => null) : Promise.resolve(null);
     financeService.listInvoices({ workspaceId, status: ['issued', 'partially_paid', 'paid', 'overdue'], limit: 300 })
@@ -105,7 +104,6 @@ export const NewCreditNoteDialog: React.FC<{
   const pick = async (id: string, rows?: Invoice[]) => {
     setInvoiceId(id);
     const inv = (rows ?? invoices).find((i) => i.id === id);
-    setSubmitFiscal(!!(inv as any)?.fiscal_mark);
     setItemsLoading(true);
     try {
       const { data } = await supabase.from('invoice_items')
@@ -227,23 +225,16 @@ export const NewCreditNoteDialog: React.FC<{
           return;
         }
         const cnId = await creditNoteDraftsService.issue(id);
-        let fiscalError: string | undefined;
-        if (submitFiscal) {
-          try { await financeService.submitCreditNoteFiscal(cnId); }
-          catch (e: any) { fiscalError = e?.message ?? 'myDATA transmission failed'; }
-        }
-        toast(fiscalError
-          ? { title: 'Credit note issued — NOT transmitted', description: `${fiscalError} Send it to myDATA from its page.`, variant: 'destructive' }
-          : { title: 'Credit note issued' });
+        toast(issuedToast('Credit note', await transmitAfterIssue('credit_note', cnId, workspaceId)));
         onCreated({ creditNoteId: cnId }); onOpenChange(false);
         return;
       }
       const r = await financeService.createCreditNote({
         invoiceId, amount: effectiveTotal, currency: invoice?.currency, reason: reason.trim(),
-        correlated, submitFiscal,
+        correlated, submitFiscal: false,
         lines: hasItems ? computed.lines : undefined,
       });
-      toast({ title: 'Credit note issued' });
+      toast(issuedToast('Credit note', await transmitAfterIssue('credit_note', r.credit_note_id, workspaceId)));
       onCreated({ creditNoteId: r.credit_note_id }); onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -339,20 +330,11 @@ export const NewCreditNoteDialog: React.FC<{
             <Textarea rows={2} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Customer return — chipped tile" />
           </div>
 
-          {invoice && (invoice as any).fiscal_mark && (
-            <label className="flex cursor-pointer items-center justify-between rounded-md border border-border/60 p-3">
-              <div>
-                <div className="text-sm font-medium">Transmit to myDATA</div>
-                <p className="text-xs text-muted-foreground">Correlated to the invoice MARK.</p>
-              </div>
-              <Switch checked={submitFiscal} onCheckedChange={setSubmitFiscal} />
-            </label>
-          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="outline" onClick={() => void save('draft')} disabled={busy}>Save draft</Button>
-          <Button onClick={() => void save('issue')} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue credit note · {formatMoney(effectiveTotal, cur)}</Button>
+          <Button onClick={() => void save('issue')} disabled={busy}>{busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue &amp; send · {formatMoney(effectiveTotal, cur)}</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

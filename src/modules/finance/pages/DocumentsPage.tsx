@@ -8,7 +8,7 @@
 import { UploadSupplierInvoiceButton } from '@/modules/finance/components/UploadSupplierInvoiceButton';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, ChevronRight, Send, Building2, CreditCard, Code2 } from 'lucide-react';
+import { Loader2, Plus, FileText, Receipt, Wallet, Tags, Repeat, Pause, Play, Trash2, Truck, ChevronDown, ChevronRight, Send, Building2, CreditCard, Code2, Eye } from 'lucide-react';
 import { CardTerminalPaymentDialog } from '@/modules/finance/components/CardTerminalPaymentDialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import {
@@ -32,6 +32,8 @@ import { Layers } from 'lucide-react';
 import { RecordExpenseDocumentDialog } from '@/modules/finance/components/RecordExpenseDocumentDialog';
 import { deliveryNotesService, deliveryNoteRelation, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
+import { DocumentRowMenu } from '@/modules/finance/components/DocumentRowMenu';
+import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
 import { chequeJob, deliveryNoteJob, type DocumentJob } from '@/modules/finance/utils/documentJob';
@@ -1081,7 +1083,12 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
   const financeBase = FINANCE_BASE;
   const issue = async (id: string) => {
     setBusy(id);
-    try { await deliveryNotesService.issue(id); toast({ title: 'Delivery note issued · stock decremented' }); onChanged(); }
+    try {
+      await deliveryNotesService.issue(id);
+      const row = rows.find((r) => r.id === id);
+      toast(issuedToast('Delivery note', row ? await transmitAfterIssue('delivery_note', id, row.workspace_id) : { status: 'off' }));
+      onChanged();
+    }
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
@@ -1203,7 +1210,7 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
               <div className="flex items-center justify-end gap-1">
                 {!readOnly && d.status === 'draft' && (
                   <Button size="sm" variant="outline" disabled={busy === d.id} onClick={() => issue(d.id)}>
-                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Issue'}
+                    {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Issue & send'}
                   </Button>
                 )}
                 {!readOnly && d.status === 'issued' && d.kind === 'dispatch' && d.fiscal_status !== 'accepted' && (
@@ -1241,6 +1248,13 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                     {busy === d.id ? <Loader2 className="h-3 w-3 animate-spin" /> : 'Cancel at myDATA'}
                   </Button>
                 )}
+                <DocumentRowMenu
+                  fiscal={d}
+                  actions={[
+                    { label: 'Open', icon: Eye, onSelect: () => navigate(deliveryNoteUrl(d.id)) },
+                    ...(d.status !== 'draft' ? [{ label: 'Download PDF', icon: FileText, onSelect: () => void genPdf(d.id) }] : []),
+                  ]}
+                />
               </div>
             </td>
           </tr>
@@ -1432,6 +1446,13 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
             <Button size="sm" variant="ghost" disabled={busy === cn.id} onClick={() => genEn16931(cn.id)} title="Download EN 16931 XML">
               <Code2 className="h-3.5 w-3.5" />
             </Button>
+            <DocumentRowMenu
+              fiscal={cn}
+              actions={[
+                { label: 'Open', icon: Eye, onSelect: () => navigate(creditNoteUrl(cn.id)) },
+                { label: 'Download PDF', icon: FileText, onSelect: () => void genPdf(cn.id) },
+              ]}
+            />
           </td>
         </tr>
       ))}
