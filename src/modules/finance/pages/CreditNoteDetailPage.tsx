@@ -15,6 +15,7 @@ import {
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
 import { ReceiveReturnDialog } from '@/modules/finance/components/ReceiveReturnDialog';
 import { FiscalRecordPanel, useFiscalAuthCode } from '@/modules/finance/components/FiscalRecordPanel';
+import { CustomerLinkPanel } from '@/modules/finance/components/CustomerLinkPanel';
 import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 
 const isTransmitted = (s: string | null) => s === 'accepted' || s === 'offline';
@@ -243,16 +244,19 @@ export const CreditNoteDetailPage: React.FC = () => {
         />
       }
       right={
-        <FiscalRecordPanel
-          record={cn}
-          authenticationCode={authCode}
-          sending={busy === 'fiscal'}
-          onSend={() => void run('fiscal', async () => {
-            const t = issuedToast('Credit note', await transmitAfterIssue('credit_note', cn.id, cn.workspace_id));
-            toast(t.variant ? t : { title: 'Sent to myDATA', description: t.description });
-            await load();
-          })}
-        />
+        <>
+          <FiscalRecordPanel
+            record={cn}
+            authenticationCode={authCode}
+            sending={busy === 'fiscal'}
+            onSend={() => void run('fiscal', async () => {
+              const t = issuedToast('Credit note', await transmitAfterIssue('credit_note', cn.id, cn.workspace_id));
+              toast(t.variant ? t : { title: 'Sent to myDATA', description: t.description });
+              await load();
+            })}
+          />
+          <CustomerLinkPanel kind="credit_note" id={cn.id} label={`Credit note ${cn.credit_note_number ?? ''}`.trim()} />
+        </>
       }
       left={
         <HubPanel title="Details">

@@ -42,6 +42,7 @@ import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentD
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { PaymentProofsCard } from '@/modules/finance/components/PaymentProofsCard';
 import { formatDate } from '@/utils/datetime';
+import { mintCustomerLink } from '@/modules/finance/services/customerLinks';
 
 
 const InvoiceDetailPage: React.FC = () => {
@@ -296,19 +297,19 @@ const InvoiceDetailPage: React.FC = () => {
               money booked as unallocated credit), and let "Credit note" open a dialog whose
               picker excludes drafts — empty, with no explanation. The only action a draft
               offers is "Mark Issued". */}
-          {isActionable && Number(invoice.amount_due) > 0 && (
+          {isActionable && (
             <Button
               onClick={async () => {
                 if (!invoice) return;
                 try {
                   setPayLinkBusy(true);
-                  const res = await financeService.getInvoicePayLink(invoice.id, { linkOnly: true });
-                  setPayLink(res.pay_link);
+                  const link = await mintCustomerLink('invoice', invoice.id);
+                  setPayLink(link);
                   try {
-                    await navigator.clipboard.writeText(res.pay_link);
-                    toast({ title: 'Pay Link Copied', description: 'Send this to the customer to collect payment by card.' });
+                    await navigator.clipboard.writeText(link);
+                    toast({ title: 'Customer link copied', description: 'The customer sees the invoice online, and can pay it while money is owed.' });
                   } catch {
-                    toast({ title: 'Pay Link Ready', description: res.pay_link });
+                    toast({ title: 'Customer link ready', description: link });
                   }
                 } catch (err: any) {
                   toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
@@ -320,7 +321,7 @@ const InvoiceDetailPage: React.FC = () => {
               variant="outline"
             >
               {payLinkBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-              Card pay link
+              Customer link
             </Button>
           )}
           {isActionable && (
@@ -359,7 +360,7 @@ const InvoiceDetailPage: React.FC = () => {
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="flex items-center justify-between gap-3 p-3 text-sm">
             <div className="min-w-0">
-              <div className="font-medium">Public pay link (valid 90 days)</div>
+              <div className="font-medium">Customer link: the invoice online, with payment while money is owed</div>
               <code className="block truncate text-xs text-muted-foreground">{payLink}</code>
             </div>
             <div className="flex gap-2 shrink-0">
@@ -375,7 +376,7 @@ const InvoiceDetailPage: React.FC = () => {
               <SendOnWhatsAppButton
                 contactId={(invoice as any).customer_contact_id ?? null}
                 companyId={(invoice as any).customer_company_id ?? null}
-                message={`Invoice ${invoice.internal_number ?? ''} — you can pay here: ${payLink}`}
+                message={`Invoice ${invoice.internal_number ?? ''}: ${payLink}`}
                 label="WhatsApp"
                 variant="ghost"
               />

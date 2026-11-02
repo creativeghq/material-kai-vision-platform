@@ -15,7 +15,11 @@ import { vatOf } from '@/modules/finance/lib/vatMath';
 import { mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { movePurposeLabel, MYDATA_MOVE_PURPOSE_OTHER } from '@/services/fiscal/fiscalVocabulary';
 
+/** What the document is. Movement documents print quantities only; orders take their own title. */
+export type RenderDocumentKind = 'invoice' | 'credit_note' | 'delivery_note' | 'sales_order' | 'purchase_order';
+
 export interface BuildRenderInput {
+  documentKind?: RenderDocumentKind;
   invoice: Record<string, any>;
   items: Record<string, any>[];
   /** finance_settings row (issuer identity + bank accounts). */
@@ -95,8 +99,9 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
   const {
     invoice: inv, items, settings: fs, customer, addressUnit, authCode, branch, order,
     logoUrl, bankAccounts, priorBalance, payUrl, providerAttribution, posPayments, timezone,
-    documentTaxes, selfBillSupplier,
+    documentTaxes, selfBillSupplier, documentKind = 'invoice',
   } = input;
+  const movementOnly = documentKind === 'delivery_note';
   // English is the default; Greek only when explicitly chosen (until translations launch).
   const lang: Lang = inv.doc_language === 'el' ? 'el' : 'en';
   const L = INVOICE_LABELS[lang];
@@ -348,12 +353,19 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     if (detail) accounts.push(detail);
   }
 
-  // ── Shipping / movement ──
+  // ── Shipping / movement ── twin of the PDF movement block, including its fallbacks.
   let shipping: { rows: string[] } | null = null;
-  if (inv.has_shipping) {
+  if (inv.has_shipping || movementOnly) {
+    const place = (street: any, num: any, postal: any, city: any) =>
+      [[street, num].filter(Boolean).join(' '), [postal, city].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    const loadingAt = place(inv.ship_from_street || inv.ship_from, inv.ship_from_number, inv.ship_from_postal, inv.ship_from_city)
+      || (movementOnly ? place(fs?.business_address, fs?.business_street_number, fs?.business_postal_code, fs?.business_city) : '');
+    const deliveryAt = place(inv.ship_to_street || inv.ship_to, inv.ship_to_number, inv.ship_to_postal, inv.ship_to_city)
+      || (movementOnly && billTo ? place(billTo.street, billTo.streetNumber, billTo.postalCode, billTo.city) : '');
     const sr = [
-      inv.ship_from ? `${L.loadingPlace}: ${inv.ship_from}` : '',
-      inv.ship_to ? `${L.deliveryPlace}: ${inv.ship_to}` : '',
+      loadingAt ? `${L.loadingPlace}: ${loadingAt}` : '',
+      deliveryAt ? `${L.deliveryPlace}: ${deliveryAt}` : '',
+      inv.transport_date ? `${L.transportDate}: ${String(inv.transport_date).slice(0, 10)}` : '',
       inv.vehicle_number ? `${L.vehicle}: ${inv.vehicle_number}` : '',
       // The NAME, not the bare code. "Purpose: 7" tells the reader of a movement document
       // nothing; the driver and the inspector holding it need the words.
@@ -371,10 +383,16 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     if (sr.length) shipping = { rows: sr };
   }
 
+  const title = documentKind === 'sales_order' ? L.salesOrder
+    : documentKind === 'purchase_order' ? L.purchaseOrder
+    : invoiceDocTitle(inv.document_type, L, inv.status);
   return {
     lang, currency,
-    title: invoiceDocTitle(inv.document_type, L, inv.status),
-    isPreInvoice: invoiceDocTitle(inv.document_type, L, inv.status) === L.preInvoice,
+    title,
+    isPreInvoice: documentKind === 'invoice' && title === L.preInvoice,
+    movementOnly,
+    partyLabel: movementOnly ? L.recipient : documentKind === 'purchase_order' ? L.supplier : L.customer,
+    totalQty: r2(rows.reduce((t, it) => t + it.qty, 0)),
     labels: L,
     // On a self-billed document the parties are the other way round: the supplier issues it and we
     // are the bill-to. The logo is ours, so it is dropped — heading the supplier's invoice with our
@@ -395,7 +413,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     payment: {
       method: paymentMethodLabel,
       info: inv.payment_method_info || undefined,
-      accounts,
+      accounts: movementOnly || documentKind === 'purchase_order' ? [] : accounts,
     },
     shipping,
     delivery,
@@ -411,8 +429,8 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     orderNotes: order?.notes || null,
     infoBox: inv.info_box || null,
     vatSuspended: !!inv.vat_payment_suspension,
-    priorBalance: (typeof priorBalance === 'number' && Math.abs(priorBalance) >= 0.01) ? priorBalance : null,
-    payUrl: selfBilledId ? null : (payUrl ?? null),
+    priorBalance: !movementOnly && typeof priorBalance === 'number' && Math.abs(priorBalance) >= 0.01 ? priorBalance : null,
+    payUrl: selfBilledId || movementOnly ? null : (payUrl ?? null),
     fiscal: inv.fiscal_mark ? {
       mark: String(inv.fiscal_mark),
       uid: inv.fiscal_uid || undefined,

@@ -13222,6 +13222,97 @@
         }
       }
     },
+    "/public-document": {
+      "post": {
+        "tags": [
+          "Finance"
+        ],
+        "summary": "Public token-based online copy of an invoice, credit note, delivery note or order",
+        "operationId": "post_public_document",
+        "description": "Resolves a customer link token (invoices.pay_token, or share_token on credit_notes, delivery_notes and orders) to one document and returns an allowlisted projection of the inputs the shared invoice template renders: document header, lines, issuer identity, printed counterparty, fiscal record. Never returns cost columns or workspace credentials. Drafts other than pre-invoices are not served. Logs a view (or download) document event.\n\n**Response:** `{ok, kind, document, counterparty_snapshot, items, document_taxes, settings, customer, self_bill_supplier, address_unit, branch, order, bank_accounts, auth_code, provider_attribution, pos_payments, timezone, logo_url, related, pdf_available, show_pay_link} | {ok, pdf_url}`",
+        "security": [
+          {
+            "queryToken": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "Token from a /pay/:token or /d/:token link. (string (32-64 hex chars))"
+                  },
+                  "pdf": {
+                    "type": "boolean",
+                    "description": "Return a signed PDF URL instead of the document data (invoices, credit notes, delivery notes)."
+                  }
+                },
+                "required": [
+                  "token"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/quote-public-share": {
       "post": {
         "tags": [

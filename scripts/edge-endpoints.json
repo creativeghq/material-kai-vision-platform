@@ -6405,6 +6405,35 @@
     "response": "{ ok, secrets: MaskedSecretView[] }"
   },
   {
+    "name": "public-document",
+    "tag": "Finance",
+    "summary": "Public token-based online copy of an invoice, credit note, delivery note or order",
+    "description": "Resolves a customer link token (invoices.pay_token, or share_token on credit_notes, delivery_notes and orders) to one document and returns an allowlisted projection of the inputs the shared invoice template renders: document header, lines, issuer identity, printed counterparty, fiscal record. Never returns cost columns or workspace credentials. Drafts other than pre-invoices are not served. Logs a view (or download) document event.",
+    "security": [
+      "queryToken",
+      "public"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "token",
+        "type": "string (32-64 hex chars)",
+        "required": true,
+        "desc": "Token from a /pay/:token or /d/:token link."
+      },
+      {
+        "name": "pdf",
+        "type": "boolean",
+        "required": false,
+        "desc": "Return a signed PDF URL instead of the document data (invoices, credit notes, delivery notes)."
+      }
+    ],
+    "response": "{ok, kind, document, counterparty_snapshot, items, document_taxes, settings, customer, self_bill_supplier, address_unit, branch, order, bank_accounts, auth_code, provider_attribution, pos_payments, timezone, logo_url, related, pdf_available, show_pay_link} | {ok, pdf_url}"
+  },
+  {
     "name": "quote-public-share",
     "tag": "Quotes",
     "summary": "Public token-based quote share lookup (anonymous-friendly)",

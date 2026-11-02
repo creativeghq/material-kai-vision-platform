@@ -28,7 +28,9 @@ export const DOCUMENT_ENTITY_TYPES = [
   'property_listing', // /p/:token
   'moodboard',        // /board/:id
   'storefront',       // /store/:slug
-  'order',
+  'order',            // /d/:token (sales and purchase)
+  'credit_note',      // /d/:token
+  'delivery_note',    // /d/:token
 ] as const;
 
 export type DocumentEntityType = typeof DOCUMENT_ENTITY_TYPES[number];

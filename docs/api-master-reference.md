@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (178)
+## 1. Supabase Edge Functions (179)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -123,6 +123,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `inbound-structured-fetch` | JWT / kai_* | Fetch the EN 16931 file a supplier's e-invoice provider serves beside its viewer |
 | `novus-onboarding` | JWT / kai_* | Register a workspace's VAT with Novus so it can transmit to myDATA |
 | `parse-supplier-cost-list` | JWT / kai_* | Parse a KB doc supplier cost list and apply costs to matching products |
+| `public-document` | token / public | Public token-based online copy of an invoice, credit note, delivery note or order |
 | `revolut-api` | JWT / kai_* | Revolut Business — live accounts & balances, connection, reconciliation, payments, cards |
 | `revolut-sync` | JWT / kai_* / cron | Revolut transaction sync sweep — cron backstop over every connected workspace |
 | `revolut-webhooks` | revolutSignature | Revolut Business webhooks v2 receiver — signed transaction events, per-workspace secret |

@@ -25,7 +25,7 @@ const readCode = (p: string) =>
 const DB_ALLOWED_ENTITY_TYPES = [
   'invoice', 'quote', 'contract', 'statement', 'catalog',
   'moodboard_sheet', 'client_view', 'property_listing', 'moodboard',
-  'storefront', 'order',
+  'storefront', 'order', 'credit_note', 'delivery_note',
 ];
 
 const EDGE_WRITER = 'supabase/functions/_shared/document-events.ts';

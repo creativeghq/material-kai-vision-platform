@@ -67,6 +67,7 @@ Disallow: /c/
 Disallow: /u/
 Disallow: /pay/
 Disallow: /statement/
+Disallow: /d/
 Disallow: /sheets/
 Disallow: /portal/
 Disallow: /tenant/
@@ -198,6 +199,7 @@ Disallow: /c/
 Disallow: /u/
 Disallow: /pay/
 Disallow: /statement/
+Disallow: /d/
 Disallow: /sheets/
 Disallow: /portal/
 Disallow: /tenant/

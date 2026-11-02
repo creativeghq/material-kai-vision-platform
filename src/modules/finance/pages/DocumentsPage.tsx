@@ -33,6 +33,7 @@ import { RecordExpenseDocumentDialog } from '@/modules/finance/components/Record
 import { deliveryNotesService, deliveryNoteRelation, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
 import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
 import { DocumentRowMenu } from '@/modules/finance/components/DocumentRowMenu';
+import { customerLinkMenuActions } from '@/modules/finance/components/customerLinkActions';
 import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
@@ -1252,7 +1253,11 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
                   fiscal={d}
                   actions={[
                     { label: 'Open', icon: Eye, onSelect: () => navigate(deliveryNoteUrl(d.id)) },
-                    ...(d.status !== 'draft' ? [{ label: 'Download PDF', icon: FileText, onSelect: () => void genPdf(d.id) }] : []),
+                    ...(d.status !== 'draft' ? [
+                      { label: 'Download PDF', icon: FileText, onSelect: () => void genPdf(d.id) },
+                      ...customerLinkMenuActions('delivery_note', d.id, `Delivery note ${d.delivery_note_number ?? ''}`.trim(), toast,
+                        d.return_of_inbound_document_id ? 'supplier' : 'customer'),
+                    ] : []),
                   ]}
                 />
               </div>
@@ -1451,6 +1456,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
               actions={[
                 { label: 'Open', icon: Eye, onSelect: () => navigate(creditNoteUrl(cn.id)) },
                 { label: 'Download PDF', icon: FileText, onSelect: () => void genPdf(cn.id) },
+                ...customerLinkMenuActions('credit_note', cn.id, `Credit note ${cn.credit_note_number ?? ''}`.trim(), toast),
               ]}
             />
           </td>

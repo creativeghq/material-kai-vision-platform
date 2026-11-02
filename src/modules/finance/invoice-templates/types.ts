@@ -48,6 +48,10 @@ export interface InvoiceRenderData {
   title: string;
   /** True when this is a draft pre-invoice (προτιμολόγιο) — not a fiscal document. */
   isPreInvoice?: boolean;
+  /** Delivery note: quantities only, no money anywhere on the page. */
+  movementOnly?: boolean;
+  partyLabel?: string;
+  totalQty?: number;
   labels: Record<string, string>;
   issuer: { name: string; lines: string[]; logoUrl?: string | null };
   customer: InvoiceParty;

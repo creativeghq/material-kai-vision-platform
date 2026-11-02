@@ -39170,6 +39170,10 @@ export type Database = {
         Args: { p_job_id: string; p_metadata: Json }
         Returns: undefined
       }
+      mint_document_share_token: {
+        Args: { p_kind: string; p_id: string; p_rotate?: boolean }
+        Returns: string
+      }
       mint_invoice_pay_token: {
         Args: { p_invoice_id: string; p_ttl_days?: number }
         Returns: string

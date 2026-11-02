@@ -37,7 +37,7 @@ const TRAINING_CRAWLERS = [
 ];
 
 /** The token IS the credential; an indexed share URL is a public document. */
-const TOKENISED_SHARE_PATHS = ['/q/', '/i/', '/c/', '/u/', '/pay/', '/statement/', '/sheets/'];
+const TOKENISED_SHARE_PATHS = ['/q/', '/i/', '/c/', '/u/', '/pay/', '/statement/', '/sheets/', '/d/'];
 
 /** The authenticated app surface. Renders an empty shell to a crawler anyway. */
 const APP_PATHS = ['/admin', '/auth', '/profile', '/settings', '/billing', '/finance', '/crm'];

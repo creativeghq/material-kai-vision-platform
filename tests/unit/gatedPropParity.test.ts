@@ -14,9 +14,6 @@ const SRC = join(ROOT, 'src');
  * capability is given a home, never on to quieten a new one.
  */
 const EXEMPT: Record<string, string> = {
-  'FiscalRecordPanel.onSend':
-    'Transmitting to myDATA is an act of the issuer. The public invoice page shows the customer what AADE '
-    + 'holds and must never offer to send it; only the logged-in document pages pass onSend.',
   'OrderLinkPicker.allowCostOf':
     'Each mount is a SEPARATE labelled control writing ONE column — Project, Trip, Property, For '
     + 'customer. The groups are off per control by design, and the one control that tried to write '

@@ -14,6 +14,8 @@ import {
   type PublicPayOtherTotals,
 } from '@/modules/finance/services/financeService';
 import { formatDate } from '@/utils/datetime';
+import { publicDocumentService, type RenderedPublicDocument } from '@/modules/finance/services/publicDocumentService';
+import { PublicDocumentView } from '@/modules/finance/components/PublicDocumentView';
 
 // Public, no-auth payment page reached from email links, "Pay now" buttons, the storefront and the
 // public quote page. The amount is always re-validated + clamped server-side.
@@ -316,7 +318,7 @@ const ProofUploadPanel: React.FC<{
   );
 };
 
-const FiscalRecordPanel: React.FC<{ fiscal: PublicFiscalRecord }> = ({ fiscal }) => {
+const AadeRecordPanel: React.FC<{ fiscal: PublicFiscalRecord }> = ({ fiscal }) => {
   const rows: [string, string | null][] = [
     ['Number', fiscal.legal_number],
     ['MARK', fiscal.mark],
@@ -445,6 +447,23 @@ const PayInvoicePage: React.FC = () => {
   const [option, setOption] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const [bankRef, setBankRef] = useState<{ rf_code: string; amount: number; currency: string } | null>(null);
+  const [doc, setDoc] = useState<RenderedPublicDocument | null>(null);
+
+  // The invoice itself, rendered by the same template as the in-app preview. Best-effort: the
+  // payment panel never waits on it.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    publicDocumentService.fetch(token)
+      .then((p) => { if (!cancelled) setDoc(publicDocumentService.render(p)); })
+      .catch(() => { /* the payment panel and the PDF still work */ });
+    return () => { cancelled = true; };
+  }, [token]);
+  const docSection = doc && (
+    <div className="mx-auto w-full max-w-[830px] px-4 pb-10">
+      <PublicDocumentView rendered={doc} />
+    </div>
+  );
 
   // Load the document + payable options. No session, no side effects. Also runs for
   // status=return (Revolut redirects on EVERY outcome): the server state decides what we say.
@@ -553,11 +572,14 @@ const PayInvoicePage: React.FC = () => {
     }
   };
 
-  const shell = (children: React.ReactNode) => (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md border-0">
-        <CardContent className="p-8">{children}</CardContent>
-      </Card>
+  const shell = (children: React.ReactNode, withDocument = false) => (
+    <div className="min-h-screen bg-background">
+      <div className="flex justify-center p-4 pt-10">
+        <Card className="w-full max-w-md border-0">
+          <CardContent className="p-8">{children}</CardContent>
+        </Card>
+      </div>
+      {withDocument && docSection}
     </div>
   );
 
@@ -660,8 +682,9 @@ const PayInvoicePage: React.FC = () => {
         <h1 className="mt-4 text-xl font-semibold">Already paid</h1>
         <p className="mt-2 text-sm text-muted-foreground">This document has no outstanding balance.</p>
         <div className="mt-4">{downloadButton}</div>
-        {fiscal && <div className="mt-6 text-left"><FiscalRecordPanel fiscal={fiscal} /></div>}
+        {fiscal && <div className="mt-6 text-left"><AadeRecordPanel fiscal={fiscal} /></div>}
       </div>,
+      true,
     );
   }
 
@@ -678,8 +701,9 @@ const PayInvoicePage: React.FC = () => {
             : 'This document has been cancelled, so there is nothing to pay on it.'}
         </p>
         <div className="mt-4">{downloadButton}</div>
-        {fiscal && <div className="mt-6 text-left"><FiscalRecordPanel fiscal={fiscal} /></div>}
+        {fiscal && <div className="mt-6 text-left"><AadeRecordPanel fiscal={fiscal} /></div>}
       </div>,
+      true,
     );
   }
 
@@ -848,11 +872,12 @@ const PayInvoicePage: React.FC = () => {
           </>
         )}
 
-        <OrderLinesPanel info={info} />
+        {!doc && <OrderLinesPanel info={info} />}
 
-        {fiscal && <FiscalRecordPanel fiscal={fiscal} />}
+        {fiscal && <AadeRecordPanel fiscal={fiscal} />}
         <div className="flex justify-center">{downloadButton}</div>
       </div>
+      {docSection && <div className="mt-6">{docSection}</div>}
     </div>
   );
 };

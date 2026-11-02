@@ -96,6 +96,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     movement: 'ΣΤΟΙΧΕΙΑ ΔΙΑΚΙΝΗΣΗΣ', loadingPlace: 'Τόπος φόρτωσης', deliveryPlace: 'Τόπος παράδοσης',
     vehicle: 'Όχημα', purpose: 'Σκοπός', notes: 'Σημειώσεις', page: 'Σελίδα', of: 'από',
     recipient: 'ΛΗΠΤΗΣ', totalQty: 'Σύνολο ποσότητας', transportDate: 'Ημ/νία μεταφοράς',
+    salesOrder: 'ΕΠΙΒΕΒΑΙΩΣΗ ΠΑΡΑΓΓΕΛΙΑΣ', purchaseOrder: 'ΠΑΡΑΓΓΕΛΙΑ ΑΓΟΡΑΣ', supplier: 'ΠΡΟΜΗΘΕΥΤΗΣ',
     paymentReceipt: 'ΑΠΟΔΕΙΞΗ ΕΙΣΠΡΑΞΗΣ', received: 'Εισπράχθηκε', method: 'Τρόπος πληρωμής',
     appliedTo: 'Εξόφληση', reference: 'Αναφορά', thankYou: 'Ευχαριστούμε για την πληρωμή σας.',
     contact: 'Επικοινωνία', office: 'Έδρα', value: 'Αξία', amountPaid: 'Ποσό πληρωμής',
@@ -142,6 +143,7 @@ const LABELS: Record<Lang, Record<string, string>> = {
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading Place', deliveryPlace: 'Delivery Place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
     recipient: 'RECIPIENT', totalQty: 'Total quantity', transportDate: 'Transport date',
+    salesOrder: 'ORDER CONFIRMATION', purchaseOrder: 'PURCHASE ORDER', supplier: 'SUPPLIER',
     paymentReceipt: 'PAYMENT RECEIPT', received: 'Received', method: 'Payment Method',
     appliedTo: 'Applied to', reference: 'Reference', thankYou: 'Thank You for Your Payment.',
     contact: 'Contact', office: 'Registered Office', value: 'Value', amountPaid: 'Amount Paid',
@@ -271,12 +273,11 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     return json({ error: 'invalid body' }, 400);
   }
 
-  // Internal callers carry no user, and the document id alone decides the workspace. A payment
-  // receipt for the Stripe webhook (service key or cron secret), or an INVOICE for
-  // finance-pay-invoice after it resolved the customer's pay token (service key only). Never a
-  // credit note or delivery note; every other call needs a finance user.
+  // Internal callers carry no user, and the document id alone decides the workspace: a payment
+  // receipt for the Stripe webhook (service key or cron secret), or a document for
+  // finance-pay-invoice / public-document after they resolved the customer's token (service key).
   const internal = (kind === 'payment_receipt' && isCronAuthorized(req))
-    || (kind === 'invoice' && isServiceRoleRequest(req));
+    || (kind !== 'payment_receipt' && isServiceRoleRequest(req));
   let authUserId: string | null = null;
   if (!internal) {
     const auth = await authenticate(req, { requireUser: true });
@@ -440,7 +441,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
     } else if (kind === 'credit_note') {
       const [{ data: cnItems }, { data: srcInv }, { data: cnTaxes, error: cnTaxErr }] = await Promise.all([
         supabase.from('credit_note_items').select('*').eq('credit_note_id', docId).order('created_at'),
-        row.invoice_id ? supabase.from('invoices').select('customer_company_id, customer_contact_id, vat_rate').eq('id', row.invoice_id).maybeSingle() : Promise.resolve({ data: null } as any),
+        row.invoice_id ? supabase.from('invoices').select('customer_company_id, customer_contact_id, vat_rate, counterparty_snapshot, doc_language').eq('id', row.invoice_id).maybeSingle() : Promise.resolve({ data: null } as any),
         supabase.from('credit_note_taxes')
           .select('tax_type, tax_category, tax_amount, reduces_payable, label')
           .eq('credit_note_id', docId).order('sort_order'),
@@ -451,6 +452,7 @@ Deno.serve(withApiLogging('finance-invoice-pdf', async (req) => {
       inv = {
         ...row, internal_number: row.credit_note_number, vat_rate: srcInv?.vat_rate ?? 24,
         customer_company_id: srcInv?.customer_company_id ?? null, customer_contact_id: srcInv?.customer_contact_id ?? null,
+        counterparty_snapshot: srcInv?.counterparty_snapshot ?? null, doc_language: srcInv?.doc_language ?? null,
         related_document: row.correlated_mark ?? null, notes: row.reason ?? null,
       };
     } else {

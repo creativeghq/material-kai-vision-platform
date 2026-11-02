@@ -7,6 +7,7 @@ import { AllocateProfitDialog } from '@/modules/finance/components/AllocateProfi
 import { MYDATA_EXEMPTION_CATEGORIES, mydataExemptionLabel } from '@/lib/mydataExemptionCategories';
 import { suggestVatExemption, type ExemptionSuggestion, type SupplyKind } from '@/modules/finance/utils/vatExemptionRules';
 import { Loader2, Plus, ShoppingCart, Coins, CalendarDays, Trash2, Search, Truck, Banknote, FileText, Receipt, PackageCheck, ChevronDown, MoreHorizontal, MoreVertical, CheckCircle2, Pencil, Package, FileClock, Building2, ArrowDownLeft, ArrowUpRight, Send, AlertTriangle, RotateCcw, PackagePlus, Link2, Unlink, Layers, MessageSquare, ShieldCheck, Percent, TrendingUp, Wallet } from 'lucide-react';
+import { customerLinkMenuActions } from '@/modules/finance/components/customerLinkActions';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
@@ -3175,6 +3176,18 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                             <CheckCircle2 className="h-3.5 w-3.5 mr-2" /> Mark completed
                           </DropdownMenuItem>
                         )}
+                      </>
+                    )}
+                    {order.status !== 'draft' && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <MenuGroup>Share</MenuGroup>
+                        {customerLinkMenuActions('order', order.id, `${order.order_type === 'purchase' ? 'Purchase order' : 'Order'} ${order.order_number ?? ''}`.trim(), toast,
+                          order.order_type === 'purchase' ? 'supplier' : 'customer').map((a) => (
+                          <DropdownMenuItem key={a.label} onClick={a.onSelect}>
+                            {a.icon && <a.icon className="h-3.5 w-3.5 mr-2" />}{a.label}
+                          </DropdownMenuItem>
+                        ))}
                       </>
                     )}
                     <DropdownMenuSeparator />

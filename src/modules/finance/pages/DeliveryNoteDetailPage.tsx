@@ -14,6 +14,7 @@ import { deliveryNotesService, deliveryNoteRelation, type DeliveryNoteDetail, ty
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { NewDeliveryNoteDialog } from '@/modules/finance/components/NewDeliveryNoteDialog';
 import { FiscalRecordPanel, useFiscalAuthCode } from '@/modules/finance/components/FiscalRecordPanel';
+import { CustomerLinkPanel } from '@/modules/finance/components/CustomerLinkPanel';
 import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 import { movePurposeLabel, movementDocTypeLabel } from '@/services/fiscal/fiscalVocabulary';
 
@@ -235,6 +236,14 @@ export const DeliveryNoteDetailPage: React.FC = () => {
               authenticationCode={authCode}
               onSend={note.status === 'issued' ? sendFiscal : undefined}
               sending={busy === 'fiscal'}
+            />
+          )}
+          {!isDraft && (
+            <CustomerLinkPanel
+              kind="delivery_note"
+              id={note.id}
+              label={`Delivery note ${note.delivery_note_number ?? ''}`.trim()}
+              title={isReturn ? 'Supplier link' : 'Customer link'}
             />
           )}
           {isReturn && <SupplierCreditPanel noteId={note.id} />}

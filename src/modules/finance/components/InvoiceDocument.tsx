@@ -131,7 +131,7 @@ export function InvoiceDocument({
   // ── Customer ──
   const Customer = () => (
     <div style={{ marginBottom: 16 }}>
-      <div style={{ fontSize: 9, fontWeight: 700, ...muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{L.customer}</div>
+      <div style={{ fontSize: 9, fontWeight: 700, ...muted, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{data.partyLabel ?? L.customer}</div>
       <div style={{ fontSize: 12, fontWeight: 700, marginTop: 3 }}>{data.customer.name}</div>
       <div style={{ fontSize: 9.5, marginTop: 2, ...muted }}>
         {data.customer.lines.map((l, i) => <div key={i}>{l}</div>)}
@@ -174,6 +174,40 @@ export function InvoiceDocument({
   const anyOtherTaxes = data.items.some((it) => it.otherTaxes > 0);
   const exemptionMarker = (code: number | null | undefined) =>
     (code ? data.vatExemptions.find((e) => e.code === code)?.marker ?? '' : '');
+
+  const MovementItems = () => (
+    <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 16 }}>
+      <thead>
+        <tr>
+          <th style={{ ...th, width: 18 }}>{L.lineNo}</th>
+          <th style={th}>{L.descr}</th>
+          <th style={thR}>{L.qty}</th>
+          <th style={th}>{L.unit}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {data.items.map((it, i) => (
+          <tr key={i}>
+            <td style={{ ...td, ...muted }}>{i + 1}</td>
+            <td style={td}>
+              <div style={{ fontWeight: 600 }}>{it.description}</div>
+              {(it.sku || it.detail) && (
+                <div style={{ fontSize: 8.5, ...muted }}>{[it.sku, it.detail].filter(Boolean).join(' · ')}</div>
+              )}
+            </td>
+            <td style={tdR}>{it.qty}</td>
+            <td style={td}>{it.unit}</td>
+          </tr>
+        ))}
+        <tr>
+          <td style={td} />
+          <td style={{ ...td, fontWeight: 700, textAlign: 'right' }}>{L.totalQty}</td>
+          <td style={{ ...tdR, fontWeight: 700 }}>{data.totalQty ?? 0}</td>
+          <td style={td} />
+        </tr>
+      </tbody>
+    </table>
+  );
 
   const Items = () => (
     <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: 8 }}>
@@ -530,22 +564,26 @@ export function InvoiceDocument({
       )}
       <Customer />
       <Delivery />
-      <Items />
-      <Exemptions />
-      <Totals />
-      <VatSuspended />
-      <Payment />
+      {data.movementOnly ? <MovementItems /> : (
+        <>
+          <Items />
+          <Exemptions />
+          <Totals />
+          <VatSuspended />
+          <Payment />
+        </>
+      )}
       <Shipping />
       <Notes />
-      <PayOnline />
-      <PosPayments />
+      {!data.movementOnly && <PayOnline />}
+      {!data.movementOnly && <PosPayments />}
       <Fiscal />
     </>
   );
 
   // Commercial: Greek delivery-style receipt — logo left / QR right, three icon party
   // columns (order · bill-to · ship-to), code+comment line items, large amount-due.
-  if (spec.headerStyle === 'commercial') {
+  if (spec.headerStyle === 'commercial' && !data.movementOnly) {
     const badge = (icon: React.ReactNode) => (
       <div style={{ width: 22, height: 22, borderRadius: '50%', border: `1px solid ${colors.accent}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         {icon}

@@ -41,6 +41,8 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
     itemCode: 'Κωδ. Είδους', itemDescr: 'Περιγραφή Είδους', itemComment: 'Σχόλιο Είδους',
     order: 'Παραγγελία', invoiceNo: 'Τιμολόγιο', orderNotes: 'Σημείωση παραγγελίας',
     preInvoice: 'ΠΡΟΤΙΜΟΛΟΓΙΟ', preInvoiceNote: 'Δεν αποτελεί φορολογικό παραστατικό.',
+    recipient: 'ΛΗΠΤΗΣ', totalQty: 'Σύνολο ποσότητας', transportDate: 'Ημ/νία μεταφοράς',
+    salesOrder: 'ΕΠΙΒΕΒΑΙΩΣΗ ΠΑΡΑΓΓΕΛΙΑΣ', purchaseOrder: 'ΠΑΡΑΓΓΕΛΙΑ ΑΓΟΡΑΣ', supplier: 'ΠΡΟΜΗΘΕΥΤΗΣ',
   },
   en: {
     invoice: 'SALES INVOICE', service: 'SERVICE INVOICE',
@@ -76,6 +78,8 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
     itemCode: 'Item Code', itemDescr: 'Description', itemComment: 'Comment',
     order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order Note',
     preInvoice: 'PRE-INVOICE', preInvoiceNote: 'Not a Tax Document.',
+    recipient: 'RECIPIENT', totalQty: 'Total quantity', transportDate: 'Transport date',
+    salesOrder: 'ORDER CONFIRMATION', purchaseOrder: 'PURCHASE ORDER', supplier: 'SUPPLIER',
   },
 };
 

@@ -162,6 +162,7 @@ const PublicCatalogPage = lazy(() => import('./components/business/catalogs/Publ
 const PayInvoicePage = lazy(() => import('./pages/PayInvoicePage'));
 const ProviderReturnPage = lazy(() => import('./pages/ProviderReturnPage'));
 const PublicAccountStatementPage = lazy(() => import('./pages/PublicAccountStatementPage'));
+const PublicDocumentPage = lazy(() => import('./pages/PublicDocumentPage'));
 const TripExpensesPage = lazy(() => import('./pages/TripExpensesPage'));
 const ClientPortalPage = lazy(() => import('./pages/ClientPortalPage'));
 const MyPropertiesPage = lazy(() => import('./pages/MyPropertiesPage'));
@@ -1194,6 +1195,8 @@ const App = () => (
 
                 {/* Public account statement (token + VAT/email gated, no auth, no layout) */}
                 <Route path="/statement/:token" element={<PageErrorBoundary name="Account statement"><PublicAccountStatementPage /></PageErrorBoundary>} />
+
+                <Route path="/d/:token" element={<PageErrorBoundary name="Document"><PublicDocumentPage /></PageErrorBoundary>} />
 
                 {/* Public online storefront (slug-gated, no auth, no layout) */}
                 <Route path="/store/:slug" element={<PageErrorBoundary name="Store"><PublicStorefrontPage /></PageErrorBoundary>} />

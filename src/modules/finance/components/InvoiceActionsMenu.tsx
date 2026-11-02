@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { saveTextFile } from '@/utils/saveTextFile';
-import { MoreVertical, Eye, CreditCard, Send, Copy, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, Send, Copy, ExternalLink, MessageCircle, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -35,6 +35,7 @@ import { formatDate } from '@/utils/datetime';
 import { OrderLinkPicker } from '@/modules/finance/components/OrderLinkPicker';
 import { CardTerminalPaymentDialog } from '@/modules/finance/components/CardTerminalPaymentDialog';
 import { type OrderLinkTarget } from '@/modules/finance/services/ordersService';
+import { customerLinkHandlers } from '@/modules/finance/services/customerLinks';
 
 interface Props {
   invoiceId: string;
@@ -114,10 +115,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     toast({ title: 'MARK copied' });
   };
 
-  const copyLink = async () => {
-    await navigator.clipboard.writeText(`${window.location.origin}${financeBase}/invoices/${invoiceId}`);
-    toast({ title: 'Link copied' });
-  };
+  const customerLink = customerLinkHandlers('invoice', invoiceId, 'Invoice', toast);
 
   /** One-shot copy of THIS document into a fresh draft. Distinct from "Save as template", which
    *  stores a reusable named shape in the library (#322) rather than another invoice. */
@@ -305,7 +303,9 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         {!isAccountant && <DropdownMenuItem onClick={openDesc}><Pencil className="h-4 w-4 mr-2" /> Change description</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openCat}><Tag className="h-4 w-4 mr-2" /> Change category</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openJob}><Briefcase className="h-4 w-4 mr-2" /> Link to a project</DropdownMenuItem>}
-        <DropdownMenuItem onClick={copyLink}><Copy className="h-4 w-4 mr-2" /> Copy link</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void customerLink.copy()}><Copy className="h-4 w-4 mr-2" /> Copy customer link</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void customerLink.open()}><ExternalLink className="h-4 w-4 mr-2" /> Open customer view</DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void customerLink.whatsapp()}><MessageCircle className="h-4 w-4 mr-2" /> Send via WhatsApp</DropdownMenuItem>
 
         <DropdownMenuSeparator />
         {!isAccountant && <DropdownMenuItem onClick={() => go('?action=credit_note')}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}

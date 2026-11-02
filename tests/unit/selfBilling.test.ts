@@ -295,7 +295,7 @@ describe('the printed document says what the transmitted one says', () => {
 
   it('HTML preview does the same, so the two cannot disagree', () => {
     expect(PREVIEW).toMatch(/selfBilledId \? \[\] : \(bankAccounts \?\? \[\]\)/);
-    expect(PREVIEW).toMatch(/payUrl: selfBilledId \? null/);
+    expect(PREVIEW).toMatch(/payUrl: selfBilledId(?: \|\| movementOnly)? \? null/);
   });
 
   it('offers the note in both languages — an English default must not print a Greek-only label', () => {
