@@ -54,6 +54,8 @@ import {
   describeValue,
 } from './productSpecDisplay';
 import { buildModelTable, modelColumnLabel, keyUnit } from './productModelTable';
+import { tileFormats } from './tileFormats';
+import { TileFormatRow } from './TileFormatRow';
 import { placeFields } from './productFieldPlacement';
 import { sectionLabel, sectionRank } from '@/services/fieldRegistryService';
 import { ProductModelsCard } from './ProductModelsCard';
@@ -562,6 +564,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const materialPropsData = allData?.material_properties || {};
   const applicationData = allData?.application || {};
   const dimensionsData = allData?.dimensions || [];
+  // `available_sizes` is the normalised list; `dimensions` can hold OCR cell fragments, so it is only the fallback.
+  const tileFormatList = resolveProductCategory(product.metadata, product.type, product.category) === 'tiles'
+    ? (() => { const a = tileFormats(allData?.available_sizes); return a.length ? a : tileFormats(dimensionsData); })()
+    : [];
 
   // Product name uppercased for matching against product-keyed metadata dicts
   const productNameUpper = (typeof product.name === 'string' ? product.name : '').toUpperCase().trim();
@@ -1838,12 +1844,17 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                     <span className="text-muted-foreground">Finish</span><span className="font-medium text-foreground">{finish}</span>
                   </span>
                 )}
-                {size && size !== 'N/A' && size !== '—' && (
+                {tileFormatList.length === 0 && size && size !== 'N/A' && size !== '—' && (
                   <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
                     <span className="text-muted-foreground">Size</span><span className="font-medium text-foreground">{String(size).split(',')[0].trim()}</span>
                   </span>
                 )}
               </div>
+              {tileFormatList.length > 0 && (
+                <div className="mt-3">
+                  <TileFormatRow formats={tileFormatList} maxBoxPx={44} />
+                </div>
+              )}
             </div>
             {/* Quick actions — full-width on mobile (below the title), compact on the right from sm up */}
             <div className="flex items-center gap-2 flex-shrink-0 pr-8 sm:pr-0">
