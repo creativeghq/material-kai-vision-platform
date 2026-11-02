@@ -45,7 +45,7 @@ describe('displayValue', () => {
     ['wall-mounted', 'Wall Mounted'],
     ['electrical', 'Electrical'],
     ['hot water', 'Hot Water'],
-    ['false', 'False'],
+    ['false', 'No'],
     ['towel_rail', 'Towel Rail'],
     ['white RAL 9016', 'White RAL 9016'],
     ['hot water, electric', 'Hot Water, Electric'],

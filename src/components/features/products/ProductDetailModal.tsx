@@ -285,6 +285,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
   // Callers pass partial products; the description is read from the record when they omit it.
   const [recordDescription, setRecordDescription] = useState('');
+  // The catalogue's item tables carry every colour x size x code; the rough model list then repeats them.
+  const [skuTableCount, setSkuTableCount] = useState(0);
+  useEffect(() => { setSkuTableCount(0); }, [product?.id]);
   useEffect(() => {
     setRecordDescription('');
     if (!isOpen || !product?.id || safeString(product.description)) return;
@@ -1620,7 +1623,10 @@ It becomes searchable from this product and by the agents. Its visibility stays 
       const hit = lookupRegistryField(field.key);
       if (!hit) continue;
       consumedKeys.add(field.key);
-      data[field.label] = summariseSkuMap(hit.raw) ?? describeValue(hit.raw) ?? hit.value;
+      const shown = summariseSkuMap(hit.raw) ?? describeValue(hit.raw) ?? hit.value;
+      // "Model: DOCKS" on the DOCKS page says nothing the title does not.
+      if (typeof shown === 'string' && normalizeMatch(shown) === productNameNorm) continue;
+      data[field.label] = shown;
       if (isLowConfidence(hit.raw)) lowConf.add(field.label);
     }
     for (const e of extras) if (!(e.label in data)) data[e.label] = e.value;
@@ -1784,11 +1790,19 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               <DialogTitle className="text-2xl sm:text-3xl mb-1 break-words tracking-tight" style={{ fontWeight: 700 }}>
                 {safeString(product.name, 'Unnamed Product')}
               </DialogTitle>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
-                {collection && <span className="font-medium">{collection}</span>}
-                {collection && <span className="text-muted-foreground/40">•</span>}
-                <span>SKU: {safeString(product.sku, 'N/A')}</span>
-              </div>
+              {(() => {
+                // The collection only when it says something the name does not; the SKU only when there is one.
+                const showCollection = !!collection && normalizeMatch(collection) !== productNameNorm;
+                const sku = safeString(product.sku);
+                if (!showCollection && !sku) return null;
+                return (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-muted-foreground">
+                    {showCollection && <span className="font-medium">{collection}</span>}
+                    {showCollection && sku && <span className="text-muted-foreground/40">•</span>}
+                    {sku && <span>SKU {sku}</span>}
+                  </div>
+                );
+              })()}
               {/* Key facets at a glance — same computed values as the spec cards below. */}
               <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                 {material && material !== '—' && (
@@ -1796,11 +1810,16 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                     <span className="text-muted-foreground">Material</span><span className="font-medium text-foreground">{material}</span>
                   </span>
                 )}
-                {primaryColors && (
-                  <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
-                    <span className="text-muted-foreground">Color</span><span className="font-medium text-foreground">{primaryColors.split(',')[0].trim()}</span>
-                  </span>
-                )}
+                {primaryColors && (() => {
+                  const options = Array.isArray(allData?.colour_options) ? allData.colour_options.length : 0;
+                  const count = Math.max(options, primaryColors.split(',').filter(c => c.trim()).length);
+                  return (
+                    <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
+                      <span className="text-muted-foreground">Colour</span>
+                      <span className="font-medium text-foreground">{count > 1 ? `${count} colours` : primaryColors.split(',')[0].trim()}</span>
+                    </span>
+                  );
+                })()}
                 {finish && finish !== '—' && (
                   <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
                     <span className="text-muted-foreground">Finish</span><span className="font-medium text-foreground">{finish}</span>
@@ -1819,7 +1838,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               )}
             </div>
             {/* Quick actions — full-width on mobile (below the title), compact on the right from sm up */}
-            <div className="flex items-center gap-2 flex-shrink-0 pr-8 sm:pr-0">
+            <div className="flex flex-wrap items-center gap-2 flex-shrink-0 pr-8 sm:pr-0">
               <AddToQuoteButton
                 productId={product.id}
                 productName={product.name}
@@ -1994,36 +2013,16 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 />
               </div>
             )}
-            {/* The product's own description only. Raw catalogue chunks are never shown as one: the
-                pick-a-chunk fallback put a special-trims table under "Product Description" on DOCKS. */}
-            {(() => {
-              const longDesc = safeString((product as unknown as Record<string, unknown>).long_description);
-              const fullDesc = longDesc || safeString(product.description) || recordDescription;
-              if (!fullDesc) return null;
-              return (
-                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6 mb-6">
-                  <div className="mb-3">
-                    <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
-                      <Info className="h-4 w-4" />
-                      Product Description
-                    </h3>
-                  </div>
-                  <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
-                    {fullDesc}
-                  </p>
-                </div>
-              );
-            })()}
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
           {/* Left Column: Image Slider (3/5 width) */}
-          <div className="lg:col-span-3 space-y-4">
+          <div className="lg:col-span-3 space-y-4 lg:sticky lg:top-4 self-start">
             {isLoadingImages ? (
-              <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border flex items-center justify-center">
+              <div className="relative aspect-[4/3] bg-surface-sunken rounded-xl overflow-hidden border border-hairline flex items-center justify-center">
                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
               </div>
             ) : images.length > 0 ? (
               <>
-                <div className="relative aspect-square bg-muted/30 rounded-xl overflow-hidden border border-border group flex items-center justify-center">
+                <div className="relative aspect-[4/3] bg-surface-sunken rounded-xl overflow-hidden border border-hairline group flex items-center justify-center">
                   <img
                     src={currentImage?.url}
                     alt={product.name}
@@ -2103,7 +2102,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 })()}
               </>
             ) : (
-              <div className="relative aspect-square bg-muted/50 rounded-xl overflow-hidden border border-border flex items-center justify-center">
+              <div className="relative aspect-[4/3] bg-surface-sunken rounded-xl overflow-hidden border border-hairline flex items-center justify-center">
                 <p className="text-muted-foreground">No images available</p>
               </div>
             )}
@@ -2111,6 +2110,26 @@ It becomes searchable from this product and by the agents. Its visibility stays 
 
           {/* Right Column: Technical Details (2/5 width) */}
           <div className="lg:col-span-2 space-y-4">
+            {/* The product's own description only. Raw catalogue chunks are never shown as one: the
+                pick-a-chunk fallback put a special-trims table under "Product Description" on DOCKS. */}
+            {(() => {
+              const longDesc = safeString((product as unknown as Record<string, unknown>).long_description);
+              const fullDesc = longDesc || safeString(product.description) || recordDescription;
+              if (!fullDesc) return null;
+              return (
+                <div className="dashboard-card rounded-2xl border-0 shadow-sm p-5">
+                  <div className="mb-3">
+                    <h3 className="text-sm font-semibold text-primary flex items-center gap-2">
+                      <Info className="h-4 w-4" />
+                      Product Description
+                    </h3>
+                  </div>
+                  <p className="text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap">
+                    {fullDesc}
+                  </p>
+                </div>
+              );
+            })()}
             {/* Key Specifications Card — category-adaptive.
                 Universal rows (Factory, Origin, Collection, Material) always show.
                 Category-specific rows are driven by the registry config.
@@ -2125,7 +2144,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               const group = extractValue(allData?.factory_group_name);
               if (group && group !== factory) universalRows.push({ label: 'Brand Group', value: String(group) });
               if (origin) universalRows.push({ label: 'Country of Origin', value: origin });
-              if (collection) universalRows.push({ label: 'Collection', value: collection });
+              if (collection && normalizeMatch(collection) !== productNameNorm) universalRows.push({ label: 'Collection', value: collection });
               universalRows.push({ label: 'Material', value: material });
 
               // ── Category-specific rows ─────────────────────────────────
@@ -2147,7 +2166,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 categorySpecRows.push({ label: 'Finish', value: finish });
                 const subtype = tryExtract(materialPropsData?.material_subtype);
                 if (subtype) categorySpecRows.push({ label: 'Subtype', value: subtype });
-                if (size !== 'N/A') categorySpecRows.push({ label: 'Size', value: size });
+                if (size !== 'N/A' && tileFormatList.length === 0) categorySpecRows.push({ label: 'Size', value: size });
                 if (thickness) categorySpecRows.push({ label: 'Thickness', value: thickness });
                 const rectified = tryExtract(materialPropsData?.rectified, allData?.rectified);
                 if (rectified) categorySpecRows.push({ label: 'Rectified', value: rectified });
@@ -2250,7 +2269,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 categorySpecRows.push({ label: 'Finish', value: finish });
                 const subtype = tryExtract(materialPropsData?.material_subtype);
                 if (subtype) categorySpecRows.push({ label: 'Subtype', value: subtype });
-                if (size !== 'N/A') categorySpecRows.push({ label: 'Size', value: size });
+                if (size !== 'N/A' && tileFormatList.length === 0) categorySpecRows.push({ label: 'Size', value: size });
                 if (thickness) categorySpecRows.push({ label: 'Thickness', value: thickness });
               } else {
                 // No curated branch. The registry's identity fields ARE "what tells these
@@ -2315,7 +2334,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               const productUrl = (product as any)?.product_url as string | null | undefined;
               if (productUrl) categorySpecRows.push({ label: 'Link', value: String(productUrl) });
               const productNotes = (product as any)?.notes as string | null | undefined;
-              if (productNotes) categorySpecRows.push({ label: 'Notes', value: String(productNotes) });
+              if (productNotes && isAdmin) categorySpecRows.push({ label: 'Notes', value: String(productNotes) });
 
               // ── Render ─────────────────────────────────────────────────
               return (
@@ -2485,16 +2504,23 @@ It becomes searchable from this product and by the agents. Its visibility stays 
               return raw.split(',').map(s => s.trim()).filter(Boolean).map(titleCaseDisplay);
             };
 
-            const colorChips = splitToChips(appearance['Colors']);
-            const shadeChips = splitToChips(appearance['Observed Shades']);
+            // Swatches with a hex ARE the colour list; the plain chips and the family would repeat them.
+            const colorChips = colourOptions.length > 0 ? [] : splitToChips(appearance['Colors']);
+            const shadeChips = splitToChips(appearance['Observed Shades']).filter(c => !/\(\+\d+ more\)/i.test(c));
 
             const CHIP_ROW_KEYS = new Set(['Colors', 'Observed Shades']);
             // CSS hex colors are exactly 3, 4, 6, or 8 chars after the `#` (rgb / rgba / rrggbb / rrggbbaa).
     // 5 and 7 char strings are not valid CSS — exclude them so we don't render bogus swatches.
     const HEX_RE = /^#(?:[0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
-            const gridFields = Object.entries(appearance).filter(
-              ([k, v]) => !CHIP_ROW_KEYS.has(k) && v && v !== 'N/A' && v !== '',
-            );
+            const seenValues = new Set<string>();
+            const gridFields = Object.entries(appearance).filter(([k, v]) => {
+              if (CHIP_ROW_KEYS.has(k) || !v || v === 'N/A' || v === '') return false;
+              if (colourOptions.length > 0 && /^colou?r family$/i.test(k)) return false;
+              const norm = renderValue(v).trim().toLowerCase();
+              if (seenValues.has(norm)) return false;
+              seenValues.add(norm);
+              return true;
+            });
 
             const renderChipRow = (label: string, chips: string[]) => {
               if (chips.length === 0) return null;
@@ -2561,7 +2587,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                   </div>
                 )}
                 {renderChipRow('Standard Colours', colorChips)}
-                {renderChipRow('Customer Colors - Under Request', shadeChips)}
+                {renderChipRow('Shades seen in the photos', shadeChips)}
                 {colourOptions.length > 0 && (
                   <div className="mt-6">
                     <p className="text-xs font-semibold text-muted-foreground mb-2">
@@ -2754,7 +2780,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           return (
             <div className="space-y-6 mt-6">
               {dimensionsCard}
-              {modelTable && <ProductModelsCard table={modelTable} />}
+              {modelTable && skuTableCount === 0 && <ProductModelsCard table={modelTable} />}
               {appearanceCard}
 
               {/* All registry-defined spec sections for THIS category, complete.
@@ -2772,7 +2798,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
 
               {variantsCard}
 
-              <ProductSkuTables productId={product.id} colourOptions={allData?.colour_options} canSeeInternal={canSeeCost} />
+              <ProductSkuTables productId={product.id} colourOptions={allData?.colour_options} canSeeInternal={canSeeCost} onTablesLoaded={setSkuTableCount} />
 
               {certificationsCard}
 

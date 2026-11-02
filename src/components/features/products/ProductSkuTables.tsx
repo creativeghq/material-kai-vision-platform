@@ -15,9 +15,11 @@ interface Props {
   productId: string;
   colourOptions?: unknown;
   canSeeInternal?: boolean;
+  /** How many item tables there are, once known; a parent drops its rougher model list when > 0. */
+  onTablesLoaded?: (count: number) => void;
 }
 
-export function ProductSkuTables({ productId, colourOptions, canSeeInternal = false }: Props) {
+export function ProductSkuTables({ productId, colourOptions, canSeeInternal = false, onTablesLoaded }: Props) {
   const [load, setLoad] = useState<Load>({ kind: 'loading' });
   const hexByName = useMemo(() => colourHexIndex(colourOptions), [colourOptions]);
 
@@ -36,11 +38,12 @@ export function ProductSkuTables({ productId, colourOptions, canSeeInternal = fa
         const rows = data ?? [];
         const tables = rows.map(r => toSkuTable(r, canSeeInternal)).filter((t): t is SkuTable => t !== null);
         setLoad({ kind: 'loaded', tables, hidden: rows.length - tables.length, capped: rows.length >= MAX_TABLES });
+        onTablesLoaded?.(tables.length);
       }, (e: unknown) => {
         if (live) setLoad({ kind: 'failed', reason: e instanceof Error ? e.message : 'request failed' });
       });
     return () => { live = false; };
-  }, [productId, canSeeInternal]);
+  }, [productId, canSeeInternal, onTablesLoaded]);
 
   if (load.kind === 'loading') return null;
   if (load.kind === 'failed') {

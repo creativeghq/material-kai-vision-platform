@@ -32,7 +32,7 @@ function CellView({ column, value, hexByName }: { column: SkuColumn; value: Cell
   if (value === null) return <span className="text-muted-foreground">—</span>;
   const text = formatCell(value);
   if (column.role === 'status' || column.role === 'availability') {
-    return <Badge variant={STATUS_VARIANT[normaliseLabel(text)] ?? 'neutral'}>{text}</Badge>;
+    return <Badge variant={STATUS_VARIANT[normaliseLabel(text)] ?? 'neutral'} className="whitespace-nowrap">{text}</Badge>;
   }
   if (column.role === 'colour') {
     const hex = hexByName[normaliseLabel(text)];

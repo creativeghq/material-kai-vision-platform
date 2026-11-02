@@ -2,9 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2 } from 'lucide-react';
-import { Input } from '@/components/core/ui/input';
 import { Button } from '@/components/core/ui/button';
-import { Card } from '@/components/core/ui/card';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { AdminStatCard } from '../AdminStatCard';
 import { ProductsTab } from './ProductsTab';
@@ -22,7 +20,8 @@ export const MaterialsDataPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeWorkspaceId } = useWorkspace();
   const workspaceId = activeWorkspaceId ?? '';
-  const [jobIdFilter, setJobIdFilter] = useState<string>(searchParams.get('jobId') || '');
+  // Only a link opens one job's data (`?jobId=` from the job monitor); there is no typed filter.
+  const jobIdFilter = searchParams.get('jobId') || '';
   // `?productId=` — several places link here to open ONE product (AsyncJobQueueMonitor's
   // per-product row, the mention dashboard's "Open"). The param was never read, so every
   // one of those links silently showed the entire catalog instead.
@@ -144,35 +143,13 @@ export const MaterialsDataPage: React.FC = () => {
           />
         </div>
 
-        {/* Job ID Filter */}
-        <Card className="p-4">
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Filter by Job ID (optional)"
-              value={jobIdFilter}
-              onChange={(e) => setJobIdFilter(e.target.value)}
-              className="max-w-md"
-            />
-            {jobIdFilter && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setJobIdFilter('');
-                  setSearchParams({});
-                }}
-              >
-                Clear Filter
-              </Button>
-            )}
+        {appliedJobId && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Filter className="h-4 w-4" />
+            Showing one ingestion job
+            <Button variant="ghost" size="sm" onClick={() => setSearchParams({})}>Show all</Button>
           </div>
-          {jobIdInvalid && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Not a job ID, so this filter is not applied. To find a product by name, use the search box in the Products tab.
-            </p>
-          )}
-        </Card>
+        )}
 
         {/* Main Content */}
         <Tabs defaultValue="products" className="w-full">

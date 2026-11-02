@@ -49,7 +49,9 @@ const NOISE_KEYS = new Set([
   'page', 'pages', 'page_range', 'page_number', 'page_numbers', 'start_page', 'end_page',
   'image_indices', 'image_index', 'confidence', 'unit', 'per_variant', 'chunk_index',
   'source', 'source_page', 'material_category', 'zone_intent',
-  'notes', 'note', 'extraction_notes', 'dimensionalaesthetic',
+  'notes', 'note', 'extraction_notes', 'dimensionalaesthetic', 'materials_mentioned',
+  // Counts of the item table, which shows the items themselves.
+  'sku_count', 'discontinued_item_count', 'made_to_order_item_count',
   // Every list item / table cell of the product's chunks (sizes, packaging lines, OCR math), never vetted.
   'key_features',
 ]);
@@ -98,12 +100,13 @@ const capitalise = (w: string): string => (w ? w[0].toUpperCase() + w.slice(1) :
 
 /**
  * The one way a value from the data reaches the screen: `wall-mounted` reads Wall Mounted,
- * `design radiator` Design Radiator, `false` False. Long sentences keep their wording and
+ * `design radiator` Design Radiator, `false` No. Long sentences keep their wording and
  * only gain a capital; codes, units, URLs and tokens already in capitals are left alone.
  */
 export function displayValue(input: string): string {
   const s = input.trim();
   if (!s) return s;
+  if (/^(true|false)$/i.test(s)) return s.toLowerCase() === 'true' ? 'Yes' : 'No';
   if (/:\/\/|^www\.|@|^#|^\d/.test(s)) return s;
   const parts = s.split(/\s*,\s*/);
   if (parts.length > 1 && parts.every(p => p.split(/\s+/).length <= 4)) return parts.map(displayValue).join(', ');
