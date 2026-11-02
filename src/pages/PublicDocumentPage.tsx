@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { publicDocumentService, type PublicDocumentPayload } from '@/modules/finance/services/publicDocumentService';
 import { PublicDocumentView } from '@/modules/finance/components/PublicDocumentView';
 import { fiscalLinks } from '@/modules/finance/components/FiscalRecordPanel';
+import { safeHref } from '@/utils/safeUrl';
 
 /** /d/:token — the customer's (or supplier's) online copy of a credit note, delivery note or order. */
 export default function PublicDocumentPage() {
@@ -85,7 +86,7 @@ export default function PublicDocumentPage() {
           <div className="flex flex-wrap gap-2">
             {links.map((l) => (
               <Button key={l.href} asChild size="sm" variant="outline" className="gap-1.5">
-                <a href={l.href} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" />{l.label}</a>
+                <a href={safeHref(l.href)} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" />{l.label}</a>
               </Button>
             ))}
             <Button size="sm" variant="outline" className="gap-1.5" onClick={() => window.print()}>
