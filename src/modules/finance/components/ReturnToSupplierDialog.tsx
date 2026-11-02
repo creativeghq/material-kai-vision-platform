@@ -20,7 +20,7 @@ import { parseDecimalOr } from '@/utils/decimal';
 import { normalizeUnit, unitFromMydataCode, unitSuffix } from '@/lib/units';
 import { inboundService, type InboundDocument, type SupplierReturnLine } from '@/modules/finance/services/inboundService';
 import { deliveryNotesService, type WarehousePick } from '@/modules/finance/services/deliveryNotesService';
-import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
+import { deliveryNoteUrl } from '@/modules/finance/routes';
 
 const NO_STOCK = '__none';
 
@@ -113,7 +113,6 @@ export const ReturnToSupplierDialog: React.FC<{
   }, [lines, rows, warehouse]);
   const picked = (lines ?? []).filter((l) => rows[l.line_number]?.include);
 
-  const goToDraft = () => navigate(financeTabUrl(FINANCE_TAB.deliveryNotes));
 
   const submit = async () => {
     if (submitting.current || !lines) return;
@@ -131,13 +130,13 @@ export const ReturnToSupplierDialog: React.FC<{
           unit: docUnitOf(l) ?? stockUnit ?? null,
         };
       });
-      await inboundService.createSupplierReturnDraft(doc.id, payload, reason.trim());
+      const noteId = await inboundService.createSupplierReturnDraft(doc.id, payload, reason.trim());
       toast({
         title: 'Return note drafted',
-        description: 'Check it under Delivery Notes and press Issue to send it — that is when the stock comes out. The refund arrives as the supplier\'s credit note.',
+        description: 'Check it, edit it if needed, then press Issue — that is when the stock comes out. The refund arrives as the supplier\'s credit note.',
       });
       onDone();
-      goToDraft();
+      navigate(deliveryNoteUrl(noteId));
     } catch (err) {
       toast({ title: 'Could not draft the return', description: err instanceof Error ? err.message : (err as { message?: string })?.message, variant: 'destructive' });
     } finally {
@@ -269,7 +268,7 @@ export const ReturnToSupplierDialog: React.FC<{
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           {openDraftId ? (
-            <Button onClick={() => { onOpenChange(false); goToDraft(); }}>Open Delivery Notes</Button>
+            <Button onClick={() => { onOpenChange(false); navigate(deliveryNoteUrl(openDraftId)); }}>Open the draft</Button>
           ) : (
             <Button onClick={submit} disabled={busy || !lines || picked.length === 0 || problems.length > 0}>
               {busy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Undo2 className="mr-2 h-4 w-4" />}

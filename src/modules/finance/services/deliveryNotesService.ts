@@ -28,7 +28,56 @@ export interface DeliveryNote {
   return_of_inbound_document_id?: string | null;
   created_at: string;
   /** Embedded order — read-only, for `deliveryNoteJob`. Never written. */
-  orders?: { project_id: string | null; projects?: { name: string | null } | { name: string | null }[] | null } | null;
+  orders?: { order_number?: string | null; project_id: string | null; projects?: { name: string | null } | { name: string | null }[] | null } | null;
+  invoice_id?: string | null;
+  order_id?: string | null;
+  move_purpose?: string | null;
+  related_document?: string | null;
+  invoices?: { internal_number: string | null; legal_number: string | null } | null;
+  inbound_documents?: { issuer_name: string | null; supplier_invoice_number: string | null; series: string | null; aa: string | null } | null;
+  /** Resolved by `list` — the company the note is addressed to. */
+  party_name?: string | null;
+}
+
+/**
+ * What a note moves goods FOR: the supplier invoice a return sends back, or the invoice / order a
+ * dispatch delivers. `to` is null when the related record has no page of its own.
+ */
+export function deliveryNoteRelation(d: DeliveryNote): { label: string; to: string | null } | null {
+  if (d.return_of_inbound_document_id) {
+    const doc = d.inbound_documents;
+    const number = doc?.supplier_invoice_number || [doc?.series, doc?.aa].filter(Boolean).join(' ');
+    return { label: `Supplier invoice ${number || d.related_document || ''}`.trim(), to: null };
+  }
+  if (d.invoice_id) {
+    return { label: `Invoice ${d.invoices?.legal_number ?? d.invoices?.internal_number ?? ''}`.trim(), to: `/finance/invoices/${d.invoice_id}` };
+  }
+  if (d.order_id) {
+    return { label: `Order ${d.orders?.order_number ?? ''}`.trim(), to: `/finance/orders/${d.order_id}` };
+  }
+  return d.related_document ? { label: d.related_document, to: null } : null;
+}
+
+/** One note with everything its page and its edit form read. */
+export interface DeliveryNoteDetail extends DeliveryNote {
+  branch_code: number;
+  move_purpose: string | null;
+  mydata_document_type: string | null;
+  transport_date: string | null;
+  vehicle_number: string | null;
+  related_document: string | null;
+  ship_from_street: string | null; ship_from_number: string | null; ship_from_postal: string | null; ship_from_city: string | null;
+  ship_to_street: string | null; ship_to_number: string | null; ship_to_postal: string | null; ship_to_city: string | null;
+  ship_to_address_unit_id: string | null;
+  receiving_note_purpose: number | null;
+  other_receiving_note_purpose_title: string | null;
+  non_obligated_recipient: boolean;
+  without_digital_transport_tracking: boolean;
+  to_weigh: boolean;
+  packagings: { packagingType: number; quantity: number; otherPackagingTypeTitle?: string }[] | null;
+  fiscal_error: string | null;
+  company_name: string | null;
+  items: (DeliveryLineInput & { id: string; source_line_number: number | null })[];
 }
 
 export interface DeliveryLineInput {
@@ -88,11 +137,51 @@ export const deliveryNotesService = {
       .from('delivery_notes')
       // The job comes from the ORDER this note was cut from (#378 L5). No `project_id` column
       // here on purpose — see documentJob.ts.
-      .select('*, orders(project_id, projects(name))')
+      .select('*, orders!delivery_notes_order_id_fkey(order_number, project_id, projects(name)), invoices!delivery_notes_invoice_id_fkey(internal_number, legal_number), inbound_documents!delivery_notes_return_of_inbound_document_id_fkey(issuer_name, supplier_invoice_number, series, aa)')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return (data ?? []) as DeliveryNote[];
+    const rows = (data ?? []) as unknown as DeliveryNote[];
+    // customer_company_id has no FK to crm_companies, so the name is a second read.
+    const ids = [...new Set(rows.map((r) => r.customer_company_id).filter(Boolean))] as string[];
+    if (ids.length) {
+      const { data: cos, error: cErr } = await supabase.from('crm_companies').select('id, name').in('id', ids);
+      if (cErr) throw cErr;
+      const names = new Map(((cos ?? []) as { id: string; name: string | null }[]).map((c) => [c.id, c.name]));
+      for (const r of rows) r.party_name = r.customer_company_id ? names.get(r.customer_company_id) ?? null : null;
+    }
+    return rows;
+  },
+
+  async get(id: string): Promise<DeliveryNoteDetail | null> {
+    const { data, error } = await supabase
+      .from('delivery_notes')
+      .select('*, orders!delivery_notes_order_id_fkey(order_number, project_id, projects(name)), invoices!delivery_notes_invoice_id_fkey(internal_number, legal_number), inbound_documents!delivery_notes_return_of_inbound_document_id_fkey(issuer_name, supplier_invoice_number, series, aa), delivery_note_items(id, warehouse_item_id, product_id, description, sku, quantity, unit, source_line_number, created_at)')
+      .eq('id', id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as unknown as DeliveryNoteDetail & {
+      delivery_note_items: (DeliveryNoteDetail['items'][number] & { created_at: string })[];
+    };
+    // No FK from customer_company_id to crm_companies, so it cannot be embedded.
+    let companyName: string | null = null;
+    if (row.customer_company_id) {
+      const { data: c, error: cErr } = await supabase.from('crm_companies').select('name').eq('id', row.customer_company_id).maybeSingle();
+      if (cErr) throw cErr;
+      companyName = (c as { name: string | null } | null)?.name ?? null;
+    }
+    const items = [...(row.delivery_note_items ?? [])]
+      .sort((a, b) => (a.source_line_number ?? 0) - (b.source_line_number ?? 0) || a.created_at.localeCompare(b.created_at));
+    return { ...row, company_name: companyName, items };
+  },
+
+  /** Rewrite a DRAFT's header and lines. Refused once issued; a return is re-checked against its caps. */
+  async updateDraft(id: string, header: Record<string, unknown>, lines: (DeliveryLineInput & { source_line_number?: number | null })[]): Promise<void> {
+    const { error } = await supabase.rpc('update_delivery_note_draft' as never, {
+      p_id: id, p_header: header, p_lines: lines,
+    } as never);
+    if (error) throw error;
   },
 
   async listWarehouse(workspaceId: string): Promise<WarehousePick[]> {

@@ -72,6 +72,7 @@ const DealDetailPage = lazy(() => import('./modules/crm/pages/DealDetailPage').t
 const LeadDetailPage = lazy(() => import('./modules/crm/pages/LeadDetailPage').then(m => ({ default: m.LeadDetailPage })));
 const CrmCompanyDetailPage = lazy(() => import('./modules/crm/pages/CompanyDetailPage').then(m => ({ default: m.CompanyDetailPage })));
 const InvoiceDetailPage = lazy(() => import('./pages/Admin/InvoiceDetailPage'));
+const DeliveryNoteDetailPage = lazy(() => import('./modules/finance/pages/DeliveryNoteDetailPage'));
 const OrderDetailPage = lazy(() => import('./pages/Admin/OrderDetailPage'));
 const PosPage = lazy(() => import('./modules/finance/pages/PosPage'));
 const SalesPage = lazy(() => import('./pages/Sales/SalesPage'));
@@ -530,6 +531,18 @@ const App = () => (
                       <CapabilityGuard capability="finance.manage">
                         <Layout>
                           <InvoiceDetailPage />
+                        </Layout>
+                      </CapabilityGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/finance/delivery-notes/:id"
+                  element={
+                    <AuthGuard>
+                      <CapabilityGuard capability="finance.manage">
+                        <Layout>
+                          <DeliveryNoteDetailPage />
                         </Layout>
                       </CapabilityGuard>
                     </AuthGuard>

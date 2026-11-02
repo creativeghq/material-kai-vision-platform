@@ -66,3 +66,8 @@ export const OVERDUE_KEY = 'overdue';
 export function financeTabUrl(tab: typeof FINANCE_TAB[keyof typeof FINANCE_TAB]): string {
   return `${FINANCE_BASE}?tab=${tab}`;
 }
+
+/** One delivery note's own page. */
+export function deliveryNoteUrl(id: string): string {
+  return `${FINANCE_BASE}/delivery-notes/${id}`;
+}

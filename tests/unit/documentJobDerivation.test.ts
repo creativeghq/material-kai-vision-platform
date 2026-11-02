@@ -48,7 +48,7 @@ describe('a cheque takes the job of the document it settles, chosen by DIRECTION
 describe('the derivation is fed by the read, and nothing stores it', () => {
   it('both list queries embed the parent that carries the job', () => {
     expect(read('src/modules/finance/services/deliveryNotesService.ts'))
-      .toMatch(/from\('delivery_notes'\)[\s\S]{0,600}?orders\(project_id, projects\(name\)\)/);
+      .toMatch(/from\('delivery_notes'\)[\s\S]{0,600}?orders(?:!\w+)?\([^()]*project_id, projects\(name\)\)/);
     const cheques = read('src/modules/finance/services/chequesService.ts');
     expect(cheques).toMatch(/invoices\(project_id, projects\(name\)\)/);
     expect(cheques).toMatch(/supplier_bills\(project_id, projects\(name\)\)/);

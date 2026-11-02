@@ -25,11 +25,12 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { usePermissions } from '@/hooks/usePermissions';
 import { financeService, formatMoney, type Invoice, type CreditNote, type SupplierCreditNote, type PaymentWithAllocation, type RecurringExpense } from '@/modules/finance/services/financeService';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
-import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
+import { FINANCE_BASE, FINANCE_TAB, deliveryNoteUrl, financeTabUrl } from '@/modules/finance/routes';
 import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { Layers } from 'lucide-react';
 import { RecordExpenseDocumentDialog } from '@/modules/finance/components/RecordExpenseDocumentDialog';
-import { deliveryNotesService, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
+import { deliveryNotesService, deliveryNoteRelation, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
+import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
 import { chequesService, type Cheque } from '@/modules/finance/services/chequesService';
 import { ChequePortfolioCard } from '@/modules/finance/components/ChequePortfolioCard';
 import { chequeJob, deliveryNoteJob, type DocumentJob } from '@/modules/finance/utils/documentJob';
@@ -806,7 +807,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           open={newDeliveryOpen}
           onOpenChange={setNewDeliveryOpen}
           initialKind={type === 'delivery_notes' ? scopedFilterValue(filterValues, 'kind') : undefined}
-          onCreated={() => { setNewDeliveryOpen(false); load(); setDispatchRefresh((n) => n + 1); }}
+          onCreated={(id) => { setNewDeliveryOpen(false); setDispatchRefresh((n) => n + 1); navigate(deliveryNoteUrl(id)); }}
         />
       )}
       {activeWorkspaceId && (
@@ -1121,6 +1122,8 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         <tr>
           <th className="px-4 py-2 text-left">Number</th>
           <th className="px-4 py-2 text-left">Type</th>
+          <th className="px-4 py-2 text-left">Party</th>
+          <th className="px-4 py-2 text-left">For</th>
           <th className="px-4 py-2 text-left">Date</th>
           <th className="px-4 py-2 text-left">Job</th>
           <th className="px-4 py-2 text-center">Status</th>
@@ -1131,16 +1134,47 @@ const DeliveryNotesTable: React.FC<{ rows: DeliveryNote[]; readOnly: boolean; on
         {rows.length === 0 && (
           <DocTableEmpty
             {...empty}
-            colSpan={6}
+            colSpan={8}
             noun="delivery notes"
             description="Goods moving in or out — a dispatch to a customer, a receipt from a supplier. A note can be turned into an invoice once it is issued."
             newLabel="New delivery note"
           />
         )}
         {rows.map((d) => (
-          <tr key={d.id} className="border-b border-border/30">
-            <td className="px-4 py-2 font-mono text-xs">{d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}</td>
-            <td className="px-4 py-2"><span className="text-[10px] text-muted-foreground">{d.return_of_inbound_document_id ? 'Return to supplier' : d.kind === 'receipt' ? 'Receipt' : 'Dispatch'}</span></td>
+          <tr
+            key={d.id}
+            className="cursor-pointer border-b border-border/30 hover:bg-muted/30"
+            onClick={(e) => { if (!isInteractiveClick(e)) navigate(deliveryNoteUrl(d.id)); }}
+          >
+            <td className="px-4 py-2 font-mono text-xs">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); navigate(deliveryNoteUrl(d.id)); }}
+                className="rounded text-left hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {d.delivery_note_number ?? <span className="text-muted-foreground">draft</span>}
+              </button>
+            </td>
+            <td className="px-4 py-2">
+              <div className="text-xs">{d.return_of_inbound_document_id ? 'Return to supplier' : d.kind === 'receipt' ? 'Goods receipt' : 'Dispatch to customer'}</div>
+              {d.kind === 'dispatch' && d.move_purpose && (
+                <div className="text-[10px] text-muted-foreground">{d.move_purpose} — {movePurposeLabel(d.move_purpose)}</div>
+              )}
+            </td>
+            <td className="px-4 py-2 max-w-[220px] truncate" title={d.party_name ?? undefined}>
+              {d.customer_company_id
+                ? <Link to={`/crm/companies/${d.customer_company_id}`} className="text-primary hover:underline">{d.party_name ?? 'Company'}</Link>
+                : <span className="text-muted-foreground">—</span>}
+            </td>
+            <td className="px-4 py-2 max-w-[220px] truncate text-xs">
+              {(() => {
+                const rel = deliveryNoteRelation(d);
+                if (!rel) return <span className="text-muted-foreground">—</span>;
+                return rel.to
+                  ? <Link to={rel.to} className="text-primary hover:underline">{rel.label}</Link>
+                  : <span title={rel.label}>{rel.label}</span>;
+              })()}
+            </td>
             <td className="px-4 py-2">{d.issued_at ? formatDate(d.issued_at) : formatDate(d.created_at)}</td>
             <td className="px-4 py-2"><JobCell job={deliveryNoteJob(d)} /></td>
             <td className="px-4 py-2 text-center">

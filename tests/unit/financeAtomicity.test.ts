@@ -81,7 +81,7 @@ describe('#351 C4 — a delivery note that saved but did not issue says so', () 
     const issueCatch = submit.indexOf('catch (issErr');
     expect(issueCatch).toBeGreaterThan(-1);
     const branch = submit.slice(issueCatch, issueCatch + 900);
-    expect(branch).toMatch(/onCreated\(\);/);
+    expect(branch).toMatch(/onCreated\(\w*\);/);
     expect(branch).toMatch(/onOpenChange\(false\);/);
     expect(branch).toMatch(/return;/);
   });

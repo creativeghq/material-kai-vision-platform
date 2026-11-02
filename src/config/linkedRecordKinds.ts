@@ -18,6 +18,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 
 import { SPEC_BY_KIND, type GlobalSearchKind } from '@/config/searchKinds';
+import { deliveryNoteUrl } from '@/modules/finance/routes';
 
 export type LinkedRecordKind =
   | 'invoice'
@@ -58,7 +59,7 @@ export const LINKED_RECORD_KINDS: Record<LinkedRecordKind, LinkedRecordKindSpec>
   quote: { label: 'Quote', plural: 'Quotes', icon: FileText, route: viaSearchRoute('quote') },
   order: { label: 'Order', plural: 'Orders', icon: ShoppingCart, route: viaSearchRoute('order') },
   credit_note: { label: 'Credit note', plural: 'Credit notes', icon: FileMinus, route: null },
-  delivery_note: { label: 'Delivery note', plural: 'Delivery notes', icon: Truck, route: null },
+  delivery_note: { label: 'Delivery note', plural: 'Delivery notes', icon: Truck, route: deliveryNoteUrl },
   supplier_bill: { label: 'Supplier bill', plural: 'Supplier bills', icon: Receipt, route: null },
   project: { label: 'Project', plural: 'Projects', icon: FolderKanban, route: viaSearchRoute('project') },
   deal: { label: 'Deal', plural: 'Deals', icon: Handshake, route: viaSearchRoute('deal') },

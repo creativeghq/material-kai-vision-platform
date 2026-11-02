@@ -1,9 +1,9 @@
 /**
- * Create a delivery note. Pick a customer (optional), add warehouse
- * items as lines, save as draft or issue immediately. Issuing decrements stock for each
- * warehouse-linked line.
+ * Create a delivery note, or edit a DRAFT one (`noteId`). Pick a customer (optional), add
+ * warehouse items as lines, save as draft or issue. Issuing decrements stock for each
+ * warehouse-linked line. A supplier return keeps its party, purpose and lines.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -32,9 +32,11 @@ export const NewDeliveryNoteDialog: React.FC<{
   workspaceId: string;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreated: () => void;
+  onCreated: (id: string) => void;
   initialKind?: string;
-}> = ({ workspaceId, open, onOpenChange, onCreated, initialKind }) => {
+  /** Edit this draft instead of creating a note. */
+  noteId?: string | null;
+}> = ({ workspaceId, open, onOpenChange, onCreated, initialKind, noteId }) => {
   const { toast } = useToast();
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [warehouse, setWarehouse] = useState<WarehousePick[]>([]);
@@ -43,7 +45,12 @@ export const NewDeliveryNoteDialog: React.FC<{
   const [branches, setBranches] = useState<FinanceBranch[]>([]);
   const [branchCode, setBranchCode] = useState<string>('0');
   const [notes, setNotes] = useState('');
-  const [lines, setLines] = useState<DeliveryLineInput[]>([]);
+  const [lines, setLines] = useState<(DeliveryLineInput & { source_line_number?: number | null })[]>([]);
+  const editing = !!noteId;
+  const [isReturn, setIsReturn] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  /** Set while a stored note is being loaded, so the customer effect keeps its stored address. */
+  const hydrating = useRef(false);
   // Transport details
   const [transportDate, setTransportDate] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -78,24 +85,59 @@ export const NewDeliveryNoteDialog: React.FC<{
     setReceivingPurpose(''); setReceivingPurposeTitle('');
     setNonObligatedRecipient(false); setWithoutDigitalTracking(false); setToWeigh(false);
     setPackagings([]);
+    setIsReturn(false); setLoadFailed(false);
     (async () => {
-      const [{ data: cos }, wh, { data: fs }, br] = await Promise.all([
+      const [{ data: cos }, wh, { data: fs }, br, note] = await Promise.all([
         supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).order('name').limit(500),
         deliveryNotesService.listWarehouse(workspaceId).catch(() => [] as WarehousePick[]),
         supabase.from('finance_settings').select('business_address, business_street_number, business_postal_code, business_city').eq('workspace_id', workspaceId).maybeSingle(),
         invoicingSetupService.listBranches(workspaceId).catch(() => [] as FinanceBranch[]),
+        noteId ? deliveryNotesService.get(noteId).catch(() => null) : Promise.resolve(null),
       ]);
       setCompanies((cos ?? []) as any);
       setWarehouse(wh);
       setBranches(br);
       // Loading address defaults to your premises.
       if (fs) setFromAddr({ street: fs.business_address ?? '', number: fs.business_street_number ?? '', postal: fs.business_postal_code ?? '', city: fs.business_city ?? '' });
+      if (!noteId) return;
+      if (!note || note.status !== 'draft') { setLoadFailed(true); return; }
+      const storedTo = !!(note.ship_to_street || note.ship_to_city);
+      // Only when the customer effect will fire, and only to keep a stored address.
+      hydrating.current = !!note.customer_company_id && storedTo;
+      setKind(note.kind);
+      setCustomer(note.customer_company_id ?? '');
+      setIsReturn(!!note.return_of_inbound_document_id);
+      setBranchCode(String(note.branch_code ?? 0));
+      setNotes(note.notes ?? '');
+      setTransportDate(note.transport_date ?? '');
+      setVehicleNumber(note.vehicle_number ?? '');
+      if (note.move_purpose) setMovePurpose(String(note.move_purpose));
+      // An empty stored address keeps the default, which is what the myDATA builder falls back to.
+      if (note.ship_from_street || note.ship_from_city) {
+        setFromAddr({ street: note.ship_from_street ?? '', number: note.ship_from_number ?? '', postal: note.ship_from_postal ?? '', city: note.ship_from_city ?? '' });
+      }
+      if (storedTo) {
+        setToAddr({ street: note.ship_to_street ?? '', number: note.ship_to_number ?? '', postal: note.ship_to_postal ?? '', city: note.ship_to_city ?? '' });
+        setToUnitId(note.ship_to_address_unit_id ?? null);
+      }
+      setReceivingPurpose(note.receiving_note_purpose != null ? String(note.receiving_note_purpose) : '');
+      setReceivingPurposeTitle(note.other_receiving_note_purpose_title ?? '');
+      setNonObligatedRecipient(!!note.non_obligated_recipient);
+      setWithoutDigitalTracking(!!note.without_digital_transport_tracking);
+      setToWeigh(!!note.to_weigh);
+      setPackagings(note.packagings ?? []);
+      setLines(note.items.map((it) => ({
+        warehouse_item_id: it.warehouse_item_id, product_id: it.product_id, description: it.description,
+        sku: it.sku, quantity: Number(it.quantity), unit: it.unit, source_line_number: it.source_line_number,
+      })));
     })();
-  }, [open, workspaceId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, workspaceId, noteId]);
 
   // Prefill the delivery address from the selected customer's main CRM address, and reset
   // any previously-chosen sub-unit (the picker re-adopts the new customer's default).
   useEffect(() => {
+    if (hydrating.current) { hydrating.current = false; return; }
     setToUnitId(null);
     if (!open || !customer) return;
     (async () => {
@@ -148,7 +190,27 @@ export const NewDeliveryNoteDialog: React.FC<{
     }
     setBusy(true);
     try {
-      const id = await deliveryNotesService.create(workspaceId, {
+      let id: string;
+      if (noteId) {
+        id = noteId;
+        await deliveryNotesService.updateDraft(noteId, {
+          customer_company_id: customer || null,
+          branch_code: parseInt(branchCode, 10) || 0,
+          notes, transport_date: transportDate, vehicle_number: vehicleNumber,
+          move_purpose: kind === 'dispatch' ? movePurpose : null,
+          receiving_note_purpose: kind === 'receipt' ? Number(receivingPurpose) : null,
+          other_receiving_note_purpose_title: kind === 'receipt' ? receivingPurposeTitle.trim() || null : null,
+          non_obligated_recipient: kind === 'dispatch' ? nonObligatedRecipient : false,
+          without_digital_transport_tracking: kind === 'dispatch' ? withoutDigitalTracking : false,
+          to_weigh: kind === 'dispatch' ? toWeigh : false,
+          packagings: kind === 'dispatch' ? packagings.filter((x) => x.quantity > 0) : [],
+          ship_from: [fromAddr.street, fromAddr.number].filter(Boolean).join(' '),
+          ship_to: [toAddr.street, toAddr.number].filter(Boolean).join(' '),
+          ship_from_street: fromAddr.street, ship_from_number: fromAddr.number, ship_from_postal: fromAddr.postal, ship_from_city: fromAddr.city,
+          ship_to_street: toAddr.street, ship_to_number: toAddr.number, ship_to_postal: toAddr.postal, ship_to_city: toAddr.city,
+          ship_to_address_unit_id: toUnitId,
+        }, lines);
+      } else id = await deliveryNotesService.create(workspaceId, {
         kind, customerCompanyId: customer || null, branchCode: parseInt(branchCode, 10) || 0, notes, lines,
         transportDate, vehicleNumber,
         // A receipt note states `receivingNotePurpose`; only a dispatch carries a move purpose.
@@ -175,7 +237,7 @@ export const NewDeliveryNoteDialog: React.FC<{
           await deliveryNotesService.issue(id);
         } catch (issErr: any) {
           /** The draft EXISTS (#351 C4). */
-          onCreated();
+          onCreated(id);
           onOpenChange(false);
           toast({
             title: 'Saved as a draft — NOT issued',
@@ -185,8 +247,8 @@ export const NewDeliveryNoteDialog: React.FC<{
           return;
         }
       }
-      toast({ title: issue ? 'Delivery note issued' : 'Draft saved' });
-      onCreated();
+      toast({ title: issue ? 'Delivery note issued' : editing ? 'Changes saved' : 'Draft saved' });
+      onCreated(id);
       onOpenChange(false);
     } catch (err: any) {
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
@@ -196,11 +258,20 @@ export const NewDeliveryNoteDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle className="flex items-center gap-2"><Truck className="h-4 w-4" /> New {kind === 'receipt' ? 'goods-receipt note' : 'delivery note'}</DialogTitle><DialogDescription className="sr-only">Create a delivery note or goods-receipt note.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle className="flex items-center gap-2"><Truck className="h-4 w-4" /> {editing ? 'Edit' : 'New'} {isReturn ? 'return to supplier' : kind === 'receipt' ? 'goods-receipt note' : 'delivery note'}</DialogTitle><DialogDescription className="sr-only">Create or edit a delivery note or goods-receipt note.</DialogDescription></DialogHeader>
+        {loadFailed ? (
+          <p className="py-6 text-sm text-destructive">This note could not be loaded, or it is no longer a draft — only a draft can be edited.</p>
+        ) : (
         <div className="space-y-5">
+          {isReturn && (
+            <p className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs text-muted-foreground">
+              Return to supplier: the supplier, the purpose (5 — Return) and the lines come from their invoice. You can change
+              quantities, remove lines, and edit transport and addresses.
+            </p>
+          )}
           <FormSection title="Document">
           <FormField label="Type">
-            <Select value={kind} onValueChange={(v: any) => setKind(v)}>
+            <Select value={kind} onValueChange={(v: any) => setKind(v)} disabled={editing}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="dispatch">Delivery note (dispatch · stock out)</SelectItem>
@@ -210,12 +281,12 @@ export const NewDeliveryNoteDialog: React.FC<{
           </FormField>
           <FormGrid>
             <FormField label={kind === 'receipt' ? 'Supplier' : 'Customer'} optional>
-              <Select value={customer} onValueChange={setCustomer}>
+              <Select value={customer} onValueChange={setCustomer} disabled={isReturn}>
                 <SelectTrigger><SelectValue placeholder="Select company…" /></SelectTrigger>
                 <SelectContent>{companies.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
               {/* Deliver to one of the customer's additional addresses (prefills the address below). */}
-              {customer && (
+              {customer && !isReturn && (
                 <AddressUnitSelect
                   companyId={customer}
                   value={toUnitId}
@@ -256,7 +327,7 @@ export const NewDeliveryNoteDialog: React.FC<{
             </FormField>
             {kind === 'dispatch' ? (
               <FormField label="Purpose">
-                <Select value={movePurpose} onValueChange={setMovePurpose}>
+                <Select value={movePurpose} onValueChange={setMovePurpose} disabled={isReturn}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {SELECTABLE_MOVE_PURPOSES.map((p) => (
@@ -389,7 +460,7 @@ export const NewDeliveryNoteDialog: React.FC<{
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label>Items</Label>
-              {addItemSelect}
+              {!isReturn && addItemSelect}
             </div>
             {lines.length === 0 ? (
               // The picker IS the way out of empty, so the empty state carries the same one
@@ -421,10 +492,11 @@ export const NewDeliveryNoteDialog: React.FC<{
           </FormField>
           </FormSection>
         </div>
+        )}
         <DialogFooter>
-          <Button variant="outline" onClick={() => submit(false)} disabled={busy}>Save draft</Button>
-          <Button onClick={() => submit(true)} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} Issue ({kind === 'receipt' ? 'add to stock' : 'decrement stock'})
+          <Button variant="outline" onClick={() => submit(false)} disabled={busy || loadFailed}>{editing ? 'Save changes' : 'Save draft'}</Button>
+          <Button onClick={() => submit(true)} disabled={busy || loadFailed}>
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {editing ? 'Save & issue' : 'Issue'} ({kind === 'receipt' ? 'add to stock' : 'decrement stock'})
           </Button>
         </DialogFooter>
       </DialogContent>
