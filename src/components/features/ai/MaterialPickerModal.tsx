@@ -747,7 +747,7 @@ export const MaterialPickerModal: React.FC<MaterialPickerModalProps> = ({
         const results = (res.data.results as any[]).map(toPickedMaterial);
         setSearchResults(results);
         // Show AI fallback if no results or top score below 0.65
-        const topScore = res.data.results[0]?.combined_score ?? res.data.results[0]?.similarity ?? 0;
+        const topScore = res.data.results[0]?.score ?? 0;
         if (results.length === 0 || topScore < 0.65) {
           setShowAiFallback(true);
         }
