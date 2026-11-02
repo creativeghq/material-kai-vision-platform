@@ -1853,6 +1853,8 @@ const RUN_EDGE_FUNCTION_ALLOWED = new Set<string>([
   // PDF and links AADE's verification page — everything the generic `send_email` node could not,
   // which is why those flows used to mail a bare "your invoice has been issued" with nothing in it.
   'finance-send-invoice-email',
+  // The seeded credit note / delivery note / order "… → Email" flows.
+  'finance-send-document-email',
 ]);
 
 const MAX_FLOW_RUNS_PER_MINUTE = 120;
@@ -2117,6 +2119,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // flow with attacker-chosen data (e.g. fake "invoice_paid" / "role_upgrade_approved" to any recipient).
 const SERVER_ONLY_EVENTS = new Set<string>([
   'invoice_paid', 'invoice_issued', 'receipt_issued',
+  'credit_note_issued', 'delivery_note_issued', 'sales_order_confirmed', 'purchase_order_confirmed',
   'stripe_payment_succeeded', 'stripe_payment_failed',
   'role_upgrade_approved', 'role_upgrade_rejected', 'role_upgrade_request_submitted',
   'finance_follow_up', 'finance_document_requested', 'module_access_requested',

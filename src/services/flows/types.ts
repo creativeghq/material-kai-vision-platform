@@ -97,6 +97,10 @@ export type TriggerType =
   // Finance documents: a tax invoice / retail receipt was issued, or a payment was received
   | 'invoice_issued'
   | 'receipt_issued'
+  | 'credit_note_issued'
+  | 'delivery_note_issued'
+  | 'sales_order_confirmed'
+  | 'purchase_order_confirmed'
   | 'payment_received'
   | 'payment_reversed'
   | 'payment_sent'
@@ -404,6 +408,10 @@ export interface PricingChangeDecidedTriggerConfig {}
 export interface FinanceDocumentRequestedTriggerConfig {}
 export interface InvoiceIssuedTriggerConfig {}
 export interface ReceiptIssuedTriggerConfig {}
+export interface CreditNoteIssuedTriggerConfig {}
+export interface DeliveryNoteIssuedTriggerConfig {}
+export interface SalesOrderConfirmedTriggerConfig {}
+export interface PurchaseOrderConfirmedTriggerConfig {}
 export interface PaymentReceivedTriggerConfig {}
 /** Refund or chargeback. Emitted by stripe-webhooks. */
 export interface PaymentReversedTriggerConfig {}
@@ -615,6 +623,10 @@ export type TriggerConfigMap = {
   finance_document_requested: FinanceDocumentRequestedTriggerConfig;
   invoice_issued: InvoiceIssuedTriggerConfig;
   receipt_issued: ReceiptIssuedTriggerConfig;
+  credit_note_issued: CreditNoteIssuedTriggerConfig;
+  delivery_note_issued: DeliveryNoteIssuedTriggerConfig;
+  sales_order_confirmed: SalesOrderConfirmedTriggerConfig;
+  purchase_order_confirmed: PurchaseOrderConfirmedTriggerConfig;
   payment_received: PaymentReceivedTriggerConfig;
   payment_reversed: PaymentReversedTriggerConfig;
   payment_sent: PaymentSentTriggerConfig;

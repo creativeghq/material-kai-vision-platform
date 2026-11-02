@@ -1064,7 +1064,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "Email a credit note or delivery note to its party, PDF attached, with its online link",
+    "summary": "Email a credit note, delivery note or order to its party, with its online link",
     "description": "Resolves the recipient from the document's party (a credit note's credited invoice customer; a delivery note's company or contact), attaches the PDF, links the online copy (/d/:token, minted on first send) and the AADE verification URL, and dispatches via email-api from the workspace's own sender. Drafts are refused. Caller needs finance.operate (or warehouse.manage for a delivery note); a mismatc",
     "fields": {
       "credit_note_id": {
@@ -1074,6 +1074,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "delivery_note_id": {
         "type": "string",
         "description": "Delivery note to email. (string (uuid))"
+      },
+      "order_id": {
+        "type": "string",
+        "description": "Sales order (to the customer) or purchase order (to the supplier) to email. Link only, no PDF. (string (uuid))"
       },
       "to": {
         "type": "string",

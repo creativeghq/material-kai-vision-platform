@@ -49,7 +49,12 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
       email = c?.email ?? null; name = c?.name ?? '';
     }
   }
-  if (!email) return json({ ok: false, error: 'No customer email on file. Add one in CRM or pass "to".' }, 422);
+  if (!email) {
+    // The seeded flow calls this for every issued invoice; a customer with no address is a skip, not a failed run.
+    return internal
+      ? json({ ok: true, skipped: 'no_recipient_email' })
+      : json({ ok: false, error: 'No customer email on file. Add one in CRM or pass "to".' }, 422);
+  }
 
   const { data: fs } = await supabase.from('finance_settings').select('business_name').eq('workspace_id', inv.workspace_id).maybeSingle();
   const sender = fs?.business_name || 'our company';

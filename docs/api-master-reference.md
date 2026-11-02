@@ -113,7 +113,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `finance-mydata-send` | JWT / kai_* | Transmits an expense document you recorded here straight to myDATA |
 | `finance-pay-invoice` | JWT / kai_* / token / public | Create a Stripe Checkout session or pay-link for an invoice |
 | `finance-reminders-cron` | cron | Cron: emit planned-payment and VAT-return-ready flow events. |
-| `finance-send-document-email` | JWT | Email a credit note or delivery note to its party, PDF attached, with its online link |
+| `finance-send-document-email` | JWT | Email a credit note, delivery note or order to its party, with its online link |
 | `finance-send-invoice-email` | JWT / kai_* | Email an invoice to its customer with optional PDF attachment |
 | `finance-send-payment` | JWT / kai_* | Instruct a real bank transfer from a workspace account to a counterparty |
 | `finance-send-statement` | JWT / kai_* / cron | Render and email a party account-statement PDF (ledger / Καρτέλα) |

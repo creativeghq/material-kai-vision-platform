@@ -19,7 +19,7 @@ import {
   BatteryLow,
   UserMinus,
   Timer,
-  Wrench, AlarmClock, ShieldCheck, Coins, ReceiptText, MessagesSquare, PhoneOff, Link2, Unlink, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck, CalendarClock} from 'lucide-react';
+  Wrench, AlarmClock, ShieldCheck, Coins, ReceiptText, MessagesSquare, PhoneOff, Link2, Unlink, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck, CalendarClock, FileMinus, ClipboardList} from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
 const triggerIcons: Record<TriggerType, React.ElementType> = {
@@ -89,6 +89,10 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   finance_document_requested: ClipboardCheck,
   invoice_issued: FileText,
   receipt_issued: FileCheck,
+  credit_note_issued: FileMinus,
+  delivery_note_issued: Truck,
+  sales_order_confirmed: ClipboardCheck,
+  purchase_order_confirmed: ClipboardList,
   payment_received: CheckCircle2,
   payment_reversed: Undo2,
   payment_sent: CheckCircle2,
