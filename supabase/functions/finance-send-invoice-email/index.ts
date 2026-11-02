@@ -65,8 +65,7 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   // customer was being sent to a copy of the document we never surface. No AADE URL, no link.
   const qr = inv.fiscal_aade_qr_url ? `<p style="margin:12px 0"><a href="${inv.fiscal_aade_qr_url}" style="color:#7a1f5c">Verify on myDATA (government) »</a></p>` : '';
 
-  // Pay / view-online link → the hosted /pay/{token} page (pay online or just view).
-  // The PDF step above mints a token when the invoice is payable; reuse it, mint as fallback.
+  // The online copy (#527): every invoice carries it, and it doubles as the pay page while money is owed.
   let payLinkHtml = '';
   // The bare URL as well as the rendered button: a workspace template composes its own call to
   // action, and it can only do that if it gets the address rather than our markup. (It could not
@@ -74,20 +73,12 @@ Deno.serve(withApiLogging('finance-send-invoice-email', async (req) => {
   // a tenant-authored template from being an HTML injection point.)
   let payUrl = '';
   try {
-    if (Number(inv.amount_due ?? 0) > 0.005 && inv.status !== 'void' && inv.status !== 'credit_noted') {
-      const { data: fresh } = await supabase.from('invoices')
-        .select('pay_token, pay_token_expires_at').eq('id', invoice_id).maybeSingle();
-      let token: string | null = fresh?.pay_token ?? inv.pay_token ?? null;
-      const exp = fresh?.pay_token_expires_at ? new Date(fresh.pay_token_expires_at) : null;
-      if (!token || (exp && exp.getTime() < Date.now())) {
-        const { data: tk } = await supabase.rpc('mint_invoice_pay_token', { p_invoice_id: invoice_id, p_ttl_days: 90 });
-        if (tk) token = tk as string;
-      }
-      if (token) {
-        const base = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
-        payUrl = `${base}/pay/${token}`;
-        payLinkHtml = `<p style="margin:18px 0"><a href="${payUrl}" style="display:inline-block;background:#7a1f5c;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:999px;font-weight:600">View / Pay online »</a></p>`;
-      }
+    const { data: token } = await supabase.rpc('mint_document_share_token', { p_kind: 'invoice', p_id: invoice_id });
+    if (token) {
+      const base = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/$/, '');
+      payUrl = `${base}/pay/${token}`;
+      const payable = Number(inv.amount_due ?? 0) > 0.005 && inv.status !== 'void' && inv.status !== 'credit_noted';
+      payLinkHtml = `<p style="margin:18px 0"><a href="${payUrl}" style="display:inline-block;background:#7a1f5c;color:#ffffff;text-decoration:none;padding:10px 20px;border-radius:4px;font-weight:600">${payable ? 'View / Pay online' : 'View online'} »</a></p>`;
     }
   } catch (e) {
     console.warn('pay link skipped', e);

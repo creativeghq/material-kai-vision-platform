@@ -80,6 +80,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   // flow it answers 401/404 rather than moving money on nobody's authority. That is the intended
   // outcome — an irreversible transfer is not a thing an automation should fire unattended.
   { id: 'finance-send-payment', label: 'finance-send-payment', sublabel: 'Instruct a real bank transfer (Revolut/Viva) — requires a signed-in finance manager' },
+  { id: 'finance-send-document-email', label: 'finance-send-document-email', sublabel: 'Email a credit note or delivery note to its party, PDF attached, with its online link' },
   { id: 'finance-send-invoice-email', label: 'finance-send-invoice-email', sublabel: 'Email an invoice to its customer with optional PDF attachment' },
   { id: 'finance-send-statement', label: 'finance-send-statement', sublabel: 'Render and email a party account-statement PDF (ledger / Καρτέλα)' },
   { id: 'finance-storefront', label: 'finance-storefront', sublabel: 'Public online storefront: browse products and submit cart checkout' },
@@ -138,6 +139,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'product-datasheet-pdf', label: 'product-datasheet-pdf', sublabel: 'Branded technical datasheet for one product, as a PDF' },
   { id: 'product-document-url', label: 'product-document-url', sublabel: "Signed, short-lived link to the original file behind a product's knowledge doc or certificate" },
   { id: 'product-market-price', label: 'product-market-price', sublabel: 'What a catalogue product is worth on the open market' },
+  { id: 'public-document', label: 'public-document', sublabel: 'Public token-based online copy of an invoice, credit note, delivery note or order' },
   { id: 'public-price', label: 'public-price', sublabel: 'Open market-price lookup: the band, and the one to show' },
   { id: 'product-feed', label: 'product-feed', sublabel: "Serves a workspace's product catalogue as an XML feed for a marketplace importer." },
   { id: 'products-3d-api', label: 'products-3d-api', sublabel: 'Public product + 3D model read for the website embed SDK (embed-key authenticated)' },

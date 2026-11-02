@@ -1795,6 +1795,40 @@
     "response": "{ok, checkout_url, session_id, invoice_id, pay_link?, pay_token?, amount?, currency?, customer_display?}"
   },
   {
+    "name": "finance-send-document-email",
+    "tag": "Finance",
+    "summary": "Email a credit note or delivery note to its party, PDF attached, with its online link",
+    "description": "Resolves the recipient from the document's party (a credit note's credited invoice customer; a delivery note's company or contact), attaches the PDF, links the online copy (/d/:token, minted on first send) and the AADE verification URL, and dispatches via email-api from the workspace's own sender. Drafts are refused. Caller needs finance.operate (or warehouse.manage for a delivery note); a mismatch answers 404.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": [
+      {
+        "name": "credit_note_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Credit note to email. One of credit_note_id / delivery_note_id is required."
+      },
+      {
+        "name": "delivery_note_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "Delivery note to email."
+      },
+      {
+        "name": "to",
+        "type": "string (email)",
+        "required": false,
+        "desc": "Override recipient email; defaults to the party's email in CRM."
+      }
+    ],
+    "response": "{ok, sent_to}"
+  },
+  {
     "name": "finance-send-invoice-email",
     "tag": "Finance",
     "summary": "Email an invoice to its customer with optional PDF attachment",

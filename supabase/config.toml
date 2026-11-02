@@ -131,6 +131,9 @@ verify_jwt = false
 [functions.finance-send-invoice-email]
 verify_jwt = false
 
+[functions.finance-send-document-email]
+verify_jwt = false
+
 [functions.finance-fiscal-offline-recovery]
 verify_jwt = false
 

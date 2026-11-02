@@ -353,6 +353,11 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       const due = Number(pre.amount_due ?? 0);
       const pct = pre.deposit_pct != null ? Number(pre.deposit_pct) : null;
       const untouched = due >= total - 0.005;
+      const [{ data: accounts }, { data: biz }] = await Promise.all([
+        supabase.from('finance_bank_accounts').select('name, kind, iban, account_ref')
+          .eq('workspace_id', quote.workspace_id).eq('is_active', true).eq('show_on_invoice', true).order('sort_order'),
+        supabase.from('finance_settings').select('business_name').eq('workspace_id', quote.workspace_id).maybeSingle(),
+      ]);
       payable = {
         pay_token: pre.pay_token,
         number: pre.internal_number ?? '',
@@ -361,6 +366,8 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
         amount_due: due,
         deposit_pct: pct,
         deposit_amount: pct && untouched ? Math.round(total * pct) / 100 : null,
+        beneficiary: biz?.business_name ?? null,
+        bank_accounts: (accounts ?? []).map((a: any) => ({ name: a.name, kind: a.kind, iban: a.iban ?? null, account_ref: a.account_ref ?? null })),
       };
     }
   }

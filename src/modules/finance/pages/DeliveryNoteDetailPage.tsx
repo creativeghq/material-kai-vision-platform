@@ -242,6 +242,7 @@ export const DeliveryNoteDetailPage: React.FC = () => {
             <CustomerLinkPanel
               kind="delivery_note"
               id={note.id}
+              workspaceId={note.workspace_id}
               label={`Delivery note ${note.delivery_note_number ?? ''}`.trim()}
               title={isReturn ? 'Supplier link' : 'Customer link'}
             />

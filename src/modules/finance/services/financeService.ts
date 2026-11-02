@@ -863,6 +863,13 @@ const _financeServiceCore = {
     return { data, error };
   },
 
+  async sendDocumentEmail(kind: 'credit_note' | 'delivery_note', id: string, to?: string): Promise<{ sent_to: string }> {
+    const { data, error } = await supabase.functions.invoke('finance-send-document-email', { body: { [`${kind}_id`]: id, to } });
+    if (error) { const { code, message } = await unwrapEmailSendError(error); throw new EmailSendError(message, (code as any) ?? 'unknown'); }
+    if (data?.ok === false) throw new Error(data.error ?? 'Email not sent');
+    return { sent_to: data?.sent_to };
+  },
+
   /** Render (or fetch cached) the customer-facing invoice PDF. Returns a 7-day signed URL. */
   async generateInvoicePdf(invoiceId: string, regenerate = false): Promise<{ pdf_url: string | null; pdf_storage_path: string | null }> {
     const { data, error } = await supabase.functions.invoke('finance-invoice-pdf', { body: { invoice_id: invoiceId, regenerate } });
@@ -4212,30 +4219,6 @@ const _financeServiceV2 = {
   },
 
   // -------- Stripe pay link / checkout --------
-
-  /**
-   * Admin-side: mint a public pay token + (optionally) create a Stripe Checkout session.
-   * Returns the public pay link in either case; checkout_url is null when link_only=true.
-   */
-  async getInvoicePayLink(invoiceId: string, opts: { linkOnly?: boolean; successUrl?: string; cancelUrl?: string } = {}): Promise<{
-    pay_link: string;
-    pay_token: string;
-    invoice_id: string;
-    checkout_url: string | null;
-    session_id: string | null;
-  }> {
-    const { data, error } = await supabase.functions.invoke('finance-pay-invoice', {
-      body: {
-        invoice_id: invoiceId,
-        link_only: opts.linkOnly === true,
-        success_url: opts.successUrl,
-        cancel_url: opts.cancelUrl,
-      },
-    });
-    if (error) throw await edgeError(error);
-    if ((data as any)?.error) throw new Error((data as any).error);
-    return data as any;
-  },
 
   /**
    * Customer-self path: an authenticated user (the invoice's customer) creates a

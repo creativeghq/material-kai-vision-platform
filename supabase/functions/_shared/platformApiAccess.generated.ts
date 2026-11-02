@@ -85,6 +85,7 @@ export const PLATFORM_API_CONFIRM: readonly BlockedEndpoint[] = [
   },
   // Reaches a customer or the public.
   { name: 'finance-send-invoice-email', reason: 'Sends an email to the customer named on the invoice.' },
+  { name: 'finance-send-document-email', reason: 'Sends a credit note or delivery note by email to its party.' },
   { name: 'finance-send-statement', reason: 'Emails a customer their account statement.' },
   { name: 'send-quote-email', reason: 'Emails the quote out to its recipient.' },
   { name: 'catalog-send-to-customers', reason: 'Sends a catalog to a list of CRM recipients.' },

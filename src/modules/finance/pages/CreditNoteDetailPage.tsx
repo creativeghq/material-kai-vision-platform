@@ -255,7 +255,7 @@ export const CreditNoteDetailPage: React.FC = () => {
               await load();
             })}
           />
-          <CustomerLinkPanel kind="credit_note" id={cn.id} label={`Credit note ${cn.credit_note_number ?? ''}`.trim()} />
+          <CustomerLinkPanel kind="credit_note" id={cn.id} workspaceId={cn.workspace_id} label={`Credit note ${cn.credit_note_number ?? ''}`.trim()} />
         </>
       }
       left={

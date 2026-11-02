@@ -70,7 +70,7 @@ describe('the public pay page states the filed facts', () => {
 
   it('renders them in all three states, each with our own PDF', () => {
     const page = read('src/pages/PayInvoicePage.tsx');
-    expect((page.match(/<FiscalRecordPanel fiscal=\{fiscal\} \/>/g) ?? []).length).toBe(3);
+    expect((page.match(/<AadeRecordPanel fiscal=\{fiscal\} \/>/g) ?? []).length).toBe(3);
     expect((page.match(/\{downloadButton\}/g) ?? []).length).toBe(3);
   });
 
@@ -78,7 +78,7 @@ describe('the public pay page states the filed facts', () => {
     const fn = read('supabase/functions/finance-pay-invoice/index.ts');
     expect(fn).toMatch(/JSON\.stringify\(\{ invoice_id: row\.invoice_id \}\)/);
     const pdf = read('supabase/functions/finance-invoice-pdf/index.ts');
-    expect(pdf).toMatch(/\(kind === 'invoice' && isServiceRoleRequest\(req\)\)/);
-    expect(pdf).not.toMatch(/kind === 'invoice' && isCronAuthorized/);
+    expect(pdf).toMatch(/\(kind !== 'payment_receipt' && isServiceRoleRequest\(req\)\)/);
+    expect(pdf).not.toMatch(/kind !== 'payment_receipt' && isCronAuthorized/);
   });
 });

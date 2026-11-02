@@ -86,6 +86,8 @@ export default function PublicQuotePage() {
   const [payable, setPayable] = useState<{
     pay_token: string; number: string; currency: string;
     total: number; amount_due: number; deposit_pct: number | null; deposit_amount: number | null;
+    beneficiary?: string | null;
+    bank_accounts?: Array<{ name: string; kind: string; iban: string | null; account_ref: string | null }>;
   } | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -343,6 +345,18 @@ export default function PublicQuotePage() {
                     ? `Pay deposit ${money(payable.deposit_amount, payable.currency)}`
                     : `Pay ${money(payable.amount_due, payable.currency)}`}
                 </Button>
+                {(payable.bank_accounts?.length ?? 0) > 0 && (
+                  <div className="space-y-1 border-t border-hairline pt-3 text-xs">
+                    <div className="font-medium">Or pay by bank transfer</div>
+                    {payable.beneficiary && <div className="text-muted-foreground">Beneficiary: {payable.beneficiary}</div>}
+                    {payable.bank_accounts!.map((a) => (
+                      <div key={`${a.name}-${a.iban ?? a.account_ref}`} className="text-muted-foreground">
+                        {a.name}: <span className="font-mono text-foreground">{a.iban ?? a.account_ref ?? '—'}</span>
+                      </div>
+                    ))}
+                    <div className="text-muted-foreground">Reference: <span className="font-mono text-foreground">{payable.number}</span></div>
+                  </div>
+                )}
               </Card>
             )}
           </div>
