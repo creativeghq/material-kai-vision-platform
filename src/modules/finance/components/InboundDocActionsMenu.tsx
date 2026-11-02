@@ -199,7 +199,16 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             {busy || docBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
+        {/* Always opens downward; when the row sits low, the menu scrolls inside the space left
+            rather than flipping up over the rows above. */}
+        <DropdownMenuContent
+          align="end"
+          side="bottom"
+          avoidCollisions={false}
+          collisionPadding={8}
+          className="w-56 max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
+        >
           <DropdownMenuItem onClick={() => setPreviewOpen(true)}>
             <Eye className="h-4 w-4 mr-2" /> Preview
           </DropdownMenuItem>
@@ -250,17 +259,11 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           >
             <PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse
           </DropdownMenuItem>
-          {/* The reason is printed, not a `title`: a disabled item takes no pointer events. */}
           <DropdownMenuItem
             onClick={onReturnToSupplier}
             disabled={!onReturnToSupplier || returnBlockedReason !== null}
-            className="items-start"
           >
-            <PackageMinus className="h-4 w-4 mr-2 mt-0.5" />
-            <span>
-              Return to supplier&hellip;
-              {returnBlockedReason && <span className="block text-[10px] text-muted-foreground">{returnBlockedReason}</span>}
-            </span>
+            <PackageMinus className="h-4 w-4 mr-2" /> Return to supplier&hellip;
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
@@ -299,7 +302,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             <Send className="h-4 w-4 mr-2" /> Pay it now&hellip;
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onRecordPayment} disabled={!canPay}>
-            <Wallet className="h-4 w-4 mr-2" /> Record a payment already made
+            <Wallet className="h-4 w-4 mr-2" /> Record Payment
           </DropdownMenuItem>
           {/* Viewing is read-only, so it stays available even for a dismissed document — the
               money that moved is still a fact worth reading back. */}
