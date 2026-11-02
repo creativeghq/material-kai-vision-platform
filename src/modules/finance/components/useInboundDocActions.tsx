@@ -122,6 +122,7 @@ export function useInboundDocActions({
       workspaceId={workspaceId as string}
       busy={busyId === doc.id}
       crmCompanyId={crmCompanyIdFor?.(doc)}
+      onPreview={() => setPreviewDoc(doc)}
       // Recording a payment is ONE act with ONE form, preset to this document. Whether an expense
       // exists yet is our bookkeeping, not the operator's question: if it does the payment settles
       // it, if it doesn't the document is converted on save. Opening never writes either way.
@@ -161,6 +162,7 @@ export function useInboundDocActions({
           doc={previewDoc}
           open
           onOpenChange={(v) => { if (!v) setPreviewDoc(null); }}
+          actions={renderActions(previewDoc)}
         />
       )}
       {billOrderDoc && (

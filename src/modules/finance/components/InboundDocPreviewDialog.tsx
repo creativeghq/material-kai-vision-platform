@@ -69,7 +69,9 @@ export const InboundDocPreviewDialog: React.FC<{
   doc: InboundDocument;
   open: boolean;
   onOpenChange: (v: boolean) => void;
-}> = ({ doc, open, onOpenChange }) => {
+  /** The row's ⋮ menu, shown just left of the close button. */
+  actions?: React.ReactNode;
+}> = ({ doc, open, onOpenChange, actions }) => {
   /**
    * Hydrate the TOASTed columns on open. The list query no longer selects `lines` / `raw` /
    * `delivery_addresses` — detoasting them for every row cost ~1 s per list paint to render a
@@ -153,7 +155,8 @@ export const InboundDocPreviewDialog: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[88vh] overflow-y-auto">
-        <DialogHeader>
+        {actions && <div className="absolute right-11 top-2.5">{actions}</div>}
+        <DialogHeader className={actions ? 'pr-16' : undefined}>
           <DialogTitle>AADE Document Preview</DialogTitle>
           <DialogDescription>
             The received document as the tax authority holds it — read-only.

@@ -19,7 +19,6 @@ import {
 import { AddIssuerToCrmDialog } from '@/modules/finance/components/AddIssuerToCrmDialog';
 import type { InboundDocument } from '@/modules/finance/services/inboundService';
 import { docFamily, isCancelledDocument, isDuplicateTransmission, isPayrollDocument, needsLineDetail } from '@/modules/finance/utils/inboundProvenance';
-import { InboundDocPreviewDialog } from '@/modules/finance/components/InboundDocPreviewDialog';
 
 interface Props {
   doc: InboundDocument;
@@ -28,6 +27,8 @@ interface Props {
   /** Set when the issuer's ΑΦΜ already matches a CRM company — the row resolved it, so the
    *  "add" action is offered as already-done rather than letting a duplicate be started. */
   crmCompanyId?: string;
+  /** Open the read-only AADE preview — hosted by the hook, so it can carry this same menu. */
+  onPreview: () => void;
   /**
    * Open the Record Payment form preset to this document. Opening must never WRITE — in
    * particular it must not convert the document into an expense; that happens when the form
@@ -67,7 +68,7 @@ interface Props {
   onChanged?: () => void;
 }
 
-export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onRecordPayment, onSendPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onReturnToSupplier, onAddLineDetail, onDismiss, onSettle, onUnsettle, onChanged }) => {
+export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy, crmCompanyId, onPreview, onRecordPayment, onSendPayment, onCreateOrder, hasOrder, onBillExistingOrder, onOpenPayments, onReceiveStock, onReturnToSupplier, onAddLineDetail, onDismiss, onSettle, onUnsettle, onChanged }) => {
   const settledOutside = !!(doc as { settled_outside_at?: string | null }).settled_outside_at;
   const navigate = useNavigate();
 
@@ -135,9 +136,6 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
             : !inCrm
               ? 'Add the issuer to CRM first.'
               : null;
-
-  // Read-only view of the document exactly as AADE holds it.
-  const [previewOpen, setPreviewOpen] = useState(false);
 
   // ---- Add issuer → CRM supplier ----
   // The dedupe probe, the research chain and the write all live in the shared dialog, so this row
@@ -209,7 +207,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           className="w-56 max-h-[var(--radix-dropdown-menu-content-available-height)] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
-          <DropdownMenuItem onClick={() => setPreviewOpen(true)}>
+          <DropdownMenuItem onClick={onPreview}>
             <Eye className="h-4 w-4 mr-2" /> Preview
           </DropdownMenuItem>
           {doc.document_path && (
@@ -328,8 +326,6 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           )}
         </DropdownMenuContent>
       </DropdownMenu>
-
-      <InboundDocPreviewDialog doc={doc} open={previewOpen} onOpenChange={setPreviewOpen} />
 
       {/* Add issuer → CRM supplier. Navigates on success, as it always has: this menu acts on
           ONE document, so landing on the record just created is the end of the errand. */}
