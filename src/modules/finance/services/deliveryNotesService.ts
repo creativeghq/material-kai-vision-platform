@@ -96,11 +96,12 @@ export const deliveryNotesService = {
   },
 
   async listWarehouse(workspaceId: string): Promise<WarehousePick[]> {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('warehouse_items')
       .select('id, name, sku, unit, qty_on_hand, product_id')
       .eq('workspace_id', workspaceId)
       .order('name', { ascending: true });
+    if (error) throw error;
     return (data ?? []) as WarehousePick[];
   },
 

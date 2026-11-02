@@ -123,14 +123,18 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   /** Already a CRM company — adding again would only make a duplicate to merge later. */
   const inCrm = !!crmCompanyId;
   const returnBlockedReason = isCancelled
-    ? voidWhy
-    : isPayroll || docFamily(doc.doc_type) === '5'
-      ? 'Only a purchase can be returned.'
-      : needsDetail
-        ? 'This document has no itemised lines yet — add the detail first.'
-        : !inCrm
-          ? 'Add the issuer to CRM first — the return note is addressed to them.'
-          : null;
+    ? 'Void at AADE — nothing was delivered.'
+    : doc.status === 'dismissed'
+      ? 'Dismissed — undismiss it first.'
+      : doc.status === 'unconfirmed'
+        ? 'Confirm the document first.'
+        : isPayroll || docFamily(doc.doc_type) === '5'
+          ? 'Only a purchase can be returned.'
+          : needsDetail
+            ? 'No itemised lines — add the detail first.'
+            : !inCrm
+              ? 'Add the issuer to CRM first.'
+              : null;
 
   // Read-only view of the document exactly as AADE holds it.
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -246,13 +250,17 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           >
             <PackagePlus className="h-4 w-4 mr-2" /> Receive into warehouse
           </DropdownMenuItem>
-          {/* The return note is addressed to the issuer, so they must be a CRM party first. */}
+          {/* The reason is printed, not a `title`: a disabled item takes no pointer events. */}
           <DropdownMenuItem
             onClick={onReturnToSupplier}
             disabled={!onReturnToSupplier || returnBlockedReason !== null}
-            title={returnBlockedReason ?? undefined}
+            className="items-start"
           >
-            <PackageMinus className="h-4 w-4 mr-2" /> Return to supplier&hellip;
+            <PackageMinus className="h-4 w-4 mr-2 mt-0.5" />
+            <span>
+              Return to supplier&hellip;
+              {returnBlockedReason && <span className="block text-[10px] text-muted-foreground">{returnBlockedReason}</span>}
+            </span>
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />

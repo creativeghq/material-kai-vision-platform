@@ -81,7 +81,7 @@ export const NewDeliveryNoteDialog: React.FC<{
     (async () => {
       const [{ data: cos }, wh, { data: fs }, br] = await Promise.all([
         supabase.from('crm_companies').select('id, name').eq('workspace_id', workspaceId).order('name').limit(500),
-        deliveryNotesService.listWarehouse(workspaceId),
+        deliveryNotesService.listWarehouse(workspaceId).catch(() => [] as WarehousePick[]),
         supabase.from('finance_settings').select('business_address, business_street_number, business_postal_code, business_city').eq('workspace_id', workspaceId).maybeSingle(),
         invoicingSetupService.listBranches(workspaceId).catch(() => [] as FinanceBranch[]),
       ]);

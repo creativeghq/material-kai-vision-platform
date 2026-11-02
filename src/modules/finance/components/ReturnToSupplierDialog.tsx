@@ -26,12 +26,26 @@ const NO_STOCK = '__none';
 
 interface RowState { include: boolean; qty: string; itemId: string }
 
-/** Most that may go back on this line from the chosen stock item; null = uncapped. */
-function capFor(line: SupplierReturnLine, itemId: string): number | null {
+const docUnitOf = (l: SupplierReturnLine) => unitFromMydataCode(Number(l.measurement_unit));
+
+/**
+ * The note states the INVOICE's quantity and issuing takes that same number out of stock, so a
+ * stock item counted in another unit (boxes invoiced, m² stocked) can never be linked.
+ */
+const sameUnit = (l: SupplierReturnLine, unit: string | null | undefined) => {
+  const doc = docUnitOf(l);
+  return !doc || !unit || normalizeUnit(doc) === normalizeUnit(unit);
+};
+
+/** Most that may go back: invoiced − returned, received here − returned, and what is on hand now. */
+function capFor(line: SupplierReturnLine, itemId: string, warehouse: WarehousePick[]): number | null {
+  const caps: number[] = [];
+  if (line.returnable != null) caps.push(line.returnable);
   const fromStock = line.stock.find((s) => s.item_id === itemId);
-  const stockLeft = fromStock ? Math.max(fromStock.received - fromStock.returned, 0) : null;
-  if (line.returnable == null) return stockLeft;
-  return stockLeft == null ? line.returnable : Math.min(line.returnable, stockLeft);
+  if (fromStock) caps.push(fromStock.received - fromStock.returned, fromStock.on_hand);
+  const picked = !fromStock ? warehouse.find((w) => w.id === itemId) : undefined;
+  if (picked) caps.push(Number(picked.qty_on_hand ?? 0));
+  return caps.length ? Math.max(Math.min(...caps), 0) : null;
 }
 
 export const ReturnToSupplierDialog: React.FC<{
@@ -45,6 +59,7 @@ export const ReturnToSupplierDialog: React.FC<{
   const [lines, setLines] = useState<SupplierReturnLine[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [warehouse, setWarehouse] = useState<WarehousePick[]>([]);
+  const [warehouseFailed, setWarehouseFailed] = useState(false);
   const [rows, setRows] = useState<Record<number, RowState>>({});
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -52,26 +67,31 @@ export const ReturnToSupplierDialog: React.FC<{
 
   useEffect(() => {
     let live = true;
-    Promise.all([
-      inboundService.supplierReturnLines(doc.id),
-      deliveryNotesService.listWarehouse(workspaceId).catch(() => [] as WarehousePick[]),
-    ])
-      .then(([ls, wh]) => {
-        if (!live) return;
-        setLines(ls);
-        setWarehouse(wh);
-        const init: Record<number, RowState> = {};
-        for (const l of ls) {
-          // The item it came in through is the item it goes out of; a line never received here
-          // moves no stock unless the operator names one (it may have arrived on the order).
-          const source = l.stock.find((s) => s.received - s.returned > 0) ?? l.stock[0];
-          const itemId = source?.item_id ?? NO_STOCK;
-          const cap = capFor(l, itemId);
-          init[l.line_number] = { include: ls.length === 1, qty: cap != null ? String(cap) : '', itemId };
-        }
-        setRows(init);
-      })
-      .catch(() => { if (live) setFailed(true); });
+    void (async () => {
+      let ls: SupplierReturnLine[];
+      try { ls = await inboundService.supplierReturnLines(doc.id); }
+      catch { if (live) setFailed(true); return; }
+      // Only a line never received from THIS document needs the whole warehouse to pick from.
+      let wh: WarehousePick[] = [];
+      if (ls.some((l) => l.stock.length === 0)) {
+        try { wh = await deliveryNotesService.listWarehouse(workspaceId); }
+        catch { if (live) setWarehouseFailed(true); }
+      }
+      if (!live) return;
+      setLines(ls);
+      setWarehouse(wh);
+      const init: Record<number, RowState> = {};
+      for (const l of ls) {
+        // The item it came in through is the item it goes out of; a line never received here
+        // moves no stock unless the operator names one (it may have arrived on the order).
+        const source = l.stock.find((s) => sameUnit(l, s.unit) && s.received - s.returned > 0);
+        const itemId = source?.item_id ?? NO_STOCK;
+        const cap = capFor(l, itemId, wh);
+        const exhausted = l.returnable != null && l.returnable <= 0;
+        init[l.line_number] = { include: ls.length === 1 && !exhausted, qty: cap != null ? String(cap) : '', itemId };
+      }
+      setRows(init);
+    })();
     return () => { live = false; };
   }, [doc.id, workspaceId]);
 
@@ -85,12 +105,12 @@ export const ReturnToSupplierDialog: React.FC<{
       const r = rows[l.line_number];
       if (!r?.include) continue;
       const qty = parseDecimalOr(r.qty, 0);
-      const cap = capFor(l, r.itemId);
+      const cap = capFor(l, r.itemId, warehouse);
       if (qty <= 0) out.push(`Line ${l.line_number}: enter a quantity.`);
       else if (cap != null && qty > cap + 1e-6) out.push(`Line ${l.line_number}: at most ${cap} can go back.`);
     }
     return out;
-  }, [lines, rows]);
+  }, [lines, rows, warehouse]);
   const picked = (lines ?? []).filter((l) => rows[l.line_number]?.include);
 
   const goToDraft = () => navigate(financeTabUrl(FINANCE_TAB.deliveryNotes));
@@ -108,7 +128,7 @@ export const ReturnToSupplierDialog: React.FC<{
           line_number: l.line_number,
           quantity: parseDecimalOr(r.qty, 0),
           warehouse_item_id: item,
-          unit: stockUnit ?? unitFromMydataCode(Number(l.measurement_unit)) ?? null,
+          unit: docUnitOf(l) ?? stockUnit ?? null,
         };
       });
       await inboundService.createSupplierReturnDraft(doc.id, payload, reason.trim());
@@ -159,10 +179,9 @@ export const ReturnToSupplierDialog: React.FC<{
             <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
               {lines.map((l) => {
                 const r = rows[l.line_number] ?? { include: false, qty: '', itemId: NO_STOCK };
-                const docUnit = unitFromMydataCode(Number(l.measurement_unit));
-                const source = l.stock.find((s) => s.item_id === r.itemId);
-                const stockUnit = source?.unit ?? warehouse.find((w) => w.id === r.itemId)?.unit ?? null;
-                const unitDiffers = r.itemId !== NO_STOCK && !!docUnit && !!stockUnit && normalizeUnit(docUnit) !== normalizeUnit(stockUnit);
+                const docUnit = docUnitOf(l);
+                const linkable = l.stock.filter((s) => sameUnit(l, s.unit));
+                const otherUnit = l.stock.find((s) => !sameUnit(l, s.unit));
                 const exhausted = l.returnable != null && l.returnable <= 0;
                 return (
                   <div
@@ -182,10 +201,14 @@ export const ReturnToSupplierDialog: React.FC<{
                         #{l.line_number}{l.item_code ? ` · ${l.item_code}` : ''}
                         {' · '}invoiced {l.invoiced ?? '—'}{l.returned ? ` · already returned ${l.returned}` : ''}
                       </div>
-                      {unitDiffers && (
+                      {otherUnit && (
                         <div className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-                          Invoiced in {unitSuffix(docUnit)}, stock counted in {unitSuffix(stockUnit)} — enter the quantity in {unitSuffix(stockUnit)}.
+                          Received into {otherUnit.name}, counted in {unitSuffix(otherUnit.unit)} — the invoice is in {unitSuffix(docUnit)}, so
+                          this return cannot take it out of stock. Adjust that item in Warehouse after issuing.
                         </div>
+                      )}
+                      {l.stock.length === 0 && warehouseFailed && (
+                        <div className="mt-1 text-[11px] text-destructive">Could not load the warehouse, so no stock item can be picked for this line.</div>
                       )}
                     </div>
                     <div className="col-start-2 flex flex-wrap items-center gap-1 sm:col-start-3">
@@ -193,20 +216,20 @@ export const ReturnToSupplierDialog: React.FC<{
                         value={r.itemId}
                         disabled={!r.include}
                         onValueChange={(v) => {
-                          const cap = capFor(l, v);
+                          const cap = capFor(l, v, warehouse);
                           setRow(l.line_number, { itemId: v, qty: cap != null ? String(cap) : r.qty });
                         }}
                       >
                         <SelectTrigger className="h-8 w-[220px] text-xs" aria-label="Take out of stock"><SelectValue /></SelectTrigger>
                         <SelectContent>
                           <SelectItem value={NO_STOCK}>Not in stock — no movement</SelectItem>
-                          {l.stock.map((s) => (
+                          {linkable.map((s) => (
                             <SelectItem key={s.item_id} value={s.item_id}>
                               {s.name} · received {s.received}{s.returned ? `, back ${s.returned}` : ''} · on hand {s.on_hand}
                             </SelectItem>
                           ))}
                           {/* Never received from THIS document — e.g. it came in on the purchase order. */}
-                          {l.stock.length === 0 && warehouse.map((w) => (
+                          {l.stock.length === 0 && warehouse.filter((w) => sameUnit(l, w.unit)).map((w) => (
                             <SelectItem key={w.id} value={w.id}>{w.name}{w.sku ? ` (${w.sku})` : ''} · on hand {w.qty_on_hand ?? 0}</SelectItem>
                           ))}
                         </SelectContent>
