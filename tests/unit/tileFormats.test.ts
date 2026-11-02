@@ -20,4 +20,12 @@ describe('tileFormats', () => {
   it('returns nothing for empty or non-size input', () => {
     expect(tileFormats(undefined, null, 'Matt', [])).toEqual([]);
   });
+
+  it('reads a panel given as width x height x thickness with the unit at the end', () => {
+    expect(tileFormats(['2400×600×9 mm', '600×600×20 mm']).map(x => x.label)).toEqual(['60×60', '240×60']);
+  });
+
+  it('reads planks in decimal centimetres', () => {
+    expect(tileFormats(['18.2x122 cm']).map(x => x.label)).toEqual(['18.2×122']);
+  });
 });

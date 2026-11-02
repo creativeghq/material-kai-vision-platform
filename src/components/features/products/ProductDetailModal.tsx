@@ -530,9 +530,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const applicationData = allData?.application || {};
   const dimensionsData = allData?.dimensions || [];
   // `available_sizes` is the normalised list; `dimensions` can hold OCR cell fragments, so it is only the fallback.
-  const tileFormatList = resolveProductCategory(product.metadata, product.type, product.category) === 'tiles'
-    ? (() => { const a = tileFormats(allData?.available_sizes); return a.length ? a : tileFormats(dimensionsData); })()
-    : [];
+  const formatList = (() => { const a = tileFormats(allData?.available_sizes); return a.length ? a : tileFormats(dimensionsData); })();
 
   // Product name uppercased for matching against product-keyed metadata dicts
   const productNameUpper = (typeof product.name === 'string' ? product.name : '').toUpperCase().trim();
@@ -1624,7 +1622,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
       if (!hit) continue;
       consumedKeys.add(field.key);
       const shown = summariseSkuMap(hit.raw) ?? describeValue(hit.raw) ?? hit.value;
-      // "Model: DOCKS" on the DOCKS page says nothing the title does not.
+      // A field whose value is the product's own name repeats the title.
       if (typeof shown === 'string' && normalizeMatch(shown) === productNameNorm) continue;
       data[field.label] = shown;
       if (isLowConfidence(hit.raw)) lowConf.add(field.label);
@@ -1825,15 +1823,15 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                     <span className="text-muted-foreground">Finish</span><span className="font-medium text-foreground">{finish}</span>
                   </span>
                 )}
-                {tileFormatList.length === 0 && size && size !== 'N/A' && size !== '—' && (
+                {formatList.length === 0 && size && size !== 'N/A' && size !== '—' && (
                   <span className="inline-flex items-center gap-1.5 text-xs rounded-full border border-border bg-muted px-3 py-1">
                     <span className="text-muted-foreground">Size</span><span className="font-medium text-foreground">{String(size).split(',')[0].trim()}</span>
                   </span>
                 )}
               </div>
-              {tileFormatList.length > 0 && (
+              {formatList.length > 0 && (
                 <div className="mt-3">
-                  <TileFormatRow formats={tileFormatList} maxBoxPx={44} />
+                  <TileFormatRow formats={formatList} maxBoxPx={44} />
                 </div>
               )}
             </div>
@@ -2110,8 +2108,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
 
           {/* Right Column: Technical Details (2/5 width) */}
           <div className="lg:col-span-2 space-y-4">
-            {/* The product's own description only. Raw catalogue chunks are never shown as one: the
-                pick-a-chunk fallback put a special-trims table under "Product Description" on DOCKS. */}
+            {/* The product's own description only; raw catalogue chunks are never shown as one. */}
             {(() => {
               const longDesc = safeString((product as unknown as Record<string, unknown>).long_description);
               const fullDesc = longDesc || safeString(product.description) || recordDescription;
@@ -2166,7 +2163,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 categorySpecRows.push({ label: 'Finish', value: finish });
                 const subtype = tryExtract(materialPropsData?.material_subtype);
                 if (subtype) categorySpecRows.push({ label: 'Subtype', value: subtype });
-                if (size !== 'N/A' && tileFormatList.length === 0) categorySpecRows.push({ label: 'Size', value: size });
+                if (size !== 'N/A' && formatList.length === 0) categorySpecRows.push({ label: 'Size', value: size });
                 if (thickness) categorySpecRows.push({ label: 'Thickness', value: thickness });
                 const rectified = tryExtract(materialPropsData?.rectified, allData?.rectified);
                 if (rectified) categorySpecRows.push({ label: 'Rectified', value: rectified });
@@ -2269,7 +2266,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 categorySpecRows.push({ label: 'Finish', value: finish });
                 const subtype = tryExtract(materialPropsData?.material_subtype);
                 if (subtype) categorySpecRows.push({ label: 'Subtype', value: subtype });
-                if (size !== 'N/A' && tileFormatList.length === 0) categorySpecRows.push({ label: 'Size', value: size });
+                if (size !== 'N/A' && formatList.length === 0) categorySpecRows.push({ label: 'Size', value: size });
                 if (thickness) categorySpecRows.push({ label: 'Thickness', value: thickness });
               } else {
                 // No curated branch. The registry's identity fields ARE "what tells these

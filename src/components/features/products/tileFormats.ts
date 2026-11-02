@@ -6,7 +6,7 @@ export interface TileFormatCm {
   label: string;
 }
 
-/** Smallest and largest side a tile, plank or slab plausibly has; OCR fragments like "4x57" fall outside. */
+/** Smallest and largest side a tile, panel, plank or slab plausibly has; OCR fragments fall outside. */
 const MIN_SIDE_CM = 5;
 const MAX_SIDE_CM = 400;
 
@@ -23,7 +23,9 @@ function parseOne(value: unknown): TileFormatCm | null {
   }
   // A size split across lines is a table cell the OCR broke, not a format.
   if (typeof text !== 'string' || /\n/.test(text)) return null;
-  const f = parseFormatText(text);
+  // Width x height x thickness: the face is the first two, and the unit sits after the third.
+  const face = text.replace(/^(\s*[\d.,]+\s*[x×X]\s*[\d.,]+)\s*[x×X]\s*[\d.,]+/, '$1');
+  const f = parseFormatText(face);
   if (!f) return null;
   const widthCm = cm(f.tileWidthM);
   const heightCm = cm(f.tileLengthM);
