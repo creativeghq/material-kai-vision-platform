@@ -12,7 +12,7 @@ import type {
   FiscalParty,
   FiscalTaxTotal,
 } from './types.ts';
-import { fiscalDate, isUnnamedLineName, mydataCountry } from './types.ts';
+import { fiscalDate, mydataCountry } from './types.ts';
 import {
   movePurposeLabel,
   isMydataMovePurpose,
@@ -33,42 +33,6 @@ function assertFiscalLines(items: unknown, err: unknown, subject: string): void 
   if (!Array.isArray(items) || items.length === 0) {
     throw new Error(`refusing to build ${subject}: it has no line items`);
   }
-}
-
-/**
- * Fold a line's variant selections (color / size / free-form attributes) into the
- * transmitted product name so the myDATA line + the provider-rendered legal document read
- * "Base name — Red, 60×60" instead of just the base product name. No-op when the line
- * carries no variant data, when a token is already present in the base name, or when the
- * base is itself an unnamed placeholder (appending "Red" to "(line item)" helps no one —
- * the transmission guard should still catch it). Result is capped so line names stay sane.
- */
-function composeLineDescription(
-  base: string,
-  opts: { color?: unknown; size?: unknown; attributes?: unknown },
-): string {
-  if (isUnnamedLineName(base)) return base;
-  const parts: string[] = [];
-  const push = (v: unknown) => {
-    const s = v == null ? '' : String(v).trim();
-    if (s) parts.push(s);
-  };
-  push(opts.color);
-  push(opts.size);
-  if (opts.attributes && typeof opts.attributes === 'object' && !Array.isArray(opts.attributes)) {
-    for (const [k, v] of Object.entries(opts.attributes as Record<string, unknown>)) {
-      const val = v == null ? '' : String(v).trim();
-      if (val) push(`${k}: ${val}`);
-    }
-  }
-  if (!parts.length) return base;
-  // Drop variant tokens already spelled out in the base name (case-insensitive) so we don't
-  // print "Tile Red — Red".
-  const lowerBase = base.toLowerCase();
-  const extra = parts.filter((p) => !lowerBase.includes(p.toLowerCase()));
-  if (!extra.length) return base;
-  const composed = `${base} — ${extra.join(', ')}`;
-  return composed.length > 300 ? composed.slice(0, 297) + '…' : composed;
 }
 
 /**
@@ -512,13 +476,9 @@ export async function buildInvoiceInputFromDb(
     return {
       lineNumber: i + 1,
       code: it.sku ?? undefined,
-      // Fold the chosen variant (color / size / attributes) into the transmitted name so the
-      // myDATA line + legal PDF disambiguate "Tile X — Red, 60×60" instead of just "Tile X".
-      description: composeLineDescription(it.description ?? 'Item', {
-        color: it.selected_color,
-        size: it.selected_size,
-        attributes: it.selected_attributes,
-      }),
+      // The stored description verbatim: it already carries the chosen variant (SQL `line_name`),
+      // and it is exactly what the printed document shows (rule 1c).
+      description: it.description ?? 'Item',
       quantity: Number(it.quantity ?? 1),
       measurementUnitLabel: it.unit ?? 'ΤΜΧ',
       // Commodity code AS SNAPSHOTTED on the line, never re-read from the product: a reissued or

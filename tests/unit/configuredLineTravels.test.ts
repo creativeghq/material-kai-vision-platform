@@ -48,7 +48,7 @@ describe('#375 — what the line prints', () => {
     // The invoice composes line detail in exactly one place (`variantOf`), and the quote in one
     // (`variant_label`), which is why neither needed a change at its render sites.
     expect(src(INVOICE_PDF)).toMatch(/lineDetailLabel\(variant, it\?\.configured_options\)/);
-    expect(src(QUOTE_FETCHER)).toMatch(/lineDetailLabel\(variantLabels\[item\.id\] \?\? null, item\.configured_options\)/);
+    expect(src(QUOTE_FETCHER)).toMatch(/lineDetailLabel\([\s\S]{0,160}variantLabels\[item\.id\][\s\S]{0,80}item\.configured_options,?\s*\)/);
   });
 
   it("the operator's screen says what the customer's document says", () => {

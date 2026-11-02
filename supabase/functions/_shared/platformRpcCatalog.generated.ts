@@ -858,6 +858,17 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_line_names",
+    "subject": "line names",
+    "args": [
+      {
+        "name": "p_rows",
+        "type": "jsonb",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_manageable_workspaces",
     "subject": "manageable workspaces",
     "args": []

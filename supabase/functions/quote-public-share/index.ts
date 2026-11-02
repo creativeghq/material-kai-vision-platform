@@ -77,12 +77,26 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     }
   } catch { /* a missing label must never stop a customer opening their quote */ }
 
+  // Series + chosen variant, derived by SQL `compose_line_name` like every order/invoice line.
+  const lineNames: Record<string, string> = {};
+  try {
+    const { data: names } = await supabase.rpc('get_line_names', {
+      p_rows: (rawItems ?? []).map((it: any) => ({
+        key: it.id, product_id: it.product_id ?? null, attributes: it.selected_attributes ?? {},
+        name: it.products ? (it.products.name ?? null) : (it.custom_product_name ?? null),
+      })),
+    });
+    for (const r of (names ?? []) as Array<{ row_key: string; line_name: string | null }>) {
+      if (r.line_name) lineNames[r.row_key] = r.line_name;
+    }
+  } catch { /* falls back to the bare name */ }
+
   const items = (rawItems ?? []).map((it: any) => {
     const product = it.products;
     const isCustom = !product;
     return {
       id: it.id,
-      name: isCustom ? (it.custom_product_name || 'Custom Item') : (product?.name || 'Product'),
+      name: lineNames[it.id] || (isCustom ? (it.custom_product_name || 'Custom Item') : (product?.name || 'Product')),
       sku: isCustom ? null : (product?.sku ?? null),
       quantity: it.quantity,
       selected_size: it.selected_size ?? null,

@@ -6,6 +6,7 @@ import { Card } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { computeTotalsBreakdown, totalsRows } from '@/modules/quotes/utils/quoteTotals';
+import { partsNotInName } from '@/modules/finance/invoice-templates/lineName';
 
 /**
  * /q/:token — public, unauthenticated viewer for a shared quote.
@@ -24,6 +25,7 @@ interface PublicQuoteItem {
   quantity: number;
   selected_size: string | null;
   selected_color: string | null;
+  variant_label?: string | null;
   room: string | null;
   dimensions: string | null;
   unit_price: number | null;
@@ -273,8 +275,10 @@ export default function PublicQuotePage() {
                         <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
                           {it.sku && <span>{it.sku}</span>}
                           {it.room && <span>· {it.room}</span>}
-                          {it.selected_size && <span>· {it.selected_size}</span>}
-                          {it.selected_color && <span>· {it.selected_color}</span>}
+                          {partsNotInName(
+                            it.name,
+                            it.variant_label ? it.variant_label.split(' · ') : [it.selected_size, it.selected_color],
+                          ).map((part) => <span key={part}>· {part}</span>)}
                           {it.dimensions && <span>· {it.dimensions}</span>}
                         </div>
                       </td>

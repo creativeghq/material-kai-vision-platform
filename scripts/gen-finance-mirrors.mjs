@@ -25,6 +25,10 @@ export const MIRRORS = [
     'src/modules/finance/invoice-templates/configuredOptions.ts',
     'supabase/functions/_shared/finance/configured-options.ts',
   ],
+  [
+    'src/modules/finance/invoice-templates/lineName.ts',
+    'supabase/functions/_shared/finance/line-name.ts',
+  ],
 ];
 
 const banner = (source) => [

@@ -28,6 +28,7 @@ import { mydataExemptionLabel } from '../_shared/finance/vat-exemptions.ts';
 import { buildInvoiceInputFromDb, buildCreditNoteInputFromDb } from '../_shared/fiscal/invoice-builder.ts';
 import { serialiseEn16931Ubl } from '../_shared/fiscal/en16931-ubl.ts';
 import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
+import { partsNotInName } from '../_shared/finance/line-name.ts';
 
 /** #374 Phase 6 — attach each line's full chosen variant, derived by SQL `variant_label`. */
 async function attachVariantLabels(supabase: any, items: any[]): Promise<void> {
@@ -58,8 +59,10 @@ async function attachVariantLabels(supabase: any, items: any[]): Promise<void> {
  * next spring must not rewrite an invoice issued last autumn.
  */
 function variantOf(it: any): string {
-  const variant = it?._variant_label
-    || [it?.selected_color, it?.selected_size].filter(Boolean).join(' / ');
+  const parts = it?._variant_label
+    ? String(it._variant_label).split(' · ')
+    : [it?.selected_color, it?.selected_size];
+  const variant = partsNotInName(it?.description, parts).join(' · ');
   return lineDetailLabel(variant, it?.configured_options);
 }
 

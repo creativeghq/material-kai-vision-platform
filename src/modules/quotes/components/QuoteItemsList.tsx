@@ -24,6 +24,8 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import { TileQuantityDialog } from '@/modules/finance/components/TileQuantityDialog';
 import { HomogeneousStockNotice } from '@/modules/stock/components/HomogeneousStockNotice';
+import { lineIdentityService } from '@/services/lineIdentityService';
+import { composeLineName, partsNotInName } from '@/modules/finance/invoice-templates/lineName';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -280,6 +282,18 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
     return () => { cancelled = true; };
   }, [items]);
 
+  const [lineNames, setLineNames] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    void lineIdentityService.lineNames(items.map((i) => ({
+      key: i.id,
+      productId: i.product_id,
+      attributes: i.selected_attributes,
+      name: i.product_id ? i.product?.name : i.custom_product_name,
+    }))).then((m) => { if (!cancelled) setLineNames(m); });
+    return () => { cancelled = true; };
+  }, [items]);
+
   const handleViewProduct = (product: SimpleProduct) => {
     setSelectedProduct(convertToDisplayProduct(product));
     setIsModalOpen(true);
@@ -419,7 +433,10 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                   const callForPrice = pricingStatus !== 'priced';
                   const awaitingSupplier = pricingStatus === 'awaiting_supplier';
 
-                  const productName = isCustom ? (item.custom_product_name || 'Custom Item') : (item.product?.name || 'Unknown Product');
+                  const bareName = isCustom ? (item.custom_product_name || 'Custom Item') : (item.product?.name || 'Unknown Product');
+                  const variantParts = [item.selected_color, item.selected_size || selectedSize];
+                  const productName = lineNames.get(item.id) ?? composeLineName(bareName, variantParts) ?? bareName;
+                  const unnamedParts = partsNotInName(productName, variantParts);
                   const displayName = item.dimensions ? `${productName}, ${item.dimensions}` : productName;
 
                   const hasDetails = item.notes || item.installation_requirements || item.delivery_date;
@@ -505,17 +522,12 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 />
                               )}
                               <div className="flex flex-wrap gap-1 mt-1">
-                                {(item.selected_size || selectedSize) && (
-                                  <Badge variant="secondary" className="text-[10px] gap-1 font-normal px-1.5 py-0">
-                                    <Ruler className="h-2 w-2" />
-                                    {item.selected_size || selectedSize}
+                                {unnamedParts.map((part) => (
+                                  <Badge key={part} variant="secondary" className="text-[10px] gap-1 font-normal px-1.5 py-0">
+                                    {part === (item.selected_size || selectedSize) && <Ruler className="h-2 w-2" />}
+                                    {part}
                                   </Badge>
-                                )}
-                                {item.selected_color && (
-                                  <Badge variant="secondary" className="text-[10px] font-normal px-1.5 py-0">
-                                    {item.selected_color}
-                                  </Badge>
-                                )}
+                                ))}
                                 {hasDetails && (
                                   <button
                                     onClick={e => { e.stopPropagation(); setExpandedItemId(isExpanded ? null : item.id); }}

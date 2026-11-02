@@ -5,6 +5,7 @@ import { HttpError } from '../_shared/api-logger.ts';
 
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import { lineDetailLabel } from '../_shared/finance/configured-options.ts';
+import { partsNotInName } from '../_shared/finance/line-name.ts';
 /**
  * Fetch complete quote data including items with product details
  */
@@ -123,6 +124,23 @@ export async function fetchQuoteData(
     }
   } catch { /* labels are an aid; the line still prints without them */ }
 
+  // The line's NAME is the series plus its chosen variant, derived by SQL `compose_line_name` —
+  // the same derivation that writes order and invoice line descriptions.
+  const lineNames: Record<string, string> = {};
+  try {
+    const { data: names } = await supabase.rpc('get_line_names', {
+      p_rows: items.map((it: any) => ({
+        key: it.id,
+        product_id: it.product_id ?? null,
+        attributes: it.selected_attributes ?? {},
+        name: it.products ? (it.products.name ?? null) : (it.custom_product_name ?? null),
+      })),
+    });
+    for (const r of (names ?? []) as Array<{ row_key: string; line_name: string | null }>) {
+      if (r.line_name) lineNames[r.row_key] = r.line_name;
+    }
+  } catch { /* the line falls back to the bare name with the variant beside it */ }
+
   // Map items (supports both catalog products and custom items)
   const mappedItems: QuoteItemData[] = items.map((item: any) => {
     const product = item.products;
@@ -134,9 +152,8 @@ export async function fetchQuoteData(
       image_url: isCustom
         ? (item.custom_image_url || null)
         : (lineImageMap[item.id] || metadata?.image_url || null),
-      product_name: isCustom
-        ? (item.custom_product_name || 'Custom Item')
-        : (product?.name || 'Unknown Product'),
+      product_name: lineNames[item.id]
+        || (isCustom ? (item.custom_product_name || 'Custom Item') : (product?.name || 'Unknown Product')),
       description: isCustom
         ? (item.custom_product_description || null)
         : (product?.description || metadata?.description || null),
@@ -148,7 +165,10 @@ export async function fetchQuoteData(
       // Variant AND configuration (#375). The configurator's choices are inside `unit_price` as
       // deltas, so a quote that prints only the product name states a figure the customer cannot
       // account for. Read from the line's frozen `configured_options`, never from a live lookup.
-      variant_label: lineDetailLabel(variantLabels[item.id] ?? null, item.configured_options) || null,
+      variant_label: lineDetailLabel(
+        partsNotInName(lineNames[item.id], (variantLabels[item.id] ?? '').split(' · ')).join(' · ') || null,
+        item.configured_options,
+      ) || null,
       quantity: item.quantity,
       unit: isCustom ? (item.custom_unit || 'pcs') : (metadata?.unit || 'pcs'),
       unit_price: parseFloat(item.unit_price) || 0,

@@ -10,6 +10,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 // catalogs (and other branded sales docs) share one control + workspace branding.
 import { fetchBrandingConfig, fetchTemplateImage, type BrandingConfig } from '../_shared/pdf/branding.ts';
 import { renderBrandedDocument, type BrandedDoc, type BrandedDocItem } from '../_shared/pdf/document.ts';
+import { composeLineName, partsNotInName } from '../_shared/finance/line-name.ts';
 
 /** Map a quote + resolved branding into the shared branded-document model. */
 function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): BrandedDoc {
@@ -27,7 +28,7 @@ function mapQuoteToBrandedDoc(quote: QuoteData, branding: BrandingConfig): Brand
     // #374 Phase 6 — the full variant when we have it, falling back to the two projected
     // columns so a legacy line with no attribute map still prints what it always did.
     size_color: it.variant_label
-      || ([it.selected_size, it.selected_color].filter(Boolean).join(' · ') || null),
+      || (partsNotInName(it.product_name, [it.selected_size, it.selected_color]).join(' · ') || null),
     quantity: it.quantity,
     unit: it.unit,
     unit_price: gross ? unitGross : it.unit_price,
@@ -376,9 +377,10 @@ function buildSampleQuote(workspaceId: string | null, vatRate: number): QuoteDat
     const lineTotal = Math.round(it.qty * it.price * 100) / 100;
     subtotal += lineTotal;
     return {
-      id: `sample-${i}`, product_name: it.name, description: 'Sample line item for template preview.',
+      id: `sample-${i}`, product_name: composeLineName(it.name, [it.color, it.extra, it.size]) ?? it.name,
+      description: 'Sample line item for template preview.',
       sku: it.sku, selected_size: it.size, selected_color: it.color, quantity: it.qty, unit: it.unit,
-      variant_label: [it.size, it.color, it.extra].filter(Boolean).join(' · ') || null,
+      variant_label: null,
       unit_price: it.price, discounted_price: null, line_total: lineTotal, notes: null, pricing_status: 'priced',
       image_url: null, room: it.room, dimensions: it.size, installation_requirements: null, delivery_date: null,
     };

@@ -37929,6 +37929,13 @@ export type Database = {
           stocked: string[]
         }[]
       }
+      get_line_names: {
+        Args: { p_rows: Json }
+        Returns: {
+          line_name: string | null
+          row_key: string
+        }[]
+      }
       get_my_credit_spend_summary: { Args: { p_days?: number }; Returns: Json }
       get_my_credit_statement: {
         Args: { p_month: number; p_tz?: string; p_year: number }

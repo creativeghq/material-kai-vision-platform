@@ -790,6 +790,16 @@
     ]
   },
   {
+    "name": "get_line_names",
+    "args": [
+      {
+        "name": "p_rows",
+        "type": "jsonb",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_manageable_workspaces",
     "args": []
   },

@@ -66,6 +66,8 @@ export interface QuoteItem {
   added_at: string;
   selected_size?: string;
   selected_color?: string;
+  /** The chosen variant, every identity axis. */
+  selected_attributes?: Record<string, string> | null;
   // Custom product fields (when product_id is null)
   custom_product_name?: string;
   custom_product_description?: string;

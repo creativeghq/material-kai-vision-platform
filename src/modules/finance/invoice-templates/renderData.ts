@@ -8,6 +8,7 @@ import type {
   InvoiceRenderData, InvoiceLineRow, VatAnalysisRow, TotalsExtraRow, VatExemptionNote,
 } from './types';
 import { resolvePrintedCounterparty, applyAddressUnit, partyAddressLines } from './counterparty';
+import { partsNotInName } from './lineName';
 import { normalizeVat } from '@/services/crm/vatNormalize';
 import { round2 as r2 } from '@/utils/decimal';
 import { vatOf } from '@/modules/finance/lib/vatMath';
@@ -228,7 +229,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
     vatByRate[key] = vatByRate[key] || { net: 0, vat: 0 };
     vatByRate[key].net += net; vatByRate[key].vat += vat;
     const detail = [
-      [it.selected_color, it.selected_size].filter(Boolean).join(' / '),
+      partsNotInName(it.description, [it.selected_color, it.selected_size]).join(' / '),
       it.line_comments,
     ].filter(Boolean).join(' — ');
     const unit = it.unit ?? (it.measurement_unit_code != null ? UNIT_LABEL_BY_CODE[Number(it.measurement_unit_code)] : '') ?? '';
