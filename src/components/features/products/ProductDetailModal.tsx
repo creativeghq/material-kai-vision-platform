@@ -260,7 +260,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // beneath it — see the comment at its mount point.
   const [images, setImages] = useState<any[]>([]);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
-  const [chunks, setChunks] = useState<any[]>([]);
   const [kbDraftCount, setKbDraftCount] = useState(0);
   // Knowledge base docs attached to this product (via kb_doc_attachments)
   const [kbDocs, setKbDocs] = useState<Array<{
@@ -283,6 +282,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [stackedError, setStackedError] = useState<string | null>(null);
   // Price lookup drawer (admin-only)
   const [priceLookupOpen, setPriceLookupOpen] = useState(false);
+
+  // Callers pass partial products; the description is read from the record when they omit it.
+  const [recordDescription, setRecordDescription] = useState('');
+  useEffect(() => {
+    setRecordDescription('');
+    if (!isOpen || !product?.id || safeString(product.description)) return;
+    let cancelled = false;
+    productDetailService.fetch(product.id)
+      .then((d) => { if (!cancelled) setRecordDescription(safeString((d as { description?: unknown } | null)?.description)); })
+      .catch(() => { /* no description beats an error card here */ });
+    return () => { cancelled = true; };
+  }, [isOpen, product?.id, product?.description]);
 
   // All hooks must be declared before any conditional return (Rules of Hooks)
 
@@ -391,55 +402,6 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
     if (isOpen) {
       loadImages();
     }
-  }, [product?.id, isOpen]);
-
-  // Load chunks for ALL users (not just admins). The Details tab's Description
-  // card falls back to chunk content when product.description is empty, so
-  // end-users also need chunks loaded. Admin-specific data (embedding status,
-  // relevance counts) stays in the admin-gated effect below.
-  useEffect(() => {
-    const loadChunks = async () => {
-      if (!product?.id || !isOpen) return;
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(product.id)) return;
-
-      try {
-        const { data: chunkRelations, error: chunkError } = await supabase
-          .from('chunk_product_relationships')
-          .select(`
-            chunk_id,
-            relevance_score,
-            created_at,
-            document_chunks (
-              id,
-              content,
-              metadata,
-              chunk_index
-            )
-          `)
-          .eq('product_id', product.id)
-          .order('relevance_score', { ascending: false });
-
-        if (chunkError) {
-          console.error('[ProductDetailModal] Error loading chunks:', JSON.stringify(chunkError));
-          setChunks([]);
-          return;
-        }
-        const loaded = (chunkRelations || [])
-          .filter(rel => rel.document_chunks)
-          .map(rel => ({
-            id: rel.document_chunks.id,
-            content: rel.document_chunks.content,
-            page_number: rel.document_chunks.metadata?.page_number ?? null,
-            chunk_index: rel.document_chunks.chunk_index,
-            relevance_score: rel.relevance_score,
-          }));
-        setChunks(loaded);
-      } catch (err) {
-        console.error('[ProductDetailModal] loadChunks exception:', err);
-        setChunks([]);
-      }
-    };
-    loadChunks();
   }, [product?.id, isOpen]);
 
   // Load KB docs attached to this product via kb_doc_attachments.
@@ -2032,59 +1994,11 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 />
               </div>
             )}
-            {/*
-              * Full description card — first thing on the Details tab so users
-              * see the narrative before diving into specs. Falls back through:
-              * 1. product.long_description
-              * 2. product.description
-              * 3.
-              */}
+            {/* The product's own description only. Raw catalogue chunks are never shown as one: the
+                pick-a-chunk fallback put a special-trims table under "Product Description" on DOCKS. */}
             {(() => {
-              // Product.long_description is optional and not in the TS type;
-              // cast through Record<string, unknown> so we can read it safely.
               const longDesc = safeString((product as unknown as Record<string, unknown>).long_description);
-              const shortDesc = safeString(product.description);
-              let fullDesc = longDesc || shortDesc;
-
-              if (!fullDesc && chunks.length > 0) {
-                // Pick narrative paragraphs from chunks — skip chunks that are
-                // mostly SKU codes, page separators, or TOC-like lines, and
-                // prefer chunks that mention the product name.
-                const productNameLower = (product.name || '').toLowerCase();
-                const candidates = chunks
-                  .map(c => String(c.content || ''))
-                  .filter(text => {
-                    // Reject if mostly digits/codes (SKU tables)
-                    const digitRatio = (text.match(/\d/g) || []).length / Math.max(text.length, 1);
-                    if (digitRatio > 0.15) return false;
-                    // Reject very short lines
-                    if (text.trim().length < 80) return false;
-                    return true;
-                  })
-                  .sort((a, b) => {
-                    // Prefer chunks mentioning the product name
-                    const aHasName = a.toLowerCase().includes(productNameLower) ? 1 : 0;
-                    const bHasName = b.toLowerCase().includes(productNameLower) ? 1 : 0;
-                    return bHasName - aHasName;
-                  });
-
-                if (candidates.length > 0) {
-                  // Extract just the English narrative (skip "Page N" separators
-                  // and bilingual duplicates). Take the first 2-3 sentences that
-                  // look like product description.
-                  const raw = candidates[0];
-                  // Strip "--- # Page N ---" markers
-                  const cleaned = raw
-                    .replace(/---\s*#\s*Page\s*\d+\s*---/gi, '')
-                    .replace(/Page\s*\d+/gi, '')
-                    .replace(/^\d+\s+―/gm, '')
-                    .replace(/\s{2,}/g, ' ')
-                    .trim();
-                  // Take up to the first 500 chars for a readable lead-in
-                  fullDesc = cleaned.length > 500 ? cleaned.slice(0, 500).trim() + '…' : cleaned;
-                }
-              }
-
+              const fullDesc = longDesc || safeString(product.description) || recordDescription;
               if (!fullDesc) return null;
               return (
                 <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6 mb-6">
