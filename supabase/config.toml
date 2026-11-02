@@ -49,6 +49,9 @@ verify_jwt = false
 [functions.dashboard-insights]
 verify_jwt = false
 
+[functions.workspace-pulse]
+verify_jwt = false
+
 [functions.mivaa-gateway]
 verify_jwt = false
 

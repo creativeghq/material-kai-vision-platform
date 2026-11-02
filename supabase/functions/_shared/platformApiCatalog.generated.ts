@@ -5025,6 +5025,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "workspace-pulse",
+    "tag": "Dashboard",
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "summary": "Glanceable per-section summary for the desktop widget",
+    "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQ",
+    "fields": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Workspace to summarise (query param on GET, body on POST). Defaults as described above. (uuid)"
+      }
+    }
+  },
+  {
     "name": "workspace-webhooks-api",
     "tag": "Webhooks",
     "methods": [

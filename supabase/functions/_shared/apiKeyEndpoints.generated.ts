@@ -100,6 +100,7 @@ export const API_KEY_ENDPOINTS: ReadonlySet<string> = new Set([
   'trigger-factory-enrichment',
   'vies-validate',
   'viva-config-test',
+  'workspace-pulse',
   'workspace-webhooks-api',
   'xml-import-orchestrator',
   'zernio-api',

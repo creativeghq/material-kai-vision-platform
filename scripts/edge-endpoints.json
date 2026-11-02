@@ -12770,6 +12770,31 @@
     "response": "{ insights, model, source, generated_at, expires_at, cached }"
   },
   {
+    "name": "workspace-pulse",
+    "tag": "Dashboard",
+    "summary": "Glanceable per-section summary for the desktop widget",
+    "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by get_workspace_pulse, which reuses dashboard_workspace_snapshot and get_deal_forecast. Workspace: the workspace_id param, else the key's bound workspace, else the caller's most recently joined one; another tenant's id is a 404.",
+    "security": [
+      "supabaseJwt",
+      "apiKeyPartner"
+    ],
+    "docs": null,
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "workspace_id",
+        "type": "uuid",
+        "required": false,
+        "desc": "Workspace to summarise (query param on GET, body on POST). Defaults as described above."
+      }
+    ],
+    "response": "{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], workspaces: [{id, name}] }"
+  },
+  {
     "name": "dataforseo-reconcile",
     "tag": "Crons",
     "summary": "Nightly cron: record what DataForSEO charged per day and endpoint, and the account balance",

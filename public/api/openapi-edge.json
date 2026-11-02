@@ -144,6 +144,10 @@
       "description": "Customs functions."
     },
     {
+      "name": "Dashboard",
+      "description": "Dashboard functions."
+    },
+    {
       "name": "HR",
       "description": "HR functions."
     },
@@ -23088,6 +23092,160 @@
                 "required": [
                   "workspace_id"
                 ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/workspace-pulse": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Glanceable per-section summary for the desktop widget",
+        "operationId": "get_workspace_pulse",
+        "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by get_workspace_pulse, which reuses dashboard_workspace_snapshot and get_deal_forecast. Workspace: the workspace_id param, else the key's bound workspace, else the caller's most recently joined one; another tenant's id is a 404.\n\n**Response:** `{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], workspaces: [{id, name}] }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Dashboard"
+        ],
+        "summary": "Glanceable per-section summary for the desktop widget",
+        "operationId": "post_workspace_pulse",
+        "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by get_workspace_pulse, which reuses dashboard_workspace_snapshot and get_deal_forecast. Workspace: the workspace_id param, else the key's bound workspace, else the caller's most recently joined one; another tenant's id is a 404.\n\n**Response:** `{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], workspaces: [{id, name}] }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Workspace to summarise (query param on GET, body on POST). Defaults as described above. (uuid)"
+                  }
+                }
               }
             }
           }

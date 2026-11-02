@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (180)
+## 1. Supabase Edge Functions (181)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -348,6 +348,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `taric-classify` | JWT / kai_* / cron | Propose a TARIC commodity code for catalog products |
 | `taric-reference-sync` | JWT / kai_* / cron | Import the EU TARIC goods nomenclature (Greek extract) into the reference table |
+
+**Dashboard**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `workspace-pulse` _(GET + POST)_ | JWT / kai_* | Glanceable per-section summary for the desktop widget |
 
 **HR**
 

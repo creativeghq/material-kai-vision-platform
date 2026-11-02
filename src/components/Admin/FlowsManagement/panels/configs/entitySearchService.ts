@@ -204,6 +204,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'vies-validate', label: 'vies-validate', sublabel: 'Server-side EU VAT validation via the VIES REST API with optional crm_companies cache write.' },
   { id: 'viva-config-test', label: 'viva-config-test', sublabel: 'Viva.com connection test — proves stored BYOK credentials against Viva without charging anyone' },
   { id: 'viva-webhooks', label: 'viva-webhooks', sublabel: 'Viva.com payment webhook receiver + verification-key handshake (multi-tenant BYOK)' },
+  { id: 'workspace-pulse', label: 'workspace-pulse', sublabel: 'Glanceable per-section summary for the desktop widget' },
   { id: 'workspace-webhook-dispatcher', label: 'workspace-webhook-dispatcher', sublabel: 'Deliver queued outbound webhook events to tenant endpoints' },
   { id: 'workspace-webhooks-api', label: 'workspace-webhooks-api', sublabel: 'Manage a workspace\'s outbound webhook endpoints' },
   { id: 'xml-import-orchestrator', label: 'xml-import-orchestrator', sublabel: 'Parse and import supplier XML feeds; supports field detection, preview, and full import modes.' },
