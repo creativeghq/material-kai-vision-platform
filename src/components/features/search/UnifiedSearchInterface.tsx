@@ -7,13 +7,7 @@ import {
   Sparkles,
   Loader2,
   Package,
-  BookOpen,
-  Brain,
   X,
-  Hash,
-  Building,
-  MapPin,
-  User,
   Palette,
   Layers,
   Wand2,
@@ -26,6 +20,7 @@ import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
 import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 import { UnifiedSearchService, type SearchResult as ServiceSearchResult } from '@/services/unifiedSearchService';
 import { trackSearchImpression, trackSearchClick } from '@/services/manufacturerAnalyticsService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -126,6 +121,36 @@ const toSearchResult = (result: ServiceSearchResult, source: string): SearchResu
   metadata: result.metadata ?? {},
 });
 
+function SearchResultTile({ result, imageUrl, onOpen }: { result: SearchResult; imageUrl: string | null | undefined; onOpen: () => void }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={onEnterOrSpace(onOpen)}
+      className="dashboard-card panel-interactive flex flex-col overflow-hidden cursor-pointer"
+    >
+      <div className="relative aspect-square bg-surface-sunken overflow-hidden">
+        {imageUrl && !failed ? (
+          <img src={imageUrl} alt={result.title} loading="lazy" className="w-full h-full object-cover" onError={() => setFailed(true)} />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <Package className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
+        <Badge variant="neutral" className="absolute top-2 right-2 text-[10px] px-1.5 py-0 h-5 tabular-nums">
+          {(result.similarity_score * 100).toFixed(0)}% match
+        </Badge>
+      </div>
+      <div className="p-3 min-w-0">
+        <p className="text-sm font-semibold truncate">{result.title}</p>
+        {result.category && <p className="text-xs text-muted-foreground truncate">{result.category}</p>}
+      </div>
+    </div>
+  );
+}
+
 export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
   onResultsFound,
   onMaterialSelect,
@@ -203,6 +228,21 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     );
     onMaterialSelect?.(result.id);
   }, [activeQuery, filteredResults, onMaterialSelect]);
+
+  // Each hit's cover from search_catalogue, the same derivation the browse grid shows.
+  const [covers, setCovers] = useState<Record<string, string | null>>({});
+  useEffect(() => {
+    const ids = [...new Set(results.map(r => r.id).filter(Boolean))].filter(id => !(id in covers));
+    if (ids.length === 0) return;
+    let cancelled = false;
+    void Promise.all(ids.map(async (id) => {
+      const { data } = await supabase.rpc('search_catalogue', { p_product_id: id, p_limit: 1 });
+      return [id, (data as Array<{ image_url: string | null }> | null)?.[0]?.image_url ?? null] as const;
+    })).then((pairs) => {
+      if (!cancelled) setCovers(prev => ({ ...prev, ...Object.fromEntries(pairs) }));
+    });
+    return () => { cancelled = true; };
+  }, [results, covers]);
 
   useEffect(() => {
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify(values));
@@ -413,24 +453,7 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
     [onResultsFound, toast, activeWorkspaceId],
   );
 
-  const getResultIcon = (type: string) => {
-    switch (type) {
-      case 'material':
-        return <Package className="h-4 w-4 text-blue-500" />;
-      case 'knowledge':
-        return <BookOpen className="h-4 w-4 text-green-500" />;
-      case 'pdf_content':
-        return <Brain className="h-4 w-4 text-purple-500" />;
-      default:
-        return <Search className="h-4 w-4 text-gray-500" />;
-    }
-  };
 
-  const getConfidenceColor = (score: number) => {
-    if (score >= 0.8) return 'bg-green-500';
-    if (score >= 0.6) return 'bg-yellow-500';
-    return 'bg-red-500';
-  };
 
   return (
     <div className="space-y-6">
@@ -683,119 +706,14 @@ export const UnifiedSearchInterface: React.FC<UnifiedSearchInterfaceProps> = ({
                 All {results.length} results are hidden by the filters above. Clear one to see them.
               </p>
             )}
-            <div className="space-y-4">
-              {filteredResults.map((result, index) => (
-                <Card
-                  key={index}
-                  className="border-l-4 border-l-primary hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => handleResultClick(result)}
-                >
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {getResultIcon(result.type)}
-                        <h3 className="font-semibold">{result.title}</h3>
-                        <Badge className="inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                          {result.type}
-                        </Badge>
-                        {result.source && (
-                          <Badge className="inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80 text-xs">
-                            {result.source}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-2 h-2 rounded-full ${getConfidenceColor(result.similarity_score)}`}
-                        />
-                        <span className="text-sm text-muted-foreground">
-                          {(result.similarity_score * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-
-                    {result.content && (
-                      <p className="text-sm text-muted-foreground mb-3">
-                        {result.content.length > 300
-                          ? `${result.content.substring(0, 300)}...`
-                          : result.content}
-                      </p>
-                    )}
-
-                    {/* Metadata */}
-                    {result.metadata && (
-                      <div className="flex flex-wrap gap-2">
-                        {result.category && (
-                          <Badge className="inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                            {result.category}
-                          </Badge>
-                        )}
-                        {result.metafield_values &&
-                          result.metafield_values
-                            .slice(0, 2)
-                            .map((field, i) => (
-                              <Badge
-                                key={i}
-                                className="inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                              >
-                                {field.display_name}:{' '}
-                                {field.value_text ||
-                                  field.value_number ||
-                                  String(field.value_boolean)}
-                              </Badge>
-                            ))}
-                        {(result as any).properties && (
-                          <Badge className="inline-flex items-center border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80">
-                            Properties Available
-                          </Badge>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Entity Badges */}
-                    {result.extracted_entities &&
-                      result.extracted_entities.length > 0 && (
-                        <div className="mt-2">
-                          <div className="text-xs text-muted-foreground mb-1">
-                            Extracted Entities:
-                          </div>
-                          <div className="flex flex-wrap gap-1">
-                            {result.extracted_entities
-                              .slice(0, 6)
-                              .map((entity, i) => (
-                                <Badge
-                                  key={i}
-                                  variant="outline"
-                                  className="text-xs"
-                                >
-                                  {entity.type === 'MATERIAL' && (
-                                    <Hash className="h-2 w-2 mr-1" />
-                                  )}
-                                  {entity.type === 'ORG' && (
-                                    <Building className="h-2 w-2 mr-1" />
-                                  )}
-                                  {entity.type === 'LOCATION' && (
-                                    <MapPin className="h-2 w-2 mr-1" />
-                                  )}
-                                  {entity.type === 'PERSON' && (
-                                    <User className="h-2 w-2 mr-1" />
-                                  )}
-                                  {entity.text}
-                                  <span className="ml-1 text-muted-foreground">
-                                    ({Math.round(entity.confidence * 100)}%)
-                                  </span>
-                                </Badge>
-                              ))}
-                            {result.extracted_entities.length > 6 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{result.extracted_entities.length - 6} more
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                  </CardContent>
-                </Card>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-5 gap-3 sm:gap-4">
+              {filteredResults.map((result) => (
+                <SearchResultTile
+                  key={result.id}
+                  result={result}
+                  imageUrl={covers[result.id]}
+                  onOpen={() => handleResultClick(result)}
+                />
               ))}
             </div>
           </CardContent>
