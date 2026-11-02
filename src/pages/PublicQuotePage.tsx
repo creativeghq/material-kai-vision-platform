@@ -354,7 +354,7 @@ export default function PublicQuotePage() {
                         {a.name}: <span className="font-mono text-foreground">{a.iban ?? a.account_ref ?? '—'}</span>
                       </div>
                     ))}
-                    <div className="text-muted-foreground">Reference: <span className="font-mono text-foreground">{payable.number}</span></div>
+                    <div className="text-muted-foreground">Use Pay above for the payment reference, so your transfer is matched automatically.</div>
                   </div>
                 )}
               </Card>

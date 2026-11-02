@@ -759,7 +759,7 @@ jobs:
             local log="/tmp/deploy-logs/$name.log"
             local attempt
             for attempt in 1 2 3; do
-              if supabase functions deploy "$name" --no-verify-jwt --project-ref "$PROJECT_REF" >"$log" 2>&1; then
+              if supabase functions deploy "$name" --no-verify-jwt --yes --project-ref "$PROJECT_REF" >"$log" 2>&1; then
                 if [ "$attempt" -gt 1 ]; then echo "✅ $name (attempt $attempt)"; else echo "✅ $name"; fi
                 return 0
               fi

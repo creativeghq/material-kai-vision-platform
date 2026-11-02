@@ -63,6 +63,12 @@ function pick(row: any, fields: readonly string[]): Record<string, unknown> | nu
   return out;
 }
 
+// Reads are whole rows: pick() is the one allowlist, so a column name can never silently empty a section.
+function rows(res: { data: any; error: any }, what: string) {
+  if (res.error) throw new Error(`could not read ${what}: ${res.error.message}`);
+  return res.data;
+}
+
 async function partyRow(db: any, companyId: string | null, contactId: string | null) {
   if (companyId) {
     const { data } = await db.from('crm_companies').select('*').eq('id', companyId).maybeSingle();
@@ -109,19 +115,17 @@ async function loadDocument(db: any, kind: Kind, id: string) {
 
   if (kind === 'invoice') {
     const { data: row } = await db.from('invoices').select('*').eq('id', id).single();
-    const [{ data: it }, { data: dt, error: dtErr }] = await Promise.all([
-      db.from('invoice_items').select(ITEM_FIELDS.join(',')).eq('invoice_id', id).order('added_at'),
+    const [it, dt] = await Promise.all([
+      db.from('invoice_items').select('*').eq('invoice_id', id).order('added_at'),
       db.from('invoice_taxes').select('tax_type, tax_category, tax_amount, reduces_payable, label')
         .eq('invoice_id', id).order('sort_order'),
     ]);
-    if (dtErr) throw new Error(`could not read document-level taxes: ${dtErr.message}`);
-    doc = row; items = it ?? []; documentTaxes = dt ?? [];
+    doc = row; items = rows(it, 'invoice lines') ?? []; documentTaxes = rows(dt, 'document-level taxes') ?? [];
     companyId = row.customer_company_id; contactId = row.customer_contact_id;
   } else if (kind === 'credit_note') {
     const { data: row } = await db.from('credit_notes').select('*').eq('id', id).single();
-    const [{ data: it }, { data: src }, { data: dt, error: dtErr }] = await Promise.all([
-      db.from('credit_note_items').select(ITEM_FIELDS.filter((f) => !['discounted_price', 'line_comments', 'measurement_unit_code', 'selected_color', 'selected_size'].includes(f)).join(','))
-        .eq('credit_note_id', id).order('created_at'),
+    const [it, { data: src }, dt] = await Promise.all([
+      db.from('credit_note_items').select('*').eq('credit_note_id', id).order('created_at'),
       row.invoice_id
         ? db.from('invoices').select('customer_company_id, customer_contact_id, vat_rate, counterparty_snapshot, doc_language, internal_number, legal_number')
           .eq('id', row.invoice_id).maybeSingle()
@@ -129,8 +133,7 @@ async function loadDocument(db: any, kind: Kind, id: string) {
       db.from('credit_note_taxes').select('tax_type, tax_category, tax_amount, reduces_payable, label')
         .eq('credit_note_id', id).order('sort_order'),
     ]);
-    if (dtErr) throw new Error(`could not read document-level taxes: ${dtErr.message}`);
-    items = it ?? []; documentTaxes = dt ?? [];
+    items = rows(it, 'credit note lines') ?? []; documentTaxes = rows(dt, 'document-level taxes') ?? [];
     doc = {
       ...row, internal_number: row.credit_note_number, vat_rate: src?.vat_rate ?? 24,
       counterparty_snapshot: src?.counterparty_snapshot ?? null, doc_language: src?.doc_language ?? null,
@@ -141,8 +144,8 @@ async function loadDocument(db: any, kind: Kind, id: string) {
     if (src) related = { label: 'invoice', number: src.legal_number ?? src.internal_number ?? null };
   } else if (kind === 'delivery_note') {
     const { data: row } = await db.from('delivery_notes').select('*').eq('id', id).single();
-    const { data: it } = await db.from('delivery_note_items').select('description, sku, quantity, unit')
-      .eq('delivery_note_id', id).order('created_at');
+    const it = rows(await db.from('delivery_note_items').select('description, sku, quantity, unit')
+      .eq('delivery_note_id', id).order('created_at'), 'delivery note lines');
     items = (it ?? []).map((x: any) => ({ ...x, unit_price: 0, net_value: 0, line_total: 0, vat_category: 8 }));
     doc = {
       ...row, internal_number: row.delivery_note_number,
@@ -156,18 +159,14 @@ async function loadDocument(db: any, kind: Kind, id: string) {
     }
   } else {
     const { data: row } = await db.from('orders').select('*').eq('id', id).single();
-    // A purchase line shows the price WE pay the supplier; a sales line never shows cost.
     const isPo = kind === 'purchase_order';
-    const { data: it } = await db.from('order_items')
-      .select(`description, quantity, unit_price, ${isPo ? 'unit_cost, ' : ''}vat_category, vat_percent, net_value, vat_amount, line_total, measurement_unit_code, selected_size, selected_color, vat_exemption_category`)
-      .eq('order_id', id).order('sort_order');
-    items = (it ?? []).map((x: any) => {
-      const { unit_cost, ...rest } = x;
-      return isPo && unit_cost != null ? { ...rest, unit_price: unit_cost } : rest;
-    });
+    // unit_price is the price on BOTH sides (a PO line's is what we pay); unit_cost never leaves via pick().
+    items = rows(await db.from('order_items').select('*').eq('order_id', id).order('sort_order'), 'order lines') ?? [];
+    const settled = rows(await db.rpc('get_order_settlements', { p_order_ids: [id] }), 'order settlement');
+    const st = Array.isArray(settled) ? settled[0] : null;
     doc = {
       ...row, internal_number: row.order_number, issued_at: row.created_at, document_type: null,
-      amount_paid: 0, amount_due: Number(row.total ?? 0),
+      amount_paid: Number(st?.settled ?? 0), amount_due: Number(st?.outstanding ?? row.total ?? 0),
     };
     companyId = isPo ? row.supplier_company_id : row.customer_company_id;
     contactId = isPo ? row.supplier_contact_id : row.customer_contact_id;
@@ -175,8 +174,7 @@ async function loadDocument(db: any, kind: Kind, id: string) {
 
   const ws = doc.workspace_id as string;
   const [{ data: fs }, { data: hr }, customer] = await Promise.all([
-    db.from('finance_settings').select([...SETTINGS_FIELDS, 'business_logo_path', 'invoice_show_pay_link'].join(','))
-      .eq('workspace_id', ws).maybeSingle(),
+    db.from('finance_settings').select('*').eq('workspace_id', ws).maybeSingle(),
     db.from('hr_settings').select('timezone').eq('workspace_id', ws).maybeSingle(),
     partyRow(db, companyId, contactId),
   ]);
@@ -194,13 +192,13 @@ async function loadDocument(db: any, kind: Kind, id: string) {
   }
   let addressUnit: any = null;
   if (doc.customer_address_unit_id) {
-    const { data } = await db.from('crm_address_units').select(ADDRESS_UNIT_FIELDS.join(','))
+    const { data } = await db.from('crm_address_units').select('*')
       .eq('id', doc.customer_address_unit_id).maybeSingle();
-    addressUnit = data;
+    addressUnit = data ? { ...data, name: data.name ?? data.label ?? null } : null;
   }
   let branch: any = null;
   if (Number(doc.branch_code ?? 0) > 0) {
-    const { data } = await db.from('finance_branches').select(BRANCH_FIELDS.join(','))
+    const { data } = await db.from('finance_branches').select('*')
       .eq('workspace_id', ws).eq('branch_code', doc.branch_code).maybeSingle();
     branch = data;
   }
@@ -301,8 +299,11 @@ Deno.serve(withApiLogging('public-document', async (req) => {
   }
 
   const payload = await loadDocument(db, hit.kind, hit.row.id);
-  recordPageEvent(db, req, 'viewed', {
-    entityType, entityId: hit.row.id, workspaceId: hit.row.workspace_id, metadata: { surface: 'document_link' },
-  }).catch(() => {});
+  // An invoice is viewed on /pay, where finance-pay-invoice already records the view.
+  if (hit.kind !== 'invoice') {
+    recordPageEvent(db, req, 'viewed', {
+      entityType, entityId: hit.row.id, workspaceId: hit.row.workspace_id, metadata: { surface: 'document_link' },
+    }).catch(() => {});
+  }
   return json({ ok: true, ...payload });
 }));
