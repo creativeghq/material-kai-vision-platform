@@ -156,87 +156,74 @@ export const ReturnToSupplierDialog: React.FC<{
           </p>
         ) : (
           <div className="space-y-3">
-            <div className="table-scroll max-h-[50vh] overflow-y-auto">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 border-b border-hairline bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
-                  <tr>
-                    <th className="w-8 px-2 py-2"><span className="sr-only">Return</span></th>
-                    <th className="px-2 py-2 text-left">Line</th>
-                    <th className="px-2 py-2 text-right">Invoiced</th>
-                    <th className="px-2 py-2 text-right">Returned</th>
-                    <th className="px-2 py-2 text-left">Take out of stock</th>
-                    <th className="px-2 py-2 text-right">Return qty</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {lines.map((l) => {
-                    const r = rows[l.line_number] ?? { include: false, qty: '', itemId: NO_STOCK };
-                    const docUnit = unitFromMydataCode(Number(l.measurement_unit));
-                    const source = l.stock.find((s) => s.item_id === r.itemId);
-                    const stockUnit = source?.unit ?? warehouse.find((w) => w.id === r.itemId)?.unit ?? null;
-                    const unitDiffers = r.itemId !== NO_STOCK && !!docUnit && !!stockUnit && normalizeUnit(docUnit) !== normalizeUnit(stockUnit);
-                    const exhausted = l.returnable != null && l.returnable <= 0;
-                    return (
-                      <tr key={l.line_number} className={`border-b border-hairline align-top ${exhausted ? 'opacity-50' : ''}`}>
-                        <td className="px-2 py-2">
-                          <Checkbox
-                            checked={r.include}
-                            disabled={exhausted}
-                            onCheckedChange={(v) => setRow(l.line_number, { include: v === true })}
-                            aria-label={`Return line ${l.line_number}`}
-                          />
-                        </td>
-                        <td className="px-2 py-2">
-                          <div className="text-xs font-medium">{l.description}</div>
-                          <div className="text-[11px] text-muted-foreground">
-                            #{l.line_number}{l.item_code ? ` · ${l.item_code}` : ''}
-                          </div>
-                          {unitDiffers && (
-                            <div className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-                              Invoiced in {unitSuffix(docUnit)}, stock counted in {unitSuffix(stockUnit)} — enter the quantity in {unitSuffix(stockUnit)}.
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-2 py-2 text-right tabular-nums">{l.invoiced ?? '—'}</td>
-                        <td className="px-2 py-2 text-right tabular-nums">{l.returned || '—'}</td>
-                        <td className="px-2 py-2">
-                          <Select
-                            value={r.itemId}
-                            disabled={!r.include}
-                            onValueChange={(v) => {
-                              const cap = capFor(l, v);
-                              setRow(l.line_number, { itemId: v, qty: cap != null ? String(cap) : r.qty });
-                            }}
-                          >
-                            <SelectTrigger className="h-8 w-[220px] text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value={NO_STOCK}>Not in stock — no movement</SelectItem>
-                              {l.stock.map((s) => (
-                                <SelectItem key={s.item_id} value={s.item_id}>
-                                  {s.name} · received {s.received}{s.returned ? `, back ${s.returned}` : ''} · on hand {s.on_hand}
-                                </SelectItem>
-                              ))}
-                              {/* Never received from THIS document — e.g. it came in on the purchase order. */}
-                              {l.stock.length === 0 && warehouse.map((w) => (
-                                <SelectItem key={w.id} value={w.id}>{w.name}{w.sku ? ` (${w.sku})` : ''} · on hand {w.qty_on_hand ?? 0}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="px-2 py-2 text-right">
-                          <Input
-                            className="ml-auto h-8 w-24 text-right text-xs tabular-nums"
-                            inputMode="decimal"
-                            value={r.qty}
-                            disabled={!r.include}
-                            onChange={(e) => setRow(l.line_number, { qty: e.target.value })}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+            <div className="max-h-[50vh] space-y-2 overflow-y-auto pr-1">
+              {lines.map((l) => {
+                const r = rows[l.line_number] ?? { include: false, qty: '', itemId: NO_STOCK };
+                const docUnit = unitFromMydataCode(Number(l.measurement_unit));
+                const source = l.stock.find((s) => s.item_id === r.itemId);
+                const stockUnit = source?.unit ?? warehouse.find((w) => w.id === r.itemId)?.unit ?? null;
+                const unitDiffers = r.itemId !== NO_STOCK && !!docUnit && !!stockUnit && normalizeUnit(docUnit) !== normalizeUnit(stockUnit);
+                const exhausted = l.returnable != null && l.returnable <= 0;
+                return (
+                  <div
+                    key={l.line_number}
+                    className={`grid grid-cols-[28px_minmax(0,1fr)] gap-2 rounded-sm border border-hairline p-2.5 sm:grid-cols-[28px_minmax(0,1fr)_auto] ${exhausted ? 'opacity-50' : ''}`}
+                  >
+                    <Checkbox
+                      className="mt-0.5 justify-self-center"
+                      checked={r.include}
+                      disabled={exhausted}
+                      onCheckedChange={(v) => setRow(l.line_number, { include: v === true })}
+                      aria-label={`Return line ${l.line_number}`}
+                    />
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-medium" title={l.description}>{l.description}</div>
+                      <div className="text-[11px] text-muted-foreground tabular-nums">
+                        #{l.line_number}{l.item_code ? ` · ${l.item_code}` : ''}
+                        {' · '}invoiced {l.invoiced ?? '—'}{l.returned ? ` · already returned ${l.returned}` : ''}
+                      </div>
+                      {unitDiffers && (
+                        <div className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+                          Invoiced in {unitSuffix(docUnit)}, stock counted in {unitSuffix(stockUnit)} — enter the quantity in {unitSuffix(stockUnit)}.
+                        </div>
+                      )}
+                    </div>
+                    <div className="col-start-2 flex flex-wrap items-center gap-1 sm:col-start-3">
+                      <Select
+                        value={r.itemId}
+                        disabled={!r.include}
+                        onValueChange={(v) => {
+                          const cap = capFor(l, v);
+                          setRow(l.line_number, { itemId: v, qty: cap != null ? String(cap) : r.qty });
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-[220px] text-xs" aria-label="Take out of stock"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NO_STOCK}>Not in stock — no movement</SelectItem>
+                          {l.stock.map((s) => (
+                            <SelectItem key={s.item_id} value={s.item_id}>
+                              {s.name} · received {s.received}{s.returned ? `, back ${s.returned}` : ''} · on hand {s.on_hand}
+                            </SelectItem>
+                          ))}
+                          {/* Never received from THIS document — e.g. it came in on the purchase order. */}
+                          {l.stock.length === 0 && warehouse.map((w) => (
+                            <SelectItem key={w.id} value={w.id}>{w.name}{w.sku ? ` (${w.sku})` : ''} · on hand {w.qty_on_hand ?? 0}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        className="h-8 w-24 text-right text-xs tabular-nums"
+                        inputMode="decimal"
+                        aria-label="Return quantity"
+                        placeholder="qty"
+                        value={r.qty}
+                        disabled={!r.include}
+                        onChange={(e) => setRow(l.line_number, { qty: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <FormField label="Reason (optional)">
