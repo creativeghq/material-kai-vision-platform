@@ -80,3 +80,6 @@ tsc.log
 # healthy, not a repo fact. It names the workspace it ran against and goes stale the moment
 # anything is deployed.
 sweep-report.json
+
+# Mac widget — its own private repo (creativeghq/hub-widget), cloned here for convenience
+hub-widget/
