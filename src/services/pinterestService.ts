@@ -7,6 +7,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
+import { getRequestWorkspaceId } from '@/utils/activeWorkspace';
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -28,6 +29,7 @@ export interface PinterestImportResult {
     similarity: number;
     image_url?: string;
   }>;
+  match_error?: string;
   error?: string;
 }
 
@@ -74,7 +76,7 @@ export async function importPin(
 ): Promise<PinterestImportResult> {
   return callEdgeFunction<PinterestImportResult>(
     'pinterest-api',
-    { action: 'import_pin', pin_url: pinUrl, moodboard_id: moodboardId, auto_match: autoMatch },
+    { action: 'import_pin', pin_url: pinUrl, moodboard_id: moodboardId, auto_match: autoMatch, workspace_id: getRequestWorkspaceId() },
   );
 }
 
@@ -88,7 +90,7 @@ export async function importPinsBulk(
 ): Promise<{ success: boolean; imported: number; failed: number; results: PinterestImportResult[] }> {
   return callEdgeFunction(
     'pinterest-api',
-    { action: 'import_pins_bulk', pin_urls: pinUrls, moodboard_id: moodboardId, auto_match: autoMatch },
+    { action: 'import_pins_bulk', pin_urls: pinUrls, moodboard_id: moodboardId, auto_match: autoMatch, workspace_id: getRequestWorkspaceId() },
   );
 }
 

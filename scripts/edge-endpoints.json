@@ -5431,16 +5431,6 @@
         "admin_only": false
       },
       {
-        "action": "rag_search_mmr",
-        "description": "MMR search (diversity) — `POST /api/rag/search/mmr` — 0.5 credits",
-        "admin_only": false
-      },
-      {
-        "action": "rag_search_advanced",
-        "description": "Advanced query — `POST /api/rag/search/advanced` — 1 credit",
-        "admin_only": false
-      },
-      {
         "action": "search_knowledge_base",
         "description": "KB search with category + price_doc_type filters — `POST /api/rag/search/knowledge-base` — not in the pricing table — forwarded with no debit",
         "admin_only": false

@@ -261,6 +261,9 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
                     <Check className="h-4 w-4" />
                     <span className="text-sm font-medium">Pin imported successfully!</span>
                   </div>
+                  {importResult.match_error && (
+                    <p className="text-xs text-amber-800">{importResult.match_error}</p>
+                  )}
                   {importResult.matches && importResult.matches.length > 0 && (
                     <div className="mt-2">
                       <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">

@@ -21,8 +21,6 @@ export const MIVAA_ACTION_PRICING: Record<string, MivaaRoutePricing> = {
   // --- Text/Semantic Search (0.5 credits) ---
   'rag_search': { creditCost: 0.5, operationType: 'text_search', description: 'RAG semantic search' },
   'rag_query': { creditCost: 0.5, operationType: 'rag_query', description: 'RAG query' },
-  'rag_search_mmr': { creditCost: 0.5, operationType: 'mmr_search', description: 'MMR diversity search' },
-  'rag_search_advanced': { creditCost: 1, operationType: 'advanced_search', description: 'Advanced search query' },
   'kb_search': { creditCost: 0.5, operationType: 'kb_search', description: 'Knowledge base search' },
   // Both were free by omission, and neither is metered on the MIVAA side (rag_routes.py has no
   // meter_operation call at all). `search_knowledge_base` runs the SAME 7-vector fusion search as

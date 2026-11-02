@@ -113,7 +113,7 @@ export function fenceSearchPayload(data: any): any {
 // deno-lint-ignore no-explicit-any
 const toCandidate = (r: any, i: number): RerankCandidate => ({
   id: String(r?.id ?? r?.product_id ?? r?.chunk_id ?? r?.document_id ?? `idx-${i}`),
-  name: String(r?.name ?? r?.title ?? r?.document_title ?? r?.heading ?? '').slice(0, 200),
+  name: String(r?.product_name ?? r?.name ?? r?.title ?? r?.document_title ?? r?.heading ?? '').slice(0, 200),
   description: String(r?.description ?? r?.content ?? r?.text ?? '') || undefined,
   category: r?.category ?? r?.category_name ?? undefined,
   relevanceScore: typeof r?.relevance_score === 'number' ? r.relevance_score : undefined,
@@ -196,6 +196,15 @@ async function nonEmptyCorpora(workspaceId: string, requested: string[]): Promis
   return new Set(requested.filter((t) => nonEmpty.has(t)));
 }
 
+/**
+ * A multi_vector product list is MIVAA's fused ranking over every channel, ordered by `score`.
+ * That order beats a text-only rerank (which cannot see the image channels), so it is kept.
+ */
+// deno-lint-ignore no-explicit-any
+function isMivaaFusedRanking(arr: any[]): boolean {
+  return arr.every((r) => r && typeof r === 'object' && r.search_type === 'hybrid_multi_source' && typeof r.score === 'number');
+}
+
 async function rerankMivaaPayload(
   // deno-lint-ignore no-explicit-any
   data: any,
@@ -207,6 +216,10 @@ async function rerankMivaaPayload(
   for (const key of RERANKABLE_KEYS) {
     const arr = data[key];
     if (!Array.isArray(arr) || arr.length < 2) continue;
+    if (isMivaaFusedRanking(arr)) {
+      data.ranking = 'mivaa_multi_vector';
+      continue;
+    }
     const outcome = await rerankResults(query, arr, toCandidate, { supabase, task });
     if (outcome.reranked) {
       data[key] = outcome.items;
@@ -352,9 +365,6 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
           }
 
           const data = await response.json();
-          // Fuse the per-aspect candidate sets into one ordering. MIVAA returns candidates
-          // scored per embedding aspect; without this the agent sees whichever aspect happened
-          // to sort first, which is not a ranking.
           const ranked = await rerankMivaaPayload(data, query, 'material_search_rerank');
           // Say WHY it is empty, so the agent stops guessing synonyms at an empty catalogue.
           const hitCount = RERANKABLE_KEYS.reduce(
@@ -528,9 +538,6 @@ export const createVisualSearchTool = (workspaceId: string, images: string[], us
             // tell the user what it actually matched on.
             return JSON.stringify(fenceSearchPayload(data));
           }
-          // The text query is optional here, so this reranks only when the user gave one to
-          // rank against; pure image-similarity results keep MIVAA's visual ordering, which is
-          // the right answer when there is no stated intent to weigh them against.
           return JSON.stringify(fenceSearchPayload(await rerankMivaaPayload(data, query || '', 'visual_search_rerank')));
         } catch (fetchError) {
           clearTimeout(timeoutId);

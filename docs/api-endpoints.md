@@ -599,29 +599,7 @@ All uploads use deep processing mode with complete AI analysis, image embeddings
 
 ---
 
-### 1.11 POST /search/advanced
-
-**Purpose:** Advanced query search with query expansion and optimization
-**Used In:** Advanced search interface
-**Flow:** User query → Query expansion → Multi-strategy search → Ranked results
-
-**Request fields:** `query`, `expand_query`, `rerank`, `filters`
-
-**Database Operations:** SELECT FROM document_chunks, embeddings
-**Frontend Integration:** AdvancedSearch.tsx
-
----
-
-### 1.12 POST /search/mmr
-
-**Purpose:** MMR (Maximal Marginal Relevance) search for diverse results
-**Used In:** Search with diversity requirements
-**Flow:** User query → Semantic search → MMR reranking → Diverse results
-
-**Request fields:** `query`, `lambda_param`, `top_k`
-
-**Database Operations:** SELECT FROM document_chunks, embeddings
-**Frontend Integration:** SearchPage.tsx (diversity mode)
+There is no `/search/advanced` or `/search/mmr` route: MMR diversity is `enable_mmr` / `mmr_lambda` on `POST /search`.
 
 ---
 

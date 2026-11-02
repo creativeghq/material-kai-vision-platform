@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { stripComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const SEARCH_TOOLS = join(ROOT, 'supabase/functions/_shared/tools/search-tools.ts');
@@ -74,6 +75,18 @@ describe('visual_search routes an aspect to an endpoint that honors it', () => {
     // would discard the exact bias a vision call was just spent computing, which is the
     // silent-no-op this whole guard is about — arriving one layer later.
     expect(visualSearch).toMatch(/if \(aspect\)[\s\S]{0,600}return JSON\.stringify\(fenceSearchPayload\(data\)\)/);
+  });
+});
+
+describe("MIVAA's multi_vector ranking survives the agent tools", () => {
+  it('a fused multi_vector product list is kept in MIVAA order, never handed to the LLM rerank', () => {
+    const src = stripComments(read(SEARCH_TOOLS));
+    const fn = src.slice(src.indexOf('async function rerankMivaaPayload'));
+    const guardAt = fn.indexOf('isMivaaFusedRanking(arr)');
+    const rerankAt = fn.indexOf('rerankResults(');
+    expect(guardAt, 'rerankMivaaPayload must skip MIVAA fused rankings').toBeGreaterThan(-1);
+    expect(guardAt).toBeLessThan(rerankAt);
+    expect(src).toMatch(/function isMivaaFusedRanking[\s\S]{0,200}'hybrid_multi_source'[\s\S]{0,80}typeof r\.score === 'number'/);
   });
 });
 

@@ -57,8 +57,6 @@ const MIVAA_ENDPOINTS = {
   'rag_delete_document': { path: '/api/rag/documents/{document_id}', method: 'DELETE' },  // Delete document
   'rag_health': { path: '/api/rag/health', method: 'GET' },  // RAG service health
   'rag_stats': { path: '/api/rag/stats', method: 'GET' },  // RAG statistics
-  'rag_search_mmr': { path: '/api/rag/search/mmr', method: 'POST' },  // MMR search (diversity)
-  'rag_search_advanced': { path: '/api/rag/search/advanced', method: 'POST' },  // Advanced query
   'search_knowledge_base': { path: '/api/rag/search/knowledge-base', method: 'POST' },  // KB search with category + price_doc_type filters
   'rag_ai_tracking': { path: '/api/rag/job/{job_id}/ai-tracking', method: 'GET' },  // AI model usage tracking
   'rag_ai_tracking_stage': { path: '/api/rag/job/{job_id}/ai-tracking/stage/{stage}', method: 'GET' },  // AI tracking by stage

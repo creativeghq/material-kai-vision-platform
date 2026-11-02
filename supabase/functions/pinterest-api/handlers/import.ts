@@ -4,7 +4,7 @@ import type { DbClient } from '../../_shared/supabase-client.ts';
 import { jsonResponse } from '../../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../../_shared/cors.ts';
-import { authenticate } from '../../_shared/auth.ts';
+import { authenticate, listUserWorkspaceIds, userCanAccessWorkspace } from '../../_shared/auth.ts';
 import { assertSafeUrl } from '../../_shared/ssrf-guard.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -116,6 +116,73 @@ async function assertMoodboardOwner(
 }
 
 /**
+ * The catalogue a pin is matched against. Moodboards carry no workspace, so: the moodboard's
+ * project's workspace, else the caller's active-workspace hint, else their only workspace —
+ * each accepted only when the caller is an active member of it (invariant 1).
+ */
+async function resolveMatchWorkspace(
+  supabase: DbClient,
+  userId: string,
+  moodboardId: string,
+  hint: unknown,
+): Promise<string | null> {
+  const { data: mb } = await supabase.from('moodboards').select('project_id').eq('id', moodboardId).maybeSingle();
+  if (mb?.project_id) {
+    const { data: proj } = await supabase.from('projects').select('workspace_id').eq('id', mb.project_id).maybeSingle();
+    if (proj?.workspace_id && await userCanAccessWorkspace(supabase, userId, proj.workspace_id)) return proj.workspace_id;
+  }
+  if (typeof hint === 'string' && hint && await userCanAccessWorkspace(supabase, userId, hint)) return hint;
+  const memberships = await listUserWorkspaceIds(supabase, userId);
+  return memberships.length === 1 ? memberships[0] : null;
+}
+
+interface CatalogMatch {
+  product_id: string;
+  product_name: string;
+  similarity: number;
+  image_url?: string;
+}
+
+// deno-lint-ignore no-explicit-any
+function toCatalogMatch(r: any): CatalogMatch | null {
+  const id = r?.product_id ?? r?.id;
+  const name = r?.product_name ?? r?.name;
+  if (!id || !name) return null;
+  const score = typeof r.score === 'number' ? r.score : (typeof r.similarity_score === 'number' ? r.similarity_score : 0);
+  const image = r.image_url ?? r.thumbnail ?? r.related_images?.[0]?.url ?? r.metadata?.image_url;
+  return { product_id: String(id), product_name: String(name), similarity: score, ...(image ? { image_url: String(image) } : {}) };
+}
+
+async function matchPinAgainstCatalog(
+  imageUrl: string,
+  workspaceId: string,
+): Promise<{ matches: CatalogMatch[] } | { error: string }> {
+  const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
+  try {
+    const res = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search?strategy=multi_vector`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(mivaaKey ? { Authorization: `Bearer ${mivaaKey}` } : {}),
+      },
+      // Image only: a pin title ("Untitled Pin") is not a query worth embedding.
+      body: JSON.stringify({ query: '', image_url: imageUrl, workspace_id: workspaceId, top_k: 5 }),
+    });
+    if (!res.ok) {
+      const detail = (await res.text()).slice(0, 300);
+      console.error(`[pinterest-import] auto-match failed: MIVAA ${res.status} ${detail}`);
+      return { error: `Catalog match failed (search service returned ${res.status})` };
+    }
+    const data = await res.json();
+    const rows = Array.isArray(data?.results) ? data.results : [];
+    return { matches: rows.map(toCatalogMatch).filter((m: CatalogMatch | null): m is CatalogMatch => m !== null) };
+  } catch (err) {
+    console.error('[pinterest-import] auto-match failed:', err);
+    return { error: 'Catalog match failed (search service unreachable)' };
+  }
+}
+
+/**
  * Import a single pin into a moodboard
  */
 async function importSinglePin(
@@ -124,11 +191,13 @@ async function importSinglePin(
   pinUrl: string,
   moodboardId: string,
   autoMatch: boolean,
+  workspaceHint: unknown,
 ): Promise<{
   success: boolean;
   moodboard_item_id?: string;
   image_url?: string;
-  matches?: unknown[];
+  matches?: CatalogMatch[];
+  match_error?: string;
   error?: string;
 }> {
   try {
@@ -197,31 +266,17 @@ async function importSinglePin(
       throw new Error(`Failed to create moodboard item: ${insertError.message}`);
     }
 
-    // 6. Auto-match if requested
-    let matches: unknown[] = [];
+    // 6. Auto-match if requested. A failed match is reported as match_error, never as zero matches.
+    let matches: CatalogMatch[] = [];
+    let matchError: string | undefined;
     if (autoMatch) {
-      try {
-        // MIVAA /api/rag/search now requires auth — authenticate as the platform service.
-        const mivaaKey = Deno.env.get('MIVAA_API_KEY') || Deno.env.get('MATERIAL_KAI_API_KEY') || '';
-        const searchRes = await fetch(`${MIVAA_GATEWAY_URL}/api/rag/search`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(mivaaKey ? { Authorization: `Bearer ${mivaaKey}` } : {}),
-          },
-          // VISUAL match on the pinned IMAGE (the value-prop) — not the pin title, which is usually
-          // "Untitled Pin". MIVAA /api/rag/search does a visual/CLIP search when given image_url
-          // (mivaa-gateway recognizes image_url → visual_search). publicUrl is the stored image.
-          body: JSON.stringify({ image_url: publicUrl, query: pinData.title, top_k: 5 }),
-        });
-
-        if (searchRes.ok) {
-          const searchData = await searchRes.json();
-          matches = searchData.results || searchData.matches || [];
-        }
-      } catch (err) {
-        console.warn('[pinterest-import] Auto-match failed:', err);
-        // Non-fatal — continue without matches
+      const workspaceId = await resolveMatchWorkspace(supabase, userId, moodboardId, workspaceHint);
+      if (!workspaceId) {
+        matchError = 'Catalog match skipped: could not determine which workspace catalog to search';
+      } else {
+        const outcome = await matchPinAgainstCatalog(publicUrl, workspaceId);
+        if ('error' in outcome) matchError = outcome.error;
+        else matches = outcome.matches;
       }
     }
 
@@ -230,6 +285,7 @@ async function importSinglePin(
       moodboard_item_id: moodboardItem.id,
       image_url: publicUrl,
       matches,
+      ...(matchError ? { match_error: matchError } : {}),
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -282,7 +338,7 @@ export async function handlePinterestImport(req: Request, body: any): Promise<Re
     const ownerCheck = await assertMoodboardOwner(supabase, moodboard_id, userId);
     if (!ownerCheck.ok) return jsonResponse({ success: false, error: ownerCheck.error }, ownerCheck.status);
 
-    const result = await importSinglePin(supabase, userId, pin_url, moodboard_id, auto_match);
+    const result = await importSinglePin(supabase, userId, pin_url, moodboard_id, auto_match, body.workspace_id);
 
     if (!result.success) {
       return jsonResponse({ success: false, error: result.error }, 400);
@@ -293,6 +349,7 @@ export async function handlePinterestImport(req: Request, body: any): Promise<Re
       moodboard_item_id: result.moodboard_item_id,
       image_url: result.image_url,
       matches: result.matches,
+      ...(result.match_error ? { match_error: result.match_error } : {}),
     });
   }
 
@@ -317,7 +374,7 @@ export async function handlePinterestImport(req: Request, body: any): Promise<Re
     let failed = 0;
 
     for (const pinUrl of pin_urls) {
-      const result = await importSinglePin(supabase, userId, pinUrl, moodboard_id, auto_match);
+      const result = await importSinglePin(supabase, userId, pinUrl, moodboard_id, auto_match, body.workspace_id);
       results.push({ pin_url: pinUrl, ...result });
 
       if (result.success) {
