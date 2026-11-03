@@ -364,6 +364,26 @@ path is not a storage claim), see [storage-buckets.md](storage-buckets.md).
 
 ---
 
+## Drawing takeoff (#532) — Specification → Takeoff and Bill
+
+Uploads are **PDF only** (never DXF/DWG/IFC). A project can start from its drawings: drop the plan PDFs
+and the engineer's study, confirm what they say, and send it to the bill.
+
+| Step | Where | What runs |
+|---|---|---|
+| Read | `takeoff-from-drawing` `analyze` (1 credit, debited first, runs in the background; `project_document_revisions.takeoff_status`) | MIVAA `/api/internal/drawings/analyze` classifies each page **vector** (CAD-exported) or **scan**, reads the printed scale, room area labels, door swings and wall pairs on vector pages, and a 16×16 fingerprint per page. The model (`output_config.format`, prompt `extraction/drawing_takeoff`) only TRANSCRIBES printed tables — προμέτρηση, door/window/radiator schedules — and counts symbols on scanned pages. It has no field to put a length in. |
+| Review | `TakeoffReviewer` | Every row is a `project_drawing_measurements` proposal with `source` (printed / detected / counted / vision / manual) and `confidence` (NULL = not AI). *Find all like this* = MIVAA `find-similar` count-by-example. A person confirms or rejects; re-analysis replaces only untouched AI proposals. |
+| Scale | revision calibration (`scale_units_per_unit`) else a plausible printed scale (`project_drawing_pages.text_units_per_width`) | Detected and hand-measured lengths/areas are stored in **page-width units** (`value_norm`) and derived by `drawing_measurement_value()`. Recalibrating re-derives them and every bill line they feed. No scale = NULL, never 0, and confirming one is refused. |
+| Bill | `takeoff_send_to_bill()` → `project_schedule_items.quantity_source = 'takeoff'` | The line quantity is `takeoff_item_quantity()` — the SUM of its confirmed rows, NULL if any has no value. A trigger keeps it current and refuses a typed-over quantity; `takeoff_detach_bill_line()` hands it back to manual. Drift probe: `projects.takeoff_quantity_drift`. |
+| Revise | `analyze` on a new revision | Fingerprints are diffed against the previous revision; confirmed measurements in changed cells get `needs_remeasure`, and the Bill shows the lines they feed. |
+
+The agent tool is `drawing_takeoff` (Construction toolkit): `status`, `analyze`, and `confirm_printed`
+behind Approve/Decline. Counted and measured figures are confirmed only by a person on the sheet.
+Not built yet: the item library and resource rates, so a confirmed bill does not yet derive a purchase
+list, labour hours or a programme.
+
+---
+
 ## What we deliberately don't do
 
 - **No forced backfill.** Existing moodboards and quotes created before Projects shipped stay project-less.

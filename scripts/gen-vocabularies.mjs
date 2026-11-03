@@ -148,6 +148,16 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/drawingVocabulary.generated.ts',
   ],
   [
+    // #532 takeoff kinds/sources/element types; the CHECKs on project_drawing_measurements enforce them.
+    'src/modules/projects/takeoffVocabulary.ts',
+    'supabase/functions/_shared/takeoffVocabulary.generated.ts',
+  ],
+  [
+    // Printed schedule units snap to the same keys the bill's unit picker offers.
+    'src/lib/units.ts',
+    'supabase/functions/_shared/units.generated.ts',
+  ],
+  [
     // #391 — `property_type`, four copies in four different SHAPES (array, array, union,
     // Set). `properties_property_type_check` is the enforcer.
     'src/modules/real-estate/realEstateVocabulary.ts',

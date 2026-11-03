@@ -623,6 +623,20 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'drawing_takeoff',
+    file: 'supabase/functions/_shared/tools/construction-tools.ts',
+    factory: 'createDrawingTakeoffTool',
+    description: 'Quantities taken off a project drawing PDFs.',
+    params: [
+      { name: 'action', type: 'enum', enum: ['status', 'analyze', 'confirm_printed'], optional: true, description: 'Default status.' },
+      { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it' },
+      { name: 'project_name', type: 'string', optional: true, description: 'The project name, if you do not have the id' },
+      { name: 'drawing', type: 'string', optional: true, description: 'analyze/confirm_printed: the drawing number or title (or revision id).' },
+      { name: 'element_type', type: 'enum', enum: ['door', 'window', 'room', 'wall', 'radiator', 'fixture', 'socket', 'light', 'pipe', 'other'], optional: true, description: 'confirm_printed: only rows of this element.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set: the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
     name: 'email_validate',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createEmailValidateTool',

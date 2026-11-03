@@ -82,13 +82,12 @@ describe('public estimator matches a visitor email exactly', () => {
 });
 
 describe('drawing takeoff reads only its own document folder', () => {
-  it('pins bucket and prefix before the download and before the debit', () => {
-    const pin = TAKEOFF.indexOf('path.startsWith(`project-docs/${doc.project_id}/${doc.id}/`)');
-    const download = TAKEOFF.indexOf('.download(path)');
-    const debit = TAKEOFF.indexOf('debitOrRefuse(');
-    expect(pin).toBeGreaterThan(-1);
-    expect(pin).toBeLessThan(download);
-    expect(download).toBeLessThan(debit);
+  it('pins bucket and prefix in the one resolver every action passes through', () => {
+    const resolver = TAKEOFF.slice(TAKEOFF.indexOf('async function resolveRevision'), TAKEOFF.indexOf('interface ReadResult'));
+    expect(resolver).toContain('path.startsWith(`project-docs/${doc.project_id}/${doc.id}/`)');
+    const handler = TAKEOFF.slice(TAKEOFF.indexOf('Deno.serve('));
+    expect(handler.indexOf('resolveRevision(')).toBeGreaterThan(-1);
+    expect(handler.indexOf('resolveRevision(')).toBeLessThan(handler.indexOf('debitOrRefuse('));
     expect(TAKEOFF).toContain("const DRAWING_BUCKET = 'pdf-documents'");
   });
 });

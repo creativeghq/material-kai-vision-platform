@@ -9,7 +9,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ClipboardList, FolderKanban, LayoutGrid, List as ListIcon, ListTodo, Plus, Tags } from 'lucide-react';
+import { ClipboardList, FolderKanban, LayoutGrid, List as ListIcon, ListTodo, Plus, ScanLine, Tags } from 'lucide-react';
 
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Button } from '@/components/core/ui/button';
@@ -35,6 +35,7 @@ import { formatMoney } from '@/utils/decimal';
 import { timeAgo } from '@/utils/datetime';
 import { buildProjectFilters, clientName } from '../components/projectFilters';
 import { CreateProjectModal } from '../components/CreateProjectModal';
+import { projectSectionPath } from '../projectSections';
 import { ProjectCategoryManager } from '../components/ProjectCategoryManager';
 import { ProjectCard, projectCoverSrc } from '../components/ProjectCard';
 import { PROJECT_STATUS_BADGE, PROJECT_STATUS_LABELS, PROJECT_STATUS_ORDER } from '../projectStatus';
@@ -127,6 +128,7 @@ export const ProjectsListPage: React.FC = () => {
   const [covers, setCovers] = useState<Map<string, ProjectCoverCandidate>>(() => new Map());
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
+  const [fromDrawings, setFromDrawings] = useState(false);
   const [managingCategories, setManagingCategories] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const { activeWorkspaceId } = useWorkspace();
@@ -323,7 +325,11 @@ export const ProjectsListPage: React.FC = () => {
                 Categories
               </Button>
             )}
-            <Button size="sm" onClick={() => setShowCreate(true)}>
+            <Button variant="secondary" size="sm" onClick={() => { setFromDrawings(true); setShowCreate(true); }}>
+              <ScanLine className="h-4 w-4 mr-2" />
+              Start from drawings
+            </Button>
+            <Button size="sm" onClick={() => { setFromDrawings(false); setShowCreate(true); }}>
               <Plus className="h-4 w-4 mr-2" />
               New project
             </Button>
@@ -441,7 +447,7 @@ export const ProjectsListPage: React.FC = () => {
         <CreateProjectModal
           open={showCreate}
           onClose={() => setShowCreate(false)}
-          onSuccess={(id) => navigate(`/projects/${id}`)}
+          onSuccess={(id) => navigate(fromDrawings ? projectSectionPath(id, 'takeoff') : `/projects/${id}`)}
           initialCategoryId={scopedFilterValue(filterValues, 'category')}
           initialClient={scopedClient}
           lockClient={false}

@@ -1,6 +1,6 @@
 /** The priced schedule — a bill of quantities. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2, ListOrdered, Check } from 'lucide-react';
+import { Loader2, Plus, Trash2, ListOrdered, Check, Unlink } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -21,6 +21,7 @@ import {
   schedulesService, isScheduleLive,
   type ProjectSchedule, type ScheduleItem, type ScheduleStatus,
 } from '../services/schedulesService';
+import { takeoffService } from '../services/takeoffService';
 
 interface Props {
   projectId: string;
@@ -244,12 +245,17 @@ export const PricedScheduleCard: React.FC<Props> = ({
                       <td className="px-3 py-2">
                         {i.description}
                         {i.is_provisional && <Badge variant="warning" className="ml-2">provisional</Badge>}
+                        {i.quantity_source === 'takeoff' && <Badge variant="info" className="ml-2">from drawings</Badge>}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">
                         {i.cost_code_id ? '✓' : <span className="text-amber-800 dark:text-amber-300">none</span>}
                       </td>
                       <td className="px-3 py-2 text-xs text-muted-foreground">{i.unit ?? '—'}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{i.quantity ?? '—'}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">
+                        {i.quantity ?? (i.quantity_source === 'takeoff'
+                          ? <span className="text-xs text-amber-800 dark:text-amber-300" title="A contributing measurement has no scale yet">needs scale</span>
+                          : '—')}
+                      </td>
                       <td className="px-3 py-2 text-right tabular-nums">{i.rate === null ? '—' : money(i.rate)}</td>
                       <td className="px-3 py-2 text-right font-medium tabular-nums">
                         {/* NULL means no rate yet. Showing 0.00 would read as "free" rather than
@@ -259,6 +265,12 @@ export const PricedScheduleCard: React.FC<Props> = ({
                           : money(i.amount)}
                       </td>
                       <td className="px-5 py-2 text-right">
+                        {isOwner && i.quantity_source === 'takeoff' && (
+                          <Button size="sm" variant="ghost" disabled={busy} title="Detach from the takeoff and type the quantity by hand"
+                            onClick={() => void act('Could not detach', () => takeoffService.detachBillLine(i.id))}>
+                            <Unlink className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         {isOwner && (
                           <Button size="sm" variant="ghost" disabled={busy}
                             onClick={() => void act('Could not delete', () => schedulesService.removeItem(i.id))}>

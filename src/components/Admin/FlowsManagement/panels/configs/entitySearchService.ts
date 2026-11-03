@@ -197,7 +197,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'installation-guide-extract', label: 'installation-guide-extract', sublabel: 'Read an uploaded installation manual into a step-by-step guide with the page and box of every drawing' },
   { id: 'installation-guide-appearance', label: 'installation-guide-appearance', sublabel: 'Read a product photo into the finish each part of an installation guide carries' },
   { id: 'installation-guide-public', label: 'installation-guide-public', sublabel: 'Open an installation guide through its public share link' },
-  { id: 'takeoff-from-drawing', label: 'takeoff-from-drawing', sublabel: 'Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines — never measured, always cited' },
+  { id: 'takeoff-from-drawing', label: 'takeoff-from-drawing', sublabel: 'Read a drawing PDF into takeoff proposals — printed tables, counted symbols and scale-derived measurements, each confirmed by a person' },
   { id: 'trade-portal', label: 'trade-portal', sublabel: 'A trade customer seeing their own account: statement, stock bands, reorder and a delegated admin' },
   { id: 'trigger-factory-enrichment', label: 'trigger-factory-enrichment', sublabel: 'Propagate factory fields within a scope and queue a factory-enrichment agent if needed' },
   { id: 'trip-expense-ops', label: 'trip-expense-ops', sublabel: 'Sales trip-expense receipts: upload, sign, and render the expense PDF' },

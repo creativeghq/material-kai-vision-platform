@@ -17,6 +17,7 @@ const MODULE_SLUG = 'projects';
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { moduleGate, roleGate, type WorkspaceRolePredicate } from './module-gate.ts';
 import { resolveProjectId as sbResolveProjectId } from '../assessment.ts';
+import { TAKEOFF_ELEMENT_TYPES } from '../takeoffVocabulary.generated.ts';
 
 type ProjectView = 'pnl' | 'finance_summary' | 'cost_by_code' | 'labor' | 'inspections';
 
@@ -605,3 +606,136 @@ export const createBidAnalysisTool = (
     },
   );
 };
+
+/**
+ * Drawing takeoff (#532): what the drawings say, start reading one, and confirm PRINTED rows.
+ * A measured or counted figure is never confirmed from chat — only a person looking at the sheet does that.
+ */
+export const createDrawingTakeoffTool = (
+  userId: string,
+  workspaceId: string | null,
+  onChunk?: (chunk: any) => void,
+  jwt?: string,
+) => {
+  return tool(
+    async (
+      { action, project_id, project_name, drawing, element_type, confirm }:
+      { action?: 'status' | 'analyze' | 'confirm_printed'; project_id?: string; project_name?: string; drawing?: string; element_type?: string; confirm?: boolean },
+    ) => {
+      const denied = await moduleGate(workspaceId, MODULE_SLUG);
+      if (denied) return denied;
+      if (!jwt) return JSON.stringify({ success: false, error: 'The takeoff needs a signed-in user session.' });
+      const id = await resolveProject(userId, workspaceId, project_id, project_name);
+      if (!id) return notFound(project_name);
+
+      const db = callerDbClient(jwt, userId, workspaceId);
+      const { data: summary, error } = await db.rpc('get_project_takeoff_summary', { p_project_id: id });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      const drawings = ((summary as any)?.drawings ?? []) as Array<Record<string, any>>;
+      const url = `/projects/${id}?tab=takeoff`;
+      const needle = (drawing ?? '').toLowerCase();
+      const pick = needle
+        ? drawings.filter((d) => String(d.label).toLowerCase().includes(needle)
+          || String(d.title).toLowerCase().includes(needle) || d.revision_id === drawing)
+        : drawings;
+      if (!action || action === 'status') {
+        const payload = {
+          success: true, project_id: id, url,
+          drawings: pick.map((d) => ({
+            label: d.label, rev: d.rev_label, revision_id: d.revision_id, status: d.takeoff_status ?? 'not_analysed',
+            problem: d.takeoff_error, pages: d.pages, cad_pages: d.vector_pages, scanned_pages: d.scan_pages,
+            to_review: d.proposed, confirmed: d.confirmed, needs_scale: d.needs_scale, groups: d.groups,
+          })),
+          bill_lines_to_remeasure: (summary as any)?.remeasure ?? [],
+          note: 'Totals are derived by the platform. Confirmed figures reach the bill only when someone sends them there in the Takeoff screen.',
+        };
+        try { onChunk?.({ type: 'construction_takeoff', ...payload, timestamp: Date.now() }); } catch { /* stream may be closed */ }
+        return JSON.stringify(payload);
+      }
+
+      if (pick.length !== 1) {
+        return JSON.stringify({
+          success: false,
+          error: pick.length ? 'More than one drawing matches. Name it exactly.' : 'No drawing on this project matches. Upload the PDF in Specification → Takeoff.',
+          drawings: drawings.map((d) => d.label),
+        });
+      }
+      const target = pick[0];
+
+      if (action === 'analyze') {
+        onChunk?.({ type: 'tool_progress', status: `Starting to read ${target.label}…`, timestamp: Date.now() });
+        const resp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/takeoff-from-drawing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+          body: JSON.stringify({ action: 'analyze', revision_id: target.revision_id }),
+        });
+        const out = await resp.json().catch(() => ({}));
+        if (!resp.ok) return JSON.stringify({ success: false, error: out?.error ?? `The takeoff could not start (${resp.status}).` });
+        const payload = {
+          success: true, project_id: id, url: `${url}&revision=${target.revision_id}`, drawing: target.label,
+          status: out?.status ?? 'running',
+          message: 'Reading has started. Proposals appear in Specification → Takeoff for review in a minute or two.',
+        };
+        try { onChunk?.({ type: 'construction_takeoff', ...payload, timestamp: Date.now() }); } catch { /* stream may be closed */ }
+        return JSON.stringify(payload);
+      }
+
+      if (action === 'confirm_printed') {
+        let q = db.from('project_drawing_measurements').select('id, label, value, unit')
+          .eq('revision_id', target.revision_id).eq('review_status', 'proposed').eq('source', 'printed');
+        if (element_type) q = q.eq('element_type', element_type);
+        const { data: rows, error: rowsError } = await q.limit(500);
+        if (rowsError) return JSON.stringify({ success: false, error: rowsError.message });
+        const list = (rows ?? []) as Array<{ id: string; label: string; value: number; unit: string }>;
+        if (!list.length) return JSON.stringify({ success: true, confirmed: 0, message: 'No printed rows are waiting for review on that drawing.' });
+        if (confirm !== true) {
+          onChunk?.({
+            type: 'action_confirmation',
+            tool: 'drawing_takeoff',
+            input: { action: 'confirm_printed', project_id: id, drawing: target.revision_id, element_type, confirm: true },
+            title: `Confirm ${list.length} printed row${list.length === 1 ? '' : 's'} on ${target.label}?`,
+            summary: list.slice(0, 8).map((r) => `${r.label}: ${r.value} ${r.unit}`).join(' · ')
+              + (list.length > 8 ? ` … and ${list.length - 8} more` : '')
+              + '. Transcribed from tables printed on the drawing; counted and measured figures are not included.',
+            toolkit_id: 'construction',
+            timestamp: Date.now(),
+          });
+          return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user approval. Do not retry.' });
+        }
+        const { error: updError } = await db.from('project_drawing_measurements')
+          .update({ review_status: 'confirmed' })
+          .in('id', list.map((r) => r.id)).eq('source', 'printed').eq('review_status', 'proposed');
+        if (updError) return JSON.stringify({ success: false, error: updError.message });
+        const payload = {
+          success: true, project_id: id, url: `${url}&revision=${target.revision_id}`, drawing: target.label, confirmed: list.length,
+          message: 'Confirmed. Send them to the bill from the Takeoff screen.',
+        };
+        try { onChunk?.({ type: 'construction_takeoff', ...payload, timestamp: Date.now() }); } catch { /* stream may be closed */ }
+        return JSON.stringify(payload);
+      }
+
+      return JSON.stringify({ success: false, error: `unknown action: ${action}` });
+    },
+    {
+      name: 'drawing_takeoff',
+      description:
+        'Quantities taken off a project drawing PDFs. status: per drawing, what was read (CAD-exported vs '
+        + 'scanned pages), how many proposals wait for review, confirmed totals per element (doors, windows, '
+        + 'rooms m², walls m), what needs a scale, and bill lines a newer revision moved. analyze: start '
+        + 'reading one uploaded drawing (costs a credit). confirm_printed: confirm the rows transcribed from '
+        + 'tables PRINTED on a drawing; it always asks the user to Approve first, never set confirm yourself. '
+        + 'Counted and measured figures are confirmed only by a person on the sheet, so never offer to confirm '
+        + 'those. Report the platform figures; never compute a quantity yourself.',
+      schema: z.object({
+        action: z.enum(['status', 'analyze', 'confirm_printed']).optional().describe('Default status.'),
+        project_id: z.string().optional().describe('The project id, when you already have it'),
+        project_name: z.string().optional().describe('The project name, if you do not have the id'),
+        drawing: z.string().optional().describe('analyze/confirm_printed: the drawing number or title (or revision id).'),
+        element_type: z.enum(TAKEOFF_ELEMENT_TYPES).optional()
+          .describe('confirm_printed: only rows of this element.'),
+        confirm: z.boolean().optional().describe('Do NOT set: the Approve/Decline card sets confirm:true on approval.'),
+      }),
+    },
+  );
+};
+

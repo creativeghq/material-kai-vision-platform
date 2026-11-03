@@ -404,7 +404,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `project-assessment` | JWT | Derive a project's health signals, and optionally write the AI assessment of them |
 | `scan-drawing-title-block` | JWT / kai_* | Read a drawing's title block into project drawing-register fields |
 | `structure-site-note` | JWT / kai_* | Turn a dictated site walk into a diary entry and the defects it described |
-| `takeoff-from-drawing` | JWT / kai_* | Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines |
+| `takeoff-from-drawing` | JWT / kai_* | Read a drawing PDF into takeoff proposals a person confirms (printed tables, counted symbols, scale-derived measurements) |
 | `tender-bid-portal` | public / JWT / kai_* | Issue a trade package to a subcontractor and take their priced return |
 
 **Public**

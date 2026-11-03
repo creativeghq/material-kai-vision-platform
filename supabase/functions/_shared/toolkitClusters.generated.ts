@@ -168,7 +168,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'construction': {
     capability: ['projects.use'],
-    tool_ids: ['project_cvr', 'project_applications', 'list_variations', 'tender_status', 'tender_bid_analysis'],
+    tool_ids: ['project_cvr', 'project_applications', 'list_variations', 'tender_status', 'tender_bid_analysis', 'drawing_takeoff'],
   },
   'projects': {
     capability: ['projects.use'],

@@ -363,6 +363,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   construction_variations: 'Variations',
   construction_tenders: 'Tender packages',
   construction_bid_analysis: 'Bid analysis',
+  construction_takeoff: 'Drawing takeoff',
   b2b_company_results: 'Companies found',
   project_report: 'Project report',
   // Deterministic surface preview (#447): the card draws it in the browser from this chunk.

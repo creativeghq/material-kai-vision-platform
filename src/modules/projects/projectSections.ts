@@ -1,6 +1,6 @@
 /** The project page's sections — their ids, their titles, and the one way to link to them. */
 export const PROJECT_TABS = [
-  'overview', 'rooms', 'products', 'moodboards', 'plan', 'purchases', 'quotes', 'billing',
+  'overview', 'rooms', 'products', 'moodboards', 'plan', 'takeoff', 'bill', 'purchases', 'quotes', 'billing',
   'finance', 'sheets', 'client-view', 'contracts', 'handover', 'tasks', 'site', 'documents',
   'requests', 'assessment', 'timeline',
 ] as const;
@@ -13,6 +13,8 @@ export const PROJECT_SECTION_LABELS: Record<ProjectTab, string> = {
   products: 'Products',
   moodboards: 'Moodboards',
   plan: 'Plan',
+  takeoff: 'Takeoff',
+  bill: 'Bill',
   purchases: 'Purchases',
   quotes: 'Quotes',
   billing: 'Billing',

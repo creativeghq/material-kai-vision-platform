@@ -1,5 +1,7 @@
 /** Drawings / documents register (WS6 #285). */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { projectSectionPath } from '../../projectSections';
 import {
   Loader2, Plus, FileStack, Download, Trash2, Eye, EyeOff, Upload, History, FileText, ScanLine,
   PenLine, Pencil,
@@ -23,7 +25,6 @@ import {
 } from '../../services/projectDocumentsService';
 import { HubEmptyState } from '@/components/core/hub';
 import { DrawingMarkupDialog } from '../DrawingMarkupDialog';
-import { DrawingTakeoffDialog } from '../DrawingTakeoffDialog';
 import { humanizeLabel } from '@/utils/humanize';
 import {
   DOCUMENT_KINDS, DISCIPLINES, DRAWING_PURPOSES, BUILDABLE_PURPOSES,
@@ -58,14 +59,7 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
     rev: ProjectDocumentRevision; url: string; label: string;
   } | null>(null);
 
-  /**
-   * The revision whose printed schedules are being read into a takeoff. No URL: the reader is
-   * given the revision id and fetches the file server-side from the row's own bucket and path, so
-   * a URL in the request body can never point it somewhere else (invariant 7).
-   */
-  const [takeoff, setTakeoff] = useState<{
-    rev: ProjectDocumentRevision; label: string;
-  } | null>(null);
+  const navigate = useNavigate();
 
   const openMarkup = async (doc: ProjectDocumentWithRevisions, rev: ProjectDocumentRevision) => {
     try {
@@ -219,14 +213,10 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
                         <PenLine className="h-4 w-4" />
                       </Button>
                     )}
-                    {/* Reads the schedules PRINTED on the sheet. Owner only, because it costs a
-                        credit and it proposes lines for a priced schedule. */}
                     {isOwner && d.current && d.kind === 'drawing' && (
                       <Button
-                        size="sm" variant="ghost" title="Read printed schedules"
-                        onClick={() => setTakeoff({
-                          rev: d.current!, label: d.drawing_number || d.title,
-                        })}
+                        size="sm" variant="ghost" title="Open in Takeoff"
+                        onClick={() => navigate(projectSectionPath(projectId, 'takeoff', { revision: d.current!.id }))}
                       >
                         <ScanLine className="h-4 w-4" />
                       </Button>
@@ -276,16 +266,6 @@ export const DocumentsTab: React.FC<{ projectId: string; isOwner: boolean }> = (
           isOwner={isOwner}
           onClose={() => setMarkup(null)}
           onRfiRaised={() => { void load(); }}
-        />
-      )}
-
-      {takeoff && (
-        <DrawingTakeoffDialog
-          revisionId={takeoff.rev.id}
-          projectId={projectId}
-          drawingLabel={takeoff.label}
-          revLabel={takeoff.rev.rev_label}
-          onClose={() => setTakeoff(null)}
         />
       )}
 

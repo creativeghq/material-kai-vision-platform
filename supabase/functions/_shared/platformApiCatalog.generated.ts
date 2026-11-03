@@ -4779,13 +4779,33 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "Transcribe the schedules printed on a drawing into proposed bill-of-quantities lines",
-    "description": "Reads the tabular schedules a design team PRINTED on a drawing sheet — door, window, room, finishes — and returns them as proposed schedule-of-works lines. It transcribes; it never measures. A quantity worked out from the geometry of a plan is a guess indistinguishable from a fact, and somebody orders materials against it, so the tool schema offers no area or length field and every returned row mu",
+    "summary": "Read a drawing PDF into takeoff proposals a person confirms (printed tables, counted symbols, scale-derived measurements)",
+    "description": "#532. action=analyze (default) debits one credit, then runs in the background: the MIVAA geometry service classifies every page as CAD-exported (vector) or scanned, reads the printed scale, room area labels, door swings and wall pairs on vector pages, and fingerprints each page; the model, constrained by a JSON schema with no length or area field, transcribes printed tables (schedules, the study's",
     "fields": {
       "revision_id": {
         "type": "string",
         "required": true,
-        "description": "The drawing revision to read. Its file location and its workspace are both taken from this row; nothing about which byte"
+        "description": "The drawing revision. Its file and its workspace are both taken from this row. (string (uuid))"
+      },
+      "action": {
+        "type": "string",
+        "description": "analyze (default) or find_similar."
+      },
+      "page": {
+        "type": "integer",
+        "description": "find_similar: the 1-based page."
+      },
+      "bbox": {
+        "type": "string",
+        "description": "find_similar: [x0,y0,x1,y1] normalised 0-1 around one symbol. (number[4])"
+      },
+      "element_type": {
+        "type": "string",
+        "description": "find_similar: door, window, room, wall, radiator, fixture, socket, light, pipe or other."
+      },
+      "label": {
+        "type": "string",
+        "description": "find_similar: the label the counted rows get."
       }
     }
   },

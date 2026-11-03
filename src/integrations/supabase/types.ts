@@ -21865,6 +21865,10 @@ export type Database = {
           storage_object_path: string
           superseded_at: string | null
           superseded_by: string | null
+          takeoff_status: string | null
+          takeoff_error: string | null
+          takeoff_at: string | null
+          takeoff_schedules_status: string | null
           uploaded_by: string | null
         }
         Insert: {
@@ -21883,6 +21887,10 @@ export type Database = {
           storage_object_path: string
           superseded_at?: string | null
           superseded_by?: string | null
+          takeoff_status?: string | null
+          takeoff_error?: string | null
+          takeoff_at?: string | null
+          takeoff_schedules_status?: string | null
           uploaded_by?: string | null
         }
         Update: {
@@ -21901,6 +21909,10 @@ export type Database = {
           storage_object_path?: string
           superseded_at?: string | null
           superseded_by?: string | null
+          takeoff_status?: string | null
+          takeoff_error?: string | null
+          takeoff_at?: string | null
+          takeoff_schedules_status?: string | null
           uploaded_by?: string | null
         }
         Relationships: [
@@ -22967,6 +22979,7 @@ export type Database = {
           item_ref: string | null
           notes: string | null
           quantity: number | null
+          quantity_source: string
           rate: number | null
           schedule_id: string
           sort: number
@@ -22983,6 +22996,7 @@ export type Database = {
           item_ref?: string | null
           notes?: string | null
           quantity?: number | null
+          quantity_source?: string
           rate?: number | null
           schedule_id: string
           sort?: number
@@ -22999,6 +23013,7 @@ export type Database = {
           item_ref?: string | null
           notes?: string | null
           quantity?: number | null
+          quantity_source?: string
           rate?: number | null
           schedule_id?: string
           sort?: number

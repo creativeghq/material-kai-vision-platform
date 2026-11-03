@@ -2869,10 +2869,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'construction',
     capability: 'projects.use',
     name: 'Construction',
-    description: 'The contractor money chain: cost report, payment applications and retention, the variation register, and where each tender package has got to.',
+    description: 'The contractor money chain: cost report, payment applications and retention, the variation register, where each tender package has got to, and what the drawings say.',
     icon: 'HardHat',
     moduleSlug: 'projects',
-    tool_ids: ['project_cvr', 'project_applications', 'list_variations', 'tender_status', 'tender_bid_analysis'],
+    tool_ids: ['project_cvr', 'project_applications', 'list_variations', 'tender_status', 'tender_bid_analysis', 'drawing_takeoff'],
     quick_starts: [
       {
         label: 'How is this job doing?', description: 'Value against cost, by cost code', icon: 'Scale',
@@ -2913,6 +2913,14 @@ export const TOOLKITS: ToolkitDefinition[] = [
         done: 'Here is how the bids actually compare.',
         promptTemplate: 'Compare the tender bids on the project "{{project_name}}".',
         run: { tool: 'tender_bid_analysis' },
+        autoFields: true,
+      },
+      {
+        label: 'What do the drawings say?', description: 'Doors, windows, rooms and walls taken off the PDFs', icon: 'FileSearch',
+        prompt: 'What quantities have we taken off the drawings on this project?',
+        done: 'That is what the drawings say so far.',
+        promptTemplate: 'Show the drawing takeoff for the project "{{project_name}}".',
+        run: { tool: 'drawing_takeoff', fixedArgs: { action: 'status' } },
         autoFields: true,
       },
     ],

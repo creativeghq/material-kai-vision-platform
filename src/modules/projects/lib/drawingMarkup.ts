@@ -113,6 +113,25 @@ export function measuredArea(
   return Math.round(Math.abs(twice / 2) * factor * factor * 1000) / 1000;
 }
 
+/** A polyline's length in page-WIDTH units, unrounded — what a takeoff row stores as `value_norm`. */
+export function lengthInPageWidths(points: readonly NormPoint[], pageAspect: number): number {
+  let total = 0;
+  for (let i = 1; i < points.length; i += 1) total += normalisedDistance(points[i - 1], points[i], pageAspect);
+  return total;
+}
+
+/** A closed polygon's area in page-width² units, unrounded. */
+export function areaInPageWidths(points: readonly NormPoint[], pageAspect: number): number {
+  const asp = pageAspect > 0 ? pageAspect : 1;
+  let twice = 0;
+  for (let i = 0; i < points.length; i += 1) {
+    const p = points[i];
+    const q = points[(i + 1) % points.length];
+    twice += p.x * (q.y / asp) - q.x * (p.y / asp);
+  }
+  return Math.abs(twice / 2);
+}
+
 /** The two corners of a box, in the order a canvas wants them, whichever way it was dragged. */
 export function boxRect(a: NormPoint, b: NormPoint): { x: number; y: number; w: number; h: number } {
   return {

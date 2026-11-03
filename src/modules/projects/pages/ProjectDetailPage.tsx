@@ -36,6 +36,8 @@ import {
   Users,
   BarChart3,
   MoreHorizontal,
+  ScanLine,
+  ListOrdered,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -86,6 +88,8 @@ import { ProductsTab } from '../components/tabs/ProductsTab';
 import { FinanceTab } from '../components/tabs/FinanceTab';
 import { PlanTab } from '../components/tabs/PlanTab';
 import { PurchaseItemsTab } from '../components/tabs/PurchaseItemsTab';
+import { TakeoffTab } from '../components/tabs/TakeoffTab';
+import { BillTab } from '../components/tabs/BillTab';
 import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { PROJECT_STATUS_BADGE, PROJECT_STATUS_LABELS } from '../projectStatus';
@@ -104,7 +108,7 @@ import { projectCoverInput } from '../utils/projectPresentation';
 
 /** Tabs only the owner sees. `finance` needs `finance.manage` on top and is handled separately. */
 const OWNER_ONLY_TABS = new Set<ProjectTab>([
-  'products', 'plan', 'purchases', 'billing', 'client-view', 'contracts', 'handover', 'timeline',
+  'products', 'plan', 'takeoff', 'purchases', 'billing', 'client-view', 'contracts', 'handover', 'timeline',
   // An assessment names margin, uncosted labour and overdue invoices. It is an internal document
   // and a collaborator (the client) must never be handed one — which is also why the two tables
   // carry no collaborator read policy at all.
@@ -122,7 +126,7 @@ type ProjectStage = 'overview' | 'design' | 'specification' | 'commercial' | 'de
 const TAB_GROUPS: ReadonlyArray<{ id: ProjectStage; label: string; icon: LucideIcon; tabs: readonly ProjectTab[] }> = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['overview'] },
   { id: 'design', label: 'Design', icon: PenTool, tabs: ['rooms', 'moodboards', 'sheets'] },
-  { id: 'specification', label: 'Specification', icon: Ruler, tabs: ['products', 'plan', 'purchases'] },
+  { id: 'specification', label: 'Specification', icon: Ruler, tabs: ['products', 'plan', 'takeoff', 'bill', 'purchases'] },
   { id: 'commercial', label: 'Commercial', icon: Briefcase, tabs: ['quotes', 'contracts', 'billing', 'finance'] },
   { id: 'delivery', label: 'Delivery', icon: HardHat, tabs: ['tasks', 'site', 'documents'] },
   { id: 'client', label: 'Client', icon: Users, tabs: ['client-view', 'requests', 'handover'] },
@@ -136,6 +140,8 @@ const TAB_ICONS: Record<ProjectTab, LucideIcon> = {
   products: Package,
   moodboards: Palette,
   plan: ClipboardList,
+  takeoff: ScanLine,
+  bill: ListOrdered,
   purchases: Hammer,
   quotes: FileText,
   billing: Receipt,
@@ -193,6 +199,8 @@ export const ProjectDetailPage: React.FC = () => {
   const availableTabs = PROJECT_TABS.filter((t) => {
     if (t === 'finance') return canFinance;
     if (t === 'billing') return isManager;
+    // The bill carries rates, so it keeps the gate the priced schedule had under Finance.
+    if (t === 'bill') return canFinance;
     if (t === 'quotes') return isTeam || collabRole === 'client';
     return isTeam || !OWNER_ONLY_TABS.has(t);
   });
@@ -456,6 +464,8 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isTeam} showBudget={canFinance} /></TabsContent>
           {isTeam && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
           {isTeam && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isTeam} /></TabsContent>}
+          {isTeam && <TabsContent value="takeoff"><TakeoffTab projectId={project.id} canSendToBill={canFinance} /></TabsContent>}
+          {canFinance && <TabsContent value="bill"><BillTab projectId={project.id} currency={project.budget_currency} /></TabsContent>}
           {isTeam && <TabsContent value="purchases"><PurchaseItemsTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} /></TabsContent>}
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
           <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} canManage={isTeam} /></ModuleTabGate></TabsContent>
