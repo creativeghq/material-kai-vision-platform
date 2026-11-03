@@ -22,6 +22,14 @@ const ASPECT_DEFICIENT_OR =
   'has_style_slig.is.null,has_style_slig.eq.false,' +
   'has_material_slig.is.null,has_material_slig.eq.false';
 
+/** Mirrors `owes_visual_vector` in MIVAA visual_backfill.py, so a row it skips is never counted failed. */
+const OWES_VISUAL_AND =
+  'or(has_slig_embedding.is.null,has_slig_embedding.eq.false),' +
+  'metadata->excluded_from_products.is.null,metadata->>bundle_skipped_reason.is.null,' +
+  'or(metadata->ai_classification->>is_material.is.null,metadata->ai_classification->>is_material.neq.false),' +
+  'or(metadata->ai_classification->>classification_pending.is.null,metadata->ai_classification->>classification_pending.neq.true),' +
+  'or(metadata->image_quality->>sourcing.is.null,metadata->image_quality->>sourcing.neq.pending)';
+
 /** An entity that failed this many ticks is reported as `stuck` and no longer re-sent every 15 minutes. */
 const STUCK_ATTEMPTS = 3;
 
@@ -154,7 +162,46 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       await log('error', 'chunk_text backfill errored', { error: msg(e) });
     }
 
-    // ── 3. UNDERSTANDING — material images missing the understanding vector ──
+    // ── 3. VISUAL — material images with no SLIG vector. Runs first: steps 4 and 5 only select images that have one ──
+    await heartbeat();
+    try {
+      const { data: settling, error: settlingErr } = await supabase.rpc('ingestion_settling_document_ids');
+      if (settlingErr) throw new Error(settlingErr.message);
+      const settlingIds = ((settling ?? []) as string[]).filter(Boolean);
+      const outsideSettling = settlingIds.length
+        ? `,or(document_id.is.null,document_id.not.in.(${settlingIds.join(',')}))`
+        : '';
+      const stuckVisual = await stuckFilter('image', 'visual');
+      const extra = (sinceIso ? `,created_at.gte.${sinceIso}` : '') + (stuckVisual ? `,id.not.in.${stuckVisual}` : '');
+      const { data: rows, error } = await supabase.from('document_images').select('id')
+        .not('image_url', 'is', null)
+        .or(`and(${OWES_VISUAL_AND}${outsideSettling}${extra})`)
+        .order('created_at', { ascending: false })
+        .limit(maxImages);
+      if (error) throw new Error(error.message);
+      const ids = (rows ?? []).map((r: any) => r.id as string);
+
+      if (ids.length === 0) {
+        families.push({ family: 'visual', scanned: 0, fixed: 0, failed: 0, status: 'ok' });
+      } else {
+        await supabase.rpc('record_embedding_backfill_attempts', { p_entity_type: 'image', p_deficiency: 'visual', p_ids: ids });
+        await callMivaa('/api/admin/visual-embeddings/backfill', { image_ids: ids, max_images: ids.length });
+        await heartbeat();
+        const { data: still } = await supabase.from('document_images').select('id').in('id', ids)
+          .or('has_slig_embedding.is.null,has_slig_embedding.eq.false');
+        const failedIds = (still ?? []).map((r: any) => r.id as string);
+        const fixedIds  = ids.filter((id) => !failedIds.includes(id));
+        if (fixedIds.length)  await supabase.rpc('resolve_embedding_backfill_entities', { p_entity_type: 'image', p_deficiency: 'visual', p_ids: fixedIds });
+        if (failedIds.length) await supabase.rpc('fail_embedding_backfill_entities',    { p_entity_type: 'image', p_deficiency: 'visual', p_ids: failedIds, p_error: 'visual_still_missing_after_backfill' });
+        families.push({ family: 'visual', scanned: ids.length, fixed: fixedIds.length, failed: failedIds.length, status: 'ok' });
+        await log(failedIds.length ? 'warn' : 'info', `visual: ${fixedIds.length}/${ids.length} fixed`, { failed_ids: failedIds.slice(0, 50) });
+      }
+    } catch (e) {
+      families.push({ family: 'visual', scanned: 0, fixed: 0, failed: 0, status: 'error', error: msg(e) });
+      await log('error', 'visual backfill errored', { error: msg(e) });
+    }
+
+    // ── 4. UNDERSTANDING — material images missing the understanding vector ──
     //     (bounded global scan; ID targeting deferred to MIVAA Phase 1)
     await heartbeat();
     try {
@@ -175,7 +222,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       await log('error', 'understanding backfill errored', { error: msg(e) });
     }
 
-    // ── 4. ASPECTS — ID-targeted; only images whose understanding already landed ──
+    // ── 5. ASPECTS — ID-targeted; only images whose understanding already landed ──
     await heartbeat();
     try {
       // An image of a still-settling ingestion must never be sent: it would be counted failed, then stuck.
@@ -217,7 +264,7 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       await log('error', 'aspects backfill errored', { error: msg(e) });
     }
 
-    // ── 5. CLASSIFICATION — quarantined images (self-targets via pending marker) ──
+    // ── 6. CLASSIFICATION — quarantined images (self-targets via pending marker) ──
     await heartbeat();
     try {
       let pq = supabase.from('document_images').select('id', { count: 'exact', head: true })

@@ -112,6 +112,23 @@ describe('service-role product writers are bounded by the authorized workspace',
   it('the platform repair agent refuses a workspace-owned copy', () => {
     expect(read('_shared/agents/embedding-backfill-agent.ts')).toMatch(/agentConfig\.workspace_id !== null/);
   });
+
+  it('a missing visual vector is repaired before the steps that require one', () => {
+    const src = read('_shared/agents/embedding-backfill-agent.ts');
+    const visual = src.indexOf("'/api/admin/visual-embeddings/backfill'");
+    expect(visual).toBeGreaterThan(-1);
+    expect(visual).toBeLessThan(src.indexOf("'/api/admin/understanding-embeddings/backfill'"));
+    expect(visual).toBeLessThan(src.indexOf("'/api/admin/aspect-embeddings/backfill'"));
+    expect(src).toMatch(/stuckFilter\('image', 'visual'\)/);
+  });
+
+  it('the visual step skips every row MIVAA owes_visual_vector skips, so none is counted failed', () => {
+    const src = read('_shared/agents/embedding-backfill-agent.ts');
+    for (const key of ['excluded_from_products', 'bundle_skipped_reason', 'is_material.neq.false',
+      'classification_pending.neq.true', 'sourcing.neq.pending', "not('image_url', 'is', null)"]) {
+      expect(src, key).toContain(key);
+    }
+  });
 });
 
 describe('LLM product writers are server-constrained, fenced and merge attributes', () => {
