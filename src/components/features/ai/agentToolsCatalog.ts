@@ -4047,19 +4047,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: [
       'workspace_capabilities',
       'dispatch_background_task', 'price_lookup', 'submit_price_proposal', 'seo_dataforseo_call',
-      'checkServerHealth', 'querySentry', 'queryDatabase', 'ingestion_report',
+      'checkServerHealth', 'querySentry', 'queryDatabase',
     ],
     quick_starts: [
-      {
-        label: 'Ingestion corrections', description: 'What the pipeline fixed, degraded or left for you', icon: 'Wrench',
-        prompt: 'Show what the ingestion pipeline corrected, degraded or left for a decision.',
-        done: 'Here is what the ingestion pipeline changed on its own.',
-        promptTemplate: 'Show the ingestion corrections for "{{document}}".',
-        run: { tool: 'ingestion_report', argMap: { document: 'document' }, fixedArgs: { action: 'report' } },
-        form: [
-          { key: 'document', label: 'Catalogue (file name, optional)', kind: 'text', placeholder: 'keros_actual' },
-        ],
-      },
       {
         label: 'Pricing KB lookup', description: 'Admin-curated price data', icon: 'Wrench',
         prompt: 'Pull a pricing-KB entry.',
@@ -4068,6 +4058,57 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'price_lookup', argMap: { query: 'product_name' } },
         form: [
           { key: 'query', label: 'Product / SKU', kind: 'text', required: true, placeholder: 'Crema Marfil 600x600' },
+        ],
+      },
+    ],
+  },
+  {
+    id: 'catalog-ingestion',
+    capability: 'workspace.manage',
+    name: 'Catalogue Ingestion',
+    description: 'Ingest a supplier PDF: discover the products, review the list before anything is created, embed once after review, and see what the pipeline corrected on its own.',
+    icon: 'Wrench',
+    adminOnly: true,
+    tool_ids: ['ingest_catalog', 'ingestion_report'],
+    quick_starts: [
+      {
+        label: 'Ingest a catalogue', description: 'Attach the PDF; it stops after discovery for your review', icon: 'Wrench',
+        prompt: 'Ingest the attached catalogue PDF. Stop after discovery so I can review the products, and do not embed yet.',
+        done: 'I\'ve asked to start the ingestion.',
+        promptTemplate: 'Ingest the attached catalogue PDF as "{{title}}" in category {{category}}. Stop after discovery for review and do not embed yet.',
+        form: [
+          { key: 'title', label: 'Catalogue name', kind: 'text', required: true, placeholder: 'Keros Actual 2026' },
+          { key: 'category', label: 'Material category key', kind: 'text', required: true, placeholder: 'tiles' },
+        ],
+      },
+      {
+        label: 'Ingestion status', description: 'Where a catalogue is and what waits on you', icon: 'Wrench',
+        prompt: 'Show the status of my latest catalogue ingestion.',
+        done: 'Here is where that ingestion stands.',
+        promptTemplate: 'Show the ingestion status of "{{document}}".',
+        run: { tool: 'ingest_catalog', argMap: { document: 'document' }, fixedArgs: { action: 'status' } },
+        form: [
+          { key: 'document', label: 'Catalogue (file name)', kind: 'text', required: true, placeholder: 'keros_actual' },
+        ],
+      },
+      {
+        label: 'Review discovered products', description: 'The list a parked ingestion waits on', icon: 'Wrench',
+        prompt: 'Show the discovered products waiting for my review.',
+        done: 'Here is the discovered product list.',
+        promptTemplate: 'Show the discovered products of "{{document}}" waiting for review.',
+        run: { tool: 'ingest_catalog', argMap: { document: 'document' }, fixedArgs: { action: 'review' } },
+        form: [
+          { key: 'document', label: 'Catalogue (file name)', kind: 'text', required: true, placeholder: 'keros_actual' },
+        ],
+      },
+      {
+        label: 'Ingestion corrections', description: 'What the pipeline fixed, degraded or left for you', icon: 'Wrench',
+        prompt: 'Show what the ingestion pipeline corrected, degraded or left for a decision.',
+        done: 'Here is what the ingestion pipeline changed on its own.',
+        promptTemplate: 'Show the ingestion corrections for "{{document}}".',
+        run: { tool: 'ingestion_report', argMap: { document: 'document' }, fixedArgs: { action: 'report' } },
+        form: [
+          { key: 'document', label: 'Catalogue (file name, optional)', kind: 'text', placeholder: 'keros_actual' },
         ],
       },
     ],
@@ -4110,7 +4151,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   stock: 'finance', finance: 'finance', contracts: 'finance',
   'trip-expenses': 'finance', travel: 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
-  catalogs: 'studio', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
+  catalogs: 'studio', 'catalog-ingestion': 'studio', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
   'project-assessment': 'studio',
   'finance-assessment': 'finance',
   'real-estate-assessment': 'sales',

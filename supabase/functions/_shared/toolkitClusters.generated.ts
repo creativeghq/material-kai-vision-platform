@@ -247,6 +247,11 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'admin-misc': {
     adminOnly: true,
     capability: ['workspace.manage'],
-    tool_ids: ['workspace_capabilities', 'dispatch_background_task', 'price_lookup', 'submit_price_proposal', 'seo_dataforseo_call', 'checkServerHealth', 'querySentry', 'queryDatabase', 'ingestion_report'],
+    tool_ids: ['workspace_capabilities', 'dispatch_background_task', 'price_lookup', 'submit_price_proposal', 'seo_dataforseo_call', 'checkServerHealth', 'querySentry', 'queryDatabase'],
+  },
+  'catalog-ingestion': {
+    adminOnly: true,
+    capability: ['workspace.manage'],
+    tool_ids: ['ingest_catalog', 'ingestion_report'],
   },
 };
