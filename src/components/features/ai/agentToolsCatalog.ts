@@ -4047,9 +4047,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: [
       'workspace_capabilities',
       'dispatch_background_task', 'price_lookup', 'submit_price_proposal', 'seo_dataforseo_call',
-      'checkServerHealth', 'querySentry', 'queryDatabase',
+      'checkServerHealth', 'querySentry', 'queryDatabase', 'ingestion_report',
     ],
     quick_starts: [
+      {
+        label: 'Ingestion corrections', description: 'What the pipeline fixed, degraded or left for you', icon: 'Wrench',
+        prompt: 'Show what the ingestion pipeline corrected, degraded or left for a decision.',
+        done: 'Here is what the ingestion pipeline changed on its own.',
+        promptTemplate: 'Show the ingestion corrections for "{{document}}".',
+        run: { tool: 'ingestion_report', argMap: { document: 'document' }, fixedArgs: { action: 'report' } },
+        form: [
+          { key: 'document', label: 'Catalogue (file name, optional)', kind: 'text', placeholder: 'keros_actual' },
+        ],
+      },
       {
         label: 'Pricing KB lookup', description: 'Admin-curated price data', icon: 'Wrench',
         prompt: 'Pull a pricing-KB entry.',

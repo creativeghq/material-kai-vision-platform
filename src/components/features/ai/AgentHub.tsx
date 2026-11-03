@@ -353,6 +353,7 @@ const seoCardFromSavedResult = (saved: any): SEOGenericCardData | undefined =>
 const AGENT_RESULT_TITLES: Record<string, string> = {
   // The capability ledger. Renders through the generic structured card below.
   workspace_capabilities: 'What this workspace can do',
+  ingestion_report: 'Ingestion corrections',
   // Construction. All five carry a `run:` quick-start — a deterministic call with NO model turn,
   // so nothing narrates the answer. They shipped emitting only `tool_progress`, which meant the
   // user pressed "How is this job doing?", read the quick-start's cheerful done line and saw no

@@ -994,6 +994,19 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'ingestion_report',
+    file: 'supabase/functions/_shared/tools/ops-tools.ts',
+    factory: 'createIngestionReportTool',
+    description: 'Report what the catalogue ingestion pipeline changed on its own per document: corrected (fixed as intended), degraded (done worse than intended, e.g.',
+    params: [
+      { name: 'action', type: 'enum', enum: ['report', 'acknowledge'], optional: true },
+      { name: 'document', type: 'string', optional: true, description: 'Document filename (partial match) or id. Omit for every document with corrections in the window.' },
+      { name: 'days', type: 'number', optional: true, description: 'How many days back to look (default 14).' },
+      { name: 'correction_ids', type: 'array', optional: true, description: 'acknowledge: only these corrections (default: all open ones on the document).' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
     name: 'knowledge_base_search',
     file: 'supabase/functions/_shared/tools/search-tools.ts',
     factory: 'createKnowledgeBaseSearchTool',

@@ -1195,7 +1195,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // never receives them. Listed by NO agent before now, which is why the comment beside
       // `needsOps` says the branch was "dead in both directions": the module never loaded and
       // the tools were never bound.
-      'checkServerHealth', 'querySentry', 'queryDatabase',
+      'checkServerHealth', 'querySentry', 'queryDatabase', 'ingestion_report',
       // generate_video's push site says it "was never pushed onto any agent, so it was
       // unreachable" — but the fix stopped at the push and never listed it here, and BOTH
       // binding paths read this list, so it stayed exactly as unreachable as before. The
@@ -2185,7 +2185,7 @@ async function executeAgent(
   // caught it because no AGENT_CONFIGS entry declares them, which made the whole branch
   // dead in both directions.
   /** `&& isAdmin` — the gate the comment beside these tools in AGENT_CONFIGS already CLAIMED (#395). */
-  const needsOps = isAdmin && config.tools.some((t: string) => ['checkServerHealth', 'querySentry'].includes(t));
+  const needsOps = isAdmin && config.tools.some((t: string) => ['checkServerHealth', 'querySentry', 'ingestion_report'].includes(t));
   const needsDb = isAdmin && config.tools.includes('queryDatabase');
   const needsSub = config.tools.some((t: string) => ['research_analysis', 'analytics_analysis', 'business_analysis', 'product_analysis'].includes(t));
   const needsB2b = config.tools.some((t: string) => ['b2b_company_search', 'b2b_manufacturer_search', 'b2b_research_validate', 'company_website_scrape', 'company_enrichment', 'company_registry_lookup', 'industrial_facility_search', 'contact_discovery', 'email_validate', 'save_to_crm'].includes(t));
@@ -2319,6 +2319,7 @@ async function executeAgent(
   const createVisualizeOnSurfaceTool = generationMod?.createVisualizeOnSurfaceTool;
   const createCheckServerHealthTool = opsMod?.createCheckServerHealthTool;
   const createQuerySentryTool = opsMod?.createQuerySentryTool;
+  const createIngestionReportTool = opsMod?.createIngestionReportTool;
   const createQueryDatabaseTool = dbMod?.createQueryDatabaseTool;
   const createResearchAnalysisTool = subAgentMod?.createResearchAnalysisTool;
   const createAnalyticsAnalysisTool = subAgentMod?.createAnalyticsAnalysisTool;
@@ -3377,6 +3378,9 @@ async function executeAgent(
   }
   if (isAdmin && config.tools.includes('querySentry') && createQuerySentryTool) {
     tools.push(createQuerySentryTool());
+  }
+  if (isAdmin && config.tools.includes('ingestion_report') && createIngestionReportTool) {
+    tools.push(createIngestionReportTool(userId, userJwt, onChunk));
   }
   // `estimate_cost` was registered here and listed by no AGENT_CONFIGS entry, so it was
   // unreachable. Deleted rather than wired up (issue #266): it multiplied
