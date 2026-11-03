@@ -1,9 +1,6 @@
-// Shared inline (WYSIWYG) Markdown editor built on MDXEditor (Lexical).
-// Notion-style: you type and it renders live — headings, **bold**, tables, code
-// blocks with syntax highlighting, links, images, admonitions, frontmatter — and
-// emits clean GFM markdown, so it is drop-in compatible with everything that
-// already stores `content_markdown` + renders it with react-markdown + remark-gfm.
-import React, { forwardRef, useMemo } from 'react';
+// Shared inline (WYSIWYG) Markdown editor built on MDXEditor (Lexical); emits GFM
+// markdown, so it is drop-in compatible with content rendered by react-markdown.
+import React, { forwardRef, useMemo, useState } from 'react';
 import {
   MDXEditor,
   type MDXEditorMethods,
@@ -42,8 +39,10 @@ import {
 } from '@mdxeditor/editor';
 import '@mdxeditor/editor/style.css';
 
+import { Textarea } from '@/components/core/ui/textarea';
 import { useTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/integrations/supabase/client';
+import { toEditorMarkdown } from './markdownEditorInput';
 import './MarkdownEditor.css';
 
 // Languages offered in the code-block language dropdown. `text` is the default
@@ -108,6 +107,8 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
     ref,
   ) {
     const { theme } = useTheme();
+    const [initialMarkdown] = useState(() => toEditorMarkdown(value));
+    const [parseError, setParseError] = useState<string | null>(null);
 
     const uploadHandler = useMemo(
       () => (imageUploadHandler === undefined ? defaultImageUploadHandler : imageUploadHandler),
@@ -126,10 +127,10 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
         imagePlugin(uploadHandler ? { imageUploadHandler: uploadHandler } : {}),
         codeBlockPlugin({ defaultCodeBlockLanguage: 'text' }),
         codeMirrorPlugin({ codeBlockLanguages: CODE_BLOCK_LANGUAGES }),
-        directivesPlugin({ directiveDescriptors: [AdmonitionDirectiveDescriptor] }),
+        directivesPlugin({ directiveDescriptors: [AdmonitionDirectiveDescriptor], escapeUnknownTextDirectives: true }),
         frontmatterPlugin(),
         markdownShortcutPlugin(),
-        diffSourcePlugin({ viewMode: 'rich-text', diffMarkdown: value }),
+        diffSourcePlugin({ viewMode: 'rich-text', diffMarkdown: initialMarkdown }),
         toolbarPlugin({
           toolbarContents: () => (
             <DiffSourceToggleWrapper>
@@ -169,12 +170,26 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
           ),
         }),
       ],
-      // `value` is intentionally excluded — MDXEditor is uncontrolled after mount
-      // (updates flow through the ref / onChange). Including it would rebuild the
-      // plugin list on every keystroke. diffMarkdown seeds the initial diff base.
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-      [uploadHandler],
+      [uploadHandler, initialMarkdown],
     );
+
+    if (parseError) {
+      return (
+        <div className={className}>
+          <p className="mb-2 text-xs text-muted-foreground">
+            The rich editor could not read this document ({parseError}), so it is open as plain Markdown.
+          </p>
+          <Textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            readOnly={readOnly}
+            placeholder={placeholder}
+            className="font-mono text-xs"
+            style={{ minHeight }}
+          />
+        </div>
+      );
+    }
 
     return (
       // The min-height CSS var is set on the wrapper (custom props inherit down to
@@ -182,8 +197,9 @@ export const MarkdownEditor = forwardRef<MDXEditorMethods, MarkdownEditorProps>(
       <div style={{ ['--mk-editor-min-height' as string]: `${minHeight}px` }}>
         <MDXEditor
           ref={ref}
-          markdown={value}
+          markdown={initialMarkdown}
           onChange={onChange}
+          onError={({ error }) => setParseError(error)}
           readOnly={readOnly}
           placeholder={placeholder}
           plugins={plugins}
