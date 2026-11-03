@@ -67,7 +67,7 @@ export interface BackgroundJob {
   workspace_id: string;
   document_id: string | null;
   job_type: string;
-  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'interrupted' | 'initialized';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'retrying' | 'cancelled' | 'interrupted' | 'initialized' | 'awaiting_review';
   progress: number;
   created_at: string;
   started_at: string | null;

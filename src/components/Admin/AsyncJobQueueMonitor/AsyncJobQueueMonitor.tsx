@@ -984,7 +984,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       setCancellingJob(jobId);
       // Conditional transition — this IS the lock. Only a job that is still running can be
       // cancelled, and the row count tells us whether we won the race.
-      const CANCELLABLE = ['pending', 'processing', 'retrying', 'interrupted'];
+      const CANCELLABLE = ['pending', 'processing', 'retrying', 'interrupted', 'awaiting_review'];
       const { data: claimed, error: claimError } = await supabase
         .from('background_jobs')
         .update({ status: 'cancelled', error: 'Job cancelled by user' })

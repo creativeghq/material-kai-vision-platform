@@ -48,6 +48,8 @@ const MIVAA_ENDPOINTS = {
   'rag_get_checkpoints': { path: '/api/rag/jobs/{job_id}/checkpoints', method: 'GET' },  // Get job checkpoints
   'rag_restart_job': { path: '/api/rag/jobs/{job_id}/restart', method: 'POST' },  // Restart failed job
   'rag_resume_job': { path: '/api/rag/documents/job/{job_id}/resume', method: 'POST' },  // Resume job from checkpoint
+  'rag_get_discovery_review': { path: '/api/rag/documents/job/{job_id}/discovery-review', method: 'GET' },  // Parked job's discovered list (#513)
+  'rag_decide_discovery_review': { path: '/api/rag/documents/job/{job_id}/discovery-review', method: 'POST' },  // Approve with edits, or cancel
   'rag_get_chunks': { path: '/api/rag/chunks', method: 'GET' },  // Get chunks (with filters)
   'rag_get_images': { path: '/api/rag/images', method: 'GET' },  // Get images (with filters)
   'rag_get_products': { path: '/api/rag/products', method: 'GET' },  // Get products (with filters)
