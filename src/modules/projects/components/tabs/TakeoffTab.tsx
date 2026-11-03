@@ -29,6 +29,7 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [newRevFor, setNewRevFor] = useState<TakeoffDrawingSummary | null>(null);
+  const [runs, setRuns] = useState(0);
 
   const selectedId = sp.get('revision');
   const setSelected = (id: string) => setSp((prev) => { const p = new URLSearchParams(prev); p.set('revision', id); return p; }, { replace: true });
@@ -51,7 +52,7 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
 
   const analyze = async (revisionId: string) => {
     setBusy(revisionId);
-    try { await takeoffService.analyze(revisionId); await load(); }
+    try { await takeoffService.analyze(revisionId); setRuns((n) => n + 1); await load(); }
     catch (e) { toast({ title: 'Could not start the analysis', description: (e as Error).message, variant: 'destructive' }); }
     finally { setBusy(null); }
   };
@@ -176,7 +177,7 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
 
       {selected && (
         <TakeoffReviewer
-          key={selected.revision_id}
+          key={`${selected.revision_id}:${runs}`}
           revisionId={selected.revision_id}
           projectId={projectId}
           label={selected.label}

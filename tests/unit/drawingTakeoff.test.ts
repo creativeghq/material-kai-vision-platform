@@ -154,6 +154,32 @@ describe('a person decides, and the bill is the sum', () => {
     expect(REVIEWER).toContain("confirmGroup(g, 'schedule')");
   });
 
+  it('a plan row with no scale makes the plan total unknown, never a partial number', () => {
+    const [g] = groupMeasurements([row({ effective_value: null }), row({}), row({ source: 'printed', effective_value: 2, value: 2 })]);
+    expect(isMixed(g)).toBe(true);
+    expect(g.bySource).toEqual({ schedule: 2, plan: null });
+  });
+
+  it('analysis is claimed in one conditional write before the debit, and a refused debit releases it', () => {
+    const claim = FN.indexOf(".or(`takeoff_status.is.null,takeoff_status.neq.running");
+    expect(claim).toBeGreaterThan(0);
+    expect(FN.indexOf('debitOrRefuse(', claim)).toBeGreaterThan(claim);
+    expect(FN).toContain('if (!claimed?.length) return json(');
+  });
+
+  it('a kept printed row is recognised on a re-read by the row itself, since it has no box', () => {
+    expect(FN).toContain("(m.source === 'printed' ? `${m.page}|printed|${m.label}|${m.unit}|${Number(m.value)}` : null)");
+    expect(FN).toContain('const k = rowKey(row as any, b);');
+  });
+
+  it('a revision diff flags confirmed rows on every older revision, not only the previous one', () => {
+    expect(FN).toContain(".in('revision_id', ((older ?? []) as any[]).map((r) => r.id))");
+  });
+
+  it('turning the page drops an unfinished outline', () => {
+    expect(REVIEWER).toContain('useEffect(() => { setDraft([]); }, [page]);');
+  });
+
   it('a room label the text layer already read is not stored a second time from the model', () => {
     expect(FN).toContain("textLayerAreas.has(`${page}|${qty.toFixed(2)}`)");
     expect(FN.indexOf('const textLayerAreas')).toBeLessThan(FN.indexOf('for (const it of read.items)'));

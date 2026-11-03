@@ -99,6 +99,8 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
   }, [revisionId, toast]);
 
   useEffect(() => { void load(); }, [load]);
+  const hasData = data != null;
+  useEffect(() => { setDraft([]); }, [page]);
   useEffect(() => {
     setFileUrl(null); setPage(1); setSelected(new Set());
     takeoffService.fileUrl(revisionId).then(setFileUrl)
@@ -160,7 +162,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
       }
     })();
     return () => { cancelled = true; task?.cancel?.(); };
-  }, [page, docLoaded, fileUrl]);
+  }, [page, docLoaded, fileUrl, hasData]);
 
   useEffect(() => () => { docRef.current?.destroy?.(); }, []);
 
@@ -206,10 +208,12 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
       });
       const why = res.reason === 'not_a_vector_page' ? 'This page is a scan, so symbols cannot be matched — count them by hand.'
         : res.reason === 'not_analysed' ? 'Analyse the drawing first.'
-          : res.reason === 'no_vector_content_in_box' ? 'There were no drawn lines inside that box.' : null;
+          : res.reason === 'no_vector_content_in_box' ? 'There were no drawn lines inside that box.'
+            : res.reason === 'too_complex' ? 'This page has too many drawn lines to search — count by hand.' : null;
+      const capped = res.reason === 'capped';
       toast({
         title: why ? 'Nothing matched' : `${res.added} new match${res.added === 1 ? '' : 'es'} to review`,
-        description: why ?? `${res.matches} found on the page; ones already counted were skipped.`,
+        description: why ?? `${res.matches} found on the page; ones already counted were skipped.${capped ? ' The search stopped at its limit, so there may be more.' : ''}`,
       });
     });
   };
@@ -463,7 +467,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
                   </div>
                   {isMixed(g) && (
                     <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
-                      The schedule says {fmt(g.bySource.schedule!, g.unit)}, the plan shows {fmt(g.bySource.plan!, g.unit)}.
+                      The schedule says {g.bySource.schedule == null ? 'an unknown amount' : fmt(g.bySource.schedule, g.unit)}, the plan shows {g.bySource.plan == null ? 'an amount that needs a scale' : fmt(g.bySource.plan, g.unit)}.
                       They count the same items: a bill line takes one or the other.
                     </p>
                   )}
@@ -605,6 +609,7 @@ const SendToBillDialog: React.FC<{
       if (!sid) {
         if (!activeWorkspaceId) throw new Error('No active workspace.');
         sid = (await schedulesService.createSchedule({ workspace_id: activeWorkspaceId, project_id: projectId, name: 'Takeoff BoQ', is_contract: true })).id;
+        setScheduleId(sid);
       }
       await takeoffService.sendToBill({
         scheduleId: sid, measurementIds: rows.map((r) => r.id),
@@ -655,7 +660,7 @@ const SendToBillDialog: React.FC<{
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={busy || units.length !== 1 || (target === 'new' && !description.trim())} onClick={() => void send()}>
+          <Button disabled={busy || schedules === null || units.length !== 1 || (target === 'new' && !description.trim())} onClick={() => void send()}>
             {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Send
           </Button>
         </DialogFooter>

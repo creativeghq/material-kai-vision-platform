@@ -14,9 +14,11 @@ export const BillTab: React.FC<{ projectId: string; currency?: string | null }> 
   const { isWorkspaceManager } = usePermissions();
   const { activeWorkspaceId } = useWorkspace();
   const [summary, setSummary] = useState<ProjectTakeoffSummary | null>(null);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    try { setSummary(await takeoffService.projectSummary(projectId)); } catch { setSummary(null); }
+    try { setSummary(await takeoffService.projectSummary(projectId)); setSummaryError(null); }
+    catch (e) { setSummary(null); setSummaryError((e as Error).message); }
   }, [projectId]);
   useEffect(() => { void load(); }, [load]);
 
@@ -25,6 +27,16 @@ export const BillTab: React.FC<{ projectId: string; currency?: string | null }> 
 
   return (
     <div className="space-y-4">
+      {summaryError && (
+        <div className="flex flex-wrap items-start gap-3 rounded-sm border border-hairline bg-card px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Could not check whether the drawings behind this bill have changed</p>
+            <p className="text-xs text-muted-foreground">{summaryError}</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => void load()}>Retry</Button>
+        </div>
+      )}
       {unread.length > 0 && (
         <div className="flex flex-wrap items-start gap-3 rounded-sm border border-hairline bg-card px-4 py-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />

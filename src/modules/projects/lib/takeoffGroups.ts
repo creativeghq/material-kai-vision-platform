@@ -27,7 +27,9 @@ export interface TakeoffGroup<M extends GroupableMeasurement> {
   confirmedTotal: number | null;
   /** Rows that cannot be valued yet: the sheet has no scale. */
   needsScale: number;
-  /** Non-rejected total per source family; both set means the same items are counted twice. */
+  /** Which source families have non-rejected rows; both means the same items are counted twice. */
+  present: Record<SourceFamily, boolean>;
+  /** Non-rejected total per family, NULL when absent or when any of its rows has no value yet. */
   bySource: Record<SourceFamily, number | null>;
 }
 
@@ -36,7 +38,7 @@ export type SourceFamily = 'schedule' | 'plan';
 export const sourceFamily = (source: string): SourceFamily => (source === 'printed' ? 'schedule' : 'plan');
 
 export const isMixed = (g: TakeoffGroup<GroupableMeasurement>): boolean =>
-  g.bySource.schedule != null && g.bySource.plan != null;
+  g.present.schedule && g.present.plan;
 
 export function groupMeasurements<M extends GroupableMeasurement>(rows: readonly M[]): TakeoffGroup<M>[] {
   const byKey = new Map<string, TakeoffGroup<M>>();
@@ -46,7 +48,7 @@ export function groupMeasurements<M extends GroupableMeasurement>(rows: readonly
     if (!g) {
       g = {
         key, element_type: m.element_type, unit: m.unit, rows: [], proposed: 0, confirmed: 0, rejected: 0,
-        confirmedTotal: 0, needsScale: 0, bySource: { schedule: null, plan: null },
+        confirmedTotal: 0, needsScale: 0, present: { schedule: false, plan: false }, bySource: { schedule: 0, plan: 0 },
       };
       byKey.set(key, g);
     }
@@ -54,7 +56,8 @@ export function groupMeasurements<M extends GroupableMeasurement>(rows: readonly
     g[m.review_status] += 1;
     if (m.review_status !== 'rejected') {
       const f = sourceFamily(m.source);
-      g.bySource[f] = (g.bySource[f] ?? 0) + (m.effective_value ?? 0);
+      g.present[f] = true;
+      g.bySource[f] = g.bySource[f] == null || m.effective_value == null ? null : g.bySource[f]! + m.effective_value;
     }
     if (m.review_status !== 'rejected' && m.effective_value == null) g.needsScale += 1;
     if (m.review_status === 'confirmed') {
@@ -66,7 +69,8 @@ export function groupMeasurements<M extends GroupableMeasurement>(rows: readonly
     if (g.confirmed === 0) g.confirmedTotal = null;
     else if (g.confirmedTotal != null) g.confirmedTotal = Math.round(g.confirmedTotal * 1000) / 1000;
     for (const f of ['schedule', 'plan'] as const) {
-      if (g.bySource[f] != null) g.bySource[f] = Math.round(g.bySource[f]! * 1000) / 1000;
+      if (!g.present[f]) g.bySource[f] = null;
+      else if (g.bySource[f] != null) g.bySource[f] = Math.round(g.bySource[f]! * 1000) / 1000;
     }
     g.rows.sort((a, b) => a.label.localeCompare(b.label));
   }

@@ -144,6 +144,12 @@ function printedKind(unit: string): { kind: TakeoffKind; unit: string } {
 const centreKey = (page: number, type: string, kind: string, b: [number, number, number, number] | null) =>
   b ? `${page}|${type}|${kind}|${((b[0] + b[2]) / 2).toFixed(3)}|${((b[1] + b[3]) / 2).toFixed(3)}` : null;
 
+/** A printed schedule row has no box; its identity is the row itself, so a re-read never re-proposes a kept one. */
+const rowKey = (m: { page: number; element_type: string; kind: string; source: string; label: string; unit: string; value: unknown },
+  b: [number, number, number, number] | null) =>
+  centreKey(m.page, m.element_type, m.kind, b)
+  ?? (m.source === 'printed' ? `${m.page}|printed|${m.label}|${m.unit}|${Number(m.value)}` : null);
+
 function base64FromBytes(bytes: Uint8Array): string {
   let binary = '';
   const chunk = 0x8000;
@@ -175,7 +181,7 @@ async function resolveRevision(admin: any, uid: string, keyWs: string | null | u
   const { data: rev } = await admin
     .from('project_document_revisions')
     .select('id, document_id, rev_label, storage_bucket, storage_object_path, created_at, is_current, '
-      + 'scale_units_per_unit, scale_unit, takeoff_status, takeoff_at, '
+      + 'scale_units_per_unit, scale_unit, takeoff_status, takeoff_error, takeoff_at, '
       + 'project_documents!inner(id, title, drawing_number, project_id, projects!inner(workspace_id))')
     .eq('id', revisionId)
     .maybeSingle();
@@ -285,10 +291,14 @@ async function diffAgainstPrevious(admin: any, rev: any, newPages: any[]): Promi
   }
   for (const page of oldBy.keys()) if (!changedByPage.has(page)) changedByPage.set(page, 'all');
 
+  // Older revisions can still feed a bill line; an area unchanged since them moved only if it moved now.
+  const { data: older } = await admin.from('project_document_revisions').select('id')
+    .eq('document_id', rev.document_id).neq('id', rev.id).lt('created_at', rev.created_at);
   const { data: confirmed } = await admin
     .from('project_drawing_measurements')
     .select('id, page, bbox')
-    .eq('revision_id', prev.id).eq('review_status', 'confirmed').eq('needs_remeasure', false);
+    .in('revision_id', ((older ?? []) as any[]).map((r) => r.id))
+    .eq('review_status', 'confirmed').eq('needs_remeasure', false);
   const flag: string[] = [];
   for (const m of (confirmed ?? []) as any[]) {
     const cells = changedByPage.get(m.page);
@@ -372,13 +382,13 @@ async function runAnalysis(admin: any, uid: string, ctx: Awaited<ReturnType<type
       .delete().eq('revision_id', rev.id).eq('review_status', 'proposed').in('source', [...REPLACEABLE_ON_REANALYSIS]);
     if (delErr) return fail(`Old proposals could not be cleared: ${delErr.message}`);
     const { data: kept } = await admin.from('project_drawing_measurements')
-      .select('page, element_type, kind, bbox').eq('revision_id', rev.id);
+      .select('page, element_type, kind, bbox, source, label, unit, value').eq('revision_id', rev.id);
     const seen = new Set<string>(((kept ?? []) as any[])
-      .map((m) => centreKey(m.page, m.element_type, m.kind, bboxOf(m.bbox))).filter(Boolean) as string[]);
+      .map((m) => rowKey(m, bboxOf(m.bbox))).filter(Boolean) as string[]);
 
     const inserts: Record<string, unknown>[] = [];
     const push = (row: Record<string, unknown>, b: [number, number, number, number] | null) => {
-      const k = centreKey(row.page as number, row.element_type as string, row.kind as string, b);
+      const k = rowKey(row as any, b);
       if (k && seen.has(k)) return;
       if (k) seen.add(k);
       inserts.push({ ...row, revision_id: rev.id, created_by: uid, bbox: b });
@@ -407,7 +417,7 @@ async function runAnalysis(admin: any, uid: string, ctx: Awaited<ReturnType<type
 
     // The text layer already gave us every printed room label; the model reading the same label is a twin.
     const textLayerAreas = new Set(inserts
-      .filter((r) => r.source === 'printed' && r.unit === 'm2')
+      .filter((r) => r.source === 'printed' && r.unit === 'm2' && r.element_type === 'room')
       .map((r) => `${r.page}|${Number(r.value).toFixed(2)}`));
 
     for (const it of read.items) {
@@ -423,7 +433,7 @@ async function runAnalysis(admin: any, uid: string, ctx: Awaited<ReturnType<type
         continue;
       }
       const { kind, unit } = printedKind(normalizeUnit(it.unit));
-      if (unit === 'm2' && textLayerAreas.has(`${page}|${qty.toFixed(2)}`)) continue;
+      if (unit === 'm2' && it.element_type === 'room' && textLayerAreas.has(`${page}|${qty.toFixed(2)}`)) continue;
       push({
         page, kind, unit, value: qty, value_norm: null, source: 'printed',
         element_type: isTakeoffElementType(it.element_type) ? it.element_type : 'other',
@@ -534,21 +544,26 @@ Deno.serve(withApiLogging('takeoff-from-drawing', async (req: Request) => {
   }
 
   if (action !== 'analyze') throw new HttpError(400, 'Unknown action');
-  const startedAt = ctx.rev.takeoff_at ? Date.parse(ctx.rev.takeoff_at) : 0;
-  if (ctx.rev.takeoff_status === 'running' && Date.now() - startedAt < STALE_RUN_MS) {
-    return json({ success: true, status: 'running', already_running: true }, 202);
-  }
+  // Claim the run in one conditional write, so two clicks cannot both pay and both read.
+  const staleBefore = new Date(Date.now() - STALE_RUN_MS).toISOString();
+  const { data: claimed, error: claimErr } = await admin.from('project_document_revisions')
+    .update({ takeoff_status: 'running', takeoff_error: null, takeoff_at: new Date().toISOString() })
+    .eq('id', ctx.rev.id)
+    .or(`takeoff_status.is.null,takeoff_status.neq.running,takeoff_at.is.null,takeoff_at.lt.${staleBefore}`)
+    .select('id');
+  if (claimErr) throw new HttpError(500, `The analysis could not start: ${claimErr.message}`);
+  if (!claimed?.length) return json({ success: true, status: 'running', already_running: true }, 202);
 
   // Invariant 10: pay before any upstream work.
   const refusal = await debitOrRefuse(
     admin, uid, 'drawing-takeoff', 'takeoff', 1, { revision_id: ctx.rev.id }, ctx.workspaceId,
   );
   if (refusal) {
+    await admin.from('project_document_revisions')
+      .update({ takeoff_status: ctx.rev.takeoff_status, takeoff_error: ctx.rev.takeoff_error ?? null, takeoff_at: ctx.rev.takeoff_at })
+      .eq('id', ctx.rev.id);
     return new Response(refusal, { status: 402, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
-  await admin.from('project_document_revisions')
-    .update({ takeoff_status: 'running', takeoff_error: null, takeoff_at: new Date().toISOString() })
-    .eq('id', ctx.rev.id);
 
   const work = runAnalysis(admin, uid, ctx);
   const runtime = (globalThis as any).EdgeRuntime;
