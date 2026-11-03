@@ -5054,7 +5054,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Glanceable per-section summary for the desktop widget",
-    "description": "User JWT or a kai_ API key. Returns one block per section (Today, My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by",
+    "description": "User JWT or a kai_ API key. Returns one block per section (Today, My tasks, Projects, Finance, Quotes, CRM, Analytics, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derive",
     "fields": {
       "workspace_id": {
         "type": "string",
