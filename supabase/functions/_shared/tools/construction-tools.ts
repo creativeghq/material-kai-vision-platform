@@ -725,7 +725,8 @@ export const createDrawingTakeoffTool = (
         + 'reading one uploaded drawing (costs a credit). confirm_printed: confirm the rows transcribed from '
         + 'tables PRINTED on a drawing; it always asks the user to Approve first, never set confirm yourself. '
         + 'Counted and measured figures are confirmed only by a person on the sheet, so never offer to confirm '
-        + 'those. Report the platform figures; never compute a quantity yourself.',
+        + 'those. Report the platform figures; never compute a quantity yourself. A group with source "schedule" '
+        + 'and one with source "plan" count the SAME items two ways: report them side by side, never add them.',
       schema: z.object({
         action: z.enum(['status', 'analyze', 'confirm_printed']).optional().describe('Default status.'),
         project_id: z.string().optional().describe('The project id, when you already have it'),

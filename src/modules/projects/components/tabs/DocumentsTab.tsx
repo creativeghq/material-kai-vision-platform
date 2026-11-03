@@ -495,9 +495,10 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
   );
 };
 
-const UploadRevisionDialog: React.FC<{
-  doc: ProjectDocumentWithRevisions; projectId: string; onClose: () => void; onSaved: () => void;
-}> = ({ doc, projectId, onClose, onSaved }) => {
+export const UploadRevisionDialog: React.FC<{
+  doc: Pick<ProjectDocumentWithRevisions, 'id' | 'title'> & { current: { rev_label: string } | null; revisions: readonly unknown[] };
+  projectId: string; onClose: () => void; onSaved: (revisionId: string) => void; pdfOnly?: boolean;
+}> = ({ doc, projectId, onClose, onSaved, pdfOnly = false }) => {
   const { toast } = useToast();
   // Suggest the next letter after the current rev, which is how drawing revs are usually labelled.
   const suggested = (() => {
@@ -517,16 +518,19 @@ const UploadRevisionDialog: React.FC<{
   const save = async () => {
     if (!rev.trim()) { toast({ title: 'Revision label required', variant: 'destructive' }); return; }
     if (!file) { toast({ title: 'Choose a file', variant: 'destructive' }); return; }
+    if (pdfOnly && !/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      toast({ title: 'PDF only', description: 'Export the drawing to PDF and upload that.', variant: 'destructive' }); return;
+    }
     setSaving(true);
     try {
-      await projectDocumentsService.uploadRevision(doc.id, projectId, rev.trim(), file, {
+      const saved = await projectDocumentsService.uploadRevision(doc.id, projectId, rev.trim(), file, {
         notes: notes.trim() || null,
         // Deliberately not defaulted to today: an issue date nobody typed must stay blank, or the
         // register shows a drawing issued late as issued on time.
         issued_at: issuedAt || null,
         purpose: purpose || null,
       });
-      onSaved();
+      onSaved(saved.id);
     } catch (err: any) {
       // The unique (document_id, rev_label) constraint is the likely cause; say so plainly.
       const dup = /duplicate key|unique/i.test(err?.message ?? '');
@@ -548,7 +552,7 @@ const UploadRevisionDialog: React.FC<{
             <Input id="rev-label" value={rev} onChange={(e) => setRev(e.target.value)} placeholder="A, B, C… or 1, 2, 3" />
           </FormField>
           <FormField label="File" htmlFor="rev-file">
-            <input id="rev-file" type="file" className="text-xs" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <input id="rev-file" type="file" className="text-xs" accept={pdfOnly ? 'application/pdf,.pdf' : undefined} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </FormField>
           <FormGrid>
             <FormField label="Issued on" htmlFor="rev-issued" hint="The date printed on the sheet.">

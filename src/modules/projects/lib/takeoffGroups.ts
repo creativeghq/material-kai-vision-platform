@@ -7,6 +7,7 @@ export interface GroupableMeasurement {
   unit: string;
   label: string;
   kind: string;
+  source: string;
   review_status: TakeoffReviewStatus;
   effective_value: number | null;
   value: number | null;
@@ -26,7 +27,16 @@ export interface TakeoffGroup<M extends GroupableMeasurement> {
   confirmedTotal: number | null;
   /** Rows that cannot be valued yet: the sheet has no scale. */
   needsScale: number;
+  /** Non-rejected total per source family; both set means the same items are counted twice. */
+  bySource: Record<SourceFamily, number | null>;
 }
+
+/** A printed schedule and the plan are two counts of the SAME items; a bill line takes one. */
+export type SourceFamily = 'schedule' | 'plan';
+export const sourceFamily = (source: string): SourceFamily => (source === 'printed' ? 'schedule' : 'plan');
+
+export const isMixed = (g: TakeoffGroup<GroupableMeasurement>): boolean =>
+  g.bySource.schedule != null && g.bySource.plan != null;
 
 export function groupMeasurements<M extends GroupableMeasurement>(rows: readonly M[]): TakeoffGroup<M>[] {
   const byKey = new Map<string, TakeoffGroup<M>>();
@@ -34,11 +44,18 @@ export function groupMeasurements<M extends GroupableMeasurement>(rows: readonly
     const key = `${m.element_type}|${m.unit}`;
     let g = byKey.get(key);
     if (!g) {
-      g = { key, element_type: m.element_type, unit: m.unit, rows: [], proposed: 0, confirmed: 0, rejected: 0, confirmedTotal: 0, needsScale: 0 };
+      g = {
+        key, element_type: m.element_type, unit: m.unit, rows: [], proposed: 0, confirmed: 0, rejected: 0,
+        confirmedTotal: 0, needsScale: 0, bySource: { schedule: null, plan: null },
+      };
       byKey.set(key, g);
     }
     g.rows.push(m);
     g[m.review_status] += 1;
+    if (m.review_status !== 'rejected') {
+      const f = sourceFamily(m.source);
+      g.bySource[f] = (g.bySource[f] ?? 0) + (m.effective_value ?? 0);
+    }
     if (m.review_status !== 'rejected' && m.effective_value == null) g.needsScale += 1;
     if (m.review_status === 'confirmed') {
       g.confirmedTotal = g.confirmedTotal == null || m.effective_value == null ? null : g.confirmedTotal + m.effective_value;
@@ -48,14 +65,18 @@ export function groupMeasurements<M extends GroupableMeasurement>(rows: readonly
   for (const g of groups) {
     if (g.confirmed === 0) g.confirmedTotal = null;
     else if (g.confirmedTotal != null) g.confirmedTotal = Math.round(g.confirmedTotal * 1000) / 1000;
+    for (const f of ['schedule', 'plan'] as const) {
+      if (g.bySource[f] != null) g.bySource[f] = Math.round(g.bySource[f]! * 1000) / 1000;
+    }
     g.rows.sort((a, b) => a.label.localeCompare(b.label));
   }
   return groups.sort((a, b) => a.element_type.localeCompare(b.element_type) || a.unit.localeCompare(b.unit));
 }
 
 /** Proposed rows that CAN be confirmed now; a measured row without a scale is refused by the database. */
-export function confirmable<M extends GroupableMeasurement>(rows: readonly M[]): M[] {
-  return rows.filter((m) => m.review_status === 'proposed' && m.effective_value != null);
+export function confirmable<M extends GroupableMeasurement>(rows: readonly M[], family?: SourceFamily): M[] {
+  return rows.filter((m) => m.review_status === 'proposed' && m.effective_value != null
+    && (family == null || sourceFamily(m.source) === family));
 }
 
 /** Confirmed rows not yet on a bill line, all in one unit — what "Send to bill" may take. */

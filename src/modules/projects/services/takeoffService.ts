@@ -88,6 +88,8 @@ export interface ProjectTakeoffSummary {
   drawings: TakeoffDrawingSummary[];
   /** Bill lines fed by a confirmed measurement that a newer revision moved. */
   remeasure: Array<{ schedule_item_id: string; description: string; item_ref: string | null }>;
+  /** Drawings whose current revision is unread while an older revision still feeds the bill. */
+  not_analysed: Array<{ document_id: string; revision_id: string; label: string; rev_label: string; billed_rev_label: string }>;
 }
 
 function readable(error: { message: string; code?: string }): Error {

@@ -30,7 +30,8 @@ import {
   toNormalised, calibrationFactor, boxRect, lengthInPageWidths, areaInPageWidths, type NormPoint,
 } from '../lib/drawingMarkup';
 import {
-  groupMeasurements, confirmable, billable, roomAreaDisagreement, cellRect, type TakeoffGroup,
+  groupMeasurements, confirmable, billable, roomAreaDisagreement, cellRect, isMixed, sourceFamily,
+  type TakeoffGroup, type SourceFamily,
 } from '../lib/takeoffGroups';
 import { TAKEOFF_ELEMENT_TYPES, type TakeoffElementType } from '../takeoffVocabulary';
 
@@ -261,9 +262,9 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
 
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
-  const confirmGroup = (g: TakeoffGroup<TakeoffMeasurement>) => {
-    const ok = confirmable(g.rows);
-    const skipped = g.rows.filter((m) => m.review_status === 'proposed').length - ok.length;
+  const confirmGroup = (g: TakeoffGroup<TakeoffMeasurement>, family?: SourceFamily) => {
+    const ok = confirmable(g.rows, family);
+    const skipped = g.rows.filter((m) => m.review_status === 'proposed' && (family == null || sourceFamily(m.source) === family)).length - ok.length;
     void act('Could not confirm', async () => {
       await takeoffService.setStatus(ok.map((m) => m.id), 'confirmed');
       if (skipped > 0) toast({ title: `${skipped} left unconfirmed`, description: 'They are measured lengths or areas and the sheet has no scale yet.' });
@@ -436,14 +437,36 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
                     {g.needsScale > 0 && <span className="text-amber-800 dark:text-amber-300">{g.needsScale} need a scale</span>}
                     {g.proposed > 0 && (
                       <span className="ml-auto flex gap-1">
-                        <Button size="sm" variant="ghost" disabled={busy} onClick={() => confirmGroup(g)}><Check className="h-3.5 w-3.5" /> All</Button>
-                        <Button size="sm" variant="ghost" disabled={busy}
+                        {isMixed(g) ? (
+                          <>
+                            <Button size="sm" variant="ghost" disabled={busy} onClick={() => confirmGroup(g, 'schedule')}
+                              aria-label={`Confirm the printed schedule rows for ${humanizeLabel(g.element_type)}`}>
+                              <Check className="h-3.5 w-3.5" /> Schedule
+                            </Button>
+                            <Button size="sm" variant="ghost" disabled={busy} onClick={() => confirmGroup(g, 'plan')}
+                              aria-label={`Confirm the plan rows for ${humanizeLabel(g.element_type)}`}>
+                              <Check className="h-3.5 w-3.5" /> Plan
+                            </Button>
+                          </>
+                        ) : (
+                          <Button size="sm" variant="ghost" disabled={busy} onClick={() => confirmGroup(g)}
+                            aria-label={`Confirm all ${humanizeLabel(g.element_type)}`}>
+                            <Check className="h-3.5 w-3.5" /> All
+                          </Button>
+                        )}
+                        <Button size="sm" variant="ghost" disabled={busy} aria-label={`Reject all ${humanizeLabel(g.element_type)}`}
                           onClick={() => void act('Could not reject', () => takeoffService.setStatus(g.rows.filter((m) => m.review_status === 'proposed').map((m) => m.id), 'rejected'))}>
                           <X className="h-3.5 w-3.5" /> All
                         </Button>
                       </span>
                     )}
                   </div>
+                  {isMixed(g) && (
+                    <p className="mt-1 text-[11px] text-amber-800 dark:text-amber-300">
+                      The schedule says {fmt(g.bySource.schedule!, g.unit)}, the plan shows {fmt(g.bySource.plan!, g.unit)}.
+                      They count the same items: a bill line takes one or the other.
+                    </p>
+                  )}
                   <ul className="mt-2 space-y-1.5">
                     {g.rows.map((m) => {
                       const outline = roomAreaDisagreement(m, pageScaleFor(data, m.page));
@@ -471,13 +494,13 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
                           </span>
                           <span className="flex shrink-0 gap-0.5">
                             {m.review_status !== 'confirmed' && (
-                              <button type="button" title="Confirm" disabled={busy} className="text-muted-foreground hover:text-primary"
+                              <button type="button" title="Confirm" aria-label={`Confirm ${m.label}`} disabled={busy} className="text-muted-foreground hover:text-primary"
                                 onClick={() => void act('Could not confirm', () => takeoffService.setStatus([m.id], 'confirmed'))}>
                                 <Check className="h-3.5 w-3.5" />
                               </button>
                             )}
                             {m.review_status !== 'rejected' && !m.schedule_item_id && (
-                              <button type="button" title="Reject" disabled={busy} className="text-muted-foreground hover:text-destructive"
+                              <button type="button" title="Reject" aria-label={`Reject ${m.label}`} disabled={busy} className="text-muted-foreground hover:text-destructive"
                                 onClick={() => void act('Could not reject', () => takeoffService.setStatus([m.id], 'rejected'))}>
                                 <X className="h-3.5 w-3.5" />
                               </button>

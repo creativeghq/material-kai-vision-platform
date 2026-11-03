@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 /** Production smoke tests — "are the critical flows actually alive, right now". */
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const MIVAA = (process.env.MIVAA_BASE_URL || 'https://v1api.materialshub.gr').replace(/\/$/, '');
 const SUPABASE_URL = (process.env.SUPABASE_URL || 'https://bgbavxtjlbvgplozizxu.supabase.co').replace(/\/$/, '');
@@ -231,7 +233,46 @@ await check('db.table-grants', ['DB_KEY'], async () => {
   return 'every table is granted to the roles its policies name';
 });
 
-// 4b'. Column grants — `products`, `order_items` and `invoice_items` carry a column allowlist for
+await check('db.definer-call-grants', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_definer_call_grants`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert(res.ok, `rpc lint_definer_call_grants → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'lint did not return an array');
+  assert(json.length === 0, `${json.length} call(s) the caller cannot execute: `
+    + json.slice(0, 6).map((r) => `${r.caller} → ${r.callee}`).join(', '));
+  return 'every definer an invoker path calls is executable by its caller';
+});
+
+await check('db.billable-services-priced', ['DB_KEY'], async () => {
+  const keys = new Set();
+  const walk = (dir) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) { if (e.name !== 'node_modules') walk(p); continue; }
+      if (!p.endsWith('.ts')) continue;
+      const src = readFileSync(p, 'utf8');
+      const re = /\b(?:debitOrRefuse|debitOrRefuseTracked|debitExternalServiceCredits)\(\s*[^,()]+,\s*[^,()]+,\s*'([^']+)'/g;
+      for (let m; (m = re.exec(src));) keys.add(m[1]);
+    }
+  };
+  walk('supabase/functions');
+  assert(keys.size > 0, 'found no debit call sites — the pattern no longer matches the code');
+  const list = [...keys].map((k) => `"${k}"`).join(',');
+  const { res, json } = await http(
+    `${SUPABASE_URL}/rest/v1/ai_model_pricing?select=model_key&category=eq.external_service&billing_type=eq.per_unit&is_active=eq.true&model_key=in.(${encodeURIComponent(list)})`,
+    { headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}` } },
+  );
+  assert(res.ok && Array.isArray(json), `ai_model_pricing read → ${res.status}`);
+  const priced = new Set(json.map((r) => r.model_key));
+  const missing = [...keys].filter((k) => !priced.has(k));
+  assert(missing.length === 0, `debited but unpriced (every call is refused): ${missing.join(', ')}`);
+  return `${keys.size} debit keys, all priced`;
+});
+
+// 4b'. Column grants —`products`, `order_items` and `invoice_items` carry a column allowlist for
 //   `authenticated` (#358), so a column ADDED later is readable by nobody and 42501s the whole request.
 await check('db.column-grants', ['DB_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_column_grants`, {

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import {
-  groupMeasurements, confirmable, billable, roomAreaDisagreement, cellRect,
+  groupMeasurements, confirmable, billable, roomAreaDisagreement, cellRect, isMixed,
 } from '../../src/modules/projects/lib/takeoffGroups';
 import { lengthInPageWidths, areaInPageWidths } from '../../src/modules/projects/lib/drawingMarkup';
 
@@ -110,7 +110,7 @@ describe('the security invariants on this path', () => {
 
 describe('a person decides, and the bill is the sum', () => {
   const row = (over: Partial<Parameters<typeof groupMeasurements>[0][number]>) => ({
-    id: Math.random().toString(36), element_type: 'door' as const, unit: 'pcs', label: 'D', kind: 'count',
+    id: Math.random().toString(36), element_type: 'door' as const, unit: 'pcs', label: 'D', kind: 'count', source: 'detected',
     review_status: 'proposed' as const, effective_value: 1, value: 1, detail: {}, schedule_item_id: null, ...over,
   });
 
@@ -142,6 +142,23 @@ describe('a person decides, and the bill is the sum', () => {
     expect(cellRect(17)).toEqual({ x: 1 / 16, y: 1 / 16, w: 1 / 16, h: 1 / 16 });
   });
 
+  it('a schedule and the plan counting the same doors are shown side by side, never summed by one click', () => {
+    const [g] = groupMeasurements([
+      row({}), row({}), row({}),
+      row({ source: 'printed', effective_value: 1 }), row({ source: 'printed', effective_value: 2, value: 2 }),
+    ]);
+    expect(isMixed(g)).toBe(true);
+    expect(g.bySource).toEqual({ schedule: 3, plan: 3 });
+    expect(confirmable(g.rows, 'schedule')).toHaveLength(2);
+    expect(confirmable(g.rows, 'plan')).toHaveLength(3);
+    expect(REVIEWER).toContain("confirmGroup(g, 'schedule')");
+  });
+
+  it('a room label the text layer already read is not stored a second time from the model', () => {
+    expect(FN).toContain("textLayerAreas.has(`${page}|${qty.toFixed(2)}`)");
+    expect(FN.indexOf('const textLayerAreas')).toBeLessThan(FN.indexOf('for (const it of read.items)'));
+  });
+
   it('nothing arrives pre-selected', () => {
     expect(REVIEWER).toContain('useState<Set<string>>(new Set())');
   });
@@ -165,6 +182,15 @@ describe('it is reachable', () => {
   it('uploads accept PDF only', () => {
     expect(TAB).toContain('accept="application/pdf,.pdf"');
     expect(TAB).toContain('PDF only');
+  });
+
+  it('a new revision can be uploaded from Takeoff, PDF only, and is read straight away', () => {
+    expect(TAB).toContain('<UploadRevisionDialog');
+    expect(TAB).toMatch(/pdfOnly[\s\S]{0,400}onSaved=\{\(revisionId\) => \{[^}]*analyze\(revisionId\)/);
+  });
+
+  it('the bill says when it still quotes a revision nobody has read', () => {
+    expect(read('src/modules/projects/components/tabs/BillTab.tsx')).toContain('summary?.not_analysed');
   });
 
   it('the drawings register opens a drawing in Takeoff', () => {

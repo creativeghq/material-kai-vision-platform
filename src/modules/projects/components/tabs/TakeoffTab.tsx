@@ -1,7 +1,7 @@
 /** Specification → Takeoff: drop drawing PDFs, read them, confirm what they say, send it to the bill (#532). */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Loader2, Upload, ScanLine, RefreshCw } from 'lucide-react';
+import { Loader2, Upload, ScanLine, RefreshCw, FilePlus2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -11,6 +11,7 @@ import { formatDate } from '@/utils/datetime';
 import { projectDocumentsService } from '../../services/projectDocumentsService';
 import { takeoffService, type TakeoffDrawingSummary } from '../../services/takeoffService';
 import { TakeoffReviewer } from '../TakeoffReviewer';
+import { UploadRevisionDialog } from './DocumentsTab';
 
 const isPdf = (f: File) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf');
 
@@ -27,6 +28,7 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
   const [drawings, setDrawings] = useState<TakeoffDrawingSummary[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
+  const [newRevFor, setNewRevFor] = useState<TakeoffDrawingSummary | null>(null);
 
   const selectedId = sp.get('revision');
   const setSelected = (id: string) => setSp((prev) => { const p = new URLSearchParams(prev); p.set('revision', id); return p; }, { replace: true });
@@ -143,7 +145,10 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{d.proposed || '—'}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{d.confirmed || '—'}</td>
-                      <td className="px-5 py-2 text-right">
+                      <td className="whitespace-nowrap px-5 py-2 text-right">
+                        <Button size="sm" variant="ghost" onClick={(e) => { e.stopPropagation(); setNewRevFor(d); }}>
+                          <FilePlus2 className="h-3.5 w-3.5" /> New revision
+                        </Button>
                         <Button size="sm" variant="ghost" disabled={busy === d.revision_id || d.takeoff_status === 'running'}
                           onClick={(e) => { e.stopPropagation(); void analyze(d.revision_id); }}>
                           {busy === d.revision_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
@@ -158,6 +163,16 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
           )}
         </CardContent>
       </Card>
+
+      {newRevFor && (
+        <UploadRevisionDialog
+          pdfOnly
+          doc={{ id: newRevFor.document_id, title: newRevFor.title, current: { rev_label: newRevFor.rev_label }, revisions: [newRevFor] }}
+          projectId={projectId}
+          onClose={() => setNewRevFor(null)}
+          onSaved={(revisionId) => { setNewRevFor(null); setSelected(revisionId); void analyze(revisionId); }}
+        />
+      )}
 
       {selected && (
         <TakeoffReviewer

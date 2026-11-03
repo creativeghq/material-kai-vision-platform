@@ -21,9 +21,25 @@ export const BillTab: React.FC<{ projectId: string; currency?: string | null }> 
   useEffect(() => { void load(); }, [load]);
 
   const remeasure = summary?.remeasure ?? [];
+  const unread = summary?.not_analysed ?? [];
 
   return (
     <div className="space-y-4">
+      {unread.length > 0 && (
+        <div className="flex flex-wrap items-start gap-3 rounded-sm border border-hairline bg-card px-4 py-3 text-sm">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">The bill still quotes an older revision</p>
+            <p className="text-xs text-muted-foreground">
+              {unread.map((d) => `${d.label}: Rev ${d.rev_label} is not analysed, the bill uses Rev ${d.billed_rev_label}`).join(' · ')}
+            </p>
+          </div>
+          <Button size="sm" variant="outline"
+            onClick={() => navigate(projectSectionPath(projectId, 'takeoff', { revision: unread[0].revision_id }))}>
+            Analyse in Takeoff
+          </Button>
+        </div>
+      )}
       {remeasure.length > 0 && (
         <div className="flex flex-wrap items-start gap-3 rounded-sm border border-hairline bg-card px-4 py-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" />

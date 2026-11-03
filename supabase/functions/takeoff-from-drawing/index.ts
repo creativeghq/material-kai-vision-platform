@@ -405,6 +405,11 @@ async function runAnalysis(admin: any, uid: string, ctx: Awaited<ReturnType<type
       }
     }
 
+    // The text layer already gave us every printed room label; the model reading the same label is a twin.
+    const textLayerAreas = new Set(inserts
+      .filter((r) => r.source === 'printed' && r.unit === 'm2')
+      .map((r) => `${r.page}|${Number(r.value).toFixed(2)}`));
+
     for (const it of read.items) {
       const description = text(it.description, 300);
       const source = text(it.source, 200);
@@ -418,6 +423,7 @@ async function runAnalysis(admin: any, uid: string, ctx: Awaited<ReturnType<type
         continue;
       }
       const { kind, unit } = printedKind(normalizeUnit(it.unit));
+      if (unit === 'm2' && textLayerAreas.has(`${page}|${qty.toFixed(2)}`)) continue;
       push({
         page, kind, unit, value: qty, value_norm: null, source: 'printed',
         element_type: isTakeoffElementType(it.element_type) ? it.element_type : 'other',
