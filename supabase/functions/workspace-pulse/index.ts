@@ -93,8 +93,29 @@ async function notifications(token: string, userId: string, rawSince: string | n
     console.error('[workspace-pulse] notifications read failed:', error.message);
     return json({ ok: false, error: 'Could not read notifications right now' }, 502);
   }
-  const rows = (data ?? []) as Array<{ created_at: string }>;
-  return json({ ok: true, notifications: rows, cursor: rows.length ? rows[rows.length - 1].created_at : since });
+  const rows = (data ?? []) as Array<{ type: string | null; action_url: string | null; created_at: string }>;
+  return json({
+    ok: true,
+    notifications: rows.map((r) => ({ ...r, category: notificationCategory(r.type, r.action_url) })),
+    cursor: rows.length ? rows[rows.length - 1].created_at : since,
+  });
+}
+
+const CATEGORY_BY_PATH: Record<string, string> = {
+  inbox: 'inbox', crm: 'crm', finance: 'finance', quotes: 'quotes', projects: 'projects',
+  warehouse: 'warehouse', hr: 'hr', properties: 'realestate', admin: 'system', profile: 'account',
+};
+
+/** Which part of the platform a notification is about, for the icon in front of it. `type` is free text, so the link decides when it is generic. */
+function notificationCategory(type: string | null, actionUrl: string | null): string {
+  const t = type ?? '';
+  if (t.startsWith('job_')) return 'jobs';
+  if (t === 'changelog_published') return 'updates';
+  const url = actionUrl ?? '';
+  const segment = url.replace(/^\/+/, '').split(/[/?#]/)[0];
+  if (t.startsWith('social_') || segment === 'messaging') return 'social';
+  if (segment === 'agent-hub') return /[?&]agent=marketing\b/.test(url) ? 'marketing' : 'agent';
+  return CATEGORY_BY_PATH[segment] ?? 'general';
 }
 
 type Db = ReturnType<typeof callerDbClient>;

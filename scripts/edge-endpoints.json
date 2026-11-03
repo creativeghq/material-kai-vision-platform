@@ -12799,7 +12799,7 @@
         "desc": "For complete_task: the id of an item whose action is complete_task."
       }
     ],
-    "response": "{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], layout: {…widget design, from widget_layouts}, workspaces: [{id, name}] } — items: [{title, subtitle, status, date, value?, currency?, tone, url}]. view=notifications: { ok, notifications: [{id, type, title, body, action_url, created_at}], cursor }"
+    "response": "{ ok, workspace: {id, name}, as_of, attention, sections: [{key, title, status, url, note, metrics: [{key, label, value, kind, currency?, tone, url}], items: [{title, subtitle, date, url}]}], unavailable: [{key, title, reason}], layout: {…widget design, from widget_layouts}, workspaces: [{id, name}] } — items: [{title, subtitle, status, date, value?, currency?, tone, url}]. view=notifications: { ok, notifications: [{id, type, title, body, action_url, created_at, category}], cursor } — category: inbox, crm, finance, quotes, projects, warehouse, hr, realestate, jobs, marketing, agent, social, updates, system, account or general."
   },
   {
     "name": "dataforseo-reconcile",
