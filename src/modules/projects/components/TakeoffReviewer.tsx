@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { humanizeLabel } from '@/utils/humanize';
 import { unitSuffix } from '@/lib/units';
+import { formatNumber } from '@/utils/decimal';
 import {
   takeoffService, type RevisionTakeoff, type TakeoffMeasurement,
 } from '../services/takeoffService';
@@ -51,7 +52,7 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const fmt = (v: number | null, unit: string) =>
-  v == null ? null : `${v.toLocaleString(undefined, { maximumFractionDigits: unit === 'pcs' ? 0 : 2 })} ${unitSuffix(unit)}`;
+  v == null ? null : `${formatNumber(v, { maxDecimals: unit === 'pcs' ? 0 : 2 })} ${unitSuffix(unit)}`;
 
 const strokeFor = (m: TakeoffMeasurement) =>
   m.review_status === 'confirmed' ? 'hsl(142 60% 38%)' : m.review_status === 'rejected' ? 'hsl(0 0% 55%)' : 'hsl(35 92% 45%)';
