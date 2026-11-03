@@ -5463,6 +5463,16 @@
         "admin_only": false
       },
       {
+        "action": "rag_get_discovery_review",
+        "description": "Discovered product list a parked ingestion waits on — `GET /api/rag/documents/job/{job_id}/discovery-review` — free",
+        "admin_only": false
+      },
+      {
+        "action": "rag_decide_discovery_review",
+        "description": "Approve the discovered list with edits, or cancel — `POST /api/rag/documents/job/{job_id}/discovery-review` — free; the pipeline bills the document",
+        "admin_only": false
+      },
+      {
         "action": "rag_get_chunks",
         "description": "Get document chunks with filters — `GET /api/rag/chunks` — free",
         "admin_only": false

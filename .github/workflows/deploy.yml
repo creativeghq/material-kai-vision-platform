@@ -532,7 +532,10 @@ jobs:
       - name: 📥 Pull Vercel environment
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
+      # The default heap ran out on 37b044bff with no code at fault; a public-repo runner has 16 GB.
       - name: 🏗️ Build (Vercel, local)
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       # This repo is public, so its artifacts are readable by any signed-in GitHub user.

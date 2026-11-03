@@ -81,7 +81,7 @@ export const FREE_ACTIONS = new Set([
   // `rag_upload` is the entry point; the rest are stages the pipeline drives itself or job
   // control on a job that has already been paid for. Charging here would bill the same PDF
   // twice, once at the door and again for every stage it walks through.
-  'rag_upload', 'rag_restart_job', 'rag_resume_job',
+  'rag_upload', 'rag_restart_job', 'rag_resume_job', 'rag_get_discovery_review', 'rag_decide_discovery_review',
   'ai_process_pdf_enhanced', 'ai_classify_document', 'ai_classify_batch',
   'ai_detect_boundaries', 'ai_group_by_product', 'ai_validate_product',
   'ai_consensus_validate',
