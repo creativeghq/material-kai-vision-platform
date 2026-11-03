@@ -3629,6 +3629,83 @@
           }
         ],
         "response": "{ ok, rows: [{ value, label, sessions, active_users, ..., secs_per_session, series: [] }], row_count, period_start, period_end, days, metrics, missing } | { ok: false, error }"
+      },
+      {
+        "name": "ga_list_properties",
+        "summary": "List the Google Analytics 4 properties the connected Google account can read.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true,
+            "desc": "Website whose Google connection to use"
+          }
+        ]
+      },
+      {
+        "name": "ga_set_property",
+        "summary": "Bind a GA4 property to the website. Must look like properties/123456789; a bare id or a G- measurement id is refused with 400.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true,
+            "desc": "Website"
+          },
+          {
+            "name": "ga_property_id",
+            "type": "string",
+            "required": true,
+            "desc": "GA4 property, e.g. properties/123456789"
+          }
+        ]
+      },
+      {
+        "name": "ga_realtime",
+        "summary": "Live GA4 realtime report for the website (never stored). 400 when Google is not connected or no Analytics property is selected.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true,
+            "desc": "Website"
+          }
+        ]
+      },
+      {
+        "name": "ga_sync",
+        "summary": "Pull the last N days of GA4 traffic now (default 28, max 365).",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true,
+            "desc": "Website"
+          },
+          {
+            "name": "days",
+            "type": "integer",
+            "required": false,
+            "desc": "1-365, default 28"
+          }
+        ]
+      },
+      {
+        "name": "submit_sitemaps",
+        "summary": "Submit the website sitemap(s) to the bound Search Console property.",
+        "params": [
+          {
+            "name": "website_id",
+            "type": "string",
+            "required": true,
+            "desc": "Website"
+          }
+        ]
+      },
+      {
+        "name": "cron-submit-sitemaps",
+        "summary": "Cron (x-cron-secret): submit sitemaps for every active connection with a bound Search Console property.",
+        "params": []
       }
     ],
     "request": {
@@ -6589,8 +6666,8 @@
   {
     "name": "recommendations-api",
     "tag": "Recommendations",
-    "summary": "Collaborative filtering interaction tracking, recommendations, and analytics.",
-    "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and cached recommendation distribution. DELETE /cache clears the user's recommendation_scores rows.",
+    "summary": "Records per-user material interactions (views, clicks, saves, quotes).",
+    "description": "Path-routed. POST /track-interaction is the only route: it records one interaction in material_interactions, which the market-trends views read. Recommendations themselves are served from product_edges, not by this function.",
     "security": [
       "supabaseJwt",
       "apiKeyPartner",
@@ -6598,9 +6675,7 @@
     ],
     "docs": null,
     "methods": [
-      "POST",
-      "GET",
-      "DELETE"
+      "POST"
     ],
     "actions": [
       {
@@ -6645,94 +6720,6 @@
           }
         ],
         "response": "{data:{}, message:'Interaction tracked successfully'}"
-      },
-      {
-        "name": "for-user",
-        "summary": "Retrieve cached collaborative-filtering recommendations for the current user.",
-        "params": [
-          {
-            "name": "workspace_id",
-            "type": "string",
-            "required": true,
-            "desc": "Workspace scope (query param)"
-          },
-          {
-            "name": "limit",
-            "type": "number",
-            "required": false,
-            "desc": "Max results (default 20, query param)"
-          },
-          {
-            "name": "algorithm",
-            "type": "string",
-            "required": false,
-            "desc": "Algorithm key (default user_user, query param)"
-          }
-        ],
-        "response": "{data:[{material_id,score,confidence,algorithm,metadata}], cached:boolean}"
-      },
-      {
-        "name": "similar-materials",
-        "summary": "Compute item-item similarity for a material from co-interaction data.",
-        "params": [
-          {
-            "name": "material_id",
-            "type": "string",
-            "required": true,
-            "desc": "Path segment: /similar-materials/{material_id}"
-          },
-          {
-            "name": "workspace_id",
-            "type": "string",
-            "required": true,
-            "desc": "Workspace scope (query param)"
-          },
-          {
-            "name": "limit",
-            "type": "number",
-            "required": false,
-            "desc": "Max results (default 10, query param)"
-          }
-        ],
-        "response": "{data:[{material_id,score,confidence,algorithm:'item_item',metadata}]}"
-      },
-      {
-        "name": "analytics",
-        "summary": "Interaction and recommendation cache analytics for a workspace.",
-        "params": [
-          {
-            "name": "workspace_id",
-            "type": "string",
-            "required": true,
-            "desc": "Path segment: /analytics/{workspace_id}"
-          },
-          {
-            "name": "days",
-            "type": "number",
-            "required": false,
-            "desc": "Lookback window in days (default 30, query param)"
-          }
-        ],
-        "response": "{data:{workspace_id,period_days,total_interactions,interactions_by_type,cached_recommendations,recommendations_by_algorithm}}"
-      },
-      {
-        "name": "cache-invalidate",
-        "summary": "Delete the current user's recommendation_scores rows, optionally scoped.",
-        "params": [
-          {
-            "name": "workspace_id",
-            "type": "string",
-            "required": false,
-            "desc": "Scope deletion to a workspace (query param)"
-          },
-          {
-            "name": "material_id",
-            "type": "string",
-            "required": false,
-            "desc": "Scope deletion to a specific material (query param)"
-          }
-        ],
-        "response": "{message:'Cache invalidated successfully'}"
       }
     ],
     "request": {
@@ -17481,6 +17468,7 @@
     ],
     "actions": [
       "list",
+      "by_order",
       "get",
       "register",
       "update",
@@ -17519,6 +17507,10 @@
         "event_id": {
           "type": "string",
           "description": "Service occurrence id, for service.complete / service.skip."
+        },
+        "order_id": {
+          "type": "string",
+          "description": "by_order: the sales order whose installed assets to list"
         }
       }
     },

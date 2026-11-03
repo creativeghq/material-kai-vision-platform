@@ -7643,7 +7643,7 @@
         ],
         "summary": "Google Search Console for connected websites (OAuth + performance sync)",
         "operationId": "post_gsc_api",
-        "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.\n\n**Routes / actions:**\n- `GET ?code&state` — Google's server-side redirect target. Verifies the signed state, exchanges the code, stores the connection, auto-matches the property + backfills 28 days, then 302s to the app. No JSON body.\n- `authorize` — Return the Google consent URL for a website (signed state binds the server-side callback to this website + user).\n- `list_properties` — List the GSC properties the connected Google account can access.\n- `set_property` — Bind a specific GSC property to the website when auto-match didn't.\n- `sync` — Pull the last N days of search-analytics now (default 28).\n- `disconnect` — Deactivate and clear the stored tokens (history is kept).\n- `cron-sync` — x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.\n- `inspect_urls` — Ask Search Console what it has CRAWLED and INDEXED, per URL, for this website. gsc_performance only holds pages that earned an impression, which is two steps downstream: \"5,351 URLs and 42 with impressions\" has three explanations with three different fixes (never crawled / crawled and declined / indexed but never matched) and nothing else can tell them apart. Walks the stalest URLs first, never-inspected ahead of all. Quota is 2,000 per day PER SITE and is counted from what was actually written today, so a failed run cannot leave a counter wrong. Google's strings are stored verbatim; crawl_status is derived in SQL by gsc_crawl_status() and falls through to \"unknown\" for wording we do not recognise.\n- `cron-inspect` — Cron (x-cron-secret): run inspect_urls for every active, property-bound connection. Scheduled separately from cron-sync because performance rows are a 5-day window refreshed daily while inspection is a multi-day backfill; sharing a schedule would starve one of them. A per-site failure is recorded on the connection, never swallowed.\n- `cron-ga-sync` — Cron (x-cron-secret), hourly: run ga_sync (28 days) for every active connection with an Analytics property. A per-site failure is recorded on the connection as ga_last_sync_error.\n- `ga_drill` — Live GA4 report (never stored): one Analytics breakdown, optionally within exact-match filters on other breakdowns (AND-ed into a dimensionFilter), a case-insensitive search over the breakdown's own dimensions, and a window of 1-365 days. Dimension names are breakdown KEYS from gaVocabulary, never GA field names. A GA failure returns ok:false with Google's message, never an empty success.",
+        "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.\n\n**Routes / actions:**\n- `GET ?code&state` — Google's server-side redirect target. Verifies the signed state, exchanges the code, stores the connection, auto-matches the property + backfills 28 days, then 302s to the app. No JSON body.\n- `authorize` — Return the Google consent URL for a website (signed state binds the server-side callback to this website + user).\n- `list_properties` — List the GSC properties the connected Google account can access.\n- `set_property` — Bind a specific GSC property to the website when auto-match didn't.\n- `sync` — Pull the last N days of search-analytics now (default 28).\n- `disconnect` — Deactivate and clear the stored tokens (history is kept).\n- `cron-sync` — x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.\n- `inspect_urls` — Ask Search Console what it has CRAWLED and INDEXED, per URL, for this website. gsc_performance only holds pages that earned an impression, which is two steps downstream: \"5,351 URLs and 42 with impressions\" has three explanations with three different fixes (never crawled / crawled and declined / indexed but never matched) and nothing else can tell them apart. Walks the stalest URLs first, never-inspected ahead of all. Quota is 2,000 per day PER SITE and is counted from what was actually written today, so a failed run cannot leave a counter wrong. Google's strings are stored verbatim; crawl_status is derived in SQL by gsc_crawl_status() and falls through to \"unknown\" for wording we do not recognise.\n- `cron-inspect` — Cron (x-cron-secret): run inspect_urls for every active, property-bound connection. Scheduled separately from cron-sync because performance rows are a 5-day window refreshed daily while inspection is a multi-day backfill; sharing a schedule would starve one of them. A per-site failure is recorded on the connection, never swallowed.\n- `cron-ga-sync` — Cron (x-cron-secret), hourly: run ga_sync (28 days) for every active connection with an Analytics property. A per-site failure is recorded on the connection as ga_last_sync_error.\n- `ga_drill` — Live GA4 report (never stored): one Analytics breakdown, optionally within exact-match filters on other breakdowns (AND-ed into a dimensionFilter), a case-insensitive search over the breakdown's own dimensions, and a window of 1-365 days. Dimension names are breakdown KEYS from gaVocabulary, never GA field names. A GA failure returns ok:false with Google's message, never an empty success.\n- `ga_list_properties` — List the Google Analytics 4 properties the connected Google account can read.\n- `ga_set_property` — Bind a GA4 property to the website. Must look like properties/123456789; a bare id or a G- measurement id is refused with 400.\n- `ga_realtime` — Live GA4 realtime report for the website (never stored). 400 when Google is not connected or no Analytics property is selected.\n- `ga_sync` — Pull the last N days of GA4 traffic now (default 28, max 365).\n- `submit_sitemaps` — Submit the website sitemap(s) to the bound Search Console property.\n- `cron-submit-sitemaps` — Cron (x-cron-secret): submit sitemaps for every active connection with a bound Search Console property.",
         "security": [
           {
             "supabaseJwt": []
@@ -7743,7 +7743,7 @@
         ],
         "summary": "Google Search Console for connected websites (OAuth + performance sync)",
         "operationId": "get_gsc_api",
-        "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.\n\n**Routes / actions:**\n- `GET ?code&state` — Google's server-side redirect target. Verifies the signed state, exchanges the code, stores the connection, auto-matches the property + backfills 28 days, then 302s to the app. No JSON body.\n- `authorize` — Return the Google consent URL for a website (signed state binds the server-side callback to this website + user).\n- `list_properties` — List the GSC properties the connected Google account can access.\n- `set_property` — Bind a specific GSC property to the website when auto-match didn't.\n- `sync` — Pull the last N days of search-analytics now (default 28).\n- `disconnect` — Deactivate and clear the stored tokens (history is kept).\n- `cron-sync` — x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.\n- `inspect_urls` — Ask Search Console what it has CRAWLED and INDEXED, per URL, for this website. gsc_performance only holds pages that earned an impression, which is two steps downstream: \"5,351 URLs and 42 with impressions\" has three explanations with three different fixes (never crawled / crawled and declined / indexed but never matched) and nothing else can tell them apart. Walks the stalest URLs first, never-inspected ahead of all. Quota is 2,000 per day PER SITE and is counted from what was actually written today, so a failed run cannot leave a counter wrong. Google's strings are stored verbatim; crawl_status is derived in SQL by gsc_crawl_status() and falls through to \"unknown\" for wording we do not recognise.\n- `cron-inspect` — Cron (x-cron-secret): run inspect_urls for every active, property-bound connection. Scheduled separately from cron-sync because performance rows are a 5-day window refreshed daily while inspection is a multi-day backfill; sharing a schedule would starve one of them. A per-site failure is recorded on the connection, never swallowed.\n- `cron-ga-sync` — Cron (x-cron-secret), hourly: run ga_sync (28 days) for every active connection with an Analytics property. A per-site failure is recorded on the connection as ga_last_sync_error.\n- `ga_drill` — Live GA4 report (never stored): one Analytics breakdown, optionally within exact-match filters on other breakdowns (AND-ed into a dimensionFilter), a case-insensitive search over the breakdown's own dimensions, and a window of 1-365 days. Dimension names are breakdown KEYS from gaVocabulary, never GA field names. A GA failure returns ok:false with Google's message, never an empty success.",
+        "description": "Connects a user_website to a Google Search Console property and pulls first-party search-analytics (query/page/clicks/impressions/ctr/position) into gsc_performance. OAuth is SERVER-SIDE: Google's redirect_uri points at THIS function (GET ?code&state); it exchanges the code and 302s back to /profile?tab=websites&gsc=<connected|pick_property|error>. This avoids the SPA's supabase-js (detectSessionInUrl+PKCE) intercepting Google's ?code= as a login code. `state` is an HMAC-signed {website_id,user_id,ts} minted at authorize-time after authenticate()+userCanAccessWorkspace(). Tokens live in website_gsc_connections (service-role only). verify_jwt disabled so the GET callback + cron (x-cron-secret, action=cron-sync) work.\n\n**Routes / actions:**\n- `GET ?code&state` — Google's server-side redirect target. Verifies the signed state, exchanges the code, stores the connection, auto-matches the property + backfills 28 days, then 302s to the app. No JSON body.\n- `authorize` — Return the Google consent URL for a website (signed state binds the server-side callback to this website + user).\n- `list_properties` — List the GSC properties the connected Google account can access.\n- `set_property` — Bind a specific GSC property to the website when auto-match didn't.\n- `sync` — Pull the last N days of search-analytics now (default 28).\n- `disconnect` — Deactivate and clear the stored tokens (history is kept).\n- `cron-sync` — x-cron-secret only — nightly refresh of every active connection + 180-day retention prune.\n- `inspect_urls` — Ask Search Console what it has CRAWLED and INDEXED, per URL, for this website. gsc_performance only holds pages that earned an impression, which is two steps downstream: \"5,351 URLs and 42 with impressions\" has three explanations with three different fixes (never crawled / crawled and declined / indexed but never matched) and nothing else can tell them apart. Walks the stalest URLs first, never-inspected ahead of all. Quota is 2,000 per day PER SITE and is counted from what was actually written today, so a failed run cannot leave a counter wrong. Google's strings are stored verbatim; crawl_status is derived in SQL by gsc_crawl_status() and falls through to \"unknown\" for wording we do not recognise.\n- `cron-inspect` — Cron (x-cron-secret): run inspect_urls for every active, property-bound connection. Scheduled separately from cron-sync because performance rows are a 5-day window refreshed daily while inspection is a multi-day backfill; sharing a schedule would starve one of them. A per-site failure is recorded on the connection, never swallowed.\n- `cron-ga-sync` — Cron (x-cron-secret), hourly: run ga_sync (28 days) for every active connection with an Analytics property. A per-site failure is recorded on the connection as ga_last_sync_error.\n- `ga_drill` — Live GA4 report (never stored): one Analytics breakdown, optionally within exact-match filters on other breakdowns (AND-ed into a dimensionFilter), a case-insensitive search over the breakdown's own dimensions, and a window of 1-365 days. Dimension names are breakdown KEYS from gaVocabulary, never GA field names. A GA failure returns ok:false with Google's message, never an empty success.\n- `ga_list_properties` — List the Google Analytics 4 properties the connected Google account can read.\n- `ga_set_property` — Bind a GA4 property to the website. Must look like properties/123456789; a bare id or a G- measurement id is refused with 400.\n- `ga_realtime` — Live GA4 realtime report for the website (never stored). 400 when Google is not connected or no Analytics property is selected.\n- `ga_sync` — Pull the last N days of GA4 traffic now (default 28, max 365).\n- `submit_sitemaps` — Submit the website sitemap(s) to the bound Search Console property.\n- `cron-submit-sitemaps` — Cron (x-cron-secret): submit sitemaps for every active connection with a bound Search Console property.",
         "security": [
           {
             "supabaseJwt": []
@@ -13736,9 +13736,9 @@
         "tags": [
           "Recommendations"
         ],
-        "summary": "Collaborative filtering interaction tracking, recommendations, and analytics.",
+        "summary": "Records per-user material interactions (views, clicks, saves, quotes).",
         "operationId": "post_recommendations_api",
-        "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and cached recommendation distribution. DELETE /cache clears the user's recommendation_scores rows.\n\n**Sub-paths:** `/recommendations-api/track-interaction`\n\n**Actions** (`action` in the body):\n- `track-interaction` — Record a user interaction event (view, click, save, purchase, rate, add_to_quote, share). → `{data:{}, message:'Interaction tracked successfully'}`\n- `for-user` — Retrieve cached collaborative-filtering recommendations for the current user. → `{data:[{material_id,score,confidence,algorithm,metadata}], cached:boolean}`\n- `similar-materials` — Compute item-item similarity for a material from co-interaction data. → `{data:[{material_id,score,confidence,algorithm:'item_item',metadata}]}`\n- `analytics` — Interaction and recommendation cache analytics for a workspace. → `{data:{workspace_id,period_days,total_interactions,interactions_by_type,cached_recommendations,recommendations_by_algorithm}}`\n- `cache-invalidate` — Delete the current user's recommendation_scores rows, optionally scoped. → `{message:'Cache invalidated successfully'}`\n\n**Response:** `{}`",
+        "description": "Path-routed. POST /track-interaction is the only route: it records one interaction in material_interactions, which the market-trends views read. Recommendations themselves are served from product_edges, not by this function.\n\n**Sub-paths:** `/recommendations-api/track-interaction`\n\n**Actions** (`action` in the body):\n- `track-interaction` — Record a user interaction event (view, click, save, purchase, rate, add_to_quote, share). → `{data:{}, message:'Interaction tracked successfully'}`\n\n**Response:** `{}`",
         "security": [
           {
             "supabaseJwt": []
@@ -13850,260 +13850,10 @@
                       }
                     },
                     "description": "Returns: {data:{}, message:'Interaction tracked successfully'}"
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "action",
-                      "workspace_id"
-                    ],
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "enum": [
-                          "for-user"
-                        ],
-                        "description": "Retrieve cached collaborative-filtering recommendations for the current user."
-                      },
-                      "workspace_id": {
-                        "type": "string",
-                        "description": "Workspace scope (query param)"
-                      },
-                      "limit": {
-                        "type": "number",
-                        "description": "Max results (default 20, query param)"
-                      },
-                      "algorithm": {
-                        "type": "string",
-                        "description": "Algorithm key (default user_user, query param)"
-                      }
-                    },
-                    "description": "Returns: {data:[{material_id,score,confidence,algorithm,metadata}], cached:boolean}"
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "action",
-                      "material_id",
-                      "workspace_id"
-                    ],
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "enum": [
-                          "similar-materials"
-                        ],
-                        "description": "Compute item-item similarity for a material from co-interaction data."
-                      },
-                      "material_id": {
-                        "type": "string",
-                        "description": "Path segment: /similar-materials/{material_id}"
-                      },
-                      "workspace_id": {
-                        "type": "string",
-                        "description": "Workspace scope (query param)"
-                      },
-                      "limit": {
-                        "type": "number",
-                        "description": "Max results (default 10, query param)"
-                      }
-                    },
-                    "description": "Returns: {data:[{material_id,score,confidence,algorithm:'item_item',metadata}]}"
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "action",
-                      "workspace_id"
-                    ],
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "enum": [
-                          "analytics"
-                        ],
-                        "description": "Interaction and recommendation cache analytics for a workspace."
-                      },
-                      "workspace_id": {
-                        "type": "string",
-                        "description": "Path segment: /analytics/{workspace_id}"
-                      },
-                      "days": {
-                        "type": "number",
-                        "description": "Lookback window in days (default 30, query param)"
-                      }
-                    },
-                    "description": "Returns: {data:{workspace_id,period_days,total_interactions,interactions_by_type,cached_recommendations,recommendations_by_algorithm}}"
-                  },
-                  {
-                    "type": "object",
-                    "required": [
-                      "action"
-                    ],
-                    "properties": {
-                      "action": {
-                        "type": "string",
-                        "enum": [
-                          "cache-invalidate"
-                        ],
-                        "description": "Delete the current user's recommendation_scores rows, optionally scoped."
-                      },
-                      "workspace_id": {
-                        "type": "string",
-                        "description": "Scope deletion to a workspace (query param)"
-                      },
-                      "material_id": {
-                        "type": "string",
-                        "description": "Scope deletion to a specific material (query param)"
-                      }
-                    },
-                    "description": "Returns: {message:'Cache invalidated successfully'}"
                   }
                 ],
                 "discriminator": {
                   "propertyName": "action"
-                }
-              }
-            }
-          }
-        }
-      },
-      "get": {
-        "tags": [
-          "Recommendations"
-        ],
-        "summary": "Collaborative filtering interaction tracking, recommendations, and analytics.",
-        "operationId": "get_recommendations_api",
-        "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and cached recommendation distribution. DELETE /cache clears the user's recommendation_scores rows.\n\n**Sub-paths:** `/recommendations-api/track-interaction`\n\n**Actions** (`action` in the body):\n- `track-interaction` — Record a user interaction event (view, click, save, purchase, rate, add_to_quote, share). → `{data:{}, message:'Interaction tracked successfully'}`\n- `for-user` — Retrieve cached collaborative-filtering recommendations for the current user. → `{data:[{material_id,score,confidence,algorithm,metadata}], cached:boolean}`\n- `similar-materials` — Compute item-item similarity for a material from co-interaction data. → `{data:[{material_id,score,confidence,algorithm:'item_item',metadata}]}`\n- `analytics` — Interaction and recommendation cache analytics for a workspace. → `{data:{workspace_id,period_days,total_interactions,interactions_by_type,cached_recommendations,recommendations_by_algorithm}}`\n- `cache-invalidate` — Delete the current user's recommendation_scores rows, optionally scoped. → `{message:'Cache invalidated successfully'}`\n\n**Response:** `{}`",
-        "security": [
-          {
-            "supabaseJwt": []
-          },
-          {
-            "apiKeyPartner": []
-          },
-          {
-            "apiKeySecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Recommendations"
-        ],
-        "summary": "Collaborative filtering interaction tracking, recommendations, and analytics.",
-        "operationId": "delete_recommendations_api",
-        "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and cached recommendation distribution. DELETE /cache clears the user's recommendation_scores rows.\n\n**Sub-paths:** `/recommendations-api/track-interaction`\n\n**Actions** (`action` in the body):\n- `track-interaction` — Record a user interaction event (view, click, save, purchase, rate, add_to_quote, share). → `{data:{}, message:'Interaction tracked successfully'}`\n- `for-user` — Retrieve cached collaborative-filtering recommendations for the current user. → `{data:[{material_id,score,confidence,algorithm,metadata}], cached:boolean}`\n- `similar-materials` — Compute item-item similarity for a material from co-interaction data. → `{data:[{material_id,score,confidence,algorithm:'item_item',metadata}]}`\n- `analytics` — Interaction and recommendation cache analytics for a workspace. → `{data:{workspace_id,period_days,total_interactions,interactions_by_type,cached_recommendations,recommendations_by_algorithm}}`\n- `cache-invalidate` — Delete the current user's recommendation_scores rows, optionally scoped. → `{message:'Cache invalidated successfully'}`\n\n**Response:** `{}`",
-        "security": [
-          {
-            "supabaseJwt": []
-          },
-          {
-            "apiKeyPartner": []
-          },
-          {
-            "apiKeySecret": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

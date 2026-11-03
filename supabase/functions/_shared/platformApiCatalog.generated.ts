@@ -529,6 +529,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "event_id": {
         "type": "string",
         "description": "Service occurrence id, for service.complete / service.skip."
+      },
+      "order_id": {
+        "type": "string",
+        "description": "by_order: the sales order whose installed assets to list"
       }
     }
   },
@@ -3932,12 +3936,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "name": "recommendations-api",
     "tag": "Recommendations",
     "methods": [
-      "POST",
-      "GET",
-      "DELETE"
+      "POST"
     ],
-    "summary": "Collaborative filtering interaction tracking, recommendations, and analytics.",
-    "description": "Path-routed REST API. POST /track-interaction records user-material interactions and invalidates the user's recommendation cache. GET /for-user returns cached recommendation scores or indicates Python service is needed for fresh computation. GET /similar-materials/{id} computes item-item similarity from interaction co-occurrence. GET /analytics/{workspace_id} returns interaction counts by type and",
+    "summary": "Records per-user material interactions (views, clicks, saves, quotes).",
+    "description": "Path-routed. POST /track-interaction is the only route: it records one interaction in material_interactions, which the market-trends views read. Recommendations themselves are served from product_edges, not by this function.",
     "routes": [
       "track-interaction"
     ],

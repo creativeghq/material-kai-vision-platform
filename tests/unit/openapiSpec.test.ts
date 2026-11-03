@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { strippedSource } from '../helpers/sourceIndex';
 import { join } from 'node:path';
 
 const ROOT = join(__dirname, '..', '..');
@@ -14,7 +15,7 @@ interface EdgeEntry {
   methods?: string[];
   request?: Param[] | { fields?: Record<string, unknown> };
   params?: Param[];
-  actions?: Array<{ name?: string; action?: string; params?: Param[] }>;
+  actions?: Array<string | { name?: string; action?: string; params?: Param[] }>;
   common?: Param[];
 }
 interface Column { name: string; type: string }
@@ -109,5 +110,97 @@ describe('database resources (Banking)', () => {
       expect(spec.paths[path].servers[0].url).not.toContain('/functions/v1');
     }
     expect(spec.tags.map((t: { name: string }) => t.name)).toContain(rest.tag);
+  });
+});
+
+describe('documented actions match the code', () => {
+  const ownSources = (fn: string): string[] => {
+    const dir = join(ROOT, 'supabase', 'functions', fn);
+    const out: string[] = [];
+    const walk = (d: string) => {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+        const p = join(d, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (e.name.endsWith('.ts') && !/\.test\.ts$/.test(e.name)) out.push(strippedSource(p));
+      }
+    };
+    walk(dir);
+    return out;
+  };
+  /** Actions as objects, as bare strings, or as the `action` field's enum / quoted values. */
+  const documented = (e: EdgeEntry) => {
+    const names = (e.actions ?? []).map((a) => (typeof a === 'string' ? a : a.name ?? a.action ?? ''));
+    const req = e.request as unknown;
+    type ActionField = { name?: string; enum?: string[]; description?: string };
+    const field: ActionField | undefined = Array.isArray(req)
+      ? (req as ActionField[]).find((p) => p.name === 'action')
+      : (req as { fields?: Record<string, ActionField> } | undefined)?.fields?.action;
+    names.push(...(field?.enum ?? []), ...[...(field?.description ?? '').matchAll(/'([a-z][\w.-]*)'/g)].map((m) => m[1]));
+    return new Set(names.filter(Boolean));
+  };
+
+  /** Case labels at the top level of every `switch (action)` / `switch (body.action)` block. */
+  const dispatchedActions = (src: string): string[] => {
+    const found: string[] = [];
+    for (const m of src.matchAll(/switch\s*\(\s*(?:\w+\??\.)?action\s*\)\s*\{/g)) {
+      let depth = 1;
+      for (let i = m.index! + m[0].length; i < src.length && depth > 0; i++) {
+        const c = src[i];
+        if (c === '{') depth++;
+        else if (c === '}') depth--;
+        else if (depth === 1 && src.startsWith('case', i)) {
+          const label = /^case\s+['"]([^'"]+)['"]\s*:/.exec(src.slice(i));
+          if (label) found.push(label[1]);
+        }
+      }
+    }
+    return found;
+  };
+
+  /** Entries that document MODES of a function with no action field. Shrink-only. */
+  const NOT_AN_ACTION_FIELD: Record<string, string> = {
+    'background-agent-runner': 'run_agent is the POST body; get_catalog is GET ?catalog=1',
+    'moodboard-sheet-share': 'one token endpoint: resolve is the read, feedback a body field',
+    'taric-classify': 'classify is the default mode of the POST body',
+    'seo-rank-tracker': 'run is the default POST',
+    'seo-domain-tracker': 'run is the default POST',
+    'seo-site-audit': 'run is the default POST',
+  };
+
+  it('every action a function dispatches on is documented', () => {
+    const undocumented = edge.flatMap((e) => {
+      const doc = documented(e);
+      return ownSources(e.name).flatMap(dispatchedActions).filter((a) => !doc.has(a)).map((a) => `${e.name}: ${a}`);
+    });
+    expect([...new Set(undocumented)], 'Add the action to scripts/edge-endpoints.json, then `npm run openapi:edge`').toEqual([]);
+  });
+
+  it('every documented action is one the function still handles', () => {
+    const phantom = edge.flatMap((e) => {
+      if (NOT_AN_ACTION_FIELD[e.name]) return [];
+      const src = ownSources(e.name).join('\n');
+      return [...documented(e)]
+        .filter((a) => !/[\s?/(]/.test(a))
+        .filter((a) => !src.includes(`'${a}'`) && !src.includes(`"${a}"`) && !src.includes(`\`${a}\``)
+          && !new RegExp(`^\\s*${a.replace(/[.-]/g, '\\$&')}\\s*:`, 'm').test(src))
+        .map((a) => `${e.name}: ${a}`);
+    });
+    expect(phantom, 'Remove it from scripts/edge-endpoints.json, then `npm run openapi:edge`').toEqual([]);
+  });
+
+  it('every deployed edge function has an entry', () => {
+    const fnDir = join(ROOT, 'supabase', 'functions');
+    const names = new Set(edge.map((e) => e.name));
+    const undocumented = readdirSync(fnDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('_') && existsSync(join(fnDir, d.name, 'index.ts')))
+      .map((d) => d.name)
+      .filter((n) => !names.has(n));
+    expect(undocumented, 'Add an entry to scripts/edge-endpoints.json, then `npm run openapi:edge`').toEqual([]);
+  });
+
+  it('the exemption list names only entries that exist and still need it', () => {
+    const names = new Set(edge.map((e) => e.name));
+    expect(Object.keys(NOT_AN_ACTION_FIELD).filter((n) => !names.has(n))).toEqual([]);
   });
 });
