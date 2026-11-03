@@ -260,7 +260,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `recommendations-api` _(GET + POST)_ | JWT / kai_* / secret | Collaborative filtering interaction tracking, recommendations, and analytics. |
+| `recommendations-api` | JWT / kai_* / secret | Records per-user material interactions (views, clicks, saves, quotes). |
 
 **SEO**
 
