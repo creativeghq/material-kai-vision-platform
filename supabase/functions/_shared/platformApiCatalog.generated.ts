@@ -5032,7 +5032,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Glanceable per-section summary for the desktop widget",
-    "description": "User JWT or a kai_ API key. Read-only. Returns one block per section (My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQ",
+    "description": "User JWT or a kai_ API key. Returns one block per section (Today, My tasks, Projects, Finance, Quotes, CRM, Deals, Real estate, Warehouse, HR, Inbox), each with headline metrics, a deep link and status ok|failed. A section appears only when the workspace owns its module AND the caller's role holds its capability; the rest are listed in unavailable with the reason. Every figure is derived in SQL by",
     "fields": {
       "workspace_id": {
         "type": "string",
@@ -5045,6 +5045,18 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "since": {
         "type": "string",
         "description": "ISO timestamp cursor for view=notifications. Omitted = start from now (returns no backlog). Use the returned cursor next"
+      },
+      "action": {
+        "type": "string",
+        "description": "POST only: create_lead (with lead) or complete_task (with task_id). Omitted = read the pulse."
+      },
+      "lead": {
+        "type": "object",
+        "description": "For create_lead: {name (required), phone, email, company_name, request, notes, source (email|phone|website|walk_in|refer"
+      },
+      "task_id": {
+        "type": "string",
+        "description": "For complete_task: the id of an item whose action is complete_task. (uuid)"
       }
     }
   },
