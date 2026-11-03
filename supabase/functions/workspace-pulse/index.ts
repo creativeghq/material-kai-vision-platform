@@ -70,8 +70,10 @@ Deno.serve(withApiLogging('workspace-pulse', async (req: Request) => {
  * The caller's own platform notifications newer than `since`, oldest first, for the desktop app to
  * show as native banners. No `since` = start now (a first launch must not replay the backlog).
  */
-async function notifications(token: string, userId: string, since: string | null): Promise<Response> {
+async function notifications(token: string, userId: string, rawSince: string | null): Promise<Response> {
   const now = new Date().toISOString();
+  // An unencoded `+00:00` offset arrives as a space (form decoding); desktop app 1.4.1 and earlier send it so.
+  const since = rawSince?.replace(' ', '+') ?? null;
   if (!since) return json({ ok: true, notifications: [], cursor: now });
   if (Number.isNaN(Date.parse(since))) throw new HttpError(400, 'since must be an ISO timestamp');
 
