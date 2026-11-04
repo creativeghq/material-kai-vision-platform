@@ -76,6 +76,7 @@ const TEAM_ROLE_PERSONA: Record<string, Persona> = {
   employee: 'employee',
   realestate_agent: 'realestate_agent',
   client: 'guest',
+  support: 'staff',
 };
 
 /** Resolve the single persona. */

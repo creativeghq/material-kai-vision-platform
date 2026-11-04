@@ -2122,7 +2122,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'credit_note_issued', 'delivery_note_issued', 'sales_order_confirmed', 'purchase_order_confirmed',
   'stripe_payment_succeeded', 'stripe_payment_failed',
   'role_upgrade_approved', 'role_upgrade_rejected', 'role_upgrade_request_submitted',
-  'finance_follow_up', 'finance_document_requested', 'module_access_requested',
+  'finance_follow_up', 'finance_document_requested', 'module_access_requested', 'workspace_access_requested',
   // A self-hosting enquiry emails the platform operator. Server-only, or any authenticated
   // user could POST a forged one and put attacker-chosen text in that mailbox.
   'self_hosting_requested',

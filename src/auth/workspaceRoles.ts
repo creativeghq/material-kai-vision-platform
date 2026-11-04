@@ -11,6 +11,7 @@ export const WORKSPACE_INVITE_ROLES = [
   'hr', 'hr_manager',
   'warehouse', 'marketing',
   'employee', 'realestate_agent',
+  'support',
 ] as const;
 export type WorkspaceInviteRole = typeof WORKSPACE_INVITE_ROLES[number];
 
@@ -104,6 +105,11 @@ export const WORKSPACE_ROLE_META: Record<WorkspaceMemberRole, WorkspaceRoleMeta>
     portal: 'Real Estate portal',
     description: 'Real Estate only: their own listings and leads, plus any listing marked “open for all”. No finance, pricing or settings.',
     requiresModule: 'real-estate',
+  },
+  support: {
+    label: 'Support',
+    portal: 'Full workspace (time-limited)',
+    description: 'Same access as a Member, for a set time. When it ends they must ask to come back in, and an owner or admin gives them a 6-digit PIN. They cannot manage the team or extend their own time.',
   },
   client: {
     label: 'Client',

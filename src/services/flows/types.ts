@@ -134,6 +134,7 @@ export type TriggerType =
   // Banking (#315): a company-card spend of ≥€100 landed (filter higher via amount)
   | 'card_spend_threshold'
   | 'module_access_requested'
+  | 'workspace_access_requested'
   // Someone asked to run the platform on their own infrastructure. Operator-facing:
   // the most valuable message this platform receives, so it gets its own trigger
   // rather than borrowing one whose name would misdescribe it in every flow list.
@@ -273,6 +274,7 @@ export type TriggerType =
 
 export interface ManualTriggerConfig {}
 export interface ModuleAccessRequestedTriggerConfig {}
+export interface WorkspaceAccessRequestedTriggerConfig {}
 export interface SelfHostingRequestedTriggerConfig {}
 export interface HrLateCheckinTriggerConfig {}
 export interface RealestateBuyerMatchesFoundTriggerConfig {}
@@ -649,6 +651,7 @@ export type TriggerConfigMap = {
   bank_payment_unmatched: BankPaymentUnmatchedTriggerConfig;
   card_spend_threshold: CardSpendThresholdTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;
+  workspace_access_requested: WorkspaceAccessRequestedTriggerConfig;
   self_hosting_requested: SelfHostingRequestedTriggerConfig;
   hr_late_checkin: HrLateCheckinTriggerConfig;
   'hr.applicant_stage_changed': HrApplicantStageChangedTriggerConfig;

@@ -165,3 +165,14 @@ Exactly one `is_root=true` workspace; its owner/admins get `isPlatformOperator` 
 ---
 
 **Last updated**: 2026-06-09 · Covers #195, #208, #212, #174, #194, #202.
+
+## Support access: a time-limited role with PIN re-entry
+
+The support workspace role holds the same capabilities as member, and always has a timer (workspace_members.access_expires_at, enforced by a CHECK). It holds no workspace.manage, so it cannot approve itself, invite anyone or extend its own time.
+
+- **Invite:** an owner or admin picks the Support role and how long access lasts. The time starts when the invite is redeemed.
+- **Timer ends:** the workspace-support-access-expire cron runs every minute and sets the member to suspended, which every RLS policy and capability check already refuses. So access can outlive the timer by up to a minute, unless the person's own app calls get_my_support_access first. It also deactivates any API key they hold for that workspace. ops.support_access_overdue fires if this cron stops.
+- **Coming back:** the person sees a full-screen "Request Approval to Enter Workspace". Owners and admins get a bell and an email through the workspace_access_requested flow.
+- **Approval:** in the Team panel, the approver sets the new access time and how long the PIN lasts. The 6-digit PIN is shown once, stored only as a bcrypt hash, and handed over by the approver in person. Five wrong tries close the request.
+
+workspace_access_requests has no client grant and no client policy, because it holds the PIN hash. Clients reach it only through the SECURITY DEFINER RPCs.

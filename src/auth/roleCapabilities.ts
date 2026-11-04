@@ -55,6 +55,11 @@ export const OPERATOR_ONLY_CAPABILITIES: readonly Capability[] = [
   'platform.admin', 'catalog.import', 'downstream.view',
 ];
 
+const MEMBER_CAPABILITIES: readonly Capability[] = [
+  'workspace.read', 'finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse',
+  'quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use', 'marketing.seo',
+];
+
 const SALES_CAPABILITIES: readonly Capability[] = [
   'workspace.read', 'sales.portal', 'quotes.use', 'crm.view', 'marketplace.browse', 'agent.use', 'inbox.use',
 ];
@@ -66,10 +71,8 @@ const SALES_CAPABILITIES: readonly Capability[] = [
 export const WORKSPACE_ROLE_CAPABILITIES: Readonly<Record<string, readonly Capability[]>> = {
   owner: BUSINESS_CAPABILITIES,
   admin: BUSINESS_CAPABILITIES,
-  member: [
-    'workspace.read', 'finance.manage', 'invoice.issue', 'crm.view', 'warehouse.manage', 'marketplace.browse',
-    'quotes.use', 'projects.use', 'moodboards.use', 'agent.use', 'inbox.use', 'marketing.seo',
-  ],
+  member: MEMBER_CAPABILITIES,
+  support: MEMBER_CAPABILITIES,
   accountant: ['workspace.read', 'finance.manage', 'finance.operate', 'invoice.issue'],
   sales: SALES_CAPABILITIES,
   sales_manager: [...SALES_CAPABILITIES, 'sales.team.view'],

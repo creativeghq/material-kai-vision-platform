@@ -125,7 +125,7 @@ export const workspaceManagementService = {
     role: WorkspaceInviteRole,
     opts?: {
       email?: string; name?: string; crmContactId?: string;
-      accessKind?: InviteAccessKind; grants?: RecordGrant[];
+      accessKind?: InviteAccessKind; grants?: RecordGrant[]; accessMinutes?: number;
     },
   ): Promise<string> {
     const { data, error } = await supabase.rpc('create_workspace_invite', {
@@ -136,6 +136,7 @@ export const workspaceManagementService = {
       p_crm_contact_id: opts?.crmContactId ?? null,
       p_access_kind: opts?.accessKind ?? 'member',
       p_grants: opts?.grants ?? null,
+      p_access_minutes: opts?.accessMinutes ?? null,
     } as never);
     if (error) throw error;
     return data as string;
@@ -149,10 +150,11 @@ export const workspaceManagementService = {
     email: string;
     name?: string;
     crmContactId?: string;
+    accessMinutes?: number;
   }): Promise<{ code: string; url: string }> {
     const email = input.email.trim().toLowerCase();
     const code = await this.createInvite(input.workspaceId, input.role, {
-      email, name: input.name, crmContactId: input.crmContactId,
+      email, name: input.name, crmContactId: input.crmContactId, accessMinutes: input.accessMinutes,
     });
     return emitInvitation({
       code, email, kind: 'team', roleLabel: WORKSPACE_ROLE_META[input.role].label,

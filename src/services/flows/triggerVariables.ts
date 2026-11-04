@@ -371,6 +371,12 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'list_price', label: 'New list price', note: 'What the factory now ASKS. Not a cost until the operator accepts it.' },
     { key: 'currency', label: 'Currency', note: 'Currency of the published ask.', example: 'EUR' },
   ]),
+  workspace_access_requested: withStandard([
+    { key: 'workspace_name', label: 'Workspace', note: 'The workspace they asked to re-enter.' },
+    { key: 'requester_name', label: 'Requested by', note: 'The support member whose timer ended.' },
+    { key: 'to', label: 'Recipient email', note: 'The owner or admin this event was raised for. Fired once per recipient.' },
+    { key: 'html_body', label: 'Email body', note: 'The escaped message, ready for an email action.' },
+  ]),
   supplier_claim_requested: withStandard([
     { key: 'admin_ids', label: 'Admin IDs', note: 'Operator (root workspace) admins to notify — iterate with a Loop ({{item}} = each admin id).' },
     { key: 'company_name', label: 'Company name', note: 'Invoicing name of the claiming workspace.' },

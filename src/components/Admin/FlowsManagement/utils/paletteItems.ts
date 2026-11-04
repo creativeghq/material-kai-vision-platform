@@ -326,6 +326,9 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Unmatched Bank Payment', description: 'An incoming bank transfer matched no open invoice', icon: 'Landmark', color: 'amber',
     defaultData: { label: 'Unmatched Bank Payment', category: 'trigger', triggerType: 'bank_payment_unmatched', config: {} } as TriggerNodeData },
   // A workspace member requested activation of a module; the owner is notified.
+  { type: 'triggerNode', category: 'trigger', subType: 'workspace_access_requested', group: 'Modules',
+    label: 'Support Access Requested', description: 'A support member whose timer ended asked an owner or admin to let them back in', icon: 'LayoutGrid', color: 'amber',
+    defaultData: { label: 'Support Access Requested', category: 'trigger', triggerType: 'workspace_access_requested', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'module_access_requested', group: 'Modules',
     label: 'Module Activation Requested', description: 'A member asked the workspace owner to activate a module', icon: 'LayoutGrid', color: 'violet',
     defaultData: { label: 'Module Activation Requested', category: 'trigger', triggerType: 'module_access_requested', config: {} } as TriggerNodeData },

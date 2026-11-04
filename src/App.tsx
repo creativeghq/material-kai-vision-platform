@@ -9,6 +9,7 @@ import { Toaster as Sonner } from '@/components/core/ui/sonner';
 import { TooltipProvider } from '@/components/core/ui/tooltip';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { WorkspaceProvider } from '@/contexts/WorkspaceContext';
+import { SupportAccessGate } from '@/components/core/Team/SupportAccessGate';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from './components/core/AdminGuard';
@@ -208,6 +209,7 @@ const App = () => (
         <TooltipProvider>
           <Toaster />
           <Sonner />
+          <SupportAccessGate />
           <BrowserRouter>
             <Suspense fallback={<PageLoader />}>
               <Routes>

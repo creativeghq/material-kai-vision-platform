@@ -25,6 +25,8 @@ import {
   type WorkspaceInviteRole, type WorkspaceMemberRole,
 } from '@/auth/workspaceRoles';
 import { HubEmptyState } from '@/components/core/hub';
+import { SupportAccessPanel } from './SupportAccessPanel';
+import { SUPPORT_ACCESS_DURATIONS, DEFAULT_SUPPORT_ACCESS_MINUTES } from '@/services/supportAccessService';
 
 interface MemberRow {
   user_id: string;
@@ -54,6 +56,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   const [role, setRole] = useState<WorkspaceInviteRole>('member');
   const [email, setEmail] = useState('');
   const [link, setLink] = useState<string | null>(null);
+  const [accessMinutes, setAccessMinutes] = useState<number>(DEFAULT_SUPPORT_ACCESS_MINUTES);
 
   /** Roles this viewer may assign to an EXISTING member: the offerable set, plus admin for an owner. */
   const assignableRoles = useMemo<WorkspaceMemberRole[]>(
@@ -99,6 +102,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
     try {
       const { url } = await workspaceManagementService.inviteByEmail({
         workspaceId, workspaceName: workspaceName || 'the team', role, email: addr,
+        accessMinutes: role === 'support' ? accessMinutes : undefined,
       });
       setLink(url);
       setEmail('');
@@ -115,7 +119,9 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   const generateLink = async () => {
     setBusy('invite-link');
     try {
-      const code = await workspaceManagementService.createInvite(workspaceId, role);
+      const code = await workspaceManagementService.createInvite(workspaceId, role, {
+        accessMinutes: role === 'support' ? accessMinutes : undefined,
+      });
       const url = `${window.location.origin}/auth?mode=signup&invite=${code}`;
       setLink(url);
       await navigator.clipboard.writeText(url).catch(() => {});
@@ -203,6 +209,21 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
             </div>
           </div>
 
+          {role === 'support' && (
+            <div className="space-y-1 sm:max-w-xs">
+              <Label>Access lasts</Label>
+              <Select value={String(accessMinutes)} onValueChange={(v) => { setAccessMinutes(Number(v)); setLink(null); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SUPPORT_ACCESS_DURATIONS.map((d) => (
+                    <SelectItem key={d.minutes} value={String(d.minutes)}>{d.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">The time starts when they accept the invitation.</p>
+            </div>
+          )}
+
           <div className="rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-start gap-2">
             <ShieldCheck className="h-3.5 w-3.5 mt-0.5 shrink-0 text-primary" />
             <span>{meta.description}</span>
@@ -282,6 +303,8 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
           </CardContent>
         </Card>
       )}
+
+      {canManage && <SupportAccessPanel workspaceId={workspaceId} members={members} onChanged={load} />}
 
       {/* ── Members ────────────────────────────────────────────────────────── */}
       <Card>

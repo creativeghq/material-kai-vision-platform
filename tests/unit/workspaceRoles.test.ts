@@ -25,6 +25,7 @@ const PERSONA_BY_ROLE: Record<WorkspaceMemberRole, string> = {
   employee: 'employee',
   realestate_agent: 'realestate_agent',
   client: 'guest',
+  support: 'staff',
 };
 
 /** Capabilities NO functional team role may hold — the ones that would make it a workspace manager
