@@ -34,7 +34,7 @@ async function callMivaa(path: string, jwt: string | undefined, userId: string, 
     const text = await resp.text();
     let parsed: any = null;
     try { parsed = JSON.parse(text); } catch { parsed = text; }
-    return { ok: resp.ok, status: resp.status, data: parsed, error: resp.ok ? undefined : describeUpstreamError(resp.status, parsed) };
+    return { ok: resp.ok, status: resp.status, data: parsed, error: resp.ok ? undefined : (typeof parsed?.detail === 'string' ? parsed.detail : describeUpstreamError(resp.status, parsed)) };
   } catch (e) {
     return { ok: false, status: 0, error: e instanceof Error ? e.message : 'network error' };
   }
