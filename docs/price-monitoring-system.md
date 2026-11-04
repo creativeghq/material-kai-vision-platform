@@ -393,3 +393,7 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 
 **External API docs**: `docs/price-monitoring-api.md` — full reference for consumers integrating from other projects.
 
+
+## Alerts report into an agent conversation
+
+Each tracked query has `tracked_queries.source_conversation_id`, and mentions and job searches have the same column. An alert posts its details to that thread with the monitoring agent (`kai`), and the bell and email open it. The FK is `ON DELETE SET NULL`, so after a chat is deleted the next alert opens a new thread. An older notification link carries `alert=<kind>:<id>`, and the page calls `reopen_monitoring_conversation`, which checks ownership, rebuilds the thread from the alert log and re-links it. That path makes no model call, and no alert text travels in the URL.

@@ -22,6 +22,20 @@ const blockAfter = (marker: string): string => {
   return HUB.slice(start);
 };
 
+describe('a link to a deleted conversation', () => {
+  const page = readFileSync('src/pages/AgentHub.tsx', 'utf8');
+
+  it('never reaches the hub, which would open an empty chat on a dead id', () => {
+    expect(page).toMatch(/initialConversationId=\{initialConversationId && liveConversations\.has\(initialConversationId\)/);
+  });
+
+  it('rebuilds a monitoring alert on the server, with nothing taken from the URL but its id', () => {
+    expect(page).toContain("rpc('reopen_monitoring_conversation'");
+    expect(page).toMatch(/p_kind: alert\[1\], p_tracked_id: alert\[2\]/);
+    expect(page).toMatch(/\^\(price\|mention\|job\):/);
+  });
+});
+
 describe('opening a conversation selects the agent that owns it', () => {
   const loader = blockAfter('const handleLoadConversation = useCallback(');
 
