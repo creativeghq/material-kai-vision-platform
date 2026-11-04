@@ -95,7 +95,7 @@ describe('a notification click reaches its target', () => {
     expect(list).toMatch(/const target = resolveNotificationTarget\(n\.action_url\)/);
     expect(list).toMatch(/const canOpen = target\.kind !== 'none'/);
     // Role, tab stop, handler and pointer ALL hang off that verdict.
-    const iconAt = list.indexOf('TYPE_ICON[n.type]');
+    const iconAt = list.indexOf('<NotificationIcon type={n.type}');
     expect(iconAt, 'the row anchor moved — this scan reads the whole map').toBeGreaterThan(0);
     const row = list.slice(0, iconAt);
     expect(row).toMatch(/canOpen \?\s*\{/);

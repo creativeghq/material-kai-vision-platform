@@ -6,8 +6,9 @@ import { Button } from '@/components/core/ui/button';
 import { HubEmptyState, HubSegmented, HubToolbar } from '@/components/core/hub';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext';
+import { logger } from '@/config';
 import { supabase } from '@/integrations/supabase/client';
-import { timeAgo } from '@/utils/datetime';
+import { formatDate, timeAgo } from '@/utils/datetime';
 import { resolveNotificationTarget, type NotificationTarget } from '@/utils/notificationLink';
 
 import { NotificationIcon } from '../components/NotificationIcon';
@@ -99,7 +100,13 @@ export default function NotificationsPage() {
 
   const open = async (row: NotificationRow, target: NotificationTarget) => {
     if (!row.is_read) {
-      await supabase.from('user_notifications').update({ is_read: true }).eq('id', row.id);
+      const { error } = await supabase.from('user_notifications').update({ is_read: true }).eq('id', row.id);
+      if (error) {
+        logger.warn('Could not mark the notification read; navigating anyway', {
+          service: 'NotificationsPage',
+          metadata: { id: row.id, error: error.message },
+        });
+      }
     }
     if (target.kind === 'route') navigate(target.to);
     else if (target.kind === 'external') window.open(target.href, '_blank', 'noopener,noreferrer');
@@ -173,7 +180,7 @@ export default function NotificationsPage() {
                         <p className={`text-sm leading-snug break-words min-w-0 ${row.is_read ? 'text-foreground/80' : 'font-semibold text-foreground'}`}>
                           {row.title}
                         </p>
-                        <span className="shrink-0 text-xs text-muted-foreground" title={new Date(row.created_at).toLocaleString()}>
+                        <span className="shrink-0 text-xs text-muted-foreground" title={formatDate(row.created_at, { withTime: true })}>
                           {timeAgo(row.created_at)}
                         </span>
                       </div>
