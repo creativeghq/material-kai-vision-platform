@@ -81,10 +81,18 @@ suite('role vocabulary · TypeScript catalog vs. the live database', () => {
     for (const role of WORKSPACE_INVITE_ROLES) {
       const { data, error } = await owner.client.rpc('create_workspace_invite', {
         p_workspace_id: ws, p_role: role, p_email: null, p_invitee_name: null,
+        ...(role === 'support' ? { p_access_minutes: 60 } : {}),
       });
       if (error || !data) rejected.push(`${role} (${error?.message ?? 'no code returned'})`);
     }
     expect(rejected, `invitable roles the RPC refuses: ${rejected.join(', ')}`).toEqual([]);
+  });
+
+  it('create_workspace_invite refuses a support invite with no duration', async () => {
+    const { error } = await owner.client.rpc('create_workspace_invite', {
+      p_workspace_id: ws, p_role: 'support', p_email: null, p_invitee_name: null,
+    });
+    expect(error, 'a support invite with no timer was minted').not.toBeNull();
   });
 
   it('create_workspace_invite refuses a role outside the catalog', async () => {
