@@ -39371,6 +39371,12 @@
             "format": "uuid",
             "nullable": true,
             "description": "Postgres `uuid`"
+          },
+          "attributed_order_id": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Postgres `uuid`"
           }
         }
       },
