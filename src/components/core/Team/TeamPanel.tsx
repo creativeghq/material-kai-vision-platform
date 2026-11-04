@@ -46,7 +46,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
   const viewerRole = useViewerWorkspaceRole(workspaceId);
   const viewerIsOwner = viewerRole === 'owner';
   const canManage = viewerIsOwner || viewerRole === 'admin';
-  const offerableRoles = useOfferableInviteRoles();
+  const offerableRoles = useOfferableInviteRoles({ includeSupport: true });
 
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [invites, setInvites] = useState<WorkspaceInvite[]>([]);
@@ -60,7 +60,10 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
 
   /** Roles this viewer may assign to an EXISTING member: the offerable set, plus admin for an owner. */
   const assignableRoles = useMemo<WorkspaceMemberRole[]>(
-    () => (viewerIsOwner ? ['admin', ...offerableRoles] : offerableRoles),
+    () => {
+      const roles = offerableRoles.filter((r) => r !== 'support');
+      return viewerIsOwner ? ['admin', ...roles] : roles;
+    },
     [viewerIsOwner, offerableRoles],
   );
 

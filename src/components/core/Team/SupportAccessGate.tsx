@@ -13,10 +13,11 @@ import {
   supportAccessService, formatTimeLeft, type MySupportAccess, type RedeemPinResult,
 } from '@/services/supportAccessService';
 
-const DISMISSED_KEY = 'mk_support_gate_dismissed';
+const dismissedKey = (userId: string) => `mk_support_gate_dismissed_${userId}`;
 
-function readDismissed(): string[] {
-  try { return JSON.parse(sessionStorage.getItem(DISMISSED_KEY) ?? '[]') as string[]; } catch { return []; }
+function readDismissed(userId: string | null): string[] {
+  if (!userId) return [];
+  try { return JSON.parse(sessionStorage.getItem(dismissedKey(userId)) ?? '[]') as string[]; } catch { return []; }
 }
 
 function pinErrorText(res: Extract<RedeemPinResult, { ok: false }>): string {
@@ -30,15 +31,15 @@ function pinErrorText(res: Extract<RedeemPinResult, { ok: false }>): string {
 }
 
 export const SupportAccessGate: React.FC = () => {
-  const { user } = useAuth();
-  const { activeWorkspaceId, refresh } = useWorkspace();
+  const { user, signOut } = useAuth();
+  const { activeWorkspaceId, memberships, loading: workspaceLoading, refresh } = useWorkspace();
   const { toast } = useToast();
   const userId = user?.id ?? null;
 
   const [rows, setRows] = useState<MySupportAccess[]>([]);
   const [fetchedAt, setFetchedAt] = useState(0);
   const [now, setNow] = useState(() => Date.now());
-  const [dismissed, setDismissed] = useState<string[]>(readDismissed);
+  const [dismissed, setDismissed] = useState<string[]>([]);
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -59,13 +60,16 @@ export const SupportAccessGate: React.FC = () => {
   }, [userId, refresh]);
 
   useEffect(() => {
+    setDismissed(readDismissed(userId));
     if (!userId) {
       activeIds.current = new Set();
       setRows([]);
-      return;
     }
-    void load();
-  }, [userId, load]);
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId && !workspaceLoading) void load();
+  }, [userId, workspaceLoading, memberships, load]);
 
   const waiting = rows.some((r) => !r.active && (r.request?.status === 'pending' || r.request?.status === 'approved'));
   const hasRows = rows.length > 0;
@@ -85,20 +89,16 @@ export const SupportAccessGate: React.FC = () => {
 
   const ended = rows.filter((r) => !r.active);
   const current = ended.find((r) => !dismissed.includes(r.workspace_id)) ?? null;
-  const reopenable = ended.find((r) => dismissed.includes(r.workspace_id)) ?? null;
+  const reopenable = ended.filter((r) => dismissed.includes(r.workspace_id));
   const activeHere = rows.find((r) => r.active && r.workspace_id === activeWorkspaceId) ?? null;
 
-  const dismiss = (workspaceId: string) => {
-    const next = [...dismissed, workspaceId];
+  const saveDismissed = (next: string[]) => {
     setDismissed(next);
-    try { sessionStorage.setItem(DISMISSED_KEY, JSON.stringify(next)); } catch { /* private mode */ }
+    if (!userId) return;
+    try { sessionStorage.setItem(dismissedKey(userId), JSON.stringify(next)); } catch { /* private mode */ }
   };
-
-  const reopen = (workspaceId: string) => {
-    const next = dismissed.filter((id) => id !== workspaceId);
-    setDismissed(next);
-    try { sessionStorage.setItem(DISMISSED_KEY, JSON.stringify(next)); } catch { /* private mode */ }
-  };
+  const dismiss = (workspaceId: string) => saveDismissed([...dismissed, workspaceId]);
+  const reopen = (workspaceId: string) => saveDismissed(dismissed.filter((id) => id !== workspaceId));
 
   const request = async (workspaceId: string) => {
     setBusy(true);
@@ -109,6 +109,12 @@ export const SupportAccessGate: React.FC = () => {
         toast({
           title: res.error === 'too_many' ? 'Too many requests' : 'Could not send the request',
           description: res.error === 'too_many' ? 'Please wait before asking again, or contact the workspace owner directly.' : undefined,
+          variant: 'destructive',
+        });
+      } else if (res.notified === 0) {
+        toast({
+          title: 'Nobody could be notified',
+          description: 'Your request is saved, but no owner or admin was told. Please contact them directly.',
           variant: 'destructive',
         });
       }
@@ -195,21 +201,29 @@ export const SupportAccessGate: React.FC = () => {
               </>
             )}
 
-            <Button variant="ghost" className="w-full" onClick={() => dismiss(current.workspace_id)}>
-              Not now
-            </Button>
+            {memberships.length > 0 ? (
+              <Button variant="ghost" className="w-full" onClick={() => dismiss(current.workspace_id)}>
+                Not now
+              </Button>
+            ) : (
+              <Button variant="ghost" className="w-full" onClick={() => { void signOut(); }}>
+                Sign out
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  if (reopenable) {
+  if (reopenable.length > 0) {
     return (
-      <div className="fixed bottom-20 right-4 z-40 lg:bottom-4">
-        <Button size="sm" variant="outline" className="bg-card" onClick={() => reopen(reopenable.workspace_id)}>
-          <KeyRound className="h-4 w-4 mr-2" /> Request access to {reopenable.workspace_name}
-        </Button>
+      <div className="fixed bottom-20 right-4 z-40 flex flex-col items-end gap-2 lg:bottom-4">
+        {reopenable.map((r) => (
+          <Button key={r.workspace_id} size="sm" variant="outline" className="bg-card" onClick={() => reopen(r.workspace_id)}>
+            <KeyRound className="h-4 w-4 mr-2" /> Request access to {r.workspace_name}
+          </Button>
+        ))}
       </div>
     );
   }

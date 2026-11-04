@@ -131,7 +131,7 @@ interface Attachment {
 
 
 const ACTIVE_MEMBER = (s: string | null | undefined) => !s || s === 'active';
-const BUSINESS_ROLES = new Set(['owner', 'admin', 'member', 'staff', 'sales']);
+const BUSINESS_ROLES = new Set(['owner', 'admin', 'member', 'staff', 'sales', 'support']);
 
 /** Who a thread is WITH — the active customer participant, earliest joined. */
 function counterpartyParticipantId(

@@ -7,7 +7,8 @@ import {
 } from '@/auth/workspaceRoles';
 
 /** The invitable roles whose portal module is on in the active workspace; one useModule per ROLE_MODULE_SLUGS entry. */
-export function useOfferableInviteRoles(): WorkspaceInviteRole[] {
+export function useOfferableInviteRoles(options?: { includeSupport?: boolean }): WorkspaceInviteRole[] {
+  const includeSupport = options?.includeSupport ?? false;
   const { enabled: hrEnabled } = useModule('hr');
   const { enabled: stockEnabled } = useModule('stock');
   const { enabled: emailMarketingEnabled } = useModule('email-marketing');
@@ -25,10 +26,11 @@ export function useOfferableInviteRoles(): WorkspaceInviteRole[] {
       'sales-finance': salesFinanceEnabled,
     };
     return WORKSPACE_INVITE_ROLES.filter((r) => {
+      if (r === 'support' && !includeSupport) return false;
       const slug = WORKSPACE_ROLE_META[r].requiresModule as RoleModuleSlug | undefined;
       return slug ? moduleEnabled[slug] : true;
     });
-  }, [hrEnabled, stockEnabled, emailMarketingEnabled, realEstateEnabled, quotesEnabled, salesFinanceEnabled]);
+  }, [hrEnabled, stockEnabled, emailMarketingEnabled, realEstateEnabled, quotesEnabled, salesFinanceEnabled, includeSupport]);
 }
 
 /** The viewer's role in `workspaceId`, or null when they are not a member of it. */

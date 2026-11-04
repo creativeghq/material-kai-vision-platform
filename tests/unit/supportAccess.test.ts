@@ -1,12 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { strippedSource } from '../helpers/sourceIndex';
 import { WORKSPACE_ROLE_CAPABILITIES } from '@/auth/roleCapabilities';
 import { formatTimeLeft, SUPPORT_ACCESS_DURATIONS, SUPPORT_PIN_VALIDITIES } from '@/services/supportAccessService';
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-
-const read = (...parts: string[]) => readFileSync(join(__dirname, '..', '..', ...parts), 'utf8');
 
 describe('support access', () => {
   it('the support role cannot manage the team, so it cannot extend its own timer', () => {
@@ -29,12 +26,30 @@ describe('support access', () => {
   });
 
   it('a person cannot forge the request event', () => {
-    expect(read('supabase', 'functions', 'flow-engine', 'index.ts'))
-      .toMatch(/SERVER_ONLY_EVENTS[\s\S]*'workspace_access_requested'/);
+    const src = strippedSource('supabase/functions/flow-engine/index.ts');
+    const start = src.indexOf('const SERVER_ONLY_EVENTS');
+    expect(start).toBeGreaterThan(-1);
+    expect(src.slice(start, src.indexOf(']);', start))).toContain("'workspace_access_requested'");
   });
 
   it('the gate is mounted for every route', () => {
-    expect(read('src', 'App.tsx')).toContain('<SupportAccessGate />');
+    expect(strippedSource('src/App.tsx')).toContain('<SupportAccessGate />');
+  });
+
+  it('only the Team panel offers Support, because only it asks how long access lasts', () => {
+    expect(strippedSource('src/components/core/Team/TeamPanel.tsx')).toContain('includeSupport: true');
+    for (const caller of [
+      'src/modules/crm/components/InvitePartyDialog.tsx',
+      'src/modules/crm/components/CompanyWorkspaceCard.tsx',
+      'src/modules/crm/pages/ContactDetailPage.tsx',
+    ]) {
+      expect(strippedSource(caller)).not.toContain('includeSupport');
+    }
+  });
+
+  it('inbox-api treats support as staff, matching its capabilities', () => {
+    expect(strippedSource('supabase/functions/inbox-api/index.ts'))
+      .toMatch(/BUSINESS_ROLES = new Set\(\[[^\]]*'support'/);
   });
 
   it('formats time left', () => {

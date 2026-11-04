@@ -63,7 +63,7 @@ const AgentHubPage: React.FC = () => {
   // Hub so it auto-enables it and shows its quick-starts (onboarding) — never a blank chat.
   const initialToolkitId = initialQuickStart ? undefined : capHandoff.toolkitId;
   const { workspaceRole } = useWorkspace();
-  const userRole = (workspaceRole ?? 'member') as 'viewer' | 'member' | 'admin' | 'owner';
+  const userRole = (workspaceRole === 'support' ? 'member' : workspaceRole ?? 'member') as 'viewer' | 'member' | 'admin' | 'owner';
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
