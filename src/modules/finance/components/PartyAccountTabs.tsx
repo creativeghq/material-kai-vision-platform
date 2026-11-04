@@ -89,7 +89,7 @@ export const PartyAccountTabs: React.FC<Props> = ({
 
   sections.push({
     id: 'issued-invoices', label: 'Issued Invoices', icon: FileText,
-    node: <PartyIssuedInvoicesCard workspaceId={workspaceId} companyId={companyId} contactId={contactId} />,
+    node: <PartyIssuedInvoicesCard workspaceId={workspaceId} companyId={companyId} contactId={contactId} partyName={partyName} />,
   });
 
   // What this supplier filed against us on myDATA. Rows that are not in Expenses yet say so:

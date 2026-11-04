@@ -1,12 +1,15 @@
 /** The invoices WE issued to a customer, on their CRM record. */
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Loader2 } from 'lucide-react';
+import { FileText, Loader2, Plus } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { usePermissions } from '@/hooks/usePermissions';
+import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { FINANCE_BASE } from '@/modules/finance/routes';
 import { statusTone } from '@/utils/statusTone';
@@ -30,10 +33,18 @@ export const PartyIssuedInvoicesCard: React.FC<{
   workspaceId: string;
   companyId?: string;
   contactId?: string;
-}> = ({ workspaceId, companyId, contactId }) => {
+  partyName?: string;
+}> = ({ workspaceId, companyId, contactId, partyName }) => {
   const navigate = useNavigate();
+  const { can, isAccountant } = usePermissions();
   const [rows, setRows] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [newOpen, setNewOpen] = useState(false);
+  const canIssue = can('invoice.issue') && !isAccountant;
+  const partyId = companyId ?? contactId;
+  const newInvoiceButton = canIssue && partyId ? (
+    <Button size="sm" onClick={() => setNewOpen(true)}><Plus className="h-4 w-4 mr-1" /> New invoice</Button>
+  ) : undefined;
 
   useEffect(() => {
     let cancelled = false;
@@ -57,9 +68,12 @@ export const PartyIssuedInvoicesCard: React.FC<{
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60 px-5 py-3 space-y-0">
-        <CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Issued Invoices</CardTitle>
-        <p className="mt-0.5 text-xs text-muted-foreground">Invoices we issued to them, newest first.</p>
+      <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 space-y-0">
+        <div>
+          <CardTitle className="flex items-center gap-2"><FileText className="h-4 w-4" /> Issued Invoices</CardTitle>
+          <p className="mt-0.5 text-xs text-muted-foreground">Invoices we issued to them, newest first.</p>
+        </div>
+        {newInvoiceButton}
       </CardHeader>
       <CardContent className="p-0">
         {error ? (
@@ -69,7 +83,7 @@ export const PartyIssuedInvoicesCard: React.FC<{
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
           </div>
         ) : rows.length === 0 ? (
-          <HubEmptyState icon={FileText} title="No invoices issued to them yet" />
+          <HubEmptyState icon={FileText} title="No invoices issued to them yet" action={newInvoiceButton} />
         ) : (
           <Table>
             <TableHeader>
@@ -103,6 +117,15 @@ export const PartyIssuedInvoicesCard: React.FC<{
           </Table>
         )}
       </CardContent>
+      {canIssue && partyId && (
+        <NewInvoiceDialog
+          workspaceId={workspaceId}
+          open={newOpen}
+          onOpenChange={setNewOpen}
+          initialCustomer={{ type: companyId ? 'company' : 'contact', id: partyId, label: partyName ?? '' }}
+          onCreated={(invoiceId) => { setNewOpen(false); navigate(`${FINANCE_BASE}/invoices/${invoiceId}`); }}
+        />
+      )}
     </Card>
   );
 };
