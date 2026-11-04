@@ -15,7 +15,7 @@ import { describeUpstreamError } from '../tool-result-shape.ts';
 type ChunkSink = ((chunk: Record<string, unknown>) => void) | undefined;
 
 const INGEST_BUCKET = 'pdf-documents';
-const ACTIONS = ['start', 'status', 'review', 'approve', 'cancel', 'embed'] as const;
+const ACTIONS = ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini'] as const;
 const REVIEW_ACTIONS = ['keep', 'drop', 'rename', 'merge_into'] as const;
 const MISSING_POLICIES = ['retire', 'needs_replacement', 'keep'] as const;
 
@@ -196,6 +196,17 @@ export const createIngestCatalogTool = (
         return JSON.stringify({ success: true, message: 'Embedding started; check status, then the ingestion report.' });
       }
 
+      if (action === 'redo_gemini') {
+        if (confirm !== true) {
+          return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Redo ${job.filename}'s patterned repairs with Gemini?`,
+            'Replaces the plain clean-ups of patterned crops with Gemini repairs, keeping any that fail the fidelity check. Stops at the first failure to run. Billed to you.');
+        }
+        const r = await callMivaa(`/api/admin/documents/${job.documentId}/redo-gemini-repairs`, jwt, userId, workspaceId, { method: 'POST' });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        onChunk?.({ type: 'ingestion_job', action: 'redoing_repairs', document: job.filename, document_id: job.documentId, timestamp: Date.now() });
+        return JSON.stringify({ success: true, message: 'Started; the ingestion report shows what was replaced or why it stopped.' });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
@@ -204,11 +215,12 @@ export const createIngestCatalogTool = (
         'Ingest a supplier PDF catalogue. start (attached PDF by number, or source_url) stops after discovery by default '
         + 'and builds no vectors; status shows where a job is and what waits on the user; review lists the discovered '
         + 'products; approve applies edits (keep/drop/rename/merge_into) and creates them; cancel ends the job; embed builds '
-        + 'every vector once after review. start/approve/cancel/embed ALWAYS ask the user to Approve first (never set confirm).',
+        + 'every vector once after review; redo_gemini redoes plain clean-ups of patterned crops once Gemini is available. '
+        + 'start/approve/cancel/embed/redo_gemini ALWAYS ask the user to Approve first (never set confirm).',
       schema: z.object({
         action: z.enum(ACTIONS).default('status'),
-        job_id: z.string().optional().describe('status/review/approve/cancel/embed: the ingestion job id.'),
-        document: z.string().optional().describe('status/review/approve/cancel/embed: the catalogue file name (partial) instead of job_id.'),
+        job_id: z.string().optional().describe('Every action but start: the ingestion job id.'),
+        document: z.string().optional().describe('Every action but start: the catalogue file name (partial) instead of job_id.'),
         title: z.string().optional().describe('start: the catalogue name.'),
         attachment: z.number().int().optional().describe('start: which attached PDF (1 = first).'),
         source_url: z.string().optional().describe('start: an https link to the PDF instead of an attachment.'),

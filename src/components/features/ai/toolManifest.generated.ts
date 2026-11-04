@@ -999,9 +999,9 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createIngestCatalogTool',
     description: 'Ingest a supplier PDF catalogue.',
     params: [
-      { name: 'action', type: 'enum', enum: ['start', 'status', 'review', 'approve', 'cancel', 'embed'], optional: true },
-      { name: 'job_id', type: 'string', optional: true, description: 'status/review/approve/cancel/embed: the ingestion job id.' },
-      { name: 'document', type: 'string', optional: true, description: 'status/review/approve/cancel/embed: the catalogue file name (partial) instead of job_id.' },
+      { name: 'action', type: 'enum', enum: ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini'], optional: true },
+      { name: 'job_id', type: 'string', optional: true, description: 'Every action but start: the ingestion job id.' },
+      { name: 'document', type: 'string', optional: true, description: 'Every action but start: the catalogue file name (partial) instead of job_id.' },
       { name: 'title', type: 'string', optional: true, description: 'start: the catalogue name.' },
       { name: 'attachment', type: 'number', optional: true, description: 'start: which attached PDF (1 = first).' },
       { name: 'source_url', type: 'string', optional: true, description: 'start: an https link to the PDF instead of an attachment.' },
