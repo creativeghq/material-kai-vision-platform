@@ -28,6 +28,7 @@ async function callMivaa(path: string, jwt: string | undefined, userId: string, 
   init: RequestInit = {}): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
   const headers = new Headers(init.headers);
   for (const [k, v] of Object.entries(mivaaAuthHeaders(jwt, { userId, workspaceId }))) headers.set(k, v);
+  headers.set('X-Workspace-Id', workspaceId);
   try {
     const resp = await fetch(`${mivaaBase()}${path}`, { ...init, headers });
     const text = await resp.text();
