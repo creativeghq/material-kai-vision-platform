@@ -1431,3 +1431,23 @@ Each chip indicates which tier produced a given field on that product. The same 
 ### Why this exists
 
 Coverage and source mix are the two best signals for "did this catalog actually parse well?" The bucket chart spots catalogs where average coverage is fine but the long tail is empty; the source chips spot catalogs where one tier silently failed and another is doing all the work. The "Re-run Catalog Knowledge" button is the standard one-click fix when Layer 2 needs to retry.
+
+## After a catalogue is created: review, settling and repair
+
+Reference for the review gate and the steps `post_ingestion_repair` runs. Each step records what it did in `ingestion_corrections`, and the audit reports what is left.
+
+| When | Step | What it does |
+|---|---|---|
+| End of Stage 0 | `discovery_dedupe` | One schema-constrained look at names, pages and codes. Flags repeats, accessories and wrong merges. With a review gate everything waits for the operator; without one only a sure repeat merges, and a different model letter never does. Job rule `exclude_names` leaves names out. |
+| End of Stage 0 | `report_site_only_series` | Pages beside a series' own pages in the maker's sitemap that name no discovered product become a decision. Nothing is created. |
+| Review gate | `notify_review_waiting` | A parked job raises `ingestion_review_waiting` to the operators. |
+| Repair, first | `route_tables_by_code` | A table goes to every product its model column names; a chunk moves only when it names exactly one. A code on more than 3 products names a format, not a model. |
+| Repair | `series_facts.settle_document` | One verified size list, the same colours in metadata and attributes, a description rebuilt when ours or wrong, values normalised, warranty in months. |
+| Repair | `inherit_packing` | A series with no packing takes the rows of its format from the brand's other series. No sibling with that format means no table. |
+| Repair | `reattribute_site_photos` | A maker's photo goes to the series its file names, unless the file also names the owner. |
+
+**A size is real** when the verified format list or a packing table holds it, or it is the first size after the series' name on a line. Index pages fill an empty format list and overrule nothing: on Keros they agreed on 222 formats and added 10 wrong ones.
+
+**Removing a product:** `merge_products_into` and `drop_catalog_product` only. A bare delete cascades quote lines, prices and supplier links. A merge aborts on any collision outside a short list of derived tables, and a drop refuses while a commercial record uses the product.
+
+**Running jobs:** a cancelled row stops the running task. A deploy defers its restart until no ingestion is running, up to 8 hours (`scripts/deploy/restart_when_idle.sh`). Each run records its code version in `stage_history`. A failed or interrupted job resumes from its checkpoint.
