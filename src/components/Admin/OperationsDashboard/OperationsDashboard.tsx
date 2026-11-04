@@ -125,7 +125,9 @@ const OperationsDashboardInner: React.FC = () => {
 
   // Initial tab from ?tab= query param so other admin pages can deep-link
   // (e.g. /admin/operations?tab=catalogs from the Catalogs list page).
-  const requestedTab = searchParams.get('tab') || '';
+  // `catalog` is what ingestion-audit notifications already stored.
+  const rawTab = searchParams.get('tab') || '';
+  const requestedTab = rawTab === 'catalog' ? 'catalogs' : rawTab;
   const initialTab = VALID_OPERATIONS_TABS.has(requestedTab) ? requestedTab : 'system-health';
   const [opsActiveTab, setOpsActiveTab] = useState<string>(initialTab);
   const handleTabChange = useCallback((value: string) => {
@@ -670,7 +672,7 @@ const OperationsDashboardInner: React.FC = () => {
               (salvaged from the retired /admin/training-models panel, 2026-06-09) merged with
               VAT + ΑΑΔΕ-verified self-serve reseller applications. */}
           <TabsContent value="factory-onboarding" className="space-y-4">
-            <Tabs defaultValue="registrations" className="space-y-4">
+            <Tabs defaultValue={searchParams.get('section') === 'marketplace' ? 'marketplace' : 'registrations'} className="space-y-4">
               <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
                 <TabsTrigger value="registrations">Brand Registrations</TabsTrigger>
                 <TabsTrigger value="access">Access Requests</TabsTrigger>

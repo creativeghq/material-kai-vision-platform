@@ -110,6 +110,20 @@ const DocsPage: React.FC = () => {
     setSearchParams(p, { replace: true });
   }, [searchParams, setSearchParams, openNew]);
 
+  // Notification deep-link: /docs?doc=<id>. Consumed once the list has loaded, because a doc from
+  // another workspace or a deleted one is absent from it and has to say so rather than show the list.
+  useEffect(() => {
+    const target = searchParams.get('doc');
+    if (!target || loading) return;
+    const doc = docs.find((d) => d.id === target);
+    if (doc) openDoc(doc);
+    else toast({ title: 'Document not available', description: 'It may have been deleted, or it belongs to another workspace.', variant: 'destructive' });
+    const p = new URLSearchParams(searchParams);
+    p.delete('doc');
+    setSearchParams(p, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, loading, docs]);
+
   const save = async () => {
     if (!activeWorkspaceId || !user?.id) return;
     if (!title.trim()) { toast({ title: 'Title required', variant: 'destructive' }); return; }

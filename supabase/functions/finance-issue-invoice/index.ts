@@ -1015,7 +1015,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             user_id: uid,
             title: 'A delivery-note cancellation did not come back',
             body: `The cancellation for delivery note ${(note as any).delivery_note_number ?? noteId} was sent to myDATA but the provider did not answer. It may have gone through. Check the note at AADE before doing anything else with it — it will not be retried automatically.`,
-            action_url: `/finance?tab=doc_delivery&id=${noteId}`,
+            action_url: `/finance/delivery-notes/${noteId}`,
             workspace_id: (note as any).workspace_id,
           }),
         );

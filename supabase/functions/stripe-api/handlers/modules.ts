@@ -535,8 +535,10 @@ async function requestSelfHosting(auth: AuthResult, body: Record<string, unknown
   let notified = 0;
   for (const op of ((operators ?? []) as Array<{ user_id: string }>)) {
     try {
-      await emitFlowEvent('self_hosting_requested', {
+      const { data: opUser } = await service.auth.admin.getUserById(op.user_id);
+      const emitted = await emitFlowEvent('self_hosting_requested', {
         user_id: op.user_id,
+        email: opUser?.user?.email ?? undefined,
         type: 'self_hosting_requested',
         title: 'Self-hosting requested',
         body: `${body.company ? String(body.company) + ' — ' : ''}${contactEmail}`
@@ -551,7 +553,8 @@ async function requestSelfHosting(auth: AuthResult, body: Record<string, unknown
         message: body.message ? String(body.message) : null,
         workspace_id: workspaceId,
       });
-      notified++;
+      // No listening flow returns triggered:0 without raising, and that is not "notified".
+      if ((emitted?.succeeded ?? 0) > 0) notified++;
     } catch (e) {
       console.error('[request-self-hosting] notify failed:', e);
     }

@@ -5,10 +5,11 @@ import type { ModuleDefinition, ModuleManifest } from '../_core';
 const NotificationsPanel = lazy(() =>
   import('./components/NotificationsPanel').then(m => ({ default: m.NotificationsPanel })),
 );
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'));
 
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
-  routes: [],
+  routes: [{ path: '/notifications', component: NotificationsPage as any }],
   navItems: [],
   headerActions: [{ id: 'bell', component: NotificationsPanel }],
 };

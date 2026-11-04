@@ -389,6 +389,13 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'risk_flag', label: 'Risk flag', note: 'low = the VAT matches their own invoicing identity; needs_review otherwise.', example: 'low' },
     { key: 'claim_request_id', label: 'Claim request ID', note: 'The supplier_claim_requests row.' },
   ]),
+  marketplace_application_submitted: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Operator (root workspace) admins to notify — iterate with a Loop ({{item}} = each admin id).' },
+    { key: 'workspace_name', label: 'Workspace', note: 'The workspace that applied.' },
+  ]),
+  marketplace_application_reviewed: withStandard([
+    { key: 'admin_ids', label: 'Admin IDs', note: 'Owners and admins of the applicant workspace — iterate with a Loop ({{item}} = each admin id).' },
+  ]),
   // #210 — HR labour lifecycle. The Ergani document code is carried on the payload so a flow
   // can branch on it (e.g. route an Ε6 termination to Finance but not an Ε5 resignation).
   'hr.departure_recorded': withStandard([

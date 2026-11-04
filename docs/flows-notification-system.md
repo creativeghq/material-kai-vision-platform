@@ -465,6 +465,14 @@ transition clean in **any** order:
 5. **Verify:** `npx tsc -p tsconfig.json --noEmit` (0 errors), commit. Edge functions +
    frontend deploy via the **"Deploy FE & Supabase"** GitHub Action on merge to `main`.
 
+**A bell has to reach someone and land somewhere.** An event with no active flow returns
+`triggered: 0` without raising, and a stale `action_url` is a valid string. The bell lists the newest
+40; `/notifications` holds the full history. Links are guarded in two places:
+`tests/unit/deepLinkTargets.test.ts` reads edge, frontend and MIVAA source, and
+`tests/integration/notificationLinks.test.ts` reads what source cannot show, through
+`lint_notification_targets()`: URLs inside SQL functions, links delivered in the last 30 days, and
+notification-shaped events with no active flow. `NO_FLOW_BY_DESIGN` there is shrink-only.
+
 ### 8a. Branching: an edge out of a condition node MUST carry `sourceHandle`
 
 The engine follows a condition's outgoing edges by **handle**, not by position:

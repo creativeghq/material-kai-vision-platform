@@ -175,6 +175,8 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   catalog_master_updated: Boxes,
   supplier_price_changed: DollarSign,
   supplier_claim_requested: Factory,
+  marketplace_application_submitted: Factory,
+  marketplace_application_reviewed: Factory,
   'realestate.buyer_matches_found': Home,
   'realestate.listing_published': Home,
   'realestate.new_listing_for_buyer': Home,

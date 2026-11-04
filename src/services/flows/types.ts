@@ -244,6 +244,8 @@ export type TriggerType =
   // no tenant's negotiated cost changes until the operator accepts it
   | 'supplier_price_changed'
   | 'supplier_claim_requested'
+  | 'marketplace_application_submitted'
+  | 'marketplace_application_reviewed'
   | 'realestate.buyer_matches_found'
   | 'realestate.new_listing_for_buyer'
   | 'realestate.listing_published'
@@ -367,6 +369,8 @@ export interface SupplierPoReceivedTriggerConfig {}
 export interface CatalogMasterUpdatedTriggerConfig {}
 export interface SupplierPriceChangedTriggerConfig {}
 export interface SupplierClaimRequestedTriggerConfig {}
+export interface MarketplaceApplicationSubmittedTriggerConfig {}
+export interface MarketplaceApplicationReviewedTriggerConfig {}
 export interface PageWatchChangedTriggerConfig {}
 /** Payload-only. Fires once per occurrence when `due_on - lead_days` is reached. */
 export interface AssetServiceDueTriggerConfig {}
@@ -709,6 +713,8 @@ export type TriggerConfigMap = {
   catalog_master_updated: CatalogMasterUpdatedTriggerConfig;
   supplier_price_changed: SupplierPriceChangedTriggerConfig;
   supplier_claim_requested: SupplierClaimRequestedTriggerConfig;
+  marketplace_application_submitted: MarketplaceApplicationSubmittedTriggerConfig;
+  marketplace_application_reviewed: MarketplaceApplicationReviewedTriggerConfig;
   'realestate.buyer_matches_found': RealestateBuyerMatchesFoundTriggerConfig;
   'realestate.new_listing_for_buyer': RealestateNewListingForBuyerTriggerConfig;
   'realestate.listing_published': RealestateListingPublishedTriggerConfig;

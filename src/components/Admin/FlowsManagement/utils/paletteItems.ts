@@ -572,6 +572,12 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'supplier_claim_requested', group: 'Finance',
     label: 'Manufacturer Claim Requested', description: 'A workspace asked to be confirmed as a manufacturer — review it in Supplier Identity Claims (notify the operator)', icon: 'Factory', color: 'amber',
     defaultData: { label: 'Manufacturer Claim Requested', category: 'trigger', triggerType: 'supplier_claim_requested', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'marketplace_application_submitted', group: 'Modules',
+    label: 'Marketplace Application Submitted', description: 'A workspace applied to join the surplus marketplace (notify the operator)', icon: 'Factory', color: 'amber',
+    defaultData: { label: 'Marketplace Application Submitted', category: 'trigger', triggerType: 'marketplace_application_submitted', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'marketplace_application_reviewed', group: 'Modules',
+    label: 'Marketplace Application Reviewed', description: 'The operator approved or declined a marketplace application (notify the applicant)', icon: 'Factory', color: 'amber',
+    defaultData: { label: 'Marketplace Application Reviewed', category: 'trigger', triggerType: 'marketplace_application_reviewed', config: {} } as TriggerNodeData },
 
   // ════════════════════════════════════════════════════
   //  CONDITIONS / LOGIC

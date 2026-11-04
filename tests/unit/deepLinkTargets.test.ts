@@ -1,8 +1,9 @@
 /** Deep-link guard — a link that goes nowhere is a silent zero in the navigation layer. */
 import { describe, it, expect } from 'vitest';
 import { readdirSync, statSync, existsSync } from 'node:fs';
-import { join, dirname, resolve, relative } from 'node:path';
+import { join, relative } from 'node:path';
 import { readSource, strippedSource, blankedSource } from '../helpers/sourceIndex';
+import { ROUTES, PAGE_FOR, importMap, resolveSpec, routeExists, ownTabsFor, tabsFor } from '../helpers/routeTargets';
 import {
   ordersLink, quotesLink, receivablesLink, payablesLink, companiesLink,
   receivablesBucketLink, CRM_KIND, PROJECTS_LINK, INBOX_LINK,
@@ -31,214 +32,6 @@ function walk(dir: string, out: string[] = []): string[] {
 const SOURCE_ROOTS = ['src', 'supabase/functions'];
 const sourceFiles = SOURCE_ROOTS.flatMap((r) => walk(join(ROOT, r)));
 
-// ─────────────────────────────── route table ───────────────────────────────
-
-function resolveSpec(spec: string, fromFile: string, name?: string): string | null {
-  if (!spec.startsWith('.') && !spec.startsWith('@/')) return null;
-  const base = spec.startsWith('@/') ? join(ROOT, 'src', spec.slice(2)) : resolve(dirname(fromFile), spec);
-  for (const c of [base + '.tsx', base + '.ts', join(base, 'index.tsx'), join(base, 'index.ts')]) {
-    if (existsSync(c)) return followBarrel(c, name);
-  }
-  return null;
-}
-
-/** `index.tsx` is often just `export { Page } from './Page'` — follow it to the real component. */
-function followBarrel(file: string, name?: string, hops = 0): string {
-  if (hops > 3) return file;
-  const src = readSource(file);
-  if (src.split('\n').filter((l) => l.trim()).length > 6) return file;
-  for (const m of src.matchAll(/export\s+\{([^}]+)\}\s+from\s+'([^']+)'/g)) {
-    const names = m[1].split(',').map((s) => s.trim().split(/\s+as\s+/).pop()!.trim());
-    if (name && !names.includes(name)) continue;
-    const base = m[2].startsWith('@/') ? join(ROOT, 'src', m[2].slice(2)) : resolve(dirname(file), m[2]);
-    for (const c of [base + '.tsx', base + '.ts', join(base, 'index.tsx')]) {
-      if (existsSync(c)) return followBarrel(c, name, hops + 1);
-    }
-  }
-  return file;
-}
-
-function importMap(file: string): Map<string, string> {
-  const src = readSource(file);
-  const map = new Map<string, string>();
-  for (const m of src.matchAll(/import\s+(?:\{([^}]+)\}|([A-Za-z0-9_]+))\s+from\s+'([^']+)'/g)) {
-    if (m[2]) map.set(m[2], m[3]);
-    if (m[1]) for (const raw of m[1].split(',')) {
-      const n = raw.trim().split(/\s+as\s+/).pop()!.trim();
-      if (n) map.set(n, m[3]);
-    }
-  }
-  for (const m of src.matchAll(/const\s+([A-Za-z0-9_]+)\s*=\s*lazy\(\(\)\s*=>\s*import\('([^']+)'\)/g)) {
-    map.set(m[1], m[2]);
-  }
-  return map;
-}
-
-/** Every declared route pattern, and the page component behind it where we can resolve one. */
-function routeTable(): { patterns: Set<string>; pageFor: Map<string, string> } {
-  const patterns = new Set<string>();
-  const pageFor = new Map<string, string>();
-
-  const appFile = join(ROOT, 'src/App.tsx');
-  const app = readSource(appFile);
-  const appImports = importMap(appFile);
-  for (const m of app.matchAll(/path="([^"]+)"/g)) patterns.add(m[1]);
-  // The page is the LEAF of the guard/layout nest — the self-closing element. Wrappers
-  // (<AuthGuard>, <Layout>, <EntitlementGuard>) are open tags and are skipped by construction.
-  for (const m of app.matchAll(/path="([^"]+)"([\s\S]{0,900}?)(?=\n\s*(?:<Route|path="))/g)) {
-    if (pageFor.has(m[1])) continue;
-    const leaves = (m[2].match(/<([A-Z][A-Za-z0-9_]*)\s*\/>/g) ?? [])
-      .map((s) => s.replace(/[<>/\s]/g, '')).reverse();
-    for (const c of leaves) {
-      const spec = appImports.get(c);
-      const f = spec && resolveSpec(spec, appFile, c);
-      if (f) { pageFor.set(m[1], f); break; }
-    }
-  }
-
-  // Feature modules register their own routes: src/modules/*/index.ts → { path, component }.
-  for (const dir of readdirSync(join(ROOT, 'src/modules'))) {
-    const file = join(ROOT, 'src/modules', dir, 'index.ts');
-    if (!existsSync(file)) continue;
-    const src = readSource(file);
-    const imports = importMap(file);
-    for (const m of src.matchAll(/path:\s*'([^']+)'/g)) patterns.add(m[1]);
-    for (const m of src.matchAll(/path:\s*'([^']+)'[\s\S]{0,200}?component:\s*([A-Za-z0-9_]+)/g)) {
-      if (pageFor.has(m[1])) continue;
-      const spec = imports.get(m[2]);
-      const f = spec && resolveSpec(spec, file, m[2]);
-      if (f) pageFor.set(m[1], f);
-    }
-  }
-  return { patterns, pageFor };
-}
-
-const { patterns: ROUTES, pageFor: PAGE_FOR } = routeTable();
-
-/** Does a concrete URL path match a declared route pattern (`:param` segments, `*` wildcard)? */
-function routeExists(urlPath: string): boolean {
-  const segs = urlPath.split('/').filter(Boolean);
-  for (const r of ROUTES) {
-    if (!r.startsWith('/')) continue;
-    const rs = r.split('/').filter(Boolean);
-    if (rs[rs.length - 1] === '*') {
-      if (segs.length >= rs.length - 1 && rs.slice(0, -1).every((s, i) => s.startsWith(':') || s === segs[i])) return true;
-      continue;
-    }
-    if (rs.length !== segs.length) continue;
-    if (rs.every((s, i) => s.startsWith(':') || s === segs[i])) return true;
-  }
-  return false;
-}
-
-// ─────────────────────────────── tab keys per page ───────────────────────────────
-
-const tabCache = new Map<string, Set<string>>();
-
-/**
- * `export const NAME = { key: 'literal', … } as const` — the members of every such object in a
- * file, so a tab key written as `FINANCE_TAB.orders` can be resolved back to `doc_orders`.
- *
- * Without this the scan only sees string literals, and moving a page's tab vocabulary into a
- * shared constant — which is the fix for links and panes drifting apart — would make the guard
- * report "renders no tabs at all" for the very page it was written about.
- */
-const constCache = new Map<string, Map<string, Map<string, string>>>();
-function constMembers(file: string): Map<string, Map<string, string>> {
-  if (constCache.has(file)) return constCache.get(file)!;
-  const out = new Map<string, Map<string, string>>();
-  const src = blankedSource(file);
-  for (const m of src.matchAll(/export\s+const\s+([A-Z][A-Z0-9_]*)\s*=\s*\{([\s\S]*?)\}\s*as\s+const/g)) {
-    const members = new Map<string, string>();
-    for (const f of m[2].matchAll(/([A-Za-z0-9_]+)\s*:\s*'([^']*)'/g)) members.set(f[1], f[2]);
-    out.set(m[1], members);
-  }
-  constCache.set(file, out);
-  return out;
-}
-
-/** Resolve `NAME.member` as referenced from `file`, following the import to its declaration. */
-function resolveConstRef(file: string, name: string, member: string): string | undefined {
-  const own = constMembers(file).get(name)?.get(member);
-  if (own !== undefined) return own;
-  const spec = importMap(file).get(name);
-  const target = spec && resolveSpec(spec, file, name);
-  return target ? constMembers(target).get(name)?.get(member) : undefined;
-}
-
-/** `{ value: 'doc_orders' }` / `{ value: FINANCE_TAB.orders }` entries in a pane catalog. */
-function catalogValues(file: string): Set<string> {
-  const src = readSource(file);
-  const keys = new Set<string>();
-  for (const m of src.matchAll(/value:\s*'([A-Za-z0-9_-]+)'/g)) keys.add(m[1]);
-  for (const m of src.matchAll(/value:\s*([A-Z][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)/g)) {
-    const v = resolveConstRef(file, m[1], m[2]);
-    if (v) keys.add(v);
-  }
-  return keys;
-}
-
-function tabKeys(file: string, depth = 0, seen = new Set<string>(), followDelegation = true): Set<string> {
-  if (seen.has(file) || depth > 2) return new Set();
-  seen.add(file);
-  const src = readSource(file);
-  const keys = new Set<string>();
-  for (const m of src.matchAll(/<TabsContent\s+[^>]*value="([^"]+)"/g)) keys.add(m[1]);
-  // A pane whose key comes from a shared constant: <TabsContent value={FINANCE_TAB.orders}>.
-  for (const m of src.matchAll(/<TabsContent\s+[^>]*value=\{([A-Z][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)\}/g)) {
-    const v = resolveConstRef(file, m[1], m[2]);
-    if (v) keys.add(v);
-  }
-  // Catalog-driven panes: <TabsContent value={d.value}> fed by an array of { value: '…' }.
-  if (/<TabsContent\s+[^>]*value=\{/.test(src)) {
-    for (const k of catalogValues(file)) keys.add(k);
-    for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
-      const r = resolveSpec(m[1], file);
-      if (!r) continue;
-      for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
-      // The catalog may live in a module of its OWN, which renders no `<TabsContent>` and so
-      // never reaches the scan above. Finance's document panes moved to
-      // src/modules/finance/sections.ts when the page's rail and the App Launcher's Finance
-      // chips were made one list; without this hop, `?tab=doc_orders` — a live link since the
-      // day the tab was named — reported as a tab that renders nothing.
-      for (const k of catalogValues(r)) keys.add(k);
-    }
-  }
-  // A page that DELEGATES its body: the route component is a thin shell (guard + PageHeader) and
-  // the tabs live one component down — /market-trends is <MarketTrendsPage> wrapping
-  // <MarketTrendsTab>. Without this the guard reports "renders no tabs at all" for every such page,
-  // which reads as a broken link when the truth is that the check could not see the tabs. Follow
-  // local imports when THIS file declares no panes of its own; the "no tabs at all" verdict then
-  // still fires, but only once the children have been looked at too.
-  if (keys.size === 0 && followDelegation) {
-    for (const m of src.matchAll(/from\s+'([^']+)'/g)) {
-      const r = resolveSpec(m[1], file);
-      if (r) for (const k of tabKeys(r, depth + 1, seen)) keys.add(k);
-    }
-  }
-  return keys;
-}
-
-/**
- * The tabs a page renders ITSELF — no delegation fallback.
- *
- * `tabsFor` follows a thin shell down to the component that holds its panes, which is right when
- * you are checking that a `?tab=` key names a real pane. It is wrong for the opposite question —
- * "does this page show a tab strip at all?" — because a plain list page that merely imports a
- * tabbed dialog comes back looking tabbed. `/projects` reported `company, contact` that way, off
- * a child component, and would have demanded a `?tab=` on a page that has none.
- */
-const ownTabCache = new Map<string, Set<string>>();
-function ownTabsFor(file: string): Set<string> {
-  if (!ownTabCache.has(file)) ownTabCache.set(file, tabKeys(file, 0, new Set(), false));
-  return ownTabCache.get(file)!;
-}
-
-function tabsFor(file: string): Set<string> {
-  if (!tabCache.has(file)) tabCache.set(file, tabKeys(file));
-  return tabCache.get(file)!;
-}
-
 // ─────────────────────────────── the scans ───────────────────────────────
 
 interface Site { file: string; line: number; }
@@ -258,6 +51,34 @@ function scan(re: RegExp): Map<string, Site[]> {
 }
 
 const show = (sites: Site[]) => sites.map((s) => `${s.file}:${s.line}`).join(', ');
+
+const pathOf = (url: string) =>
+  (url.split('?')[0].split('#')[0].replace(/\$?\{[^}]*\}/g, ':param').replace(/\/+$/, '')) || '/';
+
+function walkPython(dir: string, out: string[] = []): string[] {
+  for (const e of readdirSync(dir)) {
+    if (e === '__pycache__') continue;
+    const p = join(dir, e);
+    if (statSync(p).isDirectory()) walkPython(p, out);
+    else if (e.endsWith('.py')) out.push(p);
+  }
+  return out;
+}
+
+/** Every path literal on an `action_url:` line, so both arms of a ternary are checked. */
+function actionUrlLiterals(): Map<string, Site[]> {
+  const hits = new Map<string, Site[]>();
+  for (const file of sourceFiles) {
+    blankedSource(file).split('\n').forEach((line, i) => {
+      if (!/\baction_url\s*:/.test(line)) return;
+      for (const m of line.matchAll(/[`'"](\/[A-Za-z][^`'"]*)[`'"]/g)) {
+        if (!hits.has(m[1])) hits.set(m[1], []);
+        hits.get(m[1])!.push({ file: rel(file), line: i + 1 });
+      }
+    });
+  }
+  return hits;
+}
 
 describe('the route table itself', () => {
   it('resolves — a broken scan would silently vouch for every link in the repo', () => {
@@ -356,11 +177,54 @@ describe('the route table itself', () => {
 describe('notification action_url', () => {
   it('every action_url path matches a declared route', () => {
     const offenders: string[] = [];
-    for (const [url, sites] of scan(/action_url:\s*[`'"](\/[^`'"]*)[`'"]/g)) {
-      const path = (url.split('?')[0].split('#')[0].replace(/\$\{[^}]*\}/g, ':param').replace(/\/+$/, '')) || '/';
+    for (const [url, sites] of actionUrlLiterals()) {
+      const path = pathOf(url);
       if (!routeExists(path)) offenders.push(`${path} — ${show(sites)}`);
     }
     expect(offenders, `action_urls that land on no route:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  it('every extra ?param on an action_url is read by something', () => {
+    const readers = new Set<string>();
+    for (const file of sourceFiles) {
+      if (rel(file).startsWith('src/')) for (const m of readSource(file).matchAll(/\.get\('([A-Za-z_]+)'\)/g)) readers.add(m[1]);
+    }
+    const offenders: string[] = [];
+    for (const [url, sites] of actionUrlLiterals()) {
+      for (const m of (url.split('?')[1] ?? '').matchAll(/(?:^|&)([A-Za-z_]+)=/g)) {
+        if (m[1] !== 'tab' && !readers.has(m[1])) offenders.push(`${pathOf(url)}?${m[1]}= — ${show(sites)}`);
+      }
+    }
+    expect(offenders, `the record id in these links goes nowhere; the reader lands on the list:\n${offenders.join('\n')}`).toEqual([]);
+  });
+
+  it('every MIVAA notification link lands on a route and a tab that renders', () => {
+    const app = join(ROOT, 'mivaa-pdf-extractor/app');
+    const files = existsSync(app) ? walkPython(app) : [];
+    expect(files.length, 'mivaa-pdf-extractor/app is empty — this guard cannot see its haystack').toBeGreaterThan(50);
+
+    const offenders: string[] = [];
+    let seen = 0;
+    const check = (url: string, file: string) => {
+      seen++;
+      const path = pathOf(url);
+      const tab = url.match(/[?&]tab=([A-Za-z0-9_-]+)/)?.[1];
+      const page = PAGE_FOR.get(path);
+      if (!routeExists(path)) offenders.push(`${url} — no route (${rel(file)})`);
+      else if (tab && page && !tabsFor(page).has(tab)) offenders.push(`${url} — no such tab (${rel(file)})`);
+    };
+    for (const file of files) {
+      const src = readSource(file);
+      for (const line of src.split('\n')) {
+        if (!/action_url|action_path/.test(line) || /^\s*#/.test(line)) continue;
+        for (const m of line.matchAll(/["'](\/[A-Za-z][^"']*)["']/g)) check(m[1], file);
+      }
+      for (const fn of src.matchAll(/def _build_action_\w+[\s\S]*?(?=\n {4}(?:async )?def |\n\S|$)/g)) {
+        for (const m of fn[0].matchAll(/return\s+f?["'](\/[A-Za-z][^"']*)["']/g)) check(m[1], file);
+      }
+    }
+    expect(seen, 'no MIVAA notification links found — the call shape changed').toBeGreaterThan(5);
+    expect(offenders, offenders.join('\n')).toEqual([]);
   });
 
   /**

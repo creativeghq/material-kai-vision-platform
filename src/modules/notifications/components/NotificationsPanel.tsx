@@ -3,12 +3,9 @@ import { timeAgo } from '@/utils/datetime';
 import { resolveNotificationTarget, type NotificationTarget } from '@/utils/notificationLink';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import {
-  Bell, Inbox, Calendar, Star, Bot, CheckCheck, X, Sparkles, FileText, Building2,
-  Globe, Video, Layers, Cpu, Download, CreditCard, XCircle, UserPlus, CheckCircle,
-  Megaphone,
-} from 'lucide-react';
+import { Bell, CheckCheck, X } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { NotificationIcon } from './NotificationIcon';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { logger } from '@/config';
@@ -23,36 +20,6 @@ interface UserNotification {
   created_at: string;
   metadata: Record<string, unknown>;
 }
-
-const TYPE_ICON: Record<string, React.ReactNode> = {
-  hire_me:                <Inbox className="h-4 w-4 text-primary" />,
-  appointment_booked:     <Calendar className="h-4 w-4 text-amber-500" />,
-  appointment_confirmed:  <Calendar className="h-4 w-4 text-green-500" />,
-  appointment_cancelled:  <Calendar className="h-4 w-4 text-destructive" />,
-  review_received:        <Star className="h-4 w-4 text-amber-400" />,
-  agent_completed:        <Bot className="h-4 w-4 text-primary" />,
-  material_alert:         <Sparkles className="h-4 w-4 text-primary" />,
-  quote_updated:          <FileText className="h-4 w-4 text-violet-500" />,
-  preferred_factory:      <Building2 className="h-4 w-4 text-blue-500" />,
-  vr_world_ready:         <Globe className="h-4 w-4 text-emerald-500" />,
-  vr_world_failed:        <Globe className="h-4 w-4 text-destructive" />,
-  video_ready:            <Video className="h-4 w-4 text-emerald-500" />,
-  video_failed:           <Video className="h-4 w-4 text-destructive" />,
-  staging_ready:          <Layers className="h-4 w-4 text-emerald-500" />,
-  agent_run_done:         <Cpu className="h-4 w-4 text-emerald-500" />,
-  agent_run_failed:       <Cpu className="h-4 w-4 text-destructive" />,
-  pdf_ready:              <Download className="h-4 w-4 text-violet-500" />,
-  svbrdf_ready:           <Sparkles className="h-4 w-4 text-emerald-500" />,
-  factory_approved:       <CheckCircle className="h-4 w-4 text-green-500" />,
-  factory_rejected:       <XCircle className="h-4 w-4 text-destructive" />,
-  quote_accepted:         <FileText className="h-4 w-4 text-green-500" />,
-  quote_rejected:         <FileText className="h-4 w-4 text-destructive" />,
-  new_follower:           <UserPlus className="h-4 w-4 text-blue-500" />,
-  payment_success:        <CreditCard className="h-4 w-4 text-green-500" />,
-  payment_failed:         <CreditCard className="h-4 w-4 text-destructive" />,
-  changelog_published:    <Megaphone className="h-4 w-4 text-primary" />,
-};
-
 
 export const NotificationsPanel: React.FC = () => {
   const { user } = useAuth();
@@ -271,7 +238,7 @@ export const NotificationsPanel: React.FC = () => {
                 >
                   {/* Icon */}
                   <div className="mt-0.5 shrink-0">
-                    {TYPE_ICON[n.type] ?? <Bell className="h-4 w-4 text-muted-foreground" />}
+                    <NotificationIcon type={n.type} />
                   </div>
 
                   {/* Text */}
@@ -311,16 +278,14 @@ export const NotificationsPanel: React.FC = () => {
           </div>
 
           {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="border-t px-4 py-2 bg-muted/30">
-              <button
-                className="text-xs text-primary hover:underline w-full text-center"
-                onClick={() => { setOpen(false); navigate('/inbox'); }}
-              >
-                View inbox
-              </button>
-            </div>
-          )}
+          <div className="border-t px-4 py-2 bg-muted/30">
+            <button
+              className="text-xs text-primary hover:underline w-full text-center"
+              onClick={() => { setOpen(false); navigate('/notifications'); }}
+            >
+              View all notifications
+            </button>
+          </div>
         </div>,
         document.body,
       )}

@@ -2126,6 +2126,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   // A self-hosting enquiry emails the platform operator. Server-only, or any authenticated
   // user could POST a forged one and put attacker-chosen text in that mailbox.
   'self_hosting_requested',
+  'marketplace_application_submitted', 'marketplace_application_reviewed',
   // #462 — asserts the corpus matched a saved signal; only evaluate_signals (SQL) may say so.
   'signal.matched',
   // #193 — both assert a fact about a LEGAL document / the operator's provider account.
