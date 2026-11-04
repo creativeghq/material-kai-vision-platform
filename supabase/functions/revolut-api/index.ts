@@ -4,6 +4,7 @@
 
 import { authenticate } from '../_shared/auth.ts';
 import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
+import { bankFromIban } from '../_shared/bankVocabulary.generated.ts';
 import { HttpError, withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { corsHeaders } from '../_shared/cors.ts';
@@ -639,8 +640,12 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         throw new HttpError(400, `Account name does NOT match this IBAN (VoP). Verify with the counterparty; pass force=true only if you are certain.`);
       }
 
-      const cpBody: Record<string, unknown> = { iban, currency: bank.currency || 'EUR' };
-      if (bank.account_ref) cpBody.bic = bank.account_ref;
+      const cpBody: Record<string, unknown> = { iban, bank_country: iban.slice(0, 2), currency: bank.currency || 'EUR' };
+      const bicOrLocalAccountNo = String(bank.account_ref ?? '').replace(/\s+/g, '').toUpperCase();
+      const bic = /^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$/.test(bicOrLocalAccountNo)
+        ? bicOrLocalAccountNo
+        : bankFromIban(iban)?.bic;
+      if (bic) cpBody.bic = bic;
       if (isCompany) cpBody.company_name = holderName;
       else {
         const parts = holderName.split(/\s+/);

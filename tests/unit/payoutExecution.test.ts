@@ -185,6 +185,16 @@ describe('the controls that stand in front of an irreversible transfer', () => {
     expect(choice).toContain('isVopMismatch');
   });
 
+  it('sends account_ref as the BIC only when it is one', () => {
+    // Most rows hold a local account number there, and Revolut refuses the whole counterparty.
+    expect(revolutApi).not.toMatch(/cpBody\.bic\s*=\s*bank\.account_ref/);
+    expect(revolutApi).toMatch(/\.test\(bicOrLocalAccountNo\)\s*\?\s*bicOrLocalAccountNo\s*:\s*bankFromIban\(iban\)\?\.bic/);
+  });
+
+  it('names the bank country on a counterparty, which Revolut requires', () => {
+    expect(revolutApi).toMatch(/bank_country:\s*iban\.slice\(0,\s*2\)/);
+  });
+
   it('refuses to send from a Revolut connection that was never completed', () => {
     expect(payout).toMatch(/cfg\.refresh_token[\s\S]{0,300}never connected/);
   });
