@@ -15,7 +15,8 @@ import { describeUpstreamError } from '../tool-result-shape.ts';
 type ChunkSink = ((chunk: Record<string, unknown>) => void) | undefined;
 
 const INGEST_BUCKET = 'pdf-documents';
-const ACTIONS = ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini', 'merge_products', 'drop_product', 'wipe', 'edition_review', 'edition_apply'] as const;
+const ACTIONS = ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini', 'merge_products', 'drop_product', 'wipe', 'edition_review', 'edition_apply', 'resume', 'enrich_report', 'enrich'] as const;
+const ENRICH_BATCH = 3;
 const REVIEW_ACTIONS = ['keep', 'drop', 'rename', 'merge_into'] as const;
 const MISSING_POLICIES = ['retire', 'needs_replacement', 'keep'] as const;
 
@@ -123,6 +124,7 @@ export const createIngestCatalogTool = (
           defer_embedding: defer ? 'true' : 'false', product_limit: args.product_limit ? String(args.product_limit) : undefined,
           edition_label: args.edition_label, supersedes_document_id: args.supersedes_document_id, missing_policy: args.missing_policy,
           agent_prompt: args.rules,
+          exclude_names: args.exclude_names?.join(','),
         };
         for (const [k, v] of Object.entries(fields)) if (v !== undefined && v !== '') form.set(k, v);
         const r = await callMivaa('/api/rag/documents/upload', jwt, userId, workspaceId, { method: 'POST', body: form });
@@ -240,6 +242,43 @@ export const createIngestCatalogTool = (
         return JSON.stringify({ success: true, moved: r.data?.moved });
       }
 
+      if (action === 'enrich_report' || action === 'enrich') {
+        const invoke = async (body: Record<string, unknown>) => {
+          const { data, error } = await svcClient().functions.invoke('enrich-draft-products', {
+            body: { workspace_id: workspaceId, ...body }, headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+          });
+          return error ? { error: error.message } : (data ?? {});
+        };
+        if (action === 'enrich_report') {
+          const report = await invoke({ action: 'report', document_id: job.documentId });
+          onChunk?.({ type: 'ingestion_report', action: 'enrich_report', document: job.filename, ...report, timestamp: Date.now() });
+          return JSON.stringify({ success: !report.error, summary: report.summary, error: report.error });
+        }
+        const names: string[] = (args.products ?? []).slice(0, ENRICH_BATCH);
+        const { data: rows } = await svcClient().from('products').select('id, name').eq('workspace_id', workspaceId)
+          .eq('source_document_id', job.documentId).in('name', names);
+        if (!rows?.length) return JSON.stringify({ success: false, error: `Name up to ${ENRICH_BATCH} products of ${job.filename} in products.` });
+        if (confirm !== true) {
+          return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Enrich ${rows.length} product(s) from the maker's site?`,
+            `${rows.map((r: { name: string }) => r.name).join(', ')}. Fills empty fields only and is billed to this workspace.`);
+        }
+        const out = await invoke({ action: 'run', product_ids: rows.map((r: { id: string }) => r.id) });
+        if (out.error) return JSON.stringify({ success: false, error: out.error });
+        onChunk?.({ type: 'ingestion_job', action: 'enriched', document: job.filename, timestamp: Date.now() });
+        return JSON.stringify({ success: true, results: out.results });
+      }
+
+      if (action === 'resume') {
+        if (confirm !== true) {
+          return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Resume ${job.filename}?`,
+            'Continues a failed or interrupted job from its last checkpoint. Finished stages are not paid for again.');
+        }
+        const r = await callMivaa(`/api/rag/jobs/${job.jobId}/restart`, jwt, userId, workspaceId, { method: 'POST' });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        onChunk?.({ type: 'ingestion_job', action: 'resumed', document: job.filename, timestamp: Date.now() });
+        return JSON.stringify({ success: true, message: 'Resumed from the last checkpoint; check status.' });
+      }
+
       if (action === 'wipe') {
         if (confirm !== true) {
           return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Delete everything ${job.filename} produced?`,
@@ -283,7 +322,7 @@ export const createIngestCatalogTool = (
         + 'and builds no vectors; status shows where a job is and what waits on the user; review lists the discovered '
         + 'products; approve applies edits (keep/drop/rename/merge_into) and creates them; cancel ends the job; embed builds '
         + 'every vector once after review; redo_gemini redoes plain clean-ups of patterned crops once Gemini is available. '
-        + 'merge_products moves a created product into another and drop_product removes one (both need document or job_id); wipe deletes everything a job produced; '
+        + 'merge_products moves a created product into another and drop_product removes one (both need document or job_id); wipe deletes everything a job produced; resume continues a failed or interrupted job; enrich_report lists a catalogue\'s empty fields and enrich fills them for up to 3 products from the maker\'s site; '
         + 'edition_review and edition_apply handle a catalogue that replaces an older one. '
         + 'Every action that changes something ALWAYS asks the user to Approve first (never set confirm).',
       schema: z.object({
@@ -298,6 +337,7 @@ export const createIngestCatalogTool = (
         defer_embedding: z.boolean().optional().describe('start: build no vectors until the embed step (default true).'),
         product_limit: z.number().int().min(1).max(500).optional().describe('start: dry run on the first N products.'),
         multi_brand: z.boolean().optional().describe('start: a distributor catalogue carrying several brands.'),
+        exclude_names: z.array(z.string()).optional().describe('start: leave out discovered products whose name contains one of these (e.g. sample box).'),
         rules: z.string().optional().describe('start: plain-language rules for discovery (e.g. colours are variants, ignore sample boxes).'),
         edition_label: z.string().optional().describe('start: edition name when this replaces an older catalogue.'),
         supersedes_document_id: z.string().optional().describe('start: the older catalogue document this edition replaces.'),
@@ -308,6 +348,7 @@ export const createIngestCatalogTool = (
           new_name: z.string().optional(),
           into: z.string().optional(),
         })).optional().describe('approve: edits to the discovered list.'),
+        products: z.array(z.string()).optional().describe('enrich: up to 3 exact product names.'),
         product: z.string().optional().describe('merge_products, drop_product: the exact product name.'),
         into: z.string().optional().describe('merge_products: the exact name of the product that survives.'),
         confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
