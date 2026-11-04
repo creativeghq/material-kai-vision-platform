@@ -105,6 +105,7 @@ export type TriggerType =
   | 'payment_reversed'
   | 'payment_sent'
   | 'ingestion_audit_failed'
+  | 'ingestion_review_waiting'
   // Expenses: a received myDATA document became a cost, or was deliberately kept out of the
   // books. Both are operator acts on money, which is why anyone watching the P&L wants them.
   | 'expense.booked'
@@ -417,6 +418,7 @@ export interface PaymentReceivedTriggerConfig {}
 export interface PaymentReversedTriggerConfig {}
 export interface PaymentSentTriggerConfig {}
 export interface IngestionAuditFailedTriggerConfig {}
+export interface IngestionReviewWaitingTriggerConfig {}
 /** Payload-only. `count`/`total` describe the run, not one document. */
 export interface ExpenseBookedTriggerConfig {}
 export interface ExpenseSettledOutsideTriggerConfig {}
@@ -631,6 +633,7 @@ export type TriggerConfigMap = {
   payment_reversed: PaymentReversedTriggerConfig;
   payment_sent: PaymentSentTriggerConfig;
   ingestion_audit_failed: IngestionAuditFailedTriggerConfig;
+  ingestion_review_waiting: IngestionReviewWaitingTriggerConfig;
   'expense.booked': ExpenseBookedTriggerConfig;
   'expense.settled_outside': ExpenseSettledOutsideTriggerConfig;
   'credit_note.received': CreditNoteReceivedTriggerConfig;

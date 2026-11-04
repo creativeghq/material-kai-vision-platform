@@ -265,6 +265,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'ingestion_audit_failed', group: 'Catalogs',
     label: 'Ingestion audit needs attention', description: 'A processed document failed or needs review against what its PDF says', icon: 'ShieldAlert', color: 'red',
     defaultData: { label: 'Ingestion audit needs attention', category: 'trigger', triggerType: 'ingestion_audit_failed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'ingestion_review_waiting', group: 'Catalogs',
+    label: 'Catalogue waiting for review', description: 'Discovery finished and the job is parked until someone reviews the product list', icon: 'ShieldAlert', color: 'red',
+    defaultData: { label: 'Catalogue waiting for review', category: 'trigger', triggerType: 'ingestion_review_waiting', config: {} } as TriggerNodeData },
   // Expense cards (trip / monthly / …)
   { type: 'triggerNode', category: 'trigger', subType: 'expense_card_submitted', group: 'Finance',
     label: 'Expense Card Submitted', description: 'A team member submitted an expense card for review', icon: 'ClipboardCheck', color: 'blue',
