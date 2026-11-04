@@ -115,6 +115,10 @@ export class EmbeddingBackfillAgent implements AgentRunner {
       if (sinceIso) q = q.gte('created_at', sinceIso);
       const stuckProducts = await stuckFilter('product', 'product_text');
       if (stuckProducts) q = q.not('id', 'in', stuckProducts);
+      // A document awaiting review owes no vector yet (#513); counted here it would read as failing and go stuck.
+      const { data: deferredDocs } = await supabase.from('documents').select('id').eq('metadata->>embedding_deferred', 'true');
+      const deferredIds = (deferredDocs ?? []).map((d: { id: string }) => d.id);
+      if (deferredIds.length) q = q.or(`source_document_id.is.null,source_document_id.not.in.(${deferredIds.join(',')})`);
       const { data: rows, error } = await q;
       if (error) throw new Error(error.message);
       const ids = (rows ?? []).map((r: any) => r.id as string);
