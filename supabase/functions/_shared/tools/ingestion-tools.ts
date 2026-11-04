@@ -245,10 +245,12 @@ export const createIngestCatalogTool = (
 
       if (action === 'enrich_report' || action === 'enrich') {
         const invoke = async (body: Record<string, unknown>) => {
-          const { data, error } = await svcClient().functions.invoke('enrich-draft-products', {
-            body: { workspace_id: workspaceId, ...body }, headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+          const resp = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/enrich-draft-products`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt ?? ''}` },
+            body: JSON.stringify({ workspace_id: workspaceId, ...body }),
           });
-          return error ? { error: error.message } : (data ?? {});
+          const data = await resp.json().catch(() => ({}));
+          return resp.ok ? data : { error: data?.error || `The enrichment service answered ${resp.status}.` };
         };
         if (action === 'enrich_report') {
           const report = await invoke({ action: 'report', document_id: job.documentId });
