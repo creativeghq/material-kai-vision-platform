@@ -1,5 +1,6 @@
 /** Fiscal measurement-unit twin-parity guard (#347, defect 15). */
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 import { UNITS, unitFromMydataCode as clientUnitFromMydataCode } from '@/lib/units';
 import {
@@ -7,6 +8,7 @@ import {
   MYDATA_UNIT_BY_CODE, unitFromMydataCode as edgeUnitFromMydataCode,
 } from '../../supabase/functions/_shared/fiscal/types';
 import { buildNovusPayload } from '../../supabase/functions/_shared/fiscal/novus';
+import { blankComments } from '../helpers/stripComments';
 
 /** Minimal input — the guard runs before anything else reads issuer/counterpart/summary. */
 const payloadWithUnit = (unit: string) => () => buildNovusPayload({
@@ -63,6 +65,12 @@ describe('fiscal measurement units — edge twin matches src/lib/units.ts', () =
     // The guard, watched firing — not just the helper it calls.
     expect(payloadWithUnit('pallet')).toThrow(/no AADE measurement_unit code/);
     expect(payloadWithUnit('pallet')).toThrow(/1 \(pallet\)/);
+  });
+
+  it('the invoice envelope files the unit the operator picked, not ΤΜΧ', () => {
+    const builder = blankComments(readFileSync('supabase/functions/_shared/fiscal/invoice-builder.ts', 'utf8'));
+    expect(builder).toContain("it.unit ?? unitFromMydataCode(it.measurement_unit_code) ?? 'ΤΜΧ'");
+    expect(edgeUnitFromMydataCode(5)).toBe('m2');
   });
 
   it('buildNovusPayload lets a coded unit through', () => {

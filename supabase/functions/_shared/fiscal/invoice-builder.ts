@@ -12,7 +12,7 @@ import type {
   FiscalParty,
   FiscalTaxTotal,
 } from './types.ts';
-import { fiscalDate, mydataCountry } from './types.ts';
+import { fiscalDate, mydataCountry, unitFromMydataCode } from './types.ts';
 import {
   movePurposeLabel,
   isMydataMovePurpose,
@@ -480,7 +480,7 @@ export async function buildInvoiceInputFromDb(
       // and it is exactly what the printed document shows (rule 1c).
       description: it.description ?? 'Item',
       quantity: Number(it.quantity ?? 1),
-      measurementUnitLabel: it.unit ?? 'ΤΜΧ',
+      measurementUnitLabel: it.unit ?? unitFromMydataCode(it.measurement_unit_code) ?? 'ΤΜΧ',
       // Commodity code AS SNAPSHOTTED on the line, never re-read from the product: a reissued or
       // reprinted invoice must keep saying what it said, and the nomenclature moves monthly.
       // Cross-border commercial invoices are expected to carry it per line.

@@ -51,6 +51,8 @@ import {
 import { SELECTABLE_MOVE_PURPOSES } from '@/services/fiscal/fiscalVocabulary';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
+import { unitDef } from '@/lib/units';
+import { UNIT_LABEL_BY_CODE } from '@/modules/finance/invoice-templates/labels';
 import { projectIdentity, variantKey, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
 
 interface Customer {
@@ -711,6 +713,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       description: p.name ?? '',
       sku: p.sku ?? '',
       unit: meta.unit ?? '',
+      ...(meta.unit ? { measurement_unit_code: unitDef(meta.unit)?.mydataCode?.toString() ?? '' } : {}),
       selected_attributes: attrs,
       color: projected.selected_color ?? '',
       size: projected.selected_size ?? '',
@@ -1720,7 +1723,6 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     <Checkbox className="h-3.5 w-3.5 rounded" checked={paidUpfront} disabled={cashPct === 0} onCheckedChange={(v) => setPaidUpfront(v === true)} />
                     Paid upfront{cashPct > 0 ? ` (−${cashPct}%)` : ''}
                   </label>
-                  {/* Row defaults — apply measurement unit / VAT / income classification to every row */}
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button size="sm" variant="outline">
@@ -1729,7 +1731,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     </PopoverTrigger>
                     <PopoverContent align="end" className="w-72 space-y-2">
                       <p className="text-[11px] text-muted-foreground">Applied to every row.</p>
-                      <Select value={gUnit || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGUnit(val); applyGlobal('measurement_unit_code', val); }}>
+                      <Select value={gUnit || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGUnit(val); setLines((prev) => prev.map((l) => ({ ...l, measurement_unit_code: val, unit: '' }))); }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Measurement unit" /></SelectTrigger>
                         <SelectContent><SelectItem value="none">Unit…</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
                       </Select>
@@ -1753,9 +1755,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <div className="space-y-2">
                 <div className="flex items-center gap-2 px-2 text-[11px] text-muted-foreground">
                   <span className="w-4" /><span className="flex-1">Description</span>
-                  <span className="w-16 text-right">Qty</span><span className="w-24 text-right">Price</span>
-                  <span className="w-20 text-right">Discount €</span><span className="w-20 text-right">VAT</span>
-                  <span className="w-20 text-right">Net</span><span className="w-24 text-right">Total incl. VAT</span>
+                  <span className="w-14 text-right">Qty</span><span className="w-16">Unit</span><span className="w-20 text-right">Price</span>
+                  <span className="w-16 text-right">Discount €</span><span className="w-16 text-right">VAT</span>
+                  <span className="w-20 text-right">Net</span><span className="w-20 text-right">Total incl. VAT</span>
                   {lines.length > 1 && <span className="w-3.5" />}
                 </div>
                 {lines.map((l, idx) => {
@@ -1805,17 +1807,30 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                             </div>
                           )}
                         </div>
-                        <div className="w-16"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
-                        <div className="w-24"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
-                        <div className="w-20"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" title="Discount amount (€) taken off this line" /></div>
-                        <div className="w-20">
+                        <div className="w-14"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
+                        <div className="w-16">
+                          {/* Picking a code clears `unit`: a stored label outranks the code on both the print and the envelope. */}
+                          <Select value={l.measurement_unit_code || (l.unit ? 'label' : 'none')} onValueChange={(v) => { if (v !== 'label') update(idx, { measurement_unit_code: v === 'none' ? '' : v, unit: '' }); }}>
+                            <SelectTrigger className="h-8 px-2 text-xs" title="Unit of measure for this line">
+                              <SelectValue>{l.measurement_unit_code ? UNIT_LABEL_BY_CODE[Number(l.measurement_unit_code)] : (l.unit || 'Unit')}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">—</SelectItem>
+                              {!l.measurement_unit_code && l.unit && <SelectItem value="label">{l.unit}</SelectItem>}
+                              {units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="w-20"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
+                        <div className="w-16"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" title="Discount amount (€) taken off this line" /></div>
+                        <div className="w-16">
                           <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
                             <SelectTrigger className="h-8 px-2 text-xs" title="VAT rate for this line"><SelectValue>{linePct}%</SelectValue></SelectTrigger>
                             <SelectContent><SelectItem value="none">Default ({vatRate}%)</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                           </Select>
                         </div>
                         <div className="w-20 pt-2 text-right text-sm tabular-nums">{lineNet.toFixed(2)}</div>
-                        <div className="w-24 pt-2 text-right text-sm font-medium tabular-nums" title="Line total including VAT">{(lineNet * (1 + linePct / 100)).toFixed(2)}</div>
+                        <div className="w-20 pt-2 text-right text-sm font-medium tabular-nums" title="Line total including VAT">{(lineNet * (1 + linePct / 100)).toFixed(2)}</div>
                         {lines.length > 1 && <button type="button" tabIndex={-1} className="mt-2 text-muted-foreground hover:text-destructive" onClick={() => removeLine(idx)}><Trash2 className="h-3.5 w-3.5" /></button>}
                       </div>
                       {l.expanded && (
@@ -1845,13 +1860,6 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               <div className="space-y-1"><Label className="text-xs text-muted-foreground">Size / Format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
                             </>
                           )}
-                          <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">Measurement unit</Label>
-                            <Select value={l.measurement_unit_code || 'none'} onValueChange={(v) => update(idx, { measurement_unit_code: v === 'none' ? '' : v })}>
-                              <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Unit" /></SelectTrigger>
-                              <SelectContent><SelectItem value="none">—</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
-                            </Select>
-                          </div>
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">VAT category</Label>
                             <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
