@@ -999,7 +999,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createIngestCatalogTool',
     description: 'Ingest a supplier PDF catalogue.',
     params: [
-      { name: 'action', type: 'enum', enum: ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini'], optional: true },
+      { name: 'action', type: 'enum', enum: ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini', 'merge_products', 'drop_product', 'wipe', 'edition_review', 'edition_apply'], optional: true },
       { name: 'job_id', type: 'string', optional: true, description: 'Every action but start: the ingestion job id.' },
       { name: 'document', type: 'string', optional: true, description: 'Every action but start: the catalogue file name (partial) instead of job_id.' },
       { name: 'title', type: 'string', optional: true, description: 'start: the catalogue name.' },
@@ -1015,6 +1015,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'supersedes_document_id', type: 'string', optional: true, description: 'start: the older catalogue document this edition replaces.' },
       { name: 'missing_policy', type: 'enum', enum: ['retire', 'needs_replacement', 'keep'], optional: true, description: 'start: what happens to products missing from the new edition.' },
       { name: 'edits', type: 'array', optional: true, description: 'approve: edits to the discovered list.' },
+      { name: 'product', type: 'string', optional: true, description: 'merge_products, drop_product: the exact product name.' },
+      { name: 'into', type: 'string', optional: true, description: 'merge_products: the exact name of the product that survives.' },
       { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
     ],
   },

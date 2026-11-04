@@ -15,7 +15,7 @@ import { describeUpstreamError } from '../tool-result-shape.ts';
 type ChunkSink = ((chunk: Record<string, unknown>) => void) | undefined;
 
 const INGEST_BUCKET = 'pdf-documents';
-const ACTIONS = ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini'] as const;
+const ACTIONS = ['start', 'status', 'review', 'approve', 'cancel', 'embed', 'redo_gemini', 'merge_products', 'drop_product', 'wipe', 'edition_review', 'edition_apply'] as const;
 const REVIEW_ACTIONS = ['keep', 'drop', 'rename', 'merge_into'] as const;
 const MISSING_POLICIES = ['retire', 'needs_replacement', 'keep'] as const;
 
@@ -207,6 +207,73 @@ export const createIngestCatalogTool = (
         return JSON.stringify({ success: true, message: 'Started; the ingestion report shows what was replaced or why it stopped.' });
       }
 
+      if (action === 'merge_products' || action === 'drop_product') {
+        const find = async (name?: string) => {
+          if (!name) return null;
+          const { data } = await svcClient().from('products').select('id, name').eq('workspace_id', workspaceId)
+            .eq('source_document_id', job.documentId).eq('name', name).limit(2);
+          return data?.length === 1 ? data[0] : null;
+        };
+        const product = await find(args.product);
+        if (!product) return JSON.stringify({ success: false, error: `No single product named "${args.product}" in ${job.filename}.` });
+        if (action === 'drop_product') {
+          if (confirm !== true) {
+            return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Remove ${product.name} from ${job.filename}?`,
+              'Deletes the product and its tables and image links; its text stays on the document. Refused if a quote, invoice, price or stock record uses it.');
+          }
+          const r = await callMivaa('/api/duplicates/drop', jwt, userId, workspaceId, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ product_id: product.id, workspace_id: workspaceId }) });
+          if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+          onChunk?.({ type: 'ingestion_job', action: 'dropped', document: job.filename, product: product.name, timestamp: Date.now() });
+          return JSON.stringify({ success: true, ...r.data });
+        }
+        const into = await find(args.into);
+        if (!into) return JSON.stringify({ success: false, error: `No single product named "${args.into}" in ${job.filename} to merge into.` });
+        if (confirm !== true) {
+          return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Merge ${product.name} into ${into.name}?`,
+            'Moves its text, tables, images and every record using it to the surviving product, then removes it. Refused if a price or quote line would collide.');
+        }
+        const r = await callMivaa('/api/duplicates/merge', jwt, userId, workspaceId, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ target_product_id: into.id, source_product_ids: [product.id], workspace_id: workspaceId, user_id: userId, merge_strategy: 'manual' }) });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        onChunk?.({ type: 'ingestion_job', action: 'merged', document: job.filename, product: product.name, into: into.name, timestamp: Date.now() });
+        return JSON.stringify({ success: true, moved: r.data?.moved });
+      }
+
+      if (action === 'wipe') {
+        if (confirm !== true) {
+          return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Delete everything ${job.filename} produced?`,
+            'Removes the job and all its products, text, images and vectors. This cannot be undone.');
+        }
+        const r = await callMivaa(`/api/rag/documents/jobs/${job.jobId}?preserve_outputs=false`, jwt, userId, workspaceId, { method: 'DELETE' });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        onChunk?.({ type: 'ingestion_job', action: 'wiped', document: job.filename, timestamp: Date.now() });
+        return JSON.stringify({ success: true, message: 'Deleted. Brand companies and shared registry fields it added are not touched.' });
+      }
+
+      if (action === 'edition_review') {
+        const r = await callMivaa(`/api/rag/documents/${job.documentId}/edition`, jwt, userId, workspaceId);
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        const changes = (r.data?.changes ?? []) as Array<Record<string, unknown>>;
+        onChunk?.({ type: 'ingestion_review', action: 'edition', document: job.filename, changes, timestamp: Date.now() });
+        return JSON.stringify({ success: true, changes: changes.length, by_kind: changes.reduce<Record<string, number>>((acc, c) => {
+          const kind = String(c.change_kind);
+          acc[kind] = (acc[kind] ?? 0) + 1;
+          return acc;
+        }, {}) });
+      }
+
+      if (action === 'edition_apply') {
+        if (confirm !== true) {
+          return confirmCard(onChunk, { ...args, action, job_id: job.jobId }, `Apply the ${job.filename} edition?`,
+            'Publishes what it adds, retires or flags what it removes and updates what it changes, per the proposed action on each row.');
+        }
+        const r = await callMivaa(`/api/rag/documents/${job.documentId}/edition/apply`, jwt, userId, workspaceId, { method: 'POST' });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error });
+        onChunk?.({ type: 'ingestion_job', action: 'edition_applied', document: job.filename, timestamp: Date.now() });
+        return JSON.stringify({ success: true, ...r.data });
+      }
+
       return JSON.stringify({ success: false, error: `unknown action: ${action}` });
     },
     {
@@ -216,7 +283,9 @@ export const createIngestCatalogTool = (
         + 'and builds no vectors; status shows where a job is and what waits on the user; review lists the discovered '
         + 'products; approve applies edits (keep/drop/rename/merge_into) and creates them; cancel ends the job; embed builds '
         + 'every vector once after review; redo_gemini redoes plain clean-ups of patterned crops once Gemini is available. '
-        + 'start/approve/cancel/embed/redo_gemini ALWAYS ask the user to Approve first (never set confirm).',
+        + 'merge_products moves a created product into another and drop_product removes one (both need document or job_id); wipe deletes everything a job produced; '
+        + 'edition_review and edition_apply handle a catalogue that replaces an older one. '
+        + 'Every action that changes something ALWAYS asks the user to Approve first (never set confirm).',
       schema: z.object({
         action: z.enum(ACTIONS).default('status'),
         job_id: z.string().optional().describe('Every action but start: the ingestion job id.'),
@@ -239,6 +308,8 @@ export const createIngestCatalogTool = (
           new_name: z.string().optional(),
           into: z.string().optional(),
         })).optional().describe('approve: edits to the discovered list.'),
+        product: z.string().optional().describe('merge_products, drop_product: the exact product name.'),
+        into: z.string().optional().describe('merge_products: the exact name of the product that survives.'),
         confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
       }),
     },
