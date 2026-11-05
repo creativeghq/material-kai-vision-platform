@@ -42,6 +42,13 @@ describe('one question per tab', () => {
     expect(read('src/modules/projects/components/TakeoffReviewer.tsx')).toContain('<ModuleTabGate moduleSlug="quotes"');
   });
 
+  it('a quote sent to someone opens whatever their own plan is', () => {
+    const quotes = read('src/modules/quotes/index.ts');
+    expect(quotes).toContain("path: '/quotes/:id', component: QuoteDetailCustomerPage, openToRecipient: true");
+    expect(read('src/modules/_core/ModuleRoutes.tsx')).toContain('route.openToRecipient');
+    expect(quotes.split(/\r?\n/).filter((l) => l.includes('openToRecipient'))).toHaveLength(2);
+  });
+
   it('Invoicing holds what comes in', () => {
     expect(INVOICING).toContain('<ApplicationsCard');
     expect(INVOICING).toContain('orderType="sales"');

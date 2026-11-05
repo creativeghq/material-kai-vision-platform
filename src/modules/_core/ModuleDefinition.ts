@@ -34,6 +34,8 @@ export interface ModuleRoute {
    * entitlement. This is the flag for a module's own configuration pages.
    */
   requireWorkspaceAdmin?: boolean;
+  /** A record sent TO this person. The sender pays for the module and RLS decides what they may read. */
+  openToRecipient?: boolean;
 }
 
 export interface ModuleManifest {

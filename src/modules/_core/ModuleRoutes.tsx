@@ -53,6 +53,10 @@ export function buildModuleRoutes(): React.ReactElement[] {
                   <Component />
                 </Layout>
               </AdminGuard>
+            ) : route.openToRecipient ? (
+              <Layout>
+                <Component />
+              </Layout>
             ) : (
               <EntitlementGuard moduleSlug={mod.manifest.slug} moduleName={mod.manifest.name}>
                 {/* A module's CONFIGURATION pages add the workspace-admin rung. Entitlement alone

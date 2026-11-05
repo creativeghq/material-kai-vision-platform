@@ -37,8 +37,8 @@ const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
     { path: '/quotes', component: QuotesPage },
-    { path: '/quotes/:id', component: QuoteDetailCustomerPage },
-    { path: '/quotes/:id/preview', component: QuotePreviewPage },
+    { path: '/quotes/:id', component: QuoteDetailCustomerPage, openToRecipient: true },
+    { path: '/quotes/:id/preview', component: QuotePreviewPage, openToRecipient: true },
     { path: '/quotes/requests', component: QuoteRequestsPage },
     // The BACK-OFFICE half of the same module: the seller's queue and the vocabulary their quotes
     // are built from (status tags, upsells, timeline steps, defaults). All of it is the tenant's
