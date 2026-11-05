@@ -107,7 +107,11 @@ export const createProjectCvrTool = (
         const read = await readProjectView(jwt, userId, workspaceId ?? '', id, view);
         if ('refusal' in read) return read.refusal;
         try {
-          onChunk?.({ type: 'project_report', ...read.payload, timestamp: Date.now() });
+          const p = read.payload as Record<string, unknown>;
+          const shown = view === 'early_warning'
+            ? { url: p.url, flags: p.flags, contract: p.contract, retention: p.retention, open_items: p.open_items }
+            : p;
+          onChunk?.({ type: 'project_report', ...shown, timestamp: Date.now() });
         } catch { /* stream may be closed */ }
         return JSON.stringify(read.payload);
       }

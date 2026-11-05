@@ -204,6 +204,7 @@ export const RESULT_SETUP_DESTINATION: Record<string, { destination: string; lab
  * from DataForSEO/GSC, so "Add keyword"/"Add backlink" is meaningless on all of them at once.
  */
 const UNCREATABLE_RESULT_TYPES = new Set([
+  'project_report',
   'record_search_results',    // search hits — you add the record, not the hit
   'industrial_facilities',    // the EU industrial register; we do not write to it
   'b2b_company_results',
