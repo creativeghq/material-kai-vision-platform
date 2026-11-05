@@ -6,6 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/core/ui/checkbox';
+import { issuableDocTypeCodes } from '../issuableDocTypes';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -526,12 +527,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
       financeService.listInvoiceBankAccounts(workspaceId).then(setPreviewBanks).catch(() => setPreviewBanks([]));
       invoicingSetupService.listBranches(workspaceId).then((b) => { setBranches(b); setBranchCode(String(b.find((x) => x.branch_code === 0)?.branch_code ?? 0)); }).catch(() => setBranches([]));
-      // A document type is issuable ONLY when it's enabled AND has at least one active
-      // numbering series (both configured in Settings → Documents → Document Types & Series).
-      // No "show everything" fallback — you can't issue a type that isn't set up.
-      const enabledCodes = new Set(Object.values(enabled).filter((e) => e.enabled).map((e) => e.code));
-      const codesWithActiveSeries = new Set((allSeries ?? []).filter((s: any) => s.is_active).map((s: any) => s.doc_code));
-      const visible = allTypes.filter((t) => enabledCodes.has(t.code) && codesWithActiveSeries.has(t.code));
+      const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
+      const issuableCodes = issuableDocTypeCodes(enabledCodes, allSeries ?? []);
+      const visible = allTypes.filter((t) => issuableCodes.has(t.code));
       setDocTypes(visible.map((t) => ({ code: t.code, description: t.description })));
       setIncTypes(ic.map((t) => ({ code: t.code, description: t.description })));
       setIncCats(cat.map((t) => ({ code: t.code, description: t.description })));
@@ -1389,6 +1387,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
               <TabsContent value="details" className="mt-5 space-y-5">
             {/* Parties + document */}
+            <div className="grid items-start gap-5 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
             <FormSection title={selfPricing ? 'Billed to (you)' : 'Billed to'}>
               {!selfPricing && (
                 <div className="flex justify-end">
@@ -1577,7 +1576,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </div>
                 {docTypes.length === 0 && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                    No document types are active. Enable a type <strong>and</strong> add an active numbering series in Settings → Documents → Document Types &amp; Series before issuing.
+                    No document types are available. Enable a type in Settings → Documents → Document Types &amp; Series, and switch its numbering series back on if it was turned off.
                   </p>
                 )}
                 {buyerIsConsumer && (
@@ -1606,7 +1605,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series — auto-numbered (set series in Settings → Documents)'}
+                  {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series yet — one is created on the first issued document, numbered from 1'}
                 </p>
                 {seriesOptions.length > 1 && (
                   <Select value={chosenSeriesId} onValueChange={setChosenSeriesId}>
@@ -1643,6 +1642,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               )}
             </FormGrid>
             </FormSection>
+            </div>
 
             <FormSection title="Terms">
             <FormGrid>
