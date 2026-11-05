@@ -1605,7 +1605,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'No series yet — one is created on the first issued document, numbered from 1'}
+                  {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'A new series starts at 1 when the first document of this type is issued'}
                 </p>
                 {seriesOptions.length > 1 && (
                   <Select value={chosenSeriesId} onValueChange={setChosenSeriesId}>
