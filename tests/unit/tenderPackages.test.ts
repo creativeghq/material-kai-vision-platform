@@ -79,7 +79,7 @@ describe('the tenders service', () => {
    */
   it('copies quantities into a package but never rates', () => {
     const code = stripComments(SERVICE);
-    const fn = code.slice(code.indexOf('async addItemsFromSchedule('));
+    const fn = code.slice(code.indexOf('async linesFromProjectQuote('));
     const body = fn.slice(0, fn.indexOf('\n  },'));
     expect(body).toContain('quantity: l.quantity');
     expect(body).not.toMatch(/\brate\b/);
