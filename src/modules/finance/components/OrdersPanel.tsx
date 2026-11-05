@@ -1259,7 +1259,7 @@ export const NewOrderModal: React.FC<{
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>{preset.draft ? 'New pre-order' : isSales ? 'New sales order' : 'New purchase order'}</DialogTitle><DialogDescription className="sr-only">Order form.</DialogDescription></DialogHeader>
+        <DialogHeader><DialogTitle>{!isSales ? 'New purchase order' : preset.draft ? 'New pre-order' : 'New sales order'}</DialogTitle><DialogDescription className="sr-only">Order form.</DialogDescription></DialogHeader>
         <div className="space-y-5">
           <FormSection title="Order">
           <FormGrid>
@@ -1664,7 +1664,7 @@ export const NewOrderModal: React.FC<{
               Unless this is a cost of an order that already exists — then the button must not
               promise an order it is deliberately not going to create. */}
           <Button onClick={() => save(preset.draft ? 'draft' : 'confirmed')} disabled={busy}>
-            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {attachingToOrder ? 'Add to the order' : preset.draft ? 'Save pre-order' : 'Create order'}
+            {busy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null} {attachingToOrder ? 'Add to the order' : preset.draft ? (isSales ? 'Save pre-order' : 'Save as draft') : 'Create order'}
           </Button>
         </DialogFooter>
       </DialogContent>

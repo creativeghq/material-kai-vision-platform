@@ -18,6 +18,7 @@ import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { ToastAction } from '@/components/core/ui/toast';
 import { quoteUrl } from '@/modules/quotes/routes';
 import { humanizeLabel } from '@/utils/humanize';
@@ -606,7 +607,7 @@ const AddToQuoteDialog: React.FC<{
       });
       toast({
         title: 'Added to the quote',
-        description: 'The quantity comes from these confirmed measurements. Set the rate on the quote.',
+        description: 'The quantity comes from these confirmed measurements. Set the rate on the quote\'s Pricing tab.',
         action: <ToastAction altText="Open the quote" onClick={() => navigate(quoteUrl(res.quote_id))}>Open the quote</ToastAction>,
       });
       onSent();
@@ -619,6 +620,7 @@ const AddToQuoteDialog: React.FC<{
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent>
         <DialogHeader><DialogTitle>Add {rows.length} measurement{rows.length === 1 ? '' : 's'} to a quote</DialogTitle></DialogHeader>
+        <ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="A takeoff reaches the customer through a quote.">
         {units.length > 1 ? (
           <p className="text-sm text-destructive">A quote line has one unit and these are in {units.map(unitSuffix).join(', ')}. Add each unit separately.</p>
         ) : (
@@ -652,6 +654,7 @@ const AddToQuoteDialog: React.FC<{
             {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Add to quote
           </Button>
         </DialogFooter>
+        </ModuleTabGate>
       </DialogContent>
     </Dialog>
   );

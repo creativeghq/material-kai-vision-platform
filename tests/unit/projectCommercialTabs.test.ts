@@ -37,6 +37,11 @@ describe('one question per tab', () => {
     expect(QUOTES).toContain('canFinance && workspaceId');
   });
 
+  it('the Quotes module gates the team, never an invited client', () => {
+    expect(PAGE).toMatch(/value="quotes">\{isTeam \? <ModuleTabGate moduleSlug="quotes"/);
+    expect(read('src/modules/projects/components/TakeoffReviewer.tsx')).toContain('<ModuleTabGate moduleSlug="quotes"');
+  });
+
   it('Invoicing holds what comes in', () => {
     expect(INVOICING).toContain('<ApplicationsCard');
     expect(INVOICING).toContain('orderType="sales"');
