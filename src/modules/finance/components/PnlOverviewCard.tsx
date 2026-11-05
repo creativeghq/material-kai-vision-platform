@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowRight, Landmark, Scale } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { formatMoney } from '@/utils/decimal';
+import { todayLocalISO } from '@/utils/datetime';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { vatPayableLabel } from '@/modules/finance/vatReturn';
 import { byOrigin, byVatTreatment, type ExpenseSegmentRow } from '@/modules/finance/expenseSegments';
@@ -17,11 +18,13 @@ const TONE_BADGE: Record<PnlVerdict['tone'], 'success' | 'warning' | 'neutral'> 
 
 /**
  * One figure pointing two ways, and which way is the answer the operator came for. It states a
- * direction only when the figure is CERTAIN: over a partial period both halves are floors, and
- * the difference between two floors has no reliable sign.
+ * direction only when the figure is CERTAIN: over a partial or still-running period both halves
+ * are floors, and the difference between two floors has no reliable sign.
  */
 const vatLabel = (v: number | null, certain: boolean) =>
   certain ? vatPayableLabel(v) : 'VAT return';
+
+const docCount = (n: number) => `${n.toLocaleString()} document${n === 1 ? '' : 's'}`;
 
 /** `hasFigures` false renders the reason where the number would be. */
 const Figure: React.FC<{
@@ -99,7 +102,8 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
   const aadeVatReturn = overview?.aade_income_vat != null && overview?.aade_expense_vat != null
     ? Number(overview.aade_income_vat) - Number(overview.aade_expense_vat)
     : null;
-  const aadeVatCertain = overview?.aade_status !== 'partial';
+  const periodClosed = overview != null && overview.period_to < todayLocalISO();
+  const aadeVatCertain = overview?.aade_status !== 'partial' && periodClosed;
   const settleCcy = overview?.settlement_currency && overview.settlement_currency !== 'MIXED'
     ? overview.settlement_currency
     : ccy;
@@ -138,12 +142,12 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
                 sub={books.hasFigures ? 'from your documents' : undefined}
               />
               <Figure
-                label={vatLabel(overview?.books_vat_payable ?? null, books.hasFigures)}
+                label={vatLabel(overview?.books_vat_payable ?? null, books.hasFigures && periodClosed)}
                 value={overview?.books_vat_payable ?? null}
                 currency={ccy}
                 verdict={books}
                 sub={books.hasFigures && overview
-                  ? `${formatMoney(overview.books_vat_income, ccy)} collected − ${formatMoney(overview.books_vat_expense, ccy)} paid`
+                  ? `${formatMoney(overview.books_vat_income, ccy)} on sales − ${formatMoney(overview.books_vat_expense, ccy)} on purchases${periodClosed ? '' : ' · so far'}`
                   : undefined}
               />
             </div>
@@ -172,14 +176,14 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
                 value={overview?.aade_income_net ?? null}
                 currency="EUR"
                 verdict={aade}
-                sub={overview?.aade_income_docs != null ? `${overview.aade_income_docs.toLocaleString()} documents` : undefined}
+                sub={overview?.aade_income_docs != null ? docCount(overview.aade_income_docs) : undefined}
               />
               <Figure
                 label="Expenses — ΑΑΔΕ"
                 value={overview?.aade_expense_net ?? null}
                 currency="EUR"
                 verdict={aade}
-                sub={overview?.aade_expense_docs != null ? `${overview.aade_expense_docs.toLocaleString()} documents` : undefined}
+                sub={overview?.aade_expense_docs != null ? docCount(overview.aade_expense_docs) : undefined}
               />
               <Figure
                 label="Net — ΑΑΔΕ"
@@ -197,7 +201,7 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
                 currency="EUR"
                 verdict={aade}
                 sub={aade.hasFigures && overview
-                  ? `${formatMoney(overview.aade_income_vat, 'EUR')} collected − ${formatMoney(overview.aade_expense_vat, 'EUR')} paid${aadeVatCertain ? '' : ' · so far'}`
+                  ? `${formatMoney(overview.aade_income_vat, 'EUR')} on sales − ${formatMoney(overview.aade_expense_vat, 'EUR')} on purchases${aadeVatCertain ? '' : ' · so far'}`
                   : undefined}
               />
             </div>
@@ -212,7 +216,7 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
                       <p className="text-xs font-medium">{g.label}</p>
                       <p className="mt-0.5 text-base font-semibold tabular-nums">{formatMoney(g.net, 'EUR')}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {g.docs.toLocaleString()} document{g.docs === 1 ? '' : 's'}
+                        {docCount(g.docs)}
                         {g.vat > 0 ? ` · ${formatMoney(g.vat, 'EUR')} VAT` : ''}
                       </p>
                     </div>
@@ -248,7 +252,7 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
               </p>
             )}
             <p className="flex flex-wrap items-center gap-x-2 border-t border-hairline bg-surface-sunken px-5 py-3 text-[11px] text-muted-foreground">
-              <span>Every document filed against your ΑΦΜ. It confirms your books — it is never added to them.</span>
+              <span>Documents filed against your ΑΦΜ, paid or not — not money received or paid. They confirm your books and are never added to them.</span>
               <Link to={financeTabUrl(FINANCE_TAB.mydataBook)} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
                 Open the ΑΑΔΕ book <ArrowRight className="h-3 w-3" />
               </Link>

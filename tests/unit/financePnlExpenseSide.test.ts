@@ -397,6 +397,15 @@ describe('the VAT return points the way it actually points', () => {
     expect(card, 'the sign logic is spelled out here again').not.toMatch(/v < 0 ? 'VAT refundable'/);
   });
 
+  it('never reads a filed document as cash, or a running period as a verdict', () => {
+    const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
+    expect(card, 'VAT stated on a document was neither collected nor paid').not.toMatch(/\} (collected|paid)\b/);
+    expect(card, 'a period still running states no direction').toMatch(/aadeVatCertain = [^;]*periodClosed/);
+    expect(card).toMatch(/books\.hasFigures && periodClosed/);
+    expect(card, 'the ΑΑΔΕ strip says it is not cash').toMatch(/not money received or paid/);
+    expect(card, 'the count is singular for one').not.toMatch(/toLocaleString\(\)\} documents/);
+  });
+
   it('renders the ΑΑΔΕ VAT it already fetches', () => {
     const card = strippedSource('src/modules/finance/components/PnlOverviewCard.tsx');
     // Both halves were returned by the RPC and neither reached the screen, so the one authority
