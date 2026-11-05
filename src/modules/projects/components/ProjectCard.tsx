@@ -134,7 +134,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({ project: p, cover }) =
               {deadline.label}
             </span>
           ) : (
-            <span className="ml-auto inline-flex items-center gap-1" title="Last activity">
+            <span className="ml-auto inline-flex items-center gap-1" title="Last Activity">
               <Clock className="h-3.5 w-3.5" aria-hidden="true" />
               {timeAgo(p.last_activity_at)}
             </span>

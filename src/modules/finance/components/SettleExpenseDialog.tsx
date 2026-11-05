@@ -136,7 +136,7 @@ export const SettleExpenseDialog: React.FC<Props> = ({ workspaceId, doc, open, o
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label>Paid from</Label>
+            <Label>Paid From</Label>
             <Select value={accountId} onValueChange={setAccountId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -184,7 +184,7 @@ export const SettleExpenseDialog: React.FC<Props> = ({ workspaceId, doc, open, o
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label htmlFor="settle-date">Paid on</Label>
+              <Label htmlFor="settle-date">Paid On</Label>
               <Input id="settle-date" type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
             </div>
             {!outside && (

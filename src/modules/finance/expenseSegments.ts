@@ -24,20 +24,20 @@ export interface ExpenseSegmentRow {
 
 const KIND: Record<ExpenseKind, { label: string; detail: string }> = {
   purchase: { label: 'Purchases', detail: 'Invoices a supplier issued to you.' },
-  retail: { label: 'Retail & self-recorded', detail: 'Till receipts and the expenses you record against yourself.' },
-  cross_border: { label: 'From outside Greece', detail: 'The supplier charged no VAT. You declare it and reclaim it in the same return.' },
+  retail: { label: 'Retail & Self-Recorded', detail: 'Till receipts and the expenses you record against yourself.' },
+  cross_border: { label: 'From Outside Greece', detail: 'The supplier charged no VAT. You declare it and reclaim it in the same return.' },
   contract: { label: 'Contracts', detail: 'A contract recorded as an expense.' },
   rent: { label: 'Rent', detail: 'Rent your landlord filed. No VAT by nature.' },
-  entity: { label: 'Your own entries', detail: 'Payroll, depreciation and the year-end regularisations. ΑΑΔΕ keeps these out of their expense book.' },
-  credit_note: { label: 'Supplier credit notes', detail: 'These REDUCE an expense rather than being one.' },
-  movement: { label: 'Delivery notes', detail: 'Goods moved, no money stated.' },
-  other: { label: 'Other documents', detail: 'Payment receipts and levies — not a purchase.' },
+  entity: { label: 'Your Own Entries', detail: 'Payroll, depreciation and the year-end regularisations. ΑΑΔΕ keeps these out of their expense book.' },
+  credit_note: { label: 'Supplier Credit Notes', detail: 'These REDUCE an expense rather than being one.' },
+  movement: { label: 'Delivery Notes', detail: 'Goods moved, no money stated.' },
+  other: { label: 'Other Documents', detail: 'Payment receipts and levies — not a purchase.' },
 };
 
 const TREATMENT: Record<VatTreatment, { label: string; detail: string }> = {
   standard: { label: 'VAT charged', detail: 'The supplier charged VAT and you deduct it.' },
   zero_rated: { label: 'No VAT charged', detail: 'A document with value and no VAT on it — exempt, or the supplier is outside the VAT system.' },
-  reverse_charge: { label: 'Reverse charge', detail: 'No VAT on the document. You declare it as output and reclaim it as input, so the pair nets to nothing.' },
+  reverse_charge: { label: 'Reverse Charge', detail: 'No VAT on the document. You declare it as output and reclaim it as input, so the pair nets to nothing.' },
   no_vat: { label: 'Outside VAT', detail: 'Rent, contracts and your own entries carry no VAT at all.' },
   none: { label: 'No value', detail: 'Nothing to tax — a delivery note states goods, not money.' },
 };

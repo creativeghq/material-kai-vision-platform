@@ -129,11 +129,11 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
               )}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                 <Figure label="Backlinks" value={s.backlinks} status={blStatus} />
-                <Figure label="Referring domains" value={s.referring_domains} status={blStatus} />
-                <Figure label="Referring main domains" value={s.referring_main_domains} status={blStatus} />
-                <Figure label="Domain rank" value={s.domain_rank} status={blStatus} />
-                <Figure label="Spam score" value={s.spam_score} status={blStatus} />
-                <Figure label="Broken backlinks" value={s.broken_backlinks} status={blStatus} />
+                <Figure label="Referring Domains" value={s.referring_domains} status={blStatus} />
+                <Figure label="Referring Main Domains" value={s.referring_main_domains} status={blStatus} />
+                <Figure label="Domain Rank" value={s.domain_rank} status={blStatus} />
+                <Figure label="Spam Score" value={s.spam_score} status={blStatus} />
+                <Figure label="Broken Backlinks" value={s.broken_backlinks} status={blStatus} />
               </div>
             </>
           )}
@@ -143,7 +143,7 @@ export const WebsiteDomainIntelPanel: React.FC<{ website: UserWebsite }> = ({ we
       {s && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Referring domains</CardTitle>
+            <CardTitle className="text-base">Referring Domains</CardTitle>
             <CardDescription>One link per linking site, strongest site first.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">

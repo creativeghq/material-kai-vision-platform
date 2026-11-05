@@ -35,18 +35,18 @@ export type AgentEvalFailureClass = (typeof AGENT_EVAL_FAILURE_CLASSES)[number];
 
 export const AGENT_EVAL_FAILURE_CLASS_LABELS: Record<AgentEvalFailureClass, string> = {
   transport: 'Could not reach the agent',
-  turn_error: 'The turn errored',
-  empty_reply: 'Empty reply',
-  expected_tool_not_called: 'Expected tool not called',
-  expected_tool_failed: 'Expected tool failed',
-  expected_tool_empty: 'Expected tool returned nothing',
-  forbidden_tool_called: 'Forbidden tool called',
+  turn_error: 'The Turn Errored',
+  empty_reply: 'Empty Reply',
+  expected_tool_not_called: 'Expected Tool Not Called',
+  expected_tool_failed: 'Expected Tool Failed',
+  expected_tool_empty: 'Expected Tool Returned Nothing',
+  forbidden_tool_called: 'Forbidden Tool Called',
   reply_missing_fact: 'Reply missing a required fact',
   reply_forbidden_text: 'Reply contains forbidden text',
   hedged: 'Reply hedged',
-  framework_on_factual: 'Framework on a factual question',
-  too_slow: 'Too slow',
-  over_budget: 'Over budget',
+  framework_on_factual: 'Framework on a Factual Question',
+  too_slow: 'Too Slow',
+  over_budget: 'Over Budget',
   invalid_case: 'Case is malformed',
 };
 

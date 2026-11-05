@@ -55,7 +55,7 @@ const definition: ModuleDefinition = {
   // where to deliver events, and showing whether the plan still has a profile left for the
   // next tenant. Same panel on the Messaging module — one Zernio account serves both.
   settingsPanels: [
-    { id: 'delivery', label: 'Delivery & plan', icon: Webhook, component: ZernioWebhookPanel },
+    { id: 'delivery', label: 'Delivery & Plan', icon: Webhook, component: ZernioWebhookPanel },
   ],
 };
 

@@ -88,7 +88,7 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
   const summaryChips: { label: string; value: number; tone: string }[] = [];
   if (failureSummary.products_failed > 0) {
     summaryChips.push({
-      label: 'Products failed',
+      label: 'Products Failed',
       value: failureSummary.products_failed,
       tone: 'border-red-500/40 bg-red-500/10 text-red-300',
     });

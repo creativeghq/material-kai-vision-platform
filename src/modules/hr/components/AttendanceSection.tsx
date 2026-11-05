@@ -224,7 +224,7 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
             <Row label="Require a PIN" hint="Always on — a VAT number alone is not proof of identity. Set each employee's PIN in HR → Employees."><Switch checked disabled /></Row>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label className="text-xs">Timezone</Label><Input value={s.timezone} onChange={(e) => set('timezone', e.target.value)} className="font-mono text-sm" /></div>
-              <div className="space-y-1"><Label className="text-xs">Late grace (min)</Label><Input type="number" min={0} value={s.late_grace_minutes} onChange={(e) => set('late_grace_minutes', Number(e.target.value) || 0)} /></div>
+              <div className="space-y-1"><Label className="text-xs">Late Grace (Min)</Label><Input type="number" min={0} value={s.late_grace_minutes} onChange={(e) => set('late_grace_minutes', Number(e.target.value) || 0)} /></div>
             </div>
           </div>
 
@@ -236,7 +236,7 @@ function SettingsDialog({ workspaceId, settings, onSaved }: { workspaceId: strin
             <Row label="Notify finance / admins" hint="Bell + email"><Switch checked={s.notify_finance} onCheckedChange={(v) => set('notify_finance', v)} /></Row>
             {candidates.length > 0 && (
               <div className="space-y-1">
-                <Label className="text-xs">Also notify (bell + email)</Label>
+                <Label className="text-xs">Also Notify (Bell + Email)</Label>
                 <div className="rounded-md border border-border/60 divide-y divide-border/40 max-h-40 overflow-y-auto">
                   {candidates.map((c) => (
                     <label key={c.user_id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer">

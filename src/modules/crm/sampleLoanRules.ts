@@ -12,7 +12,7 @@ export const LOAN_STATUS_LABEL: Record<LoanStatus, string> = {
   out: 'Out with the customer',
   returned: 'Returned',
   converted: 'Turned into an order',
-  written_off: 'Written off',
+  written_off: 'Written Off',
 };
 
 export interface SampleLoanRow {

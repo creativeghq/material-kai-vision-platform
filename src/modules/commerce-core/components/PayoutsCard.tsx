@@ -147,31 +147,31 @@ export const PayoutsCard: React.FC<{ workspaceId: string; connections: StoreConn
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Their reference</Label>
+              <Label>Their Reference</Label>
               <Input value={form.external_payout_id} onChange={(e) => setForm((f) => ({ ...f, external_payout_id: e.target.value }))} placeholder="Payout id" />
             </div>
             <div className="space-y-1">
-              <Label>Paid on</Label>
+              <Label>Paid On</Label>
               <Input type="date" value={form.paid_on} onChange={(e) => setForm((f) => ({ ...f, paid_on: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label>Period from</Label>
+              <Label>Period From</Label>
               <Input type="date" value={form.period_start} onChange={(e) => setForm((f) => ({ ...f, period_start: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label>Period to</Label>
+              <Label>Period To</Label>
               <Input type="date" value={form.period_end} onChange={(e) => setForm((f) => ({ ...f, period_end: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label>Gross collected</Label>
+              <Label>Gross Collected</Label>
               <Input type="number" step="0.01" value={form.gross} onChange={(e) => setForm((f) => ({ ...f, gross: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label>Commission and fees</Label>
+              <Label>Commission and Fees</Label>
               <Input type="number" step="0.01" value={form.fees} onChange={(e) => setForm((f) => ({ ...f, fees: e.target.value }))} />
             </div>
             <div className="space-y-1">
-              <Label>Net received</Label>
+              <Label>Net Received</Label>
               <Input type="number" step="0.01" value={form.net} onChange={(e) => setForm((f) => ({ ...f, net: e.target.value }))} placeholder="gross − fees" />
             </div>
             <div className="flex items-end gap-2">

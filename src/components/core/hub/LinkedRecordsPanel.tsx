@@ -41,7 +41,7 @@ export const LinkedRecordsPanel: React.FC<LinkedRecordsPanelProps> = ({ kind, id
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle>Linked records</CardTitle>
+        <CardTitle>Linked Records</CardTitle>
       </CardHeader>
       <CardContent className="p-0">
         {failed ? (

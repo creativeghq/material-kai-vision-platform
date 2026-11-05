@@ -76,7 +76,7 @@ export const ProductPackagingCard: React.FC<{ productId: string; workspaceId: st
       </div>
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
-        <Field label="Counted in">
+        <Field label="Counted In">
           <Select value={baseUnit} onValueChange={setBaseUnit}>
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -84,11 +84,11 @@ export const ProductPackagingCard: React.FC<{ productId: string; workspaceId: st
             </SelectContent>
           </Select>
         </Field>
-        <Field label="Pieces per box">
+        <Field label="Pieces per Box">
           <Input className="h-8 text-xs" inputMode="decimal" value={piecesPerBox}
             onChange={(e) => setPiecesPerBox(e.target.value)} placeholder="—" />
         </Field>
-        <Field label="Boxes per pallet">
+        <Field label="Boxes per Pallet">
           <Input className="h-8 text-xs" inputMode="decimal" value={boxesPerPallet}
             onChange={(e) => setBoxesPerPallet(e.target.value)} placeholder="—" />
         </Field>
@@ -111,7 +111,7 @@ export const ProductPackagingCard: React.FC<{ productId: string; workspaceId: st
         <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1">Derived</div>
         <Derived label="m² per piece" value={derivedM2} suffix="m²"
           note={derivedFromGeometry ? 'from the product size' : m2Override.trim() ? 'override' : undefined} />
-        <Derived label="Pieces per pallet" value={uom?.pieces_per_pallet ?? null} />
+        <Derived label="Pieces per Pallet" value={uom?.pieces_per_pallet ?? null} />
         <Derived label="m² per box" value={uom?.m2_per_box ?? null} suffix="m²" />
         <Derived label="m² per pallet" value={uom?.m2_per_pallet ?? null} suffix="m²" />
         {!canConvertArea && (

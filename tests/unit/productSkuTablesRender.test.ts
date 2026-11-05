@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { SkuTableCard } from '@/components/features/products/SkuTableCard';
 import { toSkuTable } from '@/components/features/products/productSkuTable';
 
-const HEADERS = ['Item code', 'Colour', 'Size (cm)', 'Pieces per box', 'Status', 'Availability'];
+const HEADERS = ['Item code', 'Colour', 'Size (cm)', 'Pieces per Box', 'Status', 'Availability'];
 
 function table(rowCount: number) {
   const rows = Array.from({ length: rowCount }, (_, i) => [
@@ -68,7 +68,7 @@ describe('the item table card', () => {
   it('says so when a table was flagged for review', () => {
     const t = toSkuTable({ id: 'r', headers: ['Item code'], table_data: { rows: [['1']] }, extractor: 'pymupdf-text', metadata: { title: 'T', needs_review: true } });
     if (!t) throw new Error('table did not parse');
-    expect(renderToStaticMarkup(createElement(SkuTableCard, { table: t, hexByName: {} }))).toContain('Needs review');
-    expect(render(5)).not.toContain('Needs review');
+    expect(renderToStaticMarkup(createElement(SkuTableCard, { table: t, hexByName: {} }))).toContain('Needs Review');
+    expect(render(5)).not.toContain('Needs Review');
   });
 });

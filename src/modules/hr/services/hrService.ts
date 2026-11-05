@@ -25,7 +25,7 @@ import type {
   AppStage, DocType,
 } from '../hrVocabulary';
 export type PayBasis = 'monthly' | 'hourly';
-export const PAY_BASIS_LABELS: Record<PayBasis, string> = { monthly: 'Monthly salary', hourly: 'Hourly rate' };
+export const PAY_BASIS_LABELS: Record<PayBasis, string> = { monthly: 'Monthly Salary', hourly: 'Hourly Rate' };
 export type AbsenceStatus = 'pending' | 'approved' | 'rejected';
 
 export interface EmployeeContact {
@@ -150,7 +150,7 @@ export const EMPLOYMENT_TYPE_LABELS: Record<EmploymentType, string> = {
 };
 export const EMPLOYEE_STATUS_LABELS: Record<EmployeeStatus, string> = {
   active: 'Active',
-  on_leave: 'On leave',
+  on_leave: 'On Leave',
   terminated: 'Terminated',
 };
 export const ABSENCE_TYPE_LABELS: Record<AbsenceType, string> = {
@@ -237,7 +237,7 @@ export interface Reconciliation { matches: ReconMatch[]; discrepancies?: string[
 // routing group only; `doc_kind` itself is a free-text label the AI names per document.
 export const ACCT_KIND_GROUP_LABELS: Record<string, string> = {
   efka_payment: 'EFKA', tax_payment: 'Tax (ΦΜΥ)', apd: 'APD', payslip: 'Payslip',
-  bonus: 'Bonus (Δώρο)', allowance: 'Allowance', auxiliary_fund: 'Auxiliary fund', other: 'Other',
+  bonus: 'Bonus (Δώρο)', allowance: 'Allowance', auxiliary_fund: 'Auxiliary Fund', other: 'Other',
 };
 
 // Employee self-service (the caller's OWN record only)

@@ -169,7 +169,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
                 {/* Which document sends now use this template instead of the built-in body. This
                     is the answer to "I designed a template — how do I actually send with it?":
                     before it existed a template could only ever brand a campaign. */}
-                <th className="text-left py-3 px-4 font-medium">Used for</th>
+                <th className="text-left py-3 px-4 font-medium">Used For</th>
                 <th className="text-right py-3 px-4 font-medium">Actions</th>
               </tr>
             </thead>
@@ -261,7 +261,7 @@ export const MarketingTemplatesTab: React.FC<{ workspaceId: string }> = ({ works
         <DialogContent className="max-w-lg">
           <DialogHeader><DialogTitle>New Email Template</DialogTitle></DialogHeader>
           <div className="space-y-4">
-            <FormField label="Template name" htmlFor="tpl-name">
+            <FormField label="Template Name" htmlFor="tpl-name">
               <Input id="tpl-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Summer Newsletter" autoFocus />
             </FormField>
             <FormField label="Description" htmlFor="tpl-desc" optional>

@@ -132,7 +132,7 @@ export const MoneyOutCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
           <div className="mb-2 flex items-center gap-2 text-sm font-medium"><Link2 className="h-3.5 w-3.5" /> Payout link</div>
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-40 flex-1 space-y-1">
-              <Label className="text-xs" htmlFor="mo-link-name">Recipient name</Label>
+              <Label className="text-xs" htmlFor="mo-link-name">Recipient Name</Label>
               <Input id="mo-link-name" value={linkName} onChange={(e) => setLinkName(e.target.value)} placeholder="As known to Revolut" />
             </div>
             <div className="w-40 space-y-1">

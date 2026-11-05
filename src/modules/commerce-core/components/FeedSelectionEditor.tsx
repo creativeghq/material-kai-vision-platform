@@ -10,9 +10,9 @@ import {
 } from '@/services/commerce/productFeedsService';
 
 const MODES: { value: FeedSelectionMode; label: string; hint: string }[] = [
-  { value: 'all_published', label: 'Everything published', hint: 'Every product with a published price.' },
-  { value: 'category', label: 'Chosen categories', hint: 'Only products filed under the categories you pick.' },
-  { value: 'products', label: 'Chosen products', hint: 'Only the products you pick, one by one.' },
+  { value: 'all_published', label: 'Everything Published', hint: 'Every product with a published price.' },
+  { value: 'category', label: 'Chosen Categories', hint: 'Only products filed under the categories you pick.' },
+  { value: 'products', label: 'Chosen Products', hint: 'Only the products you pick, one by one.' },
 ];
 
 export const FeedSelectionEditor: React.FC<{ feed: ProductFeed; onSaved: () => void }> = ({ feed, onSaved }) => {

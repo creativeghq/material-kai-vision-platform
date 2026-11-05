@@ -82,7 +82,7 @@ function buildParticipantLabels(
       const prof = p.user_id ? profMap[p.user_id] : undefined;
       next.set(p.id, {
         // Their NAME, not "You": a shared inbox is read by the whole team.
-        label: prof?.full_name || prof?.email || (isMe ? 'You' : 'Team member'),
+        label: prof?.full_name || prof?.email || (isMe ? 'You' : 'Team Member'),
         kind: 'member', userId: p.user_id, avatarUrl: prof?.avatar_url ?? channelAvatarUrl,
         avatarSlot: castSlotFor(p.id, nameGender(prof?.full_name)),
       });
@@ -97,7 +97,7 @@ function buildParticipantLabels(
 }
 
 type RowAction = 'done' | 'open' | 'archive' | 'restore';
-const ROW_ACTION_VERB: Record<RowAction, string> = { done: 'Marked done', open: 'Reopened', archive: 'Deleted', restore: 'Restored' };
+const ROW_ACTION_VERB: Record<RowAction, string> = { done: 'Marked Done', open: 'Reopened', archive: 'Deleted', restore: 'Restored' };
 function isRowAction(a: string): a is RowAction { return a in ROW_ACTION_VERB; }
 function runRowAction(id: string, a: RowAction): Promise<unknown> {
   if (a === 'archive') return inboxApi.archiveThread(id);
@@ -427,7 +427,7 @@ export function useInboxPage() {
       return;
     }
     setBulkBusy(true);
-    const verbs = { ...ROW_ACTION_VERB, read: 'Marked read', delete_forever: 'Deleted permanently', label: 'Labelled', assign_me: 'Assigned to you', follow_up: 'Follow-up set' } as const;
+    const verbs = { ...ROW_ACTION_VERB, read: 'Marked read', delete_forever: 'Deleted Permanently', label: 'Labelled', assign_me: 'Assigned to you', follow_up: 'Follow-Up Set' } as const;
     try {
       const r = await runBulk(ids, (id) => {
         if (action === 'read') return inboxApi.markRead(id);

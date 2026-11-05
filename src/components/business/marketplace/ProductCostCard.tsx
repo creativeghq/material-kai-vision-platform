@@ -55,12 +55,12 @@ export const ProductCostCard: React.FC<{ productId: string }> = ({ productId }) 
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4 text-xs">
         <Fact
-          label="Purchase cost"
+          label="Purchase Cost"
           value={row.cost != null ? formatMoney(Number(row.cost), row.cost_currency ?? 'EUR') : null}
         />
-        <Fact label="Bought from" value={row.supplier?.name} />
+        <Fact label="Bought From" value={row.supplier?.name} />
         <Fact label="Brand" value={row.brand?.name} />
-        <Fact label="Their code" value={row.external_sku} />
+        <Fact label="Their Code" value={row.external_sku} />
       </div>
     </div>
   );

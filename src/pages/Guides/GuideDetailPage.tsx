@@ -107,7 +107,7 @@ function StepsEditor({ row, guide, pageUrls, onChange, locked }: { row: Installa
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>{selected ? `Step ${selected}` : 'The kit'}</CardTitle>
+          <CardTitle>{selected ? `Step ${selected}` : 'The Kit'}</CardTitle>
           <p className="text-xs text-muted-foreground">
             {locked
               ? 'Published, so this is read-only. Unpublish the guide to correct a step.'
@@ -154,7 +154,7 @@ function PartsEditor({ guide, onChange, locked }: { guide: InstallationGuideData
   return (
     <Card>
       <CardHeader>
-        <CardTitle>The kit</CardTitle>
+        <CardTitle>The Kit</CardTitle>
         <p className="text-xs text-muted-foreground">{locked ? 'Published, so this is read-only. Unpublish the guide to correct a part.' : 'Names, printed part numbers and counts, as read from the manual. Correct anything it misread.'}</p>
       </CardHeader>
       <fieldset disabled={locked} className="min-w-0">
@@ -362,7 +362,7 @@ export default function GuideDetailPage() {
       icon={BookOpen}
       title={g?.title || row.title}
       subtitle={row.status === 'review' ? 'Check the parts and steps, then publish.' : undefined}
-      breadcrumbs={[{ label: 'Installation guides', to: '/guides' }, { label: g?.title || row.title }]}
+      breadcrumbs={[{ label: 'Installation Guides', to: '/guides' }, { label: g?.title || row.title }]}
       actions={g ? (
         <div className="flex gap-2">
           <Button variant="outline" disabled={!dirty || saving} onClick={() => save()}>Save changes</Button>

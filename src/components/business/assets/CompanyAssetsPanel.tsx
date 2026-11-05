@@ -274,13 +274,13 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
       ),
     },
     {
-      id: 'holder', header: 'Held by', sortable: true, hideBelow: 'md',
+      id: 'holder', header: 'Held By', sortable: true, hideBelow: 'md',
       cell: (a) => (a.current_holder?.assignee_name
         ? <span>{a.current_holder.assignee_name}<span className="text-xs text-muted-foreground"> ({a.current_holder.assignee_kind})</span></span>
         : <span className="text-muted-foreground">Unassigned</span>),
     },
     {
-      id: 'recurring', header: 'Recurring cost', sortable: true, hideBelow: 'lg',
+      id: 'recurring', header: 'Recurring Cost', sortable: true, hideBelow: 'lg',
       cell: (a) => (a.recurring_expense_label
         ? <span className="block max-w-[14rem] truncate text-xs text-muted-foreground" title={a.recurring_expense_label}>{a.recurring_expense_label}</span>
         : <HubCellEmpty />),
@@ -414,7 +414,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                 <FormField label="Acquired">
                   <Input type="date" value={form.acquired_at || ''} onChange={(e) => setForm((f) => ({ ...f, acquired_at: e.target.value }))} />
                 </FormField>
-                <FormField label="Supplier / lessor" optional>
+                <FormField label="Supplier / Lessor" optional>
                   <Select value={form.supplier_company_id || 'none'} onValueChange={(v) => setForm((f) => ({ ...f, supplier_company_id: v === 'none' ? null : v }))}>
                     <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                     <SelectContent>
@@ -425,7 +425,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                 </FormField>
                 {showLease && (
                   <FormField
-                    label="Recurring cost"
+                    label="Recurring Cost"
                     optional
                     hint={recurring.length === 0
                       ? 'Links the monthly lease/plan expense. No recurring expenses yet — create one under Finance → Expenses to link the lease cost.'
@@ -453,16 +453,16 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                       <SelectContent>
                         <SelectItem value="none">None</SelectItem>
                         <SelectItem value="straight_line">Straight-line</SelectItem>
-                        <SelectItem value="declining_balance">Declining balance</SelectItem>
+                        <SelectItem value="declining_balance">Declining Balance</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormField>
                   {depreciates(form.depreciation_method) && (
                     <>
-                      <FormField label="Useful life (months)" className="sm:col-start-1">
+                      <FormField label="Useful Life (Months)" className="sm:col-start-1">
                         <Input type="number" min="1" value={form.useful_life_months ?? ''} onChange={(e) => setForm((f) => ({ ...f, useful_life_months: e.target.value ? parseInt(e.target.value, 10) : null }))} />
                       </FormField>
-                      <FormField label="Salvage value">
+                      <FormField label="Salvage Value">
                         <Input value={salvageText} onChange={(e) => setSalvageText(e.target.value)} placeholder="0,00" />
                       </FormField>
                       <FormField label="Start">
@@ -473,7 +473,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                   )}
                 </FormGrid>
                 <FormGrid className="border-t border-hairline pt-3">
-                  <FormField label="Tax category (άρθρο 24)">
+                  <FormField label="Tax Category (άρθρο 24)">
                     <Select
                       value={form.tax_category_code || 'none'}
                       onValueChange={(v) => setForm((f) => ({ ...f, tax_category_code: v === 'none' ? null : v }))}
@@ -487,7 +487,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                       </SelectContent>
                     </Select>
                   </FormField>
-                  <FormField label="Put into use on">
+                  <FormField label="Put into Use On">
                     <Input
                       type="date" value={form.tax_placed_in_service_on || ''}
                       onChange={(e) => setForm((f) => ({ ...f, tax_placed_in_service_on: e.target.value }))}

@@ -354,7 +354,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                 <Input value={form.subtitle} onChange={(e) => setForm({ ...form, subtitle: e.target.value })} placeholder="e.g. Modern Bathroom Design" />
               </div>
               <div className="space-y-1.5">
-                <Label>Client name</Label>
+                <Label>Client Name</Label>
                 <Input value={form.clientName} onChange={(e) => setForm({ ...form, clientName: e.target.value })} placeholder="Prepared for…" />
               </div>
               <div className="space-y-1.5">
@@ -422,9 +422,9 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
             {/* Online embeds */}
             <div className="grid sm:grid-cols-2 gap-3">
               <ToggleRow label="3D walkthrough (Marble)" desc="Embed an explorable 3D world in the online version" checked={form.embedVr} onChange={(v) => setForm({ ...form, embedVr: v })} />
-              <ToggleRow label="Lighting moods" desc="Let the client preview the render under different lighting" checked={form.embedLighting} onChange={(v) => setForm({ ...form, embedLighting: v })} />
-              <ToggleRow label="Live FF&E pricing" desc="Show an interactive FF&E table from a quote" checked={form.embedFfe} onChange={(v) => setForm({ ...form, embedFfe: v })} />
-              <ToggleRow label="Client feedback" desc="Allow inline approve / comment on the online page" checked={form.feedbackEnabled} onChange={(v) => setForm({ ...form, feedbackEnabled: v })} />
+              <ToggleRow label="Lighting Moods" desc="Let the client preview the render under different lighting" checked={form.embedLighting} onChange={(v) => setForm({ ...form, embedLighting: v })} />
+              <ToggleRow label="Live FF&E Pricing" desc="Show an interactive FF&E table from a quote" checked={form.embedFfe} onChange={(v) => setForm({ ...form, embedFfe: v })} />
+              <ToggleRow label="Client Feedback" desc="Allow inline approve / comment on the online page" checked={form.feedbackEnabled} onChange={(v) => setForm({ ...form, feedbackEnabled: v })} />
             </div>
 
             {/* Embed sources */}
@@ -472,7 +472,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                   screenshot. Attached here rather than given its own share token: this surface
                   already carries the expiry, the counter and the revoke. */}
               <ToggleRow
-                label="Room plan"
+                label="Room Plan"
                 desc="Show the floor plan you arranged, at real size"
                 checked={form.embedRoomPlan}
                 onChange={(v) => setForm({ ...form, embedRoomPlan: v })}

@@ -474,9 +474,9 @@ const FinancialSnapshotCard: React.FC<CompanyMarketTabProps> = ({ workspaceId, c
             ) : hasBooked ? (
               <>
                 <div className="grid grid-cols-3 gap-3">
-                  <StatCell label="Billed to us" value={billMoney(account!.billedTotal)} />
+                  <StatCell label="Billed to Us" value={billMoney(account!.billedTotal)} />
                   <StatCell label="Paid to them" value={billMoney(account!.paidTotal)} />
-                  <StatCell label="We owe" value={billMoney(account!.outstandingTotal)} accent={account!.outstandingTotal > 0} />
+                  <StatCell label="We Owe" value={billMoney(account!.outstandingTotal)} accent={account!.outstandingTotal > 0} />
                 </div>
                 {!billCurrency && (
                   <p className="text-xs text-muted-foreground">
@@ -650,7 +650,7 @@ const MarketPositionCard: React.FC<{ stats: MarketStatsResult }> = ({ stats }) =
               <StatCell label="Products" value={String(data!.product_count)} />
               <StatCell label="Views" value={formatNumber(views)} />
               <StatCell label="Saves" value={formatNumber(saves)} />
-              <StatCell label="Quote adds" value={formatNumber(quotes)} />
+              <StatCell label="Quote Adds" value={formatNumber(quotes)} />
             </div>
 
             {(ours || embedViews > 0) && (

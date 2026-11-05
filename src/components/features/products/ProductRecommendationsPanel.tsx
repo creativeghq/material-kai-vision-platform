@@ -25,8 +25,8 @@ interface ProductRecommendationsPanelProps {
 /** Labels for the `product_edges` edge types the read RPC returns. */
 const EDGE_LABEL: Record<ProductEdgeType, string> = {
   collection:      'Same collection',
-  material_family: 'Same material',
-  pattern_match:   'Matching finish',
+  material_family: 'Same Material',
+  pattern_match:   'Matching Finish',
   alternative:     'Similar spec',
   complementary:   'Pairs with',
 };

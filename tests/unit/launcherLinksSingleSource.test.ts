@@ -91,7 +91,7 @@ describe('appLinkSet', () => {
   it('a section behind a capability is withheld from a person who lacks it', () => {
     const gate: LinkGate = { ...OPEN, can: () => false };
     const labels = appLinkSet(app('seo-websites'), gate).sections.map((s) => s.label);
-    expect(labels).toEqual(['Connected websites']);
+    expect(labels).toEqual(['Connected Websites']);
   });
 
   it('an agent app with no sections falls back to its toolkit quick-starts, each resolved to a URL', () => {

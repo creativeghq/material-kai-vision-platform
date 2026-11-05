@@ -30,12 +30,12 @@ const ISSUE_COPY: Record<string, { label: string; why: string; fix: string }> = 
     fix: 'Find the instruction named per page below and remove it: the Disallow line in robots.txt, the <meta name="robots" content="noindex"> tag, the X-Robots-Tag response header, or the rel="nofollow"/noindex attribute. Keep it only where the page really should stay out of search (cart, account, internal search).',
   },
   broken_link: {
-    label: 'Broken links',
+    label: 'Broken Links',
     why: 'Links pointing at pages that no longer resolve. They waste crawl budget and dead-end real visitors.',
     fix: 'On each source page, point the link at the page that replaced the target, or remove it. If the target should exist, restore it or 301-redirect the old URL.',
   },
   redirect_chain: {
-    label: 'Redirect chains',
+    label: 'Redirect Chains',
     why: 'A page redirecting to a page that redirects again. Each hop loses a little ranking signal and adds latency.',
     fix: 'Make the first URL redirect straight to the final one (a single 301), then update internal links, the sitemap and canonical tags to use the final URL so nothing goes through the chain at all. A loop must be broken by hand.',
   },
@@ -50,7 +50,7 @@ const ISSUE_COPY: Record<string, { label: string; why: string; fix: string }> = 
     fix: 'Pick the page that should rank, add <link rel="canonical"> on the others pointing at it, and rewrite the ones that need to exist in their own right so they say something the canonical does not.',
   },
   error_page: {
-    label: 'Pages returning an error',
+    label: 'Pages Returning an Error',
     why: 'The crawler received a 4xx or 5xx status for these URLs, so they cannot be indexed and any link to them is a dead end.',
     fix: 'For a 404, restore the page or 301 it to its replacement and remove links to it. For a 5xx, read the server or application log for that URL — it is a crash, not a content problem.',
   },

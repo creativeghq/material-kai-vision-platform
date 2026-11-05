@@ -70,7 +70,7 @@ export const InboxAgentSettingsButton: React.FC<{ workspaceId: string }> = ({ wo
             <>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <Label className="text-sm">Auto-respond to new chats</Label>
+                  <Label className="text-sm">Auto-Respond to New Chats</Label>
                   {/* Off by default and spelled out, because the cost of a wrong guess here is
                       paid by the CUSTOMER, not by the operator: the assistant writes to them
                       under the business's name and a sent message cannot be unsent. */}
@@ -256,7 +256,7 @@ export const MyEmailAddressSection: React.FC<{ workspaceId: string }> = ({ works
           </button>
           <div className="flex items-start justify-between gap-3">
             <div>
-              <Label className="text-sm">Assistant answers email</Label>
+              <Label className="text-sm">Assistant Answers Email</Label>
               <div className="text-xs text-muted-foreground">
                 Answers new mail sent here without waiting for you, when the workspace’s
                 auto-respond is on. Any single conversation can also be handed to it from its menu.

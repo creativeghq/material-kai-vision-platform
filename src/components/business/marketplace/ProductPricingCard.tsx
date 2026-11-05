@@ -128,7 +128,7 @@ export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId 
         {isRoot ? 'Catalog base price' : 'Your sell price'}
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Applies to</Label>
+        <Label className="text-xs">Applies To</Label>
         {/* Empty selection = the product-wide row, which is what every price was before #374.
             The picker offers only axes the registry calls identity for this product AND that
             genuinely have more than one value, so a product with no variants shows nothing. */}
@@ -175,11 +175,11 @@ export const ProductPricingCard: React.FC<{ productId: string }> = ({ productId 
         </div>
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Supply mode</Label>
+        <Label className="text-xs">Supply Mode</Label>
         <Select value={supplyMode} onValueChange={(v: any) => setSupplyMode(v)}>
           <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="platform_sold">Platform-sold (invoiced through the platform)</SelectItem>
+            <SelectItem value="platform_sold">Platform-Sold (Invoiced Through the Platform)</SelectItem>
             <SelectItem value="reference_only">Reference only (shown, transacted off-platform)</SelectItem>
           </SelectContent>
         </Select>

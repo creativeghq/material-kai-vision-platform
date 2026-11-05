@@ -11,9 +11,9 @@ import { storeProductOverlays, type StoreProductOverlay } from '@/services/embed
 const CUTOUT_BADGE: Record<StoreProductOverlay['cutout_status'], { label: string; variant: 'neutral' | 'info' | 'warning' | 'success' | 'error' }> = {
   none: { label: 'No cut-out', variant: 'neutral' },
   pending: { label: 'Queued', variant: 'info' },
-  ready: { label: 'Cut out', variant: 'success' },
+  ready: { label: 'Cut Out', variant: 'success' },
   failed: { label: 'Failed', variant: 'error' },
-  outdated: { label: 'Photo changed', variant: 'warning' },
+  outdated: { label: 'Photo Changed', variant: 'warning' },
 };
 
 export const StoreProductOverlaysPanel: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {

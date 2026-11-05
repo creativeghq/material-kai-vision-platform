@@ -281,7 +281,7 @@ const SectionHeading: React.FC<{ title: string; intro?: string | null }> = ({ ti
  */
 const SpecTables: React.FC<{ tables: SpecTable[] }> = ({ tables }) => (
   <section>
-    <SectionHeading title="Technical specification" />
+    <SectionHeading title="Technical Specification" />
     <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 'var(--grid-gap)' }}>
       {tables.map((t) => (
         <div key={t.title}>

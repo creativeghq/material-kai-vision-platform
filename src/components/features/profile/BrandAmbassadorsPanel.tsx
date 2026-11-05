@@ -117,7 +117,7 @@ export const BrandAmbassadorsPanel: React.FC<Props> = ({ workspaceId, mode, comp
                 help="Distinct material categories across every profile listing you."
               />
               <HubStatTile
-                label="Profile views" category="COMBINED REACH" value={reach}
+                label="Profile Views" category="COMBINED REACH" value={reach}
                 help="Total views of the public profiles that list this brand. Their audience, not the brand's."
               />
             </HubStatGrid>

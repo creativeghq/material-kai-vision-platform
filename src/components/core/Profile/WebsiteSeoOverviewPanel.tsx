@@ -352,7 +352,7 @@ export const WebsiteSeoOverviewPanel: React.FC<{
               <SeoMetricTile
                 descriptor={{
                   key: 'answered',
-                  label: 'Answered probes',
+                  label: 'Answered Probes',
                   format: 'count',
                   upIsGood: true,
                   help: 'Probes that returned a usable answer. The gap between this and probes sent is failed calls, not absent visibility.',
@@ -370,7 +370,7 @@ export const WebsiteSeoOverviewPanel: React.FC<{
               <SeoMetricTile
                 descriptor={{
                   key: 'avg_position',
-                  label: 'Avg. mention rank',
+                  label: 'Avg. Mention Rank',
                   format: 'position',
                   upIsGood: false,
                   help: 'Where you appear in the assistant\'s list when it does name you. Lower is better.',
@@ -388,7 +388,7 @@ export const WebsiteSeoOverviewPanel: React.FC<{
               <SeoMetricTile
                 descriptor={{
                   key: 'subjects',
-                  label: 'Subjects tracked',
+                  label: 'Subjects Tracked',
                   format: 'count',
                   upIsGood: true,
                   help: 'Brands and products being probed for this workspace.',

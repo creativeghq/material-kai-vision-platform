@@ -125,7 +125,7 @@ export const TakeoffTab: React.FC<{ projectId: string }> = ({ projectId }) => {
                     <th className="px-5 py-2 text-left">Drawing</th>
                     <th className="px-3 py-2 text-left">Status</th>
                     <th className="px-3 py-2 text-right">Pages</th>
-                    <th className="px-3 py-2 text-right">To review</th>
+                    <th className="px-3 py-2 text-right">To Review</th>
                     <th className="px-3 py-2 text-right">Confirmed</th>
                     <th className="px-5 py-2"><span className="sr-only">Actions</span></th>
                   </tr>

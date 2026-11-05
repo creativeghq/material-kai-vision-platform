@@ -172,7 +172,7 @@ export const LeadsPanel: React.FC<{ workspaceId: string | null }> = ({ workspace
                 <TableHead>Interest</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Est. value</TableHead>
+                <TableHead className="text-right">Est. Value</TableHead>
                 <TableHead className="text-right">Quotes</TableHead>
                 <TableHead>Follow-up</TableHead>
                 <TableHead>Received</TableHead>

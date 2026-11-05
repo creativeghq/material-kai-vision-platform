@@ -173,10 +173,10 @@ export const CatalogOperationsTab: React.FC = () => {
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
         <Stat icon={BookOpen} label="Catalogs" value={totals.catalogs} sub={`${totals.published} published`} />
-        <Stat icon={Mail} label="Unique emails" value={totals.unique_emails} />
-        <Stat icon={Eye} label="Page views" value={totals.page_views} />
+        <Stat icon={Mail} label="Unique Emails" value={totals.unique_emails} />
+        <Stat icon={Eye} label="Page Views" value={totals.page_views} />
         <Stat icon={FileDown} label="Downloads" value={totals.pdf_downloads} />
-        <Stat icon={Activity} label="Gate attempts" value={totals.gate_attempts} />
+        <Stat icon={Activity} label="Gate Attempts" value={totals.gate_attempts} />
         <Stat icon={ShieldAlert} label="Denied" value={totals.gate_denials} variant={totals.gate_denials > 0 ? 'destructive' : 'default'} />
       </div>
 
@@ -210,9 +210,9 @@ export const CatalogOperationsTab: React.FC = () => {
                       {sortHead('status', 'Status')}
                       {sortHead('views', 'Views', 'right')}
                       {sortHead('downloads', 'Downloads', 'right', 'hidden md:table-cell')}
-                      <TableHead className="hidden lg:table-cell text-right">Gate (granted/denied)</TableHead>
-                      {sortHead('emails', 'Unique emails', 'right', 'hidden md:table-cell')}
-                      {sortHead('last', 'Last activity', undefined, 'hidden sm:table-cell')}
+                      <TableHead className="hidden lg:table-cell text-right">Gate (Granted/Denied)</TableHead>
+                      {sortHead('emails', 'Unique Emails', 'right', 'hidden md:table-cell')}
+                      {sortHead('last', 'Last Activity', undefined, 'hidden sm:table-cell')}
                       <TableHead><span className="sr-only">Actions</span></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -266,9 +266,9 @@ export const CatalogOperationsTab: React.FC = () => {
                       <TableHead>When</TableHead>
                       <TableHead>Event</TableHead>
                       <TableHead>Email</TableHead>
-                      <TableHead className="hidden md:table-cell">Matched as</TableHead>
+                      <TableHead className="hidden md:table-cell">Matched As</TableHead>
                       <TableHead>Catalog</TableHead>
-                      <TableHead className="hidden lg:table-cell">User profile</TableHead>
+                      <TableHead className="hidden lg:table-cell">User Profile</TableHead>
                       <TableHead className="hidden lg:table-cell">IP</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -326,9 +326,9 @@ export const CatalogOperationsTab: React.FC = () => {
                       <TableHead>When</TableHead>
                       <TableHead>Email</TableHead>
                       <TableHead>Granted</TableHead>
-                      <TableHead className="hidden md:table-cell">Matched as</TableHead>
+                      <TableHead className="hidden md:table-cell">Matched As</TableHead>
                       <TableHead>Catalog</TableHead>
-                      <TableHead className="hidden lg:table-cell">User profile</TableHead>
+                      <TableHead className="hidden lg:table-cell">User Profile</TableHead>
                       <TableHead className="hidden lg:table-cell">IP</TableHead>
                     </TableRow>
                   </TableHeader>

@@ -46,7 +46,7 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
   onBusyChange,
   onSubmit,
   disabled,
-  nameLabel = 'Company name *',
+  nameLabel = 'Company Name *',
   namePlaceholder = 'e.g. Acme Tiles S.A.',
   autoFocusName,
   children,

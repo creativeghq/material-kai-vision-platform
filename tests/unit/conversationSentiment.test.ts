@@ -53,7 +53,7 @@ describe('conversation sentiment', () => {
     expect(page).toMatch(/new Date\(thread\.last_message_at\)\.getTime\(\) > new Date\(sentiment\.analysed_at\)\.getTime\(\)/);
     // It refreshes itself, ONCE per new message, and says so while it is out of date.
     expect(page).toMatch(/refreshedFor/);
-    expect(page).toMatch(/Out of date/);
+    expect(page).toMatch(/Out of Date/);
   });
 
   it('forces the tool rather than parsing free-form JSON', () => {

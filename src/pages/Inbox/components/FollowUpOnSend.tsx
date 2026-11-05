@@ -66,7 +66,7 @@ export const FollowUpOnSend: React.FC<{
         <DropdownMenuTrigger asChild>
           <Button size="sm" variant={value ? 'secondary' : 'ghost'} className="h-8 text-xs" disabled={disabled} title="If they do not reply">
             <AlarmClock className="w-4 h-4" />
-            <span className="hidden sm:inline ml-1.5 max-w-[11rem] truncate">{value ? describePlan(value) : 'Follow up'}</span>
+            <span className="hidden sm:inline ml-1.5 max-w-[11rem] truncate">{value ? describePlan(value) : 'Follow Up'}</span>
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">

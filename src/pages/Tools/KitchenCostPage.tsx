@@ -598,7 +598,7 @@ function SendEstimateDialog({
             </DialogHeader>
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label htmlFor="kc-name">Your name</Label>
+                <Label htmlFor="kc-name">Your Name</Label>
                 <Input id="kc-name" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -612,7 +612,7 @@ function SendEstimateDialog({
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Kitchen shape</Label>
+                <Label>Kitchen Shape</Label>
                 <Select value={shape} onValueChange={setShape}>
                   <SelectTrigger><SelectValue placeholder="How many walls will it run along?" /></SelectTrigger>
                   <SelectContent>

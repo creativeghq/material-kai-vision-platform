@@ -68,7 +68,7 @@ export const KeywordActions: React.FC<{
   return (
     <div className={cn('flex shrink-0 items-center gap-0.5', className)}>
       {isTracked ? (
-        <IconButton label="Tracked in the rank tracker" onClick={() => undefined} disabled>
+        <IconButton label="Tracked in the Rank Tracker" onClick={() => undefined} disabled>
           <Check className="h-3.5 w-3.5 text-[hsl(var(--success))]" />
         </IconButton>
       ) : (

@@ -38,7 +38,7 @@ const definition: ModuleDefinition = {
   // the Channels tab of /messaging, but that is a TENANT page behind a workspace-admin guard and
   // is not reachable from the app menu — the operator pasting the secret is here, on the Keys tab.
   settingsPanels: [
-    { id: 'delivery', label: 'Delivery & plan', icon: Webhook, component: ZernioWebhookPanel },
+    { id: 'delivery', label: 'Delivery & Plan', icon: Webhook, component: ZernioWebhookPanel },
   ],
 };
 

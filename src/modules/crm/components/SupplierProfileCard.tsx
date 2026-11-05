@@ -110,7 +110,7 @@ export const SupplierProfileCard: React.FC<{
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Supplier profile</CardTitle>
+        <CardTitle>Supplier Profile</CardTitle>
         <CardDescription>What this supplier is, the brands it sells as its own, and the brands or factories it carries.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -144,7 +144,7 @@ export const SupplierProfileCard: React.FC<{
           </Select>
           <p className="text-xs text-muted-foreground">{SUPPLY_RELATIONSHIPS.find((r) => r.value === (value.supply_relationship ?? 'to_order'))?.hint}</p>
         </div>
-        <TagEditor id="own-brands" label="Own brands" values={value.own_brands ?? []} onChange={(v) => onSave({ own_brands: v })} />
+        <TagEditor id="own-brands" label="Own Brands" values={value.own_brands ?? []} onChange={(v) => onSave({ own_brands: v })} />
         <TagEditor
           id="brands-carried"
           label={type === 'agent' ? 'Other brands (not linked to a factory yet)' : 'Brands carried'}

@@ -34,13 +34,13 @@ const STATE_LOOK: Record<OnboardingStepState, {
   icon: React.ElementType; tone: string; ring: string; label: string;
 }> = {
   done: { icon: CheckCircle2, tone: 'text-[hsl(var(--success))]', ring: 'border-[hsl(var(--success)/0.35)] bg-[hsl(var(--success-bg))]', label: 'Done' },
-  self_reported: { icon: Hand, tone: 'text-[hsl(var(--info))]', ring: 'border-[hsl(var(--info)/0.35)] bg-[hsl(var(--info-bg))]', label: 'Marked done' },
+  self_reported: { icon: Hand, tone: 'text-[hsl(var(--info))]', ring: 'border-[hsl(var(--info)/0.35)] bg-[hsl(var(--info-bg))]', label: 'Marked Done' },
   awaiting_confirmation: { icon: Clock, tone: 'text-[hsl(var(--warning))]', ring: 'border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning-bg))]', label: 'Waiting on Novus' },
-  waiting: { icon: Clock, tone: 'text-[hsl(var(--warning))]', ring: 'border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning-bg))]', label: 'In progress' },
-  todo: { icon: ArrowRight, tone: 'text-primary', ring: 'border-primary bg-surface-sunken', label: 'Your turn' },
+  waiting: { icon: Clock, tone: 'text-[hsl(var(--warning))]', ring: 'border-[hsl(var(--warning)/0.35)] bg-[hsl(var(--warning-bg))]', label: 'In Progress' },
+  todo: { icon: ArrowRight, tone: 'text-primary', ring: 'border-primary bg-surface-sunken', label: 'Your Turn' },
   pending: { icon: Clock, tone: 'text-muted-foreground', ring: 'border-hairline', label: 'Not yet' },
-  blocked: { icon: MinusCircle, tone: 'text-muted-foreground', ring: 'border-hairline', label: 'Earlier step first' },
-  failed: { icon: XCircle, tone: 'text-[hsl(var(--error))]', ring: 'border-[hsl(var(--error)/0.35)] bg-[hsl(var(--error-bg))]', label: 'Needs attention' },
+  blocked: { icon: MinusCircle, tone: 'text-muted-foreground', ring: 'border-hairline', label: 'Earlier Step First' },
+  failed: { icon: XCircle, tone: 'text-[hsl(var(--error))]', ring: 'border-[hsl(var(--error)/0.35)] bg-[hsl(var(--error-bg))]', label: 'Needs Attention' },
   not_applicable: { icon: MinusCircle, tone: 'text-muted-foreground', ring: 'border-hairline', label: 'Not needed' },
 };
 
@@ -51,9 +51,9 @@ const ACTOR_LABEL: Record<string, string> = {
 
 const OVERALL: Record<EInvoiceOnboarding['overall'], { variant: 'success' | 'warning' | 'error' | 'neutral'; label: string }> = {
   not_started: { variant: 'neutral', label: 'Not started' },
-  in_progress: { variant: 'warning', label: 'In progress' },
+  in_progress: { variant: 'warning', label: 'In Progress' },
   active: { variant: 'success', label: 'Active — this VAT can issue' },
-  attention: { variant: 'error', label: 'Needs attention' },
+  attention: { variant: 'error', label: 'Needs Attention' },
 };
 
 const EMPTY_DRAFT: ApplicationDraft = {
@@ -257,7 +257,7 @@ export const EInvoiceOnboardingCard = forwardRef<EInvoiceOnboardingHandle, Props
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="admin-name">Administrator — full name</Label>
+                <Label htmlFor="admin-name">Administrator — Full Name</Label>
                 <Input
                   id="admin-name" value={draft.administrator_full_name}
                   onChange={(e) => edit({ administrator_full_name: e.target.value })}
@@ -304,17 +304,17 @@ export const EInvoiceOnboardingCard = forwardRef<EInvoiceOnboardingHandle, Props
             {draft.transaction_types.includes('B2C') && (
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="isp-name">Internet provider</Label>
+                  <Label htmlFor="isp-name">Internet Provider</Label>
                   <Input id="isp-name" value={draft.isp_provider_name}
                     onChange={(e) => edit({ isp_provider_name: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="isp-num">Their contract number</Label>
+                  <Label htmlFor="isp-num">Their Contract Number</Label>
                   <Input id="isp-num" value={draft.isp_contract_number}
                     onChange={(e) => edit({ isp_contract_number: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="isp-date">Contract date</Label>
+                  <Label htmlFor="isp-date">Contract Date</Label>
                   <Input id="isp-date" type="date" max={todayLocalISO()} value={draft.isp_contract_date ?? ''}
                     onChange={(e) => edit({ isp_contract_date: e.target.value || null })} />
                 </div>

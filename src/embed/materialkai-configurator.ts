@@ -460,7 +460,7 @@ export class MaterialKaiConfigurator extends HTMLElement {
     form.className = 'quote';
 
     const fields: Array<[string, string, string]> = [
-      ['name', 'Your name', 'text'],
+      ['name', 'Your Name', 'text'],
       ['email', 'Email', 'email'],
       ['message', 'Anything else we should know?', 'text'],
     ];

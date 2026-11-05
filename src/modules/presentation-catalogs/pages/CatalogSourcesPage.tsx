@@ -92,7 +92,7 @@ export const CatalogSourcesPage: React.FC = () => {
         <CardContent className="p-4 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-2">
-              <Label>Manufacturer name (optional)</Label>
+              <Label>Manufacturer Name (optional)</Label>
               <Input value={manufacturer} onChange={(e) => setManufacturer(e.target.value)} placeholder="e.g. Flobali" />
             </div>
             <div className="space-y-2">

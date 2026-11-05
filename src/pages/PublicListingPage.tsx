@@ -10,7 +10,7 @@ import { realEstatePublic, type PublicListing } from '@/modules/real-estate/serv
 
 // Public `/p/:token` listing page (anonymous). All content comes from the token-gated
 // real-estate-public edge fn's toPublic() projection; rendered via JSX only (no HTML-string assembly).
-const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
+const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on Request' });
 
 // Lazy: the Spark/Three splat renderer loads only when the listing actually carries a VR world.
 const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
@@ -169,7 +169,7 @@ const InquiryForm: React.FC<{ token: string }> = ({ token }) => {
   return (
     <form onSubmit={submit} className="space-y-3 rounded-xl border p-4">
       <h2 className="font-semibold">Enquire about this property</h2>
-      <Input required placeholder="Your name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
+      <Input required placeholder="Your Name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />
       <Input required type="email" placeholder="Email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} />
       <Input placeholder="Phone (optional)" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} />
       <Textarea rows={3} placeholder="Message" value={f.message} onChange={(e) => setF({ ...f, message: e.target.value })} />

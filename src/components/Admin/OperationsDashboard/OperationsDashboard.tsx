@@ -1146,8 +1146,8 @@ const OperationsDashboardInner: React.FC = () => {
                       { key: 'resend-email',           label: 'Resend Email',         category: 'Email',        unit: 'email',      raw: 0.0004, billed: null },
                       // Split 2026-08-23. One flat rate averaged a FREE 24h-window reply and a
                       // Meta-billed marketing template together, understating the second ~10x.
-                      { key: 'whatsapp-service',      label: 'WhatsApp service reply', category: 'Messaging',  unit: 'message',    raw: 0,      billed: 0.064 },
-                      { key: 'whatsapp-template',     label: 'WhatsApp template',      category: 'Messaging',  unit: 'message',    raw: 0.06,   billed: 0.09 },
+                      { key: 'whatsapp-service',      label: 'WhatsApp Service Reply', category: 'Messaging',  unit: 'message',    raw: 0,      billed: 0.064 },
+                      { key: 'whatsapp-template',     label: 'WhatsApp Template',      category: 'Messaging',  unit: 'message',    raw: 0.06,   billed: 0.09 },
                       { key: 'apollo-enrich',         label: 'Apollo Enrichment',    category: 'B2B Data',     unit: 'contact',    raw: 0.05,   billed: 0.075 },
                       { key: 'apollo-people-match',   label: 'Apollo People Match',  category: 'B2B Data',     unit: 'match',      raw: 0.02,   billed: 0.03 },
                       { key: 'hunter-email-finder',   label: 'Hunter Email Finder',  category: 'B2B Data',     unit: 'email',      raw: 0.01,   billed: 0.015 },

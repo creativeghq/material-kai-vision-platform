@@ -1453,7 +1453,7 @@ async function handleLeadReceived(supabase: any, payload: any): Promise<{ thread
     || 'Someone';
   const email = leadAnswer(fields.email) || null;
   const phone = leadAnswer(fields.phone_number ?? fields.phone) || null;
-  const formName = String(lead.formName || 'Lead form');
+  const formName = String(lead.formName || 'Lead Form');
   const at = lead.createdAt || payload.timestamp || new Date().toISOString();
 
   const threadId = await findOrCreateSocialThread(supabase, {

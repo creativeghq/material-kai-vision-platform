@@ -148,16 +148,16 @@ export default function DesignSystemPage() {
       sortable: true,
       cell: (r) => demoMoney(r.value) ?? <HubCellEmpty />,
     },
-    { id: 'updated', header: 'Last activity', align: 'right', hideBelow: 'sm', cell: (r) => r.updated },
+    { id: 'updated', header: 'Last Activity', align: 'right', hideBelow: 'sm', cell: (r) => r.updated },
   ];
 
   return (
     <>
       <PageHeader
         icon={Palette}
-        title="Design system"
+        title="Design System"
         subtitle="Every surface, token and pattern — rendered live, in the current theme"
-        breadcrumbs={[{ label: 'Platform', to: '/' }, { label: 'Design system' }]}
+        breadcrumbs={[{ label: 'Platform', to: '/' }, { label: 'Design System' }]}
         actions={
           <>
             <Button variant="outline" size="sm">
@@ -254,7 +254,7 @@ export default function DesignSystemPage() {
 
             <section>
               <SectionHeader
-                title="Type scale"
+                title="Type Scale"
                 subtitle="Serif for identity (h1/h2), sans for chrome (h3 and below). Weight carries the hierarchy."
               />
               <Card>
@@ -323,10 +323,10 @@ export default function DesignSystemPage() {
                 subtitle="Auto-fitting grid. Deltas are coloured by meaning, not by direction."
               />
               <HubStatGrid>
-                <HubStatTile label="Contacts created" value="444" category="OFFLINE SOURCE" delta={{ value: '12.4%', direction: 'up', caption: 'vs last month' }} />
-                <HubStatTile label="Qualified leads" value="69" delta={{ value: '43.75%', direction: 'up' }} help="Contacts whose lifecycle stage reached MQL in the period." />
-                <HubStatTile label="Cost per lead" value="€38.20" delta={{ value: '9.1%', direction: 'up', upIsGood: false, caption: 'vs last month' }} />
-                <HubStatTile label="Landing page views" value="428,376" delta={{ value: '2.78%', direction: 'down', caption: 'vs last month' }} />
+                <HubStatTile label="Contacts Created" value="444" category="OFFLINE SOURCE" delta={{ value: '12.4%', direction: 'up', caption: 'vs last month' }} />
+                <HubStatTile label="Qualified Leads" value="69" delta={{ value: '43.75%', direction: 'up' }} help="Contacts whose lifecycle stage reached MQL in the period." />
+                <HubStatTile label="Cost per Lead" value="€38.20" delta={{ value: '9.1%', direction: 'up', upIsGood: false, caption: 'vs last month' }} />
+                <HubStatTile label="Landing Page Views" value="428,376" delta={{ value: '2.78%', direction: 'down', caption: 'vs last month' }} />
                 <HubStatTile label="Open deals" value="1,124" delta={{ value: '0.0%', direction: 'flat' }} />
               </HubStatGrid>
             </section>
@@ -366,7 +366,7 @@ export default function DesignSystemPage() {
 
             <section>
               <SectionHeader
-                title="Segmented control"
+                title="Segmented Control"
                 subtitle="Two views of the SAME list. A tab changes the section; this changes the answer."
               />
               <Card>
@@ -376,8 +376,8 @@ export default function DesignSystemPage() {
                     value={dsSide}
                     onChange={setDsSide}
                     options={[
-                      { value: 'customer', label: 'Issued to customers' },
-                      { value: 'supplier', label: 'Received from suppliers' },
+                      { value: 'customer', label: 'Issued to Customers' },
+                      { value: 'supplier', label: 'Received from Suppliers' },
                     ]}
                   />
                   <HubSegmented
@@ -399,7 +399,7 @@ export default function DesignSystemPage() {
             </section>
 
             <section>
-              <SectionHeader title="Empty states" subtitle="Two kinds of nothing, two different answers." />
+              <SectionHeader title="Empty States" subtitle="Two kinds of nothing, two different answers." />
               <div className="grid gap-3 md:grid-cols-2">
                 <Card>
                   <HubEmptyState
@@ -438,7 +438,7 @@ export default function DesignSystemPage() {
 
             <section>
               <SectionHeader
-                title="Field row"
+                title="Field Row"
                 subtitle="Labelled controls on one baseline. The hint belongs to the row, never to a column."
               />
               <Card>
@@ -560,7 +560,7 @@ export default function DesignSystemPage() {
                     <HubRecordIdentity
                       name="Elena Papadopoulou"
                       subtitle="Specification Manager"
-                      meta={<Badge variant="info">Qualified lead</Badge>}
+                      meta={<Badge variant="info">Qualified Lead</Badge>}
                       actions={
                         <>
                           <Button size="icon-sm" variant="outline" aria-label="Log a note">
@@ -583,8 +583,8 @@ export default function DesignSystemPage() {
                     />
                     <HubPanel title="About this contact" collapsible>
                       <HubPropertyList>
-                        <HubProperty label="First name">Elena</HubProperty>
-                        <HubProperty label="Last name">Papadopoulou</HubProperty>
+                        <HubProperty label="First Name">Elena</HubProperty>
+                        <HubProperty label="Last Name">Papadopoulou</HubProperty>
                         <HubProperty label="Email">
                           <a className="text-primary hover:underline" href="mailto:elena@aegean.gr">
                             elena@aegean.gr
@@ -717,7 +717,7 @@ export default function DesignSystemPage() {
         {section === 'forms' && (
           <section className="space-y-6">
             <SectionHeader
-              title="Settings screen"
+              title="Settings Screen"
               subtitle="A section rail plus one form panel. Every control is the same 36px height."
             />
             <div className="flex flex-col gap-4 lg:flex-row">
@@ -727,9 +727,9 @@ export default function DesignSystemPage() {
                 aria-label="Settings sections"
                 groups={[
                   {
-                    label: 'Your preferences',
+                    label: 'Your Preferences',
                     items: [
-                      { id: 'account', label: 'Account defaults' },
+                      { id: 'account', label: 'Account Defaults' },
                       { id: 'notifications', label: 'Notifications', count: 3 },
                       { id: 'security', label: 'Security' },
                     ],
@@ -737,7 +737,7 @@ export default function DesignSystemPage() {
                   {
                     label: 'Workspace',
                     items: [
-                      { id: 'team', label: 'Users & teams' },
+                      { id: 'team', label: 'Users & Teams' },
                       { id: 'branding', label: 'Branding' },
                       { id: 'integrations', label: 'Integrations' },
                       { id: 'billing', label: 'Billing' },
@@ -749,7 +749,7 @@ export default function DesignSystemPage() {
               <div className="min-w-0 flex-1">
                 <Card>
                   <CardHeader>
-                    <CardTitle>Account defaults</CardTitle>
+                    <CardTitle>Account Defaults</CardTitle>
                     <CardDescription>
                       Applied to every new record created in this workspace.
                     </CardDescription>
@@ -757,11 +757,11 @@ export default function DesignSystemPage() {
                   <CardContent className="space-y-4">
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div className="space-y-1.5">
-                        <Label htmlFor="ds-name">Workspace name</Label>
+                        <Label htmlFor="ds-name">Workspace Name</Label>
                         <Input id="ds-name" defaultValue="Aegean Interiors" />
                       </div>
                       <div className="space-y-1.5">
-                        <Label htmlFor="ds-currency">Default currency</Label>
+                        <Label htmlFor="ds-currency">Default Currency</Label>
                         <Select defaultValue="eur">
                           <SelectTrigger id="ds-currency">
                             <SelectValue />
@@ -776,7 +776,7 @@ export default function DesignSystemPage() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <Label htmlFor="ds-notes">Default quote footer</Label>
+                      <Label htmlFor="ds-notes">Default Quote Footer</Label>
                       <Textarea
                         id="ds-notes"
                         rows={3}

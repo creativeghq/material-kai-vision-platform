@@ -388,7 +388,7 @@ export const InboxComposer: React.FC<{ m: MailComposerModel }> = ({ m }) => {
             <Checkbox id="inbox-include-signature" checked={email.includeSignature} onCheckedChange={(v) => email.setIncludeSignature(v === true)} className="mt-0.5" aria-label="Include my signature" />
             {signatureHtml ? (
               <iframe
-                title="Email signature" sandbox="" srcDoc={signatureDocument(signatureHtml)}
+                title="Email Signature" sandbox="" srcDoc={signatureDocument(signatureHtml)}
                 className={`h-40 min-w-0 flex-1 rounded-sm border border-hairline bg-white ${email.includeSignature ? '' : 'opacity-40'}`}
               />
             ) : (

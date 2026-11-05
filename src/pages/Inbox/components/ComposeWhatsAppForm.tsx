@@ -64,7 +64,7 @@ export const ComposeWhatsAppForm: React.FC<{
           </div>
         )}
         <div className="space-y-1.5">
-          <Label htmlFor="wa-phone" className="text-xs text-muted-foreground">Phone number</Label>
+          <Label htmlFor="wa-phone" className="text-xs text-muted-foreground">Phone Number</Label>
           <Input id="wa-phone" placeholder="+30 691 234 5678" value={phone} onChange={(e) => setPhone(e.target.value)} />
         </div>
         <div className="space-y-1.5">

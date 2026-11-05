@@ -140,7 +140,7 @@ const MarketplaceNetworkPage: React.FC = () => {
                   <th className="px-4 py-2 text-left">Workspace</th>
                   <th className="px-4 py-2 text-left">Rank</th>
                   <th className="px-4 py-2 text-left">Parent</th>
-                  <th className="px-4 py-2 text-left">Catalog access</th>
+                  <th className="px-4 py-2 text-left">Catalog Access</th>
                   <th className="px-4 py-2 text-left">Discount %</th>
                   <th className="px-4 py-2 text-center">e-Invoicing</th>
                   <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
@@ -166,12 +166,12 @@ const MarketplaceNetworkPage: React.FC = () => {
                           <Select value={d.catalog_access} onValueChange={(v) => setDrafts((s) => ({ ...s, [r.id]: { ...d, catalog_access: v } }))}>
                             <SelectTrigger className="h-8 w-[150px]"><SelectValue /></SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="operator_catalog">Full catalog</SelectItem>
-                              <SelectItem value="own_products_only">Own only</SelectItem>
+                              <SelectItem value="operator_catalog">Full Catalog</SelectItem>
+                              <SelectItem value="own_products_only">Own Only</SelectItem>
                             </SelectContent>
                           </Select>
                         ) : (
-                          <span className="text-muted-foreground">{r.catalog_access === 'own_products_only' ? 'Own only' : 'Full catalog'}</span>
+                          <span className="text-muted-foreground">{r.catalog_access === 'own_products_only' ? 'Own Only' : 'Full Catalog'}</span>
                         )}
                       </td>
                       <td className="px-4 py-2">
@@ -223,7 +223,7 @@ const MarketplaceNetworkPage: React.FC = () => {
       </Card>
 
       {/* Per-factory grants sit directly under the coarse per-workspace switch above, because
-          they are the fine-grained version of the same decision: "Full catalog" is the
+          they are the fine-grained version of the same decision: "Full Catalog" is the
           all-factories case, a grant is one factory. */}
       <CatalogGrantRequestsCard workspaceIds={childRows.map((r) => r.id)} />
       </div>

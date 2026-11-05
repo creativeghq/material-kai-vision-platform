@@ -237,8 +237,8 @@ export const WebhooksPanel: React.FC = () => {
                 <thead>
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-6 py-3 font-medium">Flow</th>
-                    <th className="px-3 py-3 font-medium">Flow status</th>
-                    <th className="px-3 py-3 font-medium">Last fired</th>
+                    <th className="px-3 py-3 font-medium">Flow Status</th>
+                    <th className="px-3 py-3 font-medium">Last Fired</th>
                     <th className="px-3 py-3 font-medium">Result</th>
                     <th className="px-3 py-3 font-medium">Duration</th>
                     <th className="px-3 py-3 font-medium text-right">24h</th>
@@ -308,7 +308,7 @@ export const WebhooksPanel: React.FC = () => {
                   <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
                     <th className="px-6 py-3 font-medium">Endpoint</th>
                     <th className="px-3 py-3 font-medium">URL</th>
-                    <th className="px-3 py-3 font-medium">Last call</th>
+                    <th className="px-3 py-3 font-medium">Last Call</th>
                     <th className="px-3 py-3 font-medium">Result</th>
                     <th className="px-3 py-3 font-medium text-right">24h</th>
                     <th className="px-3 py-3 font-medium text-right">24h fail</th>

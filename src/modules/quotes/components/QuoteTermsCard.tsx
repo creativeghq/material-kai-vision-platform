@@ -90,7 +90,7 @@ export const QuoteTermsCard: React.FC<{ workspaceId: string }> = ({ workspaceId 
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="quote-default-terms">Default terms</Label>
+            <Label htmlFor="quote-default-terms">Default Terms</Label>
             <Textarea
               id="quote-default-terms"
               value={terms}

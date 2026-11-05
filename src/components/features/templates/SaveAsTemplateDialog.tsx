@@ -134,7 +134,7 @@ export const SaveAsTemplateDialog: React.FC<{
           ) : (
           <>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Template name</Label>
+            <Label className="text-xs text-muted-foreground">Template Name</Label>
             <Input
               value={title}
               autoFocus

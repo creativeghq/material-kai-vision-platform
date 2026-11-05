@@ -31,13 +31,13 @@ export interface IntakeAddition {
 
 export const STOCK_MODE_LABEL: Record<StockMode, string> = {
   auto: 'Decide from the document date',
-  catalog_only: 'Catalogue only — no stock',
+  catalog_only: 'Catalogue Only — No Stock',
   catalog_and_stock: 'Receive the stock too',
 };
 
 export const ADDITION_MODE_LABEL: Record<AdditionMode, string> = {
-  catalog_only: 'Catalogue only',
-  catalog_and_stock: 'Catalogue and stock',
+  catalog_only: 'Catalogue Only',
+  catalog_and_stock: 'Catalogue and Stock',
 };
 
 /** A document older than this is an archive, not a delivery. */

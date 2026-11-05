@@ -351,7 +351,7 @@ const NewInspectionDialog: React.FC<{
           </div>
 
           <div className="space-y-2">
-            <Label className="text-xs">Things to check</Label>
+            <Label className="text-xs">Things to Check</Label>
             <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
               {items.map((it, i) => (
                 <div key={i} className="space-y-1.5 rounded-md border border-hairline p-2">

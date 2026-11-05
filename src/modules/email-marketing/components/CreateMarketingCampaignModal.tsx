@@ -163,13 +163,13 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
 
           {/* Details */}
           <TabsContent value="details" className="space-y-4">
-            <FormField label="Campaign name" htmlFor="c-name">
+            <FormField label="Campaign Name" htmlFor="c-name">
               <Input id="c-name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Summer Sale 2026" />
             </FormField>
             <FormField label="Description" htmlFor="c-desc" optional>
               <Textarea id="c-desc" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
             </FormField>
-            <FormField label="Email template" htmlFor="c-tpl">
+            <FormField label="Email Template" htmlFor="c-tpl">
               <Select value={form.template_id || undefined} onValueChange={(v) => setForm({ ...form, template_id: v })}>
                 <SelectTrigger id="c-tpl"><SelectValue placeholder={templates.length ? 'Select a template' : 'No ready templates — design one first'} /></SelectTrigger>
                 <SelectContent>
@@ -177,10 +177,10 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="Subject line" htmlFor="c-subj" optional hint="Overrides the template subject.">
+            <FormField label="Subject Line" htmlFor="c-subj" optional hint="Overrides the template subject.">
               <Input id="c-subj" value={form.subject_line} onChange={(e) => setForm({ ...form, subject_line: e.target.value })} />
             </FormField>
-            <FormField label="Preview text" htmlFor="c-prev" optional>
+            <FormField label="Preview Text" htmlFor="c-prev" optional>
               <Input id="c-prev" value={form.preview_text} onChange={(e) => setForm({ ...form, preview_text: e.target.value })} />
             </FormField>
           </TabsContent>

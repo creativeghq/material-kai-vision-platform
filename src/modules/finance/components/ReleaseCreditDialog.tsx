@@ -103,13 +103,13 @@ export const ReleaseCreditDialog: React.FC<{
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs">Amount to release</Label>
+            <Label className="text-xs">Amount to Release</Label>
             <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
             <p className="text-[11px] text-muted-foreground">Release part of it and the rest stays on their account.</p>
           </div>
 
           <div className="space-y-1">
-            <Label className="text-xs">Income category</Label>
+            <Label className="text-xs">Income Category</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger><SelectValue placeholder={incomeCats.length ? 'Pick a category' : 'No income categories'} /></SelectTrigger>
               <SelectContent>

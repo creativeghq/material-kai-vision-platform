@@ -199,7 +199,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
     <div className="space-y-3">
       <Card>
         <CardHeader>
-          <CardTitle>The product photo</CardTitle>
+          <CardTitle>The Product Photo</CardTitle>
           <p className="text-xs text-muted-foreground">Find the product and tap the photo that matches yours, or upload your own photo of it in its room, then press Read the finishes. The 3D takes its colours, its wood and stone textures and the room around it (wall and floor) from that photo. Reading a photo costs a few credits.</p>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -324,7 +324,7 @@ export function GuideLookEditor({ row, onSaved, toast }: {
           {draft.room && (draft.room.plate_url || photoUrl) && (
             <Card>
               <CardHeader>
-                <CardTitle>Your space</CardTitle>
+                <CardTitle>Your Space</CardTitle>
                 <p className="text-xs text-muted-foreground">
                   The 3D straightens the wall behind the product into a flat, level backdrop and builds the room around it. Drag the four points onto the back wall's corners: the two bottom ones where it meets the floor, the two top ones where it meets the ceiling (or the top of the photo). Save the look to apply it.
                 </p>

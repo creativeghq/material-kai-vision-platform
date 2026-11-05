@@ -14,8 +14,8 @@ import { AgentCommissionStatementDialog } from './AgentCommissionStatementDialog
 const money = (n: number | null | undefined, ccy: string) => formatMoney(n ?? 0, ccy || 'EUR', { decimals: 2 });
 
 const PARTY_LABELS: Record<string, string> = {
-  listing_agent: 'Listing agent',
-  buyer_agent: 'Buyer agent',
+  listing_agent: 'Listing Agent',
+  buyer_agent: 'Buyer Agent',
   house: 'House',
   referral: 'Referral',
   external: 'External party',

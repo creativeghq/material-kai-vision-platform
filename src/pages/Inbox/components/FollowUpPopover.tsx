@@ -11,9 +11,9 @@ import { OutreachComposer, type OutreachStepInput, type OutreachTemplateChoice }
 
 export const FOLLOW_UP_PRESETS: Array<{ label: string; days: number }> = [
   { label: 'Tomorrow', days: 1 },
-  { label: 'In 3 days', days: 3 },
-  { label: 'In a week', days: 7 },
-  { label: 'In 2 weeks', days: 14 },
+  { label: 'In 3 Days', days: 3 },
+  { label: 'In a Week', days: 7 },
+  { label: 'In 2 Weeks', days: 14 },
 ];
 
 export interface PendingOutreach { id: string; send_at: string; preview?: string | null; sequence_id?: string | null; step?: number | null }
@@ -60,7 +60,7 @@ export const FollowUpPopover: React.FC<{
 
   const title = outreach.length
     ? `Follow-up sends ${stamp(outreach[0].send_at)}${outreach.length > 1 ? ` (+${outreach.length - 1})` : ''}`
-    : boomerangAt ? `Back on ${stamp(boomerangAt)}` : 'Follow up';
+    : boomerangAt ? `Back on ${stamp(boomerangAt)}` : 'Follow Up';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -68,13 +68,13 @@ export const FollowUpPopover: React.FC<{
         {compact ? (
           <Button size="sm" variant="ghost" className="h-6 text-xs"><AlarmClock className="w-3.5 h-3.5 mr-1" />{title}</Button>
         ) : (
-          <Button variant={pending ? 'secondary' : 'outline'} size="icon" className="h-9 w-9" title={pending ? `${title} — click to change` : 'Follow up'}>
+          <Button variant={pending ? 'secondary' : 'outline'} size="icon" className="h-9 w-9" title={pending ? `${title} — click to change` : 'Follow Up'}>
             <AlarmClock className="w-4 h-4" />
           </Button>
         )}
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[26rem] max-w-[calc(100vw-2rem)] p-0 max-h-[80vh] overflow-y-auto">
-        <div role="tablist" aria-label="Follow up" className="flex items-center gap-4 px-3 border-b border-hairline sticky top-0 bg-popover z-10">
+        <div role="tablist" aria-label="Follow Up" className="flex items-center gap-4 px-3 border-b border-hairline sticky top-0 bg-popover z-10">
           <button role="tab" aria-selected={tab === 'boomerang'} onClick={() => setTab('boomerang')} className="text-xs py-2">Boomerang</button>
           <button role="tab" aria-selected={tab === 'outreach'} onClick={() => setTab('outreach')} className="text-xs py-2">Automatic outreach</button>
         </div>
@@ -90,7 +90,7 @@ export const FollowUpPopover: React.FC<{
             )}
             {showNote && (
               <div className="space-y-1">
-                <Label htmlFor={`${idPrefix}-note`} className="text-xs">Note to yourself (optional)</Label>
+                <Label htmlFor={`${idPrefix}-note`} className="text-xs">Note to Yourself (optional)</Label>
                 <Input id={`${idPrefix}-note`} className="h-8 text-xs" placeholder="e.g. confirm the decking quantity" value={note} onChange={(e) => setNote(e.target.value)} />
               </div>
             )}
@@ -100,7 +100,7 @@ export const FollowUpPopover: React.FC<{
               ))}
             </div>
             <div className="space-y-1">
-              <Label htmlFor={`${idPrefix}-boomerang`} className="text-xs">Or pick a date and time</Label>
+              <Label htmlFor={`${idPrefix}-boomerang`} className="text-xs">Or Pick a Date and Time</Label>
               <div className="flex gap-1.5">
                 <Input id={`${idPrefix}-boomerang`} type="datetime-local" className="h-8 text-xs" value={custom} min={toLocalInputValue(new Date())} onChange={(e) => setCustom(e.target.value)} />
                 <Button size="sm" className="h-8 shrink-0" disabled={busy || !custom} onClick={() => run(() => onBoomerang(new Date(custom), note.trim()))}>Set</Button>

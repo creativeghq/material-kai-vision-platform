@@ -166,7 +166,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
                       return (
                         <div key={kind} className="space-y-1">
                           <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                            {kind === 'manual' ? 'Custom' : 'Professional type'}
+                            {kind === 'manual' ? 'Custom' : 'Professional Type'}
                           </div>
                           <div className="flex flex-wrap gap-1.5">
                             {list.map((c) => {
@@ -229,7 +229,7 @@ export const SendToCustomersModal: React.FC<Props> = ({ open, onClose, catalog, 
                 <Input value={subject} onChange={(e) => setSubject(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label>Personal message (optional)</Label>
+                <Label>Personal Message (optional)</Label>
                 <Textarea
                   value={messageBody}
                   onChange={(e) => setMessageBody(e.target.value)}

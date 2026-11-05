@@ -92,18 +92,18 @@ export const RetentionTermsDialog: React.FC<{
                 <p className="text-[11px] text-muted-foreground">Deducted from every valuation.</p>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Capped at % of contract</Label>
+                <Label className="text-xs">Capped at % of Contract</Label>
                 <Input inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} />
                 <p className="text-[11px] text-muted-foreground">Deduction stops once this is held.</p>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs">Defects period (months)</Label>
+                <Label className="text-xs">Defects Period (Months)</Label>
                 <Input inputMode="numeric" value={defects} onChange={(e) => setDefects(e.target.value)} />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Practical completion</Label>
+                <Label className="text-xs">Practical Completion</Label>
                 <Input type="date" value={pc} onChange={(e) => setPc(e.target.value)} />
                 <p className="text-[11px] text-muted-foreground">
                   The two standard releases are dated from this — half on the day, half at the end

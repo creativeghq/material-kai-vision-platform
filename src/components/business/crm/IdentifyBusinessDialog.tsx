@@ -387,7 +387,7 @@ export const IdentifyBusinessDialog: React.FC<Props> = ({
                   A business{identity.confidence ? ` · ${identity.confidence} confidence` : ''}
                 </Badge>
               )}
-              {verdict === 'person' && <Badge variant="info">Looks like an individual</Badge>}
+              {verdict === 'person' && <Badge variant="info">Looks Like an Individual</Badge>}
               {verdict === 'unclear' && <Badge variant="warning">Not enough to tell</Badge>}
               {verdict === 'unknown' && <Badge variant="neutral">Could not check</Badge>}
               {identity.person_name && (

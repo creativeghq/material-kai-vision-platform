@@ -67,7 +67,7 @@ describe('it is actually applied, and reachable', () => {
     // A capability nobody can fill is the bug this fixes, not a smaller version of it.
     expect(DASH).toMatch(/WebsiteBrandProfilePanel/);
     expect(DASH).toMatch(/view === 'brand'/);
-    expect(readFileSync('src/components/core/Profile/seo/sections.ts', 'utf8')).toMatch(/value: 'brand', label: 'Brand profile'/);
+    expect(readFileSync('src/components/core/Profile/seo/sections.ts', 'utf8')).toMatch(/value: 'brand', label: 'Brand Profile'/);
     expect(PANEL).toMatch(/from\('workspace_brand_profile'\)/);
     expect(PANEL).toMatch(/website_id: ownVoice \? websiteId : null/);
     expect(DASH).toMatch(/<WebsiteBrandProfilePanel websiteId=\{website\.id\}/);

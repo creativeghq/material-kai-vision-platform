@@ -113,35 +113,35 @@ export interface SeoMetricDescriptor {
 export const DOMAIN_METRICS: SeoMetricDescriptor[] = [
   {
     key: 'domain_rank',
-    label: 'Domain rank',
+    label: 'Domain Rank',
     format: 'score',
     upIsGood: true,
     help: 'Strength of this domain\'s backlink profile on a 0–100 scale, from the backlink index. Comparative, not a Google figure.',
   },
   {
     key: 'organic_keywords',
-    label: 'Organic keywords',
+    label: 'Organic Keywords',
     format: 'count',
     upIsGood: true,
     help: 'How many distinct queries the domain ranks in the top 100 for, in its detected market.',
   },
   {
     key: 'organic_traffic',
-    label: 'Est. monthly traffic',
+    label: 'Est. Monthly Traffic',
     format: 'count',
     upIsGood: true,
     help: 'Estimated monthly organic visits, modelled from ranking positions and each keyword\'s search volume. An estimate, not analytics.',
   },
   {
     key: 'organic_traffic_value',
-    label: 'Traffic value',
+    label: 'Traffic Value',
     format: 'currency',
     upIsGood: true,
     help: 'What this organic traffic would cost to buy as ads at the same keywords\' CPC. Useful as a size-of-prize figure.',
   },
   {
     key: 'referring_domains',
-    label: 'Referring domains',
+    label: 'Referring Domains',
     format: 'count',
     upIsGood: true,
     help: 'Distinct domains linking to this site. Usually a better health signal than raw backlink count.',
@@ -155,14 +155,14 @@ export const DOMAIN_METRICS: SeoMetricDescriptor[] = [
   },
   {
     key: 'broken_backlinks',
-    label: 'Broken backlinks',
+    label: 'Broken Backlinks',
     format: 'count',
     upIsGood: false,
     help: 'Inbound links pointing at URLs that no longer resolve — recoverable link equity if redirected.',
   },
   {
     key: 'spam_score',
-    label: 'Spam score',
+    label: 'Spam Score',
     format: 'score',
     upIsGood: false,
     help: 'Share of the backlink profile judged low quality. Higher is worse.',
@@ -173,14 +173,14 @@ export const GSC_METRICS: SeoMetricDescriptor[] = [
   { key: 'clicks', label: 'Clicks', format: 'count', upIsGood: true, help: 'Times someone clicked through to your site from Google search results.' },
   { key: 'impressions', label: 'Impressions', format: 'count', upIsGood: true, help: 'Times a link to your site appeared in results a searcher saw.' },
   { key: 'ctr', label: 'CTR', format: 'percent', upIsGood: true, help: 'Clicks divided by impressions. Low CTR at a good position usually means the title and description are not earning the click.' },
-  { key: 'avg_position', label: 'Avg. position', format: 'position', upIsGood: false, help: 'Impression-weighted mean ranking position. LOWER is better — position 3 beats position 30.' },
+  { key: 'avg_position', label: 'Avg. Position', format: 'position', upIsGood: false, help: 'Impression-weighted mean ranking position. LOWER is better — position 3 beats position 30.' },
 ];
 
 export const ANALYTICS_METRICS: SeoMetricDescriptor[] = [
   { key: 'sessions', label: 'Sessions', format: 'count', upIsGood: true, help: 'Visits to the site. One person returning tomorrow is two sessions.' },
-  { key: 'active_users', label: 'Active users', format: 'count', upIsGood: true, help: 'Distinct people, not visits. The gap between this and sessions is how often people come back.' },
+  { key: 'active_users', label: 'Active Users', format: 'count', upIsGood: true, help: 'Distinct people, not visits. The gap between this and sessions is how often people come back.' },
   { key: 'new_users', label: 'New users', format: 'count', upIsGood: true, help: 'First-time visitors in the window.' },
-  { key: 'engagement_rate', label: 'Engaged sessions', format: 'percent', upIsGood: true, help: 'Share of sessions that lasted, scrolled or converted — the inverse of a bounce, and a better read on whether the page delivered.' },
+  { key: 'engagement_rate', label: 'Engaged Sessions', format: 'percent', upIsGood: true, help: 'Share of sessions that lasted, scrolled or converted — the inverse of a bounce, and a better read on whether the page delivered.' },
   { key: 'conversions', label: 'Conversions', format: 'count', upIsGood: true, help: 'Events marked as conversions in the Analytics property. Zero here usually means none are configured, not that nobody converted.' },
   { key: 'revenue', label: 'Revenue', format: 'currency', upIsGood: true, help: 'Revenue attributed by Analytics. Only present when ecommerce or a value-carrying event is set up.' },
 ];
@@ -188,7 +188,7 @@ export const ANALYTICS_METRICS: SeoMetricDescriptor[] = [
 export const HEALTH_METRICS: SeoMetricDescriptor[] = [
   { key: 'performance', label: 'Performance', format: 'score', upIsGood: true, help: 'Lighthouse performance score for the audited page (0–100).' },
   { key: 'accessibility', label: 'Accessibility', format: 'score', upIsGood: true, help: 'Lighthouse accessibility score (0–100).' },
-  { key: 'best_practices', label: 'Best practices', format: 'score', upIsGood: true, help: 'Lighthouse best-practices score (0–100).' },
+  { key: 'best_practices', label: 'Best Practices', format: 'score', upIsGood: true, help: 'Lighthouse best-practices score (0–100).' },
   { key: 'seo', label: 'Technical SEO', format: 'score', upIsGood: true, help: 'Lighthouse on-page SEO score (0–100). Covers crawlability basics, not rankings.' },
 ];
 

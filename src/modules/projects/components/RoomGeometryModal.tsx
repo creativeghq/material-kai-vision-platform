@@ -156,7 +156,7 @@ export const RoomGeometryModal: React.FC<RoomGeometryModalProps> = ({
 
           <div>
             <div className="flex items-center justify-between mb-2 gap-2">
-              <Label className="text-sm">Floor plan</Label>
+              <Label className="text-sm">Floor Plan</Label>
               <div className="flex items-center gap-1">
                 <input
                   ref={fileRef}

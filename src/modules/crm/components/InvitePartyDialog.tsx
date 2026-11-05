@@ -69,7 +69,7 @@ const OPTIONS: Option[] = [
     blurb: 'A member of your workspace. They see what that role sees — your customers, your costs, your pipeline.',
   },
   {
-    key: 'trade_portal', icon: ShieldCheck, title: 'Trade portal', sends: false, needs: 'company',
+    key: 'trade_portal', icon: ShieldCheck, title: 'Trade Portal', sends: false, needs: 'company',
     blurb: 'A B2B account for the whole company, with spend caps and their own delegated admin. Set up on the company record.',
   },
   {
@@ -255,7 +255,7 @@ export const InvitePartyDialog: React.FC<Props> = ({
                 onChange={(e) => setEmail(e.target.value)} placeholder="jane@example.com" />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="ip-name">Their name</Label>
+              <Label htmlFor="ip-name">Their Name</Label>
               <Input id="ip-name" value={name}
                 onChange={(e) => setName(e.target.value)} placeholder="Jane Smith" />
             </div>
@@ -315,17 +315,17 @@ export const InvitePartyDialog: React.FC<Props> = ({
           {dest === 'own_workspace' && (
             <div className="grid gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <Label htmlFor="ip-catalog">Catalog access</Label>
+                <Label htmlFor="ip-catalog">Catalog Access</Label>
                 <Select value={catalogAccess} onValueChange={(v) => setCatalogAccess(v as typeof catalogAccess)}>
                   <SelectTrigger id="ip-catalog"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="operator_catalog">Your full catalog</SelectItem>
-                    <SelectItem value="own_products_only">Their own products only</SelectItem>
+                    <SelectItem value="operator_catalog">Your Full Catalog</SelectItem>
+                    <SelectItem value="own_products_only">Their Own Products Only</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="ip-discount">Their discount off retail (%)</Label>
+                <Label htmlFor="ip-discount">Their Discount Off Retail (%)</Label>
                 <Input id="ip-discount" inputMode="numeric" value={discountPct}
                   onChange={(e) => setDiscountPct(e.target.value)} />
               </div>

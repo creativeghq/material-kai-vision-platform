@@ -232,7 +232,7 @@ const OpeningBalanceDialog: React.FC<{
         </DialogHeader>
         <FormSection title="Balance">
           <FormGrid>
-            <FormField label="As of">
+            <FormField label="As Of">
               <Input type="date" value={asOf} max={todayLocalISO()} onChange={(e) => setAsOf(e.target.value)} />
             </FormField>
             <FormField label="Direction">

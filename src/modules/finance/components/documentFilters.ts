@@ -116,7 +116,7 @@ export function buildDocumentFilters(
         },
         {
           key: 'dates', label: 'Dates', icon: CalendarDays,
-          fields: [{ key: 'paid_at', type: 'dateRange', label: 'Payment date', accessor: (r) => r.paid_at }],
+          fields: [{ key: 'paid_at', type: 'dateRange', label: 'Payment Date', accessor: (r) => r.paid_at }],
         },
       ];
     }
@@ -164,7 +164,7 @@ export function buildDocumentFilters(
           key: 'dates', label: 'Dates', icon: CalendarDays,
           fields: [
             { key: 'issued_at', type: 'dateRange', label: 'Issue date', accessor: (r) => r.issued_at },
-            { key: 'due_at', type: 'dateRange', label: 'Due date', accessor: (r) => r.due_at ?? r.due_date },
+            { key: 'due_at', type: 'dateRange', label: 'Due Date', accessor: (r) => r.due_at ?? r.due_date },
           ],
         },
       ];
@@ -192,7 +192,7 @@ export function buildDocumentFilters(
               accessor: (r) => r.fiscal_status === 'accepted' || r.fiscal_status === 'offline',
             },
             {
-              key: 'linked', type: 'bool', label: 'Linked invoice',
+              key: 'linked', type: 'bool', label: 'Linked Invoice',
               trueLabel: 'Linked', falseLabel: 'Standalone',
               accessor: (r) => !!r.invoice_id,
             },
@@ -244,7 +244,7 @@ export function buildDocumentFilters(
           key: 'kind', label: 'Kind & VAT', icon: Receipt,
           fields: [
             {
-              key: 'expense_kind', type: 'multi', label: 'Expense kind',
+              key: 'expense_kind', type: 'multi', label: 'Expense Kind',
               options: optionsFromRows(rows, (r) => r.expense_kind, (k) => expenseKindCopy(k).label),
               accessor: (r) => r.expense_kind,
             },
@@ -347,7 +347,7 @@ export function buildDocumentFilters(
         },
         {
           key: 'dates', label: 'Dates', icon: CalendarDays,
-          fields: [{ key: 'due_date', type: 'dateRange', label: 'Due date', accessor: (r) => r.due_date }],
+          fields: [{ key: 'due_date', type: 'dateRange', label: 'Due Date', accessor: (r) => r.due_date }],
         },
       ];
     }

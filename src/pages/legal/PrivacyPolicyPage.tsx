@@ -179,7 +179,7 @@ export default function PrivacyPolicyPage() {
       <h2>13. Changes to this Policy</h2>
       <p>
         We may update this Policy from time to time. Material changes will be notified through the
-        Platform or by email. The "Last updated" date above reflects the latest version.
+        Platform or by email. The "Last Updated" date above reflects the latest version.
       </p>
 
       <h2>14. Contact</h2>

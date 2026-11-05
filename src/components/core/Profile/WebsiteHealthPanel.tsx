@@ -101,10 +101,10 @@ export const WebsiteHealthPanel: React.FC<{ website: UserWebsite }> = ({ website
                   choice: the request asked for `best-practices` where DataForSEO wants
                   `best_practices`, the whole task 40501'd, and all three scores were
                   NULL on every audit ever taken. A missing score now says so. */}
-              <Gauge100 label="On-page SEO" score={health.seo_score} />
+              <Gauge100 label="On-Page SEO" score={health.seo_score} />
               <Gauge100 label="Performance" score={health.perf_score} />
               <Gauge100 label="Accessibility" score={health.a11y_score} />
-              <Gauge100 label="Best practices" score={health.bp_score} />
+              <Gauge100 label="Best Practices" score={health.bp_score} />
               {health.perf_score == null && (
                 <p className="max-w-[26ch] text-xs text-muted-foreground">
                   Lighthouse returned nothing on this audit, so speed and accessibility are

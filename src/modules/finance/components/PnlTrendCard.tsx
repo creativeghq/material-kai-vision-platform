@@ -243,7 +243,7 @@ export const PnlTrendCard: React.FC<Props> = ({ rows, days, currency, loading })
                     <TableHead className="text-right">Income</TableHead>
                     <TableHead className="text-right">Expenses</TableHead>
                     <TableHead className="text-right">Net</TableHead>
-                    <TableHead className="text-right">To book</TableHead>
+                    <TableHead className="text-right">To Book</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

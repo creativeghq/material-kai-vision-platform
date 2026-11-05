@@ -28,7 +28,7 @@ export function buildInboxFilters(
           accessor: (t: InboxThread) => inboxSourceKey(t),
         }] : []),
         ...(waNumbers.length > 1 ? [{
-          key: 'wa_number', type: 'select' as const, label: 'WhatsApp number',
+          key: 'wa_number', type: 'select' as const, label: 'WhatsApp Number',
           description: 'The business number the conversation is on.',
           placeholder: 'All numbers',
           options: waNumbers.map((n) => ({ value: n.zernio_account_id, label: whatsAppNumberLabel(n) })),
@@ -41,7 +41,7 @@ export function buildInboxFilters(
           key: 'order_intake', type: 'multi', label: 'Order',
           description: 'Conversations an order was read out of.',
           options: [
-            { value: 'pending_review', label: 'Waiting for approval' },
+            { value: 'pending_review', label: 'Waiting for Approval' },
             { value: 'approved', label: 'Approved' },
             { value: 'rejected', label: 'Dismissed' },
           ],
@@ -63,7 +63,7 @@ export function buildInboxFilters(
           key: 'agent_state', type: 'multi', label: 'AI assistant',
           options: [
             { value: 'active', label: 'Handling' },
-            { value: 'paused', label: 'Taken over' },
+            { value: 'paused', label: 'Taken Over' },
             { value: 'off', label: 'Off' },
           ],
           accessor: (t: InboxThread) => t.agent_state,
@@ -77,7 +77,7 @@ export function buildInboxFilters(
           // A DIFFERENT question from Unread, and the one the mailbox could not previously ask:
           // a thread can be read and still owe the customer an answer. Derived server-side by
           // `inbox_thread_reply_state`; an unknown verdict is not "no".
-          key: 'needs_reply', type: 'bool', label: 'Waiting on us',
+          key: 'needs_reply', type: 'bool', label: 'Waiting on Us',
           description: 'The customer spoke last and nobody has answered.',
           trueLabel: 'Needs a reply', falseLabel: 'Answered',
           accessor: (t: InboxThread) => t.waiting_on === 'us',
@@ -88,7 +88,7 @@ export function buildInboxFilters(
       key: 'people', label: 'Assignment', icon: UserRound,
       fields: [
         {
-          key: 'assignee', type: 'multi', label: 'Assigned to',
+          key: 'assignee', type: 'multi', label: 'Assigned To',
           description: 'Who owns the conversation. Unassigned means nobody has picked it up.',
           options: [
             { value: NONE_VALUE, label: 'Unassigned' },
@@ -97,9 +97,9 @@ export function buildInboxFilters(
           accessor: (t: InboxThread) => (t.assignee_name ? [t.assignee_name] : []),
         },
         ...(myUserId ? [{
-          key: 'mine', type: 'bool' as const, label: 'Just mine',
+          key: 'mine', type: 'bool' as const, label: 'Just Mine',
           description: 'Conversations assigned to you.',
-          trueLabel: 'Assigned to me', falseLabel: 'Not mine',
+          trueLabel: 'Assigned to Me', falseLabel: 'Not mine',
           accessor: (t: InboxThread) => t.assigned_user_id === myUserId,
         }] : []),
       ],
@@ -115,7 +115,7 @@ export function buildInboxFilters(
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
-        { key: 'last_message_at', type: 'dateRange', label: 'Last message', accessor: (t: InboxThread) => t.last_message_at },
+        { key: 'last_message_at', type: 'dateRange', label: 'Last Message', accessor: (t: InboxThread) => t.last_message_at },
         { key: 'created_at', type: 'dateRange', label: 'Started', accessor: (t: InboxThread) => t.created_at },
       ],
     },

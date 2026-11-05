@@ -196,7 +196,7 @@ export const NewOrderDialog: React.FC<{
 
           {/* Order name */}
           <div className="space-y-1">
-            <Label className="text-xs">Order name *</Label>
+            <Label className="text-xs">Order Name *</Label>
             <Input className="h-8 text-xs" placeholder="e.g. Kitchen renovation — materials" value={orderName} onChange={(e) => setOrderName(e.target.value)} />
           </div>
         </div>

@@ -153,7 +153,7 @@ export const RecordExpenseDocumentDialog: React.FC<Props> = ({ workspaceId, onRe
           <div className="space-y-5">
             <FormSection title="Document">
               <FormGrid cols={3}>
-                <FormField label="Document type" htmlFor="xd-type" className="sm:col-span-3">
+                <FormField label="Document Type" htmlFor="xd-type" className="sm:col-span-3">
                   <Select value={form.docType} onValueChange={(v) => set('docType', v)}>
                     <SelectTrigger id="xd-type" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -193,7 +193,7 @@ export const RecordExpenseDocumentDialog: React.FC<Props> = ({ workspaceId, onRe
 
             <FormSection title="Amounts">
               <FormGrid cols={3}>
-                <FormField label="Net amount" htmlFor="xd-net">
+                <FormField label="Net Amount" htmlFor="xd-net">
                   <Input id="xd-net" type="number" step="0.01" inputMode="decimal" className="h-9 text-right tabular-nums" value={form.net} onChange={(e) => set('net', e.target.value)} />
                 </FormField>
                 <FormField label="VAT category" htmlFor="xd-vatcat">
@@ -210,7 +210,7 @@ export const RecordExpenseDocumentDialog: React.FC<Props> = ({ workspaceId, onRe
 
                 {needsExemption && (
                   <FormField
-                    label="Exemption article"
+                    label="Exemption Article"
                     htmlFor="xd-exempt"
                     hint="ΑΑΔΕ refuses a 0% line that does not state one."
                     className="sm:col-span-3"

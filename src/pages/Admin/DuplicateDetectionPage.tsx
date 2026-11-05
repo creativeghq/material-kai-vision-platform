@@ -117,12 +117,12 @@ const FILTER_GROUPS: FilterGroupDef[] = [
     key: 'similarity', label: 'Similarity', icon: Percent,
     fields: [
       {
-        key: 'overall_similarity_score', type: 'range', label: 'Overall similarity',
+        key: 'overall_similarity_score', type: 'range', label: 'Overall Similarity',
         description: 'Fraction, not percent — 0.6 is the detector default.',
         column: 'overall_similarity_score', min: 0, max: 1, step: 0.05,
       },
-      { key: 'name_similarity', type: 'range', label: 'Name similarity', column: 'name_similarity', min: 0, max: 1, step: 0.05 },
-      { key: 'visual_similarity', type: 'range', label: 'Visual similarity', column: 'visual_similarity', min: 0, max: 1, step: 0.05 },
+      { key: 'name_similarity', type: 'range', label: 'Name Similarity', column: 'name_similarity', min: 0, max: 1, step: 0.05 },
+      { key: 'visual_similarity', type: 'range', label: 'Visual Similarity', column: 'visual_similarity', min: 0, max: 1, step: 0.05 },
     ],
   },
 ];

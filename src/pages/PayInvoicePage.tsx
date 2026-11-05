@@ -84,7 +84,7 @@ function buildOptions(providers: ProviderOption[], bankTransfer: PublicBankTrans
       key: TRANSFER_KEY,
       provider: null,
       method: 'transfer',
-      label: 'Direct bank transfer',
+      label: 'Direct Bank Transfer',
       hint: 'Transfer to our bank account and upload the receipt here.',
     });
   }
@@ -143,7 +143,7 @@ const PROOF_STATE: Record<PublicPaymentProof['state'], { label: string; variant:
   checking: { label: 'Checking…', variant: 'neutral' },
   checked: { label: 'Receipt checked — waiting for the bank', variant: 'info' },
   received: { label: 'Received — the seller will review it', variant: 'warning' },
-  confirmed: { label: 'Payment confirmed', variant: 'success' },
+  confirmed: { label: 'Payment Confirmed', variant: 'success' },
   rejected: { label: 'Not accepted', variant: 'error' },
 };
 
@@ -323,7 +323,7 @@ const AadeRecordPanel: React.FC<{ fiscal: PublicFiscalRecord }> = ({ fiscal }) =
     ['Number', fiscal.legal_number],
     ['MARK', fiscal.mark],
     ['UID', fiscal.uid],
-    ['Authentication code', fiscal.authentication_code],
+    ['Authentication Code', fiscal.authentication_code],
     ['Issued', fiscal.issued_at ? formatDate(fiscal.issued_at, { withTime: true }) : null],
   ];
   return (
@@ -362,11 +362,11 @@ const AadeRecordPanel: React.FC<{ fiscal: PublicFiscalRecord }> = ({ fiscal }) =
 
 // myDATA header totals: withholdings and deductions reduce what is paid, the rest add to it.
 const OTHER_TOTAL_ROWS: Array<[keyof PublicPayOtherTotals, string, 1 | -1]> = [
-  ['withheld', 'Withholding tax', -1],
+  ['withheld', 'Withholding Tax', -1],
   ['deductions', 'Deductions', -1],
   ['fees', 'Fees', 1],
-  ['stamp_duty', 'Stamp duty', 1],
-  ['other_taxes', 'Other taxes', 1],
+  ['stamp_duty', 'Stamp Duty', 1],
+  ['other_taxes', 'Other Taxes', 1],
 ];
 
 const OrderLinesPanel: React.FC<{ info: PayInfo }> = ({ info }) => {
@@ -758,7 +758,7 @@ const PayInvoicePage: React.FC = () => {
               <dd className="mt-0.5 font-medium tabular-nums">{formatMoney(info.total, info.currency)}</dd>
             </div>
             <div className="px-4 py-3">
-              <dt className="text-[11px] font-semibold text-muted-foreground">{partPaid ? 'Outstanding' : 'To pay'}</dt>
+              <dt className="text-[11px] font-semibold text-muted-foreground">{partPaid ? 'Outstanding' : 'To Pay'}</dt>
               <dd className="mt-0.5 font-semibold tabular-nums">{formatMoney(info.amount_due, info.currency)}</dd>
             </div>
           </dl>

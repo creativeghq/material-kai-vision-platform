@@ -181,7 +181,7 @@ export const PayViaRevolutDialog: React.FC<{
         ) : (
           <div className="space-y-3">
             <div>
-              <Label className="text-xs" htmlFor="pvr-bank">Supplier account</Label>
+              <Label className="text-xs" htmlFor="pvr-bank">Supplier Account</Label>
               <Select value={bankId} onValueChange={(v) => { setBankId(v); setVopBlocked(false); setForceVop(false); }}>
                 <SelectTrigger id="pvr-bank"><SelectValue placeholder="— choose —" /></SelectTrigger>
                 <SelectContent>
@@ -210,7 +210,7 @@ export const PayViaRevolutDialog: React.FC<{
                 <Input id="pvr-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
               </div>
               <div>
-                <Label className="text-xs" htmlFor="pvr-ref">Reference note (optional)</Label>
+                <Label className="text-xs" htmlFor="pvr-ref">Reference Note (optional)</Label>
                 <Input id="pvr-ref" value={reference} onChange={(e) => setReference(e.target.value)} maxLength={100} />
                 <p className="mt-1 text-[10px] text-muted-foreground">
                   Sent as <span className="font-mono">{payoutReference(bill?.supplier_bill_number, reference)}</span> — the

@@ -33,7 +33,7 @@ export interface CogsResult {
 }
 
 export const METHOD_LABEL: Record<ValuationMethod, string> = {
-  weighted_average: 'Weighted average (μέση σταθμική)',
+  weighted_average: 'Weighted Average (μέση σταθμική)',
   fifo: 'FIFO',
   standard: 'Standard cost',
 };

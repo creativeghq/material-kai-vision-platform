@@ -22,7 +22,7 @@ export function buildCatalogOperationsFilters(
       key: 'general', label: 'General', icon: BookOpen,
       fields: [
         {
-          key: 'q', type: 'text', label: 'Email contains',
+          key: 'q', type: 'text', label: 'Email Contains',
           placeholder: 'Search by email…',
           column: 'email',
         },
@@ -36,10 +36,10 @@ export function buildCatalogOperationsFilters(
           column: 'catalog_id',
         },
         {
-          key: 'event_type', type: 'select', label: 'Event type',
+          key: 'event_type', type: 'select', label: 'Event Type',
           description: 'Applies to the Events timeline; the email-gate log has no event type.',
           options: [
-            { value: 'page_view', label: 'Page views' },
+            { value: 'page_view', label: 'Page Views' },
             { value: 'pdf_download', label: 'PDF downloads' },
           ],
           column: 'event_type',
@@ -50,13 +50,13 @@ export function buildCatalogOperationsFilters(
       key: 'visitor', label: 'Visitor', icon: Users,
       fields: [
         {
-          key: 'matched_kind', type: 'multi', label: 'Matched as',
+          key: 'matched_kind', type: 'multi', label: 'Matched As',
           description: 'How the gate resolved the visitor email against the platform.',
           options: optionsFromRows(timelineRows, (r: any) => r.matched_kind, humanizeLabel),
           accessor: (r) => r.matched_kind,
         },
         {
-          key: 'matched_user', type: 'bool', label: 'Platform user',
+          key: 'matched_user', type: 'bool', label: 'Platform User',
           trueLabel: 'Matched a user', falseLabel: 'Anonymous visitor',
           accessor: (r) => !!r.matched_user_id,
         },

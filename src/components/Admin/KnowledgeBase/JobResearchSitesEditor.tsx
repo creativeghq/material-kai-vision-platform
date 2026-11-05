@@ -25,14 +25,14 @@ import {
 const SITE_TYPES: Array<{ key: JobSiteType; label: string; description: string; example: string }> = [
   {
     key: 'perplexity_domain',
-    label: 'Perplexity domain filter',
+    label: 'Perplexity Domain Filter',
     description:
       "Pinned domains for Sonar's search_domain_filter. Capped at 10 by Perplexity — extras truncate alphabetically. Bare domains (no scheme).",
     example: 'kariera.gr',
   },
   {
     key: 'rss_feed_default',
-    label: 'Default RSS feeds',
+    label: 'Default RSS Feeds',
     description:
       'RSS / Atom feeds polled directly via httpx + XML parse on every refresh, UNIONed with each tracked_job\'s own rss_feed_urls. Gives per-item dates that Perplexity search can\'t. New tracked_jobs auto-enable the rss_feeds source when any default exists.',
     example: 'https://weworkremotely.com/categories/remote-back-end-programming-jobs.rss',
@@ -331,7 +331,7 @@ export function JobResearchSitesEditor() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Display name (optional)</Label>
+                <Label className="text-xs">Display Name (optional)</Label>
                 <Input value={draft.display_name} onChange={(e) => setDraft(d => ({ ...d, display_name: e.target.value }))} placeholder="Kariera.gr" />
               </div>
               <div>
@@ -376,7 +376,7 @@ export function JobResearchSitesEditor() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Label className="text-xs">Display name (optional)</Label>
+                <Label className="text-xs">Display Name (optional)</Label>
                 <Input value={editDraft.display_name} onChange={(e) => setEditDraft(d => ({ ...d, display_name: e.target.value }))} placeholder="Kariera.gr" />
               </div>
               <div>
@@ -410,7 +410,7 @@ export function JobResearchSitesEditor() {
           </DialogHeader>
           <div className="space-y-3">
             <div>
-              <Label className="text-xs">Resources (one per line)</Label>
+              <Label className="text-xs">Resources (One per Line)</Label>
               <Textarea
                 value={bulkUrls}
                 onChange={(e) => setBulkUrls(e.target.value)}

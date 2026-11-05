@@ -2178,7 +2178,7 @@ async function sendOrderConfirmation(
       // A social DM is private; the send-router relays it and throws on a failed relay.
       await insertMessageAndNotify(db, {
         thread, senderParticipantId: null, body, attachments: [],
-        messageType: 'text', senderUserId: null, senderLabel: 'Order confirmation',
+        messageType: 'text', senderUserId: null, senderLabel: 'Order Confirmation',
       });
       return { channel: 'social', status: 'sent', at };
     }
@@ -2193,7 +2193,7 @@ async function sendOrderConfirmation(
         attachments: [],
         messageType: 'text',
         senderUserId: null,
-        senderLabel: 'Order confirmation',
+        senderLabel: 'Order Confirmation',
       });
       return { channel: 'email', status: 'sent', at };
     }
@@ -2205,7 +2205,7 @@ async function sendOrderConfirmation(
       attachments: [],
       messageType: 'text',
       senderUserId: null,
-      senderLabel: 'Order confirmation',
+      senderLabel: 'Order Confirmation',
     });
     return { channel: 'none', status: 'sent', at };
   } catch (e) {

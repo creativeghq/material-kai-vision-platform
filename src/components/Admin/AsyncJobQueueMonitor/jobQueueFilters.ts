@@ -40,18 +40,18 @@ export function buildJobQueueFilters(jobs: BackgroundJob[]): FilterGroupDef[] {
       key: 'health', label: 'Health', icon: AlertTriangle,
       fields: [
         {
-          key: 'has_error', type: 'bool', label: 'Error message',
+          key: 'has_error', type: 'bool', label: 'Error Message',
           trueLabel: 'Has an error', falseLabel: 'No error',
           accessor: (j) => !!j.error,
         },
         {
-          key: 'has_failures', type: 'bool', label: 'Failure rollup',
+          key: 'has_failures', type: 'bool', label: 'Failure Rollup',
           description: 'update_job_failure_summary found per-product or OCR failures on this job.',
           trueLabel: 'Has failures', falseLabel: 'Clean',
           accessor: (j) => !!j.failure_summary,
         },
         {
-          key: 'slow_operation', type: 'bool', label: 'Slow operation',
+          key: 'slow_operation', type: 'bool', label: 'Slow Operation',
           description: 'Currently inside a stage that is legitimately long-running, so auto-recovery skips it.',
           trueLabel: 'In a slow operation', falseLabel: 'Not in a slow operation',
           accessor: (j) => !!j.current_slow_operation,
@@ -73,7 +73,7 @@ export function buildJobQueueFilters(jobs: BackgroundJob[]): FilterGroupDef[] {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
         { key: 'created_at', type: 'dateRange', label: 'Created', accessor: (j) => j.created_at },
-        { key: 'updated_at', type: 'dateRange', label: 'Last update', accessor: (j) => j.updated_at ?? j.created_at },
+        { key: 'updated_at', type: 'dateRange', label: 'Last Update', accessor: (j) => j.updated_at ?? j.created_at },
       ],
     },
   ];

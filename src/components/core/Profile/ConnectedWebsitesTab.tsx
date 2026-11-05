@@ -46,7 +46,7 @@ function statusOf(w: UserWebsite): {
   icon: React.ReactNode;
 } {
   if (w.last_crawl_error) {
-    return { label: 'Crawl failed', variant: 'error', icon: <AlertTriangle className="h-3 w-3" /> };
+    return { label: 'Crawl Failed', variant: 'error', icon: <AlertTriangle className="h-3 w-3" /> };
   }
   if (w.last_crawled_at && w.page_count > 0) {
     return { label: 'Indexed', variant: 'success', icon: <CheckCircle2 className="h-3 w-3" /> };
@@ -283,7 +283,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
     },
     {
       id: 'crawled',
-      header: 'Last crawl',
+      header: 'Last Crawl',
       align: 'right',
       hideBelow: 'md',
       cell: (w) => (w.last_crawled_at ? timeAgo(w.last_crawled_at) : <HubCellEmpty />),
@@ -422,7 +422,7 @@ export const ConnectedWebsitesTab: React.FC<{ onOpen?: (w: UserWebsite) => void 
               />
             </div>
             <div>
-              <Label htmlFor="ws-cap">Max pages to index</Label>
+              <Label htmlFor="ws-cap">Max Pages to Index</Label>
               <Input
                 id="ws-cap"
                 type="number"

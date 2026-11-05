@@ -218,7 +218,7 @@ export interface KycCheck {
 }
 export const KYC_TYPE_LABELS: Record<string, string> = {
   identity: 'Identity',
-  source_of_funds: 'Source of funds',
+  source_of_funds: 'Source of Funds',
   pep_sanctions: 'PEP & sanctions',
 };
 
@@ -282,14 +282,14 @@ export interface PropertyDocument {
   url?: string | null;
 }
 export const DOC_TYPE_LABELS: Record<string, string> = {
-  energy_certificate: 'Energy certificate (ΠΕΑ)',
-  building_id: 'Electronic building ID (Ηλ. Ταυτότητα)',
-  title_deed: 'Title deed',
-  floor_plan: 'Floor plan',
+  energy_certificate: 'Energy Certificate (ΠΕΑ)',
+  building_id: 'Electronic Building ID (Ηλ. Ταυτότητα)',
+  title_deed: 'Title Deed',
+  floor_plan: 'Floor Plan',
   topographic: 'Topographic diagram',
-  agency_agreement: 'Agency agreement',
+  agency_agreement: 'Agency Agreement',
   permit: 'Permit',
-  tax_clearance: 'Tax clearance',
+  tax_clearance: 'Tax Clearance',
   other: 'Other',
 };
 export interface OpenHouse {

@@ -271,7 +271,7 @@ function ProductTile({ product, onView, surplus, price }: {
                 )}
               </span>
               <span className="text-[10px] text-muted-foreground">
-                {price.kind === 'your_price' ? 'Your price' : 'Retail'}
+                {price.kind === 'your_price' ? 'Your Price' : 'Retail'}
               </span>
             </>
           ) : (
@@ -634,8 +634,8 @@ export const DiscoverPage: React.FC = () => {
               <Select value={profileSort} onValueChange={(v) => setProfileSort(v as 'followers' | 'views' | 'name')}>
                 <SelectTrigger className="h-8 w-40 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="followers">Most followed</SelectItem>
-                  <SelectItem value="views">Most viewed</SelectItem>
+                  <SelectItem value="followers">Most Followed</SelectItem>
+                  <SelectItem value="views">Most Viewed</SelectItem>
                   <SelectItem value="name">Name A–Z</SelectItem>
                 </SelectContent>
               </Select>
@@ -758,7 +758,7 @@ export const DiscoverPage: React.FC = () => {
                     <SelectTrigger className="h-8 w-36 text-xs"><SelectValue placeholder="Sort" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="name">Name A–Z</SelectItem>
-                      <SelectItem value="factory">By brand</SelectItem>
+                      <SelectItem value="factory">By Brand</SelectItem>
                     </SelectContent>
                   </Select>
                 </FilterBar>

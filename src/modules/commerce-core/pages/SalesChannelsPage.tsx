@@ -44,11 +44,11 @@ const PLATFORM_LABEL: Record<CommercePlatform, string> = {
 };
 
 const CREDENTIAL_FIELDS: Record<CommercePlatform, { key: string; label: string; hint?: string }[]> = {
-  skroutz: [{ key: 'api_token', label: 'Smart Cart API token', hint: 'Merchants → Services → Skroutz Marketplace. Generating a new token expires the previous one.' }],
-  shopify: [{ key: 'admin_token', label: 'Admin API access token', hint: 'Needs read_orders and write_orders.' }],
+  skroutz: [{ key: 'api_token', label: 'Smart Cart API Token', hint: 'Merchants → Services → Skroutz Marketplace. Generating a new token expires the previous one.' }],
+  shopify: [{ key: 'admin_token', label: 'Admin API Access Token', hint: 'Needs read_orders and write_orders.' }],
   woocommerce: [
-    { key: 'consumer_key', label: 'Consumer key' },
-    { key: 'consumer_secret', label: 'Consumer secret' },
+    { key: 'consumer_key', label: 'Consumer Key' },
+    { key: 'consumer_secret', label: 'Consumer Secret' },
   ],
   generic: [{ key: 'api_token', label: 'API token' }],
 };
@@ -294,7 +294,7 @@ export default function SalesChannelsPage() {
                     </div>
                   ))}
                   <div className="space-y-1 sm:col-span-2">
-                    <Label>Webhook secret</Label>
+                    <Label>Webhook Secret</Label>
                     <div className="flex gap-2">
                       <Input value={secret} onChange={(e) => setSecret(e.target.value)} className="font-mono text-xs" />
                       <Button type="button" variant="outline" onClick={() => setSecret(generateWebhookSecret())}>Regenerate</Button>
@@ -392,7 +392,7 @@ export default function SalesChannelsPage() {
                       </div>
                     ))}
                     <div className="space-y-1">
-                      <Label>Webhook secret</Label>
+                      <Label>Webhook Secret</Label>
                       <div className="flex gap-2">
                         <Input value={rotateSecret} onChange={(e) => setRotateSecret(e.target.value)} className="font-mono text-xs" placeholder="Leave blank to keep the current one" />
                         <Button type="button" variant="outline" onClick={() => setRotateSecret(generateWebhookSecret())}>Generate</Button>

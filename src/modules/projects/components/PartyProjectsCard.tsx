@@ -86,7 +86,7 @@ export const PartyProjectsCard: React.FC<{
                   <th className="px-4 py-2 text-left">Deadline</th>
                   <th className="px-4 py-2 text-right">Budget</th>
                   <th className="px-4 py-2 text-right">Spent</th>
-                  <th className="px-4 py-2 text-right">Last activity</th>
+                  <th className="px-4 py-2 text-right">Last Activity</th>
                   <th className="px-4 py-2 text-right w-14"><span className="sr-only">Actions</span></th>
                 </tr>
               </thead>

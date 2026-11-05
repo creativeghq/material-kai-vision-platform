@@ -108,7 +108,7 @@ export default function PublicContractSignPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label>Your full legal name <span className="text-destructive">*</span></Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={state.counterparty || 'Full name'} />
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={state.counterparty || 'Full Name'} />
           </div>
           <div className="space-y-1">
             <Label>Email (optional)</Label>

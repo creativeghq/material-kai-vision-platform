@@ -1397,7 +1397,7 @@ export function PlatformOverviewTab() {
         <KpiCard label="Avg Rating" value={reviewKpis.avgRating !== '—' ? `${reviewKpis.avgRating}★` : '—'} icon={Star} color="text-amber-500" />
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <KpiCard label="Projects (all-time)" value={projectKpis.total} icon={Package} color="text-primary" />
+        <KpiCard label="Projects (All-Time)" value={projectKpis.total} icon={Package} color="text-primary" />
         <KpiCard label="Active Projects" value={projectKpis.active} icon={Package} color="text-green-600" sub={projectKpis.total > 0 ? `${Math.round((projectKpis.active / projectKpis.total) * 100)}% of total` : undefined} />
         <KpiCard label="With Deadline" value={projectKpis.withDeadline} icon={Award} color="text-amber-500" />
         <KpiCard label="Budget Allocated (USD)" value={`$${projectKpis.budgetSumUsd.toLocaleString('en-US', { maximumFractionDigits: 0 })}`} icon={Award} color="text-cyan-600" sub="USD-quoted projects only" />
@@ -1513,7 +1513,7 @@ export function PlatformOverviewTab() {
         <KpiCard label="Searches (12w)" value={searchKpis.totalSearches} icon={Search} />
         <KpiCard label="Search→Save Rate" value={searchKpis.searchToSaveRate} icon={TrendingUp} color="text-green-600" />
         <KpiCard label="Avg Satisfaction" value={searchKpis.avgSatisfaction !== '—' ? `${searchKpis.avgSatisfaction}★` : '—'} icon={Star} color="text-amber-500" />
-        <KpiCard label="Zero-result Rate" value={searchKpis.zeroResultRate} icon={Package} color="text-red-500" />
+        <KpiCard label="Zero-Result Rate" value={searchKpis.zeroResultRate} icon={Package} color="text-red-500" />
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl">
@@ -1545,7 +1545,7 @@ export function PlatformOverviewTab() {
               <LineChart data={searchLatencyTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                 <XAxis dataKey="week" tick={{ fontSize: 11 }} /><YAxis tick={{ fontSize: 11 }} />
-                <Tooltip formatter={(v: any) => [`${v}ms`, 'Avg latency']} />
+                <Tooltip formatter={(v: any) => [`${v}ms`, 'Avg Latency']} />
                 <Line type="monotone" dataKey="avgMs" stroke={COLORS[4]} strokeWidth={2} dot={false} name="Avg ms" />
               </LineChart>
             </ResponsiveContainer>
@@ -1670,7 +1670,7 @@ export function PlatformOverviewTab() {
                     <p className="text-xs text-muted-foreground">{doc.category}</p>
                   </div>
                   <div className="ml-4 shrink-0 flex items-center gap-3 tabular-nums text-muted-foreground text-xs">
-                    <span title="Page views">{doc.views} views</span>
+                    <span title="Page Views">{doc.views} views</span>
                     {doc.agentMentions > 0 && <span title="AI agent mentions" className="text-violet-600">🤖 {doc.agentMentions}</span>}
                   </div>
                 </div>

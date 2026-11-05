@@ -244,7 +244,7 @@ export const SocialPostEditorDialog: React.FC<{
             {editable && (
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="social-post-account" className="text-xs text-muted-foreground">Post as</Label>
+                  <Label htmlFor="social-post-account" className="text-xs text-muted-foreground">Post As</Label>
                   <Select value={accountId} onValueChange={setAccountId}>
                     <SelectTrigger id="social-post-account" className="mt-1">
                       <SelectValue placeholder={eligibleAccounts.length ? 'Choose an account…' : `No ${platformLabel(post.platform)} account connected`} />

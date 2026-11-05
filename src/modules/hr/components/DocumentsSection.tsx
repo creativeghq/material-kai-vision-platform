@@ -158,7 +158,7 @@ function UploadDialog({ workspaceId, employees, onDone }: { workspaceId: string;
               <Label>Employee</Label>
               <Select value={employeeId || 'none'} onValueChange={(v) => setEmployeeId(v === 'none' ? '' : v)}>
                 <SelectTrigger><SelectValue placeholder="General" /></SelectTrigger>
-                <SelectContent><SelectItem value="none">General (no employee)</SelectItem>{employees.map((e) => <SelectItem key={e.id} value={e.id}>{empName(e)}</SelectItem>)}</SelectContent>
+                <SelectContent><SelectItem value="none">General (No Employee)</SelectItem>{employees.map((e) => <SelectItem key={e.id} value={e.id}>{empName(e)}</SelectItem>)}</SelectContent>
               </Select>
             </div>
             <div className="space-y-1">

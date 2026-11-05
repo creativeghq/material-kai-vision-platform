@@ -365,7 +365,7 @@ export default function PublicQuotePage() {
             <div className="flex items-center gap-2 text-sm font-medium"><PenLine className="h-4 w-4 text-primary" /> Approve this quote</div>
             <p className="text-xs text-muted-foreground">Type your name to sign and accept this estimate. Your signature is recorded with a timestamp.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <Input placeholder="Full name *" value={signerName} onChange={(e) => setSignerName(e.target.value)} />
+              <Input placeholder="Full Name *" value={signerName} onChange={(e) => setSignerName(e.target.value)} />
               <Input placeholder="Email (optional)" value={signerEmail} onChange={(e) => setSignerEmail(e.target.value)} />
             </div>
             {acceptError && <div className="text-xs text-destructive">{acceptError}</div>}

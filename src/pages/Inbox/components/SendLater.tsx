@@ -20,9 +20,9 @@ function at(daysAhead: number, hour: number): Date {
 export function sendLaterPresets(now = new Date()): Array<{ label: string; at: Date }> {
   const toMonday = ((8 - now.getDay()) % 7) || 7;
   return [
-    { label: 'Tomorrow morning', at: at(1, 8) },
-    { label: 'Tomorrow afternoon', at: at(1, 14) },
-    { label: 'Monday morning', at: at(toMonday, 8) },
+    { label: 'Tomorrow Morning', at: at(1, 8) },
+    { label: 'Tomorrow Afternoon', at: at(1, 14) },
+    { label: 'Monday Morning', at: at(toMonday, 8) },
   ];
 }
 

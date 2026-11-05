@@ -142,7 +142,7 @@ export const QuestionPagePicker: React.FC<{
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-2">
                         <span className="truncate text-xs font-medium text-foreground">{r.title || urlPath(r.url)}</span>
-                        {found === null && i === 0 && <Badge variant="info">Best match</Badge>}
+                        {found === null && i === 0 && <Badge variant="info">Best Match</Badge>}
                       </span>
                       <span className="block truncate text-[11px] text-muted-foreground">{urlPath(r.url)}</span>
                       {r.hint && <span className="block text-[11px] text-muted-foreground">{r.hint}</span>}

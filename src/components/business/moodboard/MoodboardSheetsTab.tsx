@@ -33,14 +33,14 @@ interface MoodboardSheetsTabProps {
 }
 
 const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
-  material_board: 'Selected materials with descriptions and swatches',
+  material_board: 'Selected Materials with Descriptions and Swatches',
   color_palette: 'Color palette extracted from your moodboard',
-  concept_board: 'Inspiration collage with curated images',
-  lighting_plan: 'Top-down floor plan with fixture symbols',
+  concept_board: 'Inspiration Collage with Curated Images',
+  lighting_plan: 'Top-Down Floor Plan with Fixture Symbols',
   plumbing_plan: 'Top-down plan with plumbing fixtures (WC, basin, bath, drains)',
   electrical_plan: 'Top-down plan with sockets, switches, the board and data/TV outlets',
-  annotated_render: 'Render with AI-detected callouts',
-  elevation_render_pair: 'Uploaded elevation with dimensions + render',
+  annotated_render: 'Render with AI-Detected Callouts',
+  elevation_render_pair: 'Uploaded Elevation with Dimensions + Render',
   ffe_schedule: 'Furniture, Fixtures & Equipment table',
   scope_of_works: 'What will happen — phases and works, from the client-visible tasks on the project',
   area_breakdown: 'Composited design board: hero render + plan + elevation + finishes',

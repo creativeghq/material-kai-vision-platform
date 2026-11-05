@@ -82,7 +82,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
       // the product opted in via `enforce_moq`. Either way the operator is told which it was.
       const moqNote = r.moq_rounded ? ` Raised from ${r.quantity_requested} — supplier minimum ${r.moq}.` : '';
       toast({
-        title: r.moq_rounded ? 'Reorder drafted at the supplier minimum' : 'Reorder drafted',
+        title: r.moq_rounded ? 'Reorder drafted at the supplier minimum' : 'Reorder Drafted',
         description: `${r.quantity} ${it.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}.${moqNote} Review & send in Finance → Orders.`,
       });
     } catch (err: any) {
@@ -100,13 +100,13 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
         <KPI icon={Coins} label={`Stock value${ov.items_missing_cost > 0 ? ` · ${ov.items_missing_cost} missing cost` : ''}`} value={fmtMoney(ov.total_value, val?.currencies?.[0])} />
-        <KPI icon={Package} label="Stock items" value={ov.items} />
+        <KPI icon={Package} label="Stock Items" value={ov.items} />
         <KPI icon={WarehouseIcon} label="Warehouses" value={ov.warehouses} />
-        <KPI icon={PackageCheck} label="Units on hand" value={formatNumber(Number(ov.total_on_hand))} />
-        <KPI icon={ArrowLeftRight} label="Units reserved" value={formatNumber(Number(ov.total_reserved))} />
-        <KPI icon={AlertTriangle} label="Low stock" value={ov.low_stock} tone={ov.low_stock > 0 ? 'amber' : 'default'} />
-        <KPI icon={PackageX} label="Out of stock" value={ov.out_of_stock} tone={ov.out_of_stock > 0 ? 'red' : 'default'} />
-        <KPI icon={Inbox} label="Pending intake" value={ov.pending_intake} tone={ov.pending_intake > 0 ? 'amber' : 'default'} />
+        <KPI icon={PackageCheck} label="Units on Hand" value={formatNumber(Number(ov.total_on_hand))} />
+        <KPI icon={ArrowLeftRight} label="Units Reserved" value={formatNumber(Number(ov.total_reserved))} />
+        <KPI icon={AlertTriangle} label="Low Stock" value={ov.low_stock} tone={ov.low_stock > 0 ? 'amber' : 'default'} />
+        <KPI icon={PackageX} label="Out of Stock" value={ov.out_of_stock} tone={ov.out_of_stock > 0 ? 'red' : 'default'} />
+        <KPI icon={Inbox} label="Pending Intake" value={ov.pending_intake} tone={ov.pending_intake > 0 ? 'amber' : 'default'} />
         <KPI icon={ClipboardList} label="Open counts" value={ov.open_counts} />
       </div>
 
@@ -161,7 +161,7 @@ export const StockOverviewSection: React.FC<{ workspaceId: string; onNavigate?: 
                 <tr className="border-b border-border/60">
                   <th className="px-4 py-2 text-left">Item</th>
                   <th className="px-4 py-2 text-left">SKU</th>
-                  <th className="px-4 py-2 text-right">On hand</th>
+                  <th className="px-4 py-2 text-right">On Hand</th>
                   <th className="px-4 py-2 text-right">Reorder</th>
                   <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                 </tr>

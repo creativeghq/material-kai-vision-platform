@@ -78,7 +78,7 @@ export const INVOICE_LABELS: Record<Lang, Record<string, string>> = {
     itemCode: 'Item Code', itemDescr: 'Description', itemComment: 'Comment',
     order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order Note',
     preInvoice: 'PRE-INVOICE', preInvoiceNote: 'Not a Tax Document.',
-    recipient: 'RECIPIENT', totalQty: 'Total quantity', transportDate: 'Transport date',
+    recipient: 'RECIPIENT', totalQty: 'Total Quantity', transportDate: 'Transport Date',
     salesOrder: 'ORDER CONFIRMATION', purchaseOrder: 'PURCHASE ORDER', supplier: 'SUPPLIER',
   },
 };

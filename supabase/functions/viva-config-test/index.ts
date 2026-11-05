@@ -70,7 +70,7 @@ Deno.serve(withApiLogging('viva-config-test', async (req) => {
   if (!transferCtx) {
     checks.push({
       key: 'transfer',
-      label: 'Sending money',
+      label: 'Sending Money',
       ok: false,
       detail: 'No Account Transactions credentials saved. Viva can take card payments but cannot send any — '
         + 'add the second client pair from Settings → API Access.',
@@ -86,7 +86,7 @@ Deno.serve(withApiLogging('viva-config-test', async (req) => {
       }));
       checks.push({
         key: 'transfer',
-        label: 'Sending money',
+        label: 'Sending Money',
         ok: wallets.length > 0,
         detail: wallets.length > 0
           ? `${wallets.length} wallet${wallets.length === 1 ? '' : 's'} readable — map one to a bank account to pay from it.`
@@ -95,7 +95,7 @@ Deno.serve(withApiLogging('viva-config-test', async (req) => {
     } catch (err) {
       checks.push({
         key: 'transfer',
-        label: 'Sending money',
+        label: 'Sending Money',
         ok: false,
         detail: `${err instanceof Error ? err.message : String(err)}`,
       });

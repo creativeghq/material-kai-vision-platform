@@ -59,11 +59,11 @@ type SortDirection = 'asc' | 'desc';
 
 /** The grid's sort menu. The table sorts by column instead, through the same comparator. */
 const GRID_SORTS: ReadonlyArray<{ id: string; label: string; key: SortKey; direction: SortDirection }> = [
-  { id: 'updated:desc', label: 'Recently active', key: 'updated', direction: 'desc' },
+  { id: 'updated:desc', label: 'Recently Active', key: 'updated', direction: 'desc' },
   { id: 'deadline:asc', label: 'Deadline, soonest first', key: 'deadline', direction: 'asc' },
   { id: 'name:asc', label: 'Name, A to Z', key: 'name', direction: 'asc' },
-  { id: 'budget:desc', label: 'Most budget used', key: 'budget', direction: 'desc' },
-  { id: 'created:desc', label: 'Newest first', key: 'created', direction: 'desc' },
+  { id: 'budget:desc', label: 'Most Budget Used', key: 'budget', direction: 'desc' },
+  { id: 'created:desc', label: 'Newest First', key: 'created', direction: 'desc' },
 ];
 
 const VIEW_OPTIONS: readonly HubSegment<ProjectsView>[] = [
@@ -257,7 +257,7 @@ export const ProjectsListPage: React.FC = () => {
     },
     {
       id: 'budget',
-      header: 'Budget used',
+      header: 'Budget Used',
       sortable: true,
       align: 'right',
       hideBelow: 'lg',

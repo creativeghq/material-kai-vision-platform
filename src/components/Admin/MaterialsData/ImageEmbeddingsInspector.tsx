@@ -170,7 +170,7 @@ export const ImageEmbeddingsInspector: React.FC<ImageEmbeddingsInspectorProps> =
             )}
             {va.parse_error && (
               <Badge variant="outline" className="text-xs text-amber-700 border-amber-500">
-                Parse error
+                Parse Error
               </Badge>
             )}
           </CardTitle>
@@ -184,7 +184,7 @@ export const ImageEmbeddingsInspector: React.FC<ImageEmbeddingsInspectorProps> =
           {va.data && (
             <div className="grid grid-cols-2 gap-2">
               {va.data.material_type && (
-                <Field label="Material type" value={va.data.material_type} />
+                <Field label="Material Type" value={va.data.material_type} />
               )}
               {va.data.category && <Field label="Category" value={va.data.category} />}
               {va.data.subcategory && <Field label="Subcategory" value={va.data.subcategory} />}

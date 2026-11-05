@@ -17,7 +17,7 @@ export const PROJECT_SECTION_LABELS: Record<ProjectTab, string> = {
   purchases: 'Purchases',
   quotes: 'Quotes',
   billing: 'Invoicing',
-  finance: 'Cost report',
+  finance: 'Cost Report',
   sheets: 'Sheets',
   'client-view': 'Client View',
   contracts: 'Contracts',

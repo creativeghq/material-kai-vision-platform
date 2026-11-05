@@ -297,7 +297,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label className="text-xs" htmlFor="crmb-name">Bank name *</Label>
+          <Label className="text-xs" htmlFor="crmb-name">Bank Name *</Label>
           <Input
             id="crmb-name"
             list="crmb-bank-names"
@@ -311,7 +311,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
           </datalist>
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs" htmlFor="crmb-holder">Account holder</Label>
+          <Label className="text-xs" htmlFor="crmb-holder">Account Holder</Label>
           <Input id="crmb-holder" value={form.account_holder ?? ''} onChange={(e) => setForm((f) => ({ ...f, account_holder: e.target.value }))} placeholder="Name on the account" />
         </div>
         <div className="space-y-1.5">
@@ -440,7 +440,7 @@ export const CrmBankAccountsCard: React.FC<Props> = ({ workspaceId, companyId, c
                             </Badge>
                           )}
                           {!s.checksum_ok && (
-                            <Badge variant="error" className="text-[9px] py-0">Fails its checksum</Badge>
+                            <Badge variant="error" className="text-[9px] py-0">Fails Its Checksum</Badge>
                           )}
                         </div>
                         {s.iban && <div className="text-xs font-mono text-muted-foreground truncate">{s.iban}</div>}

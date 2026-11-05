@@ -14,14 +14,14 @@ const EMPTY: SignatureCard = {
 
 const FIELDS: Array<{ key: Exclude<keyof SignatureCard, 'confidentiality'>; label: string; placeholder: string }> = [
   { key: 'name', label: 'Name', placeholder: 'Maria Papadopoulou' },
-  { key: 'title', label: 'Job title', placeholder: 'Sales Manager' },
+  { key: 'title', label: 'Job Title', placeholder: 'Sales Manager' },
   { key: 'company', label: 'Company', placeholder: 'Example Ltd' },
   { key: 'phone', label: 'Phone', placeholder: '+30 210 000 0000' },
   { key: 'email', label: 'Email', placeholder: 'maria@example.gr' },
   { key: 'website', label: 'Website', placeholder: 'example.gr' },
   { key: 'address', label: 'Location', placeholder: 'Thessaloniki, Greece' },
   { key: 'tagline', label: 'Tagline', placeholder: 'One line about the business' },
-  { key: 'logo_url', label: 'Logo image URL (https)', placeholder: 'https://…/logo.png' },
+  { key: 'logo_url', label: 'Logo Image URL (https)', placeholder: 'https://…/logo.png' },
 ];
 
 export const SignatureDesignerDialog: React.FC<{

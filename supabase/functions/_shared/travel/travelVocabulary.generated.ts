@@ -10,13 +10,13 @@ export type FlightTripType = typeof FLIGHT_TRIP_TYPES[number];
 
 export const FLIGHT_CABIN_LABELS: Record<FlightCabin, string> = {
   economy: 'Economy',
-  premium_economy: 'Premium economy',
+  premium_economy: 'Premium Economy',
   business: 'Business',
   first: 'First',
 };
 
 export const FLIGHT_TRIP_TYPE_LABELS: Record<FlightTripType, string> = {
-  one_way: 'One way',
+  one_way: 'One Way',
   round_trip: 'Return',
 };
 

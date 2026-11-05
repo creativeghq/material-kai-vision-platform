@@ -540,7 +540,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
 
             {pendingEntityType === 'business' && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField label="Company name *">
+                <FormField label="Company Name *">
                   <Input
                     value={businessForm.name}
                     onChange={(e) => setBusinessForm({ ...businessForm, name: e.target.value })}
@@ -581,7 +581,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                     onAdopt={adoptAadeAll}
                   />
                 </FormField>
-                <FormField label="Tax office">
+                <FormField label="Tax Office">
                   <Input
                     value={businessForm.tax_office}
                     onChange={(e) => setBusinessForm({ ...businessForm, tax_office: e.target.value })}
@@ -602,7 +602,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                     placeholder="+30 210 0000000"
                   />
                 </FormField>
-                <FormField label="Business email">
+                <FormField label="Business Email">
                   <Input
                     type="email"
                     value={businessForm.email}
@@ -631,7 +631,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
                     placeholder="42"
                   />
                 </FormField>
-                <FormField label="Postal code">
+                <FormField label="Postal Code">
                   <Input
                     value={businessForm.postal_code}
                     onChange={(e) => setBusinessForm({ ...businessForm, postal_code: e.target.value })}
@@ -679,16 +679,16 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
             {entityType === 'business' ? (
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-y-4 gap-x-8">
-                  <FieldDisplay label="Company name" value={business.name} />
+                  <FieldDisplay label="Company Name" value={business.name} />
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">VAT number</p>
                     <p className="text-sm">{business.vat_number || <span className="text-muted-foreground italic">Not set</span>}</p>
                     <ViesStatusBadge cache={viesCache} />
                   </div>
-                  <FieldDisplay label="Tax office" value={business.tax_office} />
+                  <FieldDisplay label="Tax Office" value={business.tax_office} />
                   <FieldDisplay label="Profession" value={business.profession} />
                   <FieldDisplay label="Phone" value={business.phone} />
-                  <FieldDisplay label="Business email" value={business.email} />
+                  <FieldDisplay label="Business Email" value={business.email} />
                   <FieldDisplay label="Website" value={business.website} className="md:col-span-3" />
                   <FieldDisplay label="Address" value={fullAddress} className="md:col-span-3" />
                 </div>

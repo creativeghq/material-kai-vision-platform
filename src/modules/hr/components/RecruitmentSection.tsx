@@ -362,7 +362,7 @@ function AddApplicantDialog({ workspaceId, postingId, onDone }: { workspaceId: s
       <DialogContent>
         <DialogHeader><DialogTitle>Add Applicant</DialogTitle></DialogHeader>
         <div className="space-y-3">
-          <div className="space-y-1"><Label>Full name *</Label><Input value={f.name} onChange={(e) => upd('name', e.target.value)} /></div>
+          <div className="space-y-1"><Label>Full Name *</Label><Input value={f.name} onChange={(e) => upd('name', e.target.value)} /></div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1"><Label>Email</Label><Input type="email" value={f.email} onChange={(e) => upd('email', e.target.value)} /></div>
             <div className="space-y-1"><Label>Phone</Label><Input value={f.phone} onChange={(e) => upd('phone', e.target.value)} /></div>
@@ -500,7 +500,7 @@ function JobDialog({ workspaceId, departments, posting, onDone, scope }: { works
                   <SelectContent>{(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => <SelectItem key={t} value={t}>{EMPLOYMENT_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Work setup" optional className="sm:col-span-3">
+              <FormField label="Work Setup" optional className="sm:col-span-3">
                 <Select value={f.location_type || 'none'} onValueChange={(v) => upd('location_type', v === 'none' ? '' : v)}>
                   <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                   <SelectContent>
@@ -511,7 +511,7 @@ function JobDialog({ workspaceId, departments, posting, onDone, scope }: { works
               </FormField>
               <FormField label="Location" optional className="sm:col-span-2"><Input value={f.location} onChange={(e) => upd('location', e.target.value)} placeholder="United Kingdom; Ireland" /></FormField>
               <FormField label="Level" optional className="sm:col-span-2"><Input value={f.level} onChange={(e) => upd('level', e.target.value)} placeholder="P4" /></FormField>
-              <FormField label="Applications close" optional className="sm:col-span-2"><Input type="date" value={f.closes_at} onChange={(e) => upd('closes_at', e.target.value)} /></FormField>
+              <FormField label="Applications Close" optional className="sm:col-span-2"><Input type="date" value={f.closes_at} onChange={(e) => upd('closes_at', e.target.value)} /></FormField>
             </FormGrid>
           </FormSection>
 
@@ -538,8 +538,8 @@ function JobDialog({ workspaceId, departments, posting, onDone, scope }: { works
 
           <FormSection title="Pay">
             <FormGrid cols={3}>
-              <FormField label="Salary min" optional><Input type="text" inputMode="decimal" value={f.salary_min} onChange={(e) => upd('salary_min', e.target.value)} /></FormField>
-              <FormField label="Salary max" optional><Input type="text" inputMode="decimal" value={f.salary_max} onChange={(e) => upd('salary_max', e.target.value)} /></FormField>
+              <FormField label="Salary Min" optional><Input type="text" inputMode="decimal" value={f.salary_min} onChange={(e) => upd('salary_min', e.target.value)} /></FormField>
+              <FormField label="Salary Max" optional><Input type="text" inputMode="decimal" value={f.salary_max} onChange={(e) => upd('salary_max', e.target.value)} /></FormField>
               <FormField label="Currency"><Input value={f.currency} onChange={(e) => upd('currency', e.target.value.toUpperCase())} placeholder="EUR" /></FormField>
             </FormGrid>
 
@@ -567,13 +567,13 @@ function JobDialog({ workspaceId, departments, posting, onDone, scope }: { works
                   </div>
                 </div>
               ))}
-              <FormField label="Compensation note" optional>
+              <FormField label="Compensation Note" optional>
                 <Textarea rows={2} value={f.compensation_note} onChange={(e) => upd('compensation_note', e.target.value)} placeholder="How you determine compensation, link to your philosophy, etc." />
               </FormField>
             </div>
           </FormSection>
 
-          <FormSection title="Application form">
+          <FormSection title="Application Form">
             <div className="grid grid-cols-2 gap-2 text-sm">
               {([
                 ['require_resume', 'Require a résumé (PDF)'], ['ask_phone', 'Ask for phone'],

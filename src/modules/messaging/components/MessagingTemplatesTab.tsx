@@ -506,7 +506,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, workspaceId, on
           <FormSection title="Message">
             <FormGrid cols={1}>
               <FormField
-                label="Message content"
+                label="Message Content"
                 htmlFor="mt-content"
                 hint={
                   <span className="flex justify-between gap-2">
@@ -540,7 +540,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, workspaceId, on
             <FormSection title="WhatsApp">
               <FormGrid>
                 <FormField
-                  label="WhatsApp template name"
+                  label="WhatsApp Template Name"
                   htmlFor="mt-wa-name"
                   hint={formData.whatsapp_template_name
                     ? 'Bound. Cold sends will use this template.'
@@ -553,7 +553,7 @@ const TemplateModal: React.FC<TemplateModalProps> = ({ template, workspaceId, on
                     placeholder="approved_template_name"
                   />
                 </FormField>
-                <FormField label="Language code" htmlFor="mt-wa-lang">
+                <FormField label="Language Code" htmlFor="mt-wa-lang">
                   <Input
                     id="mt-wa-lang"
                     value={formData.whatsapp_language_code}

@@ -489,14 +489,14 @@ function drawTotals(page: PDFPage, g: Geom, totals: BrandedTotals, y: number, fo
   if (hasDiscount) {
     line('Value before discount', formatCurrency(totals.gross_subtotal as number, cur));
     line('Discount', `- ${formatCurrency(totals.discount_total as number, cur)}`, false, true);
-    line('Net value', formatCurrency(totals.subtotal, cur));
+    line('Net Value', formatCurrency(totals.subtotal, cur));
   } else {
     line('Price', formatCurrency(totals.subtotal, cur));
   }
   line(`VAT (${totals.vat_rate}%)`, formatCurrency(totals.vat_amount, cur), false, true);
   y -= 8;
   page.drawLine({ start: { x: labelX, y: y + 16 }, end: { x: rightEdge, y: y + 16 }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
-  line(hasDiscount ? 'Total payable' : 'FINAL', formatCurrency(totals.grand_total, cur), true);
+  line(hasDiscount ? 'Total Payable' : 'FINAL', formatCurrency(totals.grand_total, cur), true);
 }
 
 function drawTerms(pdfDoc: PDFDocument, g: Geom, page: PDFPage, startY: number, terms: string, bgImage: PDFImage | null, font: PDFFont, fontBold: PDFFont): { page: PDFPage; y: number; added: number } {
@@ -618,7 +618,7 @@ function drawSpecPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
   const startPage = () => {
     drawPageBackground(page, g, bgImage);
     let hy = g.PAGE_H - g.MARGIN_TOP;
-    const heading = doc.spec_title || 'Technical specification';
+    const heading = doc.spec_title || 'Technical Specification';
     if (first) {
       hy = drawHeadingWithRule(page, g, heading, hy, fontBold); hy -= 24;
       first = false;

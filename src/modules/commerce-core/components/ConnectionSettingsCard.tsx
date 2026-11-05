@@ -85,7 +85,7 @@ export const ConnectionSettingsCard: React.FC<{
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label>Warehouse orders draw from</Label>
+            <Label>Warehouse Orders Draw From</Label>
             <Select
               value={connection.default_warehouse_id ?? NONE}
               onValueChange={(v) => patch({ default_warehouse_id: v === NONE ? null : v })}
@@ -98,7 +98,7 @@ export const ConnectionSettingsCard: React.FC<{
             </Select>
           </div>
           <div className="space-y-1">
-            <Label>Income category</Label>
+            <Label>Income Category</Label>
             <Select
               value={connection.income_category_id ?? NONE}
               onValueChange={(v) => patch({ income_category_id: v === NONE ? null : v })}
@@ -112,12 +112,12 @@ export const ConnectionSettingsCard: React.FC<{
             <p className="text-xs text-muted-foreground">Leave it on the default unless this workspace keeps its own chart of accounts.</p>
           </div>
           <div className="space-y-1">
-            <Label>Receipt code</Label>
+            <Label>Receipt Code</Label>
             <Input value={connection.default_doc_code_receipt}
               onChange={(e) => patch({ default_doc_code_receipt: e.target.value })} className="font-mono" />
           </div>
           <div className="space-y-1">
-            <Label>Invoice code</Label>
+            <Label>Invoice Code</Label>
             <Input value={connection.default_doc_code_invoice}
               onChange={(e) => patch({ default_doc_code_invoice: e.target.value })} className="font-mono" />
           </div>
@@ -157,7 +157,7 @@ export const ConnectionSettingsCard: React.FC<{
                   onBlur={(e) => patch({ vat_number_key: e.target.value.trim() || null })} className="font-mono text-xs" />
               </div>
               <div className="space-y-1">
-                <Label>Invoice-requested field</Label>
+                <Label>Invoice-Requested Field</Label>
                 <Input defaultValue={connection.invoice_request_key ?? ''} placeholder="_billing_invoice_type"
                   onBlur={(e) => patch({ invoice_request_key: e.target.value.trim() || null })} className="font-mono text-xs" />
               </div>

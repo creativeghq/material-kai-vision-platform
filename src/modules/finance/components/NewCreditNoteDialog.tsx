@@ -247,7 +247,7 @@ export const NewCreditNoteDialog: React.FC<{
         <DialogHeader><DialogTitle>{draftId ? 'Edit credit note draft' : 'New Credit Note'}</DialogTitle><DialogDescription className="sr-only">Issue a credit note against an existing invoice.</DialogDescription></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label>Against invoice *</Label>
+            <Label>Against Invoice *</Label>
             <Select value={invoiceId} onValueChange={pick}>
               <SelectTrigger><SelectValue placeholder="Pick the invoice to credit…" /></SelectTrigger>
               <SelectContent>
@@ -280,7 +280,7 @@ export const NewCreditNoteDialog: React.FC<{
               <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             ) : hasItems ? (
               <div className="space-y-1">
-                <Label>Lines to credit</Label>
+                <Label>Lines to Credit</Label>
                 <div className="rounded-md border border-border/60">
                   <div className="grid grid-cols-[24px_1fr_70px_56px_84px_84px] gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground">
                     <span /><span>Description</span><span className="text-right">Invoiced</span><span className="text-right">Credit</span><span className="text-right">VAT</span><span className="text-right">Net</span>

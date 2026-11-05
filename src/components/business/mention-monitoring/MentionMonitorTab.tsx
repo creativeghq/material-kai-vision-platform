@@ -52,22 +52,22 @@ interface Props {
  * an operator nothing about what they are being asked to do.
  */
 const OPPORTUNITY_LABELS: Record<string, string> = {
-  keyword_opportunity: 'Keyword gap',
-  pao_question: 'People also ask',
+  keyword_opportunity: 'Keyword Gap',
+  pao_question: 'People Also Ask',
   ai_overview: 'AI Overview',
-  featured_snippet: 'Featured snippet',
-  related_search: 'Related search',
-  competitor_ranking: 'Competitor ranks here',
-  video_carousel: 'Video carousel',
-  news_carousel: 'News carousel',
-  knowledge_graph: 'Knowledge panel',
+  featured_snippet: 'Featured Snippet',
+  related_search: 'Related Search',
+  competitor_ranking: 'Competitor Ranks Here',
+  video_carousel: 'Video Carousel',
+  news_carousel: 'News Carousel',
+  knowledge_graph: 'Knowledge Panel',
   paid_competitor: 'Competitor is paying',
-  shopping_listing: 'Shopping listing',
+  shopping_listing: 'Shopping Listing',
   llm_visibility: 'LLM visibility',
-  domain_snapshot: 'Domain snapshot',
-  trending_topic: 'Trending topic',
-  outlet_pitch: 'Outlet to pitch',
-  author_relationship: 'Author to know',
+  domain_snapshot: 'Domain Snapshot',
+  trending_topic: 'Trending Topic',
+  outlet_pitch: 'Outlet to Pitch',
+  author_relationship: 'Author to Know',
   sentiment_response: 'Needs a response',
 };
 
@@ -668,7 +668,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                     >
                       <div className="flex items-center gap-2">
                         <Ban className="h-4 w-4 text-muted-foreground" />
-                        <CardTitle className="font-medium">Excluded sources</CardTitle>
+                        <CardTitle className="font-medium">Excluded Sources</CardTitle>
                         <Badge variant="outline" className="text-[10px]">{exclusions.length}</Badge>
                       </div>
                       <span className="text-xs text-muted-foreground">

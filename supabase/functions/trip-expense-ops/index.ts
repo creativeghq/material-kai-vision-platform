@@ -247,7 +247,7 @@ async function drawReport(
 
 // ---- helpers ----
 function statusLabel(s: string): string {
-  return ({ draft: 'Draft', submitted: 'Under review', partially_approved: 'Partially approved', approved: 'Approved', rejected: 'Rejected', reimbursed: 'Reimbursed' } as Record<string, string>)[s] || s;
+  return ({ draft: 'Draft', submitted: 'Under review', partially_approved: 'Partially Approved', approved: 'Approved', rejected: 'Rejected', reimbursed: 'Reimbursed' } as Record<string, string>)[s] || s;
 }
 function b64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);

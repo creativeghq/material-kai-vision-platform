@@ -150,7 +150,7 @@ export const IntrastatObligationCard: React.FC<Props> = ({
               />
             </div>
             <div>
-              <Label htmlFor={`intr-from-${flow}`} className="text-xs">Effective from</Label>
+              <Label htmlFor={`intr-from-${flow}`} className="text-xs">Effective From</Label>
               <Input
                 id={`intr-from-${flow}`} type="date" className="mt-1 h-8 w-40 text-xs"
                 value={draft.from}

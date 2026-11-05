@@ -164,7 +164,7 @@ export const TileQuantityDialog: React.FC<{
 
         <div className="flex items-end gap-2">
           <div className="w-28">
-            <Label htmlFor="tile-wastage" className="text-xs">Cut allowance %</Label>
+            <Label htmlFor="tile-wastage" className="text-xs">Cut Allowance %</Label>
             <Input
               id="tile-wastage" type="number" className="mt-1 h-8 text-xs" value={wastage}
               onChange={(e) => setWastage(e.target.value)}

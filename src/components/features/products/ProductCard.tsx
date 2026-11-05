@@ -166,7 +166,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           return (
             <div className="mb-3 pb-3 border-b border-gray-200">
               <p className="text-xs text-gray-600 mb-0.5">
-                {isYourPrice ? 'Your price' : 'Retail'} <span className="text-gray-400">(excl. VAT)</span>
+                {isYourPrice ? 'Your Price' : 'Retail'} <span className="text-gray-400">(excl. VAT)</span>
               </p>
               <p className="font-semibold text-gray-900">
                 {sym(cur)}{price.toFixed(2)}

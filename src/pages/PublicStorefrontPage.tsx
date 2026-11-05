@@ -244,7 +244,7 @@ const PublicStorefrontPage: React.FC = () => {
                       as one. Checkout is named in Annex I IV(g)(ii) specifically. */}
                   <div className="space-y-1">
                     <Label htmlFor="storefront-name" className="text-xs">Name</Label>
-                    <Input id="storefront-name" autoComplete="name" className="h-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your name" />
+                    <Input id="storefront-name" autoComplete="name" className="h-9" value={name} onChange={(e) => setName(e.target.value)} placeholder="Your Name" />
                   </div>
                   <div className="space-y-1">
                     <Label htmlFor="storefront-email" className="text-xs">Email</Label>
@@ -257,7 +257,7 @@ const PublicStorefrontPage: React.FC = () => {
                 </div>
                 {meta?.turnstile_site_key && (
                   <div className="space-y-1">
-                    <Label className="text-xs">Bot check</Label>
+                    <Label className="text-xs">Bot Check</Label>
                     <TurnstileWidget
                       ref={turnstileRef}
                       siteKey={meta.turnstile_site_key}

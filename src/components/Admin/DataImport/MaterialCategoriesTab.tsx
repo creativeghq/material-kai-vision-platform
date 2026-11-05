@@ -361,9 +361,9 @@ export const MaterialCategoriesTab: React.FC = () => {
             <TableHeader>
               <TableRow>
                 <TableHead className="w-24">Order</TableHead>
-                <TableHead>Display name</TableHead>
+                <TableHead>Display Name</TableHead>
                 <TableHead className="hidden md:table-cell">Key</TableHead>
-                <TableHead className="hidden sm:table-cell">Default unit</TableHead>
+                <TableHead className="hidden sm:table-cell">Default Unit</TableHead>
                 <TableHead>Active</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -454,7 +454,7 @@ export const MaterialCategoriesTab: React.FC = () => {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cat-display">Display name</Label>
+              <Label htmlFor="cat-display">Display Name</Label>
               <Input
                 id="cat-display"
                 value={editing.display_name}
@@ -464,7 +464,7 @@ export const MaterialCategoriesTab: React.FC = () => {
               <p className="text-xs text-muted-foreground">Shown in the dropdown to users.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cat-parent">Parent category</Label>
+              <Label htmlFor="cat-parent">Parent Category</Label>
               <Select
                 value={editing.parent_category_id ?? PARENT_NONE}
                 onValueChange={(v) => setEditing({ ...editing, parent_category_id: v === PARENT_NONE ? null : v })}
@@ -482,7 +482,7 @@ export const MaterialCategoriesTab: React.FC = () => {
               <p className="text-xs text-muted-foreground">Leave as top-level, or nest under a parent to make this a subcategory.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="cat-key">Key (slug)</Label>
+              <Label htmlFor="cat-key">Key (Slug)</Label>
               <Input
                 id="cat-key"
                 value={editing.category_key}
@@ -499,7 +499,7 @@ export const MaterialCategoriesTab: React.FC = () => {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="cat-unit">Default unit</Label>
+                <Label htmlFor="cat-unit">Default Unit</Label>
                 <Input
                   id="cat-unit"
                   value={editing.default_unit ?? 'pcs'}
@@ -556,7 +556,7 @@ export const MaterialCategoriesTab: React.FC = () => {
       <CardContent className="space-y-4">
         <div className="flex flex-wrap items-end gap-2">
           <div className="space-y-1">
-            <Label htmlFor="alias-key" className="text-xs">Incoming key</Label>
+            <Label htmlFor="alias-key" className="text-xs">Incoming Key</Label>
             <Input
               id="alias-key"
               value={newAlias}

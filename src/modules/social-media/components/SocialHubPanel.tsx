@@ -54,24 +54,24 @@ export const SocialHubPanel: React.FC = () => {
 
   const tabs = useMemo<HubTabItem[]>(() => {
     const out: HubTabItem[] = [
-      { id: 'accounts', label: 'My accounts', icon: Share2 },
+      { id: 'accounts', label: 'My Accounts', icon: Share2 },
       // The workspace-wide roster is the same read /social-media/accounts does, and it carries the
       // same workspace-admin gate the route does — an ordinary member seeing every colleague's
       // connected handles is a disclosure, not a convenience.
-      ...(isWorkspaceManager ? [{ id: 'workspace-accounts', label: 'Workspace accounts', icon: Building2 }] : []),
-      { id: 'analytics', label: 'Post analytics', icon: BarChart3 },
+      ...(isWorkspaceManager ? [{ id: 'workspace-accounts', label: 'Workspace Accounts', icon: Building2 }] : []),
+      { id: 'analytics', label: 'Post Analytics', icon: BarChart3 },
     ];
     if (hasMessaging && isWorkspaceManager) {
       out.push(
-        { id: 'whatsapp', label: 'WhatsApp channel', icon: Settings },
+        { id: 'whatsapp', label: 'WhatsApp Channel', icon: Settings },
         // First in the order a workspace without WhatsApp actually needs: get a number,
         // then everything else. It used to be the one step the product did not offer.
         { id: 'wa-numbers', label: 'Get a number', icon: Phone },
-        { id: 'wa-templates', label: 'WhatsApp templates', icon: FileText },
-        { id: 'wa-forms', label: 'WhatsApp forms', icon: ClipboardList },
-        { id: 'wa-campaigns', label: 'WhatsApp campaigns', icon: Send },
-        { id: 'wa-logs', label: 'Message log', icon: MessageCircle },
-        { id: 'wa-analytics', label: 'WhatsApp analytics', icon: BarChart3 },
+        { id: 'wa-templates', label: 'WhatsApp Templates', icon: FileText },
+        { id: 'wa-forms', label: 'WhatsApp Forms', icon: ClipboardList },
+        { id: 'wa-campaigns', label: 'WhatsApp Campaigns', icon: Send },
+        { id: 'wa-logs', label: 'Message Log', icon: MessageCircle },
+        { id: 'wa-analytics', label: 'WhatsApp Analytics', icon: BarChart3 },
         { id: 'wa-optouts', label: 'Opt-outs', icon: Users },
       );
     }

@@ -170,26 +170,26 @@ export const OfferDisclosureCard: React.FC<{
       )}
 
       <div className="grid gap-2 sm:grid-cols-2">
-        <Field label="Manufacturer name (a)">
+        <Field label="Manufacturer Name (a)">
           <Input
             className="h-8 text-xs" value={row.manufacturer_name ?? ''}
             onChange={(e) => set({ manufacturer_name: e.target.value || null })}
           />
         </Field>
-        <Field label="Manufacturer email (a)">
+        <Field label="Manufacturer Email (a)">
           <Input
             className="h-8 text-xs" value={row.manufacturer_email ?? ''}
             onChange={(e) => set({ manufacturer_email: e.target.value || null })}
           />
         </Field>
-        <Field label="Manufacturer postal address (a)" className="sm:col-span-2">
+        <Field label="Manufacturer Postal Address (a)" className="sm:col-span-2">
           <Input
             className="h-8 text-xs" value={row.manufacturer_postal_address ?? ''}
             onChange={(e) => set({ manufacturer_postal_address: e.target.value || null })}
           />
         </Field>
 
-        <Field label="Responsible person (b)" className="sm:col-span-2">
+        <Field label="Responsible Person (b)" className="sm:col-span-2">
           <Select
             value={row.responsible_person_source}
             onValueChange={(v) => set({ responsible_person_source: v as ResponsiblePersonSource })}
@@ -211,19 +211,19 @@ export const OfferDisclosureCard: React.FC<{
 
         {row.responsible_person_source === 'named' && (
           <>
-            <Field label="Responsible person name">
+            <Field label="Responsible Person Name">
               <Input
                 className="h-8 text-xs" value={row.responsible_person_name ?? ''}
                 onChange={(e) => set({ responsible_person_name: e.target.value || null })}
               />
             </Field>
-            <Field label="Responsible person email">
+            <Field label="Responsible Person Email">
               <Input
                 className="h-8 text-xs" value={row.responsible_person_email ?? ''}
                 onChange={(e) => set({ responsible_person_email: e.target.value || null })}
               />
             </Field>
-            <Field label="Responsible person postal address" className="sm:col-span-2">
+            <Field label="Responsible Person Postal Address" className="sm:col-span-2">
               <Input
                 className="h-8 text-xs" value={row.responsible_person_postal_address ?? ''}
                 onChange={(e) => set({ responsible_person_postal_address: e.target.value || null })}
@@ -232,21 +232,21 @@ export const OfferDisclosureCard: React.FC<{
           </>
         )}
 
-        <Field label="Product identifier (c)">
+        <Field label="Product Identifier (c)">
           <Input
             className="h-8 text-xs" value={row.product_identifier ?? ''}
             onChange={(e) => set({ product_identifier: e.target.value || null })}
             placeholder="model, batch or serial"
           />
         </Field>
-        <Field label="Product type (c)">
+        <Field label="Product Type (c)">
           <Input
             className="h-8 text-xs" value={row.product_type ?? ''}
             onChange={(e) => set({ product_type: e.target.value || null })}
           />
         </Field>
 
-        <Field label="Safety-only contact email (art. 35(2))" className="sm:col-span-2">
+        <Field label="Safety-Only Contact Email (art. 35(2))" className="sm:col-span-2">
           <Input
             className="h-8 text-xs" value={row.safety_contact_email ?? ''}
             onChange={(e) => set({ safety_contact_email: e.target.value || null })}
@@ -254,7 +254,7 @@ export const OfferDisclosureCard: React.FC<{
           />
         </Field>
 
-        <Field label="Accessibility information (EAA Annex I IV(g)(i))" className="sm:col-span-2">
+        <Field label="Accessibility Information (EAA Annex I IV(g)(i))" className="sm:col-span-2">
           <Textarea
             className="text-xs" rows={2} value={row.accessibility_information ?? ''}
             onChange={(e) => set({ accessibility_information: e.target.value || null })}

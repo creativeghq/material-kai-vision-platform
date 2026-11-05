@@ -68,7 +68,7 @@ describe('invoice line columns — every stored myDATA figure reaches the page',
     const data = build({}, [
       { description: 'Export A', quantity: 1, unit_price: 100, net_value: 100, vat_percent: 0, vat_exemption_category: 8 },
       { description: 'Export B', quantity: 1, unit_price: 50, net_value: 50, vat_percent: 0, vat_exemption_category: 8 },
-      { description: 'Reverse charge', quantity: 1, unit_price: 30, net_value: 30, vat_percent: 0, vat_exemption_category: 16 },
+      { description: 'Reverse Charge', quantity: 1, unit_price: 30, net_value: 30, vat_percent: 0, vat_exemption_category: 16 },
     ]);
     expect(data.vatExemptions).toHaveLength(2);
     expect(data.vatExemptions[0]).toMatchObject({ marker: '(1)', code: 8 });

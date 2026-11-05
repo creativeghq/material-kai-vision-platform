@@ -118,9 +118,9 @@ const SINGULAR_LABEL: Partial<Record<GlobalSearchKind, string>> = {
   catalog: 'Catalog',
   blueprint: 'Blueprint',
   template: 'Template',
-  email_template: 'Email template',
+  email_template: 'Email Template',
   conversation: 'Agent chat',
-  inbox_thread: 'Inbox thread',
+  inbox_thread: 'Inbox Thread',
 };
 
 export const RECORD_LINKS: readonly RecordLinkSpec[] = [

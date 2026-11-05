@@ -49,7 +49,7 @@ export function buildMonitoredProductFilters(
           accessor: (r) => r.country_code,
         },
         {
-          key: 'has_error', type: 'bool', label: 'Last refresh',
+          key: 'has_error', type: 'bool', label: 'Last Refresh',
           trueLabel: 'Errored', falseLabel: 'Clean',
           accessor: (r) => !!r.last_error,
         },
@@ -59,7 +59,7 @@ export function buildMonitoredProductFilters(
       key: 'price', label: 'Price', icon: Coins,
       fields: [
         {
-          key: 'current_price', type: 'range', label: 'Cheapest price',
+          key: 'current_price', type: 'range', label: 'Cheapest Price',
           description: 'Denormalized cache — the cheapest non-anomaly hit from the latest refresh.',
           min: 0, max: maxPrice, accessor: (r) => r.current_price,
         },
@@ -96,12 +96,12 @@ export function buildMonitoredProductFilters(
           min: 0, max: 1, step: 0.05, accessor: (r) => r.volatility_score,
         },
         {
-          key: 'consecutive_stable_refreshes', type: 'range', label: 'Stable refreshes',
+          key: 'consecutive_stable_refreshes', type: 'range', label: 'Stable Refreshes',
           min: 0, max: Math.max(10, ...rows.map((r) => r.consecutive_stable_refreshes ?? 0)),
           accessor: (r) => r.consecutive_stable_refreshes,
         },
         {
-          key: 'total_credits_used', type: 'range', label: 'Credits used', unit: ' cr',
+          key: 'total_credits_used', type: 'range', label: 'Credits Used', unit: ' cr',
           min: 0, max: Math.max(10, ...rows.map((r) => Number(r.total_credits_used ?? 0))),
           accessor: (r) => r.total_credits_used ?? 0,
         },
@@ -110,8 +110,8 @@ export function buildMonitoredProductFilters(
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
-        { key: 'last_refreshed_at', type: 'dateRange', label: 'Last check', accessor: (r) => r.last_refreshed_at },
-        { key: 'next_check_at', type: 'dateRange', label: 'Next check', accessor: (r) => r.next_check_at },
+        { key: 'last_refreshed_at', type: 'dateRange', label: 'Last Check', accessor: (r) => r.last_refreshed_at },
+        { key: 'next_check_at', type: 'dateRange', label: 'Next Check', accessor: (r) => r.next_check_at },
       ],
     },
   ];

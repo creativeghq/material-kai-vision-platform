@@ -756,7 +756,7 @@ class ProjectsService {
     return rows.map((r) => ({
       ...r,
       is_mine: r.user_id === user.id,
-      owner_name: r.user_id === user.id ? 'You' : (nameById.get(r.user_id) ?? 'Shared with me'),
+      owner_name: r.user_id === user.id ? 'You' : (nameById.get(r.user_id) ?? 'Shared with Me'),
     }));
   }
 

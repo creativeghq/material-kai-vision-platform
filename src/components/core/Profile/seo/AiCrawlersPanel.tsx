@@ -157,7 +157,7 @@ export const AiCrawlersPanel: React.FC<{ websiteId: string }> = ({ websiteId }) 
                         <th className={`${TH} text-right`}>Requests</th>
                         <th className={`${TH} text-right`}>Pages</th>
                         <th className={`${TH} text-left`}>IP check</th>
-                        <th className={`${TH} text-left`}>Last seen</th>
+                        <th className={`${TH} text-left`}>Last Seen</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-hairline">
@@ -170,7 +170,7 @@ export const AiCrawlersPanel: React.FC<{ websiteId: string }> = ({ websiteId }) 
                           <td className="px-3 py-2 text-xs">
                             {b.unverified > 0 ? <Badge variant="warning">{compact(b.unverified)} not from the vendor&rsquo;s IPs</Badge>
                               : b.verified > 0 ? <Badge variant="success">Vendor IPs</Badge>
-                              : <Badge variant="neutral">Vendor publishes no IP list</Badge>}
+                              : <Badge variant="neutral">Vendor Publishes No IP List</Badge>}
                           </td>
                           <td className="px-3 py-2 text-xs text-muted-foreground">{formatDate(b.last_seen)}</td>
                         </tr>
@@ -213,9 +213,9 @@ export const AiCrawlersPanel: React.FC<{ websiteId: string }> = ({ websiteId }) 
                         <tr>
                           <th className={`${TH} text-left`}>Page</th>
                           <th className={`${TH} text-left`}>Assistant</th>
-                          <th className={`${TH} text-right`}>Crawler reads</th>
-                          <th className={`${TH} text-right`}>Visitors sent</th>
-                          <th className={`${TH} text-right`}>Key events</th>
+                          <th className={`${TH} text-right`}>Crawler Reads</th>
+                          <th className={`${TH} text-right`}>Visitors Sent</th>
+                          <th className={`${TH} text-right`}>Key Events</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-hairline">

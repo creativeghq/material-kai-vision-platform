@@ -84,11 +84,11 @@ type DocType = 'invoices' | 'receipts' | 'credit_notes' | 'payments' | 'dispatch
 const DOC_LABEL: Record<DocType, string> = {
   invoices: 'Invoices',
   receipts: 'Receipts',
-  credit_notes: 'Credit notes',
+  credit_notes: 'Credit Notes',
   payments: 'Payments',
   expenses: 'Expenses (Inbox)',
   dispatch: 'Dispatch board',
-  delivery_notes: 'Delivery notes',
+  delivery_notes: 'Delivery Notes',
   cheques: 'Cheques',
 };
 
@@ -528,8 +528,8 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
           value={creditSide}
           onChange={(side) => { setCreditSide(side); setPage(1); }}
           options={[
-            { value: 'customer', label: 'Issued to customers' },
-            { value: 'supplier', label: 'Received from suppliers' },
+            { value: 'customer', label: 'Issued to Customers' },
+            { value: 'supplier', label: 'Received from Suppliers' },
           ]}
         />
       )}
@@ -1472,7 +1472,7 @@ const CreditNoteTable: React.FC<{ rows: CreditNote[]; financeBase: string; onCha
       target={{ kind: 'refund', creditNoteId: refund.id }}
       amount={Number((refund as any).total ?? (refund as any).amount ?? 0)}
       currency={(refund as any).currency ?? 'EUR'}
-      label={String((refund as any).credit_note_number ?? 'Credit note')}
+      label={String((refund as any).credit_note_number ?? 'Credit Note')}
       onDone={onChanged}
     />
   )}

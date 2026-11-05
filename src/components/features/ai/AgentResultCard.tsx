@@ -692,7 +692,7 @@ export const AgentResultCard: React.FC<{
       {!hideTitle && <div className="text-xs text-muted-foreground mb-2">{title}</div>}
       {/*
         A payload that is just a wrapper around one list — `{ flows: [...] }`, `{ deals: [...] }` —
-        renders the table directly. Otherwise the card reads "Workspace flows" and then, one line
+        renders the table directly. Otherwise the card reads "Workspace Flows" and then, one line
         below, a field label "Flows" above the same rows: the shape of the JSON leaking through as
         a heading nobody needs.
       */}

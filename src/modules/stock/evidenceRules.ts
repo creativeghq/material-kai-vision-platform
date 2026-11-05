@@ -14,7 +14,7 @@ export const DELIVERY_OUTCOME_LABEL: Record<DeliveryOutcome, string> = {
   refused: 'Refused on site',
   damaged: 'Damaged on arrival',
   failed: 'Could not deliver',
-  partial: 'Part delivered',
+  partial: 'Part Delivered',
 };
 
 export type Disposition =
@@ -30,10 +30,10 @@ export type Disposition =
  */
 export const DISPOSITION_LABEL: Record<Disposition, string> = {
   breakage: 'Breakage',
-  wrong_item: 'Wrong item',
+  wrong_item: 'Wrong Item',
   quality: 'Quality',
   shortage: 'Short shipped',
-  returned_saleable: 'Returned saleable',
+  returned_saleable: 'Returned Saleable',
 };
 
 export type ClaimResolution = 'refund' | 'replacement' | 'write_off';

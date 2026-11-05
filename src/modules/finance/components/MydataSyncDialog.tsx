@@ -64,12 +64,12 @@ export const MydataSyncDialog: React.FC<{
             <Select value={period} onValueChange={(v) => pickPeriod(v as Period)}>
               <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="last_7_days">Last 7 days</SelectItem>
+                <SelectItem value="last_7_days">Last 7 Days</SelectItem>
                 <SelectItem value="this_month">This month</SelectItem>
-                <SelectItem value="last_month">Last month</SelectItem>
-                <SelectItem value="last_3_months">Last 3 months</SelectItem>
-                <SelectItem value="ytd">Year to date</SelectItem>
-                <SelectItem value="custom">Custom range</SelectItem>
+                <SelectItem value="last_month">Last Month</SelectItem>
+                <SelectItem value="last_3_months">Last 3 Months</SelectItem>
+                <SelectItem value="ytd">Year to Date</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
           </div>

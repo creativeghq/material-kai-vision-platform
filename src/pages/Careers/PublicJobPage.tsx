@@ -229,7 +229,7 @@ function ApplicationForm({ slug, job, siteKey, onDone }: {
         {cfg.ask_location && <div className="space-y-1.5"><Label>Location</Label><Input value={f.location} onChange={(e) => upd('location', e.target.value)} placeholder="City, Country" /></div>}
       </div>
       <div className="space-y-1.5">
-        <Label>Current role</Label>
+        <Label>Current Role</Label>
         <Input value={f.headline} onChange={(e) => upd('headline', e.target.value)} placeholder="e.g. Senior Product Manager @ Acme" />
       </div>
 
@@ -270,7 +270,7 @@ function ApplicationForm({ slug, job, siteKey, onDone }: {
       )}
       {cfg.ask_cover_letter && (
         <div className="space-y-1.5">
-          <Label>Cover letter</Label>
+          <Label>Cover Letter</Label>
           <Textarea rows={5} value={f.cover_letter} onChange={(e) => upd('cover_letter', e.target.value)} placeholder="Why you’re a great fit (optional)" />
         </div>
       )}

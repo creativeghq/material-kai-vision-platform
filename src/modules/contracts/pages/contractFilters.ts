@@ -54,7 +54,7 @@ export function buildContractFilters(rows: Contract[]): FilterGroupDef[] {
     {
       key: 'value', label: 'Value', icon: Coins,
       fields: [
-        { key: 'value', type: 'range', label: 'Contract value', min: 0, max: valueMax, accessor: (c: Contract) => c.value ?? 0 },
+        { key: 'value', type: 'range', label: 'Contract Value', min: 0, max: valueMax, accessor: (c: Contract) => c.value ?? 0 },
         {
           key: 'currency', type: 'multi', label: 'Currency',
           options: optionsFromRows(rows, (c) => c.currency ?? undefined),

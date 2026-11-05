@@ -48,7 +48,7 @@ export const EXPENSE_CARD_TYPE_LABEL: Record<ExpenseCardType, string> = {
 export const TRIP_STATUS_LABEL: Record<TripStatus, string> = {
   draft: 'Draft',
   submitted: 'Under review',
-  partially_approved: 'Partially approved',
+  partially_approved: 'Partially Approved',
   approved: 'Approved',
   rejected: 'Rejected',
   reimbursed: 'Reimbursed',

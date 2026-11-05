@@ -239,7 +239,7 @@ export const HireMeModal: React.FC<HireMeModalProps> = ({
                             <Badge variant="secondary" className="mt-1 text-xs gap-1 tabular-nums">
                               {svc.list_price != null
                                 ? `${formatMoney(svc.list_price, svc.currency)}${svc.unit ? ` / ${svc.unit}` : ''} + VAT`
-                                : 'Price on request'}
+                                : 'Price on Request'}
                             </Badge>
                             {svc.description && (
                               <p className="text-xs text-muted-foreground mt-1 line-clamp-2">

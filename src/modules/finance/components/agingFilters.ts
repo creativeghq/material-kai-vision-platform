@@ -50,19 +50,19 @@ export function buildAgingFilters(
           accessor: (r: AgingRow) => [r.party_name, r.internal_number, r.supplier_bill_number, r.description, r.category_name],
         },
         {
-          key: AGE_BUCKET_KEY, type: 'select', label: 'Age bucket',
+          key: AGE_BUCKET_KEY, type: 'select', label: 'Age Bucket',
           description: 'Same value the bucket cards above set.',
           options: ALL_AGE_BUCKETS.map((b) => ({ value: b, label: ageBucketLabel(b) })),
           accessor: (r: AgingRow) => r.age_bucket,
         },
         {
-          key: 'entry_kind', type: 'multi', label: 'Entry kind',
+          key: 'entry_kind', type: 'multi', label: 'Entry Kind',
           description: 'An issued document, or a confirmed order that is not invoiced yet.',
           options: [
             { value: 'invoice', label: side === 'ar' ? 'Invoice' : 'Supplier bill' },
-            { value: 'order', label: 'Order — not invoiced' },
-            ...(side === 'ar' ? [{ value: 'credit', label: 'Customer credit' }] : []),
-            { value: 'manual', label: 'Manual entry' },
+            { value: 'order', label: 'Order — Not Invoiced' },
+            ...(side === 'ar' ? [{ value: 'credit', label: 'Customer Credit' }] : []),
+            { value: 'manual', label: 'Manual Entry' },
           ],
           accessor: (r: AgingRow) => r.entry_kind ?? 'invoice',
         },
@@ -77,7 +77,7 @@ export function buildAgingFilters(
           // un-invoiced order ages against `effective_due_at` (order date + payment terms) while
           // `due_at` stays null, so a date filter would silently drop exactly the rows the
           // buckets DO age.
-          key: OVERDUE_KEY, type: 'bool', label: 'Past due',
+          key: OVERDUE_KEY, type: 'bool', label: 'Past Due',
           trueLabel: 'Past due only', falseLabel: 'Not yet due',
           accessor: (r: AgingRow) => isAgingRowOverdue(r),
         },
@@ -107,14 +107,14 @@ export function buildAgingFilters(
       key: 'amounts', label: 'Amounts', icon: Coins,
       fields: [
         { key: 'total', type: 'range', label: 'Total', min: total.min, max: total.max, accessor: (r: AgingRow) => r.total },
-        { key: 'amount_due', type: 'range', label: 'Still due', min: due.min, max: due.max, accessor: (r: AgingRow) => r.amount_due },
+        { key: 'amount_due', type: 'range', label: 'Still Due', min: due.min, max: due.max, accessor: (r: AgingRow) => r.amount_due },
       ],
     },
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
         {
-          key: 'due_at', type: 'dateRange', label: 'Due date',
+          key: 'due_at', type: 'dateRange', label: 'Due Date',
           description: 'For an un-invoiced order this is its expected payment date.',
           accessor: (r: AgingRow) => r.due_at,
         },

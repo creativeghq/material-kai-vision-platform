@@ -168,7 +168,7 @@ const STEP: Record<AiCitationsView, { intro: string; next?: { view: AiCitationsV
   },
   pages: {
     intro: 'Each question goes to the page that should answer it. Answer it on the site, under the question as a heading, and the next crawl marks it done.',
-    next: { view: 'beyond', label: 'Mentions and traffic from AI' },
+    next: { view: 'beyond', label: 'Mentions and Traffic from AI' },
   },
   beyond: {
     intro: 'What the assistants say about you elsewhere in your market, the visits they send you, and where else the brand should appear.',
@@ -928,19 +928,19 @@ export const WebsiteAiVisibilityPanel: React.FC<{
           )}
           <div className="grid grid-cols-2 gap-4 border-t border-hairline pt-3 sm:grid-cols-3 lg:grid-cols-6">
             <Stat
-              label="Named rate"
+              label="Named Rate"
               value={t.share_of_voice != null ? `${t.share_of_voice}%` : null}
               reason={t.answered === 0 ? 'Nothing answered, so this is unknown.' : null}
               help="Answers that named you divided by answers that came back. Failed calls are excluded."
             />
             <Stat
-              label="Cited rate"
+              label="Cited Rate"
               value={report?.totals.citation_rate != null ? `${report.totals.citation_rate}%` : null}
               reason={noSources ? 'No answer carried a source.' : t.answered === 0 ? 'Nothing answered.' : null}
               help="Answers that linked your site divided by answers that came back."
             />
             <Stat label="Answered" value={`${t.answered} of ${t.probes}`} help="Questions that got an answer, of those asked." />
-            <Stat label="Carried sources" value={String(t.with_citations)} help="Answers that linked any source at all." />
+            <Stat label="Carried Sources" value={String(t.with_citations)} help="Answers that linked any source at all." />
             <Stat
               label="Avg rank when named"
               value={t.avg_position != null ? `#${t.avg_position}` : null}
@@ -948,7 +948,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{
               help="Where you appeared in a ranked answer that named you."
             />
             <Stat
-              label="Subjects asked about"
+              label="Subjects Asked About"
               value={String(t.subjects_probed)}
               help={`Since ${t.first_run_at ? formatDate(t.first_run_at) : '—'} · answered by ${PROBE_TIER_LABEL[tier as MentionProbeTier] ?? tier}.`}
             />
@@ -1001,7 +1001,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{
 
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">By subject</CardTitle>
+            <CardTitle className="text-base">By Subject</CardTitle>
             <CardDescription>Which of your brands and products the assistants actually know.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -1012,7 +1012,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{
                   <TableHead>Type</TableHead>
                   <TableHead className="text-right">Answered</TableHead>
                   <TableHead className="text-right">Named</TableHead>
-                  <TableHead className="text-right">Named rate</TableHead>
+                  <TableHead className="text-right">Named Rate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1119,7 +1119,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{
 
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="text-base">Named rate by question</CardTitle>
+          <CardTitle className="text-base">Named Rate by Question</CardTitle>
           <CardDescription>Every question over the whole window, not only its latest answers.</CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -1132,7 +1132,7 @@ export const WebsiteAiVisibilityPanel: React.FC<{
                   <TableHead>Question</TableHead>
                   <TableHead className="text-right">Answered</TableHead>
                   <TableHead className="text-right">Named</TableHead>
-                  <TableHead className="text-right">Named rate</TableHead>
+                  <TableHead className="text-right">Named Rate</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

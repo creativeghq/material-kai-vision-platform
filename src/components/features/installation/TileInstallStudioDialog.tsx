@@ -112,7 +112,7 @@ function Studio({ design }: { design: TileInstallDesign }) {
             <FormField label="Rotation (°)"><Input type="number" step={15} value={rotationDeg} onChange={(e) => setRotationDeg(Number(e.target.value) || 0)} /></FormField>
             <FormField label="Joint (mm)"><Input type="number" step={0.5} value={joint} onChange={(e) => setJoint(e.target.value)} /></FormField>
           </FormGrid>
-          <FormField label="Tile thickness (mm)"><Input type="number" value={thickness} onChange={(e) => setThickness(e.target.value)} /></FormField>
+          <FormField label="Tile Thickness (mm)"><Input type="number" value={thickness} onChange={(e) => setThickness(e.target.value)} /></FormField>
           <Button className="w-full gap-1.5" onClick={() => setRun((r) => r + 1)} disabled={errors.length > 0}>
             <Play className="h-4 w-4" />Play the installation
           </Button>

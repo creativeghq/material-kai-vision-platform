@@ -150,8 +150,8 @@ async function buildVariables(supabase: any, workspaceId: string): Promise<Recor
     <table style="width:100%; border-collapse:collapse; font-size:13px;">
       <thead><tr style="background:#fafafa;">
         <th style="padding:8px; text-align:left; font-size:11px; color:#666; text-transform:uppercase;">Window</th>
-        <th style="padding:8px; text-align:right; font-size:11px; color:#666; text-transform:uppercase;">Expected in</th>
-        <th style="padding:8px; text-align:right; font-size:11px; color:#666; text-transform:uppercase;">Expected out</th>
+        <th style="padding:8px; text-align:right; font-size:11px; color:#666; text-transform:uppercase;">Expected In</th>
+        <th style="padding:8px; text-align:right; font-size:11px; color:#666; text-transform:uppercase;">Expected Out</th>
         <th style="padding:8px; text-align:right; font-size:11px; color:#666; text-transform:uppercase;">Net</th>
       </tr></thead>
       <tbody>

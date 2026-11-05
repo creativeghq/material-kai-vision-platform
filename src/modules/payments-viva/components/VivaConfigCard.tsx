@@ -301,7 +301,7 @@ export const VivaConfigCard: React.FC<Props> = ({ workspaceId }) => {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Payment source code</Label>
+              <Label className="text-xs">Payment Source Code</Label>
               <Input
                 value={sourceCode}
                 onChange={(e) => setSourceCode(e.target.value)}

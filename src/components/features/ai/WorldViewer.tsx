@@ -47,7 +47,7 @@ const STATUS_CONFIG: Record<string, { label: string; icon: React.ReactNode }> = 
   uploading: { label: 'Uploading design image...', icon: <Loader2 className="w-6 h-6 animate-spin text-blue-400" /> },
   generating: { label: 'Creating your 3D world...', icon: <Globe className="w-6 h-6 animate-pulse text-violet-400" /> },
   completed: { label: 'World ready!', icon: <Sparkles className="w-6 h-6 text-green-400" /> },
-  failed: { label: 'Generation failed', icon: <AlertCircle className="w-6 h-6 text-red-400" /> },
+  failed: { label: 'Generation Failed', icon: <AlertCircle className="w-6 h-6 text-red-400" /> },
 };
 
 export const WorldViewer: React.FC<WorldViewerProps> = ({

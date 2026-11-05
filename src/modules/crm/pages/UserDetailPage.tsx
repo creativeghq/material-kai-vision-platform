@@ -631,7 +631,7 @@ export const UserDetailPage: React.FC = () => {
                       <Shield className="h-3.5 w-3.5" /> Role &amp; classification
                     </div>
                     <div>
-                      <Label htmlFor="user-role">Account tier (global)</Label>
+                      <Label htmlFor="user-role">Account Tier (Global)</Label>
                       <Select
                         value={user.role_id || ''}
                         onValueChange={(v) => patchInlineUser({ role_id: v })}

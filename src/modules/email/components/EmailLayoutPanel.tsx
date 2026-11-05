@@ -151,7 +151,7 @@ export const EmailLayoutPanel: React.FC = () => {
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="brand_name">Brand name</Label>
+              <Label htmlFor="brand_name">Brand Name</Label>
               <Input
                 id="brand_name"
                 placeholder="Materials Hub"
@@ -161,7 +161,7 @@ export const EmailLayoutPanel: React.FC = () => {
               <p className="text-xs text-muted-foreground">Wordmark in the header. Defaults to the sender name.</p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="brand_url">Brand link</Label>
+              <Label htmlFor="brand_url">Brand Link</Label>
               <Input
                 id="brand_url"
                 placeholder="https://app.materialshub.gr"
@@ -184,7 +184,7 @@ export const EmailLayoutPanel: React.FC = () => {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="brand_logo_dark_url">Logo URL — dark mode</Label>
+              <Label htmlFor="brand_logo_dark_url">Logo URL — Dark Mode</Label>
               <Input
                 id="brand_logo_dark_url"
                 placeholder="https://…/logo-white.png (optional)"
@@ -197,7 +197,7 @@ export const EmailLayoutPanel: React.FC = () => {
               </p>
             </div>
             <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="brand_footer_note">Extra footer line</Label>
+              <Label htmlFor="brand_footer_note">Extra Footer Line</Label>
               <Input
                 id="brand_footer_note"
                 placeholder="Optional — anything beyond the company details"

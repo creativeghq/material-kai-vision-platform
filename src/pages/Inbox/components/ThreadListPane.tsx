@@ -28,7 +28,7 @@ import { SwipeRow, type SwipeAction } from './SwipeRow';
 const FOLDER_VIEW_KEY = 'inbox.whatsapp.layout';
 
 const VIEW_TITLE: Record<string, string> = {
-  all: 'Inbox', followup: 'Follow up', unread: 'Unread', starred: 'Starred', sent: 'Sent', drafts: 'Drafts', archived: 'Archived',
+  all: 'Inbox', followup: 'Follow Up', unread: 'Unread', starred: 'Starred', sent: 'Sent', drafts: 'Drafts', archived: 'Archived',
 };
 const LONG_PRESS_MS = 450;
 
@@ -441,7 +441,7 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                   [role="tab"] in index.css. A filled pill here would read as a button. */}
               <TabsList className="h-auto gap-3 bg-transparent p-0">
                 <TabsTrigger value="open" className="text-xs px-0 py-1">Open</TabsTrigger>
-                <TabsTrigger value="snoozed" className="text-xs px-0 py-1">Follow up</TabsTrigger>
+                <TabsTrigger value="snoozed" className="text-xs px-0 py-1">Follow Up</TabsTrigger>
                 <TabsTrigger value="closed" className="text-xs px-0 py-1">Done</TabsTrigger>
               </TabsList>
             </Tabs>

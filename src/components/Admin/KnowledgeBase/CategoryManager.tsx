@@ -472,7 +472,7 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ onViewDocument
             {/* Lock — protects every doc in the category from deletion */}
             <div className="flex items-start justify-between gap-3 rounded-lg border p-3">
               <div className="space-y-0.5">
-                <Label htmlFor="cat_lock">Lock category</Label>
+                <Label htmlFor="cat_lock">Lock Category</Label>
                 <p className="text-xs text-muted-foreground">
                   When locked, every document in this category is protected from deletion and platform reset (unless a doc is explicitly unlocked).
                 </p>

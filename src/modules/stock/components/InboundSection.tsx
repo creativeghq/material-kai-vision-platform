@@ -15,8 +15,8 @@ import { stockService, type InboundShipment } from '../services/stockService';
 // Normalized milestone order → progress + label/colour.
 const STAGES = ['pending', 'booked', 'gate_in', 'loaded', 'departed', 'in_transit', 'arrived', 'discharged', 'gate_out', 'delivered'];
 const STAGE_LABEL: Record<string, string> = {
-  pending: 'Pending', booked: 'Booked', gate_in: 'Gate in', loaded: 'Loaded', departed: 'Departed',
-  in_transit: 'In transit', arrived: 'Arrived', discharged: 'Discharged', gate_out: 'Gate out', delivered: 'Delivered', unknown: 'Unknown',
+  pending: 'Pending', booked: 'Booked', gate_in: 'Gate In', loaded: 'Loaded', departed: 'Departed',
+  in_transit: 'In Transit', arrived: 'Arrived', discharged: 'Discharged', gate_out: 'Gate Out', delivered: 'Delivered', unknown: 'Unknown',
 };
 const progressPct = (status: string) => {
   const i = STAGES.indexOf(status);

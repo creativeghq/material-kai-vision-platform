@@ -68,10 +68,10 @@ export const IslandVatTerritoriesCard: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Postcode prefix</TableHead>
+                  <TableHead>Postcode Prefix</TableHead>
                   <TableHead>Territory</TableHead>
                   <TableHead>Region</TableHead>
-                  <TableHead>In force</TableHead>
+                  <TableHead>In Force</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

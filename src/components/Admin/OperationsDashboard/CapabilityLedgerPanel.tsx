@@ -133,7 +133,7 @@ export const CapabilityLedgerPanel: React.FC = () => {
                     <th className="text-left text-[11px] font-semibold px-3 py-2 border-b border-hairline">Area</th>
                     <th className="text-left text-[11px] font-semibold px-3 py-2 border-b border-hairline">Status</th>
                     <th className="text-left text-[11px] font-semibold px-3 py-2 border-b border-hairline">Why</th>
-                    <th className="text-right text-[11px] font-semibold px-3 py-2 border-b border-hairline">Last activity</th>
+                    <th className="text-right text-[11px] font-semibold px-3 py-2 border-b border-hairline">Last Activity</th>
                   </tr>
                 </thead>
                 <tbody>

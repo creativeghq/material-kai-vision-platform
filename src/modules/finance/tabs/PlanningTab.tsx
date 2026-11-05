@@ -78,10 +78,10 @@ function buildPlanningFilters(rows: PlannedPayment[]): FilterGroupDef[] {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
         {
-          key: 'scheduled_for', type: 'dateRange', label: 'Scheduled date',
+          key: 'scheduled_for', type: 'dateRange', label: 'Scheduled Date',
           description: 'Applied server-side — changing it reloads the list.',
         },
-        { key: 'reminder_at', type: 'dateRange', label: 'Reminder date', accessor: (r: PlannedPayment) => r.reminder_at },
+        { key: 'reminder_at', type: 'dateRange', label: 'Reminder Date', accessor: (r: PlannedPayment) => r.reminder_at },
       ],
     },
   ];
@@ -325,8 +325,8 @@ export const PlanningTab: React.FC<Props> = ({ workspaceId }) => {
       ) : groupedLayout ? (
         <div className="space-y-4">
           {grouped.overdue.length > 0 && <Section title="Overdue" rows={grouped.overdue} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} accent="destructive" />}
-          {grouped.today.length > 0 && <Section title="Due today" rows={grouped.today} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
-          {grouped.next7.length > 0 && <Section title="Next 7 days" rows={grouped.next7} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
+          {grouped.today.length > 0 && <Section title="Due Today" rows={grouped.today} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
+          {grouped.next7.length > 0 && <Section title="Next 7 Days" rows={grouped.next7} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
           {grouped.next30.length > 0 && <Section title="Next 30 days" rows={grouped.next30} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
           {grouped.later.length > 0 && <Section title="Later" rows={grouped.later} onMarkPaid={markPaid} onCancel={cancel} onEdit={setEditRow} onPay={setPayRow} markingId={markingId} />}
         </div>

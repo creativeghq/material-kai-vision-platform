@@ -252,7 +252,7 @@ export const WorkspaceKeysTab: React.FC = () => {
               <CardContent className="space-y-3 p-5">
                 <ConnectionRow
                   icon={Share2}
-                  title="Social accounts"
+                  title="Social Accounts"
                   description="Instagram, Facebook, LinkedIn, TikTok and more (via Zernio)."
                   to="/profile?tab=social-accounts"
                   status={conn.social > 0

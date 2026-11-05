@@ -554,7 +554,7 @@ function specRows(it: PurchaseItem, includeCosts: boolean): [string, string][] {
     push('Finish', d.finish);
     push('Opening', d.opening);
     push('Handing', d.handing);
-    push('Hinge side', d.hinge_side);
+    push('Hinge Side', d.hinge_side);
     push('Frame', d.frame);
     push('Hardware', d.hardware);
   } else if (it.item_type === 'window') {
@@ -977,7 +977,7 @@ async function drawPurchaseOrderDoc(pdf: PDFDocument, font: any, bold: any, ctx:
     page.drawText(val, { x: W - M - tw, y, size: sz, font: f, color: INK });
     y -= strong ? 18 : 15;
   };
-  totalsRow('Subtotal (net)', money(ctx.subtotal));
+  totalsRow('Subtotal (Net)', money(ctx.subtotal));
   totalsRow('VAT', money(ctx.vat));
   totalsRow('TOTAL', money(ctx.total), true);
 

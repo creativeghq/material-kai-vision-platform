@@ -122,7 +122,7 @@ export default function EmployeeSelfServicePage() {
                   onClick={() => clock(currentlyIn ? 'departure' : 'arrival')}
                 >
                   {busy === 'clock' ? <Loader2 className="h-5 w-5 mr-2 animate-spin" /> : currentlyIn ? <LogOut className="h-5 w-5 mr-2" /> : <LogIn className="h-5 w-5 mr-2" />}
-                  {currentlyIn ? 'Clock out' : 'Clock in'}
+                  {currentlyIn ? 'Clock Out' : 'Clock In'}
                 </Button>
                 )}
                 <p className="text-xs text-muted-foreground text-center max-w-xs">
@@ -157,9 +157,9 @@ export default function EmployeeSelfServicePage() {
             {!profile ? <EmptyState title="No profile found" /> : (
               <>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <HrStat label="Leave allowance" value={profile.summary?.annual_leave_allowance_days ?? profile.annual_leave_allowance_days} hint="days / year" />
-                  <HrStat label="Leave remaining" value={profile.summary?.remaining_leave_days ?? '—'} hint="days" />
-                  <HrStat label="Absence taken" value={profile.summary?.total_absence_days ?? 0} hint="days" />
+                  <HrStat label="Leave Allowance" value={profile.summary?.annual_leave_allowance_days ?? profile.annual_leave_allowance_days} hint="days / year" />
+                  <HrStat label="Leave Remaining" value={profile.summary?.remaining_leave_days ?? '—'} hint="days" />
+                  <HrStat label="Absence Taken" value={profile.summary?.total_absence_days ?? 0} hint="days" />
                   <HrStat label="Status" value={<span className="capitalize">{profile.status.replace('_', ' ')}</span>} />
                 </div>
                 <Card>

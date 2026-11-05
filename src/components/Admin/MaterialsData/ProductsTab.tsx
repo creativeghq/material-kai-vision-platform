@@ -356,8 +356,8 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                   <TableHead>Category</TableHead>
                   <TableHead>Manufacturer</TableHead>
                   <TableHead>Embedding</TableHead>
-                  <TableHead>Web enrichment</TableHead>
-                  <TableHead>Sellable online</TableHead>
+                  <TableHead>Web Enrichment</TableHead>
+                  <TableHead>Sellable Online</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>

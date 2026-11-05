@@ -97,13 +97,13 @@ export const PromoteThreadDialog: React.FC<{
         <div className="space-y-3">
           {!hasContact && (
             <div className="space-y-1.5">
-              <Label htmlFor="promote-contact">Contact name</Label>
+              <Label htmlFor="promote-contact">Contact Name</Label>
               <Input id="promote-contact" value={contactName} onChange={(e) => setContactName(e.target.value)}
                 placeholder="Who is this?" />
             </div>
           )}
           <div className="space-y-1.5">
-            <Label htmlFor="promote-type">Deal type</Label>
+            <Label htmlFor="promote-type">Deal Type</Label>
             <Select value={dealType} onValueChange={setDealType}>
               <SelectTrigger id="promote-type">
                 <SelectValue placeholder={types === null ? 'Loading…' : 'Pick a type'} />

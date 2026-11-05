@@ -328,8 +328,8 @@ export const AiQuestionsPanel: React.FC<{
                       <th className="px-3 py-2 text-left">Question</th>
                       <th className="px-3 py-2 text-left">Engine</th>
                       <th className="px-3 py-2 text-right">AI search volume</th>
-                      <th className="px-3 py-2 text-left">Your cited page</th>
-                      <th className="px-3 py-2 text-left">Last seen</th>
+                      <th className="px-3 py-2 text-left">Your Cited Page</th>
+                      <th className="px-3 py-2 text-left">Last Seen</th>
                       <th className="px-3 py-2"><span className="sr-only">Action</span></th>
                     </tr>
                   </thead>
@@ -400,7 +400,7 @@ export const AiQuestionsPanel: React.FC<{
                       <th className="px-3 py-2 text-right">Impressions</th>
                       <th className="px-3 py-2 text-right">Clicks</th>
                       <th className="px-3 py-2 text-right">Position</th>
-                      <th className="px-3 py-2 text-left">Your page</th>
+                      <th className="px-3 py-2 text-left">Your Page</th>
                       <th className="px-3 py-2 text-left">AI Overview</th>
                       <th className="px-3 py-2"><span className="sr-only">Action</span></th>
                     </tr>
@@ -447,9 +447,9 @@ export const AiQuestionsPanel: React.FC<{
                   <thead className="sticky top-0 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
                     <tr>
                       <th className="px-3 py-2 text-left">Question</th>
-                      <th className="px-3 py-2 text-left">Researched keyword</th>
+                      <th className="px-3 py-2 text-left">Researched Keyword</th>
                       <th className="px-3 py-2 text-right">Seen</th>
-                      <th className="px-3 py-2 text-left">Last seen</th>
+                      <th className="px-3 py-2 text-left">Last Seen</th>
                       <th className="px-3 py-2"><span className="sr-only">Action</span></th>
                     </tr>
                   </thead>

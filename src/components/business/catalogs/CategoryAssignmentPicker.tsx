@@ -37,7 +37,7 @@ function assignableHere(c: CrmCategorySummary, target: Target): boolean {
 
 function groupLabel(c: CrmCategorySummary): string {
   if (c.workspace_id) return 'Your categories';
-  return c.kind === 'professional_type' ? 'Professional type' : 'Platform lists';
+  return c.kind === 'professional_type' ? 'Professional Type' : 'Platform lists';
 }
 
 export const CategoryAssignmentPicker: React.FC<Props> = ({ target, className, bare = false }) => {

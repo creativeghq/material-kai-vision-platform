@@ -184,11 +184,11 @@ export const DealDrawer: React.FC<Props> = ({ deal, stages, canManage, onClose, 
               <HubProperty label="Probability" layout="inline">
                 {deal.probability != null ? `${deal.probability}%` : null}
               </HubProperty>
-              <HubProperty label="Expected close" layout="inline">
+              <HubProperty label="Expected Close" layout="inline">
                 {deal.expected_close_date ? formatDate(deal.expected_close_date) : null}
               </HubProperty>
               {deal.status === 'lost' && (
-                <HubProperty label="Lost because" layout="inline">{deal.lost_reason}</HubProperty>
+                <HubProperty label="Lost Because" layout="inline">{deal.lost_reason}</HubProperty>
               )}
             </HubPropertyList>
 

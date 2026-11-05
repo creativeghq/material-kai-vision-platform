@@ -113,7 +113,7 @@ export const BookingModal: React.FC<{
             <div className="space-y-1.5">
               <Label>Your name <span className="text-destructive">*</span></Label>
               <Input
-                placeholder="Full name"
+                placeholder="Full Name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
               />

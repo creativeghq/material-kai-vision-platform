@@ -155,7 +155,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
-                <Label>Purchasable as an add-on</Label>
+                <Label>Purchasable as an Add-On</Label>
                 <p className="text-xs text-muted-foreground">Workspaces whose plan doesn't include it can buy it.</p>
               </div>
               <Switch checked={isAddon} onCheckedChange={setIsAddon} />
@@ -163,7 +163,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
 
             {isAddon && (
               <div className="space-y-2">
-                <Label>Stripe product</Label>
+                <Label>Stripe Product</Label>
                 <Select value={productId} onValueChange={setProductId}>
                   <SelectTrigger><SelectValue placeholder="Select a Stripe product…" /></SelectTrigger>
                   <SelectContent>
@@ -187,7 +187,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
 
                 {/* One-click create — no Stripe dashboard trip needed. */}
                 <div className="rounded-md border border-dashed p-3 space-y-2">
-                  <Label className="text-xs">Or create a new product</Label>
+                  <Label className="text-xs">Or Create a New Product</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       type="text" inputMode="decimal" value={newAmount}
@@ -212,7 +212,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
             )}
 
             <div className="space-y-2">
-              <Label>Catalog summary (optional)</Label>
+              <Label>Catalog Summary (optional)</Label>
               <Input value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="One line shown on the activation card" />
             </div>
 
@@ -221,7 +221,7 @@ export const ModuleBillingDialog: React.FC<Props> = ({ slug, name, open, onOpenC
             <div className="space-y-2 border-t pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <Label>Also uses credits</Label>
+                  <Label>Also Uses Credits</Label>
                   <p className="text-xs text-muted-foreground">Shown as a chip on the tenant&apos;s module card.</p>
                 </div>
                 <Switch checked={consumesCredits} onCheckedChange={setConsumesCredits} />

@@ -80,11 +80,11 @@ export type PriceDocType =
   | 'supplier_cost_list';
 
 export const PRICE_DOC_TYPE_LABELS: Record<PriceDocType, string> = {
-  price_list: 'Price list (customer-facing / retail)',
-  discount_rule: 'Discount rule',
-  contract_terms: 'Contract terms',
+  price_list: 'Price List (Customer-Facing / Retail)',
+  discount_rule: 'Discount Rule',
+  contract_terms: 'Contract Terms',
   promotion: 'Promotion',
-  supplier_cost_list: 'Supplier cost list (procurement)',
+  supplier_cost_list: 'Supplier Cost List (Procurement)',
 };
 
 export interface ParseSupplierCostListOutcome {

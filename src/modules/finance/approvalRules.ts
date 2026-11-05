@@ -41,12 +41,12 @@ export interface MarginVerdict {
 }
 
 export const SUBJECT_LABEL: Record<ApprovalSubject, string> = {
-  credit_hold: 'Credit hold',
-  margin_floor: 'Margin authority',
-  pos_variance: 'Till variance',
-  project_variation: 'Project variation',
-  project_application: 'Project application',
-  project_purchase_order: 'Project purchase order',
+  credit_hold: 'Credit Hold',
+  margin_floor: 'Margin Authority',
+  pos_variance: 'Till Variance',
+  project_variation: 'Project Variation',
+  project_application: 'Project Application',
+  project_purchase_order: 'Project Purchase Order',
 };
 
 /** Whether a verdict should stop the write rather than merely inform. */

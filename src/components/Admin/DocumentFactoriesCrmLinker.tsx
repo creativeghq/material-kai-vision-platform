@@ -450,7 +450,7 @@ export const DocumentFactoriesCrmLinker: React.FC<DocumentFactoriesCrmLinkerProp
           {dialog && (
             <div className="space-y-3 py-2">
               <div className="space-y-1.5">
-                <Label htmlFor="biz-name">Business name *</Label>
+                <Label htmlFor="biz-name">Business Name *</Label>
                 <Input
                   id="biz-name"
                   value={dialog.name}

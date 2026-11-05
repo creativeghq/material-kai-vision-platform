@@ -180,7 +180,7 @@ export const BatchCategorizationPage = ({ embedded = false }: { embedded?: boole
           </div>
 
           <div className="flex items-center gap-3">
-            <Label className="w-32 shrink-0">Max products</Label>
+            <Label className="w-32 shrink-0">Max Products</Label>
             <div className="flex gap-2">
               {[50, 100, 200, 500].map((n) => (
                 <Button

@@ -133,7 +133,7 @@ export const INTERCONNECTION_LABEL: Record<InterconnectionStatus, string> = {
 export const TERMINAL_VERDICT_LABEL: Record<TerminalVerdict, string> = {
   interconnected: 'Interconnected',
   must_interconnect: 'Must be interconnected',
-  out_of_scope: 'Out of scope (wholesale only)',
+  out_of_scope: 'Out of Scope (Wholesale Only)',
 };
 
 export const ROUTE_LABEL: Record<InterconnectionRoute, string> = {

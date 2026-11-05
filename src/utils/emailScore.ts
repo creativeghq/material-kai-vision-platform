@@ -41,7 +41,7 @@ export function scoreEmail(input: { body: string; subject?: string | null }): Em
     tip: questions === 0 ? 'Ask one clear question, so they know what to answer.' : questions > 3 ? 'Too many questions: keep the one or two that matter.' : null }, 3, qFit);
 
   const sFit = band(avgSentence, 5, 17, 1, 35);
-  add({ key: 'sentences', label: 'Sentence length', value: `${Math.round(avgSentence)} words on average`, ok: sFit >= 0.8,
+  add({ key: 'sentences', label: 'Sentence Length', value: `${Math.round(avgSentence)} words on average`, ok: sFit >= 0.8,
     tip: avgSentence > 17 ? 'Split long sentences: short ones are easier to answer.' : null }, 2, sFit);
 
   const pFit = band(longestParagraph, 1, 70, 0, 160);

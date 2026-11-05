@@ -345,7 +345,7 @@ export const ProjectDetailPage: React.FC = () => {
             )}
             {myMembership && (
               <Badge variant="info" className="hidden sm:inline-flex">
-                {myMembership.role === 'manager' ? 'Project manager' : 'Team member'}
+                {myMembership.role === 'manager' ? 'Project manager' : 'Team Member'}
               </Badge>
             )}
             {project.category?.label && (

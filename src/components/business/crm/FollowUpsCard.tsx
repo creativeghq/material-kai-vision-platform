@@ -15,12 +15,12 @@ interface FollowUpRow {
 }
 
 function verdict(r: FollowUpRow): { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral' } {
-  if (r.kind === 'boomerang') return { label: 'Comes back', variant: 'info' };
+  if (r.kind === 'boomerang') return { label: 'Comes Back', variant: 'info' };
   if (r.status === 'pending' || r.status === 'sending') return { label: 'Waiting', variant: 'info' };
   if (r.status === 'sent') return r.replied_at ? { label: 'Got a reply', variant: 'success' } : { label: 'Sent, no reply yet', variant: 'neutral' };
   if (r.status === 'failed') return { label: 'Not sent', variant: 'error' };
   if (r.cancel_reason === 'replied') return { label: 'Answered before it was needed', variant: 'success' };
-  if (r.cancel_reason === 'deleted') return { label: 'Conversation deleted', variant: 'neutral' };
+  if (r.cancel_reason === 'deleted') return { label: 'Conversation Deleted', variant: 'neutral' };
   return { label: 'Cancelled', variant: 'neutral' };
 }
 

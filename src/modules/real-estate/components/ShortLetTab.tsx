@@ -105,7 +105,7 @@ export const ShortLetTab: React.FC<{ ws: string | null; propertyId: string; ical
                 <div><Label className="text-xs">Check-in</Label><Input className="h-9" type="date" value={draft.check_in} onChange={(e) => setDraft({ ...draft, check_in: e.target.value })} /></div>
                 <div><Label className="text-xs">Check-out</Label><Input className="h-9" type="date" value={draft.check_out} onChange={(e) => setDraft({ ...draft, check_out: e.target.value })} /></div>
                 <div><Label className="text-xs">Guest</Label><Input className="h-9" value={draft.guest_name} onChange={(e) => setDraft({ ...draft, guest_name: e.target.value })} /></div>
-                <div><Label className="text-xs">Nightly rate</Label><Input className="h-9" type="number" value={draft.nightly_rate} onChange={(e) => setDraft({ ...draft, nightly_rate: e.target.value })} /></div>
+                <div><Label className="text-xs">Nightly Rate</Label><Input className="h-9" type="number" value={draft.nightly_rate} onChange={(e) => setDraft({ ...draft, nightly_rate: e.target.value })} /></div>
                 <div>
                   <Label className="text-xs">Channel</Label>
                   <select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={draft.channel} onChange={(e) => setDraft({ ...draft, channel: e.target.value })}>

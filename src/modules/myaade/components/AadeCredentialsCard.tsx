@@ -88,7 +88,7 @@ export const AadeCredentialsCard: React.FC<{ workspaceId: string }> = ({ workspa
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-emerald-500" />
               <span className="text-sm font-medium">Platform default codes are active</span>
-              <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">In use</Badge>
+              <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">In Use</Badge>
             </div>
             <p className="text-xs text-muted-foreground">
               Business lookups already work on the platform-level codes configured for your account

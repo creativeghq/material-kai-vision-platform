@@ -307,7 +307,7 @@ export const ProjectCoverDialog: React.FC<ProjectCoverDialogProps> = ({
             {generated && (
               <PickTile
                 src={getOptimizedImageUrl(generated, { width: 800, quality: 80 })}
-                label="Rendered cover"
+                label="Rendered Cover"
                 selected={pick?.kind === 'generate' && pick.url === generated}
                 onSelect={() => setPick({ kind: 'generate', url: generated })}
               />

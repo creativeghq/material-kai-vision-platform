@@ -853,7 +853,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
           <FormSection title="Amounts">
             <FormGrid cols={4}>
-              <FormField label="Subtotal (net)">
+              <FormField label="Subtotal (Net)">
                 <Input type="text" inputMode="decimal" value={subtotalNet} onChange={(e) => setSubtotalNet(e.target.value)} />
               </FormField>
               <FormField label="VAT amount">
@@ -879,7 +879,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
               </FormField>
               {!paidNow && (
-                <FormField label="Due date">
+                <FormField label="Due Date">
                   <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
                 </FormField>
               )}
@@ -892,11 +892,11 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Select value={repeat} onValueChange={(v) => setRepeat(v as 'none' | RecurringCadence)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">One-off (no repeat)</SelectItem>
-                    <SelectItem value="weekly">Every week</SelectItem>
-                    <SelectItem value="monthly">Every month</SelectItem>
-                    <SelectItem value="quarterly">Every quarter</SelectItem>
-                    <SelectItem value="yearly">Every year</SelectItem>
+                    <SelectItem value="none">One-Off (No Repeat)</SelectItem>
+                    <SelectItem value="weekly">Every Week</SelectItem>
+                    <SelectItem value="monthly">Every Month</SelectItem>
+                    <SelectItem value="quarterly">Every Quarter</SelectItem>
+                    <SelectItem value="yearly">Every Year</SelectItem>
                   </SelectContent>
                 </Select>
               </FormField>
@@ -908,7 +908,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           <div className="rounded-md border border-border/60 p-3 space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <Label className="text-sm">Paid now</Label>
+                <Label className="text-sm">Paid Now</Label>
                 <p className="text-[11px] text-muted-foreground">{paidNow ? 'Books the payment out of an account — settles immediately.' : 'Leaves it as an open payable in AP until you mark it paid.'}</p>
               </div>
               <Switch checked={paidNow} onCheckedChange={setPaidNow} />

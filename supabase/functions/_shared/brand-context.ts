@@ -62,15 +62,15 @@ export function brandContextLines(ctx: BrandContext, audience: BrandAudience): s
   if (audience !== 'customer') {
     push('Positioning', text(p?.positioning));
     push('Ideal customer', text(p?.icp));
-    pushList('Messaging pillars', list(p?.messaging_pillars));
+    pushList('Messaging Pillars', list(p?.messaging_pillars));
     pushList('Competitors', ctx.competitors);
-    pushList('Active hypotheses', list(p?.active_hypotheses));
+    pushList('Active Hypotheses', list(p?.active_hypotheses));
   }
   if (audience === 'strategy') return lines;
   pushList('Tone', list(p?.tone_attributes));
   pushList('Personality', list(p?.personality_traits));
-  push('Writing style', text(p?.writing_style));
-  pushList('Preferred terminology', list(p?.terminology_preferences));
+  push('Writing Style', text(p?.writing_style));
+  pushList('Preferred Terminology', list(p?.terminology_preferences));
   pushList('Never use', list(p?.avoid_list));
   return lines;
 }

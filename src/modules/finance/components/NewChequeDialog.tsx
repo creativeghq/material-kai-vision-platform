@@ -83,8 +83,8 @@ export const NewChequeDialog: React.FC<{
               <Select value={direction} onValueChange={(v: any) => { setDirection(v); setTargetId(''); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="in">Received (from customer)</SelectItem>
-                  <SelectItem value="out">Issued (to supplier)</SelectItem>
+                  <SelectItem value="in">Received (From Customer)</SelectItem>
+                  <SelectItem value="out">Issued (To Supplier)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -101,7 +101,7 @@ export const NewChequeDialog: React.FC<{
               <Input value={bank} onChange={(e) => setBank(e.target.value)} placeholder="Piraeus" />
             </div>
             <div className="space-y-1 col-span-2">
-              <Label>Due date</Label>
+              <Label>Due Date</Label>
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
             </div>
             <div className="space-y-1 col-span-2">

@@ -638,13 +638,13 @@ function SearchAppearance({ metaTitle, metaDescription, slug }: {
     <div className="mb-4 rounded-lg border border-hairline bg-surface-sunken p-3 space-y-2.5">
       <p className="text-xs font-semibold">Search appearance</p>
       <MetaField
-        label="Meta title"
+        label="Meta Title"
         value={metaTitle}
         max={META_TITLE_MAX}
         hint="No meta title — search engines will invent one from the page."
       />
       <MetaField
-        label="Meta description"
+        label="Meta Description"
         value={metaDescription}
         max={META_DESCRIPTION_MAX}
         hint="No meta description — search engines will pull an arbitrary sentence from the body instead."
@@ -1028,7 +1028,7 @@ function BriefTab({ data, onAddFaq }: {
 const GAP_SOURCE_LABEL: Record<NonNullable<MissingTopic['source']>, string> = {
   keyword: 'Searched keyword',
   question: 'People Also Ask',
-  competitor_heading: 'Competitor section',
+  competitor_heading: 'Competitor Section',
 };
 
 /** What the article does not cover that people search for — and what it already does. */
@@ -1095,7 +1095,7 @@ function GapsGainsTab({ data, labels, onAddToContent, onReanalyze }: {
                     row you should probably not write about. */}
                 {topic.competitorBrand && (
                   <Badge variant="neutral" title="This query names a competitor's brand">
-                    Competitor brand
+                    Competitor Brand
                   </Badge>
                 )}
               </div>
@@ -1239,7 +1239,7 @@ function ResearchTab({ data, labels, onAddToContent }: {
     // so an empty set means the research stage recorded none for this keyword — which is a fact
     // about the SERP, not a placeholder waiting to fill itself in.
     if (entries.length === 0) {
-      entries.push({ label: 'Content landscape', value: 'The research stage measured none of the ranked pages for this keyword.' });
+      entries.push({ label: 'Content Landscape', value: 'The research stage measured none of the ranked pages for this keyword.' });
     }
     return entries;
   }, [data.statistics]);
@@ -1811,7 +1811,7 @@ const CALLOUT_META: Record<CalloutKind, {
   definition: { label: 'Definition',    Icon: BookOpen,    borderClass: 'border-blue-500/30',    bgClass: 'bg-blue-500/5',        iconClass: 'text-blue-700 dark:text-blue-400' },
   example:    { label: 'Example',       Icon: Lightbulb,   borderClass: 'border-amber-500/30',   bgClass: 'bg-amber-500/5',       iconClass: 'text-amber-800 dark:text-amber-400' },
   info:       { label: 'Note',          Icon: Info,        borderClass: 'border-sky-500/30',     bgClass: 'bg-sky-500/5',         iconClass: 'text-sky-700 dark:text-sky-400' },
-  warning:    { label: 'Heads up',      Icon: AlertOctagon, borderClass: 'border-red-500/30',     bgClass: 'bg-red-500/5',         iconClass: 'text-red-700 dark:text-red-400' },
+  warning:    { label: 'Heads Up',      Icon: AlertOctagon, borderClass: 'border-red-500/30',     bgClass: 'bg-red-500/5',         iconClass: 'text-red-700 dark:text-red-400' },
   quote:      { label: 'Quote',         Icon: Quote,       borderClass: 'border-muted-foreground/30', bgClass: 'bg-muted/40',     iconClass: 'text-muted-foreground' },
 };
 
@@ -2296,7 +2296,7 @@ const VERDICT_TONE: Record<string, 'success' | 'warning' | 'error' | 'info' | 'n
 
 const VERDICT_LABEL: Record<string, string> = {
   improving: 'Improving', stable: 'Holding', slipping: 'Slipping',
-  dropped_out: 'Dropped out', new: 'Too new to compare',
+  dropped_out: 'Dropped Out', new: 'Too new to compare',
 };
 
 function ArticlePerformance({
@@ -3027,7 +3027,7 @@ export default function SEOArticleViewer({ articleId, initialArticle }: SEOArtic
                   </>
                 )}
                 {article.status === 'failed' && (
-                  <span className="text-red-700 dark:text-red-400 truncate">{article.error_message || 'Generation failed'}</span>
+                  <span className="text-red-700 dark:text-red-400 truncate">{article.error_message || 'Generation Failed'}</span>
                 )}
               </div>
             </div>

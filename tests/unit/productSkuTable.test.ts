@@ -3,7 +3,7 @@ import {
   NO_FILTER, colourHexIndex, distinctValues, filterRows, formatCell, isDisplayableTable, isFiltering, summarise, toSkuTable,
 } from '@/components/features/products/productSkuTable';
 
-const HEADERS = ['Item code', 'Colour', 'Size (cm)', 'Pieces per box', 'Status', 'Availability'];
+const HEADERS = ['Item code', 'Colour', 'Size (cm)', 'Pieces per Box', 'Status', 'Availability'];
 const ROWS = [
   ['8001', 'white', '60x120', 2, 'Active', 'Standard range'],
   ['8002', 'grey', '60x120', 2, 'Discontinued', 'Standard range'],

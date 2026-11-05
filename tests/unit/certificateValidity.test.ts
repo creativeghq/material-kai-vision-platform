@@ -10,7 +10,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8').replace
 describe('SQL decides validity, TypeScript only formats it', () => {
   it('formats each verdict certificate_validity() can return', () => {
     expect(presentValidity('valid')).toEqual({ label: 'Valid', tone: 'success', known: true });
-    expect(presentValidity('expiring_soon')).toEqual({ label: 'Expiring soon', tone: 'warning', known: true });
+    expect(presentValidity('expiring_soon')).toEqual({ label: 'Expiring Soon', tone: 'warning', known: true });
     expect(presentValidity('expired')).toEqual({ label: 'Expired', tone: 'error', known: true });
     expect(presentValidity('no_expiry_stated'))
       .toEqual({ label: 'No expiry stated', tone: 'neutral', known: true });

@@ -54,7 +54,7 @@ const CATEGORY_COLOR: Record<CreditSpendCategoryLabel, string> = {
 const TOPUP_LABEL: Record<string, string> = {
   purchase: 'Credit purchase',
   bonus: 'Bonus credits',
-  monthly_grant: 'Monthly grant',
+  monthly_grant: 'Monthly Grant',
 };
 
 const formatDay = (value: string) => formatDateValue(value);
@@ -180,7 +180,7 @@ export const CreditUsageHistory: React.FC = () => {
   const handleDownload = () => {
     if (!statement) return;
     const csv = toCsv(
-      ['Date', 'Description', 'Amount (credits)'],
+      ['Date', 'Description', 'Amount (Credits)'],
       [
         ['', 'Starting balance', statement.starting_balance.toFixed(2)],
         ...rows.map((r) => [r.date, r.description, r.amount.toFixed(2)]),
@@ -267,7 +267,7 @@ export const CreditUsageHistory: React.FC = () => {
                   <TableRow>
                     <TableHead className="w-44">Date</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Amount (credits)</TableHead>
+                    <TableHead className="text-right">Amount (Credits)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -308,7 +308,7 @@ export const CreditUsageHistory: React.FC = () => {
 
       <Card className="rounded-2xl">
         <CardHeader>
-          <CardTitle>Daily spend</CardTitle>
+          <CardTitle>Daily Spend</CardTitle>
           <CardDescription>{monthLabel(month)}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -84,7 +84,7 @@ describe('the seven elements are all required', () => {
       consumer_action: 'Stop using it', remedies: 'Refund',
       contact_channel: '800', share_encouragement: 'Tell others',
     };
-    expect(missingRecallElements(r)).toEqual(['Hazard description (c)']);
+    expect(missingRecallElements(r)).toEqual(['Hazard Description (c)']);
     expect(missingRecallElements({})).toHaveLength(6);
   });
 

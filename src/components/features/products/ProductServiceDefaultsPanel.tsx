@@ -154,7 +154,7 @@ export const ProductServiceDefaultsPanel: React.FC<Props> = ({ productId, worksp
 
           <div className="flex items-end gap-3">
             <div className="w-40">
-              <Label htmlFor="warranty-months" className="text-xs">Warranty (months)</Label>
+              <Label htmlFor="warranty-months" className="text-xs">Warranty (Months)</Label>
               <Input
                 id="warranty-months"
                 type="number"
@@ -229,7 +229,7 @@ export const ProductServiceDefaultsPanel: React.FC<Props> = ({ productId, worksp
             onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
         </div>
         <div className="w-32">
-          <Label className="text-xs">Every (months)</Label>
+          <Label className="text-xs">Every (Months)</Label>
           <Input type="number" min={1} value={draft.interval_months}
             onChange={(e) => setDraft({ ...draft, interval_months: e.target.value })} />
         </div>

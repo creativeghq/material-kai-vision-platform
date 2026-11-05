@@ -14,7 +14,7 @@ export interface ValidityPresentation {
 
 const PRESENTATION: Record<CertificateValidity, Omit<ValidityPresentation, 'known'>> = {
   valid: { label: 'Valid', tone: 'success' },
-  expiring_soon: { label: 'Expiring soon', tone: 'warning' },
+  expiring_soon: { label: 'Expiring Soon', tone: 'warning' },
   expired: { label: 'Expired', tone: 'error' },
   no_expiry_stated: { label: 'No expiry stated', tone: 'neutral' },
 };

@@ -83,7 +83,7 @@ export function ProductCertificateDialog({ productId, draft, onClose, onSaved }:
                   placeholder="A1"
                 />
               </FormField>
-              <FormField label="Certificate number" htmlFor="cert-number" optional>
+              <FormField label="Certificate Number" htmlFor="cert-number" optional>
                 <Input
                   id="cert-number" value={form.certificate_number}
                   onChange={(e) => set('certificate_number', e.target.value)}
@@ -108,13 +108,13 @@ export function ProductCertificateDialog({ productId, draft, onClose, onSaved }:
 
           <FormSection title="Validity">
             <FormGrid>
-              <FormField label="Valid from" htmlFor="cert-from" optional>
+              <FormField label="Valid From" htmlFor="cert-from" optional>
                 <Input
                   id="cert-from" type="date" value={form.valid_from}
                   onChange={(e) => set('valid_from', e.target.value)}
                 />
               </FormField>
-              <FormField label="Valid until" htmlFor="cert-until" optional>
+              <FormField label="Valid Until" htmlFor="cert-until" optional>
                 <Input
                   id="cert-until" type="date" value={form.valid_until}
                   onChange={(e) => set('valid_until', e.target.value)}

@@ -143,7 +143,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
           {/* Send form */}
           <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/30">
             <div>
-              <Label className="text-xs">Email address</Label>
+              <Label className="text-xs">Email Address</Label>
               <Input
                 type="email"
                 value={email}
@@ -164,7 +164,7 @@ export const InviteCollaboratorsModal: React.FC<InviteCollaboratorsModalProps> =
               <p className="mt-1 text-xs text-muted-foreground">{ROLE_OPTIONS.find((o) => o.value === role)?.hint}</p>
             </div>
             <div>
-              <Label className="text-xs">Personal message (optional)</Label>
+              <Label className="text-xs">Personal Message (optional)</Label>
               <Textarea
                 value={message}
                 onChange={e => setMessage(e.target.value)}

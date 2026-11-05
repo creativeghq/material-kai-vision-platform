@@ -353,245 +353,245 @@ const seoCardFromSavedResult = (saved: any): SEOGenericCardData | undefined =>
 const AGENT_RESULT_TITLES: Record<string, string> = {
   // The capability ledger. Renders through the generic structured card below.
   workspace_capabilities: 'What this workspace can do',
-  ingestion_report: 'Ingestion corrections',
-  ingestion_job: 'Catalogue ingestion',
-  ingestion_review: 'Discovered products',
+  ingestion_report: 'Ingestion Corrections',
+  ingestion_job: 'Catalogue Ingestion',
+  ingestion_review: 'Discovered Products',
   // Construction. All five carry a `run:` quick-start — a deterministic call with NO model turn,
   // so nothing narrates the answer. They shipped emitting only `tool_progress`, which meant the
   // user pressed "How is this job doing?", read the quick-start's cheerful done line and saw no
   // numbers whatsoever. The coverage guard skips `tool_progress` (rightly — it is a status line,
   // not a result), so with no other chunk there was nothing for it to object to.
-  construction_cvr: 'Cost report',
-  construction_applications: 'Payment applications',
+  construction_cvr: 'Cost Report',
+  construction_applications: 'Payment Applications',
   construction_variations: 'Variations',
-  construction_tenders: 'Tender packages',
-  construction_bid_analysis: 'Bid analysis',
-  construction_takeoff: 'Drawing takeoff',
+  construction_tenders: 'Tender Packages',
+  construction_bid_analysis: 'Bid Analysis',
+  construction_takeoff: 'Drawing Takeoff',
   b2b_company_results: 'Companies found',
-  project_report: 'Project report',
+  project_report: 'Project Report',
   // Deterministic surface preview (#447): the card draws it in the browser from this chunk.
-  visualizer_render: 'Surface preview',
+  visualizer_render: 'Surface Preview',
   // Cross-entity record lookup. The "Find a record" quick-start is a DIRECT run (no model turn),
   // so this card is the only thing that puts the matches on screen.
-  record_search_results: 'Records found',
-  document_templates_list: 'Our document templates',
+  record_search_results: 'Records Found',
+  document_templates_list: 'Our Document Templates',
   // A question asked of a spreadsheet attachment in the Inbox: the answer, plus the SQL and the
   // rows that produced it, so the reader can check the number rather than trust it.
-  inbox_spreadsheet_answer: 'Spreadsheet answer',
+  inbox_spreadsheet_answer: 'Spreadsheet Answer',
   // Deal pipeline (#311). Every onChunk type a tool emits MUST be here or the output is dropped
   // and the user sees "Done" with no data.
-  crm_deals_list: 'Deal pipeline',
-  crm_deal_forecast: 'Weighted forecast',
-  crm_deal_saved: 'Deal updated',
-  crm_deal_documents: 'Deal documents',
-  crm_deal_pipeline_stats: 'Pipeline analytics',
+  crm_deals_list: 'Deal Pipeline',
+  crm_deal_forecast: 'Weighted Forecast',
+  crm_deal_saved: 'Deal Updated',
+  crm_deal_documents: 'Deal Documents',
+  crm_deal_pipeline_stats: 'Pipeline Analytics',
   // Counterparty bank accounts. The "Bank accounts" quick-start is a DIRECT run, so this card is
   // the only thing that puts them on screen; the saved card is how the operator sees what the
   // approval they just gave actually wrote.
-  crm_bank_accounts_listed: 'Bank accounts on file',
-  crm_bank_account_saved: 'Bank account updated',
+  crm_bank_accounts_listed: 'Bank Accounts on File',
+  crm_bank_account_saved: 'Bank Account Updated',
   // The platform API fallback. `discover_platform_api` is a DIRECT-run quick-start, so this card
   // is the only thing that puts its matches on screen; the result card is how the user sees what
   // a call they approved actually returned.
-  platform_api_matches: 'Platform capabilities',
-  platform_api_result: 'Platform API result',
+  platform_api_matches: 'Platform Capabilities',
+  platform_api_result: 'Platform API Result',
   platform_data_matches: 'Figures the platform derives',
-  platform_data_result: 'Platform data',
+  platform_data_result: 'Platform Data',
   // My HR (employee self-service). These MUST be registered: a quick-start with `run` is a
   // deterministic direct tool call that skips the LLM, so there is no narration fallback — an
   // unregistered chunk is dropped and the user just sees "Done — ran manage_my_hr" with no data.
-  my_hr_profile: 'My HR profile',
-  my_hr_timeoff: 'My time off',
-  my_hr_timeoff_requested: 'Time-off request submitted',
-  my_hr_documents: 'My HR documents',
-  my_hr_punches: 'My clock-ins',
+  my_hr_profile: 'My HR Profile',
+  my_hr_timeoff: 'My Time Off',
+  my_hr_timeoff_requested: 'Time-Off Request Submitted',
+  my_hr_documents: 'My HR Documents',
+  my_hr_punches: 'My Clock-Ins',
   // B2B — the EU industrial facility register. A direct-run quick-start skips the LLM, so this
   // chunk is the only thing that puts the factories on screen.
-  industrial_facilities: 'Factories found',
+  industrial_facilities: 'Factories Found',
   // Price monitoring
-  price_tracking_started: 'Price tracking started',
-  price_summary: 'Competitor prices',
+  price_tracking_started: 'Price Tracking Started',
+  price_summary: 'Competitor Prices',
   // Email marketing
-  email_campaigns_list: 'Email campaigns',
-  email_templates_list: 'Email templates',
-  email_campaign_created: 'Draft campaign created',
-  brand_change_proposed: 'Brand change proposed',
-  email_campaign_sent: 'Campaign sending',
+  email_campaigns_list: 'Email Campaigns',
+  email_templates_list: 'Email Templates',
+  email_campaign_created: 'Draft Campaign Created',
+  brand_change_proposed: 'Brand Change Proposed',
+  email_campaign_sent: 'Campaign Sending',
   // CRM
-  crm_company_created: 'Company added to CRM',
-  crm_contact_created: 'Contact added to CRM',
-  crm_activity_logged: 'Activity logged',
-  crm_kad_results: 'Business activity codes (KAD)',
-  crm_customer_health: 'Customer health',
-  finance_order_worklist: 'Orders needing action',
+  crm_company_created: 'Company Added to CRM',
+  crm_contact_created: 'Contact Added to CRM',
+  crm_activity_logged: 'Activity Logged',
+  crm_kad_results: 'Business Activity Codes (KAD)',
+  crm_customer_health: 'Customer Health',
+  finance_order_worklist: 'Orders Needing Action',
   // Messaging / WhatsApp
-  messaging_channels_list: 'WhatsApp channels',
-  messaging_sent: 'WhatsApp sent',
+  messaging_channels_list: 'WhatsApp Channels',
+  messaging_sent: 'WhatsApp Sent',
   // No `seo_*_card` key belongs here: this map is read FIRST, so listing one shadows
   // SEOGenericCard's branch and the card arrives as a flattened key/value dump. Sixteen
   // were, all sixteen had a branch. Guarded by tests/unit/seoCardCoverage.test.ts.
   // Quotes — the unpriced rung (#341). The priced ones render their own cards.
-  quote_request_raised: 'Quote request recorded',
+  quote_request_raised: 'Quote Request Recorded',
   // Contracts
   contracts_list: 'Contracts',
-  contract_created: 'Contract drafted',
-  doc_saved: 'Document saved',
+  contract_created: 'Contract Drafted',
+  doc_saved: 'Document Saved',
   doc_suggestion_submitted: 'Edit suggested',
-  contract_sent: 'Contract sent for signature',
+  contract_sent: 'Contract Sent for Signature',
   // AI Assessment (#397) — one set of chunks for all three subjects (project / finance /
   // real estate). The reader tools are direct-run quick-starts — no model turn, so there is no
   // prose to fall back on. An unregistered chunk here is a cheerful "done" over a blank screen.
   assessment_report: 'AI assessment',
-  assessment_actions: 'Assessment actions',
-  assessment_action_applied: 'Action added to the task list',
+  assessment_actions: 'Assessment Actions',
+  assessment_action_applied: 'Action Added to the Task List',
   // Customer Inbox
-  inbox_threads_list: 'Customer conversations',
+  inbox_threads_list: 'Customer Conversations',
   inbox_reply_sent: 'Reply sent',
   // Reviews
   reviews_list: 'Reviews about you',
   review_reply_posted: 'Reply posted',
   // Real Estate
-  real_estate_properties: 'Property listings',
+  real_estate_properties: 'Property Listings',
   real_estate_property: 'Property',
-  real_estate_leads: 'Property leads',
-  real_estate_listing_created: 'Draft listing created',
-  real_estate_listing_published: 'Listing published',
-  real_estate_viewing_scheduled: 'Viewing scheduled',
+  real_estate_leads: 'Property Leads',
+  real_estate_listing_created: 'Draft Listing Created',
+  real_estate_listing_published: 'Listing Published',
+  real_estate_viewing_scheduled: 'Viewing Scheduled',
   real_estate_description_draft: 'AI listing copy',
   real_estate_lettings: 'Lettings',
-  real_estate_work_order: 'Maintenance logged',
-  real_estate_sale: 'Sale completed',
-  real_estate_deals: 'Deal pipeline',
+  real_estate_work_order: 'Maintenance Logged',
+  real_estate_sale: 'Sale Completed',
+  real_estate_deals: 'Deal Pipeline',
   real_estate_deal: 'Deal',
   real_estate_cma: 'CMA valuation',
-  real_estate_investments: 'Investment portfolio',
-  real_estate_portals: 'Buyer portals',
-  real_estate_performance: 'Listing performance',
-  real_estate_links: 'Listing links',
-  real_estate_rent_settlements: 'Rent received',
-  real_estate_commission_splits: 'Commission splits',
+  real_estate_investments: 'Investment Portfolio',
+  real_estate_portals: 'Buyer Portals',
+  real_estate_performance: 'Listing Performance',
+  real_estate_links: 'Listing Links',
+  real_estate_rent_settlements: 'Rent Received',
+  real_estate_commission_splits: 'Commission Splits',
   // Appointments
-  appointments_list: 'Upcoming appointments',
-  appointment_scheduled: 'Appointment scheduled',
+  appointments_list: 'Upcoming Appointments',
+  appointment_scheduled: 'Appointment Scheduled',
   // Finance (read)
   finance_invoices_list: 'Invoices',
   finance_orders_list: 'Orders',
   finance_payments_list: 'Payments',
-  customer_balance_result: 'Customer balance',
-  finance_invoice_issued: 'Invoice issued',
+  customer_balance_result: 'Customer Balance',
+  finance_invoice_issued: 'Invoice Issued',
   finance_monthly_pnl: 'Monthly P&L',
-  finance_profit_drawdown: 'Profit drawdown',
-  finance_order_profit: 'Order margin',
-  finance_invoice_profit: 'Invoice margin',
-  finance_order_customs: 'Customs preview',
-  finance_buyer_limits: 'Credit limit',
-  finance_party_profit: 'Customer margin',
-  finance_supplier_inbound_orders: 'Orders from buyers',
+  finance_profit_drawdown: 'Profit Drawdown',
+  finance_order_profit: 'Order Margin',
+  finance_invoice_profit: 'Invoice Margin',
+  finance_order_customs: 'Customs Preview',
+  finance_buyer_limits: 'Credit Limit',
+  finance_party_profit: 'Customer Margin',
+  finance_supplier_inbound_orders: 'Orders from Buyers',
   // Finance expenses
   // The myDATA/ΑΑΔΕ expenses FEED — a different and much larger set than `expenses_list`, which
   // is only what we have booked. Both quick-starts are `run:` (no model turn), so an unregistered
   // chunk here is a cheerful "done" over an empty screen.
   mydata_expense_documents: 'myDATA expense documents',
-  mydata_expense_suppliers: 'Suppliers filing against us',
+  mydata_expense_suppliers: 'Suppliers Filing Against Us',
   mydata_inbound_status: 'myDATA connection',
-  expense_recorded: 'Expense recorded',
-  expenses_list: 'Recent expenses',
-  expense_paid: 'Expense paid',
+  expense_recorded: 'Expense Recorded',
+  expenses_list: 'Recent Expenses',
+  expense_paid: 'Expense Paid',
   expense_payments: 'Payments on this expense',
   // Company assets (shared Finance + HR register)
-  company_assets_list: 'Company assets',
-  company_asset_added: 'Asset added',
-  company_asset_assigned: 'Asset assigned',
-  company_asset_returned: 'Asset returned',
+  company_assets_list: 'Company Assets',
+  company_asset_added: 'Asset Added',
+  company_asset_assigned: 'Asset Assigned',
+  company_asset_returned: 'Asset Returned',
   // Knowledge-graph tools
-  customer_overview_result: 'Customer overview',
-  supplier_overview_result: 'Supplier overview',
-  product_provenance_result: 'Product provenance',
-  product_price_history_result: 'Price history',
+  customer_overview_result: 'Customer Overview',
+  supplier_overview_result: 'Supplier Overview',
+  product_provenance_result: 'Product Provenance',
+  product_price_history_result: 'Price History',
   projects_using_product_result: 'Projects using this product',
-  products_in_project_result: 'Products in project',
-  products_by_brand_result: 'Products by brand',
-  brand_overview_result: 'Brand overview',
-  related_products_result: 'Related products',
-  find_products_by_spec_result: 'Products by spec',
+  products_in_project_result: 'Products in Project',
+  products_by_brand_result: 'Products by Brand',
+  brand_overview_result: 'Brand Overview',
+  related_products_result: 'Related Products',
+  find_products_by_spec_result: 'Products by Spec',
   // #337. Registered here or the payload is dropped and the user sees "Done — ran price_my_spec"
   // with no verdict — which on this tool means they cannot tell a real price from "we don't have it".
   spec_pricing_result: 'What that would cost',
   // Website embed. Same rule as above: unregistered, the snippet the merchant is meant to COPY is
   // the payload that gets dropped, and "Done — ran embed_readiness" is worth nothing to anyone.
   embed_readiness_result: 'Ready for your website',
-  embed_overview_result: 'Your website embed',
+  embed_overview_result: 'Your Website Embed',
   // Purchase sheet
-  purchase_sheet_ready: 'Purchase sheet ready',
+  purchase_sheet_ready: 'Purchase Sheet Ready',
   // Trip / expense cards
-  trip_card_created: 'Trip card created',
-  flight_offers_card: 'Flight fares',
-  trip_expense_added: 'Expense added',
-  trip_cards_list: 'Trip cards',
-  trip_card_submitted: 'Trip card submitted',
-  expense_card_submitted: 'Expense card submitted',
+  trip_card_created: 'Trip Card Created',
+  flight_offers_card: 'Flight Fares',
+  trip_expense_added: 'Expense Added',
+  trip_cards_list: 'Trip Cards',
+  trip_card_submitted: 'Trip Card Submitted',
+  expense_card_submitted: 'Expense Card Submitted',
   // Job research
-  job_search_created: 'Job search created',
-  job_search_updated: 'Job search updated',
-  job_searches_list: 'Job searches',
-  job_digest_preview: 'Job digest preview',
+  job_search_created: 'Job Search Created',
+  job_search_updated: 'Job Search Updated',
+  job_searches_list: 'Job Searches',
+  job_digest_preview: 'Job Digest Preview',
   // The three READ chunks below are each reachable from a `run:` quick-start ("My flows",
   // "Which job boards?", "Browse the radar"). A direct run has NO model turn, so the
   // "the agent's prose summarizes it" assumption these used to rely on is false: they were
   // logged to console.debug and the user got a bare "Done!" with the data thrown away.
-  job_sites_list: 'Job boards searched',
-  signals_hiring_results: 'Companies hiring',
-  signals_technology_results: 'Companies using the technology',
-  signals_intent_results: 'Companies in market',
-  company_signals: 'Company signals',
-  signals_list: 'Saved signals',
-  signal_matches_list: 'Signal matches',
-  signal_saved: 'Signal saved',
-  flows_list: 'Workspace flows',
-  flow_suggestions: 'Suggested automations',
-  tech_radar_list: 'Tech radar',
+  job_sites_list: 'Job Boards Searched',
+  signals_hiring_results: 'Companies Hiring',
+  signals_technology_results: 'Companies Using the Technology',
+  signals_intent_results: 'Companies in Market',
+  company_signals: 'Company Signals',
+  signals_list: 'Saved Signals',
+  signal_matches_list: 'Signal Matches',
+  signal_saved: 'Signal Saved',
+  flows_list: 'Workspace Flows',
+  flow_suggestions: 'Suggested Automations',
+  tech_radar_list: 'Tech Radar',
   // Also a `run:` ("Track an entry" pins action:'create'), so also unnarrated. Its `done` copy
   // at least says an entry was added — but the title, cadence and derived schedule it came back
   // with were going to console.debug, so the user could not see WHAT was tracked.
-  tech_radar_monitor: 'Tech radar entry tracked',
+  tech_radar_monitor: 'Tech Radar Entry Tracked',
   // Stock management
-  stock_overview: 'Stock overview',
-  stock_items: 'Stock items',
-  stock_low: 'Low stock',
-  stock_movements: 'Stock movements',
-  stock_adjusted: 'Stock updated',
-  stock_reordered: 'Reorder drafted',
-  stock_forecast: 'Resupply forecast',
-  stock_forecast_preview: 'Resupply preview',
-  stock_transferred: 'Stock transferred',
-  stock_pending: 'Pending intake',
-  stock_pending_resolved: 'Intake resolved',
-  stock_project_holds: 'Stock held for project',
-  sourcing_board: 'Sourcing board',
-  sourcing_suppliers: 'Product suppliers',
+  stock_overview: 'Stock Overview',
+  stock_items: 'Stock Items',
+  stock_low: 'Low Stock',
+  stock_movements: 'Stock Movements',
+  stock_adjusted: 'Stock Updated',
+  stock_reordered: 'Reorder Drafted',
+  stock_forecast: 'Resupply Forecast',
+  stock_forecast_preview: 'Resupply Preview',
+  stock_transferred: 'Stock Transferred',
+  stock_pending: 'Pending Intake',
+  stock_pending_resolved: 'Intake Resolved',
+  stock_project_holds: 'Stock Held for Project',
+  sourcing_board: 'Sourcing Board',
+  sourcing_suppliers: 'Product Suppliers',
   sourcing_granted_catalog: 'Products you may sell',
   // HR management
   hr_employees: 'Employees',
   hr_overview: 'HR overview',
-  hr_on_leave: 'On leave',
-  hr_absence_recorded: 'Absence recorded',
-  hr_employee_added: 'Employee added',
+  hr_on_leave: 'On Leave',
+  hr_absence_recorded: 'Absence Recorded',
+  hr_employee_added: 'Employee Added',
   // Social management
-  social_accounts: 'Social accounts',
-  social_post: 'Social post',
-  social_best_time: 'Best time to post',
-  social_insights: 'Social insights',
-  social_post_analytics: 'Post analytics',
-  social_content_generated: 'Caption drafted',
-  social_image_generated: 'Image generated',
-  social_video_generated: 'Video generated',
+  social_accounts: 'Social Accounts',
+  social_post: 'Social Post',
+  social_best_time: 'Best Time to Post',
+  social_insights: 'Social Insights',
+  social_post_analytics: 'Post Analytics',
+  social_content_generated: 'Caption Drafted',
+  social_image_generated: 'Image Generated',
+  social_video_generated: 'Video Generated',
   // Quotes
   quotes_list: 'Quotes',
   // Misc
-  price_lookup_matches: 'Price lookup matches',
-  price_proposal: 'Price proposal',
-  price_resolution: 'Price and calculation options',
-  project_created: 'Project created',
+  price_lookup_matches: 'Price Lookup Matches',
+  price_proposal: 'Price Proposal',
+  price_resolution: 'Price and Calculation Options',
+  project_created: 'Project Created',
   // video_generated is intentionally NOT here — it has a dedicated handler that maps it into the
   // rich <video> player card (videoData). Registering it would make the generic card shadow that.
 };
@@ -2023,24 +2023,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // name below, so a new tool reads sensibly the day it ships instead of falling into a
     // generic bucket nobody remembers to update.
     const toolVerbs: Record<string, string> = {
-      material_search: 'Searching materials',
-      visual_search: 'Searching by image',
+      material_search: 'Searching Materials',
+      visual_search: 'Searching by Image',
       knowledge_base_search: 'Searching the knowledge base',
       read_document_section: 'Reading the document',
       find_records: 'Searching your records',
-      load_toolkit: 'Loading more tools',
+      load_toolkit: 'Loading More Tools',
       b2b_company_search: 'Researching companies',
       b2b_manufacturer_search: 'Researching manufacturers',
       company_enrichment: 'Enriching the company',
       company_website_scrape: 'Reading their website',
-      contact_discovery: 'Finding contacts',
+      contact_discovery: 'Finding Contacts',
       generate_3d: 'Rendering in 3D',
       generate_gemini: 'Generating the image',
-      price_lookup: 'Checking prices',
+      price_lookup: 'Checking Prices',
       submit_price_proposal: 'Preparing the price proposal',
       create_quote: 'Drafting the quote',
-      list_my_quotes: 'Fetching quotes',
-      manage_finance: 'Working through the finances',
+      list_my_quotes: 'Fetching Quotes',
+      manage_finance: 'Working Through the Finances',
       request_input: 'Putting a form on screen',
     };
 
@@ -4676,7 +4676,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       (typeof n === 'number' ? [`${n} ${n === 1 ? one : many}`] : undefined);
     if (m.demoData) return { id: m.id, kind: 'demo', title: 'Demo results', meta: count(Array.isArray(m.demoData.data) ? m.demoData.data.length : undefined, 'item') };
     if (m.heatPumpData) return { id: m.id, kind: 'calc', title: 'Heat-pump sizing' };
-    if (m.heatingCostData) return { id: m.id, kind: 'calc', title: 'Heating cost comparison' };
+    if (m.heatingCostData) return { id: m.id, kind: 'calc', title: 'Heating Cost Comparison' };
     // The third calculator. `renderCanvasArtifact` has drawn a KitchenCostResultCard since the day
     // the canvas shipped, and nothing could ever reach it: the canvas only renders a message that
     // got a TAB here, and this branch was missing. Two registries, and the complete-looking one
@@ -4706,7 +4706,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.geminiImageData && !m.videoData) return { id: m.id, kind: 'image', title: 'Generated image', preview: m.geminiImageData.image_url };
     if (m.videoData) return { id: m.id, kind: 'video', title: 'Generated video' };
     if (m.inspirationData) return { id: m.id, kind: 'inspiration', title: m.inspirationData.page_title || 'Inspiration board', preview: m.inspirationData.hero_image };
-    if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech radar' };
+    if (m.techRadarData) return { id: m.id, kind: 'radar', title: 'Tech Radar' };
     if (m.agentResultData) {
       // `primaryListCount` is AgentResultCard's own answer to "which list is this result
       // about" — imported so the card and the table cannot disagree on the number.
@@ -6811,7 +6811,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                   {/* Floor Plan → 3D Render — guided capture (photo-first) */}
                   <button
-                    onClick={() => launchInteriorQuickStart('Floor plan → 3D')}
+                    onClick={() => launchInteriorQuickStart('Floor Plan → 3D')}
                     className={`flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors ${selectedGenerationMode === 'floor-plan-render' ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700'}`}
                     title="Convert a floor plan to a photorealistic eye-level interior perspective"
                   >
@@ -6841,7 +6841,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                         );
                       } else {
                         // Single-image redesign → guided capture (photo-first + target style).
-                        launchInteriorQuickStart('Redesign from a photo');
+                        launchInteriorQuickStart('Redesign from a Photo');
                       }
                     }}
                     className={`flex items-center gap-1 px-2.5 py-1 border text-xs font-medium transition-colors ${(selectedGenerationMode === 'redesign' || selectedGenerationMode === 'copy-style') ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-700'}`}
@@ -7345,7 +7345,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           models={[]}
           directImage={{
             url: geminiModalImage.url,
-            title: geminiModalImage.kind === 'generated' ? 'Generated Design' : 'Your room photo',
+            title: geminiModalImage.kind === 'generated' ? 'Generated Design' : 'Your Room Photo',
           }}
           onDirectImageClose={() => setGeminiModalImage(null)}
           workspaceId={workspaceId}

@@ -294,7 +294,7 @@ const InvoiceDetailPage: React.FC = () => {
           {/* `isActionable` adds status !== 'draft'. Gating only on void/credit_noted let a
               PUBLIC card-pay link be minted for an unissued document, let "Record payment"
               open against a draft (whose row the payment dialog's picker excludes, so the
-              money booked as unallocated credit), and let "Credit note" open a dialog whose
+              money booked as unallocated credit), and let "Credit Note" open a dialog whose
               picker excludes drafts — empty, with no explanation. The only action a draft
               offers is "Mark Issued". */}
           {isActionable && (
@@ -445,7 +445,7 @@ const InvoiceDetailPage: React.FC = () => {
                 <th className="px-4 py-2 text-right">Qty</th>
                 <th className="px-4 py-2 text-right">Unit Price</th>
                 <th className="px-4 py-2 text-right">Line Total</th>
-                <th className="px-4 py-2 text-right">Cost (snap)</th>
+                <th className="px-4 py-2 text-right">Cost (Snap)</th>
                 <th className="px-4 py-2 text-right">Margin</th>
               </tr>
             </thead>
@@ -481,9 +481,9 @@ const InvoiceDetailPage: React.FC = () => {
           </CardHeader>
           <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
             {[
-              ['Loading place', (invoice as any).ship_from],
-              ['Delivery place', (invoice as any).ship_to],
-              ['Transport date', (invoice as any).transport_date],
+              ['Loading Place', (invoice as any).ship_from],
+              ['Delivery Place', (invoice as any).ship_to],
+              ['Transport Date', (invoice as any).transport_date],
               ['Time', (invoice as any).transport_time],
               ['Vehicle no.', (invoice as any).vehicle_number],
               ['Responsible', (invoice as any).responsible],
@@ -504,9 +504,9 @@ const InvoiceDetailPage: React.FC = () => {
           // AADE 8.12 via the one table — the literal that used to sit here was that list
           // rotated by two, so code 7 (POS / e-POS) read as "Domestic account".
           ['Payment Method', inv.payment_method_code ? mydataPaymentLabel(inv.payment_method_code) : null],
-          ['Payment note', inv.payment_method_info],
-          ['Related document', inv.related_document],
-          ['Digital transaction fee', Number(inv.digital_transaction_fee) > 0 ? formatMoney(inv.digital_transaction_fee, inv.currency) : null],
+          ['Payment Note', inv.payment_method_info],
+          ['Related Document', inv.related_document],
+          ['Digital Transaction Fee', Number(inv.digital_transaction_fee) > 0 ? formatMoney(inv.digital_transaction_fee, inv.currency) : null],
           ['Withholding', Number(inv.total_withheld_amount) > 0 ? formatMoney(inv.total_withheld_amount, inv.currency) : null],
           ['Prices include VAT', inv.prices_include_vat ? 'Yes' : null],
           ['VAT payment suspension', inv.vat_payment_suspension ? 'Yes' : null],

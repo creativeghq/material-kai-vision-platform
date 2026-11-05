@@ -107,7 +107,7 @@ export const ShippingCredentialsCard: React.FC<{ workspaceId: string }> = ({ wor
           does not charge credits for it. This is entirely optional; leave it empty and inbound tracking stays off.
         </p>
         <div className="space-y-1">
-          <Label className="text-xs">ShipsGo API key</Label>
+          <Label className="text-xs">ShipsGo API Key</Label>
           <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} autoComplete="new-password"
             placeholder={hasKey ? `${keyMasked ?? '••••'} (configured — leave blank to keep)` : 'Paste your ShipsGo API token'} />
         </div>

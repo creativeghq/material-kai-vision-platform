@@ -80,7 +80,7 @@ export default function ClockInKioskPage() {
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2 mb-6 text-muted-foreground">
           <Clock className="h-5 w-5" />
-          <span className="text-sm font-medium">{meta?.workspace_name || 'Clock in'}</span>
+          <span className="text-sm font-medium">{meta?.workspace_name || 'Clock In'}</span>
         </div>
 
         {phase === 'loading' && <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}

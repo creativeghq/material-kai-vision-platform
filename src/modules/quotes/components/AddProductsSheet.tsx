@@ -641,7 +641,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
 
                 <FormSection title="Product">
                 <FormGrid>
-                  <FormField label="Product name" htmlFor="cp-name" className="sm:col-span-2">
+                  <FormField label="Product Name" htmlFor="cp-name" className="sm:col-span-2">
                     <Input id="cp-name" value={customForm.name} onChange={e => setCustomField('name', e.target.value)} placeholder="e.g. Custom Marble Slab" />
                   </FormField>
                   <FormField label="SKU / Code" htmlFor="cp-sku" optional>
@@ -694,7 +694,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                 </FormGrid>
                 </FormSection>
 
-                <FormSection title="Price and quantity">
+                <FormSection title="Price and Quantity">
                 <FormGrid>
                   <div className="min-w-0 space-y-1">
                     <div className="flex items-center justify-between gap-2">
@@ -750,7 +750,7 @@ export const AddProductsSheet: React.FC<AddProductsSheetProps> = ({
                     <FormField label="Dimensions (W×H×D)" htmlFor="cp-dims" optional>
                       <Input id="cp-dims" value={customForm.dimensions} onChange={e => setCustomField('dimensions', e.target.value)} placeholder="e.g. 120×60×45" />
                     </FormField>
-                    <FormField label="Installation requirements" htmlFor="cp-install" optional className="sm:col-span-2">
+                    <FormField label="Installation Requirements" htmlFor="cp-install" optional className="sm:col-span-2">
                       <textarea
                         id="cp-install"
                         value={customForm.installation_requirements}

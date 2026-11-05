@@ -106,7 +106,7 @@ export function buildQuoteRequestFilters(
       key: 'classification', label: 'Classification', icon: Tags,
       fields: [
         {
-          key: 'status_tag', type: 'multi', label: 'Status tag',
+          key: 'status_tag', type: 'multi', label: 'Status Tag',
           description: 'Workflow tag assigned by the team.',
           options: tagOptions,
           accessor: (r: QuoteWithItems) => r.status_tag_id ?? undefined,

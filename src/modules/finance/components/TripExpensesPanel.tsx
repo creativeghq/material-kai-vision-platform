@@ -721,19 +721,19 @@ const TripLinkedRecordsCard: React.FC<{
       <CardHeader className="border-b border-border/60 px-5 py-3">
         <CardTitle className="text-sm">Filed against this card</CardTitle>
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <Totals label="Claimed here" value={spent} currency={cardCurrency} />
+          <Totals label="Claimed Here" value={spent} currency={cardCurrency} />
           {/* Each currency on its own tile. One figure spanning EUR and GBP is a wrong number
               that still looks like a number, so the RPC groups and this renders the groups. */}
           {links.earned.map((m: TripMoneyByCurrency) => (
-            <Totals key={`e:${m.currency}`} label="Orders won" value={Number(m.amount)} currency={m.currency} tone="green" />
+            <Totals key={`e:${m.currency}`} label="Orders Won" value={Number(m.amount)} currency={m.currency} tone="green" />
           ))}
           {links.filed.map((m: TripMoneyByCurrency) => (
-            <Totals key={`f:${m.currency}`} label="Bills filed" value={Number(m.amount)} currency={m.currency} tone="amber" />
+            <Totals key={`f:${m.currency}`} label="Bills Filed" value={Number(m.amount)} currency={m.currency} tone="amber" />
           ))}
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        {sales.length > 0 && <LinkRowGroup icon={<ShoppingCart className="h-3 w-3" />} text="Orders won" />}
+        {sales.length > 0 && <LinkRowGroup icon={<ShoppingCart className="h-3 w-3" />} text="Orders Won" />}
         {sales.map((o) => (
           <div key={o.id} className="flex items-center justify-between border-b border-border/30 px-5 py-2 text-sm">
             <span className="truncate">
@@ -856,11 +856,11 @@ const NewTripCardDialog: React.FC<{
               <Input id="tripexpensespanel-purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder={isTrip ? 'Client meetings' : undefined} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{isTrip ? 'Trip start' : 'Period from'}</label>
+              <label className="text-xs text-muted-foreground">{isTrip ? 'Trip start' : 'Period From'}</label>
               <Input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <label className="text-xs text-muted-foreground">{isTrip ? 'Trip end' : 'Period to'}</label>
+              <label className="text-xs text-muted-foreground">{isTrip ? 'Trip end' : 'Period To'}</label>
               <Input type="date" value={end} min={start || undefined} onChange={(e) => setEnd(e.target.value)} />
             </div>
           </div>
@@ -1046,10 +1046,10 @@ const AddExpenseDialog: React.FC<{
               <Select value={method} onValueChange={(v: any) => setMethod(v)}>
                 <SelectTrigger id="tripexpensespanel-paid-with"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="personal">Personal funds</SelectItem>
+                  <SelectItem value="personal">Personal Funds</SelectItem>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="card">Card</SelectItem>
-                  <SelectItem value="company_card">Company card</SelectItem>
+                  <SelectItem value="company_card">Company Card</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>

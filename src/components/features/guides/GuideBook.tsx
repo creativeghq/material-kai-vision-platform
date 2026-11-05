@@ -267,7 +267,7 @@ export const GuideBook: React.FC<Props> = ({
                 key={i}
                 type="button"
                 onClick={() => onPlayStep(i)}
-                title={i ? `Build step ${i}` : 'The kit'}
+                title={i ? `Build step ${i}` : 'The Kit'}
                 className={cn('group absolute rounded-md transition-colors', on ? 'bg-amber-400/20' : 'hover:bg-amber-400/15')}
                 style={{
                   left: offset + r.x + s.box.x0 * r.w,
@@ -284,7 +284,7 @@ export const GuideBook: React.FC<Props> = ({
                   )}
                   style={{ mixBlendMode: 'normal' }}
                 >
-                  {i ? `Step ${i}` : 'The kit'}
+                  {i ? `Step ${i}` : 'The Kit'}
                 </b>
               </button>
             );

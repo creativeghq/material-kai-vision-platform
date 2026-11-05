@@ -14,7 +14,7 @@ export const DELIVERY_STAGE_LABEL: Record<DeliveryStage, string> = {
   draft: 'Draft',
   ordered: 'Ordered',
   shipped: 'Shipped',
-  part_delivered: 'Part delivered',
+  part_delivered: 'Part Delivered',
   delivered: 'Delivered',
   cancelled: 'Cancelled',
 };

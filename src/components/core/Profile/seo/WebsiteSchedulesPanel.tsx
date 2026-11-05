@@ -90,9 +90,9 @@ export const WebsiteSchedulesPanel: React.FC<{ website: UserWebsite }> = ({ webs
                 <TableRow>
                   <TableHead>Collector</TableHead>
                   <TableHead>Schedule</TableHead>
-                  <TableHead className="text-right">Per run (max)</TableHead>
-                  <TableHead className="text-right">Per month (max)</TableHead>
-                  <TableHead>Last run</TableHead>
+                  <TableHead className="text-right">Per Run (Max)</TableHead>
+                  <TableHead className="text-right">Per Month (Max)</TableHead>
+                  <TableHead>Last Run</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

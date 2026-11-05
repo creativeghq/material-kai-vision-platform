@@ -20,10 +20,10 @@ interface Rule {
 }
 
 const TYPE_LABELS: Record<string, string> = {
-  category_extra: 'Category extra discount',
-  date_window: 'Seasonal window (per category)',
-  cash_payment: 'Paid upfront (cash)',
-  payment_terms: 'Agreed payment terms',
+  category_extra: 'Category Extra Discount',
+  date_window: 'Seasonal Window (Per Category)',
+  cash_payment: 'Paid Upfront (Cash)',
+  payment_terms: 'Agreed Payment Terms',
   first_order: "Customer's first order",
   bundle: 'Bought together (bundle)',
 };
@@ -156,12 +156,12 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
             <Select value={type} onValueChange={(v) => setType(v as any)}>
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="category_extra">Category extra</SelectItem>
-                <SelectItem value="date_window">Seasonal window</SelectItem>
-                <SelectItem value="payment_terms">Payment terms</SelectItem>
-                <SelectItem value="first_order">First order</SelectItem>
-                <SelectItem value="bundle">Bought together</SelectItem>
-                <SelectItem value="cash_payment">Paid upfront (cash)</SelectItem>
+                <SelectItem value="category_extra">Category Extra</SelectItem>
+                <SelectItem value="date_window">Seasonal Window</SelectItem>
+                <SelectItem value="payment_terms">Payment Terms</SelectItem>
+                <SelectItem value="first_order">First Order</SelectItem>
+                <SelectItem value="bundle">Bought Together</SelectItem>
+                <SelectItem value="cash_payment">Paid Upfront (Cash)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -198,7 +198,7 @@ export const CustomPricingRulesCard: React.FC<{ workspaceId: string }> = ({ work
           )}
           {type === 'bundle' && (
             <div className="space-y-1">
-              <Label className="text-xs">Bought together</Label>
+              <Label className="text-xs">Bought Together</Label>
               <Select value="" onValueChange={(v) => setBundleCats((prev) => (prev.includes(v) ? prev : [...prev, v]))}>
                 <SelectTrigger className="h-8 w-44 text-xs">
                   <SelectValue placeholder={bundleCats.length ? bundleCats.join(' + ') : 'Add categories'} />

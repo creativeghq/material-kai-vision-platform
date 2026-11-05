@@ -78,7 +78,7 @@ export const ContactTaxVatCard: React.FC<ContactTaxVatCardProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="tax_office">Tax office</Label>
+          <Label htmlFor="tax_office">Tax Office</Label>
           <Input
             id="tax_office"
             value={localTax}

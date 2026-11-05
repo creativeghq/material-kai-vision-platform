@@ -79,7 +79,7 @@ export function totalsRows(
   const rows: TotalsRow[] = [{ label: 'Price', value: b.price, kind: 'price' }];
   if (b.hasDiscount) {
     rows.push({ label: 'Discount', value: b.discount, kind: 'discount', negative: true });
-    rows.push({ label: 'Price after Discount', value: b.priceAfterDiscount, kind: 'subtotal' });
+    rows.push({ label: 'Price After Discount', value: b.priceAfterDiscount, kind: 'subtotal' });
   }
   for (const e of opts?.extras ?? []) {
     rows.push({ label: e.label, value: e.value, kind: 'extra', negative: e.negative });

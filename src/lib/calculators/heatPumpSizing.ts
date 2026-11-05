@@ -192,9 +192,9 @@ export function computeHeatPumpSizing(input: HeatPumpSizingInput): HeatPumpSizin
 
 export const INSULATION_OPTIONS: Array<{ value: InsulationLevel; label: string; hint: string }> = [
   { value: 'none', label: 'No insulation (pre-1980)', hint: '≈ 90 W/m²' },
-  { value: 'medium', label: 'Partial / post-1980', hint: '≈ 70 W/m²' },
-  { value: 'modern', label: 'Well insulated (KENAK)', hint: '≈ 50 W/m²' },
-  { value: 'passive', label: 'Passive house / nZEB', hint: '≈ 25 W/m²' },
+  { value: 'medium', label: 'Partial / Post-1980', hint: '≈ 70 W/m²' },
+  { value: 'modern', label: 'Well Insulated (KENAK)', hint: '≈ 50 W/m²' },
+  { value: 'passive', label: 'Passive House / nZEB', hint: '≈ 25 W/m²' },
 ];
 
 export const ZONE_OPTIONS: Array<{ value: ClimateZone; label: string }> = [
@@ -205,14 +205,14 @@ export const ZONE_OPTIONS: Array<{ value: ClimateZone; label: string }> = [
 ];
 
 export const EMITTER_OPTIONS: Array<{ value: EmitterType; label: string }> = [
-  { value: 'underfloor', label: 'Underfloor heating (35 °C)' },
-  { value: 'fan_coil', label: 'Fan coils (45 °C)' },
-  { value: 'low_temp_radiator', label: 'Low-temp radiators (50 °C)' },
-  { value: 'high_temp_radiator', label: 'Existing radiators (60 °C)' },
+  { value: 'underfloor', label: 'Underfloor Heating (35 °C)' },
+  { value: 'fan_coil', label: 'Fan Coils (45 °C)' },
+  { value: 'low_temp_radiator', label: 'Low-Temp Radiators (50 °C)' },
+  { value: 'high_temp_radiator', label: 'Existing Radiators (60 °C)' },
 ];
 
 export const GLAZING_OPTIONS: Array<{ value: GlazingExposure; label: string }> = [
   { value: 'low', label: 'Compact, few windows' },
   { value: 'normal', label: 'Typical' },
-  { value: 'high', label: 'Large glazing / exposed' },
+  { value: 'high', label: 'Large Glazing / Exposed' },
 ];

@@ -156,9 +156,9 @@ export const GA_DRILL_TARGETS: Record<GaBreakdownKey, GaBreakdownKey[]> = {
 };
 
 export const GA_DIMENSION_NOUN: Record<GaBreakdownKey, string> = {
-  country: 'Country', city: 'City', page: 'Page', landing_page: 'Landing page', device: 'Device',
+  country: 'Country', city: 'City', page: 'Page', landing_page: 'Landing Page', device: 'Device',
   browser: 'Browser', os: 'Operating system', source: 'Source / medium', event: 'Event',
-  returning: 'New vs returning', item: 'Product', ads_campaign: 'Ad campaign', age: 'Age',
+  returning: 'New vs returning', item: 'Product', ads_campaign: 'Ad Campaign', age: 'Age',
   gender: 'Gender', language: 'Language', hostname: 'Hostname',
 };
 

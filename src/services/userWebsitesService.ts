@@ -991,7 +991,7 @@ export const userWebsitesService = {
       body: { website_id: websiteId, mode: 'full' },
     });
     if (error) throw error;
-    if (!data?.success) throw new Error(data?.error || 'Crawl failed');
+    if (!data?.success) throw new Error(data?.error || 'Crawl Failed');
     return data.data as CrawlResult;
   },
 

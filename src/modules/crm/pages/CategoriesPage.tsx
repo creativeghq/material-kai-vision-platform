@@ -38,13 +38,13 @@ import { DEFAULT_CATEGORY_COLOR } from '@/components/business/crm/categoryColors
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 
 const KIND_LABELS: Record<CrmCategoryKind, string> = {
-  professional_type: 'Professional type',
-  role: 'Access role',
+  professional_type: 'Professional Type',
+  role: 'Access Role',
   employment: 'Employment (HR)',
   manual: 'Custom',
   industry: 'Industry',
-  lead_status: 'Lead status',
-  lead_source: 'Lead source',
+  lead_status: 'Lead Status',
+  lead_source: 'Lead Source',
 };
 
 /** Kinds whose members are derived by `crm_resync_auto_category_members`; operator-only surface. */
@@ -354,9 +354,9 @@ export const CategoriesPanel: React.FC = () => {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {canManageOwn && <SelectItem value="workspace">Custom — private to {activeWorkspace?.name ?? 'this workspace'}</SelectItem>}
-                      <SelectItem value="industry">Industry — shared</SelectItem>
-                      <SelectItem value="lead_status">Lead status option — shared</SelectItem>
-                      <SelectItem value="lead_source">Lead source option — shared</SelectItem>
+                      <SelectItem value="industry">Industry — Shared</SelectItem>
+                      <SelectItem value="lead_status">Lead Status Option — Shared</SelectItem>
+                      <SelectItem value="lead_source">Lead Source Option — Shared</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -387,7 +387,7 @@ export const CategoriesPanel: React.FC = () => {
               )}
               {editing?.kind === 'industry' && (
                 <div className="space-y-1 border-t border-hairline pt-3">
-                  <Label>Product category</Label>
+                  <Label>Product Category</Label>
                   <Select value={form.materialId ?? '__none'} onValueChange={(v) => setForm({ ...form, materialId: v === '__none' ? null : v })}>
                     <SelectTrigger><SelectValue placeholder="Not matched" /></SelectTrigger>
                     <SelectContent>

@@ -1093,15 +1093,15 @@ const PosPage: React.FC = () => {
             <DialogHeader><DialogTitle>{zReport.status === 'closed' ? `Z report #${zReport.z_number}` : 'X report (live)'}</DialogTitle><DialogDescription className="sr-only">Point-of-sale action.</DialogDescription></DialogHeader>
             <div className="space-y-1 text-sm">
               <Row label="Receipts" value={String(zReport.receipt_count)} />
-              <Row label="Total sales" value={formatMoney(zReport.total_sales, currency)} />
+              <Row label="Total Sales" value={formatMoney(zReport.total_sales, currency)} />
               {Object.entries(zReport.by_payment || {}).map(([k, v]) => <Row key={k} label={`· ${k}`} value={formatMoney(v as number, currency)} muted />)}
               <div className="border-t border-border/60 my-1" />
               {(zReport.by_vat || []).map((r, i) => <Row key={i} label={`VAT ${r.rate}%`} value={`net ${formatMoney(r.net, currency)} · vat ${formatMoney(r.vat, currency)}`} muted />)}
               <div className="border-t border-border/60 my-1" />
-              <Row label="Opening float" value={formatMoney(zReport.opening_float, currency)} />
+              <Row label="Opening Float" value={formatMoney(zReport.opening_float, currency)} />
               <Row label="Cash in / Out" value={`${formatMoney(zReport.cash_in, currency)} / ${formatMoney(zReport.cash_out, currency)}`} />
-              <Row label="Expected cash" value={formatMoney(zReport.expected_cash, currency)} />
-              {zReport.counted_cash != null && <Row label="Counted cash" value={formatMoney(zReport.counted_cash, currency)} />}
+              <Row label="Expected Cash" value={formatMoney(zReport.expected_cash, currency)} />
+              {zReport.counted_cash != null && <Row label="Counted Cash" value={formatMoney(zReport.counted_cash, currency)} />}
               {zReport.cash_variance != null && <Row label="Variance" value={formatMoney(zReport.cash_variance, currency)} danger={zReport.cash_variance !== 0} />}
             </div>
             <DialogFooter>

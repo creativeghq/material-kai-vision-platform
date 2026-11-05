@@ -7,8 +7,8 @@ export type PartySide = 'customer' | 'supplier';
 export const OPENING_BALANCE_SOURCES = ['party_statement', 'previous_system', 'accountant', 'other'] as const;
 export type OpeningBalanceSource = (typeof OPENING_BALANCE_SOURCES)[number];
 export const OPENING_BALANCE_SOURCE_LABELS: Record<OpeningBalanceSource, string> = {
-  party_statement: 'Their statement',
-  previous_system: 'Previous system',
+  party_statement: 'Their Statement',
+  previous_system: 'Previous System',
   accountant: 'Accountant',
   other: 'Other',
 };

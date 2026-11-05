@@ -295,7 +295,7 @@ export const KeywordResearchDetail: React.FC<{
               sub="volume vs difficulty"
             />
             <Figure
-              label="Addressable volume"
+              label="Addressable Volume"
               value={row.total_addressable_volume != null ? compact(row.total_addressable_volume) : '—'}
               sub={`across ${compact(row.total_keywords_found ?? 0)} keywords`}
             />
@@ -422,7 +422,7 @@ export const KeywordResearchDetail: React.FC<{
       {features?.hasFeaturedSnippet && features.featuredSnippetContent && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">The snippet being shown</CardTitle>
+            <CardTitle className="text-base">The Snippet Being Shown</CardTitle>
             <CardDescription>
               Position zero is taken{features.featuredSnippetType ? ` by a ${features.featuredSnippetType}` : ''}.
               Match the format to compete for it.
@@ -440,7 +440,7 @@ export const KeywordResearchDetail: React.FC<{
         {/* ── People Also Ask ─────────────────────────────────────────── */}
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Questions people also ask</CardTitle>
+            <CardTitle className="text-base">Questions People Also Ask</CardTitle>
             <CardDescription>Straight from the results page — the follow-ups this query leads to.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -508,7 +508,7 @@ export const KeywordResearchDetail: React.FC<{
         <Card className="dashboard-card">
           <CardHeader className="flex flex-row items-start justify-between gap-3">
             <div>
-              <CardTitle className="text-base">Keyword clusters</CardTitle>
+              <CardTitle className="text-base">Keyword Clusters</CardTitle>
               <CardDescription>
                 {clusters.length} themes the expanded keyword set falls into. Each is a candidate page rather than a
                 candidate paragraph.
@@ -526,7 +526,7 @@ export const KeywordResearchDetail: React.FC<{
                     <TableHead>Theme</TableHead>
                     <TableHead className="text-right">Keywords</TableHead>
                     <TableHead className="text-right">Volume</TableHead>
-                    <TableHead>Top terms</TableHead>
+                    <TableHead>Top Terms</TableHead>
                     {onTrack && <TableHead className="w-28" />}
                   </TableRow>
                 </TableHeader>
@@ -575,13 +575,13 @@ export const KeywordResearchDetail: React.FC<{
       {blob?.contentLandscape && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">The content already out there</CardTitle>
+            <CardTitle className="text-base">The Content Already Out There</CardTitle>
             <CardDescription>What the pages competing for this query look like.</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
               <Figure
-                label="Avg. word count"
+                label="Avg. Word Count"
                 value={
                   blob.contentLandscape.avgWordCount
                     ? compact(blob.contentLandscape.avgWordCount)
@@ -590,12 +590,12 @@ export const KeywordResearchDetail: React.FC<{
                 sub={blob.contentLandscape.avgWordCount ? 'words per page' : 'the source returned no length data'}
               />
               <Figure
-                label="Avg. domain rank"
+                label="Avg. Domain Rank"
                 value={blob.contentLandscape.avgDomainRank ? Math.round(blob.contentLandscape.avgDomainRank) : '—'}
                 sub="of the ranking set"
               />
               <Figure
-                label="Content score"
+                label="Content Score"
                 value={
                   blob.contentLandscape.avgContentScore
                     ? Math.round(blob.contentLandscape.avgContentScore)
@@ -603,7 +603,7 @@ export const KeywordResearchDetail: React.FC<{
                 }
               />
               <Figure
-                label="Freshest page"
+                label="Freshest Page"
                 value={
                   blob.contentLandscape.dateRange?.latest
                     ? new Date(blob.contentLandscape.dateRange.latest).getFullYear()
@@ -685,7 +685,7 @@ export const KeywordResearchDetail: React.FC<{
       {(blob?.contentGapOpportunities?.length ?? 0) > 0 && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Competing pages</CardTitle>
+            <CardTitle className="text-base">Competing Pages</CardTitle>
             <CardDescription>The titles of the pages ranking for this keyword. What they actually cover is above, read from the pages themselves.</CardDescription>
           </CardHeader>
           <CardContent>

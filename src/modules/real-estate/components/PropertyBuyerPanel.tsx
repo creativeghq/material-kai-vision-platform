@@ -200,10 +200,10 @@ export const PropertyBuyerPanel: React.FC<{ contactId: string; workspaceId: stri
           <Fld label="Role"><select className="h-9 w-full rounded-md border bg-background px-2 text-sm" value={ext.contact_role ?? ''} onChange={(e) => setE('contact_role', e.target.value)}>
             {['', 'buyer', 'seller', 'renter', 'investor', 'landlord'].map((o) => <option key={o} value={o}>{o || '—'}</option>)}
           </select></Fld>
-          <Fld label="Budget min"><Input type="number" value={ext.budget_min ?? ''} onChange={(e) => setE('budget_min', e.target.value)} /></Fld>
-          <Fld label="Budget max"><Input type="number" value={ext.budget_max ?? ''} onChange={(e) => setE('budget_max', e.target.value)} /></Fld>
+          <Fld label="Budget Min"><Input type="number" value={ext.budget_min ?? ''} onChange={(e) => setE('budget_min', e.target.value)} /></Fld>
+          <Fld label="Budget Max"><Input type="number" value={ext.budget_max ?? ''} onChange={(e) => setE('budget_max', e.target.value)} /></Fld>
           <Fld label="Pre-approval"><Input value={ext.pre_approval_status ?? ''} onChange={(e) => setE('pre_approval_status', e.target.value)} placeholder="approved / pending" /></Fld>
-          <Fld label="Pre-approval amount"><Input type="number" value={ext.pre_approval_amount ?? ''} onChange={(e) => setE('pre_approval_amount', e.target.value)} /></Fld>
+          <Fld label="Pre-Approval Amount"><Input type="number" value={ext.pre_approval_amount ?? ''} onChange={(e) => setE('pre_approval_amount', e.target.value)} /></Fld>
           <Fld label="Lender"><Input value={ext.lender ?? ''} onChange={(e) => setE('lender', e.target.value)} /></Fld>
         </div>
         {/* What they OWN is no longer three loose fields here — it lives in the Properties table

@@ -109,7 +109,7 @@ export const TaricReferencePanel: React.FC = () => {
             <Select value={source} onValueChange={(v) => setSource(v as 'taric_eu' | 'gr_national')}>
               <SelectTrigger className="h-9 text-xs w-[190px]"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="gr_national">Greek national extract</SelectItem>
+                <SelectItem value="gr_national">Greek National Extract</SelectItem>
                 <SelectItem value="taric_eu">EU TARIC extract</SelectItem>
               </SelectContent>
             </Select>

@@ -91,17 +91,17 @@ export default function HeatPumpToolPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="area">Heated area (m²)</Label>
+                <Label htmlFor="area">Heated Area (m²)</Label>
                 <Input id="area" type="number" inputMode="decimal" min={1} value={floorArea} onChange={(e) => setFloorArea(e.target.value)} />
               </div>
               <div>
-                <Label htmlFor="ceiling">Ceiling height (m)</Label>
+                <Label htmlFor="ceiling">Ceiling Height (m)</Label>
                 <Input id="ceiling" type="number" inputMode="decimal" min={1.8} step={0.1} value={ceiling} onChange={(e) => setCeiling(e.target.value)} />
               </div>
             </div>
 
             <div>
-              <Label>Insulation / Building era</Label>
+              <Label>Insulation / Building Era</Label>
               <Select value={insulation} onValueChange={(v) => setInsulation(v as InsulationLevel)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -118,7 +118,7 @@ export default function HeatPumpToolPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Climate zone</Label>
+                <Label>Climate Zone</Label>
                 <Select value={zone} onValueChange={(v) => setZone(v as ClimateZone)} disabled={advanced && designTemp.trim() !== ''}>
                   <SelectTrigger>
                     <SelectValue />
@@ -150,7 +150,7 @@ export default function HeatPumpToolPage() {
             </div>
 
             <div>
-              <Label>Heat-emission system</Label>
+              <Label>Heat-Emission System</Label>
               <Select value={emitter} onValueChange={(v) => setEmitter(v as EmitterType)}>
                 <SelectTrigger>
                   <SelectValue />
@@ -185,14 +185,14 @@ export default function HeatPumpToolPage() {
 
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <Label htmlFor="advanced" className="cursor-pointer">Advanced: exact design temperature</Label>
+                <Label htmlFor="advanced" className="cursor-pointer">Advanced: Exact Design Temperature</Label>
                 <p className="text-xs text-muted-foreground">Override the zone with the local TOTEE winter design temp.</p>
               </div>
               <Switch id="advanced" className="shrink-0" checked={advanced} onCheckedChange={setAdvanced} />
             </div>
             {advanced && (
               <div className="w-full sm:w-1/2">
-                <Label htmlFor="design-temp">Design outdoor temp (°C)</Label>
+                <Label htmlFor="design-temp">Design Outdoor Temp (°C)</Label>
                 <Input id="design-temp" type="number" inputMode="decimal" placeholder="e.g. -4" value={designTemp} onChange={(e) => setDesignTemp(e.target.value)} />
               </div>
             )}
@@ -220,12 +220,12 @@ export default function HeatPumpToolPage() {
 
               <Card className="dashboard-card">
                 <CardContent className="p-5 space-y-3 text-sm">
-                  <Row icon={Flame} label="Space-heating load" value={`${result.spaceHeatingKW} kW`} />
-                  {includeDhw && <Row icon={Waves} label="Hot-water allowance" value={`${result.dhwKW} kW`} />}
-                  <Row icon={Thermometer} label="Total design load" value={`${result.totalDesignKW} kW`} bold />
+                  <Row icon={Flame} label="Space-Heating Load" value={`${result.spaceHeatingKW} kW`} />
+                  {includeDhw && <Row icon={Waves} label="Hot-Water Allowance" value={`${result.dhwKW} kW`} />}
+                  <Row icon={Thermometer} label="Total Design Load" value={`${result.totalDesignKW} kW`} bold />
                   <Separator />
-                  <Row label="Effective specific load" value={`${result.effectiveWattsPerM2} W/m²`} muted />
-                  <Row label="Required flow temp" value={`${result.flowTempC} °C`} muted />
+                  <Row label="Effective Specific Load" value={`${result.effectiveWattsPerM2} W/m²`} muted />
+                  <Row label="Required Flow Temp" value={`${result.flowTempC} °C`} muted />
                   <p className="text-xs text-muted-foreground leading-relaxed pt-1">{result.emitterNote}</p>
                   <p className="text-[11px] text-muted-foreground/80 leading-relaxed">{result.climateBasis}</p>
                 </CardContent>

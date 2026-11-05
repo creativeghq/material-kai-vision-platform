@@ -109,7 +109,7 @@ const MoneyStrip: React.FC<{ money: IssuerMoney | null | undefined; loading: boo
             : ''}</>}
       />
       <Tile
-        label="In the books"
+        label="In the Books"
         value={nothingBooked ? '—' : formatMoney(money.booked_total, cur)}
         note={nothingBooked
           ? 'None of these are expenses yet'
@@ -131,7 +131,7 @@ const MoneyStrip: React.FC<{ money: IssuerMoney | null | undefined; loading: boo
       />
       {money.settled_outside_documents > 0 && (
         <Tile
-          label="Settled outside the books"
+          label="Settled Outside the Books"
           value={formatMoney(money.settled_outside_total, cur)}
           note={`${money.settled_outside_documents} document${money.settled_outside_documents === 1 ? '' : 's'} · kept out of the P&L on purpose`}
           tone="text-muted-foreground"

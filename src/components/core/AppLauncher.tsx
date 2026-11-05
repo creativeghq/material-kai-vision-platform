@@ -151,7 +151,7 @@ export const AppLauncher: React.FC = () => {
         {hasLinks ? (
           <div className="mt-1.5 flex flex-wrap gap-1.5">
             {/* Create actions lead (e.g. "New Quote"), then nested sections (e.g.
-                "Price monitoring") — the card's primary verb comes first. */}
+                "Price Monitoring") — the card's primary verb comes first. */}
             {actions.map((a) => (
               <button
                 key={a.to}

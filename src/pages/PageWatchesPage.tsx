@@ -84,7 +84,7 @@ function watchState(w: PageWatch): { label: string; tone: Tone; hint?: string; r
   }
   if (!w.last_check_at) {
     return {
-      label: 'Awaiting first check', tone: 'info', rank: 1,
+      label: 'Awaiting First Check', tone: 'info', rank: 1,
       hint: 'The baseline snapshot is usually taken within a minute or two of adding the watch.',
     };
   }
@@ -94,8 +94,8 @@ function watchState(w: PageWatch): { label: string; tone: Tone; hint?: string; r
 /** What a detected CHANGE was. `same` and `error` mean opposite things — never merge them. */
 const CHANGE_STATUS: Record<PageWatchChangeStatus, { label: string; tone: Tone }> = {
   changed: { label: 'Changed', tone: 'warning' },
-  new: { label: 'First snapshot', tone: 'info' },
-  removed: { label: 'Page gone', tone: 'error' },
+  new: { label: 'First Snapshot', tone: 'info' },
+  removed: { label: 'Page Gone', tone: 'error' },
   error: { label: 'Check failed', tone: 'error' },
   same: { label: 'No change', tone: 'neutral' },
 };
@@ -153,8 +153,8 @@ const EMPTY_FORM = {
 };
 
 const STATE_FILTERS = [
-  { value: 'all', label: 'Any state' },
-  { value: 'review', label: 'Needs review' },
+  { value: 'all', label: 'Any State' },
+  { value: 'review', label: 'Needs Review' },
   { value: 'trouble', label: 'Not running' },
   { value: 'quiet', label: 'Running, quiet' },
   { value: 'paused', label: 'Paused' },
@@ -397,7 +397,7 @@ export default function PageWatchesPage() {
     },
     {
       id: 'checked',
-      header: 'Last check',
+      header: 'Last Check',
       sortable: true,
       hideBelow: 'sm',
       cell: (w) => <span className="text-muted-foreground">{timeAgo(w.last_check_at)}</span>,
@@ -471,9 +471,9 @@ export default function PageWatchesPage() {
       <>
         <PageHeader
           icon={FileSearch}
-          title="Page monitoring"
+          title="Page Monitoring"
           subtitle="Watch a page you do not control and read exactly what changed"
-          breadcrumbs={[{ label: 'Tools', to: '/tools' }, { label: 'Page monitoring' }]}
+          breadcrumbs={[{ label: 'Tools', to: '/tools' }, { label: 'Page Monitoring' }]}
         />
         <div className="space-y-6 p-4 sm:p-6">
           <Card>
@@ -498,9 +498,9 @@ export default function PageWatchesPage() {
     <>
       <PageHeader
         icon={FileSearch}
-        title="Page monitoring"
+        title="Page Monitoring"
         subtitle="Watch a page you do not control and read exactly what changed"
-        breadcrumbs={[{ label: 'Tools', to: '/tools' }, { label: 'Page monitoring' }]}
+        breadcrumbs={[{ label: 'Tools', to: '/tools' }, { label: 'Page Monitoring' }]}
         actions={
           <>
             <Button size="sm" variant="outline" onClick={toggleExplainer}>
@@ -625,7 +625,7 @@ export default function PageWatchesPage() {
                   value={kind}
                   onChange={setKind}
                   options={[
-                    { value: 'all', label: 'Any kind' },
+                    { value: 'all', label: 'Any Kind' },
                     ...(Object.keys(PAGE_WATCH_CATEGORY_LABELS) as PageWatchCategory[])
                       .map((c) => ({ value: c, label: PAGE_WATCH_CATEGORY_LABELS[c] })),
                   ]}

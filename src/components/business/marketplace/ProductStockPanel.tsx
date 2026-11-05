@@ -107,7 +107,7 @@ export const ProductStockPanel: React.FC<Props> = ({
       <div className="flex items-center gap-2 text-xs">
         <Boxes className="h-3.5 w-3.5 text-muted-foreground" />
         <span className={totalAvailable <= 0 ? 'text-destructive' : anyLow ? 'text-amber-500' : 'text-emerald-500'}>
-          {totalAvailable <= 0 ? 'Out of stock' : anyLow ? 'Low stock' : 'In stock'}
+          {totalAvailable <= 0 ? 'Out of Stock' : anyLow ? 'Low Stock' : 'In Stock'}
         </span>
         {totalAvailable > 0 && (
           <span className="text-muted-foreground">— {num(totalAvailable)} {suffix} available</span>
@@ -137,9 +137,9 @@ export const ProductStockPanel: React.FC<Props> = ({
                 <TableHead>Warehouse</TableHead>
                 <TableHead>Variant</TableHead>
                 <TableHead>Location</TableHead>
-                <TableHead className="text-right">On hand</TableHead>
+                <TableHead className="text-right">On Hand</TableHead>
                 <TableHead className="text-right">Reserved</TableHead>
-                <TableHead className="text-right">Reorder at</TableHead>
+                <TableHead className="text-right">Reorder At</TableHead>
                 <TableHead>Status</TableHead>
                 {showListings && <TableHead>Listing</TableHead>}
               </TableRow>
@@ -174,7 +174,7 @@ export const ProductStockPanel: React.FC<Props> = ({
                     </TableCell>
                     {/* Plain coloured words, not pills — house table style. */}
                     <TableCell className={onHand <= 0 ? 'text-destructive' : low ? 'text-amber-500' : 'text-emerald-500'}>
-                      {onHand <= 0 ? 'Out of stock' : low ? 'Low' : 'In stock'}
+                      {onHand <= 0 ? 'Out of Stock' : low ? 'Low' : 'In Stock'}
                     </TableCell>
                     {showListings && (
                       <TableCell className="text-muted-foreground">
@@ -218,7 +218,7 @@ export const ProductStockPanel: React.FC<Props> = ({
               suffix="mm"
             />
             <Fact label="Manufacturer" value={firstWithPhysical.manufacturer} />
-            <Fact label="Supplier code" value={firstWithPhysical.supplier_product_code} />
+            <Fact label="Supplier Code" value={firstWithPhysical.supplier_product_code} />
             <Fact label="Serial" value={firstWithPhysical.serial_number} />
           </CardContent>
         </Card>
@@ -227,7 +227,7 @@ export const ProductStockPanel: React.FC<Props> = ({
       {movements.length > 0 && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-sm">Recent movements</CardTitle>
+            <CardTitle className="text-sm">Recent Movements</CardTitle>
             <CardDescription>The last {movements.length} stock changes for this product.</CardDescription>
           </CardHeader>
           <CardContent className="p-0">

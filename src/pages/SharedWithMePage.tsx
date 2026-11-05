@@ -45,7 +45,7 @@ const SharedWithMePage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader icon={Share2} title="Shared with me" subtitle="Everything someone has given you access to" />
+      <PageHeader icon={Share2} title="Shared with Me" subtitle="Everything someone has given you access to" />
       <div className="px-3 sm:px-6 py-4 sm:py-8">
         {loading ? (
           <div className="py-12 text-center"><Loader2 className="inline h-5 w-5 animate-spin text-muted-foreground" /></div>

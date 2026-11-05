@@ -439,7 +439,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                     return (
                       <>
                         <FormField
-                          label="Price document type"
+                          label="Price Document Type"
                           htmlFor="price_doc_type"
                           hint={<>Guides the agent: <span className="font-medium">price_list</span> for retail catalogs, <span className="font-medium">discount_rule</span> for blanket rules, <span className="font-medium">contract_terms</span> for negotiated terms, <span className="font-medium">promotion</span> for time-limited offers, <span className="font-medium">supplier_cost_list</span> for procurement costs (materialized to <code className="text-[10px]">products.cost</code>).</>}
                         >
@@ -643,7 +643,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
               })()}
 
               <FormField
-                label="Agent access"
+                label="Agent Access"
                 hint={(document.allowed_agents?.length ?? 0) === 0
                   ? 'All agents can read this doc in agent KB search (default).'
                   : `Only the selected agent${document.allowed_agents!.length === 1 ? '' : 's'} can retrieve this doc in agent KB search. Admin reads are unaffected.`}
@@ -846,7 +846,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <div>
-                        <Label>Frequently asked questions</Label>
+                        <Label>Frequently Asked Questions</Label>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Rendered at the bottom of the article and emitted as Google FAQ rich-result data.
                         </p>

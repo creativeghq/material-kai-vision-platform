@@ -97,14 +97,14 @@ export const TrackSubjectDialog: React.FC<Props> = ({ open, onClose, onCreated, 
               <SelectTrigger id="subject-type"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="brand">Brand</SelectItem>
-                <SelectItem value="keyword">Keyword / topic</SelectItem>
+                <SelectItem value="keyword">Keyword / Topic</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
             <Label htmlFor="subject-label">
-              {subjectType === 'brand' ? 'Brand name' : 'Keyword or topic'}
+              {subjectType === 'brand' ? 'Brand Name' : 'Keyword or topic'}
             </Label>
             <Input
               id="subject-label"
@@ -116,7 +116,7 @@ export const TrackSubjectDialog: React.FC<Props> = ({ open, onClose, onCreated, 
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="subject-domain">Homepage domain</Label>
+            <Label htmlFor="subject-domain">Homepage Domain</Label>
             <Input
               id="subject-domain"
               value={homepageDomain}
@@ -131,7 +131,7 @@ export const TrackSubjectDialog: React.FC<Props> = ({ open, onClose, onCreated, 
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="subject-aliases">Also known as</Label>
+            <Label htmlFor="subject-aliases">Also Known As</Label>
             <Input
               id="subject-aliases"
               value={aliases}

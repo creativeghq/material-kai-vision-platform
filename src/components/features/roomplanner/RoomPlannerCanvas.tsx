@@ -118,7 +118,7 @@ export const RoomPlannerCanvas: React.FC<RoomPlannerCanvasProps> = ({
       className="w-full rounded-lg border border-border/60 bg-muted/20 touch-none"
       onPointerDown={() => onSelect(null)}
       role="application"
-      aria-label="Room plan"
+      aria-label="Room Plan"
     >
       {gridLines}
 

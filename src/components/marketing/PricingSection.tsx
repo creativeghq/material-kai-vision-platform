@@ -107,7 +107,7 @@ export const PricingSection: React.FC = () => {
                   <CardContent className="p-6 flex flex-col h-full">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="text-lg font-semibold">{p.name}</h3>
-                      {paid && <Badge variant="info">Most complete</Badge>}
+                      {paid && <Badge variant="info">Most Complete</Badge>}
                     </div>
 
                     <div className="mb-4 mt-2">

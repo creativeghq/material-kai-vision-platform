@@ -717,7 +717,7 @@ const DealDialog: React.FC<{
         <div className="space-y-3">
           {/* 1. TYPE — first, because the stage list and the subject picker below both depend on it. */}
           <div>
-            <Label className="text-xs" htmlFor="deal-type">Deal type</Label>
+            <Label className="text-xs" htmlFor="deal-type">Deal Type</Label>
             {isEdit || lockedTypeKey || types.length === 1 ? (
               <div className="flex h-9 items-center rounded-sm border border-hairline bg-surface-sunken px-2.5 text-sm">
                 {type?.label ?? '—'}
@@ -806,7 +806,7 @@ const DealDialog: React.FC<{
               <Input id="deal-value" type="number" value={f.value ?? ''} onChange={(e) => setF((p) => ({ ...p, value: e.target.value }))} />
             </div>
             <div>
-              <Label className="text-xs" htmlFor="deal-close">Expected close</Label>
+              <Label className="text-xs" htmlFor="deal-close">Expected Close</Label>
               <Input id="deal-close" type="date" value={f.expected_close_date ?? ''} onChange={(e) => setF((p) => ({ ...p, expected_close_date: e.target.value }))} />
             </div>
           </div>

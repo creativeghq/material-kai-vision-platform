@@ -47,7 +47,7 @@ interface RowState {
 const DECIDED_BY_LABEL: Record<Row['decidedBy'], string> = {
   ai: 'Classifier',
   manual: 'Your decision',
-  fiscal_code: 'Document type',
+  fiscal_code: 'Document Type',
   kad: 'Registered activity',
 };
 
@@ -55,7 +55,7 @@ const FIELDS: HubTableField<Row>[] = [
   { id: 'supplier', sortValue: (r) => r.issuerName ?? '', searchText: (r) => `${r.issuerName ?? ''} ${r.issuerKey}` },
   { id: 'category', sortValue: (r) => r.categoryLabel, filterValue: (r) => r.categoryLabel, filterLabel: 'Category',
     searchText: (r) => r.categoryLabel },
-  { id: 'decidedBy', filterValue: (r) => r.decidedBy, filterLabel: 'Decided by',
+  { id: 'decidedBy', filterValue: (r) => r.decidedBy, filterLabel: 'Decided By',
     filterOptionLabel: (v) => DECIDED_BY_LABEL[v as Row['decidedBy']] ?? v },
   { id: 'docs', sortValue: (r) => r.docs },
   { id: 'net', sortValue: (r) => r.net },
@@ -363,7 +363,7 @@ export const CategoriseExpensesPanel: React.FC<{
                     onChange={(v) => t.setFilter('category', v)}
                   />
                   <HubFilterSelect
-                    label="Decided by"
+                    label="Decided By"
                     value={t.filters.decidedBy ?? HUB_FILTER_ALL}
                     options={t.filterOptions.decidedBy}
                     onChange={(v) => t.setFilter('decidedBy', v)}

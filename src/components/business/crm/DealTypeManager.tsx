@@ -113,8 +113,8 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
                 <SelectContent>
                   {/* Closed list: a subject is a row the code knows how to render and link. */}
                   <SelectItem value="none" className="text-xs">No subject</SelectItem>
-                  <SelectItem value="property" className="text-xs">About a property</SelectItem>
-                  <SelectItem value="project" className="text-xs">About a project</SelectItem>
+                  <SelectItem value="property" className="text-xs">About a Property</SelectItem>
+                  <SelectItem value="project" className="text-xs">About a Project</SelectItem>
                 </SelectContent>
               </Select>
               <Button size="sm" className="w-full" onClick={createType} disabled={busy}>

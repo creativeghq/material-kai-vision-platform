@@ -139,7 +139,7 @@ export default function EmbedPlannerPage() {
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-28">
-          <Label className="text-xs">Room width (m)</Label>
+          <Label className="text-xs">Room Width (m)</Label>
           <MoneyInput
             displayDecimals={null}
             value={room.widthM}
@@ -147,7 +147,7 @@ export default function EmbedPlannerPage() {
           />
         </div>
         <div className="w-28">
-          <Label className="text-xs">Room depth (m)</Label>
+          <Label className="text-xs">Room Depth (m)</Label>
           <MoneyInput
             displayDecimals={null}
             value={room.depthM}

@@ -128,7 +128,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
           {/* Issue */}
           <div className="flex flex-wrap items-end gap-2">
             <div className="min-w-48 space-y-1">
-              <Label className="text-xs" htmlFor="ce-member">Team member</Label>
+              <Label className="text-xs" htmlFor="ce-member">Team Member</Label>
               <Select value={holderId || undefined} onValueChange={setHolderId}>
                 <SelectTrigger id="ce-member"><SelectValue placeholder="— choose —" /></SelectTrigger>
                 <SelectContent>
@@ -137,7 +137,7 @@ export const CardsExpensesCard: React.FC<{ workspaceId: string }> = ({ workspace
               </Select>
             </div>
             <div className="w-44 space-y-1">
-              <Label className="text-xs" htmlFor="ce-label">Card label</Label>
+              <Label className="text-xs" htmlFor="ce-label">Card Label</Label>
               <Input id="ce-label" value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Site expenses" maxLength={30} />
             </div>
             <Button onClick={issueCard} disabled={busy !== null}>

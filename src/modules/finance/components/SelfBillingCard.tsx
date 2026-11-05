@@ -182,7 +182,7 @@ export const SelfBillingCard: React.FC<{ workspaceId: string }> = ({ workspaceId
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
         <div className="min-w-0">
-          <CardTitle>Self-billing (αυτοτιμολόγηση)</CardTitle>
+          <CardTitle>Self-Billing (αυτοτιμολόγηση)</CardTitle>
           <CardDescription>
             Invoices you raise in a supplier&apos;s name. The supplier is the issuer and you are the
             counterpart, so it is booked as a purchase — a supplier bill is raised with each one.
@@ -222,7 +222,7 @@ export const SelfBillingCard: React.FC<{ workspaceId: string }> = ({ workspaceId
                     <TableRow>
                       <SortHead id="supplier" label="Supplier" sort={t.sort} onSort={t.toggleSort} />
                       <SortHead id="vat" label="Authorized ΑΦΜ" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell" />
-                      <SortHead id="signed" label="Agreement signed" sort={t.sort} onSort={t.toggleSort} className="hidden md:table-cell" />
+                      <SortHead id="signed" label="Agreement Signed" sort={t.sort} onSort={t.toggleSort} className="hidden md:table-cell" />
                       <SortHead id="authorized" label="ΑΦΜ authorized" sort={t.sort} onSort={t.toggleSort} className="hidden md:table-cell" />
                       <SortHead id="state" label="State" sort={t.sort} onSort={t.toggleSort} />
                       <TableHead><span className="sr-only">Actions</span></TableHead>
@@ -296,14 +296,14 @@ export const SelfBillingCard: React.FC<{ workspaceId: string }> = ({ workspaceId
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Written agreement signed</Label>
+                    <Label className="text-xs">Written Agreement Signed</Label>
                     <Input
                       className="h-9" type="date" value={form.signed_on}
                       onChange={(e) => setForm((f) => ({ ...f, signed_on: e.target.value }))}
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs">Numbering series</Label>
+                    <Label className="text-xs">Numbering Series</Label>
                     <Input
                       className="h-9" value={form.series} maxLength={20}
                       onChange={(e) => setForm((f) => ({ ...f, series: e.target.value }))}

@@ -224,7 +224,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
       {pending.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Proposed changes</CardTitle>
+            <CardTitle>Proposed Changes</CardTitle>
             <CardDescription>
               Agents propose; nothing changes until a workspace admin approves. An approved change reaches every agent on its next run.
             </CardDescription>
@@ -289,8 +289,8 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
               {area('Ideal customer', 'icp', 'Architects and contractors fitting out 5+ unit residential projects.')}
             </FormGrid>
             <FormGrid>
-              {list('Messaging pillars', 'messaging_pillars', 'stock in Thessaloniki, technical support')}
-              {list('Active hypotheses', 'active_hypotheses', 'architects respond to case studies', 'Comma-separated. What we are testing right now.')}
+              {list('Messaging Pillars', 'messaging_pillars', 'stock in Thessaloniki, technical support')}
+              {list('Active Hypotheses', 'active_hypotheses', 'architects respond to case studies', 'Comma-separated. What we are testing right now.')}
             </FormGrid>
             <FormField label="Competitors" hint="Read from this website's tracked competitors. Agents use them to differentiate.">
               <div className="flex flex-wrap items-center gap-2">
@@ -308,8 +308,8 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
             <FormGrid>
               {list('Tone', 'tone_attributes', 'practical, direct, warm')}
               {list('Personality', 'personality_traits', 'expert, no-nonsense')}
-              {list('Preferred terminology', 'terminology_preferences', 'porcelain tile, not "ceramic"')}
-              {list('Words to avoid', 'avoid_list', 'cheap, revolutionary',
+              {list('Preferred Terminology', 'terminology_preferences', 'porcelain tile, not "ceramic"')}
+              {list('Words to Avoid', 'avoid_list', 'cheap, revolutionary',
                 'Comma-separated words or exact phrases. Every generated draft is checked for them; a draft that uses one is flagged, and the inbox assistant will not send it on its own.')}
             </FormGrid>
             <FormField label="Learned from your edits">
@@ -330,7 +330,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
                 </p>
               )}
             </FormField>
-            {area('Writing style', 'writing_style', 'Short paragraphs, concrete numbers, no marketing adjectives.')}
+            {area('Writing Style', 'writing_style', 'Short paragraphs, concrete numbers, no marketing adjectives.')}
           </FormSection>
 
           <FormSection title="Who is writing">
@@ -359,7 +359,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
           </FormSection>
 
           <FormSection
-            title="First-hand experience"
+            title="First-Hand Experience"
             description="What you know that a competitor cannot copy. This is the part the model must not invent — leave it blank rather than guess."
           >
             <FormGrid>

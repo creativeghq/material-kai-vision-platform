@@ -76,7 +76,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
       // for, and it is no longer necessarily the number we asked this function for (#332 step 2).
       const moqNote = r.moq_rounded ? ` Raised from ${r.quantity_requested} — supplier minimum ${r.moq}.` : '';
       toast({
-        title: r.moq_rounded ? 'Reorder drafted at the supplier minimum' : 'Reorder drafted',
+        title: r.moq_rounded ? 'Reorder drafted at the supplier minimum' : 'Reorder Drafted',
         description: `${r.quantity} ${c.unit} of ${r.item_name} from ${r.supplier_name ?? 'supplier'} → ${channel}.${moqNote}`,
       });
     } catch (err: any) { toast({ title: 'Reorder failed', description: err?.message, variant: 'destructive' }); }
@@ -153,7 +153,7 @@ export const ResupplySection: React.FC<{ workspaceId: string }> = ({ workspaceId
                 {aiRan && <th className="px-3 py-2 text-left">#</th>}
                 <th className="px-4 py-2 text-left">Item</th>
                 <th className="px-4 py-2 text-right">Vel/day</th>
-                <th className="px-4 py-2 text-right">Days cover</th>
+                <th className="px-4 py-2 text-right">Days Cover</th>
                 <th className="px-4 py-2 text-left">Trend</th>
                 <th className="px-4 py-2 text-right">Lead</th>
                 {aiRan && <th className="px-4 py-2 text-left">Recommendation</th>}

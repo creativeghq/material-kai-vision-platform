@@ -373,7 +373,7 @@ export const PartyAccountSummary: React.FC<{
           {bothRoles && <div className="text-[11px] font-medium text-muted-foreground">As supplier</div>}
           <div className={`grid gap-3 grid-cols-2 ${gridCols[supplierCols] ?? 'md:grid-cols-4'}`}>
             {balanceInSupplier && balanceStat}
-            {cell('Billed to us', formatMoney(supplier.billed), false,
+            {cell('Billed to Us', formatMoney(supplier.billed), false,
               'Total of the supplier bills received. Purchase orders not yet billed are not in here.')}
             {cell('Paid to them', formatMoney(supplier.paid), false,
               'Cash allocated to those bills. Money paid against a purchase order that has not been'
@@ -524,7 +524,7 @@ export const CustomerAccountOverview: React.FC<Target & { isSupplier?: boolean; 
         onAllocateProfit={activeWorkspaceId ? () => setAllocateOpen(true) : undefined}
         meta={[
           { label: 'Open orders', value: openOrders },
-          { label: 'Last payment', value: lastPayment ? formatDate(lastPayment.paid_at) : '—' },
+          { label: 'Last Payment', value: lastPayment ? formatDate(lastPayment.paid_at) : '—' },
         ]}
       />
 
@@ -794,11 +794,11 @@ export const CustomerTopItemsCard: React.FC<Target> = ({ contactId, companyId })
           <thead className="sticky top-0 z-10 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
             <tr className="border-b border-hairline">
               <th className="px-4 py-2 text-left">Product</th>
-              <th className="hidden px-4 py-2 text-right sm:table-cell">Qty bought</th>
+              <th className="hidden px-4 py-2 text-right sm:table-cell">Qty Bought</th>
               <th className="px-4 py-2 text-right">Revenue</th>
               <th className="hidden px-4 py-2 text-right md:table-cell">Orders</th>
-              <th className="px-4 py-2 text-right">On hand</th>
-              <th className="hidden px-4 py-2 text-right md:table-cell">Last ordered</th>
+              <th className="px-4 py-2 text-right">On Hand</th>
+              <th className="hidden px-4 py-2 text-right md:table-cell">Last Ordered</th>
             </tr>
           </thead>
           <tbody>

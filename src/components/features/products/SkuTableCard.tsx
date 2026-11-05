@@ -90,7 +90,7 @@ export function SkuTableCard({ table, hexByName }: { table: SkuTable; hexByName:
             <Badge variant="neutral">{counts.total === 1 ? '1 item' : `${counts.total} items`}</Badge>
             {counts.discontinued > 0 && <Badge variant="warning">{counts.discontinued} discontinued</Badge>}
             {counts.madeToOrder > 0 && <Badge variant="info">{counts.madeToOrder} made to order</Badge>}
-            {table.needsReview && <Badge variant="warning">Needs review</Badge>}
+            {table.needsReview && <Badge variant="warning">Needs Review</Badge>}
           </div>
         </div>
         {table.source && <p className="text-xs text-muted-foreground">{table.source}</p>}

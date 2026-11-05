@@ -255,13 +255,13 @@ const APPS: App[] = [
 
 /** Free, no-login public tools already live on the platform. Mirrors /tools. */
 const TOOLS: { label: string; to: string }[] = [
-  { label: 'Material search', to: '/tools/product-search' },
-  { label: 'Heat-pump sizer', to: '/tools/heat-pump' },
-  { label: 'Heating cost comparison', to: '/tools/heating-cost' },
-  { label: 'Kitchen cost calculator', to: '/tools/kitchen-cost' },
-  { label: 'Price scan', to: '/tools/price-scan' },
-  { label: 'Mention scan', to: '/tools/mention-scan' },
-  { label: 'Project plan estimator', to: '/tools/project-plan' },
+  { label: 'Material Search', to: '/tools/product-search' },
+  { label: 'Heat-Pump Sizer', to: '/tools/heat-pump' },
+  { label: 'Heating Cost Comparison', to: '/tools/heating-cost' },
+  { label: 'Kitchen Cost Calculator', to: '/tools/kitchen-cost' },
+  { label: 'Price Scan', to: '/tools/price-scan' },
+  { label: 'Mention Scan', to: '/tools/mention-scan' },
+  { label: 'Project Plan Estimator', to: '/tools/project-plan' },
 ];
 
 /** Systems the platform talks to — each one is a live integration, not a roadmap item. */

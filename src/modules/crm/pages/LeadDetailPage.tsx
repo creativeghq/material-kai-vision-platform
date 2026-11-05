@@ -237,14 +237,14 @@ export const LeadDetailPage: React.FC = () => {
                   </Select>
                 )}
               </HubProperty>
-              {lead.status === 'lost' && <HubProperty label="Lost reason">{lead.lost_reason}</HubProperty>}
+              {lead.status === 'lost' && <HubProperty label="Lost Reason">{lead.lost_reason}</HubProperty>}
               <HubProperty label="Email">{lead.email}</HubProperty>
               <HubProperty label="Phone">{lead.phone}</HubProperty>
               <HubProperty label="Company">{lead.company_name}</HubProperty>
-              <HubProperty label="Estimated value">
+              <HubProperty label="Estimated Value">
                 {lead.estimated_value == null ? null : <span className="tabular-nums">{formatMoney(lead.estimated_value, lead.currency)}</span>}
               </HubProperty>
-              <HubProperty label="Follow-up on">
+              <HubProperty label="Follow-Up On">
                 {lead.follow_up_on
                   ? <span className={overdue ? 'text-[hsl(var(--error))]' : undefined}>{formatDate(fromLocalISODate(lead.follow_up_on))}{overdue ? ' · overdue' : ''}</span>
                   : null}

@@ -160,7 +160,7 @@ export const WebsiteArticlesPanel: React.FC<{ website: UserWebsite }> = ({ websi
                   <TableHead>Title</TableHead>
                   <TableHead>Keyword</TableHead>
                   <TableHead className="text-right">Age</TableHead>
-                  <TableHead>Last reviewed</TableHead>
+                  <TableHead>Last Reviewed</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>

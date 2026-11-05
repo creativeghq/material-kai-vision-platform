@@ -41,7 +41,7 @@ export const IngestionAuditList: React.FC<Props> = ({ rows, filenames, acknowled
             <TableHead>Status</TableHead>
             <TableHead className="text-right">Numbers</TableHead>
             <TableHead className="text-right">Codes</TableHead>
-            <TableHead className="text-right">Pages to review</TableHead>
+            <TableHead className="text-right">Pages to Review</TableHead>
             <TableHead className="text-right">Findings</TableHead>
             <TableHead><span className="sr-only">Actions</span></TableHead>
           </TableRow>

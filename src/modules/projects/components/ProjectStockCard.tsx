@@ -80,7 +80,7 @@ export const ProjectStockCard: React.FC<{ projectId: string }> = ({ projectId })
               <thead className="border-b border-border/60 text-xs text-muted-foreground">
                 <tr>
                   <th className="px-2 py-2 text-left">Product</th>
-                  <th className="px-2 py-2 text-left">Held by</th>
+                  <th className="px-2 py-2 text-left">Held By</th>
                   <th className="px-2 py-2 text-right">Qty</th>
                   <th className="px-2 py-2 text-left">Status</th>
                   <th className="px-2 py-2 text-left">Expected</th>

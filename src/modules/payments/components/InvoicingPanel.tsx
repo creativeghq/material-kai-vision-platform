@@ -258,7 +258,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
               />
             </div>
             <div>
-              <Label className="text-xs">Next number</Label>
+              <Label className="text-xs">Next Number</Label>
               <Input
                 type="number"
                 min={1}
@@ -268,7 +268,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
               />
             </div>
             <div>
-              <Label className="text-xs">Zero padding</Label>
+              <Label className="text-xs">Zero Padding</Label>
               <Input
                 type="number"
                 min={0}
@@ -287,7 +287,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
 
           <div className="grid grid-cols-2 gap-4 pt-2 border-t border-hairline">
             <div>
-              <Label className="text-xs">Default payment terms (days)</Label>
+              <Label className="text-xs">Default Payment Terms (Days)</Label>
               <Input
                 type="number"
                 min={0}
@@ -299,7 +299,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
               <p className="text-xs text-muted-foreground mt-1">Stamped as <code>due_at</code> when an invoice is issued.</p>
             </div>
             <div>
-              <Label className="text-xs">Default VAT rate (%)</Label>
+              <Label className="text-xs">Default VAT Rate (%)</Label>
               <MoneyInput
                 value={fields.default_vat_rate}
                 displayDecimals={null}
@@ -332,7 +332,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <TemplateUploadSlot
-              label="Cover image"
+              label="Cover Image"
               previewUrl={coverPreviewUrl}
               hasPath={!!fields.invoice_template_cover_path}
               uploading={uploadingCover}
@@ -341,7 +341,7 @@ export const InvoicingPanel: React.FC<Props> = (_props) => {
               onRemove={() => handleRemoveTemplate('cover')}
             />
             <TemplateUploadSlot
-              label="Footer image"
+              label="Footer Image"
               previewUrl={footerPreviewUrl}
               hasPath={!!fields.invoice_template_footer_path}
               uploading={uploadingFooter}

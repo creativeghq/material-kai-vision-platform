@@ -124,7 +124,7 @@ const ORDER_FILTER_GROUPS: FilterGroupDef[] = [
   {
     key: 'amounts', label: 'Amounts', icon: Coins,
     fields: [
-      { key: 'total', type: 'range', label: 'Order total', min: 0, max: 50000 },
+      { key: 'total', type: 'range', label: 'Order Total', min: 0, max: 50000 },
       {
         key: 'currency', type: 'select', label: 'Currency',
         description: 'Pair with a total range — amounts are not comparable across currencies.',
@@ -368,7 +368,7 @@ export const OrdersPanel: React.FC<{
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
           <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4" /> {fixedType === 'purchase' ? 'Purchase orders' : fixedType === 'sales' ? 'Sales orders' : 'Orders'}
+            <ShoppingCart className="h-4 w-4" /> {fixedType === 'purchase' ? 'Purchase Orders' : fixedType === 'sales' ? 'Sales orders' : 'Orders'}
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Filters only matter on the global Finance list. Inside a single party the list is
@@ -1338,7 +1338,7 @@ export const NewOrderModal: React.FC<{
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="Expected payment date" htmlFor="neworder-expected">
+            <FormField label="Expected Payment Date" htmlFor="neworder-expected">
               <Input id="neworder-expected" type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
               {/* A pre-order stays out of Receivables/Payables until a deposit is recorded, so the
                   expected date won't age until then — flag it so the operator isn't surprised. */}
@@ -1380,7 +1380,7 @@ export const NewOrderModal: React.FC<{
             <div className="rounded-md border border-border/60 overflow-x-auto">
               {/* Sales shows a separate Cost column (for margin); a purchase order's price IS the cost. */}
               <div className={`grid ${isSales ? 'grid-cols-[1fr_52px_62px_82px_82px_88px_84px_24px]' : 'grid-cols-[1fr_52px_62px_82px_88px_84px_24px]'} gap-2 bg-muted/40 px-2 py-1.5 text-[11px] font-medium text-muted-foreground min-w-[640px]`}>
-                <span>Product</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">{isSales ? 'Unit price' : 'Cost/unit'}</span>{isSales && <span className="text-right">Cost/unit</span>}<span className="text-right">VAT</span><span className="text-right">Line total</span><span />
+                <span>Product</span><span className="text-right">Qty</span><span>Unit</span><span className="text-right">{isSales ? 'Unit Price' : 'Cost/unit'}</span>{isSales && <span className="text-right">Cost/unit</span>}<span className="text-right">VAT</span><span className="text-right">Line total</span><span />
               </div>
               {items.map((l, i) => {
                 // #3 — selling a stocked catalog line for more than we have on hand.
@@ -1596,9 +1596,9 @@ export const NewOrderModal: React.FC<{
             </div>
           )}
 
-          <FormSection title="Note & totals">
+          <FormSection title="Note & Totals">
           <FormField
-            label="Order note"
+            label="Order Note"
             htmlFor="neworder-notes"
             optional
             hint="Prints on the invoice and the payment receipt, and stays visible on the order here."
@@ -1676,8 +1676,8 @@ export const NewOrderModal: React.FC<{
 // 3-way match verdict → badge label + tone. Shared by the PO list row and detail panel.
 const MATCH_META: Record<ThreeWayMatchStatus, { label: string; cls: string }> = {
   no_lines:         { label: 'No lines',         cls: 'text-muted-foreground border-border' },
-  awaiting_receipt: { label: 'Awaiting receipt', cls: 'text-sky-600 border-sky-500/40' },
-  awaiting_bill:    { label: 'Awaiting bill',    cls: 'text-amber-600 border-amber-500/40' },
+  awaiting_receipt: { label: 'Awaiting Receipt', cls: 'text-sky-600 border-sky-500/40' },
+  awaiting_bill:    { label: 'Awaiting Bill',    cls: 'text-amber-600 border-amber-500/40' },
   matched:          { label: 'Matched',          cls: 'text-emerald-600 border-emerald-500/40' },
   variance:         { label: 'Variance',         cls: 'text-destructive border-destructive/40' },
 };
@@ -2927,7 +2927,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
               {order && (
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
                   <span className={`font-medium ${order.order_type === 'sales' ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}`}>
-                    {order.order_type === 'sales' ? 'Sales order' : 'Purchase order'}
+                    {order.order_type === 'sales' ? 'Sales order' : 'Purchase Order'}
                   </span>
                   {/* Who the order is with, one click from their CRM record — the header named a
                       number and nothing else, so answering "who is this for?" meant leaving the
@@ -2952,7 +2952,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       order total and `outstanding` comes straight off `get_order_settlements`
                       (see the const above). */}
                   <span aria-hidden>·</span>
-                  <span className="text-sm font-semibold tabular-nums text-foreground" title="Order total">
+                  <span className="text-sm font-semibold tabular-nums text-foreground" title="Order Total">
                     {formatMoney(Number(order.total), order.currency)}
                   </span>
                   <span aria-hidden>·</span>
@@ -3085,7 +3085,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     another one would invert the direction the whole link is defined by. */}
                 {order.order_type === 'purchase' && (
                   <>
-                    <Label className="text-xs text-muted-foreground">For customer</Label>
+                    <Label className="text-xs text-muted-foreground">For Customer</Label>
                     <OrderLinkPicker
                       workspaceId={order.workspace_id}
                       value={coversValue}
@@ -3229,7 +3229,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <>
                         <DropdownMenuSeparator />
                         <MenuGroup>Share</MenuGroup>
-                        {customerLinkMenuActions('order', order.id, `${order.order_type === 'purchase' ? 'Purchase order' : 'Order'} ${order.order_number ?? ''}`.trim(), toast,
+                        {customerLinkMenuActions('order', order.id, `${order.order_type === 'purchase' ? 'Purchase Order' : 'Order'} ${order.order_number ?? ''}`.trim(), toast,
                           order.order_type === 'purchase' ? 'supplier' : 'customer').map((a) => (
                           <DropdownMenuItem key={a.label} onClick={a.onSelect}>
                             {a.icon && <a.icon className="h-3.5 w-3.5 mr-2" />}{a.label}
@@ -3295,7 +3295,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     <SelectItem value="none">No category</SelectItem>
                     {/* Keep a since-deactivated category selectable so its value doesn't render blank. */}
                     {order.category_id && !categories.some((c) => c.id === order.category_id) && (
-                      <SelectItem value={order.category_id}>Current category (inactive)</SelectItem>
+                      <SelectItem value={order.category_id}>Current Category (Inactive)</SelectItem>
                     )}
                     {categories.filter((c) => c.kind === (order.order_type === 'sales' ? 'income' : 'expense') || c.kind === 'both').map((c) => (
                       <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
@@ -3304,7 +3304,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">Expected payment date</Label>
+                <Label className="text-xs text-muted-foreground">Expected Payment Date</Label>
                 <Input type="date" className="h-8 w-44 text-xs" value={order.expected_payment_date ?? ''} disabled={saving}
                   onChange={(e) => void saveMeta({ expectedPaymentDate: e.target.value || null })} />
               </div>
@@ -3572,7 +3572,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <span className="text-right tabular-nums" title="Net = price × qty (excl. VAT, after discount)">{formatMoney(Number(it.net_value), order.currency)}</span>
                       {isSalesOrder && (
                         <>
-                          <span className="text-right tabular-nums text-muted-foreground" title="Cost per unit">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
+                          <span className="text-right tabular-nums text-muted-foreground" title="Cost per Unit">{it.unit_cost != null ? formatMoney(Number(it.unit_cost), order.currency) : '—'}</span>
                           <span className="text-right tabular-nums text-muted-foreground" title="Cost total (cost/unit × qty) — what this line costs us">{lineCost != null ? formatMoney(lineCost, order.currency) : '—'}</span>
                           <span className={`text-right tabular-nums ${lineProfit == null ? 'text-muted-foreground' : lineProfit >= 0 ? 'text-emerald-600' : 'text-destructive'}`} title="Profit on this line (excl. VAT) + margin % of net">
                             {lineProfit != null ? formatMoney(lineProfit, order.currency) : '—'}
@@ -3885,7 +3885,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                 else — a field belonging to the record reading as one belonging to whichever tab you
                 were on. Captured when the order is placed; prints on the invoice and the receipt. */}
             <div className="space-y-1 rounded-md border border-border/60 bg-muted/20 px-3 py-2">
-              <Label className="text-xs text-muted-foreground">Order note</Label>
+              <Label className="text-xs text-muted-foreground">Order Note</Label>
               <Textarea
                 key={order.id}
                 rows={2}
@@ -4777,7 +4777,7 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     {/* Recording money ON the order. Which side depends on what KIND of order it is: a sales order
         is settled by the customer paying us, a purchase order by us paying the supplier. The dialog
         used to be hard-wired to the customer side, so "Record payment" on a purchase order offered
-        "Received from customer" — the opposite side of the trade. */}
+        "Received from Customer" — the opposite side of the trade. */}
     {/* No `issueDoc` prop any more (#378 F1). Whether this order can still produce a sales
         document — and which one — is a property of the ORDER, so the dialog derives it from
         whichever order is selected, including one picked inside the dialog on a screen that never
@@ -4936,23 +4936,23 @@ const LineWarrantyDialog: React.FC<{
                 <SelectContent>
                   <SelectItem value="manufacturer">Manufacturer</SelectItem>
                   <SelectItem value="extended">Extended</SelectItem>
-                  <SelectItem value="installer">Installer / labour</SelectItem>
+                  <SelectItem value="installer">Installer / Labour</SelectItem>
                   <SelectItem value="insurance">Insurance</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="Cover (months)" htmlFor="wr-months">
+            <FormField label="Cover (Months)" htmlFor="wr-months">
               <Input id="wr-months" type="number" min="1" step="1" className="h-9" value={months}
                 placeholder="24"
                 onChange={(e) => setMonths(e.target.value)}
                 onBlur={(e) => void applyMonths(e.target.value, startsOn)} />
             </FormField>
-            <FormField label="Starts on" htmlFor="wr-start">
+            <FormField label="Starts On" htmlFor="wr-start">
               <Input id="wr-start" type="date" className="h-9" value={startsOn}
                 onChange={(e) => setStartsOn(e.target.value)}
                 onBlur={(e) => void applyMonths(months, e.target.value)} />
             </FormField>
-            <FormField label="Ends on" htmlFor="wr-end">
+            <FormField label="Ends On" htmlFor="wr-end">
               <Input id="wr-end" type="date" className="h-9" value={endsOn}
                 disabled={resolving}
                 onChange={(e) => setEndsOn(e.target.value)} />
@@ -5058,7 +5058,7 @@ const VatExemptionDialog: React.FC<{
               the customer’s record. Set one here only to override it for this line.
             </p>
           )}
-          <FormField label="Exemption cause" htmlFor="vat-exemption-cause">
+          <FormField label="Exemption Cause" htmlFor="vat-exemption-cause">
             <Select value={code} onValueChange={setCode} disabled={busy}>
               <SelectTrigger id="vat-exemption-cause" className="w-full"><SelectValue placeholder="Pick the governing article…" /></SelectTrigger>
               <SelectContent className="max-h-72">

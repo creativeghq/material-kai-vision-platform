@@ -119,7 +119,7 @@ import { FlightSearchPanel } from '@/modules/travel/components/FlightSearchPanel
 const AGE_BUCKETS: AgeBucket[] = ['current', '0-30', '31-60', '61-90', '90+'];
 
 const DASH_PERIOD_LABEL: Record<'this_month' | 'last_month' | 'last_quarter' | 'ytd', string> = {
-  this_month: 'This month', last_month: 'Last month', last_quarter: 'Last 3 months', ytd: 'Year to date',
+  this_month: 'This month', last_month: 'Last Month', last_quarter: 'Last 3 Months', ytd: 'Year to Date',
 };
 
 /** {from,to} ISO dates for a dashboard period selector. */
@@ -523,7 +523,7 @@ const FinancePage: React.FC = () => {
         { key: 'q', type: 'text', label: 'Search', placeholder: 'Quote number / name…', accessor: (r: FollowUpRow) => [r.quote_number, r.name] },
         { key: 'status', type: 'multi', label: 'Status', options: optionsFromRows(followUps, (r) => r.status), accessor: (r: FollowUpRow) => r.status },
         { key: 'value', type: 'range', label: 'Value', min: 0, max: Math.max(Math.ceil(maxVal / 10) * 10, 10), accessor: (r: FollowUpRow) => r.grand_total },
-        { key: 'idle', type: 'range', label: 'Days idle', min: 0, max: Math.max(maxIdle, 10), accessor: (r: FollowUpRow) => r.days_since_activity },
+        { key: 'idle', type: 'range', label: 'Days Idle', min: 0, max: Math.max(maxIdle, 10), accessor: (r: FollowUpRow) => r.days_since_activity },
       ],
     }];
   }, [followUps]);
@@ -664,7 +664,7 @@ const FinancePage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-5">
               <KpiCard
                 icon={BanknoteIcon}
-                label="Cash in bank"
+                label="Cash in Bank"
                 value={formatMoney(cashPosition)}
                 accent={cashPosition < 0 ? 'destructive' : 'default'}
                 subtext={deposits.total > 0 ? `incl. ${formatMoney(deposits.total)} not yet invoiced` : 'Payments in − out'}
@@ -933,7 +933,7 @@ const FinancePage: React.FC = () => {
                   one row, which invites a subtraction across them that means nothing. Every figure
                   was already correct; only the periods were unstated. */}
               <MoneySummaryCard
-                label="Money received — all time"
+                label="Money Received — All Time"
                 value={formatMoney(cashIn)}
                 sub={`${formatMoney(cashOut)} paid out · ${formatMoney(cashPosition)} net in bank`}
               />
@@ -945,7 +945,7 @@ const FinancePage: React.FC = () => {
                   : 'across all open receivables'}
               />
               <MoneySummaryCard
-                label="Gross profit — last 12 months"
+                label="Gross Profit — Last 12 Months"
                 value={formatMoney(profit.margin)}
                 sub={profit.pct !== null
                   ? `${formatMoney(profit.revenue)} sold − ${formatMoney(profit.cogs)} cost · ${profit.pct}%`
@@ -1006,8 +1006,8 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Total</th>
                       <th className="px-4 py-2 text-right">Paid</th>
                       <th className="px-4 py-2 text-right">Due</th>
-                      <th className="px-4 py-2 text-right">Due date</th>
-                      <th className="px-4 py-2 text-right">Days overdue</th>
+                      <th className="px-4 py-2 text-right">Due Date</th>
+                      <th className="px-4 py-2 text-right">Days Overdue</th>
                       <th className="px-4 py-2 w-10"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
@@ -1213,8 +1213,8 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Total</th>
                       <th className="px-4 py-2 text-right">Paid</th>
                       <th className="px-4 py-2 text-right">Due</th>
-                      <th className="px-4 py-2 text-right">Due date</th>
-                      <th className="px-4 py-2 text-right">Days overdue</th>
+                      <th className="px-4 py-2 text-right">Due Date</th>
+                      <th className="px-4 py-2 text-right">Days Overdue</th>
                       {!isAccountant && <th className="px-4 py-2 w-24"><span className="sr-only">Actions</span></th>}
                     </tr>
                   </thead>
@@ -1473,8 +1473,8 @@ const FinancePage: React.FC = () => {
                         <th className="px-4 py-2 text-left">Quote</th>
                         <th className="px-4 py-2 text-left">Status</th>
                         <th className="px-4 py-2 text-right">Value</th>
-                        <th className="px-4 py-2 text-right">Days idle</th>
-                        <th className="px-4 py-2 text-right">Next scheduled</th>
+                        <th className="px-4 py-2 text-right">Days Idle</th>
+                        <th className="px-4 py-2 text-right">Next Scheduled</th>
                         <th className="px-4 py-2 text-right"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
@@ -2059,7 +2059,7 @@ const RecentOrdersCard: React.FC<{
 }> = ({ rows, balances, balancesUnknown, onViewAll }) => {
   const recent = useMemo(() => rows.slice(0, RECENT_ORDERS_SHOWN), [rows]);
   return (
-    <InsightCard title="Recent orders" icon={ShoppingCart} onViewAll={onViewAll} isEmpty={recent.length === 0} empty="No sales orders yet.">
+    <InsightCard title="Recent Orders" icon={ShoppingCart} onViewAll={onViewAll} isEmpty={recent.length === 0} empty="No sales orders yet.">
       <ul className="divide-y divide-border/40">
         {recent.map((o) => (
           <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-2.5">

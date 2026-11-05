@@ -115,7 +115,7 @@ export const IncomeExpenseBook: React.FC<Props> = ({
     <Card>
       <CardHeader className="flex-row flex-wrap items-start justify-between gap-3 space-y-0">
         <div>
-          <CardTitle>Income–expense book</CardTitle>
+          <CardTitle>Income–Expense Book</CardTitle>
           <CardDescription>
             Βιβλίο Εσόδων-Εξόδων · {formatDate(from)} — {formatDate(to)} · every document AADE holds, split by
             the category your accountant filed in myDATA

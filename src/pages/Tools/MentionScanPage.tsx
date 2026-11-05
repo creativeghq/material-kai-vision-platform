@@ -121,7 +121,7 @@ export default function MentionScanPage() {
           <CardHeader>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <Label htmlFor="subject-label">Brand or product to monitor</Label>
+                <Label htmlFor="subject-label">Brand or Product to Monitor</Label>
                 <Input
                   id="subject-label"
                   placeholder="e.g. Kohler, Roca, Geberit AquaClean Mera"

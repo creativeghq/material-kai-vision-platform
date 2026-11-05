@@ -63,8 +63,8 @@ const KINDS: Record<string, {
   contract:       { label: 'Contracts',       icon: FileSignature, group: GROUP_COMMERCIAL, href: () => '/contracts' },
   property:       { label: 'Listings',        icon: Home,          group: GROUP_PROPERTY,   href: (r) => `/properties/${r.id}` },
   tenancy:        { label: 'Tenancies',       icon: KeyRound,      group: GROUP_PROPERTY,   href: (r) => (r.parent_id ? `/properties/${r.parent_id}` : null) },
-  property_sale:  { label: 'Property sales',  icon: Handshake,     group: GROUP_PROPERTY,   href: (r) => (r.parent_id ? `/properties/${r.parent_id}` : null) },
-  property_offer: { label: 'Property offers', icon: Tag,           group: GROUP_PROPERTY,   href: (r) => (r.parent_id ? `/properties/${r.parent_id}` : null) },
+  property_sale:  { label: 'Property Sales',  icon: Handshake,     group: GROUP_PROPERTY,   href: (r) => (r.parent_id ? `/properties/${r.parent_id}` : null) },
+  property_offer: { label: 'Property Offers', icon: Tag,           group: GROUP_PROPERTY,   href: (r) => (r.parent_id ? `/properties/${r.parent_id}` : null) },
   project:        { label: 'Projects',        icon: FolderKanban,  group: GROUP_DELIVERY,   href: (r) => `/projects/${r.id}` },
   asset:          { label: 'Equipment',       icon: Wrench,        group: GROUP_AFTER },
   // A payment's own id is not a route, so it opens the ORDER it settles — same reason tenancy

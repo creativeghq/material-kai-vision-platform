@@ -90,14 +90,14 @@ function randomSlugSuffix(): string {
 export const DOCUMENT_EMAIL_KINDS = [
   {
     kind: 'invoice' as const,
-    label: 'Invoice emails',
+    label: 'Invoice Emails',
     /** Refused by `assert_document_email_template_binding` when the template omits one. */
     required: ['invoice_number', 'total'],
     variables: ['invoice_number', 'customer_name', 'sender_name', 'total', 'currency', 'due_date', 'pay_url', 'rf_code', 'fiscal_mark', 'fiscal_qr_url'],
   },
   {
     kind: 'quote' as const,
-    label: 'Quote emails',
+    label: 'Quote Emails',
     required: ['view_url'],
     variables: ['quote_title', 'quote_number', 'customer_name', 'sender_name', 'total', 'currency', 'expires_at', 'view_url', 'message'],
   },

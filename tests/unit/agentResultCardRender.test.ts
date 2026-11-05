@@ -12,7 +12,7 @@ const FLOWS = {
   ],
 };
 
-const render = (data: Record<string, unknown>, resultType = 'flows_list', title = 'Workspace flows') =>
+const render = (data: Record<string, unknown>, resultType = 'flows_list', title = 'Workspace Flows') =>
   renderToStaticMarkup(React.createElement(AgentResultCard, { title, data, resultType, onAsk: () => {} }));
 
 /** Does a <table> render INSIDE an element carrying `cls`? Containment, so a depth scan. */
@@ -53,7 +53,7 @@ const NESTED_ROWS = {
 };
 
 describe('a table nested under a field takes the full width', () => {
-  const html = render(NESTED_ROWS, 'seo_my_rankings', 'Your rankings');
+  const html = render(NESTED_ROWS, 'seo_my_rankings', 'Your Rankings');
 
   it('still renders the rows as a table', () => {
     expect(html).toContain('<table');
@@ -108,9 +108,7 @@ describe('AgentResultCard renders a record list as a table', () => {
 
   it('labelises a stored enum value', () => {
     expect(html).not.toContain('>quote_approved<');
-    // Sentence case, not Title Case: this is a VALUE, and "Partially paid" is how a person writes
-    // it. Column HEADINGS keep Title Case — they are labels, not prose.
-    expect(html).toContain('Quote approved');
+    expect(html).toContain('Quote Approved');
   });
 
   it('does not repeat the list key as a heading above its own table', () => {
@@ -160,7 +158,7 @@ describe('a stamped chunk peels its wrapper', () => {
   };
   // Rendered with no `access`, so the capability-gated route is unavailable and the payload's
   // own `path` is the only href there is — the fallback, and the case a standalone card hits.
-  const html = render(RECORD_SEARCH, 'record_search_results', 'Records found');
+  const html = render(RECORD_SEARCH, 'record_search_results', 'Records Found');
 
   it('peels the wrapper instead of labelling it "Data"', () => {
     expect(html).not.toMatch(/>Data</);
@@ -340,7 +338,7 @@ const FULL_ACCESS = {
 describe('AgentResultCard makes the records reachable', () => {
   const html = renderToStaticMarkup(
     React.createElement(AgentResultCard, {
-      title: 'Recent expenses',
+      title: 'Recent Expenses',
       data: EXPENSES,
       resultType: 'expenses_list',
       access: FULL_ACCESS,
@@ -379,7 +377,7 @@ describe('AgentResultCard makes the records reachable', () => {
     // Gates come from the persona, and a card rendered without one must not guess. This is also
     // what keeps the component renderable outside every provider.
     const bare = renderToStaticMarkup(
-      React.createElement(AgentResultCard, { title: 'Recent expenses', data: EXPENSES, resultType: 'expenses_list' }),
+      React.createElement(AgentResultCard, { title: 'Recent Expenses', data: EXPENSES, resultType: 'expenses_list' }),
     );
     expect(bare).toContain('<table');
     expect(bare).not.toContain('/crm/companies/');
@@ -388,7 +386,7 @@ describe('AgentResultCard makes the records reachable', () => {
   it('withholds a link the persona cannot open', () => {
     const walled = renderToStaticMarkup(
       React.createElement(AgentResultCard, {
-        title: 'Recent expenses',
+        title: 'Recent Expenses',
         data: EXPENSES,
         resultType: 'expenses_list',
         access: {

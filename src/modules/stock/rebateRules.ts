@@ -35,7 +35,7 @@ export const CLAIM_LABEL: Record<ClaimStatus, string> = {
   expected: 'Expected — an accrual, not banked',
   claimed: 'Claimed — waiting on the supplier',
   settled: 'Settled',
-  written_off: 'Written off',
+  written_off: 'Written Off',
 };
 
 /**

@@ -200,7 +200,7 @@ export const TaskDrawer: React.FC<{
                   </Prop>
                 )}
                 {!readOnly && (
-                  <Prop label="Time logged">
+                  <Prop label="Time Logged">
                     <div className="flex items-center gap-2">
                       <span className="tabular-nums">{minutes === null ? '—' : formatMinutes(minutes)}</span>
                       {activeWorkspaceId && (
@@ -413,7 +413,7 @@ const CommentRow: React.FC<{ comment: TaskComment; mine: boolean; onDelete: () =
       <UserAvatar userId={comment.author_id} className="h-7 w-7" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 text-xs">
-          <span className="font-semibold text-foreground">{mine ? 'You' : profile?.fullName ?? 'Team member'}</span>
+          <span className="font-semibold text-foreground">{mine ? 'You' : profile?.fullName ?? 'Team Member'}</span>
           <span className="text-muted-foreground" title={formatDate(comment.created_at)}>{timeAgo(comment.created_at)}</span>
           {comment.edited_at && <span className="text-muted-foreground">· edited</span>}
           {mine && (

@@ -313,7 +313,7 @@ const NewVariationDialog: React.FC<{
               </p>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Extra days</Label>
+              <Label className="text-xs">Extra Days</Label>
               <Input inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value)} placeholder="0" />
               <p className="text-[11px] text-muted-foreground">
                 The programme claim, lost if it only lives in an email.
@@ -333,12 +333,12 @@ const NewVariationDialog: React.FC<{
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Raised on</Label>
+              <Label className="text-xs">Raised On</Label>
               <Input type="date" value={raisedOn} onChange={(e) => setRaisedOn(e.target.value)} />
             </div>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Cost code</Label>
+            <Label className="text-xs">Cost Code</Label>
             <CostCodePicker value={costCodeId} onChange={setCostCodeId} />
           </div>
           <div className="flex justify-end gap-2 pt-1">

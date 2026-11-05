@@ -34,13 +34,13 @@ const AI_ERROR: Record<string, string> = {
 };
 
 function proofBadge(p: InvoicePaymentProof): { label: string; tone: Tone } {
-  if (p.payment_id) return { label: 'Payment recorded', tone: 'success' };
-  if (p.bank_confirmed) return { label: 'Confirmed by bank', tone: 'success' };
+  if (p.payment_id) return { label: 'Payment Recorded', tone: 'success' };
+  if (p.bank_confirmed) return { label: 'Confirmed by Bank', tone: 'success' };
   if (p.status === 'rejected') return { label: 'Rejected', tone: 'error' };
   if (p.ai_status === 'pending') return { label: 'Checking…', tone: 'neutral' };
   if (p.ai_status !== 'checked') return { label: 'Not checked', tone: 'neutral' };
   if (p.ai_verdict === 'matches') return { label: 'Matches the order', tone: 'success' };
-  if (p.ai_verdict === 'review') return { label: 'Needs review', tone: 'warning' };
+  if (p.ai_verdict === 'review') return { label: 'Needs Review', tone: 'warning' };
   if (p.ai_verdict === 'not_a_receipt') return { label: 'Not a transfer receipt', tone: 'error' };
   return { label: 'Unreadable', tone: 'error' };
 }
@@ -84,7 +84,7 @@ const ConfirmProofDialog: React.FC<{
     try {
       const res = await financeService.confirmPaymentProof(proof.id, { amount, paidOn, bankAccountId: accountId || null });
       toast({
-        title: res.duplicate ? 'Already recorded' : 'Payment recorded',
+        title: res.duplicate ? 'Already recorded' : 'Payment Recorded',
         description: res.issue_error
           ? `The money is booked, but issuing the document failed: ${res.issue_error}`
           : res.issued ? `Paid in full — issued as ${res.issued.legal_number ?? 'a legal document'}.` : undefined,
@@ -118,11 +118,11 @@ const ConfirmProofDialog: React.FC<{
             <p className="text-[11px] text-muted-foreground">Outstanding: {formatMoney(outstanding, currency)}</p>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Date received</Label>
+            <Label className="text-xs">Date Received</Label>
             <Input type="date" className="h-9 text-sm" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Into account</Label>
+            <Label className="text-xs">Into Account</Label>
             <Select value={accountId || 'none'} onValueChange={(v) => setAccountId(v === 'none' ? '' : v)}>
               <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>

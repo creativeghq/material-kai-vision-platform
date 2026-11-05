@@ -26,11 +26,11 @@ import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fisc
 
 type BucketKey = 'overdue' | 'today' | 'next7' | 'later' | 'undated';
 const BUCKET_LABEL: Record<BucketKey, string> = {
-  overdue: 'Overdue', today: 'Today', next7: 'Next 7 days', later: 'Later', undated: 'No ship date',
+  overdue: 'Overdue', today: 'Today', next7: 'Next 7 Days', later: 'Later', undated: 'No ship date',
 };
 const BUCKET_ORDER: BucketKey[] = ['overdue', 'today', 'next7', 'later', 'undated'];
 
-const PAYMENT_LABEL: Record<string, string> = { paid: 'Paid', partially_paid: 'Part paid', unpaid: 'Unpaid' };
+const PAYMENT_LABEL: Record<string, string> = { paid: 'Paid', partially_paid: 'Part Paid', unpaid: 'Unpaid' };
 const paymentKey = (o: DispatchQueueOrder) => (o.is_paid ? 'paid' : o.payment_status === 'partially_paid' ? 'partially_paid' : 'unpaid');
 
 const FIELDS: HubTableField<DispatchQueueOrder>[] = [
@@ -40,7 +40,7 @@ const FIELDS: HubTableField<DispatchQueueOrder>[] = [
   { id: 'payment', filterValue: paymentKey, filterLabel: 'Payment', filterOptionLabel: (v) => PAYMENT_LABEL[v] ?? v },
   { id: 'stock', filterValue: (o) => (o.has_shortfall ? 'short' : 'ok'), filterLabel: 'Stock',
     filterOptionLabel: (v) => (v === 'short' ? 'Shortfall' : 'Covered') },
-  { id: 'note', filterValue: (o) => (o.dispatch ? 'draft' : 'none'), filterLabel: 'Dispatch note',
+  { id: 'note', filterValue: (o) => (o.dispatch ? 'draft' : 'none'), filterLabel: 'Dispatch Note',
     filterOptionLabel: (v) => (v === 'draft' ? 'Draft cut' : 'Not cut yet') },
   { id: 'lines', sortValue: (o) => o.lines.length },
   { id: 'total', sortValue: (o) => o.total },
@@ -222,7 +222,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                 options={t.filterOptions.payment} onChange={(v) => t.setFilter('payment', v)} />
               <HubFilterSelect label="Stock" value={t.filters.stock ?? HUB_FILTER_ALL}
                 options={t.filterOptions.stock} onChange={(v) => t.setFilter('stock', v)} />
-              <HubFilterSelect label="Dispatch note" value={t.filters.note ?? HUB_FILTER_ALL}
+              <HubFilterSelect label="Dispatch Note" value={t.filters.note ?? HUB_FILTER_ALL}
                 options={t.filterOptions.note} onChange={(v) => t.setFilter('note', v)} />
               <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
             </>
@@ -282,7 +282,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                                 money is in is a decision, and it needs the fact to hand. */}
                             {!o.is_paid && (
                               <Badge variant="warning" className="mt-1 text-[10px]">
-                                {o.payment_status === 'partially_paid' ? 'Part paid' : 'Unpaid'}
+                                {o.payment_status === 'partially_paid' ? 'Part Paid' : 'Unpaid'}
                               </Badge>
                             )}
                           </td>
@@ -347,7 +347,7 @@ export const DispatchBoard: React.FC<{ workspaceId: string; readOnly: boolean }>
                                     <th className="py-1 text-left font-medium">Item</th>
                                     <th className="hidden py-1 text-left font-medium sm:table-cell">SKU</th>
                                     <th className="py-1 text-right font-medium">Ordered</th>
-                                    <th className="py-1 text-right font-medium">On hand</th>
+                                    <th className="py-1 text-right font-medium">On Hand</th>
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -397,7 +397,7 @@ function printRunSheet(orders: DispatchQueueOrder[]) {
       </div>
       ${o.ship_to ? `<div class="ship">${esc(o.ship_to)}</div>` : ''}
       <table>
-        <thead><tr><th>☐</th><th>Item</th><th>SKU</th><th class="r">Qty</th><th class="r">On hand</th></tr></thead>
+        <thead><tr><th>☐</th><th>Item</th><th>SKU</th><th class="r">Qty</th><th class="r">On Hand</th></tr></thead>
         <tbody>
           ${o.lines.map((l) => `<tr class="${l.shortfall ? 'short' : ''}"><td>☐</td><td>${esc(l.description)}</td><td>${esc(l.sku ?? '')}</td><td class="r">${esc(l.quantity)}${l.unit ? ' ' + esc(l.unit) : ''}</td><td class="r">${l.qty_on_hand == null ? '-' : esc(l.qty_on_hand)}</td></tr>`).join('')}
         </tbody>

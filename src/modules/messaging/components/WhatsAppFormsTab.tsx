@@ -43,7 +43,7 @@ type Draft = {
 
 const blankDraft = (channelId: string): Draft => ({
   name: '', purpose: 'order', intro: '', cta: 'Open form', submitLabel: 'Send', channelId,
-  fields: [{ key: 'name', label: 'Your name', kind: 'text', required: true }],
+  fields: [{ key: 'name', label: 'Your Name', kind: 'text', required: true }],
 });
 
 function toFields(d: Draft): WhatsAppFormField[] {
@@ -143,7 +143,7 @@ export const WhatsAppFormsTab: React.FC = () => {
       <Card>
         <CardHeader className="flex flex-row items-start justify-between gap-4">
           <div>
-            <CardTitle>WhatsApp forms</CardTitle>
+            <CardTitle>WhatsApp Forms</CardTitle>
             <CardDescription>
               A form opens inside WhatsApp, so a customer answers in fields instead of a paragraph. The answers land in the
               conversation as a message — an order form feeds order intake exactly like a typed order.
@@ -225,7 +225,7 @@ export const WhatsAppFormsTab: React.FC = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Latest answers</CardTitle>
+          <CardTitle>Latest Answers</CardTitle>
           <CardDescription>The last 50 submissions. Each one is also a message in its conversation.</CardDescription>
         </CardHeader>
         <CardContent>
@@ -280,7 +280,7 @@ export const WhatsAppFormsTab: React.FC = () => {
               </div>
               {!draft.id && channels.length > 1 && (
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label>WhatsApp number</Label>
+                  <Label>WhatsApp Number</Label>
                   <Select value={draft.channelId} onValueChange={(v) => setDraft({ ...draft, channelId: v })}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -290,11 +290,11 @@ export const WhatsAppFormsTab: React.FC = () => {
                 </div>
               )}
               <div className="space-y-1.5 sm:col-span-2">
-                <Label>Message sent with the form</Label>
+                <Label>Message Sent with the Form</Label>
                 <Textarea rows={2} value={draft.intro} onChange={(e) => setDraft({ ...draft, intro: e.target.value })} placeholder="Tell us what you need and we will confirm the order." />
               </div>
               <div className="space-y-1.5">
-                <Label>Button text</Label>
+                <Label>Button Text</Label>
                 <Input value={draft.cta} maxLength={WHATSAPP_FORM_LIMITS.cta} onChange={(e) => setDraft({ ...draft, cta: e.target.value })} />
               </div>
               <div className="space-y-1.5">

@@ -43,7 +43,7 @@ const FIELDS: HubTableField<QueueRow>[] = [
     id: 'request',
     sortValue: (r) => r.document_request,
     filterValue: (r) => r.document_request,
-    filterLabel: 'Asked for',
+    filterLabel: 'Asked For',
     filterOptionLabel: (v) => v.replace(/_/g, ' '),
   },
   { id: 'seen', sortValue: (r) => r.synced_at },
@@ -162,7 +162,7 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
               searchPlaceholder="Search order or document"
               filters={<>
                 <HubFilterSelect label="State" value={t.filters.state ?? HUB_FILTER_ALL} options={t.filterOptions.state ?? []} onChange={(v) => t.setFilter('state', v)} />
-                <HubFilterSelect label="Asked for" value={t.filters.request ?? HUB_FILTER_ALL} options={t.filterOptions.request ?? []} onChange={(v) => t.setFilter('request', v)} />
+                <HubFilterSelect label="Asked For" value={t.filters.request ?? HUB_FILTER_ALL} options={t.filterOptions.request ?? []} onChange={(v) => t.setFilter('request', v)} />
                 <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
               </>}
             />
@@ -173,7 +173,7 @@ export const SkroutzQueueCard: React.FC<{ connection: StoreConnection }> = ({ co
                 <tr className="text-left">
                   <th className="px-2 py-1 text-[11px] font-semibold" aria-sort={ariaSort('order')}>{sortHead('order', 'Order')}</th>
                   <th className="px-2 py-1 text-[11px] font-semibold" aria-sort={ariaSort('state')}>{sortHead('state', 'State')}</th>
-                  <th className="hidden px-2 py-1 text-[11px] font-semibold md:table-cell" aria-sort={ariaSort('request')}>{sortHead('request', 'Asked for')}</th>
+                  <th className="hidden px-2 py-1 text-[11px] font-semibold md:table-cell" aria-sort={ariaSort('request')}>{sortHead('request', 'Asked For')}</th>
                   <th className="hidden px-2 py-1 text-[11px] font-semibold sm:table-cell" aria-sort={ariaSort('seen')}>{sortHead('seen', 'Seen')}</th>
                   <th className="px-2 py-1"><span className="sr-only">Actions</span></th>
                 </tr>

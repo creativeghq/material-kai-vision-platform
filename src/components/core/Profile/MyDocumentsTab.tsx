@@ -19,7 +19,7 @@ import { formatMoney as money } from '@/utils/decimal';
 import { formatDate as fmtDate } from '@/utils/datetime';
 
 const ORDER_STATUS_LABEL: Record<CustomerOrder['status'], string> = {
-  draft: 'Pre-order', confirmed: 'Confirmed', partially_fulfilled: 'Partially delivered',
+  draft: 'Pre-order', confirmed: 'Confirmed', partially_fulfilled: 'Partially Delivered',
   fulfilled: 'Completed', cancelled: 'Cancelled',
 };
 const PAYMENT_LABEL: Record<CustomerOrder['payment_status'], string> = {
@@ -110,7 +110,7 @@ export const MyDocumentsTab: React.FC = () => {
       {/* ── Account summary (per currency) ── */}
       {summary.map((s) => (
         <div key={s.currency} className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <SummaryCard label="Total spent" value={money(s.paid, s.currency)} icon={Wallet} />
+          <SummaryCard label="Total Spent" value={money(s.paid, s.currency)} icon={Wallet} />
           <SummaryCard label="Outstanding" value={money(s.outstanding, s.currency)} icon={Wallet} danger={s.outstanding > 0} />
           <SummaryCard label="Orders" value={String(s.order_count)} icon={Package} />
           <SummaryCard label="Documents" value={String(s.doc_count)} icon={FileText} />

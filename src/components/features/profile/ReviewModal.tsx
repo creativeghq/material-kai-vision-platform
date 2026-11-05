@@ -139,7 +139,7 @@ export const ReviewModal: React.FC<{
 
           {/* Dimension ratings */}
           <div className="space-y-2">
-            <Label className="text-muted-foreground text-xs uppercase tracking-wide">Detailed ratings (optional)</Label>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wide">Detailed Ratings (optional)</Label>
             <div className="grid grid-cols-1 gap-2">
               {DIMENSIONS.map((d) => (
                 <div key={d.key} className="flex items-center justify-between">
@@ -156,7 +156,7 @@ export const ReviewModal: React.FC<{
           {/* Service */}
           {services.length > 0 && (
             <div className="space-y-1.5">
-              <Label>Service hired for (optional)</Label>
+              <Label>Service Hired for (optional)</Label>
               <Select value={serviceName || '__none__'} onValueChange={(v) => setServiceName(v === '__none__' ? '' : v)}>
                 <SelectTrigger><SelectValue placeholder="— Select a service —" /></SelectTrigger>
                 <SelectContent>

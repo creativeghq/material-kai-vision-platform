@@ -82,14 +82,14 @@ export interface TaskGate {
 
 export const CAUSE_LABEL: Record<ClaimCause, string> = {
   workmanship: 'Our workmanship',
-  product_failure: 'The product failed',
+  product_failure: 'The Product Failed',
   customer_change: 'The customer changed their mind',
   undetermined: 'Undetermined',
 };
 
 export const OUTCOME_LABEL: Record<MoneyOutcome, string> = {
   internal_rework: 'Internal rework — our cost',
-  supplier_claim: 'Recoverable from the supplier',
+  supplier_claim: 'Recoverable from the Supplier',
   chargeable: 'Chargeable to the customer',
   undetermined: 'Undetermined — the cost stays ours',
   unclassified: 'Nobody has decided',

@@ -38,16 +38,16 @@ export interface RunEndpoint {
 }
 
 export const ELECTRICAL_RUN_DEFS: RunDef[] = [
-  { kind: 'lighting_circuit',  label: 'Lighting circuit', color: '#f59e0b' },
-  { kind: 'socket_circuit',    label: 'Socket circuit',   color: '#3b82f6' },
+  { kind: 'lighting_circuit',  label: 'Lighting Circuit', color: '#f59e0b' },
+  { kind: 'socket_circuit',    label: 'Socket Circuit',   color: '#3b82f6' },
   { kind: 'dedicated_circuit', label: 'Dedicated',        color: '#ef4444', dash: [4, 2] },
   { kind: 'switch_leg',        label: 'Switch leg',       color: '#a78bfa', dash: [2, 2] },
 ];
 
 export const PLUMBING_RUN_DEFS: RunDef[] = [
-  { kind: 'cold_supply', label: 'Cold supply',  color: '#3b82f6' },
-  { kind: 'hot_supply',  label: 'Hot supply',   color: '#ef4444' },
-  { kind: 'waste',       label: 'Waste / soil', color: '#78716c', dash: [5, 3] },
+  { kind: 'cold_supply', label: 'Cold Supply',  color: '#3b82f6' },
+  { kind: 'hot_supply',  label: 'Hot Supply',   color: '#ef4444' },
+  { kind: 'waste',       label: 'Waste / Soil', color: '#78716c', dash: [5, 3] },
 ];
 
 export const LIGHTING_RUN_DEFS: RunDef[] = [

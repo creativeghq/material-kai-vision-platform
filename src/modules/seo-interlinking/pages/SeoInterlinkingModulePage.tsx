@@ -96,7 +96,7 @@ export const SeoInterlinkingPanel: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('crawl-user-website', {
         body: { website_id: row.id, mode: 'full' },
       });
-      if (error || !data?.success) throw new Error(await edgeErrorMessage(error, 'Crawl failed'));
+      if (error || !data?.success) throw new Error(await edgeErrorMessage(error, 'Crawl Failed'));
       toast({
         title: 'Recrawl complete',
         description: `${data.data?.pages_indexed ?? 0} of ${data.data?.pages_discovered ?? 0} pages indexed`,

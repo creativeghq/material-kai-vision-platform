@@ -451,7 +451,7 @@ Deno.serve(withApiLogging('finance-fiscal-offline-recovery', async (req) => {
         const rows = (attempts ?? []) as { transmission_failure: boolean; created_at: string }[];
         if (!rows[0]?.transmission_failure) continue;
         const transient = rows.filter((a) => a.transmission_failure).length;
-        const label = `${table === 'invoices' ? 'Invoice' : table === 'credit_notes' ? 'Credit note' : 'Delivery note'} ${(d as any).id}`;
+        const label = `${table === 'invoices' ? 'Invoice' : table === 'credit_notes' ? 'Credit Note' : 'Delivery Note'} ${(d as any).id}`;
         if (transient > MAX_OUTAGE_RETRIES) {
           if (hoursSince((d as any).fiscal_alerted_at) >= REALERT_HOURS) {
             results.outage_alerted++;

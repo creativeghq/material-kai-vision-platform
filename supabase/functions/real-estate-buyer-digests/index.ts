@@ -15,7 +15,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { isCronAuthorized } from '../_shared/auth.ts';
 import { escapeHtml } from '../_shared/html.ts';
 
-const money = (n: number | null, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
+const money = (n: number | null, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on Request' });
 
 serve(withApiLogging('real-estate-buyer-digests', async (req) => {
   await bootstrapForFunction();

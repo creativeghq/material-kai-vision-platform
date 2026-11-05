@@ -15,10 +15,10 @@ export const PAGE_REVIEW_VERDICT_LABELS: Record<PageReviewVerdict, string> = {
 
 export const PAGE_RECOMMENDATION_KIND_LABELS: Record<PageRecommendationKind, string> = {
   title: 'Title',
-  description: 'Meta description',
+  description: 'Meta Description',
   h1: 'H1 heading',
-  content_gap: 'Content gap',
-  internal_link: 'Internal link',
+  content_gap: 'Content Gap',
+  internal_link: 'Internal Link',
 };
 
 export const PAGE_RECOMMENDATION_STATUS_LABELS: Record<PageRecommendationStatus, string> = {
@@ -38,6 +38,6 @@ export const PAGE_LIST_FILTER_LABELS: Record<PageListFilter, string> = {
   not_fetched: 'Not fetched',
   no_title: 'No title',
   no_description: 'No description',
-  has_impressions: 'Has impressions',
-  has_open_recommendations: 'Has open proposals',
+  has_impressions: 'Has Impressions',
+  has_open_recommendations: 'Has Open Proposals',
 };

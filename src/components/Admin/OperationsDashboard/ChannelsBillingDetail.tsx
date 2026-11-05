@@ -169,7 +169,7 @@ export const ChannelsBillingDetail: React.FC = () => {
                   <TableRow>
                     <TableHead>Workspace</TableHead>
                     <TableHead>Number</TableHead>
-                    <TableHead className="text-right">Costs us</TableHead>
+                    <TableHead className="text-right">Costs Us</TableHead>
                     <TableHead className="hidden sm:table-cell">Held</TableHead>
                     <TableHead className="hidden md:table-cell">Why</TableHead>
                   </TableRow>

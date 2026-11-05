@@ -177,7 +177,7 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
                   const cur = vp?.currency ?? 'EUR';
                   const disc = vp?.discount_pct ?? 0;
                   // The LABEL comes from `kind`, not from whether there is a discount.
-                  const label = vp?.kind === 'your_price' ? 'Your price' : 'Retail';
+                  const label = vp?.kind === 'your_price' ? 'Your Price' : 'Retail';
                   return (
                     <p className="text-sm font-semibold text-foreground mt-1.5">
                       <span className="mr-1 text-[11px] font-normal text-muted-foreground">{label}</span>

@@ -119,7 +119,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
             <tr className="border-b border-hairline">
               <th className="px-4 py-2 text-left w-8"><span className="sr-only">Actions</span></th>
               <th className="px-4 py-2 text-left">Code</th>
-              <th className="px-4 py-2 text-left">Document type</th>
+              <th className="px-4 py-2 text-left">Document Type</th>
               <th className="px-4 py-2 text-center">Issue</th>
             </tr>
           </thead>
@@ -185,7 +185,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                           <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
                             <Badge variant="outline" className="font-mono">{s.series}</Badge>
                             {branches.length > 1 && <Badge variant="secondary" className="text-[10px]">{branchLabel(s.branch_id)}</Badge>}
-                            <Badge variant={s.sales_channel ? 'info' : 'neutral'} className="text-[10px]">{s.sales_channel ? SALES_CHANNEL_LABEL[s.sales_channel as SalesChannel] ?? s.sales_channel : 'All sales'}</Badge>
+                            <Badge variant={s.sales_channel ? 'info' : 'neutral'} className="text-[10px]">{s.sales_channel ? SALES_CHANNEL_LABEL[s.sales_channel as SalesChannel] ?? s.sales_channel : 'All Sales'}</Badge>
                             <span className="text-xs text-muted-foreground">Next #</span>
                             <Input
                               className="h-7 w-24 text-xs"
@@ -225,9 +225,9 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                             <div className="space-y-1">
                               <span className="text-[10px] text-muted-foreground">Applies to</span>
                               <Select value={newChannel || 'all'} onValueChange={(v) => setNewChannel(v === 'all' ? '' : v)}>
-                                <SelectTrigger className="h-7 w-52 text-xs"><SelectValue placeholder="All sales" /></SelectTrigger>
+                                <SelectTrigger className="h-7 w-52 text-xs"><SelectValue placeholder="All Sales" /></SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="all">All sales</SelectItem>
+                                  <SelectItem value="all">All Sales</SelectItem>
                                   {SALES_CHANNELS.map((c) => <SelectItem key={c} value={c}>{SALES_CHANNEL_LABEL[c]}</SelectItem>)}
                                 </SelectContent>
                               </Select>

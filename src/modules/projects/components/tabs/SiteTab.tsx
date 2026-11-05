@@ -104,7 +104,7 @@ export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ pro
         <div className="flex rounded-md border border-border/60 p-0.5">
           <Toggle value="snags" icon={<ClipboardList className="h-3.5 w-3.5" />} label="Snags" />
           <Toggle value="inspections" icon={<ClipboardCheck className="h-3.5 w-3.5" />} label="Inspections" />
-          <Toggle value="log" icon={<CalendarDays className="h-3.5 w-3.5" />} label="Site log" />
+          <Toggle value="log" icon={<CalendarDays className="h-3.5 w-3.5" />} label="Site Log" />
         </div>
       </div>
       {/* Inspections sit beside snags rather than inside them because the relationship runs one
@@ -463,7 +463,7 @@ const AddSnagDialog: React.FC<{
             <CostCodePicker value={costCodeId} onChange={setCostCodeId} placeholder="No trade" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Due date</Label>
+            <Label className="text-xs">Due Date</Label>
             <Input type="date" className="h-9" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
           </div>
           <div className="space-y-1">

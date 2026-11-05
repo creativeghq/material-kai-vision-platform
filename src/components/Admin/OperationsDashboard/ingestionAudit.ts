@@ -37,7 +37,7 @@ const STATUS_TONE: Record<AuditStatus, BadgeTone> = {
 
 const STATUS_LABEL: Record<AuditStatus, string> = {
   passed: 'Passed',
-  needs_review: 'Needs review',
+  needs_review: 'Needs Review',
   failed: 'Failed',
   unverifiable: 'Unverifiable',
   audit_error: 'Audit error',

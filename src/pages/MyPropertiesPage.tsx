@@ -58,7 +58,7 @@ const Detail: React.FC<{ propertyId: string; onBack: () => void }> = ({ property
           <HubStatGrid>
             <HubStatTile label="Viewings" value={String(d.viewings.length)} />
             <HubStatTile label="Enquiries" value={String(d.enquiries)} />
-            <HubStatTile label="Days on market" value={d.performance?.days_on_market != null ? String(d.performance.days_on_market) : '—'} />
+            <HubStatTile label="Days on Market" value={d.performance?.days_on_market != null ? String(d.performance.days_on_market) : '—'} />
             <HubStatTile label="Asking" value={formatMoney(p.price, p.currency ?? 'EUR', { decimals: 0 })} />
           </HubStatGrid>
         </CardContent>
@@ -97,7 +97,7 @@ const Detail: React.FC<{ propertyId: string; onBack: () => void }> = ({ property
 
       {d.price_history.length > 0 && (
         <Card>
-          <CardHeader><CardTitle>Price history</CardTitle></CardHeader>
+          <CardHeader><CardTitle>Price History</CardTitle></CardHeader>
           <CardContent className="space-y-1 text-sm">
             {d.price_history.map((h) => (
               <div key={h.changed_at} className="flex justify-between border-b border-hairline py-1 last:border-0">
@@ -115,10 +115,10 @@ const Detail: React.FC<{ propertyId: string; onBack: () => void }> = ({ property
             <CardHeader><CardTitle>Let &amp; rent</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <HubStatGrid>
-                <HubStatTile label="Rent received" value={formatMoney(m.rent.received, m.rent.currency, { decimals: 0 })} />
+                <HubStatTile label="Rent Received" value={formatMoney(m.rent.received, m.rent.currency, { decimals: 0 })} />
                 <HubStatTile label="Outstanding" value={formatMoney(m.rent.outstanding, m.rent.currency, { decimals: 0 })} />
                 <HubStatTile label="Rent" value={`${formatMoney(m.tenancy.rent_amount, m.rent.currency, { decimals: 0 })} ${m.tenancy.rent_frequency ?? ''}`} />
-                <HubStatTile label="Tenancy ends" value={m.tenancy.end_date ? formatDate(m.tenancy.end_date) : '—'} />
+                <HubStatTile label="Tenancy Ends" value={m.tenancy.end_date ? formatDate(m.tenancy.end_date) : '—'} />
               </HubStatGrid>
               {m.charges.length > 0 && (
                 <div className="table-scroll">
@@ -218,7 +218,7 @@ const MyPropertiesPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader icon={Home} title="My properties" subtitle="How your property is doing, and what has been happening on it" />
+      <PageHeader icon={Home} title="My Properties" subtitle="How your property is doing, and what has been happening on it" />
       <div className="px-3 sm:px-6 py-4 sm:py-8">
         {loading ? (
           <div className="py-12 text-center"><Loader2 className="inline h-5 w-5 animate-spin text-muted-foreground" /></div>

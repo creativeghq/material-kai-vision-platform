@@ -97,11 +97,11 @@ export function buildEmailTemplateFilters(
           accessor: (t) => [t.name, t.slug, t.description],
         },
         {
-          key: 'kind', type: 'select', label: 'Template kind',
+          key: 'kind', type: 'select', label: 'Template Kind',
           description: 'System templates are automation-only and hidden from the manual send pickers.',
           options: [
-            { value: 'manual', label: 'Manual — user-sendable', count: templates.length - systemCount },
-            { value: 'system', label: 'System — automation', count: systemCount },
+            { value: 'manual', label: 'Manual — User-Sendable', count: templates.length - systemCount },
+            { value: 'system', label: 'System — Automation', count: systemCount },
           ],
           accessor: (t) => (t.is_system ? 'system' : 'manual'),
         },

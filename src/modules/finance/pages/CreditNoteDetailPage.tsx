@@ -48,7 +48,7 @@ const LinesCard: React.FC<{ lines: (CreditLine & { id?: string })[]; currency: s
   const vat = round2(lines.reduce((t, l) => t + Number(l.vat_amount ?? 0), 0));
   return (
     <Card>
-      <CardHeader><CardTitle>Lines credited</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Lines Credited</CardTitle></CardHeader>
       <CardContent className="p-0">
         {lines.length === 0 ? (
           <div className="p-4"><HubEmptyState icon={FileMinus} title="No lines" description="Pick the invoice lines this note credits." action={action} /></div>
@@ -98,7 +98,7 @@ const PartyLinks: React.FC<{ invoiceId: string; invoice: CreditNoteDraft['invoic
         ? <Link className="text-primary hover:underline" to={`/crm/companies/${invoice.customer_company_id}`}>{partyName ?? 'Company'}</Link>
         : null}
     </HubProperty>
-    <HubProperty label="Credits invoice">
+    <HubProperty label="Credits Invoice">
       <Link className="text-primary hover:underline" to={`${FINANCE_BASE}/invoices/${invoiceId}`}>{invoiceLabel(invoice)}</Link>
     </HubProperty>
   </>
@@ -173,9 +173,9 @@ export const CreditNoteDraftPage: React.FC = () => {
           <HubPropertyList>
             <HubProperty label="Status"><Badge variant="neutral">Draft</Badge></HubProperty>
             <PartyLinks invoiceId={draft.invoice_id} invoice={draft.invoice} partyName={draft.party_name} />
-            <HubProperty label="Document type">{docType}</HubProperty>
+            <HubProperty label="Document Type">{docType}</HubProperty>
             <HubProperty label="Reason">{draft.reason}</HubProperty>
-            <HubProperty label="Last changed">{formatDate(draft.updated_at)}</HubProperty>
+            <HubProperty label="Last Changed">{formatDate(draft.updated_at)}</HubProperty>
           </HubPropertyList>
         </HubPanel>
       }
@@ -250,7 +250,7 @@ export const CreditNoteDetailPage: React.FC = () => {
             authenticationCode={authCode}
             sending={busy === 'fiscal'}
             onSend={() => void run('fiscal', async () => {
-              const t = issuedToast('Credit note', await transmitAfterIssue('credit_note', cn.id, cn.workspace_id));
+              const t = issuedToast('Credit Note', await transmitAfterIssue('credit_note', cn.id, cn.workspace_id));
               toast(t.variant ? t : { title: 'Sent to myDATA', description: t.description });
               await load();
             })}
@@ -268,11 +268,11 @@ export const CreditNoteDetailPage: React.FC = () => {
               </span>
             </HubProperty>
             <PartyLinks invoiceId={cn.invoice_id} invoice={cn.invoice} partyName={cn.party_name} />
-            <HubProperty label="Document type">{cn.document_type}</HubProperty>
+            <HubProperty label="Document Type">{cn.document_type}</HubProperty>
             <HubProperty label="Issued">{cn.issued_at ? formatDate(cn.issued_at) : null}</HubProperty>
             <HubProperty label="Reason">{cn.reason}</HubProperty>
             <HubProperty label="Correlated MARK">{cn.correlated_mark ? <span className="font-mono text-xs">{cn.correlated_mark}</span> : null}</HubProperty>
-            <HubProperty label="Goods returned">{cn.goods_returned_at ? formatDate(cn.goods_returned_at) : <span className="text-muted-foreground">Nothing received back</span>}</HubProperty>
+            <HubProperty label="Goods Returned">{cn.goods_returned_at ? formatDate(cn.goods_returned_at) : <span className="text-muted-foreground">Nothing received back</span>}</HubProperty>
           </HubPropertyList>
         </HubPanel>
       }

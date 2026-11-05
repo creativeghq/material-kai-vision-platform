@@ -58,7 +58,7 @@ import { formatNumber } from '@/utils/decimal';
 const ACCESS_MODES: Array<{ id: CatalogAccessMode; label: string; description: string }> = [
   {
     id: 'allowlist',
-    label: 'Known contacts only',
+    label: 'Known Contacts Only',
     description: 'The reader must already be a workspace member, a CRM contact or company, or on the allowlist below. Anyone else is turned away.',
   },
   {
@@ -546,7 +546,7 @@ export const CatalogBuilderPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Description (cover page)</Label>
+                <Label>Description (Cover Page)</Label>
                 <Textarea
                   defaultValue={catalog.description || ''}
                   rows={3}
@@ -554,7 +554,7 @@ export const CatalogBuilderPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Client name (cover line)</Label>
+                <Label>Client Name (Cover Line)</Label>
                 <Input
                   defaultValue={catalog.cover_data?.client_name || ''}
                   onBlur={(e) => handleSaveCover({
@@ -569,7 +569,7 @@ export const CatalogBuilderPage: React.FC = () => {
             <CardHeader><CardTitle>Back Cover</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-2">
-                <Label>Closing message</Label>
+                <Label>Closing Message</Label>
                 <Textarea
                   defaultValue={catalog.back_cover_data?.closing_message || ''}
                   rows={2}
@@ -579,7 +579,7 @@ export const CatalogBuilderPage: React.FC = () => {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Contact line</Label>
+                <Label>Contact Line</Label>
                 <Input
                   defaultValue={catalog.back_cover_data?.contact_line || ''}
                   onBlur={(e) => handleSaveCover({
@@ -659,10 +659,10 @@ export const CatalogBuilderPage: React.FC = () => {
 
         <TabsContent value="log" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <MiniStat icon={Eye} label="Page views" value={viewEvents.filter((e) => e.event_type === 'page_view').length} />
+            <MiniStat icon={Eye} label="Page Views" value={viewEvents.filter((e) => e.event_type === 'page_view').length} />
             <MiniStat icon={FileDown} label="PDF downloads" value={viewEvents.filter((e) => e.event_type === 'pdf_download').length} />
-            <MiniStat icon={Activity} label="Gate granted" value={accessLog.filter((r) => r.granted_access).length} />
-            <MiniStat icon={Activity} label="Gate denied" value={accessLog.filter((r) => !r.granted_access).length} variant={accessLog.some((r) => !r.granted_access) ? 'destructive' : 'default'} />
+            <MiniStat icon={Activity} label="Gate Granted" value={accessLog.filter((r) => r.granted_access).length} />
+            <MiniStat icon={Activity} label="Gate Denied" value={accessLog.filter((r) => !r.granted_access).length} variant={accessLog.some((r) => !r.granted_access) ? 'destructive' : 'default'} />
           </div>
 
           <Card>
@@ -680,7 +680,7 @@ export const CatalogBuilderPage: React.FC = () => {
                       <th className="text-left px-3 py-2 font-medium">When</th>
                       <th className="text-left px-3 py-2 font-medium">Event</th>
                       <th className="text-left px-3 py-2 font-medium">Email</th>
-                      <th className="text-left px-3 py-2 font-medium">Matched as</th>
+                      <th className="text-left px-3 py-2 font-medium">Matched As</th>
                       <th className="text-left px-3 py-2 font-medium">IP</th>
                     </tr>
                   </thead>
@@ -717,7 +717,7 @@ export const CatalogBuilderPage: React.FC = () => {
                       <th className="text-left px-3 py-2 font-medium">When</th>
                       <th className="text-left px-3 py-2 font-medium">Email</th>
                       <th className="text-left px-3 py-2 font-medium">Granted</th>
-                      <th className="text-left px-3 py-2 font-medium">Matched as</th>
+                      <th className="text-left px-3 py-2 font-medium">Matched As</th>
                       <th className="text-left px-3 py-2 font-medium">IP</th>
                     </tr>
                   </thead>

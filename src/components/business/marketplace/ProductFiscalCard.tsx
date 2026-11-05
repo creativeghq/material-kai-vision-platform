@@ -323,7 +323,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
         <Grid>
           {/* The INVOICING unit, which legitimately differs from the warehouse counting unit
               (buy by pallet, sell by m²) — that one lives on the stock row. */}
-          <FieldBox label="Invoicing unit">
+          <FieldBox label="Invoicing Unit">
             <Select value={form.unitCode || NONE} onValueChange={(v) => set({ unitCode: v === NONE ? '' : v })}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Not set" /></SelectTrigger>
               <SelectContent>
@@ -343,21 +343,21 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
               </SelectContent>
             </Select>
           </FieldBox>
-          <FieldBox label="Income category (wholesale)">
+          <FieldBox label="Income Category (Wholesale)">
             <RefSelect value={form.incCat} options={incCats} onChange={(v) => set({ incCat: v })} />
           </FieldBox>
-          <FieldBox label="Income type (wholesale)">
+          <FieldBox label="Income Type (Wholesale)">
             <RefSelect value={form.incType} options={incTypes} onChange={(v) => set({ incType: v })} />
           </FieldBox>
           {/* Retail is a DIFFERENT E3 code for the same article — collected on intake but never
               previously visible here, so a wrong one could not be corrected. */}
-          <FieldBox label="Income category (retail)">
+          <FieldBox label="Income Category (Retail)">
             <RefSelect value={form.incCatRetail} options={incCats} onChange={(v) => set({ incCatRetail: v })} />
           </FieldBox>
-          <FieldBox label="Income type (retail)">
+          <FieldBox label="Income Type (Retail)">
             <RefSelect value={form.incTypeRetail} options={incTypes} onChange={(v) => set({ incTypeRetail: v })} />
           </FieldBox>
-          <FieldBox label="Default markup %">
+          <FieldBox label="Default Markup %">
             <Input className="h-8 text-xs" inputMode="decimal" value={form.markup}
               disabled={!markupKnown} title={markupKnown ? undefined : 'Markup is a cost fact you cannot read here'}
               onChange={(e) => set({ markup: e.target.value })} placeholder={markupKnown ? '0' : '—'} />
@@ -388,7 +388,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
             <TaricCombobox value={form.taric} onChange={(code) => set({ taric: code })}
               triggerClassName="h-8 text-xs w-full" />
           </FieldBox>
-          <FieldBox label="Country of origin">
+          <FieldBox label="Country of Origin">
             <OriginCountryCombobox value={form.origin} onChange={(code) => set({ origin: code })}
               triggerClassName="h-8 text-xs w-full" />
           </FieldBox>
@@ -469,7 +469,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
           <RegulatoryRoleNotice productId={productId} refreshKey={savedAt} />
         </div>
         <Grid>
-          <FieldBox className="sm:col-span-2" label="Manufacturer product-type code (DoPC)">
+          <FieldBox className="sm:col-span-2" label="Manufacturer Product-Type Code (DoPC)">
             <Input
               className="h-8 text-xs" value={form.dopcTypeCode}
               onChange={(e) => set({ dopcTypeCode: e.target.value })}
@@ -488,15 +488,15 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
           SPECIES, so art. 9(1)(a) asks for the scientific name as well as the common one.
         </p>
         <Grid>
-          <FieldBox label="Wood species (common)">
+          <FieldBox label="Wood Species (Common)">
             <Input className="h-8 text-xs" value={form.speciesCommon}
               onChange={(e) => set({ speciesCommon: e.target.value })} placeholder="oak" />
           </FieldBox>
-          <FieldBox label="Wood species (scientific)">
+          <FieldBox label="Wood Species (Scientific)">
             <Input className="h-8 text-xs italic" value={form.speciesScientific}
               onChange={(e) => set({ speciesScientific: e.target.value })} placeholder="Quercus robur" />
           </FieldBox>
-          <FieldBox label="First placed on the EU market">
+          <FieldBox label="First Placed on the EU Market">
             <Input className="h-8 text-xs" type="date" value={form.firstPlacedOn}
               onChange={(e) => set({ firstPlacedOn: e.target.value })} />
           </FieldBox>
@@ -525,7 +525,7 @@ export const ProductFiscalCard: React.FC<{ productId: string }> = ({ productId }
           <FieldBox className="sm:col-span-3" label="Link">
             <Input className="h-8 text-xs" value={form.productUrl} onChange={(e) => set({ productUrl: e.target.value })} placeholder="https://" />
           </FieldBox>
-          <FieldBox label="Discontinued by the supplier">
+          <FieldBox label="Discontinued by the Supplier">
             <Input
               className="h-8 text-xs" type="date" value={form.discontinuedOn}
               onChange={(e) => set({ discontinuedOn: e.target.value })}

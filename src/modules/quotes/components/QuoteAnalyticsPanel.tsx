@@ -169,12 +169,12 @@ export const QuoteAnalyticsPanel: React.FC<Props> = ({
 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={Eye} label="Customer views" value={stats.viewsCustomer} />
-        <StatCard icon={Globe} label="Public views" value={stats.viewsPublic} />
+        <StatCard icon={Eye} label="Customer Views" value={stats.viewsCustomer} />
+        <StatCard icon={Globe} label="Public Views" value={stats.viewsPublic} />
         <StatCard icon={Printer} label="Previews" value={stats.previews} />
         <StatCard icon={Download} label="Downloads" value={stats.downloads} />
-        <StatCard icon={Users} label="Unique visitors" value={stats.uniqueSessions.size} />
-        <StatCard icon={Building2} label="Admin views" value={stats.viewsAdmin} />
+        <StatCard icon={Users} label="Unique Visitors" value={stats.uniqueSessions.size} />
+        <StatCard icon={Building2} label="Admin Views" value={stats.viewsAdmin} />
       </div>
 
       {/* Activity timeline */}

@@ -311,7 +311,7 @@ function NewSubmissionDialog({ workspaceId, onDone }: { workspaceId: string; onD
           </p>
           <div className="flex gap-2 items-end">
             <div className="flex-1 space-y-1">
-              <Label className="text-xs">Document type</Label>
+              <Label className="text-xs">Document Type</Label>
               <Select value={code} onValueChange={setCode}>
                 <SelectTrigger><SelectValue placeholder="Select an Ergani submission type" /></SelectTrigger>
                 <SelectContent>{types.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} · {t.description}</SelectItem>)}</SelectContent>

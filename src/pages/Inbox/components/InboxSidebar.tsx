@@ -135,7 +135,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'dra
             count={view === 'all' ? threadTotal : null}
             onClick={() => goToView('all')}
           />
-          <NavRow icon={<AlarmClock className="w-4 h-4 shrink-0" />} label="Follow up" active={view === 'followup'} onClick={() => goToView('followup')} />
+          <NavRow icon={<AlarmClock className="w-4 h-4 shrink-0" />} label="Follow Up" active={view === 'followup'} onClick={() => goToView('followup')} />
           <NavRow
             icon={<Mail className="w-4 h-4 shrink-0" />}
             label="Unread"
@@ -177,7 +177,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'dra
         <nav className="px-2 pb-1 space-y-0.5">
           <NavRow
             icon={<Phone className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
-            label="Every number"
+            label="Every Number"
             dense
             active={!waNumberFilter}
             onClick={() => setWaNumberFilter(null)}
@@ -222,7 +222,7 @@ export const InboxSidebar: React.FC<{ s: InboxPageState; variant?: 'rail' | 'dra
         <nav className="px-2 pb-3 space-y-0.5">
           <NavRow
             icon={<Tag className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />}
-            label="All labels"
+            label="All Labels"
             dense
             active={labelIds.length === 0}
             onClick={() => setLabelFilter(null)}

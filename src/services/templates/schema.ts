@@ -69,12 +69,12 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
         'income_classification_type', 'income_classification_category', 'line_comments', 'product_id',
       ],
       orderBy: 'added_at',
-      label: 'Line items',
+      label: 'Line Items',
     }],
     editableFields: [
       { key: 'notes', label: 'Notes', kind: 'textarea' },
-      { key: 'payment_terms_days', label: 'Payment terms (days)', kind: 'number' },
-      { key: 'vat_rate', label: 'Default VAT rate (%)', kind: 'number' },
+      { key: 'payment_terms_days', label: 'Payment Terms (Days)', kind: 'number' },
+      { key: 'vat_rate', label: 'Default VAT Rate (%)', kind: 'number' },
       { key: 'document_type', label: 'myDATA document type', kind: 'text', hint: 'e.g. 1.1 sales invoice, 2.1 service invoice' },
     ],
   },
@@ -102,10 +102,10 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
         'installation_requirements', 'notes', 'product_id', 'selected_color', 'selected_size',
       ],
       orderBy: 'added_at',
-      label: 'Line items',
+      label: 'Line Items',
     }],
     editableFields: [
-      { key: 'name', label: 'Default quote name', kind: 'text' },
+      { key: 'name', label: 'Default Quote Name', kind: 'text' },
       { key: 'notes', label: 'Notes', kind: 'textarea' },
       { key: 'vat_rate', label: 'VAT rate (%)', kind: 'number' },
       { key: 'deposit_pct', label: 'Deposit (%)', kind: 'number' },
@@ -139,10 +139,10 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       },
     ],
     editableFields: [
-      { key: 'name', label: 'Default project name', kind: 'text' },
+      { key: 'name', label: 'Default Project Name', kind: 'text' },
       { key: 'description', label: 'Description', kind: 'textarea' },
       { key: 'budget_amount', label: 'Budget', kind: 'number' },
-      { key: 'budget_currency', label: 'Budget currency', kind: 'text' },
+      { key: 'budget_currency', label: 'Budget Currency', kind: 'text' },
     ],
   },
 
@@ -160,9 +160,9 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       label: 'Slots',
     }],
     editableFields: [
-      { key: 'title', label: 'Default board title', kind: 'text' },
+      { key: 'title', label: 'Default Board Title', kind: 'text' },
       { key: 'description', label: 'Description', kind: 'textarea' },
-      { key: 'is_public', label: 'Public board', kind: 'boolean' },
+      { key: 'is_public', label: 'Public Board', kind: 'boolean' },
     ],
   },
 
@@ -185,7 +185,7 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
         'vat_category', 'discount_pct', 'sort_order', 'product_id', 'update_warehouse',
       ],
       orderBy: 'sort_order',
-      label: 'Line items',
+      label: 'Line Items',
     }],
     editableFields: [
       { key: 'notes', label: 'Notes', kind: 'textarea' },
@@ -204,9 +204,9 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
     // that carries none.
     captureFields: ['context', 'contract_type', 'title', 'body_markdown', 'currency'],
     editableFields: [
-      { key: 'title', label: 'Default contract title', kind: 'text' },
-      { key: 'contract_type', label: 'Contract type', kind: 'text' },
-      { key: 'body_markdown', label: 'Terms (markdown)', kind: 'textarea' },
+      { key: 'title', label: 'Default Contract Title', kind: 'text' },
+      { key: 'contract_type', label: 'Contract Type', kind: 'text' },
+      { key: 'body_markdown', label: 'Terms (Markdown)', kind: 'textarea' },
     ],
   },
 
@@ -230,7 +230,7 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
   },
 
   hr_onboarding: {
-    label: 'Onboarding checklist',
+    label: 'Onboarding Checklist',
     plural: 'Onboarding checklists',
     description: 'The tasks every new starter goes through — applied to an employee in one step.',
     sourceTable: 'hr_employees',
@@ -268,14 +268,14 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       { key: 'subtype', label: 'Subtype', kind: 'text' },
       { key: 'condition', label: 'Condition', kind: 'text' },
       { key: 'furnished', label: 'Furnished', kind: 'text', hint: 'Free text on the listing — yes / no / partial.' },
-      { key: 'energy_class', label: 'Energy class', kind: 'text' },
-      { key: 'country_code', label: 'Country code', kind: 'text' },
+      { key: 'energy_class', label: 'Energy Class', kind: 'text' },
+      { key: 'country_code', label: 'Country Code', kind: 'text' },
     ],
   },
 
   crm_company: {
-    label: 'Customer terms',
-    plural: 'Customer terms',
+    label: 'Customer Terms',
+    plural: 'Customer Terms',
     description: 'A commercial-terms preset — pricing level, discount, credit and payment terms.',
     sourceTable: 'crm_companies',
     capability: 'crm.view',
@@ -291,10 +291,10 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
     ],
     editableFields: [
       { key: 'discount_percent', label: 'Discount %', kind: 'number' },
-      { key: 'payment_terms_days', label: 'Payment terms (days)', kind: 'number' },
-      { key: 'credit_limit', label: 'Credit limit', kind: 'number' },
-      { key: 'min_order_value', label: 'Minimum order value', kind: 'number' },
-      { key: 'discount_notes', label: 'Discount notes', kind: 'textarea' },
+      { key: 'payment_terms_days', label: 'Payment Terms (Days)', kind: 'number' },
+      { key: 'credit_limit', label: 'Credit Limit', kind: 'number' },
+      { key: 'min_order_value', label: 'Minimum Order Value', kind: 'number' },
+      { key: 'discount_notes', label: 'Discount Notes', kind: 'textarea' },
       { key: 'prices_vat_inclusive', label: 'Show prices VAT-inclusive', kind: 'boolean' },
     ],
   },
@@ -315,10 +315,10 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
       // and they belong to the walk that produced them rather than to the template.
       fields: ['title', 'guidance', 'sequence', 'cost_code_id'],
       orderBy: 'sequence',
-      label: 'Checklist items',
+      label: 'Checklist Items',
     }],
     editableFields: [
-      { key: 'title', label: 'Default inspection name', kind: 'text' },
+      { key: 'title', label: 'Default Inspection Name', kind: 'text' },
       { key: 'notes', label: 'Notes', kind: 'textarea' },
     ],
   },

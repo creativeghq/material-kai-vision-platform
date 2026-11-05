@@ -65,15 +65,15 @@ export interface ClientViewSettings {
 
 export const SELECTION_STATUS_LABEL: Record<SelectionStatus, string> = {
   proposed: 'Proposed',
-  client_approved: 'Approved by the client',
+  client_approved: 'Approved by the Client',
   declined: 'Declined',
   ordered: 'Ordered',
 };
 
 export const POSITION_LABEL: Record<SelectionPositionStatus, string> = {
   ok: 'Every allowance is settled',
-  overage_unbilled: 'Over budget with no change order',
-  unpriced_selections: 'Selections with no price',
+  overage_unbilled: 'Over Budget with No Change Order',
+  unpriced_selections: 'Selections with No Price',
   unfrozen: 'Allowances not frozen',
   no_allowances: 'No allowance set',
   no_project: 'No such project',

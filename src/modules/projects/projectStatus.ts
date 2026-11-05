@@ -15,8 +15,8 @@ export const PROJECT_STATUS_ORDER: readonly ProjectStatus[] = [
 
 export const PROJECT_STATUS_LABELS: Record<ProjectStatus, string> = {
   planning: 'Planning',
-  in_progress: 'In progress',
-  on_hold: 'On hold',
+  in_progress: 'In Progress',
+  on_hold: 'On Hold',
   completed: 'Completed',
   archived: 'Archived',
 };

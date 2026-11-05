@@ -162,9 +162,9 @@ export const WebsiteSeoDashboard: React.FC<{ website: UserWebsite }> = ({ websit
           down the page instead of read one at a time. */}
       <HubStatGrid>
         <HubStatTile label="Articles" value={loading || !overview ? '—' : overview.articles.total} onClick={() => setTab('articles')} />
-        <HubStatTile label="Keyword research" value={loading || !overview ? '—' : overview.keyword_research.total} onClick={() => setTab('keywords/research')} />
-        <HubStatTile label="Toolkit runs" value={loading || !overview ? '—' : overview.toolkit_runs.total} onClick={() => setTab('reports/runs')} />
-        <HubStatTile label="Domain audits" value={loading || !overview ? '—' : overview.tracked_domains.total} onClick={() => setTab('authority/history')} />
+        <HubStatTile label="Keyword Research" value={loading || !overview ? '—' : overview.keyword_research.total} onClick={() => setTab('keywords/research')} />
+        <HubStatTile label="Toolkit Runs" value={loading || !overview ? '—' : overview.toolkit_runs.total} onClick={() => setTab('reports/runs')} />
+        <HubStatTile label="Domain Audits" value={loading || !overview ? '—' : overview.tracked_domains.total} onClick={() => setTab('authority/history')} />
       </HubStatGrid>
 
       {/* Rendered from `SEO_SECTIONS` — seo/sections.ts. `HubRailSectionLabel` is how a group

@@ -657,7 +657,7 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
   emitFlowEvent('stripe_payment_failed', {
     user_id: profile.user_id,
     type: 'payment_failed',
-    title: 'Payment failed',
+    title: 'Payment Failed',
     body: 'Your payment could not be processed. Please update your payment details.',
     action_url: '/profile?tab=billing',
     payment_intent_id: paymentIntent.id,

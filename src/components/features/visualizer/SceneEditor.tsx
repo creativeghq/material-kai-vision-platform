@@ -136,7 +136,7 @@ export const SceneEditor: React.FC<Props> = ({ scene, workspaceId, existing, onS
             <MoneyInput displayDecimals={null} value={widthM} onValueChange={(v) => setWidthM(v || 1)} />
           </div>
           <div>
-            <Label className="text-xs">Far to near (m)</Label>
+            <Label className="text-xs">Far to Near (m)</Label>
             <MoneyInput displayDecimals={null} value={depthM} onValueChange={(v) => setDepthM(v || 1)} />
           </div>
         </div>

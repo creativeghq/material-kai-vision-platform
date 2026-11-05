@@ -12,7 +12,7 @@ import { userWebsitesService, type UserWebsite, type WebsiteDomainHistoryRow } f
 import { Loading } from './seo/dashboardPrimitives';
 import { RunPrice } from './seo/RunPrice';
 
-const SOURCE_LABEL: Record<string, string> = { domain_tracker: 'Snapshot', toolkit_audit: 'Earlier audit' };
+const SOURCE_LABEL: Record<string, string> = { domain_tracker: 'Snapshot', toolkit_audit: 'Earlier Audit' };
 
 /** Websites → Authority → history: the own domain's one series, newest first. */
 export const WebsiteDomainAuditsPanel: React.FC<{ website: UserWebsite }> = ({ website }) => {
@@ -47,7 +47,7 @@ export const WebsiteDomainAuditsPanel: React.FC<{ website: UserWebsite }> = ({ w
     <Card className="dashboard-card">
       <CardHeader className="flex flex-row items-start justify-between gap-3">
         <div>
-          <CardTitle>Domain history</CardTitle>
+          <CardTitle>Domain History</CardTitle>
           <CardDescription>
             Rank, keywords, traffic and backlinks for this website's own domain, one row per snapshot. Snapshots run on
             the schedule set under Reports → Schedules; a manual snapshot is charged like any lookup.
@@ -69,7 +69,7 @@ export const WebsiteDomainAuditsPanel: React.FC<{ website: UserWebsite }> = ({ w
                   <TableHead className="text-right">Rank</TableHead>
                   <TableHead className="text-right">Keywords</TableHead>
                   <TableHead className="text-right">Traffic</TableHead>
-                  <TableHead className="text-right">Ref. domains</TableHead>
+                  <TableHead className="text-right">Ref. Domains</TableHead>
                   <TableHead className="text-right">Backlinks</TableHead>
                   <TableHead className="text-right">Spam</TableHead>
                 </TableRow>

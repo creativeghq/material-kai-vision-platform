@@ -153,10 +153,10 @@ export const FlightSearchPanel: React.FC<{
       </CardHeader>
       <CardContent className="space-y-4">
         <FormGrid>
-          <FormField label="From (airport code)">
+          <FormField label="From (Airport Code)">
             <Input value={form.origin} maxLength={3} placeholder="ATH" onChange={(e) => setForm({ ...form, origin: e.target.value })} />
           </FormField>
-          <FormField label="To (airport code)">
+          <FormField label="To (Airport Code)">
             <Input value={form.destination} maxLength={3} placeholder="FCO" onChange={(e) => setForm({ ...form, destination: e.target.value })} />
           </FormField>
           <FormField label="Depart">

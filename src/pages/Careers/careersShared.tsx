@@ -4,7 +4,7 @@ import { formatMoney } from '@/utils/decimal';
 import type { CareersJobSummary, CompanyProfile, CompensationBand } from '@/services/publicCareersService';
 
 export const EMPLOYMENT_LABELS: Record<string, string> = {
-  full_time: 'Full time', part_time: 'Part time', contractor: 'Contractor',
+  full_time: 'Full Time', part_time: 'Part Time', contractor: 'Contractor',
 };
 export const LOCATION_TYPE_LABELS: Record<string, string> = {
   onsite: 'On-site', hybrid: 'Hybrid', remote: 'Remote',

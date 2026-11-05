@@ -39,8 +39,8 @@ export interface IntrastatObligation {
 export const INTRASTAT_STATUS_LABEL: Record<IntrastatStatus, string> = {
   not_obliged: 'Not obliged',
   approaching: 'Approaching the threshold',
-  obliged_from: 'Obliged — monthly',
-  threshold_unknown: 'Obligation unknown',
+  obliged_from: 'Obliged — Monthly',
+  threshold_unknown: 'Obligation Unknown',
 };
 
 export const FLOW_LABEL: Record<IntrastatFlow, string> = {

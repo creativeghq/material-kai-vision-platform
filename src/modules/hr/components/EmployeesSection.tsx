@@ -152,7 +152,7 @@ export function EmployeesSection({ workspaceId, canManage }: { workspaceId: stri
                           : e.crm_contact_id
                             ? <HubCellLink to={`/crm/contacts/${e.crm_contact_id}`} className="block max-w-[16rem] truncate">{empName(e)}</HubCellLink>
                             : <span className="block max-w-[16rem] truncate" title={empName(e)}>{empName(e)}</span>}
-                        {e.on_leave_today && <Badge variant="warning" className="shrink-0">On leave</Badge>}
+                        {e.on_leave_today && <Badge variant="warning" className="shrink-0">On Leave</Badge>}
                       </div>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{e.contact?.position ? <span className="block max-w-[14rem] truncate" title={e.contact.position}>{e.contact.position}</span> : <HubCellEmpty />}</TableCell>
@@ -252,7 +252,7 @@ function AddEmployeeDialog({ workspaceId, departments, onDone, departmentId, emp
         <div className="space-y-5">
           <FormSection title="Person">
             <FormGrid>
-              <FormField label="Full name" className="sm:col-span-2"><Input value={f.name} onChange={(e) => upd('name', e.target.value)} placeholder="Jane Doe" /></FormField>
+              <FormField label="Full Name" className="sm:col-span-2"><Input value={f.name} onChange={(e) => upd('name', e.target.value)} placeholder="Jane Doe" /></FormField>
               <FormField label="Email" optional><Input type="email" value={f.email} onChange={(e) => upd('email', e.target.value)} /></FormField>
               <FormField label="Position" optional><Input value={f.position} onChange={(e) => upd('position', e.target.value)} placeholder="Designer" /></FormField>
               <FormField label="VAT number" optional hint="For Ergani."><Input value={f.vat} onChange={(e) => upd('vat', e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></FormField>
@@ -267,14 +267,14 @@ function AddEmployeeDialog({ workspaceId, departments, onDone, departmentId, emp
                   <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Employment type">
+              <FormField label="Employment Type">
                 <Select value={f.employment_type} onValueChange={(v) => upd('employment_type', v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>{(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => <SelectItem key={t} value={t}>{EMPLOYMENT_TYPE_LABELS[t]}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
               <FormField label="Start date" optional><Input type="date" value={f.start_date} onChange={(e) => upd('start_date', e.target.value)} /></FormField>
-              <FormField label="Leave (days)"><Input type="number" min={0} value={f.allowance} onChange={(e) => upd('allowance', e.target.value)} /></FormField>
+              <FormField label="Leave (Days)"><Input type="number" min={0} value={f.allowance} onChange={(e) => upd('allowance', e.target.value)} /></FormField>
             </FormGrid>
             <WorkingTimeFields start={f.workStart} end={f.workEnd} days={workDays} onStart={(v) => upd('workStart', v)} onEnd={(v) => upd('workEnd', v)} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
           </FormSection>
@@ -287,12 +287,12 @@ function AddEmployeeDialog({ workspaceId, departments, onDone, departmentId, emp
                 </Select>
               </FormField>
               {f.pay_basis === 'monthly'
-                ? <FormField label="Monthly salary"><Input type="text" inputMode="decimal" value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></FormField>
+                ? <FormField label="Monthly Salary"><Input type="text" inputMode="decimal" value={f.salary} onChange={(e) => upd('salary', e.target.value)} placeholder="0" /></FormField>
                 : <>
-                    <FormField label="Hourly rate"><Input type="text" inputMode="decimal" value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></FormField>
-                    <FormField label="Weekly hours" hint="→ hours/day"><Input type="text" inputMode="decimal" value={f.weekly} onChange={(e) => upd('weekly', e.target.value)} placeholder="40" /></FormField>
+                    <FormField label="Hourly Rate"><Input type="text" inputMode="decimal" value={f.hourly} onChange={(e) => upd('hourly', e.target.value)} placeholder="0" /></FormField>
+                    <FormField label="Weekly Hours" hint="→ hours/day"><Input type="text" inputMode="decimal" value={f.weekly} onChange={(e) => upd('weekly', e.target.value)} placeholder="40" /></FormField>
                   </>}
-              <FormField label="Dependent children" hint="Tax credit."><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></FormField>
+              <FormField label="Dependent Children" hint="Tax credit."><Input type="number" min={0} value={f.children} onChange={(e) => upd('children', e.target.value)} /></FormField>
             </FormGrid>
           </FormSection>
         </div>
@@ -329,7 +329,7 @@ function InviteButton({ workspaceId, employee, onDone }: { workspaceId: string; 
         <DialogHeader><DialogTitle>Invite {empName(employee)} to the portal</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">They’ll get a login limited to their own HR self-service — their profile, onboarding, time-off requests and documents. They cannot see other employees, sales, finance or CRM.</p>
-          <div className="space-y-1"><Label>Work email *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></div>
+          <div className="space-y-1"><Label>Work Email *</Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="name@company.com" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>
@@ -396,7 +396,7 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
                   <SelectContent><SelectItem value="none">—</SelectItem>{departments.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Annual leave (days)"><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></FormField>
+              <FormField label="Annual Leave (Days)"><Input type="number" min={0} value={allowance} onChange={(e) => setAllowance(e.target.value)} /></FormField>
             </FormGrid>
             <WorkingTimeFields start={workStart} end={workEnd} days={workDays} onStart={setWorkStart} onEnd={setWorkEnd} onToggleDay={(n) => setWorkDays((d) => d.includes(n) ? d.filter((x) => x !== n) : [...d, n].sort())} />
           </FormSection>
@@ -409,15 +409,15 @@ function EditEmployeeDialog({ workspaceId, employee, departments, onClose, onDon
                 </Select>
               </FormField>
               {payBasis === 'monthly'
-                ? <FormField label="Monthly salary"><Input type="text" inputMode="decimal" value={salary} onChange={(e) => setSalary(e.target.value)} /></FormField>
-                : <FormField label="Hourly rate"><Input type="text" inputMode="decimal" value={hourly} onChange={(e) => setHourly(e.target.value)} /></FormField>}
+                ? <FormField label="Monthly Salary"><Input type="text" inputMode="decimal" value={salary} onChange={(e) => setSalary(e.target.value)} /></FormField>
+                : <FormField label="Hourly Rate"><Input type="text" inputMode="decimal" value={hourly} onChange={(e) => setHourly(e.target.value)} /></FormField>}
               {payBasis === 'hourly' && (
-                <FormField label="Weekly hours" hint="→ hours/day"><Input type="text" inputMode="decimal" value={weekly} onChange={(e) => setWeekly(e.target.value)} placeholder="40" /></FormField>
+                <FormField label="Weekly Hours" hint="→ hours/day"><Input type="text" inputMode="decimal" value={weekly} onChange={(e) => setWeekly(e.target.value)} placeholder="40" /></FormField>
               )}
-              <FormField label="Dependent children" hint="Tax credit."><Input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} /></FormField>
+              <FormField label="Dependent Children" hint="Tax credit."><Input type="number" min={0} value={children} onChange={(e) => setChildren(e.target.value)} /></FormField>
             </FormGrid>
           </FormSection>
-          <FormSection title="Ergani and kiosk">
+          <FormSection title="Ergani and Kiosk">
             <FormGrid>
               <FormField label="VAT number" optional hint="For Ergani."><Input value={vat} onChange={(e) => setVat(e.target.value)} className="font-mono" maxLength={9} placeholder="9 digits" /></FormField>
               <FormField label="AMKA" optional hint="Social security no. — for Ergani."><Input value={amka} onChange={(e) => setAmka(e.target.value)} className="font-mono" maxLength={11} placeholder="11 digits" /></FormField>

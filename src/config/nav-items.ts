@@ -131,7 +131,7 @@ export interface SidebarNavItem {
 export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // ── Top bar: universal surfaces every user relies on ──
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
-  { id: 'shared', label: 'Shared with me', path: '/shared', icon: Share2, surface: 'app', description: 'Projects, properties and moodboards someone has given you access to.' },
+  { id: 'shared', label: 'Shared with Me', path: '/shared', icon: Share2, surface: 'app', description: 'Projects, properties and moodboards someone has given you access to.' },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
   // Material Search no longer has its own top-bar entry — it moved under Discover → Products
   // (the "Smart search" mode) so browsing and searching materials live in one place, and the

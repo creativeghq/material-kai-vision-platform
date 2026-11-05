@@ -174,7 +174,7 @@ const DashboardPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
         {kpi('Active', d.totals.active, 'text-emerald-700 dark:text-emerald-500')}
         {kpi('Public', d.totals.public, 'text-emerald-700 dark:text-emerald-500')}
         {kpi('Draft', d.totals.draft, 'text-muted-foreground')}
-        {kpi('Under offer', d.totals.under_offer, 'text-amber-800 dark:text-amber-500')}
+        {kpi('Under Offer', d.totals.under_offer, 'text-amber-800 dark:text-amber-500')}
         {kpi('New leads', d.new_leads, 'text-primary')}
       </div>
       {d.commission && d.commission.sold_count > 0 && (() => {
@@ -1065,10 +1065,10 @@ const InvestmentsPanel: React.FC<{ ws: string | null }> = ({ ws }) => {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <Stat label="Properties" value={String(portfolio.count)} />
         <Stat label="Invested" value={money(portfolio.total_invested, ccy)} />
-        <Stat label="Cash in" value={money(portfolio.cash_invested, ccy)} />
+        <Stat label="Cash In" value={money(portfolio.cash_invested, ccy)} />
         <Stat label="Annual NOI" value={money(portfolio.annual_noi, ccy)} />
-        <Stat label="Cash flow / mo" value={money(portfolio.monthly_cash_flow, ccy)} accent />
-        <Stat label="Blended yield" value={`${portfolio.blended_net_yield_pct}%`} accent />
+        <Stat label="Cash Flow / Mo" value={money(portfolio.monthly_cash_flow, ccy)} accent />
+        <Stat label="Blended Yield" value={`${portfolio.blended_net_yield_pct}%`} accent />
       </div>
       <Card><CardContent className="p-0"><div className="divide-y divide-border">
         {investments.map((iv) => (

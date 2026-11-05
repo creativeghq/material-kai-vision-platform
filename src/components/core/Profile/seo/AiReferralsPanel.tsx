@@ -66,11 +66,11 @@ export const AiReferralsPanel: React.FC<{ websiteId: string }> = ({ websiteId })
                 help="AI-referred sessions divided by sessions from the sources Google Analytics reported."
               />
               <Figure
-                label="Engaged rate"
+                label="Engaged Rate"
                 value={data.ai_engaged_rate != null ? `${data.ai_engaged_rate}%` : null}
                 help={`Engaged sessions from assistants. Site-wide: ${data.site_engaged_rate ?? '—'}%.`}
               />
-              <Figure label="Key events" value={compact(Number(data.ai_conversions))} help="Conversions (key events) from AI-referred sessions." />
+              <Figure label="Key Events" value={compact(Number(data.ai_conversions))} help="Conversions (key events) from AI-referred sessions." />
             </div>
             {data.site_engaged_rate != null && data.ai_engaged_rate != null && (
               <p className="text-[11px] text-muted-foreground">
@@ -91,7 +91,7 @@ export const AiReferralsPanel: React.FC<{ websiteId: string }> = ({ websiteId })
                       <th className="px-3 py-2 text-left">Assistant</th>
                       <th className="px-3 py-2 text-right">Sessions</th>
                       <th className="px-3 py-2 text-right">Engaged</th>
-                      <th className="px-3 py-2 text-right">Key events</th>
+                      <th className="px-3 py-2 text-right">Key Events</th>
                       <th className="px-3 py-2 text-left">GA4 source</th>
                     </tr>
                   </thead>

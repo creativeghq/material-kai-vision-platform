@@ -148,7 +148,7 @@ export const OrderCustomsCard: React.FC<{
               <TableHead>Sub-heading</TableHead>
               <TableHead>What it covers</TableHead>
               <TableHead className="text-right">Lines</TableHead>
-              <TableHead className="text-right">Net mass</TableHead>
+              <TableHead className="text-right">Net Mass</TableHead>
               <TableHead className="text-right">Duty</TableHead>
             </TableRow>
           </TableHeader>
@@ -213,7 +213,7 @@ export const OrderCustomsCard: React.FC<{
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground" htmlFor={`mass-${l.id}`}>Net mass (kg)</Label>
+                  <Label className="text-xs text-muted-foreground" htmlFor={`mass-${l.id}`}>Net Mass (kg)</Label>
                   <Input
                     id={`mass-${l.id}`}
                     className="h-9 w-32 border-0 bg-transparent px-2 text-sm tabular-nums hover:bg-muted/60"

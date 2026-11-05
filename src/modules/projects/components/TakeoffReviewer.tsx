@@ -540,7 +540,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
             re-derives every measured length and area on it, including bill lines.
           </p>
           <FormGrid>
-            <FormField label="Real length">
+            <FormField label="Real Length">
               <Input value={known} onChange={(e) => setKnown(e.target.value)} inputMode="decimal" autoFocus />
             </FormField>
             <FormField label="Unit">

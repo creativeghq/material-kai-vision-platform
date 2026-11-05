@@ -132,7 +132,7 @@ export const IntakeAdditionsPanel: React.FC<{ workspaceId: string }> = ({ worksp
                   <TableHead>Product</TableHead>
                   <TableHead>Mode</TableHead>
                   <TableHead className="text-right">Moved</TableHead>
-                  <TableHead className="text-right">On hand</TableHead>
+                  <TableHead className="text-right">On Hand</TableHead>
                   <TableHead>Document</TableHead>
                   <TableHead />
                 </TableRow>

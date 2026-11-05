@@ -29,8 +29,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
 
 const TILE_COLORS = [
-  { label: 'Light grey', value: '#d8d6d2' },
-  { label: 'Warm beige', value: '#d9c7a8' },
+  { label: 'Light Grey', value: '#d8d6d2' },
+  { label: 'Warm Beige', value: '#d9c7a8' },
   { label: 'White', value: '#f1efea' },
   { label: 'Anthracite', value: '#4a4a4c' },
 ];
@@ -160,7 +160,7 @@ export default function TileInstallationPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[20rem_minmax(0,1fr)]">
         <Card className="h-fit">
           <CardHeader>
-            <CardTitle>Your floor</CardTitle>
+            <CardTitle>Your Floor</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             <FormSection title="Room">
@@ -211,7 +211,7 @@ export default function TileInstallationPage() {
                   )}
                 </div>
               </div>
-              {!tileImage && <Swatches label="Tile colour" options={TILE_COLORS} value={tileColor} onChange={setTileColor} />}
+              {!tileImage && <Swatches label="Tile Colour" options={TILE_COLORS} value={tileColor} onChange={setTileColor} />}
             </FormSection>
 
             <FormSection title="Setting">
@@ -219,7 +219,7 @@ export default function TileInstallationPage() {
                 {field('jointMm', 'Joint (mm)', '0.5')}
                 {field('perimeterGapMm', 'Wall gap (mm)')}
                 <FormField
-                  label="Trowel notch (mm)"
+                  label="Trowel Notch (mm)"
                   hint={
                     Number(draft.trowelNotchMm) !== typicalNotch && longSide > 0 ? (
                       <Button
@@ -241,11 +241,11 @@ export default function TileInstallationPage() {
                   />
                 </FormField>
               </FormGrid>
-              <Swatches label="Grout colour" options={GROUT_COLORS} value={groutColor} onChange={setGroutColor} />
+              <Swatches label="Grout Colour" options={GROUT_COLORS} value={groutColor} onChange={setGroutColor} />
               <div className="space-y-2 pt-1">
                 <ToggleRow label="Prime the floor first" checked={prime} onChange={setPrime} />
                 <ToggleRow
-                  label="Back-butter tiles"
+                  label="Back-Butter Tiles"
                   hint={suggestBackButter(longSide) ? 'Recommended for tiles this large' : undefined}
                   checked={backButter}
                   onChange={setBackButter}
@@ -253,7 +253,7 @@ export default function TileInstallationPage() {
               </div>
             </FormSection>
 
-            <FormSection title="Your room (optional)" description="Put the floor into a photo of the real room.">
+            <FormSection title="Your Room (optional)" description="Put the floor into a photo of the real room.">
               <input
                 ref={roomInput}
                 type="file"
@@ -338,9 +338,9 @@ export default function TileInstallationPage() {
                 </CardHeader>
                 <CardContent className="p-0">
                   <dl className="divide-y divide-hairline text-sm">
-                    <Row label="Floor area" value={`${formatNumber(q.areaM2, { maxDecimals: 2 })} m²`} />
+                    <Row label="Floor Area" value={`${formatNumber(q.areaM2, { maxDecimals: 2 })} m²`} />
                     <Row label={`Tiles to order (the layout uses ${q.tilesFromLayout}, plus ${q.sparePct}% spare)`} value={formatNumber(q.tilesToBuy)} />
-                    <Row label="Pieces on the floor" value={`${q.fullTiles} full + ${q.cutTiles} cut`} />
+                    <Row label="Pieces on the Floor" value={`${q.fullTiles} full + ${q.cutTiles} cut`} />
                     <Row label={`Spacers (${shown.params.jointMm} mm)`} value={formatNumber(q.spacers)} />
                     <Row label={`Tile adhesive (${shown.params.trowelNotchMm} mm notch${shown.params.backButter ? ', back-buttered' : ''})`} value={`≈ ${formatNumber(q.adhesiveKg, { maxDecimals: 0 })} kg`} />
                     <Row label={`Grout (${shown.params.jointMm} mm joints)`} value={`≈ ${formatNumber(q.groutKg, { maxDecimals: 1 })} kg`} />

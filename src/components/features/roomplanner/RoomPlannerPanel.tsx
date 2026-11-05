@@ -82,7 +82,7 @@ export const RoomPlannerPanel: React.FC = () => {
           .insert({
             workspace_id: activeWorkspaceId,
             user_id: auth.user?.id ?? null,
-            name: layout.name ?? 'Room plan',
+            name: layout.name ?? 'Room Plan',
             status: 'draft',
             currency: 'EUR',
           })

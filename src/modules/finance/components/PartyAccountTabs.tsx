@@ -114,11 +114,11 @@ export const PartyAccountTabs: React.FC<Props> = ({
   if (showCommercial) {
     sections.push(
       {
-        id: 'top-items', label: 'Top items', icon: ShoppingBag,
+        id: 'top-items', label: 'Top Items', icon: ShoppingBag,
         node: <CustomerTopItemsCard companyId={companyId} contactId={contactId} />,
       },
       {
-        id: 'rules', label: 'Payment rules', icon: ShieldCheck,
+        id: 'rules', label: 'Payment Rules', icon: ShieldCheck,
         node: <CustomerFinanceRulesCard companyId={companyId} contactId={contactId} />,
       },
     );

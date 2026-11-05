@@ -393,9 +393,9 @@ export const PendingProductsCard: React.FC<{ workspaceId: string; warehouses: Wa
         <Select value={mode} onValueChange={(v) => saveMode(v as IntakeMode)}>
           <SelectTrigger className="h-7 w-[190px] text-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="off">Off — ignore supplier lines</SelectItem>
-            <SelectItem value="suggest">Review before adding</SelectItem>
-            <SelectItem value="auto">Auto-add exact matches</SelectItem>
+            <SelectItem value="off">Off — Ignore Supplier Lines</SelectItem>
+            <SelectItem value="suggest">Review Before Adding</SelectItem>
+            <SelectItem value="auto">Auto-Add Exact Matches</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -1109,10 +1109,10 @@ const IntakeLineList: React.FC<{
                           <>
                             {pl.dimensions.label && <Detected label={pl.dimensions.label} title={`Read from "${pl.dimensions.matched}"`} />}
                             {pl.manufacturer && <Detected label={pl.manufacturer} title="Maker recognised from a name your CRM already knows" />}
-                            {pl.series && <Detected label={pl.series} title="Range / collection" />}
+                            {pl.series && <Detected label={pl.series} title="Range / Collection" />}
                             {pl.color && <Detected label={pl.color} title="Colour" />}
                             {pl.finish && <Detected label={pl.finish} title="Surface finish" />}
-                            {pl.grade && <Detected label={`grade ${pl.grade}`} title="Quality grade" />}
+                            {pl.grade && <Detected label={`grade ${pl.grade}`} title="Quality Grade" />}
                             {!unitStated && pl.unit && <Detected label={pl.unit} title={pl.unit_reason} />}
                           </>
                         )}
@@ -1126,7 +1126,7 @@ const IntakeLineList: React.FC<{
                   </div>
 
                   <div className="grid grid-cols-1 gap-2 md:grid-cols-[1fr_110px_70px_80px]">
-                    <Input className="h-8 text-sm" value={e.name} onChange={(ev) => setEdit(l.id, { name: ev.target.value })} placeholder="Product name" />
+                    <Input className="h-8 text-sm" value={e.name} onChange={(ev) => setEdit(l.id, { name: ev.target.value })} placeholder="Product Name" />
                     <Input className="h-8 text-sm" value={e.sku} onChange={(ev) => setEdit(l.id, { sku: ev.target.value })} placeholder="SKU" />
                     {/* A Select, not a text box. Free text is how the queue came to hold 'ml',
                         'gr', 'ltr', 'BIG BAG' and 'σάκι' — none of which any reader normalises
@@ -1383,7 +1383,7 @@ const IntakeLineList: React.FC<{
                         <DetailField label="Manufacturer" id={`mfr-${l.id}`} value={e.manufacturer}
                           onChange={(v) => { setEdit(l.id, { manufacturer: v }); repriceOne(l.id, { manufacturer: v }); }}
                           placeholder="e.g. Jowat" />
-                        <DetailField label="Supplier item code" id={`sup-${l.id}`} value={e.supplier_product_code}
+                        <DetailField label="Supplier Item Code" id={`sup-${l.id}`} value={e.supplier_product_code}
                           onChange={(v) => setEdit(l.id, { supplier_product_code: v })} placeholder="their code" />
                         <div className="space-y-0.5">
                           <label htmlFor={`mat-${l.id}`} className="text-[10px] text-muted-foreground">Material category</label>
@@ -1400,7 +1400,7 @@ const IntakeLineList: React.FC<{
                             </SelectContent>
                           </Select>
                         </div>
-                        <DetailField label="Shelf / location" id={`loc-${l.id}`} value={e.location}
+                        <DetailField label="Shelf / Location" id={`loc-${l.id}`} value={e.location}
                           onChange={(v) => setEdit(l.id, { location: v })} placeholder="Aisle 3 / Shelf B" />
 
                         <DetailField label="Width (mm)" id={`w-${l.id}`} value={e.width_mm} numeric
@@ -1412,7 +1412,7 @@ const IntakeLineList: React.FC<{
                         <DetailField label="Weight (kg)" id={`kg-${l.id}`} value={e.weight_kg} numeric
                           onChange={(v) => setEdit(l.id, { weight_kg: v })} />
 
-                        <DetailField label="Reorder point" id={`rp-${l.id}`} value={e.reorder_point} numeric
+                        <DetailField label="Reorder Point" id={`rp-${l.id}`} value={e.reorder_point} numeric
                           onChange={(v) => setEdit(l.id, { reorder_point: v })} />
                         <DetailField label="Barcode" id={`bc-${l.id}`} value={e.barcode}
                           onChange={(v) => setEdit(l.id, { barcode: v })} placeholder="EAN / UPC" />
@@ -1442,7 +1442,7 @@ const IntakeLineList: React.FC<{
                           </Select>
                         </div>
 
-                        <DetailField label="Range / collection" id={`ser-${l.id}`} value={e.series}
+                        <DetailField label="Range / Collection" id={`ser-${l.id}`} value={e.series}
                           onChange={(v) => setEdit(l.id, { series: v })} placeholder="e.g. AMALFI" />
                         <DetailField label="Colour" id={`col-${l.id}`} value={e.color}
                           onChange={(v) => setEdit(l.id, { color: v })} placeholder="e.g. grey" />

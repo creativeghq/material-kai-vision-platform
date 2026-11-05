@@ -43,7 +43,7 @@ describe('KB price lookup → proposal flow', () => {
   });
 
   it('every document type has a label and the badge cannot render "undefined"', () => {
-    expect(DRAWER).toMatch(/supplier_cost_list: 'Supplier cost list'/);
+    expect(DRAWER).toMatch(/supplier_cost_list: 'Supplier Cost List'/);
     expect(DRAWER).toMatch(/DOC_TYPE_LABEL\[m\.doc_type\] \?\? DOC_TYPE_LABEL\.unknown/);
   });
 

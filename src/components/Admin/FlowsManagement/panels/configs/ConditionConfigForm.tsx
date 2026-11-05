@@ -154,8 +154,8 @@ export function ConditionConfigForm({ data, onChange }: ConditionConfigFormProps
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="and">All conditions (AND)</SelectItem>
-                <SelectItem value="or">Any condition (OR)</SelectItem>
+                <SelectItem value="and">All Conditions (AND)</SelectItem>
+                <SelectItem value="or">Any Condition (OR)</SelectItem>
               </SelectContent>
             </Select>
           </div>

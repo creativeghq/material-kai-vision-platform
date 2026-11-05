@@ -523,7 +523,7 @@ export function GuidePlayerView({ row, guide, pageUrls, sourceUrl, photoUrl = nu
                 aria-pressed={view === v}
                 className={cn('rounded-sm px-2.5 py-1 text-xs font-medium capitalize', view === v ? 'bg-foreground text-background' : 'text-muted-foreground hover:text-foreground')}
               >
-                {v === 'photo' ? 'Your space' : v}
+                {v === 'photo' ? 'Your Space' : v}
               </button>
             ))}
           </div>

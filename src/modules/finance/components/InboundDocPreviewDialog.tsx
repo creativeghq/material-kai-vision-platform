@@ -229,12 +229,12 @@ export const InboundDocPreviewDialog: React.FC<{
             {/* Issuer ΑΦΜ / country moved to the header above; only branch is left, and only when
                 it identifies an actual establishment ('0' is the head office, i.e. no branch). */}
             {doc.issuer_branch && doc.issuer_branch !== '0' && (
-              <Row label="Issuer branch">{doc.issuer_branch}</Row>
+              <Row label="Issuer Branch">{doc.issuer_branch}</Row>
             )}
-            <Row label="Series · number">{number || '—'}</Row>
+            <Row label="Series · Number">{number || '—'}</Row>
             <Row label="UID"><span className="font-mono text-[10px] break-all">{doc.uid ?? '—'}</span></Row>
             {doc.authentication_code && (
-              <Row label="Authentication code">
+              <Row label="Authentication Code">
                 <span className="font-mono text-[10px] break-all">{doc.authentication_code}</span>
               </Row>
             )}
@@ -284,7 +284,7 @@ export const InboundDocPreviewDialog: React.FC<{
                   <th className="px-3 py-2 text-left">Description</th>
                   <th className="px-3 py-2 text-center">Unit</th>
                   <th className="px-3 py-2 text-right">Qty</th>
-                  <th className="px-3 py-2 text-right">Unit price</th>
+                  <th className="px-3 py-2 text-right">Unit Price</th>
                   <th className="px-3 py-2 text-right">Net</th>
                   <th className="px-3 py-2 text-right">VAT</th>
                   <th className="px-3 py-2 text-right">Total</th>
@@ -401,13 +401,13 @@ export const InboundDocPreviewDialog: React.FC<{
                 is summed, and the amount already sits on the invoice row. What was missing was a
                 NAME for the money, not the money. */}
             {detail && detail.money.billed_on && Number(doc.total_gross ?? 0) === 0 && detail.money.billed_gross != null && (
-              <Row label="Billed on">
+              <Row label="Billed On">
                 <span title="A plain ΔΑ prices nothing — the invoice bills the goods separately. This is that invoice.">
                   {detail.money.billed_on} — {formatMoney(Number(detail.money.billed_gross), doc.currency)}
                 </span>
               </Row>
             )}
-            <Row label="Net value">{formatMoney(doc.total_net ?? 0, doc.currency)}</Row>
+            <Row label="Net Value">{formatMoney(doc.total_net ?? 0, doc.currency)}</Row>
             {isReverseCharged(doc.doc_type)
               ? <Row label="VAT">
                   <span title="Intra-EU acquisition: zero-rated at source, so the supplier charged nothing. We declare this VAT and reclaim it in the same return.">
@@ -417,13 +417,13 @@ export const InboundDocPreviewDialog: React.FC<{
               : <Row label="VAT">{formatMoney(doc.total_vat ?? 0, doc.currency)}</Row>}
             {!!doc.total_withheld && <Row label="Withheld">{formatMoney(doc.total_withheld, doc.currency)}</Row>}
             {!!doc.total_fees && <Row label="Fees">{formatMoney(doc.total_fees, doc.currency)}</Row>}
-            {!!doc.total_stamp_duty && <Row label="Stamp duty">{formatMoney(doc.total_stamp_duty, doc.currency)}</Row>}
-            {!!doc.total_other_taxes && <Row label="Other taxes">{formatMoney(doc.total_other_taxes, doc.currency)}</Row>}
+            {!!doc.total_stamp_duty && <Row label="Stamp Duty">{formatMoney(doc.total_stamp_duty, doc.currency)}</Row>}
+            {!!doc.total_other_taxes && <Row label="Other Taxes">{formatMoney(doc.total_other_taxes, doc.currency)}</Row>}
             {!!doc.total_deductions && <Row label="Deductions">{formatMoney(doc.total_deductions, doc.currency)}</Row>}
             {/* PAYABLE, and it says so — which is exactly why it must not be AADE's
                 totalGrossValue on a 13.x/14.x. That figure adds VAT we self-assess and reclaim;
                 nobody will ever be paid it. */}
-            <Row label="Total payable">
+            <Row label="Total Payable">
               <span className="text-sm">{formatMoney(invoicedTotal(doc), doc.currency)}</span>
             </Row>
           </div>

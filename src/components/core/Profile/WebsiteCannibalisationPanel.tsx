@@ -20,10 +20,10 @@ import { useToast } from '@/hooks/use-toast';
 
 type SortKey = 'impressions' | 'pages' | 'position' | 'severity' | 'query';
 const SORT_OPTIONS: { value: SortKey; label: string; dir: 'asc' | 'desc' }[] = [
-  { value: 'impressions', label: 'Most impressions', dir: 'desc' },
-  { value: 'severity', label: 'Most severe', dir: 'desc' },
-  { value: 'pages', label: 'Most competing pages', dir: 'desc' },
-  { value: 'position', label: 'Best position', dir: 'asc' },
+  { value: 'impressions', label: 'Most Impressions', dir: 'desc' },
+  { value: 'severity', label: 'Most Severe', dir: 'desc' },
+  { value: 'pages', label: 'Most Competing Pages', dir: 'desc' },
+  { value: 'position', label: 'Best Position', dir: 'asc' },
   { value: 'query', label: 'Query A–Z', dir: 'asc' },
 ];
 const SEVERITY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -238,7 +238,7 @@ export const WebsiteCannibalisationPanel: React.FC<{ website: UserWebsite }> = (
     facets: {
       severity: { label: 'Severity', valueOf: (it) => it.severity, labels: SEVERITY_LABELS, order: ['high', 'medium', 'low'] },
       split: {
-        label: 'Click split',
+        label: 'Click Split',
         valueOf: (it) => (it.leader_is_best_converter ? 'aligned' : 'misdirected'),
         labels: SPLIT_LABELS,
         order: ['misdirected', 'aligned'],

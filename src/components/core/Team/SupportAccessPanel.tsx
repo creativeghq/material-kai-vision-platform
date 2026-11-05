@@ -115,10 +115,10 @@ export const SupportAccessPanel: React.FC<Props> = ({ workspaceId, members, onCh
                   {row.active
                     ? <Badge variant="success">{formatTimeLeft(row.seconds_left)} left</Badge>
                     : row.request?.status === 'pending'
-                      ? <Badge variant="warning">Asking to come back in</Badge>
+                      ? <Badge variant="warning">Asking to Come Back In</Badge>
                       : row.request?.status === 'approved'
                         ? <Badge variant="info">PIN valid for {formatTimeLeft(row.request.pin_seconds_left ?? 0)}</Badge>
-                        : <Badge variant="neutral">Access ended</Badge>}
+                        : <Badge variant="neutral">Access Ended</Badge>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -163,7 +163,7 @@ export const SupportAccessPanel: React.FC<Props> = ({ workspaceId, members, onCh
           ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1">
-                <Label>Access lasts</Label>
+                <Label>Access Lasts</Label>
                 <Select value={String(accessMinutes)} onValueChange={(v) => setAccessMinutes(Number(v))}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>

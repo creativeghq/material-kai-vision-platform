@@ -207,10 +207,10 @@ export default function PublicClientViewPage() {
           return (
             <section>
               <h2 className="text-lg font-semibold flex items-center gap-2 mb-3">
-                <Box className="h-5 w-5 text-primary" /> {plan.name || 'Room plan'}
+                <Box className="h-5 w-5 text-primary" /> {plan.name || 'Room Plan'}
               </h2>
               <Card className="dashboard-card p-4">
-                <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Room plan">
+                <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Room Plan">
                   <rect
                     x={ox} y={oy} width={plan.width_m * scale} height={plan.depth_m * scale}
                     className="fill-muted/40 stroke-border" strokeWidth={1}
@@ -372,7 +372,7 @@ export default function PublicClientViewPage() {
                     )}
                   </div>
                   <span className={`shrink-0 text-xs ${s.resolved ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {s.resolved ? 'Done' : 'In progress'}
+                    {s.resolved ? 'Done' : 'In Progress'}
                   </span>
                 </div>
               ))}
@@ -393,7 +393,7 @@ export default function PublicClientViewPage() {
                     type="text"
                     value={authorName}
                     onChange={(e) => setAuthorName(e.target.value)}
-                    placeholder="Your name"
+                    placeholder="Your Name"
                     className="w-full rounded-md bg-background border border-border px-3 py-2 text-sm"
                   />
                   <textarea

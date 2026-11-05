@@ -208,7 +208,7 @@ export const create3DGenerationTool = (
         const result = await response.json();
 
         if (!result.success) {
-          throw new Error(result.error || 'Generation failed');
+          throw new Error(result.error || 'Generation Failed');
         }
 
         // IMMEDIATELY send generation job info via streaming callback
@@ -250,7 +250,7 @@ export const create3DGenerationTool = (
         console.error('Interior design generation error:', error);
         return JSON.stringify({
           success: false,
-          error: error instanceof Error ? error.message : 'Generation failed',
+          error: error instanceof Error ? error.message : 'Generation Failed',
         });
       }
     },
@@ -669,7 +669,7 @@ export const createGeminiGenerationTool = (
           success: false,
           error: isAbort
             ? 'Gemini generation timed out after 300s. The backend may be overloaded — please retry.'
-            : error instanceof Error ? error.message : 'Generation failed',
+            : error instanceof Error ? error.message : 'Generation Failed',
         });
       }
     },

@@ -274,7 +274,7 @@ export const RecallsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             ))}
 
             <div>
-              <Label className="text-xs">Safety Business Gateway reference (art. 20)</Label>
+              <Label className="text-xs">Safety Business Gateway Reference (art. 20)</Label>
               <Input
                 className="mt-1 h-8 text-xs" value={editing.gateway_reference ?? ''}
                 onChange={(e) => setEditing((r) => ({ ...r, gateway_reference: e.target.value || null }))}

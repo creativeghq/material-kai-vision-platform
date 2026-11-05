@@ -113,11 +113,11 @@ interface PriceLookupDrawerProps {
 }
 
 const DOC_TYPE_LABEL: Record<PriceLookupMatch['doc_type'], string> = {
-  price_list: 'Price list',
-  discount_rule: 'Discount rule',
-  contract_terms: 'Contract terms',
+  price_list: 'Price List',
+  discount_rule: 'Discount Rule',
+  contract_terms: 'Contract Terms',
   promotion: 'Promotion',
-  supplier_cost_list: 'Supplier cost list',
+  supplier_cost_list: 'Supplier Cost List',
   unknown: 'Unclassified',
 };
 
@@ -846,7 +846,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
             </p>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label htmlFor="price-unit-price">Unit price *</Label>
+                <Label htmlFor="price-unit-price">Unit Price *</Label>
                 <Input
                   id="price-unit-price"
                   type="number"

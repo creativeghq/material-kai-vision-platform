@@ -935,7 +935,7 @@ export const QuoteDetailPage: React.FC = () => {
             companyId={quote.customer_company_id}
             contactId={quote.customer_contact_id}
             value={quote.customer_address_unit_id ?? null}
-            label="Bill-to address"
+            label="Bill-To Address"
             onChange={async (unitId) => {
               await quotesService.updateQuote(quote.id, { customer_address_unit_id: unitId } as any);
               await loadQuoteDetails();
@@ -1498,10 +1498,10 @@ export const QuoteDetailPage: React.FC = () => {
                     <label htmlFor="quotedetailadminpage-product-optional" className="text-sm font-medium mb-2 block">Product (optional)</label>
                     <Select value={selectedTimelineItemId} onValueChange={setSelectedTimelineItemId}>
                       <SelectTrigger id="quotedetailadminpage-product-optional" className="w-full">
-                        <SelectValue placeholder="All products" />
+                        <SelectValue placeholder="All Products" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__none__">All products</SelectItem>
+                        <SelectItem value="__none__">All Products</SelectItem>
                         {(quote.items || []).map((item: any) => {
                           const name = !item.product_id
                             ? (item.custom_product_name || 'Custom Item')

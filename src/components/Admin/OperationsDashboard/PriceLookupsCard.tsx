@@ -105,10 +105,10 @@ export const PriceLookupsCard: React.FC = () => {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-              <Stat label="Total lookups" value={stats.total} />
+              <Stat label="Total Lookups" value={stats.total} />
               <Stat label="Committed" value={stats.committed} hint={`${stats.commitRate}% rate`} />
               <Stat label="No match" value={stats.noMatch} hint={`${stats.noMatchRate}% rate`} tone={stats.noMatchRate > 30 ? 'warning' : 'default'} />
-              <Stat label="Avg latency" value={`${stats.avgLatency}ms`} />
+              <Stat label="Avg Latency" value={`${stats.avgLatency}ms`} />
               <Stat label="Successful" value={stats.successful} />
             </div>
 

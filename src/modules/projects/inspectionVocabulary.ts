@@ -42,7 +42,7 @@ export type InspectionOutcome = (typeof INSPECTION_OUTCOMES)[number];
 export const INSPECTION_OUTCOME_LABELS: Record<InspectionOutcome, string> = {
   empty: 'No items',
   not_started: 'Not started',
-  in_progress: 'In progress',
+  in_progress: 'In Progress',
   failed: 'Failed',
   passed: 'Passed',
 };

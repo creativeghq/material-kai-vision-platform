@@ -12,11 +12,11 @@ import { MATERIAL_CATS, catLabel } from '@/lib/materialCategories';
 import type { BrowseFilters } from '@/services/marketplaceService';
 
 export const CONDITION_LABEL: Record<string, string> = {
-  new: 'New', open_box: 'Open box', remnant: 'Remnant', lot: 'Mixed lot',
+  new: 'New', open_box: 'Open box', remnant: 'Remnant', lot: 'Mixed Lot',
 };
 
 export const DELIVERY_LABEL: Record<string, string> = {
-  pickup: 'Pickup only', ship: 'Shipping', both: 'Pickup or shipping',
+  pickup: 'Pickup Only', ship: 'Shipping', both: 'Pickup or Shipping',
 };
 
 const labelOptions = (map: Record<string, string>) =>

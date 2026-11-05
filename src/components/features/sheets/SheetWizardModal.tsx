@@ -363,7 +363,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
         {/* STEP: details */}
         {step === 'details' && type && (
           <div className="space-y-4">
-            <FormField label="Sheet title">
+            <FormField label="Sheet Title">
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={SHEET_TYPE_LABELS[type]} />
             </FormField>
 
@@ -417,8 +417,8 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
 
             {!loadingData && type === 'area_breakdown' && (
               <div className="space-y-3">
-                <ImagePick label="Hero render" value={heroUrl} onChange={setHeroUrl} items={items} onUpload={uploadImage} />
-                <ImagePick label="Dimensioned plan" optional value={planUrl} onChange={setPlanUrl} items={items} onUpload={uploadImage} />
+                <ImagePick label="Hero Render" value={heroUrl} onChange={setHeroUrl} items={items} onUpload={uploadImage} />
+                <ImagePick label="Dimensioned Plan" optional value={planUrl} onChange={setPlanUrl} items={items} onUpload={uploadImage} />
                 <ImagePick label="Elevation" optional value={elevationUrl} onChange={setElevationUrl} items={items} onUpload={uploadImage} />
                 <FormField label="Subtitle" optional>
                   <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="e.g. Modern Bathroom Design" />
@@ -459,7 +459,7 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
                   <Button type="button" size="sm" variant={backdropKind === 'rect' ? 'default' : 'outline'} onClick={() => setBackdropKind('rect')}>Blank room (mm)</Button>
                 </div>
                 {backdropKind === 'upload'
-                  ? <ImagePick label="Floor plan" value={backdropUrl} onChange={setBackdropUrl} items={items} onUpload={uploadImage} />
+                  ? <ImagePick label="Floor Plan" value={backdropUrl} onChange={setBackdropUrl} items={items} onUpload={uploadImage} />
                   : <FormGrid>
                       <FormField label="Width (mm)"><Input type="number" value={rectW} onChange={(e) => { setRectW(e.target.value); setRoomId(null); }} placeholder="e.g. 3000" /></FormField>
                       <FormField label="Height (mm)"><Input type="number" value={rectH} onChange={(e) => { setRectH(e.target.value); setRoomId(null); }} placeholder="e.g. 2400" /></FormField>
@@ -475,14 +475,14 @@ export function SheetWizardModal({ open, onClose, presetMoodboardId, presetMoodb
 
             {!loadingData && type === 'annotated_render' && (
               <div className="space-y-1">
-                <ImagePick label="Render to annotate" value={backdropUrl} onChange={setBackdropUrl} items={items} onUpload={uploadImage} />
+                <ImagePick label="Render to Annotate" value={backdropUrl} onChange={setBackdropUrl} items={items} onUpload={uploadImage} />
                 <p className="text-[11px] text-muted-foreground">Callouts are auto-detected, then you refine them on the canvas.</p>
               </div>
             )}
 
             {!loadingData && type === 'elevation_render_pair' && (
               <div className="space-y-1">
-                <ImagePick label="Elevation image" value={elevationUrl} onChange={setElevationUrl} items={items} onUpload={uploadImage} />
+                <ImagePick label="Elevation Image" value={elevationUrl} onChange={setElevationUrl} items={items} onUpload={uploadImage} />
                 <p className="text-[11px] text-muted-foreground">You'll add dimensions + tile callouts on the canvas.</p>
               </div>
             )}

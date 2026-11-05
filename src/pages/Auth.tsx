@@ -411,7 +411,7 @@ export const Auth: React.FC = () => {
             <TabsContent value="signup">
               <form onSubmit={handleSignUp} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="signup-name" className="text-sm font-medium text-foreground">Full name</Label>
+                  <Label htmlFor="signup-name" className="text-sm font-medium text-foreground">Full Name</Label>
                   <Input
                     id="signup-name"
                     type="text"
@@ -488,7 +488,7 @@ export const Auth: React.FC = () => {
                   {applyAsReseller && (
                     <div className="space-y-2 pl-7">
                       <Label htmlFor="signup-vat" className="text-sm font-medium text-foreground">
-                        Business VAT number (ΑΦΜ)
+                        Business VAT Number (ΑΦΜ)
                       </Label>
                       <Input
                         id="signup-vat"

@@ -8,8 +8,8 @@ export const SHIPMENT_STATUSES: ShipmentStatus[] = [
 
 export const SHIPMENT_STATUS_LABEL: Record<ShipmentStatus, string> = {
   ready: 'Ready to ship',
-  handed_over: 'Handed to carrier',
-  in_transit: 'In transit',
+  handed_over: 'Handed to Carrier',
+  in_transit: 'In Transit',
   delivered: 'Delivered',
   returned: 'Returned',
   lost: 'Lost',

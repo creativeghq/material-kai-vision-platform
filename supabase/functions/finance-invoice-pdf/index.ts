@@ -142,12 +142,12 @@ const LABELS: Record<Lang, Record<string, string>> = {
     mark: 'MARK', uid: 'UID', verify: 'Scan for the Filed Document',
     movement: 'TRANSPORT DETAILS', loadingPlace: 'Loading Place', deliveryPlace: 'Delivery Place',
     vehicle: 'Vehicle', purpose: 'Purpose', notes: 'Notes', page: 'Page', of: 'of',
-    recipient: 'RECIPIENT', totalQty: 'Total quantity', transportDate: 'Transport date',
+    recipient: 'RECIPIENT', totalQty: 'Total Quantity', transportDate: 'Transport Date',
     salesOrder: 'ORDER CONFIRMATION', purchaseOrder: 'PURCHASE ORDER', supplier: 'SUPPLIER',
     paymentReceipt: 'PAYMENT RECEIPT', received: 'Received', method: 'Payment Method',
-    appliedTo: 'Applied to', reference: 'Reference', thankYou: 'Thank You for Your Payment.',
+    appliedTo: 'Applied To', reference: 'Reference', thankYou: 'Thank You for Your Payment.',
     contact: 'Contact', office: 'Registered Office', value: 'Value', amountPaid: 'Amount Paid',
-    inWords: 'In Words', receivedBy: 'Received by', newBalance: 'New Balance', serial: 'No.', code: 'Code',
+    inWords: 'In Words', receivedBy: 'Received By', newBalance: 'New Balance', serial: 'No.', code: 'Code',
     orderDetails: 'ORDER DETAILS', billTo: 'BILL TO', shipTo: 'SHIP TO',
     itemCode: 'Item Code', itemDescr: 'Description', itemComment: 'Comment',
     order: 'Order', invoiceNo: 'Invoice', orderNotes: 'Order Note',
@@ -174,7 +174,7 @@ import {
 import { movePurposeLabel, MYDATA_MOVE_PURPOSE_OTHER, receivingNotePurposeLabel, MYDATA_RECEIVING_NOTE_PURPOSE_OTHER } from '../_shared/fiscal/fiscalVocabulary.generated.ts';
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
-  bank_transfer: 'Bank transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
+  bank_transfer: 'Bank Transfer', cash: 'Cash', card: 'Card', check: 'Check', iris: 'IRIS', other: 'Other',
 };
 
 // The myDATA CODE → name (AADE 8.12) comes from `mydataPaymentLabel` in the mirrored

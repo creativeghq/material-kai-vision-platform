@@ -258,12 +258,12 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
       {/* Summary — the distinct money streams */}
       {summary && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-          <SummaryTile label="Total gross" value={money(summary.total_gross, cur)} />
-          <SummaryTile label="Net → employees" value={money(summary.total_net, cur)} strong />
-          <SummaryTile label="Income tax → AADE" value={money(summary.total_income_tax, cur)} />
-          <SummaryTile label="Employee EFKA (withheld)" value={money(summary.total_employee_contributions, cur)} />
+          <SummaryTile label="Total Gross" value={money(summary.total_gross, cur)} />
+          <SummaryTile label="Net → Employees" value={money(summary.total_net, cur)} strong />
+          <SummaryTile label="Income Tax → AADE" value={money(summary.total_income_tax, cur)} />
+          <SummaryTile label="Employee EFKA (Withheld)" value={money(summary.total_employee_contributions, cur)} />
           <SummaryTile label="Employer EFKA → EFKA" value={money(summary.total_employer_contributions, cur)} strong />
-          <SummaryTile label="Total employer cost" value={money(summary.total_employer_cost, cur)} />
+          <SummaryTile label="Total Employer Cost" value={money(summary.total_employer_cost, cur)} />
         </div>
       )}
 
@@ -278,7 +278,7 @@ function PayrollRunDetail({ workspaceId, runId, canManage, onBack }: { workspace
                 <TableHead aria-sort={ariaSort('employee')}>{sortHead('employee', 'Employee')}</TableHead>
                 <TableHead className="text-right" aria-sort={ariaSort('gross')}>{sortHead('gross', 'Gross', 'right')}</TableHead>
                 <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('efka')}>{sortHead('efka', 'Empl. EFKA', 'right')}</TableHead>
-                <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('tax')}>{sortHead('tax', 'Income tax', 'right')}</TableHead>
+                <TableHead className="hidden md:table-cell text-right" aria-sort={ariaSort('tax')}>{sortHead('tax', 'Income Tax', 'right')}</TableHead>
                 <TableHead className="text-right" aria-sort={ariaSort('net')}>{sortHead('net', 'Net', 'right')}</TableHead>
                 <TableHead className="hidden lg:table-cell text-right" aria-sort={ariaSort('employer')}>{sortHead('employer', 'Employer EFKA', 'right')}</TableHead>
               </TableRow></TableHeader>
@@ -423,10 +423,10 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
                 <FormField label="Country / Mode">
                   <Select value={s.country_code} onValueChange={(v) => upd('country_code', v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="GR">Greece (auto)</SelectItem><SelectItem value="none">None (manual)</SelectItem></SelectContent>
+                    <SelectContent><SelectItem value="GR">Greece (Auto)</SelectItem><SelectItem value="none">None (manual)</SelectItem></SelectContent>
                   </Select>
                 </FormField>
-                <FormField label="Salaries / year"><Input type="number" value={s.salaries_per_year} onChange={(e) => upd('salaries_per_year', Number(e.target.value))} /></FormField>
+                <FormField label="Salaries / Year"><Input type="number" value={s.salaries_per_year} onChange={(e) => upd('salaries_per_year', Number(e.target.value))} /></FormField>
                 <FormField label="Currency"><Input value={s.currency} onChange={(e) => upd('currency', e.target.value)} /></FormField>
               </FormGrid>
             </FormSection>
@@ -434,16 +434,16 @@ function PayrollSettingsDialog({ workspaceId }: { workspaceId: string }) {
               <FormGrid cols={3}>
                 <FormField label="Employee %"><NumField scale={100} value={s.employee_contribution_rate} onChange={(n) => upd('employee_contribution_rate', n ?? 0)} /></FormField>
                 <FormField label="Employer %"><NumField scale={100} value={s.employer_contribution_rate} onChange={(n) => upd('employer_contribution_rate', n ?? 0)} /></FormField>
-                <FormField label="Monthly ceiling" optional><NumField allowNull value={s.contribution_monthly_ceiling} onChange={(n) => upd('contribution_monthly_ceiling', n)} placeholder="none" /></FormField>
+                <FormField label="Monthly Ceiling" optional><NumField allowNull value={s.contribution_monthly_ceiling} onChange={(n) => upd('contribution_monthly_ceiling', n)} placeholder="none" /></FormField>
               </FormGrid>
             </FormSection>
-            <FormSection title="Income tax">
+            <FormSection title="Income Tax">
               <FormGrid cols={3}>
-                <FormField label="Tax credit (base)"><NumField value={s.tax_credit_base} onChange={(n) => upd('tax_credit_base', n ?? 0)} /></FormField>
+                <FormField label="Tax Credit (Base)"><NumField value={s.tax_credit_base} onChange={(n) => upd('tax_credit_base', n ?? 0)} /></FormField>
                 <FormField label="Taper /€1,000"><NumField value={s.tax_credit_taper_per_1000} onChange={(n) => upd('tax_credit_taper_per_1000', n ?? 0)} /></FormField>
-                <FormField label="Taper floor"><NumField value={s.tax_credit_taper_floor} onChange={(n) => upd('tax_credit_taper_floor', n ?? 0)} /></FormField>
+                <FormField label="Taper Floor"><NumField value={s.tax_credit_taper_floor} onChange={(n) => upd('tax_credit_taper_floor', n ?? 0)} /></FormField>
                 <FormField
-                  label="Income-tax brackets (annual) — JSON"
+                  label="Income-Tax Brackets (Annual) — JSON"
                   hint={<>Array of {'{up_to, rate}'}; last entry uses <code>up_to: null</code> for the top band. Rates are fractions (0.09 = 9%).</>}
                   className="sm:col-span-3"
                 >

@@ -44,18 +44,18 @@ export function buildAgentRunFilters(runs: AgentRun[], agents: BackgroundAgent[]
           accessor: (r) => r.agent_id,
         },
         {
-          key: 'agent_type', type: 'multi', label: 'Agent type',
+          key: 'agent_type', type: 'multi', label: 'Agent Type',
           options: optionsFromRows(runs, (r) => agentOf(r)?.agent_type, humanizeLabel),
           accessor: (r) => agentOf(r)?.agent_type,
         },
         {
-          key: 'trigger_type', type: 'multi', label: 'Trigger type',
+          key: 'trigger_type', type: 'multi', label: 'Trigger Type',
           description: 'How the owning agent is scheduled — cron, event, chain or manual.',
           options: optionsFromRows(runs, (r) => agentOf(r)?.trigger_type, humanizeLabel),
           accessor: (r) => agentOf(r)?.trigger_type,
         },
         {
-          key: 'enabled', type: 'bool', label: 'Agent enabled',
+          key: 'enabled', type: 'bool', label: 'Agent Enabled',
           description: 'A disabled cron/event agent will never fire again.',
           trueLabel: 'Enabled agents', falseLabel: 'Disabled agents',
           accessor: (r) => !!agentOf(r)?.enabled,
@@ -79,7 +79,7 @@ export function buildAgentRunFilters(runs: AgentRun[], agents: BackgroundAgent[]
           min: credits.min, max: credits.max, step: 0.1, accessor: (r) => r.credits_debited,
         },
         {
-          key: 'delegated_to_python', type: 'bool', label: 'Python delegation',
+          key: 'delegated_to_python', type: 'bool', label: 'Python Delegation',
           description: 'Runs longer than 25s are handed to the MIVAA backend.',
           trueLabel: 'Delegated to Python', falseLabel: 'Ran in the edge function',
           accessor: (r) => !!r.delegated_to_python,
@@ -90,7 +90,7 @@ export function buildAgentRunFilters(runs: AgentRun[], agents: BackgroundAgent[]
           accessor: (r) => (r.recovery_attempts ?? 0) > 0,
         },
         {
-          key: 'chained', type: 'bool', label: 'Chained run',
+          key: 'chained', type: 'bool', label: 'Chained Run',
           description: 'Triggered by a parent agent completing.',
           trueLabel: 'Chained', falseLabel: 'Top-level',
           accessor: (r) => !!r.parent_run_id,
@@ -101,7 +101,7 @@ export function buildAgentRunFilters(runs: AgentRun[], agents: BackgroundAgent[]
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
         { key: 'created_at', type: 'dateRange', label: 'Created', accessor: (r) => r.created_at },
-        { key: 'started_at', type: 'dateRange', label: 'Last run', accessor: (r) => r.started_at ?? r.created_at },
+        { key: 'started_at', type: 'dateRange', label: 'Last Run', accessor: (r) => r.started_at ?? r.created_at },
       ],
     },
   ];
@@ -131,7 +131,7 @@ export function buildChatToolCallFilters(calls: ChatToolCall[]): FilterGroupDef[
           accessor: (c) => !!c.success,
         },
         {
-          key: 'zero_result', type: 'bool', label: 'Zero result',
+          key: 'zero_result', type: 'bool', label: 'Zero Result',
           description: 'Tool ran cleanly but returned nothing — usually a retrieval gap, not a bug.',
           trueLabel: 'Zero result only', falseLabel: 'Returned results',
           accessor: (c) => !!c.zero_result,
@@ -142,7 +142,7 @@ export function buildChatToolCallFilters(calls: ChatToolCall[]): FilterGroupDef[
       key: 'origin', label: 'Origin', icon: MessageSquare,
       fields: [
         {
-          key: 'agent_id', type: 'multi', label: 'Chat agent',
+          key: 'agent_id', type: 'multi', label: 'Chat Agent',
           options: optionsFromRows(calls, (c) => c.agent_id),
           accessor: (c) => c.agent_id,
         },
@@ -161,14 +161,14 @@ export function buildChatToolCallFilters(calls: ChatToolCall[]): FilterGroupDef[
           min: duration.min, max: duration.max, accessor: (c) => c.duration_ms,
         },
         {
-          key: 'result_count', type: 'range', label: 'Results returned',
+          key: 'result_count', type: 'range', label: 'Results Returned',
           min: results.min, max: results.max, accessor: (c) => c.result_count,
         },
       ],
     },
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
-      fields: [{ key: 'created_at', type: 'dateRange', label: 'Called at', accessor: (c) => c.created_at }],
+      fields: [{ key: 'created_at', type: 'dateRange', label: 'Called At', accessor: (c) => c.created_at }],
     },
   ];
 }

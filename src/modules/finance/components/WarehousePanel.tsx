@@ -70,14 +70,14 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
         key: 'quantity', label: 'Quantity', icon: Boxes,
         fields: [
           {
-            key: 'qty', type: 'range', label: 'On hand',
+            key: 'qty', type: 'range', label: 'On Hand',
             min: 0, max: Math.max(Math.ceil(maxQty / 10) * 10, 10),
             accessor: (i: WarehouseItem) => i.qty_on_hand,
           },
           {
-            key: 'low', type: 'bool', label: 'Low stock',
+            key: 'low', type: 'bool', label: 'Low Stock',
             description: 'On hand at or below the reorder point.',
-            trueLabel: 'Low stock', falseLabel: 'Above reorder point',
+            trueLabel: 'Low Stock', falseLabel: 'Above reorder point',
             accessor: (i: WarehouseItem) => i.reorder_point > 0 && i.qty_on_hand <= i.reorder_point,
           },
         ],
@@ -225,7 +225,7 @@ export const WarehousePanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                 <th className="px-4 py-2 text-left">Item</th>
                 <th className="px-4 py-2 text-left">SKU</th>
                 <th className="px-4 py-2 text-left">Location</th>
-                <th className="px-4 py-2 text-right">On hand</th>
+                <th className="px-4 py-2 text-right">On Hand</th>
                 <th className="px-4 py-2 text-right">Reserved</th>
                 <th className="px-4 py-2 text-right">Reorder</th>
                 <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
@@ -574,8 +574,8 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
               </div>
               <FormSection title="Stock">
                 <FormGrid cols={3}>
-                  <FormField label="On hand"><Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} /></FormField>
-                  <FormField label="Reorder pt"><Input type="text" inputMode="decimal" value={reorder} onChange={(e) => setReorder(e.target.value)} /></FormField>
+                  <FormField label="On Hand"><Input type="text" inputMode="decimal" value={qty} onChange={(e) => setQty(e.target.value)} /></FormField>
+                  <FormField label="Reorder Pt"><Input type="text" inputMode="decimal" value={reorder} onChange={(e) => setReorder(e.target.value)} /></FormField>
                   <FormField label="Unit"><Input value={unit} onChange={(e) => setUnit(e.target.value)} /></FormField>
                   <FormField label="Location" optional className="sm:col-span-3"><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Aisle 3 / Shelf B" /></FormField>
                 </FormGrid>
@@ -584,7 +584,7 @@ const AddItemDialog: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
                 <summary className="cursor-pointer text-xs text-muted-foreground select-none">Codes &amp; myDATA classification (optional)</summary>
                 <FormGrid className="pt-3">
                   <FormField label="Barcode"><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></FormField>
-                  <FormField label="Serial number (S/N)"><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></FormField>
+                  <FormField label="Serial Number (S/N)"><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></FormField>
                   <FormField label="CPV code"><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></FormField>
                   <FormField label="TARIC code"><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></FormField>
                   <FormField label="myDATA class. type"><Input value={clsType} onChange={(e) => setClsType(e.target.value)} placeholder="e.g. E3_561_001" /></FormField>
@@ -721,7 +721,7 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
         <div className="space-y-5">
           <FormSection title="Stock">
             <FormGrid>
-              <FormField label="Reorder point"><Input type="number" min={0} value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} placeholder="0" /></FormField>
+              <FormField label="Reorder Point"><Input type="number" min={0} value={reorderPoint} onChange={(e) => setReorderPoint(e.target.value)} placeholder="0" /></FormField>
               <FormField label="Unit"><Input value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="pcs" /></FormField>
               <FormField label="Location" optional className="sm:col-span-2"><Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="aisle / bin" /></FormField>
             </FormGrid>
@@ -729,7 +729,7 @@ const EditItemCatalogDialog: React.FC<{ item: WarehouseItem | null; onOpenChange
           <FormSection title="Codes">
             <FormGrid>
               <FormField label="Barcode" optional><Input value={barcode} onChange={(e) => setBarcode(e.target.value)} placeholder="EAN / UPC" /></FormField>
-              <FormField label="Serial number (S/N)" optional><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></FormField>
+              <FormField label="Serial Number (S/N)" optional><Input value={serial} onChange={(e) => setSerial(e.target.value)} /></FormField>
               <FormField label="CPV code" optional><Input value={cpv} onChange={(e) => setCpv(e.target.value)} placeholder="procurement" /></FormField>
               <FormField label="TARIC code" optional><TaricCombobox value={taric} onChange={setTaric} triggerClassName="w-full h-10" /></FormField>
             </FormGrid>
@@ -759,12 +759,12 @@ const CONDITIONS: { value: ListingCondition; label: string }[] = [
   { value: 'new', label: 'New' },
   { value: 'open_box', label: 'Open box' },
   { value: 'remnant', label: 'Remnant / Offcut'},
-  { value: 'lot', label: 'Mixed lot' },
+  { value: 'lot', label: 'Mixed Lot' },
 ];
 const DELIVERY: { value: DeliveryOption; label: string }[] = [
-  { value: 'pickup', label: 'Pickup only' },
+  { value: 'pickup', label: 'Pickup Only' },
   { value: 'ship', label: 'Shipping' },
-  { value: 'both', label: 'Pickup or shipping' },
+  { value: 'both', label: 'Pickup or Shipping' },
 ];
 
 const ListToMarketplaceDialog: React.FC<{
@@ -928,7 +928,7 @@ const ListToMarketplaceDialog: React.FC<{
             </FormGrid>
           </FormSection>
 
-          <FormSection title="Price and quantity">
+          <FormSection title="Price and Quantity">
             <div className="rounded-md border border-border/60 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
               {loadingMeta ? (
                 <span className="flex items-center gap-2"><Loader2 className="h-3 w-3 animate-spin" /> Checking comparable surplus…</span>
@@ -972,7 +972,7 @@ const ListToMarketplaceDialog: React.FC<{
                   <SelectContent>{DELIVERY.map((d) => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Listing expires"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></FormField>
+              <FormField label="Listing Expires"><Input type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} /></FormField>
             </FormGrid>
           </FormSection>
         </div>

@@ -30,22 +30,22 @@ import {
 const PROPERTY_TYPES: Array<{ value: PropertyType; label: string }> = [
   { value: 'residential', label: 'Residential' },
   { value: 'commercial', label: 'Commercial' },
-  { value: 'land', label: 'Land / plot' },
+  { value: 'land', label: 'Land / Plot' },
   { value: 'other', label: 'Other' },
 ];
 
 const TRANSACTION_TYPES: Array<{ value: TransactionType; label: string }> = [
-  { value: 'sale', label: 'For sale' },
-  { value: 'rent', label: 'For rent' },
-  { value: 'short_let', label: 'Short let' },
-  { value: 'business_transfer', label: 'Business transfer' },
+  { value: 'sale', label: 'For Sale' },
+  { value: 'rent', label: 'For Rent' },
+  { value: 'short_let', label: 'Short Let' },
+  { value: 'business_transfer', label: 'Business Transfer' },
   { value: 'auction', label: 'Auction' },
 ];
 
 const LISTING_STATUSES: Array<{ value: ListingStatus; label: string }> = [
-  { value: 'draft', label: 'Draft — not listed' },
-  { value: 'active', label: 'Active listing' },
-  { value: 'under_offer', label: 'Under offer' },
+  { value: 'draft', label: 'Draft — Not Listed' },
+  { value: 'active', label: 'Active Listing' },
+  { value: 'under_offer', label: 'Under Offer' },
   { value: 'sold', label: 'Sold' },
   { value: 'rented', label: 'Rented' },
   { value: 'withdrawn', label: 'Withdrawn' },
@@ -263,7 +263,7 @@ export const PropertyFormDialog: React.FC<{
 
             <Section title="Price">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                <Fld label="Asking price" className="col-span-2">
+                <Fld label="Asking Price" className="col-span-2">
                   <MoneyInput value={f.price} onValueChange={(v) => set('price', v)} placeholder="0.00" />
                 </Fld>
                 <Fld label="Currency">
@@ -281,27 +281,27 @@ export const PropertyFormDialog: React.FC<{
                   <Input value={f.address} onChange={(e) => set('address', e.target.value)} placeholder="Street name" />
                 </Fld>
                 <Fld label="Number"><Input value={f.street_number} onChange={(e) => set('street_number', e.target.value)} /></Fld>
-                <Fld label="Town / area"><Input value={f.town} onChange={(e) => set('town', e.target.value)} /></Fld>
+                <Fld label="Town / Area"><Input value={f.town} onChange={(e) => set('town', e.target.value)} /></Fld>
                 <Fld label="Region"><Input value={f.region} onChange={(e) => set('region', e.target.value)} /></Fld>
                 <Fld label="Postcode"><Input value={f.postcode} onChange={(e) => set('postcode', e.target.value)} /></Fld>
-                <Fld label="Country code"><Input value={f.country_code} onChange={(e) => set('country_code', e.target.value.toUpperCase())} maxLength={2} placeholder="GR" /></Fld>
+                <Fld label="Country Code"><Input value={f.country_code} onChange={(e) => set('country_code', e.target.value.toUpperCase())} maxLength={2} placeholder="GR" /></Fld>
               </div>
             </Section>
 
             <Section title="Size & condition">
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {!isLand && (
-                  <Fld label="Built area (m²)">
+                  <Fld label="Built Area (m²)">
                     <MoneyInput value={f.area_built} onValueChange={(v) => set('area_built', v)} displayDecimals={null} />
                   </Fld>
                 )}
-                <Fld label="Plot area (m²)">
+                <Fld label="Plot Area (m²)">
                   <MoneyInput value={f.area_plot} onValueChange={(v) => set('area_plot', v)} displayDecimals={null} />
                 </Fld>
                 {isResidential && intField('Bedrooms', 'bedrooms')}
                 {isResidential && intField('Bathrooms', 'bathrooms')}
                 {!isLand && <Fld label="Floor"><Input value={f.floor} onChange={(e) => set('floor', e.target.value)} placeholder="e.g. 3 / ground" /></Fld>}
-                {!isLand && intField('Year built', 'year_built')}
+                {!isLand && intField('Year Built', 'year_built')}
                 {!isLand && (
                   <Fld label="Condition">
                     <Select value={f.condition || NONE} onValueChange={(v) => set('condition', v === NONE ? '' : v)}>
@@ -314,7 +314,7 @@ export const PropertyFormDialog: React.FC<{
                   </Fld>
                 )}
                 {!isLand && (
-                  <Fld label="Energy class">
+                  <Fld label="Energy Class">
                     <Select value={f.energy_class || NONE} onValueChange={(v) => set('energy_class', v === NONE ? '' : v)}>
                       <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                       <SelectContent>

@@ -163,7 +163,7 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
           {/* SERP-feature signals — each one explained */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <SignalCell
-              label="Video carousel"
+              label="Video Carousel"
               status={videos ? (videos.source?.brand_present === true ? 'good' : videos.source?.brand_present === false ? 'opportunity' : 'info') : 'neutral'}
               value={videos ? (videos.source?.brand_present === true ? 'You appear' : videos.source?.brand_present === false ? 'Present — not you' : 'Present') : 'None'}
               desc={videos
@@ -171,19 +171,19 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
                 : 'No video pack — text results dominate.'}
             />
             <SignalCell
-              label="News pack"
+              label="News Pack"
               status={news.length > 0 ? 'info' : 'neutral'}
               value={news.length > 0 ? `${news.length} result${news.length === 1 ? '' : 's'}` : 'None'}
               desc={news.length > 0 ? 'Freshness matters — recent coverage can rank.' : 'No news pack — not a trending query.'}
             />
             <SignalCell
-              label="Paid advertisers"
+              label="Paid Advertisers"
               status={paid.length > 0 ? 'opportunity' : 'good'}
               value={paid.length > 0 ? `${paid.length} bidding` : 'None'}
               desc={paid.length > 0 ? 'Advertisers are paying for this term — commercial intent.' : 'No paid competition — cheaper to own organically.'}
             />
             <SignalCell
-              label="Shopping listings"
+              label="Shopping Listings"
               status={shopping.length > 0 ? 'info' : 'neutral'}
               value={shopping.length > 0 ? `${shopping.length} listing${shopping.length === 1 ? '' : 's'}` : 'None'}
               desc={shopping.length > 0 ? 'Product listings show — transactional query.' : 'No shopping pack.'}
@@ -393,13 +393,13 @@ export function SEOResearchCard({ data }: { data: SEOResearchCardData }) {
             <div className="rounded-lg border border-border bg-muted/40 p-3">
               <div className="text-xs text-muted-foreground mb-2">Your domain · {domain.source?.homepage_domain}</div>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <Stat label="Domain rank" value={domain.source?.domain_rank} />
-                <Stat label="Ranking keywords" value={fmtNum(domain.source?.ranking_keywords_count)} />
-                <Stat label="Est. traffic /mo" value={fmtNum(domain.source?.estimated_organic_monthly_traffic)} />
+                <Stat label="Domain Rank" value={domain.source?.domain_rank} />
+                <Stat label="Ranking Keywords" value={fmtNum(domain.source?.ranking_keywords_count)} />
+                <Stat label="Est. Traffic /Mo" value={fmtNum(domain.source?.estimated_organic_monthly_traffic)} />
                 <Stat label="Backlinks" value={fmtNum(domain.source?.backlinks)} />
-                <Stat label="Referring domains" value={fmtNum(domain.source?.referring_domains)} />
+                <Stat label="Referring Domains" value={fmtNum(domain.source?.referring_domains)} />
                 <Stat
-                  label="Traffic value /mo"
+                  label="Traffic Value /Mo"
                   value={domain.source?.estimated_traffic_value_usd != null
                     ? `$${fmtNum(domain.source.estimated_traffic_value_usd)}`
                     : '—'}

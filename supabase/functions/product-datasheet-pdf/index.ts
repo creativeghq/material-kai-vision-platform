@@ -236,7 +236,7 @@ Deno.serve(withApiLogging('product-datasheet-pdf', async (req: Request) => {
       }],
     }],
     spec_tables: specTables.length ? specTables : null,
-    spec_title: 'Technical specification',
+    spec_title: 'Technical Specification',
     totals: null,
   };
 

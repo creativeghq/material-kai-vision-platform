@@ -89,7 +89,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
   },
   {
     id: 'email-templates',
-    label: 'Transactional emails',
+    label: 'Transactional Emails',
     description: 'The email bodies your workspace sends automatically.',
     icon: Mail,
     route: '/emails?tab=templates',
@@ -97,7 +97,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
   },
   {
     id: 'marketing-templates',
-    label: 'Marketing emails',
+    label: 'Marketing Emails',
     description: 'Designed campaign templates for bulk sends.',
     icon: Megaphone,
     route: '/marketing/email?tab=templates',
@@ -105,7 +105,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
   },
   {
     id: 'messaging-templates',
-    label: 'WhatsApp messages',
+    label: 'WhatsApp Messages',
     description: 'Approved WhatsApp / SMS message templates.',
     icon: MessageCircle,
     route: '/messaging?tab=templates',
@@ -113,7 +113,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
   },
   {
     id: 'catalog-templates',
-    label: 'Catalog designs',
+    label: 'Catalog Designs',
     description: 'Cover, background and accent styling for product catalogs.',
     icon: BookOpen,
     route: '/catalogs',
@@ -121,7 +121,7 @@ export const EXTERNAL_TEMPLATE_SOURCES: readonly ExternalTemplateSource[] = [
   },
   {
     id: 'invoice-designs',
-    label: 'Invoice & PDF designs',
+    label: 'Invoice & PDF Designs',
     description: 'How your invoices, quotes and sheets are laid out and branded.',
     icon: FileSignature,
     route: '/finance?tab=settings',

@@ -174,7 +174,7 @@ export const SampleLoansCard: React.FC<{
               />
             </div>
             <div>
-              <Label htmlFor="loan-due">Due back</Label>
+              <Label htmlFor="loan-due">Due Back</Label>
               <Input
                 id="loan-due" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.dueBackOn}
                 onChange={(e) => setDraft((d) => ({ ...d, dueBackOn: e.target.value }))}

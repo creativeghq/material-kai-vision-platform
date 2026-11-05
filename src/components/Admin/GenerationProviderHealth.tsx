@@ -171,7 +171,7 @@ export function GenerationProviderHealth() {
     <Card className="dashboard-card">
       <CardHeader className="flex flex-row items-start justify-between gap-4">
         <div className="min-w-0">
-          <CardTitle>Generation providers</CardTitle>
+          <CardTitle>Generation Providers</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             What each provider said when we last asked it directly. This does not infer health from
             traffic — a provider with no traffic and no funds looked healthy for two months that way.

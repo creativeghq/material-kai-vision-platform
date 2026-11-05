@@ -85,7 +85,7 @@ describe('every state has a name', () => {
   it('all four read as something an operator would say', () => {
     const states: LoanStatus[] = ['out', 'returned', 'converted', 'written_off'];
     for (const s of states) expect(LOAN_STATUS_LABEL[s]).toBeTruthy();
-    expect(LOAN_STATUS_LABEL.written_off).toMatch(/Written off/);
+    expect(LOAN_STATUS_LABEL.written_off).toMatch(/Written Off/);
   });
 });
 

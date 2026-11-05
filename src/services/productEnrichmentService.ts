@@ -77,7 +77,7 @@ export const ATTEMPT_LABEL: Record<string, { label: string; tone: 'success' | 'w
   failed: { label: 'Failed', tone: 'error' },
   running: { label: 'Running', tone: 'info' },
   extracted: { label: 'Saving', tone: 'info' },
-  promoted: { label: 'Needs retry', tone: 'warning' },
-  promoted_pending: { label: 'Needs retry', tone: 'warning' },
-  in_progress: { label: 'In progress', tone: 'info' },
+  promoted: { label: 'Needs Retry', tone: 'warning' },
+  promoted_pending: { label: 'Needs Retry', tone: 'warning' },
+  in_progress: { label: 'In Progress', tone: 'info' },
 };

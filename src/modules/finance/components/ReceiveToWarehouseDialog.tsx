@@ -947,7 +947,7 @@ const LineCard: React.FC<{
           <Section title="Identity">
             <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-6">
               <Field className="sm:col-span-3" label="Description">
-                <Input className="h-8 text-xs" value={row.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Product name" />
+                <Input className="h-8 text-xs" value={row.name} onChange={(e) => onChange({ name: e.target.value })} placeholder="Product Name" />
               </Field>
               <Field label="Code (SKU, optional)">
                 <Input className="h-8 text-xs" value={row.sku} onChange={(e) => onChange({ sku: e.target.value })} />
@@ -973,10 +973,10 @@ const LineCard: React.FC<{
               <Field className="sm:col-span-2" label="Manufacturer">
                 <Input className="h-8 text-xs" value={row.manufacturer} onChange={(e) => onChange({ manufacturer: e.target.value })} placeholder="maker" />
               </Field>
-              <Field className="sm:col-span-2" label="Series / collection">
+              <Field className="sm:col-span-2" label="Series / Collection">
                 <Input className="h-8 text-xs" value={row.series} onChange={(e) => onChange({ series: e.target.value })} placeholder="e.g. AMALFI" />
               </Field>
-              <Field className="sm:col-span-2" label="Supplier product code">
+              <Field className="sm:col-span-2" label="Supplier Product Code">
                 <Input className="h-8 text-xs" value={row.supplierCode} onChange={(e) => onChange({ supplierCode: e.target.value })} placeholder="their code" />
               </Field>
               {/* Read out of the name where possible ("GRIS" → grey). Canonical lowercase
@@ -987,7 +987,7 @@ const LineCard: React.FC<{
               <Field className="sm:col-span-2" label="Finish">
                 <Input className="h-8 text-xs" value={row.finish} onChange={(e) => onChange({ finish: e.target.value })} placeholder="e.g. matt" />
               </Field>
-              <Field className="sm:col-span-2" label="Quality grade">
+              <Field className="sm:col-span-2" label="Quality Grade">
                 <Input className="h-8 text-xs" value={row.grade ?? ''} onChange={(e) => onChange({ grade: e.target.value || null })} placeholder="e.g. A" />
               </Field>
             </div>
@@ -1007,10 +1007,10 @@ const LineCard: React.FC<{
               <Field label="Weight (kg)">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.weight} onChange={(e) => onChange({ weight: e.target.value })} />
               </Field>
-              <Field label="Shelf location">
+              <Field label="Shelf Location">
                 <Input className="h-8 text-xs" value={row.location} onChange={(e) => onChange({ location: e.target.value })} placeholder="A-12" />
               </Field>
-              <Field label="Stock threshold">
+              <Field label="Stock Threshold">
                 <Input className="h-8 text-xs" inputMode="decimal" value={row.reorderPoint}
                   onChange={(e) => onChange({ reorderPoint: e.target.value })} placeholder="0" />
               </Field>
@@ -1068,16 +1068,16 @@ const LineCard: React.FC<{
 
           <Section title="myDATA classification">
             <div className="grid grid-cols-1 gap-x-3 gap-y-2 sm:grid-cols-4">
-              <Field label="Income category (wholesale)">
+              <Field label="Income Category (Wholesale)">
                 <RefSelect value={row.incomeCatWholesale} options={incomeCats} onChange={(v) => onChange({ incomeCatWholesale: v })} />
               </Field>
-              <Field label="Income type (wholesale)">
+              <Field label="Income Type (Wholesale)">
                 <RefSelect value={row.incomeTypeWholesale} options={incomeTypes} onChange={(v) => onChange({ incomeTypeWholesale: v })} />
               </Field>
-              <Field label="Income category (retail)">
+              <Field label="Income Category (Retail)">
                 <RefSelect value={row.incomeCatRetail} options={incomeCats} onChange={(v) => onChange({ incomeCatRetail: v })} />
               </Field>
-              <Field label="Income type (retail)">
+              <Field label="Income Type (Retail)">
                 <RefSelect value={row.incomeTypeRetail} options={incomeTypes} onChange={(v) => onChange({ incomeTypeRetail: v })} />
               </Field>
             </div>
@@ -1093,7 +1093,7 @@ const LineCard: React.FC<{
               <Field label="Barcode">
                 <Input className="h-8 text-xs" value={row.barcode} onChange={(e) => onChange({ barcode: e.target.value })} />
               </Field>
-              <Field label="Serial number">
+              <Field label="Serial Number">
                 <Input className="h-8 text-xs" value={row.serialNumber} onChange={(e) => onChange({ serialNumber: e.target.value })} />
               </Field>
               <Field label="CPV code">
@@ -1260,7 +1260,7 @@ const CatalogMatchPicker: React.FC<{
   if (value) {
     return (
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Catalog product</Label>
+        <Label className="text-xs text-muted-foreground">Catalog Product</Label>
         <div className="flex items-center gap-2 rounded-md border border-border/60 px-2 py-1.5">
           {value.image_url
             ? <img src={value.image_url} alt="" className="h-8 w-8 rounded object-cover" />
@@ -1281,7 +1281,7 @@ const CatalogMatchPicker: React.FC<{
 
   return (
     <div className="space-y-1">
-      <Label className="text-xs text-muted-foreground">Catalog product</Label>
+      <Label className="text-xs text-muted-foreground">Catalog Product</Label>
       {!open ? (
         <Button type="button" size="sm" variant="outline" className="h-8 w-full justify-start"
           onClick={() => setOpen(true)}>

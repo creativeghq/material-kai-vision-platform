@@ -136,7 +136,7 @@ export const WarrantyClaimsCard: React.FC<{ workspaceId: string; companyId: stri
               </Select>
             </div>
             <div>
-              <Label htmlFor="wc-installed">Installed on</Label>
+              <Label htmlFor="wc-installed">Installed On</Label>
               <Input id="wc-installed" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.installedOn}
                 onChange={(e) => setDraft((d) => ({ ...d, installedOn: e.target.value }))} />
             </div>
@@ -200,10 +200,10 @@ export const WarrantyClaimsCard: React.FC<{ workspaceId: string; companyId: stri
                   )}
                 >
                   <SelectTrigger className="h-8 w-56 text-xs" aria-label={`Cause of ${c.description}`}>
-                    <SelectValue placeholder="Cause not decided" />
+                    <SelectValue placeholder="Cause Not Decided" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none" disabled>Cause not decided</SelectItem>
+                    <SelectItem value="none" disabled>Cause Not Decided</SelectItem>
                     {CAUSES.map((k) => <SelectItem key={k} value={k}>{CAUSE_LABEL[k]}</SelectItem>)}
                   </SelectContent>
                 </Select>

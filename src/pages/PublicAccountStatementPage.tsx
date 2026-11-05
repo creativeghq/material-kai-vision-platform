@@ -17,8 +17,8 @@ import { httpUrlOrNull } from '@/utils/safeUrl';
 type ViewData = Awaited<ReturnType<typeof financeService.viewStatementShare>>;
 
 const KIND_LABEL: Record<string, string> = {
-  invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment',
-  supplier_bill: 'Supplier bill', supplier_credit_note: 'Supplier credit note',
+  invoice: 'Invoice', credit_note: 'Credit Note', payment: 'Payment',
+  supplier_bill: 'Supplier Bill', supplier_credit_note: 'Supplier Credit Note',
 };
 
 const PublicAccountStatementPage: React.FC = () => {
@@ -179,7 +179,7 @@ const PublicAccountStatementPage: React.FC = () => {
                     <thead className="text-xs text-muted-foreground">
                       <tr className="border-b">
                         <th className="px-4 py-2 text-left">Invoice</th>
-                        <th className="px-4 py-2 text-right">Amount due</th>
+                        <th className="px-4 py-2 text-right">Amount Due</th>
                         <th className="px-4 py-2 text-right">Pay</th>
                       </tr>
                     </thead>

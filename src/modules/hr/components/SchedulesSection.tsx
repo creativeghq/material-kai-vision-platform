@@ -279,11 +279,11 @@ function ScheduleDialog({ workspaceId, employees, existing, onDone }: {
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1"><Label>Name</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Summer roster" /></div>
             <div className="space-y-1"><Label>Effective from *</Label><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></div>
-            <div className="space-y-1"><Label>Effective to</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Effective To</Label><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></div>
           </div>
 
           <div className="flex items-center justify-between pt-1">
-            <Label>Weekly pattern</Label>
+            <Label>Weekly Pattern</Label>
             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={copyFromEmployee}>
               <Copy className="h-3.5 w-3.5 mr-1" />Copy contract hours
             </Button>

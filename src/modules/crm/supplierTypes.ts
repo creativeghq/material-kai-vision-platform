@@ -1,9 +1,9 @@
 /** Mirrors the `crm_companies_supplier_type_check` constraint; import-free so it can be mirrored if Deno needs it. */
 export const SUPPLIER_TYPES = [
   { value: 'manufacturer', label: 'Manufacturer', hint: 'Owns the production of what it sells' },
-  { value: 'own_brand_distributor', label: 'Own-brand distributor', hint: 'Sells its own brand, made by others' },
+  { value: 'own_brand_distributor', label: 'Own-Brand Distributor', hint: 'Sells its own brand, made by others' },
   { value: 'agent', label: 'Agent', hint: 'Represents factories on commission' },
-  { value: 'importer_distributor', label: 'Importer / distributor', hint: 'Imports and distributes other brands' },
+  { value: 'importer_distributor', label: 'Importer / Distributor', hint: 'Imports and distributes other brands' },
   { value: 'wholesaler', label: 'Wholesaler', hint: 'Multi-brand trade stockist' },
   { value: 'retailer', label: 'Retailer', hint: 'Sells to the public' },
 ] as const;
@@ -13,7 +13,7 @@ export type SupplierType = (typeof SUPPLIER_TYPES)[number]['value'];
 /** Mirrors the `crm_company_representations.kind` CHECK. */
 export const REPRESENTATION_KINDS = [
   { value: 'agent', label: 'Agent' },
-  { value: 'exclusive_distributor', label: 'Exclusive distributor' },
+  { value: 'exclusive_distributor', label: 'Exclusive Distributor' },
   { value: 'distributor', label: 'Distributor' },
 ] as const;
 

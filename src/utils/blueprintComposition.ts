@@ -355,26 +355,26 @@ export interface DerivedComposition {
 /** Display names + units for the yields the schedule knows about. Anything else falls back. */
 const YIELD_LABELS: Record<string, { label: string; unit: string }> = {
   doors: { label: 'Doors', unit: 'pcs' },
-  drawers: { label: 'Drawer boxes', unit: 'pcs' },
+  drawers: { label: 'Drawer Boxes', unit: 'pcs' },
   hinges: { label: 'Hinges', unit: 'pcs' },
   shelves: { label: 'Shelves', unit: 'pcs' },
-  legs: { label: 'Cabinet legs', unit: 'pcs' },
-  runner_sets: { label: 'Drawer runner sets', unit: 'set' },
-  gola_vertical: { label: 'Gola vertical profile', unit: 'pcs' },
-  gola_end_cap: { label: 'Gola end caps', unit: 'pcs' },
-  gola_joiner: { label: 'Gola corner joiners', unit: 'pcs' },
+  legs: { label: 'Cabinet Legs', unit: 'pcs' },
+  runner_sets: { label: 'Drawer Runner Sets', unit: 'set' },
+  gola_vertical: { label: 'Gola Vertical Profile', unit: 'pcs' },
+  gola_end_cap: { label: 'Gola End Caps', unit: 'pcs' },
+  gola_joiner: { label: 'Gola Corner Joiners', unit: 'pcs' },
   // Service connections. These come from the APPLIANCES and are the half of a kitchen survey that
   // never reaches the workshop drawing — nine sockets behind a worktop is a first-fix electrical
   // job, and finding that out on fitting day is the expensive way.
-  socket: { label: 'Power sockets', unit: 'pcs' },
-  socket_dedicated: { label: 'Dedicated circuits', unit: 'pcs' },
-  water_in: { label: 'Water supply points', unit: 'pcs' },
-  waste_out: { label: 'Waste connections', unit: 'pcs' },
-  gas_point: { label: 'Gas connections', unit: 'pcs' },
-  duct_run: { label: 'Extraction duct runs', unit: 'run' },
-  carbon_filter: { label: 'Recirculation filters', unit: 'pcs' },
-  worktop_cutout: { label: 'Worktop cut-outs', unit: 'pcs' },
-  appliance_housing: { label: 'Appliance housings', unit: 'pcs' },
+  socket: { label: 'Power Sockets', unit: 'pcs' },
+  socket_dedicated: { label: 'Dedicated Circuits', unit: 'pcs' },
+  water_in: { label: 'Water Supply Points', unit: 'pcs' },
+  waste_out: { label: 'Waste Connections', unit: 'pcs' },
+  gas_point: { label: 'Gas Connections', unit: 'pcs' },
+  duct_run: { label: 'Extraction Duct Runs', unit: 'run' },
+  carbon_filter: { label: 'Recirculation Filters', unit: 'pcs' },
+  worktop_cutout: { label: 'Worktop Cut-Outs', unit: 'pcs' },
+  appliance_housing: { label: 'Appliance Housings', unit: 'pcs' },
 };
 
 const titleise = (key: string) =>

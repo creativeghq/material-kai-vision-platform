@@ -382,7 +382,7 @@ export const ONBOARDING_STEPS: readonly OnboardingStep[] = [
         requireCapability: 'agent.use',
       },
       {
-        label: 'Your websites',
+        label: 'Your Websites',
         description: 'Connect a site to open its SEO dashboard and Search Console data.',
         route: '/profile?tab=websites',
         icon: Globe,

@@ -422,14 +422,14 @@ export async function runVivaConnectionTest(
     await getVivaAccessToken(ctx);
     checks.push({
       key: 'oauth',
-      label: 'Smart Checkout credentials',
+      label: 'Smart Checkout Credentials',
       ok: true,
       detail: `Token issued by ${envLabel} accounts host.`,
     });
   } catch (err) {
     checks.push({
       key: 'oauth',
-      label: 'Smart Checkout credentials',
+      label: 'Smart Checkout Credentials',
       ok: false,
       // The overwhelmingly common cause is a demo/production mismatch: the two are
       // separate accounts whose credentials are NOT interchangeable.
@@ -447,14 +447,14 @@ export async function runVivaConnectionTest(
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     checks.push({
       key: 'merchant',
-      label: 'Merchant ID / API key',
+      label: 'Merchant ID / API Key',
       ok: true,
       detail: 'Verification key retrieved — the webhook Verify step will succeed.',
     });
   } catch (err) {
     checks.push({
       key: 'merchant',
-      label: 'Merchant ID / API key',
+      label: 'Merchant ID / API Key',
       ok: false,
       detail: `${err instanceof Error ? err.message : String(err)} — webhook verification will fail until this pair is right.`,
     });
@@ -500,7 +500,7 @@ export async function runVivaConnectionTest(
     const expected = ctx.credentials.source_code || 'Default';
     checks.push({
       key: 'source_code',
-      label: 'Payment source',
+      label: 'Payment Source',
       ok: echoed === expected,
       detail: echoed === expected
         ? `Viva echoed source ${echoed} — matches your configuration.`
@@ -509,7 +509,7 @@ export async function runVivaConnectionTest(
   } catch (err) {
     checks.push({
       key: 'source_code',
-      label: 'Payment source',
+      label: 'Payment Source',
       ok: false,
       detail: `Order read-back failed: ${err instanceof Error ? err.message : String(err)}`,
     });

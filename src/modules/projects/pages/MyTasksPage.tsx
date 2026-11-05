@@ -18,14 +18,14 @@ import { TaskComments } from '../components/tasks/TaskDrawer';
 type Scope = 'mine' | 'assigned';
 
 const SCOPES: readonly HubSegment<Scope>[] = [
-  { value: 'mine', label: 'All my work', title: 'Assigned to you, plus unassigned tasks in your projects' },
-  { value: 'assigned', label: 'Assigned to me', title: 'Only tasks someone gave you' },
+  { value: 'mine', label: 'All My Work', title: 'Assigned to you, plus unassigned tasks in your projects' },
+  { value: 'assigned', label: 'Assigned to Me', title: 'Only tasks someone gave you' },
 ];
 
 const GROUPS = [
   { key: 'overdue', label: 'Overdue' },
   { key: 'today', label: 'Today' },
-  { key: 'week', label: 'Next 7 days' },
+  { key: 'week', label: 'Next 7 Days' },
   { key: 'later', label: 'Later' },
   { key: 'undated', label: 'No date' },
   { key: 'done', label: 'Done' },
@@ -110,9 +110,9 @@ export const MyTasksPage: React.FC = () => {
     <div className="min-h-screen bg-background">
       <PageHeader
         icon={ListTodo}
-        title="My tasks"
+        title="My Tasks"
         subtitle="Everything on your plate, across every project"
-        breadcrumbs={[{ label: 'Projects', to: '/projects' }, { label: 'My tasks' }]}
+        breadcrumbs={[{ label: 'Projects', to: '/projects' }, { label: 'My Tasks' }]}
       />
       <main className="space-y-4 px-4 py-6 sm:px-6">
         <div className="flex flex-wrap items-center gap-3">
@@ -136,7 +136,7 @@ export const MyTasksPage: React.FC = () => {
               icon={CheckSquare}
               title="Nothing on your plate"
               description={scope === 'assigned'
-                ? 'Nobody has assigned you a task. Unassigned tasks in your own projects are under "All my work".'
+                ? 'Nobody has assigned you a task. Unassigned tasks in your own projects are under "All My Work".'
                 : 'Tasks assigned to you, and unassigned tasks in projects you run, collect here.'}
               action={<Button onClick={() => navigate('/projects')}>Open Projects</Button>}
             />

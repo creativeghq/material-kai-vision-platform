@@ -24,11 +24,11 @@ export function HeatPumpResultCard({ result }: { result: HeatPumpSizingResult })
         </div>
 
         <div className="space-y-2 text-sm">
-          <Row icon={Flame} label="Space-heating load" value={`${result.spaceHeatingKW} kW`} />
-          {result.dhwKW > 0 && <Row icon={Waves} label="Hot-water allowance" value={`${result.dhwKW} kW`} />}
-          <Row icon={Thermometer} label="Total design load" value={`${result.totalDesignKW} kW`} bold />
-          <Row label="Effective specific load" value={`${result.effectiveWattsPerM2} W/m²`} muted />
-          <Row label="Required flow temp" value={`${result.flowTempC} °C`} muted />
+          <Row icon={Flame} label="Space-Heating Load" value={`${result.spaceHeatingKW} kW`} />
+          {result.dhwKW > 0 && <Row icon={Waves} label="Hot-Water Allowance" value={`${result.dhwKW} kW`} />}
+          <Row icon={Thermometer} label="Total Design Load" value={`${result.totalDesignKW} kW`} bold />
+          <Row label="Effective Specific Load" value={`${result.effectiveWattsPerM2} W/m²`} muted />
+          <Row label="Required Flow Temp" value={`${result.flowTempC} °C`} muted />
         </div>
 
         <p className="text-xs text-muted-foreground leading-relaxed">{result.emitterNote}</p>

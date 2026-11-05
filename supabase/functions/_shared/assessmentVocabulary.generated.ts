@@ -145,9 +145,9 @@ export const ASSESSMENT_VERDICTS = [
 export type AssessmentVerdict = (typeof ASSESSMENT_VERDICTS)[number];
 
 export const ASSESSMENT_VERDICT_LABELS: Record<AssessmentVerdict, string> = {
-  on_track: 'On track',
-  at_risk: 'At risk',
-  off_track: 'Off track',
+  on_track: 'On Track',
+  at_risk: 'At Risk',
+  off_track: 'Off Track',
   stalled: 'Stalled',
   not_enough_data: 'Not enough data',
 };
@@ -165,7 +165,7 @@ export type ActionState = (typeof ACTION_STATES)[number];
 
 export const ACTION_STATE_LABELS: Record<ActionState, string> = {
   open: 'Open',
-  task_created: 'On the task list',
+  task_created: 'On the Task List',
   done: 'Done',
   dismissed: 'Dismissed',
 };

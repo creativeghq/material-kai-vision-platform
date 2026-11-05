@@ -99,7 +99,7 @@ export function cbamIsWatched(p: CbamYearPosition | null): boolean {
 export function extractToRows(rows: CbamExtractRow[]): string[][] {
   const cell = (v: string | number | null) => (v == null ? '' : String(v));
   return [
-    ['Sector', 'Goods code', 'Country of origin', 'Entries', 'Net mass (kg)', 'Carbon price paid (EUR)'],
+    ['Sector', 'Goods Code', 'Country of Origin', 'Entries', 'Net Mass (kg)', 'Carbon price paid (EUR)'],
     ...rows.map((r) => [
       cell(r.sector), cell(r.goods_code), cell(r.country_of_origin),
       cell(r.entries), cell(r.net_mass_kg), cell(r.carbon_price_paid_eur),

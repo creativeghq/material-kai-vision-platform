@@ -11,10 +11,10 @@ export const INBOUND_OUTCOME: Record<string, { label: string; tone: string }> = 
   received: { label: 'Stocked', tone: 'text-emerald-600 dark:text-emerald-400' },
   // #415: 60 of 100 boards arrived. Distinct from `received` on purpose -- one word for both
   // is how the outstanding 40 stopped being tracked anywhere.
-  partially_received: { label: 'Part stocked', tone: 'text-amber-800 dark:text-amber-300' },
+  partially_received: { label: 'Part Stocked', tone: 'text-amber-800 dark:text-amber-300' },
   ordered: { label: 'Ordered', tone: 'text-emerald-600 dark:text-emerald-400' },
   dismissed: { label: 'Dismissed', tone: 'text-muted-foreground line-through' },
-  unconfirmed: { label: 'To confirm', tone: 'text-amber-800 dark:text-amber-300' },
+  unconfirmed: { label: 'To Confirm', tone: 'text-amber-800 dark:text-amber-300' },
   // AADE voided the document. Written as a light/dark PAIR because `red-400` is chosen for
   // plum-black and renders far too pale on the light themes' cream.
   cancelled: { label: 'Cancelled at AADE', tone: 'text-red-700 dark:text-red-400' },

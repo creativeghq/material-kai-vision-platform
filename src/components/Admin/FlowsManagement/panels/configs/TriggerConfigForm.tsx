@@ -49,7 +49,7 @@ function RatingFilter({
   };
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">Star ratings</Label>
+      <Label className="text-xs">Star Ratings</Label>
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <Button

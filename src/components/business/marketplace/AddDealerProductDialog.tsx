@@ -252,7 +252,7 @@ export const AddDealerProductDialog: React.FC<{
           </FormGrid>
           </FormSection>
 
-          <FormSection title="Price and supply">
+          <FormSection title="Price and Supply">
           <FormGrid cols={4}>
             <FormField label="Price" htmlFor="dp-price" optional>
               <Input id="dp-price" type="number" step="0.01" min="0" value={price} onChange={(e) => setPrice(e.target.value)} />
@@ -266,12 +266,12 @@ export const AddDealerProductDialog: React.FC<{
             <FormField label="Unit" htmlFor="dp-unit" optional>
               <Input id="dp-unit" value={unit} onChange={(e) => setUnit(e.target.value)} placeholder="m², pcs" />
             </FormField>
-            <FormField label="Supply mode" htmlFor="dp-supply">
+            <FormField label="Supply Mode" htmlFor="dp-supply">
               <Select value={supplyMode} onValueChange={(v: any) => setSupplyMode(v)}>
                 <SelectTrigger id="dp-supply"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="platform_sold">Platform-sold</SelectItem>
-                  <SelectItem value="reference_only">Reference only</SelectItem>
+                  <SelectItem value="reference_only">Reference Only</SelectItem>
                 </SelectContent>
               </Select>
             </FormField>

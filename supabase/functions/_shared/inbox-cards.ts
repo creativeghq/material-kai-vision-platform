@@ -42,7 +42,7 @@ export interface InboxCard {
  * stored as `price_line`; the renderers print it, they do not re-derive it.
  */
 export function cardPriceLine(card: Pick<InboxCard, 'price' | 'currency' | 'unit' | 'price_basis'>): string {
-  if (card.price == null || !Number.isFinite(Number(card.price))) return 'Price on request';
+  if (card.price == null || !Number.isFinite(Number(card.price))) return 'Price on Request';
   let amount: string;
   try {
     amount = new Intl.NumberFormat('en-IE', {

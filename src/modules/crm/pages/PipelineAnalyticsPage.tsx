@@ -193,7 +193,7 @@ export default function PipelineAnalyticsPage() {
     { id: 'won', header: 'Won', align: 'right', sortable: true, hideBelow: 'md', cell: (r) => r.won_count },
     {
       id: 'wonValue',
-      header: 'Won value',
+      header: 'Won Value',
       align: 'right',
       sortable: true,
       cell: (r) => formatMoney(Number(r.won_value), r.currency, { decimals: 0 }),
@@ -201,7 +201,7 @@ export default function PipelineAnalyticsPage() {
     { id: 'lost', header: 'Lost', align: 'right', sortable: true, hideBelow: 'sm', cell: (r) => r.lost_count },
     {
       id: 'winRate',
-      header: 'Win rate',
+      header: 'Win Rate',
       align: 'right',
       sortable: true,
       cell: (r) => (r.win_rate_pct == null ? <HubCellEmpty /> : `${r.win_rate_pct}%`),
@@ -217,14 +217,14 @@ export default function PipelineAnalyticsPage() {
     <>
       <PageHeader
         icon={BarChart3}
-        title="Pipeline analytics"
+        title="Pipeline Analytics"
         subtitle="Conversion, velocity and outcomes — derived from the deals themselves"
-        breadcrumbs={[{ label: 'CRM', to: '/crm' }, { label: 'Pipeline analytics' }]}
+        breadcrumbs={[{ label: 'CRM', to: '/crm' }, { label: 'Pipeline Analytics' }]}
         actions={
           <>
             {types.length > 1 && (
               <Select value={typeId ?? undefined} onValueChange={pickType}>
-                <SelectTrigger className="h-9 w-[180px] text-xs"><SelectValue placeholder="Deal type" /></SelectTrigger>
+                <SelectTrigger className="h-9 w-[180px] text-xs"><SelectValue placeholder="Deal Type" /></SelectTrigger>
                 <SelectContent>
                   {types.map((t) => <SelectItem key={t.id} value={t.id} className="text-xs">{t.label}</SelectItem>)}
                 </SelectContent>
@@ -233,10 +233,10 @@ export default function PipelineAnalyticsPage() {
             <Select value={String(months)} onValueChange={(v) => setMonths(Number(v))}>
               <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="3" className="text-xs">Last 3 months</SelectItem>
-                <SelectItem value="6" className="text-xs">Last 6 months</SelectItem>
-                <SelectItem value="12" className="text-xs">Last 12 months</SelectItem>
-                <SelectItem value="24" className="text-xs">Last 24 months</SelectItem>
+                <SelectItem value="3" className="text-xs">Last 3 Months</SelectItem>
+                <SelectItem value="6" className="text-xs">Last 6 Months</SelectItem>
+                <SelectItem value="12" className="text-xs">Last 12 Months</SelectItem>
+                <SelectItem value="24" className="text-xs">Last 24 Months</SelectItem>
               </SelectContent>
             </Select>
             {currencies.length > 1 && (
@@ -275,7 +275,7 @@ export default function PipelineAnalyticsPage() {
             {/* ── Headline numbers ─────────────────────────────────────────────────── */}
             <HubStatGrid>
               <HubStatTile
-                label="Weighted pipeline"
+                label="Weighted Pipeline"
                 value={formatMoney(Number(fc?.weighted_value ?? 0), activeCurrency, { decimals: 0 })}
                 help="Open value × each deal's probability. A deal with no probability set falls back to how far along its stage is."
               />
@@ -290,7 +290,7 @@ export default function PipelineAnalyticsPage() {
                 category={`${totalWon} DEALS`}
               />
               <HubStatTile
-                label="Win rate"
+                label="Win Rate"
                 value={winRate == null ? '—' : `${winRate}%`}
                 help="Won ÷ closed. Open deals are excluded — counting them as losses makes a healthy pipeline look like a failing one."
                 category={winRate == null ? 'NOTHING CLOSED YET' : `${totalWon} WON / ${totalLost} LOST`}
@@ -300,13 +300,13 @@ export default function PipelineAnalyticsPage() {
             {/* ── Funnel ───────────────────────────────────────────────────────────── */}
             <section>
               <SectionHeader
-                title="Stage funnel"
+                title="Stage Funnel"
                 subtitle="How many deals ever reached each stage, and the share that went on to the next one."
               />
               <div className="grid gap-3 lg:grid-cols-5">
                 <Card className="lg:col-span-3">
                   <CardHeader>
-                    <CardTitle>Deals reaching each stage</CardTitle>
+                    <CardTitle>Deals Reaching Each Stage</CardTitle>
                     <CardDescription>
                       Derived from stage order — a deal sitting in stage 4 must have passed 1–3, so
                       this is correct from the first deal rather than only after history accrues.
@@ -357,7 +357,7 @@ export default function PipelineAnalyticsPage() {
             {/* ── Outcomes over time ───────────────────────────────────────────────── */}
             <section>
               <SectionHeader
-                title="Outcomes over time"
+                title="Outcomes Over Time"
                 subtitle={`Created, won and lost per month, in ${activeCurrency}.`}
               />
               <Card>
@@ -379,7 +379,7 @@ export default function PipelineAnalyticsPage() {
                         <RTooltip
                           contentStyle={tooltipStyle}
                           formatter={(value: number, name: string) =>
-                            name === 'Won value'
+                            name === 'Won Value'
                               ? [formatMoney(value, activeCurrency, { decimals: 0 }), name]
                               : [value, name]
                           }
@@ -388,7 +388,7 @@ export default function PipelineAnalyticsPage() {
                         <Bar yAxisId="count" dataKey="created" name="Created" fill={CHART.muted} radius={[3, 3, 0, 0]} />
                         <Bar yAxisId="count" dataKey="won" name="Won" fill={CHART.success} radius={[3, 3, 0, 0]} />
                         <Bar yAxisId="count" dataKey="lost" name="Lost" fill={CHART.error} radius={[3, 3, 0, 0]} />
-                        <Line yAxisId="value" type="monotone" dataKey="wonValue" name="Won value" stroke={CHART.primary} strokeWidth={2} dot={false} />
+                        <Line yAxisId="value" type="monotone" dataKey="wonValue" name="Won Value" stroke={CHART.primary} strokeWidth={2} dot={false} />
                       </ComposedChart>
                     </ResponsiveContainer>
                   )}
@@ -399,7 +399,7 @@ export default function PipelineAnalyticsPage() {
             {/* ── Velocity ─────────────────────────────────────────────────────────── */}
             <section>
               <SectionHeader
-                title="Time in stage"
+                title="Time in Stage"
                 subtitle="Average days a deal spends in each stage before moving on."
               />
               <Card>
@@ -442,7 +442,7 @@ export default function PipelineAnalyticsPage() {
 
             {/* ── Owners ───────────────────────────────────────────────────────────── */}
             <section>
-              <SectionHeader title="By owner" subtitle="Who is carrying what, and how much of it closes." />
+              <SectionHeader title="By Owner" subtitle="Who is carrying what, and how much of it closes." />
               <HubDataTable
                 rows={ownerTable.rows}
                 columns={ownerColumns}

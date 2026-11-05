@@ -78,12 +78,12 @@ export const TAX_STATUS_LABEL: Record<TaxDepreciationStatus, string> = {
   no_tax_category: 'No statutory category',
   no_cost: 'No acquisition cost',
   no_service_date: 'No in-service date',
-  not_started: 'Starts next month',
-  rate_not_configured: 'Rate not on file',
+  not_started: 'Starts Next Month',
+  rate_not_configured: 'Rate Not on File',
 };
 
 export const TAX_RATE_STATUS_LABEL: Record<TaxRateStatus, string> = {
-  in_force: 'In force',
+  in_force: 'In Force',
   unconfirmed: 'Recorded, not confirmed',
   not_configured: 'Not configured',
 };

@@ -591,7 +591,7 @@ export const SystemPerformance: React.FC<{ embedded?: boolean }> = ({ embedded =
                   title="Success Rate (24h)"
                   value={`${documentMetrics.success_rate_24h.toFixed(1)}%`}
                   icon={CheckCircle}
-                  description="Last 24 hours"
+                  description="Last 24 Hours"
                   trend={documentMetrics.performance_trends.success_rate_trend}
                   status={
                     documentMetrics.success_rate_24h > 95

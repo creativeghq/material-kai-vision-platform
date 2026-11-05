@@ -27,7 +27,7 @@ describe('the Bill is gone', () => {
 describe('one question per tab', () => {
   it('names the tabs for what they answer, without moving the links', () => {
     expect(PROJECT_SECTION_LABELS.billing).toBe('Invoicing');
-    expect(PROJECT_SECTION_LABELS.finance).toBe('Cost report');
+    expect(PROJECT_SECTION_LABELS.finance).toBe('Cost Report');
     expect(PAGE).toContain("tabs: ['quotes', 'contracts', 'billing', 'purchases', 'finance']");
   });
 

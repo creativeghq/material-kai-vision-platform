@@ -88,7 +88,7 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
     <Card>
       <WorkPanelHeader
         icon={Users}
-        title="Trade portal"
+        title="Trade Portal"
         description="Their statement, prices and stock. We set the policy; their administrator decides who may buy and up to how much."
         action={!loading && !failed && account && users.length > 0 && !formOpen && (
           <Button size="sm" variant="outline" onClick={openForm}>
@@ -150,7 +150,7 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="tp-cap">Cap per order</Label>
+                  <Label htmlFor="tp-cap">Cap per Order</Label>
                   <Input id="tp-cap" type="number" min="0" className="mt-1 h-8 w-28 text-xs"
                     placeholder="uncapped" value={draft.cap}
                     onChange={(e) => setDraft((d) => ({ ...d, cap: e.target.value }))} />
@@ -195,7 +195,7 @@ export const TradePortalCard: React.FC<{ workspaceId: string; companyId: string 
                 </Select>
               </div>
               <div>
-                <Label htmlFor="tp-thr" className="text-xs">Approval above</Label>
+                <Label htmlFor="tp-thr" className="text-xs">Approval Above</Label>
                 <Input
                   id="tp-thr" type="number" min="0" className="mt-1 h-8 w-28 text-xs"
                   defaultValue={account.approval_threshold ?? ''}

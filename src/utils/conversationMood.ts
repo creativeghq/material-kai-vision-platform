@@ -54,7 +54,7 @@ const STYLES: Record<ConversationMood, MoodStyle> = {
     needsAttention: true,
   },
   waiting: {
-    label: 'Waiting on us', face: '⏳',
+    label: 'Waiting on Us', face: '⏳',
     ring: 'ring-amber-600 dark:ring-amber-400',
     chip: 'bg-amber-500/15 text-amber-800 dark:text-amber-300',
     bar: 'bg-amber-500 dark:bg-amber-400',

@@ -103,7 +103,7 @@ export const PriceAlertPreferences: React.FC<PriceAlertPreferencesProps> = ({ pr
   };
 
   const channelInfo = useMemo(() => ([
-    { id: 'bell', label: 'In-app bell', icon: BellRing },
+    { id: 'bell', label: 'In-App Bell', icon: BellRing },
     { id: 'email', label: 'Email', icon: Mail },
     { id: 'webhook', label: 'Webhook', icon: Webhook },
   ]), []);

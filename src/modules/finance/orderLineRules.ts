@@ -44,9 +44,9 @@ export type FulfilmentType = 'collect_now' | 'delivered' | 'direct_order' | 'quo
  * trade counter actually is, and why this is not a property of the document.
  */
 export const FULFILMENT_LABEL: Record<FulfilmentType, string> = {
-  collect_now: 'Collect now',
+  collect_now: 'Collect Now',
   delivered: 'Deliver',
-  direct_order: 'Direct from supplier',
+  direct_order: 'Direct from Supplier',
   quotation: 'Quote only',
   credit: 'Return / credit',
 };
@@ -57,10 +57,10 @@ export const LINE_DATE_FIELDS = [
   { key: 'shipped_on', label: 'Shipped', side: 'logistics' },
   { key: 'delivery_on', label: 'Delivery', side: 'logistics' },
   { key: 'install_on', label: 'Install', side: 'logistics' },
-  { key: 'client_deposit_on', label: 'Client deposit', side: 'money' },
-  { key: 'supplier_deposit_on', label: 'Supplier deposit', side: 'money' },
-  { key: 'client_balance_on', label: 'Client balance', side: 'money' },
-  { key: 'supplier_balance_on', label: 'Supplier balance', side: 'money' },
+  { key: 'client_deposit_on', label: 'Client Deposit', side: 'money' },
+  { key: 'supplier_deposit_on', label: 'Supplier Deposit', side: 'money' },
+  { key: 'client_balance_on', label: 'Client Balance', side: 'money' },
+  { key: 'supplier_balance_on', label: 'Supplier Balance', side: 'money' },
 ] as const;
 
 export type LineDateKey = typeof LINE_DATE_FIELDS[number]['key'];
@@ -71,7 +71,7 @@ export const BUCKET_LABEL: Record<QueueBucket, string> = {
   overdue: 'Overdue',
   today: 'Today',
   this_week: 'This week',
-  next_week: 'Next week',
+  next_week: 'Next Week',
   later: 'Later',
   undated: 'No date promised',
 };

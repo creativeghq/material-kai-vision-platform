@@ -109,7 +109,7 @@ export function useTableSegments<T, K extends string, F extends string = never>(
 }
 
 export const AGE_WINDOW_LABELS: Record<string, string> = {
-  '7d': 'Last 7 days',
+  '7d': 'Last 7 Days',
   '30d': '8–30 days ago',
   '90d': '31–90 days ago',
   older: 'Older than 90 days',

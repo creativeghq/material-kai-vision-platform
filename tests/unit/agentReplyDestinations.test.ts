@@ -225,7 +225,7 @@ describe('the agent bubble renders the destination as a link', () => {
 
 // ── 4. The result card offers the flow, not a request for one ────────────────
 
-const render = (data: Record<string, unknown>, resultType: string, title = 'Social accounts') =>
+const render = (data: Record<string, unknown>, resultType: string, title = 'Social Accounts') =>
   renderToStaticMarkup(React.createElement(AgentResultCard, { title, data, resultType, onAsk: () => {} }));
 
 describe('a list fed by a setup flow links to that flow', () => {
@@ -254,7 +254,7 @@ describe('a list fed by a setup flow links to that flow', () => {
   });
 
   it('covers the other connection-shaped lists too', () => {
-    const wa = render({ channels: [] }, 'messaging_channels_list', 'WhatsApp channels');
+    const wa = render({ channels: [] }, 'messaging_channels_list', 'WhatsApp Channels');
     expect(wa).toContain('Connect a channel');
     // The channels rail on the profile, not the workspace-admin-gated /messaging page.
     expect(wa).toContain('/profile?tab=social-accounts&amp;section=whatsapp');
@@ -277,7 +277,7 @@ describe('a list nobody can add to offers no create action', () => {
     const html = render(
       { flows: [{ id: 'f1', name: 'One', status: 'active' }, { id: 'f2', name: 'Two', status: 'draft' }] },
       'flows_list',
-      'Workspace flows',
+      'Workspace Flows',
     );
     expect(html).toContain('Add flow');
   });

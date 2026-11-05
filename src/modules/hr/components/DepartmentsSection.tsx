@@ -136,7 +136,7 @@ function EditDepartmentDialog({ workspaceId, department, onClose, onDone }: { wo
           <div className="space-y-1"><Label>Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} /></div>
           <div className="space-y-1"><Label>Description</Label><Textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} /></div>
           <div className="space-y-1">
-            <Label>Department head</Label>
+            <Label>Department Head</Label>
             <Select value={headContactId || 'none'} onValueChange={(v) => setHeadContactId(v === 'none' ? '' : v)}>
               <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
               <SelectContent>

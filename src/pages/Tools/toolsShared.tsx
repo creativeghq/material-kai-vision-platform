@@ -157,9 +157,9 @@ export function ScanningPanel({ kind }: { kind: 'price' | 'mention' | 'product' 
   const steps =
     kind === 'price'
       ? [
-          { label: 'Searching retailers across the web', icon: Globe },
-          { label: 'Reading product pages to verify prices', icon: PackageCheck },
-          { label: 'Ranking by price and availability', icon: TrendingDown },
+          { label: 'Searching Retailers Across the Web', icon: Globe },
+          { label: 'Reading Product Pages to Verify Prices', icon: PackageCheck },
+          { label: 'Ranking by Price and Availability', icon: TrendingDown },
         ]
       : kind === 'product'
         ? [
@@ -168,9 +168,9 @@ export function ScanningPanel({ kind }: { kind: 'price' | 'mention' | 'product' 
             { label: 'Ranking the closest matches', icon: TrendingDown },
           ]
         : [
-            { label: 'Querying news outlets and blogs', icon: Newspaper },
-            { label: 'Filtering for relevant mentions', icon: Search },
-            { label: 'Grouping by outlet', icon: Globe },
+            { label: 'Querying News Outlets and Blogs', icon: Newspaper },
+            { label: 'Filtering for Relevant Mentions', icon: Search },
+            { label: 'Grouping by Outlet', icon: Globe },
           ];
   const title =
     kind === 'price' ? 'Scanning live retailers…'
@@ -725,8 +725,8 @@ export function prettifySource(source: string): string {
     dataforseo: 'Google Shopping',
     dataforseo_shopping: 'Google Shopping',
     dataforseo_news: 'Google News',
-    firecrawl_url: 'Direct page read',
-    firecrawl_careers: 'Career page',
+    firecrawl_url: 'Direct Page Read',
+    firecrawl_careers: 'Career Page',
     skroutz: 'Skroutz',
     bestprice: 'BestPrice',
     shopflix: 'Shopflix',

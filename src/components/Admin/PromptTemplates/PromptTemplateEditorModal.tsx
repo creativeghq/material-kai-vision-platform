@@ -183,10 +183,10 @@ export const PromptTemplateEditorModal: React.FC<{
 
           <FormSection title="Prompt">
             <FormGrid cols={1}>
-              <FormField label="System prompt" optional>
+              <FormField label="System Prompt" optional>
                 <Textarea rows={3} value={form.system_prompt ?? ''} onChange={(e) => set('system_prompt', e.target.value)} />
               </FormField>
-              <FormField label="Prompt template">
+              <FormField label="Prompt Template">
                 <Textarea rows={8} value={form.prompt_template} onChange={(e) => set('prompt_template', e.target.value)} placeholder="The prompt body. Use {{variables}} where supported." className="font-mono text-xs" />
               </FormField>
             </FormGrid>
@@ -204,7 +204,7 @@ export const PromptTemplateEditorModal: React.FC<{
                 <MoneyInput value={form.temperature} displayDecimals={null}
                   onValueChange={(v) => set('temperature', Math.min(2, Math.max(0, v ?? 0)))} />
               </FormField>
-              <FormField label="Max tokens">
+              <FormField label="Max Tokens">
                 <Input type="number" step="256" min="256" max="16384" value={form.max_tokens}
                   onChange={(e) => set('max_tokens', Math.min(16384, Math.max(256, parseInt(e.target.value, 10) || 4096)))} />
               </FormField>

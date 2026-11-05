@@ -127,7 +127,7 @@ export const TenderPackagesCard: React.FC<Props> = ({
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle>Tender packages</CardTitle>
+        <CardTitle>Tender Packages</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
           Send a trade package to several subcontractors and compare what comes back. Awarding one
           creates the purchase order, so the commitment shows in the cost report straight away.

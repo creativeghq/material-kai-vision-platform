@@ -67,9 +67,9 @@ export const PAGE_WATCH_SCHEDULES = [
 export type PageWatchSchedule = typeof PAGE_WATCH_SCHEDULES[number];
 
 export const PAGE_WATCH_CATEGORY_LABELS: Record<PageWatchCategory, string> = {
-  supplier_terms: 'Supplier terms',
+  supplier_terms: 'Supplier Terms',
   regulatory: 'Regulatory',
-  partner_docs: 'Partner API docs',
+  partner_docs: 'Partner API Docs',
   competitor: 'Competitor',
   other: 'Other',
 };

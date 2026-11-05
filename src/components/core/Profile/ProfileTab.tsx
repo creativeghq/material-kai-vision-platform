@@ -993,13 +993,13 @@ export const ProfileTab: React.FC = () => {
   const strength: ProfileStrengthItem[] = [
     { key: 'photo', label: 'Photo', done: !!personal.avatar_url },
     { key: 'name', label: 'Name', done: !!personal.full_name.trim() },
-    { key: 'role', label: 'Professional type', done: !!personal.professional_type },
+    { key: 'role', label: 'Professional Type', done: !!personal.professional_type },
     { key: 'phone', label: 'Phone', done: !!phoneNumber },
     { key: 'location', label: 'Location', done: !!personal.location.trim() },
     { key: 'bio', label: 'Bio', done: !!personal.bio.trim() },
     { key: 'services', label: 'A service', done: services.length > 0 },
     { key: 'skills', label: 'Skills', done: skillTags.length > 0 },
-    { key: 'signature', label: 'Email signature', done: !!composer.settings.signature_card || !!composer.settings.email_signature.trim() },
+    { key: 'signature', label: 'Email Signature', done: !!composer.settings.signature_card || !!composer.settings.email_signature.trim() },
   ];
 
   const jumpTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1012,9 +1012,9 @@ export const ProfileTab: React.FC = () => {
   };
 
   const heroStats: ProfileHeroStat[] = isPublic ? [
-    { label: 'Profile visits', value: profileViews },
+    { label: 'Profile Visits', value: profileViews },
     { label: 'Followers', value: analytics.followers },
-    { label: 'Hire requests', value: analytics.hireRequestsTotal, hint: analytics.hireRequestsUnread ? `${analytics.hireRequestsUnread} unread` : undefined },
+    { label: 'Hire Requests', value: analytics.hireRequestsTotal, hint: analytics.hireRequestsUnread ? `${analytics.hireRequestsUnread} unread` : undefined },
     { label: 'Reviews', value: analytics.reviewsCount, hint: analytics.reviewsCount ? `${analytics.reviewsAvg.toFixed(1)} ★ average` : undefined },
   ] : [];
 
@@ -1093,9 +1093,9 @@ export const ProfileTab: React.FC = () => {
             </div>
           ) : (
             <dl className="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2">
-              <FieldDisplay icon={User} label="Full name" value={personal.full_name} />
+              <FieldDisplay icon={User} label="Full Name" value={personal.full_name} />
               <FieldDisplay icon={Mail} label="Email" value={user?.email || ''} />
-              <FieldDisplay icon={Briefcase} label="Professional type" value={personal.professional_type ? PROFESSIONAL_TYPE_LABELS[personal.professional_type] : ''} />
+              <FieldDisplay icon={Briefcase} label="Professional Type" value={personal.professional_type ? PROFESSIONAL_TYPE_LABELS[personal.professional_type] : ''} />
               <FieldDisplay icon={MessageCircle} label="Phone" value={phoneNumber} />
               <FieldDisplay icon={Building2} label="Company" value={personal.company} />
               <FieldDisplay icon={MapPin} label="Location" value={personal.location} />
@@ -1415,7 +1415,7 @@ export const ProfileTab: React.FC = () => {
                 <p className="text-[11px] font-semibold text-muted-foreground">Visibility</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2">
                   {[
-                    { icon: Grid3x3, label: 'Board visits',   value: analytics.totalMoodboardViews },
+                    { icon: Grid3x3, label: 'Board Visits',   value: analytics.totalMoodboardViews },
                   ].map(({ icon: Icon, label, value }) => (
                     <div key={label} className="rounded-sm border border-hairline bg-surface-sunken p-2">
                       <div className="flex items-center gap-1.5 leading-none">
@@ -1431,7 +1431,7 @@ export const ProfileTab: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2">
                   {[
                     { icon: Calendar, label: 'Appts',      value: analytics.appointmentsTotal,      badge: analytics.appointmentsPending > 0 ? analytics.appointmentsPending : null, badgeClass: 'bg-amber-100 text-amber-700' },
-                    { icon: FileText, label: 'Quote reqs', value: analytics.moodboardQuoteRequests, badge: null, badgeClass: '' },
+                    { icon: FileText, label: 'Quote Reqs', value: analytics.moodboardQuoteRequests, badge: null, badgeClass: '' },
                   ].map(({ icon: Icon, label, value, badge, badgeClass }) => (
                     <div key={label} className="rounded-sm border border-hairline bg-surface-sunken p-2">
                       <div className="flex items-center gap-1.5 leading-none">

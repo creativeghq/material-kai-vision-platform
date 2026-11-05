@@ -53,11 +53,11 @@ const FILING_BADGE: Record<DeliveryFilingState, { label: string; variant: 'succe
 };
 
 const ROLES: { key: MovementPartyRole; label: string }[] = [
-  { key: 'sender', label: 'Sender (us)' },
-  { key: 'sender_third', label: 'Third-party sender' },
+  { key: 'sender', label: 'Sender (Us)' },
+  { key: 'sender_third', label: 'Third-Party Sender' },
   { key: 'carrier', label: 'Carrier' },
   { key: 'recipient', label: 'Recipient' },
-  { key: 'recipient_third', label: 'Third-party recipient' },
+  { key: 'recipient_third', label: 'Third-Party Recipient' },
 ];
 
 export const MovementLifecycleDialog: React.FC<{
@@ -305,7 +305,7 @@ export const MovementLifecycleDialog: React.FC<{
                 <p className="text-sm font-medium">{EVENT_LABEL[adding]}</p>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="space-y-1">
-                    <Label className="text-xs">Declared by</Label>
+                    <Label className="text-xs">Declared By</Label>
                     <select
                       className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
                       value={role} onChange={(e) => setRole(e.target.value as MovementPartyRole)}
@@ -333,7 +333,7 @@ export const MovementLifecycleDialog: React.FC<{
                         <Input value={vehicle} onChange={(e) => setVehicle(e.target.value)} placeholder="ΑΒΓ-1234" />
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-xs">Vehicle type</Label>
+                        <Label className="text-xs">Vehicle Type</Label>
                         <select
                           className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
                           value={transportType} onChange={(e) => setTransportType(e.target.value)}

@@ -37,13 +37,13 @@ export const RELATIONSHIPS: readonly RelationshipDef[] = [
   },
   {
     key: 'authorized_dealer',
-    label: 'Authorized dealer',
+    label: 'Authorized Dealer',
     description: 'You are authorised to sell the brand.',
     publicPrefix: 'Authorized dealer of',
   },
   {
     key: 'certified_installer',
-    label: 'Certified installer',
+    label: 'Certified Installer',
     description: 'The brand has trained or certified you to install its products.',
     publicPrefix: 'Certified installer for',
   },
@@ -201,7 +201,7 @@ export function groupByCategory<T extends Pick<Ambassadorship, 'category_keys' |
   // silently would make it vanish from a profile it is still on, so it gets its own bucket.
   const uncategorised = sorted.filter((a) => a.category_keys.length === 0);
   if (uncategorised.length) {
-    groups.push({ categoryKey: '', label: 'Other brands', items: uncategorised });
+    groups.push({ categoryKey: '', label: 'Other Brands', items: uncategorised });
   }
 
   return groups;

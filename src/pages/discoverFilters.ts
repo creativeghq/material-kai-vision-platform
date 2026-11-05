@@ -83,7 +83,7 @@ export function buildProfileFilters(rows: ProfileFilterRow[]): FilterGroupDef[] 
           accessor: (r) => [r.full_name, r.company, r.bio, r.location, ...(r.services ?? [])],
         },
         {
-          key: 'professional_type', type: 'multi', label: 'Professional type',
+          key: 'professional_type', type: 'multi', label: 'Professional Type',
           options: optionsFromRows(rows, (r) => r.professional_type ?? undefined, typeLabel),
           accessor: (r) => r.professional_type ?? undefined,
         },
@@ -153,7 +153,7 @@ export function buildProductFilters(
       key: 'availability', label: 'Availability', icon: Store,
       fields: [
         {
-          key: 'surplus', type: 'bool', label: 'Marketplace surplus',
+          key: 'surplus', type: 'bool', label: 'Marketplace Surplus',
           description: 'Materials also listed as surplus / last stock.',
           trueLabel: 'Surplus only', falseLabel: 'No surplus listing',
           accessor: (r) => !!surplus[r.id],

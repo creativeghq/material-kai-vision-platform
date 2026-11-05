@@ -117,7 +117,7 @@ export default function HeatingCostPage() {
             <Separator />
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="hpcop">Heat-pump COP</Label>
+                <Label htmlFor="hpcop">Heat-Pump COP</Label>
                 <Input id="hpcop" type="number" inputMode="decimal" min={1} step={0.1} value={hpCop} onChange={(e) => setHpCop(e.target.value)} />
               </div>
               <div>

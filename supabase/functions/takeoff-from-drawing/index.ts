@@ -450,7 +450,7 @@ async function runAnalysis(admin: any, uid: string, ctx: Awaited<ReturnType<type
       push({
         page: el.page, kind: 'count', unit: 'pcs', value: 1, value_norm: null, source: 'vision',
         element_type: el.element_type, label: text(el.label, 120) ?? el.element_type,
-        geometry: corners(b), confidence: 0.5, source_ref: 'Seen on the scanned page', detail: {},
+        geometry: corners(b), confidence: 0.5, source_ref: 'Seen on the Scanned Page', detail: {},
       }, b);
     }
 

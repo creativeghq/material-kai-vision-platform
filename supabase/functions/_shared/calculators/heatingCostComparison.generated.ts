@@ -58,8 +58,8 @@ const METHOD_LABELS: Record<HeatingMethodKey, string> = {
   oil: 'Heating oil',
   gas: 'Natural gas',
   ac: 'A/C (inverter)',
-  heat_pump: 'Heat pump',
-  energy_fireplace: 'Energy fireplace',
+  heat_pump: 'Heat Pump',
+  energy_fireplace: 'Energy Fireplace',
   non_energy_fireplace: 'Open fireplace',
 };
 

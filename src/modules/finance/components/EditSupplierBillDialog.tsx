@@ -212,12 +212,12 @@ export const EditSupplierBillDialog: React.FC<{
               <FormField label="Issue date">
                 <Input type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
               </FormField>
-              <FormField label="Due date">
+              <FormField label="Due Date">
                 <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
               </FormField>
               {/* #444 -- the day it reached US, which from 1 July 2030 starts a five-day
                   statutory clock and cannot be reconstructed from the issue date. */}
-              <FormField label="Received on">
+              <FormField label="Received On">
                 <Input type="date" value={receivedOn} onChange={(e) => setReceivedOn(e.target.value)} />
               </FormField>
             </FormGrid>
@@ -258,7 +258,7 @@ export const EditSupplierBillDialog: React.FC<{
                 </Select>
               </FormField>
               <FormField
-                label="Cost code"
+                label="Cost Code"
                 optional
                 hint="How this cost is classified on the job. Separate from the accounting category — the project cost report groups by this."
               >
@@ -267,7 +267,7 @@ export const EditSupplierBillDialog: React.FC<{
             </FormGrid>
             </FormSection>
 
-            <FormSection title="Notes and receipt">
+            <FormSection title="Notes and Receipt">
             <FormField label="Notes" optional>
               <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} />
             </FormField>

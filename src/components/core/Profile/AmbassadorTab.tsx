@@ -670,7 +670,7 @@ function AmbassadorshipEditor({
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ambassador-relationship">Your relationship</Label>
+          <Label htmlFor="ambassador-relationship">Your Relationship</Label>
           <Select
             value={draft.relationship}
             onValueChange={(v) => setDraft((d) => ({ ...d, relationship: v as AmbassadorshipDraft['relationship'] }))}
@@ -755,7 +755,7 @@ function AmbassadorshipEditor({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ambassador-url">Brand link</Label>
+          <Label htmlFor="ambassador-url">Brand Link</Label>
           <Input
             id="ambassador-url" type="url" placeholder="https://…"
             value={draft.brand_url ?? ''}
@@ -763,7 +763,7 @@ function AmbassadorshipEditor({
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="ambassador-moodboard">Showcase moodboard</Label>
+          <Label htmlFor="ambassador-moodboard">Showcase Moodboard</Label>
           <Select
             value={draft.showcase_moodboard_id ?? 'none'}
             onValueChange={(v) => setDraft((d) => ({ ...d, showcase_moodboard_id: v === 'none' ? null : v }))}

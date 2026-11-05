@@ -10,16 +10,16 @@ import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 // Mandatory Novus issuer fields (providerAdditionalInvoiceDetails.issuer — all YES in the
 // Provider docs). branch comes from the invoice's establishment, not finance_settings.
 const REQUIRED_ISSUER_FIELDS: { key: string; label: string }[] = [
-  { key: 'business_name', label: 'Company name' },
+  { key: 'business_name', label: 'Company Name' },
   { key: 'business_vat', label: 'VAT number' },
   { key: 'business_profession', label: 'Activity / Profession'},
-  { key: 'business_tax_office', label: 'Tax office (ΔΟΥ)' },
+  { key: 'business_tax_office', label: 'Tax Office (ΔΟΥ)' },
   { key: 'business_address', label: 'Street' },
-  { key: 'business_street_number', label: 'Street number' },
-  { key: 'business_postal_code', label: 'Postal code' },
+  { key: 'business_street_number', label: 'Street Number' },
+  { key: 'business_postal_code', label: 'Postal Code' },
   { key: 'business_city', label: 'City' },
   { key: 'business_country', label: 'Country' },
-  { key: 'business_country_code', label: 'Country code' },
+  { key: 'business_country_code', label: 'Country Code' },
 ];
 
 interface Props {

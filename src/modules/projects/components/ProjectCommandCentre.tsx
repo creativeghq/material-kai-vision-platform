@@ -104,9 +104,9 @@ const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[] | null; on
   const cash = series.billed_by_month.map((b, i) => ({
     month: monthLabel(b.month),
     Billed: b.amount,
-    'Supplier bills': series.bills_by_month[i]?.amount ?? 0,
+    'Supplier Bills': series.bills_by_month[i]?.amount ?? 0,
   }));
-  const hasCash = cash.some((c) => c.Billed !== 0 || c['Supplier bills'] !== 0);
+  const hasCash = cash.some((c) => c.Billed !== 0 || c['Supplier Bills'] !== 0);
   const labour = series.labour_by_week.map((w) => ({
     week: new Date(`${w.week.slice(0, 10)}T00:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }),
     Hours: Math.round((w.minutes / 60) * 10) / 10,
@@ -117,9 +117,9 @@ const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[] | null; on
     { label: 'Open RFIs', count: oi.rfis, tab: 'requests' },
     { label: 'Open submittals', count: oi.submittals, tab: 'requests' },
     { label: 'Open snags', count: oi.snags, tab: 'site', alert: oi.critical_snags > 0 },
-    { label: 'Inspections to sign off', count: oi.inspections, tab: 'site' },
+    { label: 'Inspections to Sign Off', count: oi.inspections, tab: 'site' },
     { label: 'Open tasks', count: oi.tasks, tab: 'tasks', alert: oi.overdue_tasks > 0 },
-    { label: 'Late deliveries', count: oi.late_deliveries, tab: 'purchases', alert: oi.late_deliveries > 0 },
+    { label: 'Late Deliveries', count: oi.late_deliveries, tab: 'purchases', alert: oi.late_deliveries > 0 },
   ];
 
   return (
@@ -138,15 +138,15 @@ const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[] | null; on
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-5">
         <Stat
-          label="Contract incl. variations"
+          label="Contract incl. Variations"
           value={contract.total > 0 ? money(contract.total) : '—'}
           hint={contract.variations_approved !== 0 ? `${money(contract.variations_approved)} approved variations` : 'Accepted quotes'}
         />
         <Stat label="Billed" value={money(pnl.billed_revenue ?? 0)} hint="Issued invoices, less credit notes" />
         <Stat label="Certified" value={money(data.certified)} hint="Progress applications" />
-        <Stat label="Retention held" value={money(data.retention.outstanding)} hint={data.retention.released > 0 ? `${money(data.retention.released)} released` : undefined} />
+        <Stat label="Retention Held" value={money(data.retention.outstanding)} hint={data.retention.released > 0 ? `${money(data.retention.released)} released` : undefined} />
         <Stat
-          label="Variations pending"
+          label="Variations Pending"
           value={money(contract.variations_pending)}
           hint={contract.variations_pending_count > 0 ? `${contract.variations_pending_count} awaiting a decision` : 'None awaiting a decision'}
         />
@@ -209,7 +209,7 @@ const Body: React.FC<{ data: CommandCentreData; snaps: CostSnapshot[] | null; on
                 <Tooltip formatter={(v: number) => money(v)} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 <Bar dataKey="Billed" fill="hsl(var(--chart-1))" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="Supplier bills" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="Supplier Bills" fill="hsl(var(--chart-2))" radius={[2, 2, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           ) : (

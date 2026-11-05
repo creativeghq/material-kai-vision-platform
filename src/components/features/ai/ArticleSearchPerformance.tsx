@@ -127,7 +127,7 @@ function PerformanceBody({ totals, weeks }: { totals: GscQueryPageRows; weeks: W
       <div className="grid gap-3 sm:grid-cols-4">
         {metric('Clicks', formatNumber(row.clicks ?? 0))}
         {metric('Impressions', formatNumber(row.impressions ?? 0))}
-        {metric('Avg. position', row.position != null ? String(row.position) : '—')}
+        {metric('Avg. Position', row.position != null ? String(row.position) : '—')}
         <div>
           <div className="text-xs font-semibold text-muted-foreground">Weekly impressions</div>
           {weeks.length >= 2

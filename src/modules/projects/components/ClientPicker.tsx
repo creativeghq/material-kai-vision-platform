@@ -236,7 +236,7 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
           <div className="space-y-2 p-3 rounded-lg border border-border bg-muted/30">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">First name</Label>
+                <Label className="text-xs">First Name</Label>
                 <Input
                   value={newFirstName}
                   onChange={e => setNewFirstName(e.target.value)}
@@ -245,7 +245,7 @@ export const ClientPicker: React.FC<ClientPickerProps> = ({ value, onChange, dis
                 />
               </div>
               <div>
-                <Label className="text-xs">Last name</Label>
+                <Label className="text-xs">Last Name</Label>
                 <Input
                   value={newLastName}
                   onChange={e => setNewLastName(e.target.value)}

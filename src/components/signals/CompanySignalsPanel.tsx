@@ -142,7 +142,7 @@ export function CompanySignalsPanel({ website }: { website: string | null | unde
             <div className="table-scroll">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-hairline text-left text-[11px] font-semibold text-muted-foreground">
-                  <th className="py-2 pr-3">Role</th><th className="py-2 pr-3">Location</th><th className="py-2 pr-3">Team</th><th className="py-2 pr-3">First seen</th><th className="py-2"><span className="sr-only">Source</span></th>
+                  <th className="py-2 pr-3">Role</th><th className="py-2 pr-3">Location</th><th className="py-2 pr-3">Team</th><th className="py-2 pr-3">First Seen</th><th className="py-2"><span className="sr-only">Source</span></th>
                 </tr></thead>
                 <tbody>
                   {roles.map((r) => (

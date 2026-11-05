@@ -27,8 +27,8 @@ interface Props {
 
 const STATE_TONE = {
   active: { variant: 'success' as const, label: 'Running their own workspace' },
-  invited: { variant: 'info' as const, label: 'Invitation sent' },
-  stalled: { variant: 'warning' as const, label: 'Invitation expired' },
+  invited: { variant: 'info' as const, label: 'Invitation Sent' },
+  stalled: { variant: 'warning' as const, label: 'Invitation Expired' },
   none: { variant: 'neutral' as const, label: 'Not on the platform' },
 };
 
@@ -85,7 +85,7 @@ export const CompanyWorkspaceCard: React.FC<Props> = ({
     <Card>
       <WorkPanelHeader
         icon={Building2}
-        title="Platform access"
+        title="Platform Access"
         description="Give this business its own workspace on the platform, run by their own people."
         action={!loading && !forbidden && <Badge variant={tone.variant}>{tone.label}</Badge>}
       />

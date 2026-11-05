@@ -60,7 +60,7 @@ const VERDICT: Record<number, { label: string; variant: 'error' | 'warning' | 'i
   1: { label: 'No tool, hedged', variant: 'error', hint: 'Called nothing and said it could not — the strongest signal of a missing capability.' },
   2: { label: 'Hedged', variant: 'warning', hint: 'Used a tool but still told the user it could not do something.' },
   3: { label: 'No tool called', variant: 'warning', hint: 'Answered from the model alone. Fine for chat, a gap if it was asked to do something.' },
-  4: { label: 'Tool found nothing', variant: 'info', hint: 'A tool ran and returned nothing, or failed.' },
+  4: { label: 'Tool Found Nothing', variant: 'info', hint: 'A tool ran and returned nothing, or failed.' },
   5: { label: 'Served', variant: 'neutral', hint: 'Tools ran and the reply did not hedge.' },
 };
 

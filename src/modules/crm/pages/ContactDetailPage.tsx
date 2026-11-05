@@ -1087,7 +1087,7 @@ export const ContactDetailPage: React.FC = () => {
                           </div>
                           <div className="flex items-center justify-between gap-4 pt-2 border-t">
                             <div className="space-y-1">
-                              <Label htmlFor="contact_type" className="cursor-pointer">Contact type</Label>
+                              <Label htmlFor="contact_type" className="cursor-pointer">Contact Type</Label>
                               <p className="text-xs text-muted-foreground">Drives B2C vs B2B VAT logic.</p>
                             </div>
                             <Select value={contact.contact_type ?? '__unset'} onValueChange={(v) => patchInline({ contact_type: v === '__unset' ? null : v })}>
@@ -1111,13 +1111,13 @@ export const ContactDetailPage: React.FC = () => {
                           <CardHeader><CardTitle className="flex items-center gap-2"><Percent className="h-4 w-4 text-muted-foreground" />Pricing</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                              <InlineSelect alwaysEdit={isNew} label="Pricing level" value={contact.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
-                              <InlineText alwaysEdit={isNew} type="number" label="Customer discount % (override)" value={contact.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 30" copy={false} hint="Applied automatically by the AI price lookup. Empty = none." />
+                              <InlineSelect alwaysEdit={isNew} label="Pricing Level" value={contact.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
+                              <InlineText alwaysEdit={isNew} type="number" label="Customer Discount % (Override)" value={contact.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 30" copy={false} hint="Applied automatically by the AI price lookup. Empty = none." />
                               <div className="md:col-span-2">
-                                <InlineText alwaysEdit={isNew} multiline label="Discount notes" value={contact.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 30% per 2025 agreement." copy={false} />
+                                <InlineText alwaysEdit={isNew} multiline label="Discount Notes" value={contact.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 30% per 2025 agreement." copy={false} />
                               </div>
                             </div>
-                            <InlineText alwaysEdit={isNew} type="number" label="Credit limit" value={contact.credit_limit ?? undefined} onSave={(v) => patchInline({ credit_limit: v })} placeholder="e.g. 5000" copy={false} hint="Max outstanding receivable; finance flags this customer when exceeded." />
+                            <InlineText alwaysEdit={isNew} type="number" label="Credit Limit" value={contact.credit_limit ?? undefined} onSave={(v) => patchInline({ credit_limit: v })} placeholder="e.g. 5000" copy={false} hint="Max outstanding receivable; finance flags this customer when exceeded." />
                           </CardContent>
                         </Card>
 
@@ -1125,8 +1125,8 @@ export const ContactDetailPage: React.FC = () => {
                           <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4 text-muted-foreground" />Invoicing &amp; VAT</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                              <InlineSelect alwaysEdit={isNew} label="Segment" value={contact.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />
-                              <InlineSelect alwaysEdit={isNew} label="Default VAT-exemption category" value={contact.vat_exemption_reason ?? undefined} unsetValue="__none" placeholder="None" options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))} displayValue={contact.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{contact.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === contact.vat_exemption_reason)?.label}</span> : undefined} onSave={(v) => patchInline({ vat_exemption_reason: v })} hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here." />
+                              <InlineSelect alwaysEdit={isNew} label="Segment" value={contact.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public Sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />
+                              <InlineSelect alwaysEdit={isNew} label="Default VAT-Exemption Category" value={contact.vat_exemption_reason ?? undefined} unsetValue="__none" placeholder="None" options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))} displayValue={contact.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{contact.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === contact.vat_exemption_reason)?.label}</span> : undefined} onSave={(v) => patchInline({ vat_exemption_reason: v })} hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here." />
                             </div>
                             <div className="flex items-center justify-between gap-4">
                               <div className="space-y-1">
@@ -1143,13 +1143,13 @@ export const ContactDetailPage: React.FC = () => {
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 pt-0">
-                                    <InlineText alwaysEdit={isNew} label="Billing name" value={contact.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
+                                    <InlineText alwaysEdit={isNew} label="Billing Name" value={contact.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
                                     <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={contact.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
-                                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={contact.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} placeholder="e.g. Tax Office Chalandriou" />
+                                    <InlineText alwaysEdit={isNew} label="Tax Office (ΔΟΥ)" value={contact.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} placeholder="e.g. Tax Office Chalandriou" />
                                     <InlineSelect alwaysEdit={isNew} label="VAT country" value={contact.billing_country_code ?? undefined} placeholder="Not set" options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))} displayValue={contact.billing_country_code ? <span className="font-mono">{contact.billing_country_code}</span> : undefined} onSave={(v) => patchInline({ billing_country_code: v })} />
                                     <InlineText alwaysEdit={isNew} label="Street" value={contact.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
                                     <InlineText alwaysEdit={isNew} label="Number" value={contact.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
-                                    <InlineText alwaysEdit={isNew} label="Postal code" value={contact.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Postal Code" value={contact.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
                                     <InlineText alwaysEdit={isNew} label="City" value={contact.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
                                   </div>
                                 </CollapsibleContent>
@@ -1272,7 +1272,7 @@ export const ContactDetailPage: React.FC = () => {
                       // that has not enabled Real Estate, so the section appears and explains
                       // itself rather than the surface silently not existing.
                       ...(realEstateEnabled ? [{
-                        id: 'buyer-profile', label: 'Buyer profile', icon: Home, group: 'Property',
+                        id: 'buyer-profile', label: 'Buyer Profile', icon: Home, group: 'Property',
                         node: (
                           <ModuleTabGate moduleSlug="real-estate" moduleName="Real Estate"
                             blurb="See this contact's property interests, viewings and buyer requirements.">

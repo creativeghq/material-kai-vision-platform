@@ -64,16 +64,16 @@ interface XMLFieldMappingModalProps {
 const CORE_TARGET_FIELDS: Array<{ value: string; label: string; required: boolean }> = [
   { value: 'name', label: 'Product Name', required: true },
   { value: 'factory_name', label: 'Brand', required: true },
-  { value: 'material_category', label: 'Category (per row)', required: false },
+  { value: 'material_category', label: 'Category (Per Row)', required: false },
   { value: 'description', label: 'Description', required: false },
   { value: 'factory_group_name', label: 'Brand Group', required: false },
   { value: 'external_sku', label: 'SKU / External ID', required: false },
   { value: 'mpn', label: 'MPN (manufacturer part number)', required: false },
   { value: 'barcode', label: 'Barcode / EAN', required: false },
   { value: 'price', label: 'List price (published)', required: false },
-  { value: 'supplier_cost', label: 'Supplier cost (never published)', required: false },
+  { value: 'supplier_cost', label: 'Supplier Cost (Never Published)', required: false },
   { value: 'currency', label: 'Currency', required: false },
-  { value: 'unit', label: 'Selling unit', required: false },
+  { value: 'unit', label: 'Selling Unit', required: false },
   { value: 'weight', label: 'Weight (kg)', required: false },
   { value: 'images', label: 'Image URLs', required: false },
 ];
@@ -583,7 +583,7 @@ const XMLFieldMappingModal: React.FC<XMLFieldMappingModalProps> = ({
 
         {templates.length > 0 && (
           <div className="flex items-center gap-3">
-            <Label className="text-sm">Mapping template</Label>
+            <Label className="text-sm">Mapping Template</Label>
             <Select value={templateId} onValueChange={handleTemplatePick}>
               <SelectTrigger className="w-[280px]">
                 <SelectValue placeholder="Apply a saved template" />

@@ -57,7 +57,7 @@ export const GmailShareDialog: React.FC<{ account: MailAccount; onClose: () => v
         </DialogHeader>
         <div className="flex items-center gap-2">
           <Switch id="gmail-shared" checked={shared} onCheckedChange={setShared} />
-          <Label htmlFor="gmail-shared">Shared mailbox</Label>
+          <Label htmlFor="gmail-shared">Shared Mailbox</Label>
         </div>
         {shared && (
           people === null ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : (

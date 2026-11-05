@@ -79,7 +79,7 @@ export const LeadFormFields: React.FC<Props> = ({ form, onChange, disabled }) =>
         </Select>
       </div>
       <div className="space-y-1 sm:col-span-2">
-        <Label htmlFor="lead-title">Interested in</Label>
+        <Label htmlFor="lead-title">Interested In</Label>
         <Input id="lead-title" disabled={disabled} value={form.title} onChange={(e) => set('title', e.target.value)} placeholder="e.g. Floor tiles ~70m²" />
       </div>
       <div className="space-y-1 sm:col-span-2">
@@ -100,11 +100,11 @@ export const LeadFormFields: React.FC<Props> = ({ form, onChange, disabled }) =>
         </Select>
       </div>
       <div className="space-y-1">
-        <Label htmlFor="lead-value">Est. value (EUR)</Label>
+        <Label htmlFor="lead-value">Est. Value (EUR)</Label>
         <Input id="lead-value" inputMode="decimal" disabled={disabled} value={form.estimated_value} onChange={(e) => set('estimated_value', e.target.value)} />
       </div>
       <div className="space-y-1">
-        <Label htmlFor="lead-follow">Follow-up on</Label>
+        <Label htmlFor="lead-follow">Follow-Up On</Label>
         <Input id="lead-follow" type="date" disabled={disabled} value={form.follow_up_on} onChange={(e) => set('follow_up_on', e.target.value)} />
       </div>
       <div className="space-y-1">
@@ -113,7 +113,7 @@ export const LeadFormFields: React.FC<Props> = ({ form, onChange, disabled }) =>
       </div>
       {form.status === 'lost' && (
         <div className="space-y-1 sm:col-span-2">
-          <Label htmlFor="lead-lost">Lost reason</Label>
+          <Label htmlFor="lead-lost">Lost Reason</Label>
           <Input id="lead-lost" disabled={disabled} value={form.lost_reason} onChange={(e) => set('lost_reason', e.target.value)} />
         </div>
       )}

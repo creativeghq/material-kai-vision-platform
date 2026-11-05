@@ -9,8 +9,8 @@ export type ConsentBasis =
 
 /** Reader-facing wording. Formatting only — SQL owns the verdict AND which bases may send. */
 export const CONSENT_BASIS_LABEL: Record<ConsentBasis, string> = {
-  workspace_member: 'Workspace member',
-  contact_opt_in: 'Marketing consent on file',
+  workspace_member: 'Workspace Member',
+  contact_opt_in: 'Marketing Consent on File',
   b2b_company: 'Business address',
   no_consent: 'No marketing consent on their contact record',
   unverified: 'Typed address, not in your contacts',

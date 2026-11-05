@@ -29,7 +29,7 @@ export const CompetitorGapPanel: React.FC<{ websiteId: string }> = ({ websiteId 
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="text-base">Keyword gap</CardTitle>
+        <CardTitle className="text-base">Keyword Gap</CardTitle>
         <CardDescription>
           Queries your tracked competitors rank for and this site neither ranks for nor tracks, most shared first.
           Track one, research it, or write the page that answers it.
@@ -47,7 +47,7 @@ export const CompetitorGapPanel: React.FC<{ websiteId: string }> = ({ websiteId 
                   <TableRow>
                     <TableHead>Keyword</TableHead>
                     <TableHead className="text-right">Competitors</TableHead>
-                    <TableHead className="text-right">Their best</TableHead>
+                    <TableHead className="text-right">Their Best</TableHead>
                     <TableHead className="text-right">Volume</TableHead>
                     <TableHead className="w-32"><span className="sr-only">Actions</span></TableHead>
                   </TableRow>

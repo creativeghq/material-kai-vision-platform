@@ -71,13 +71,13 @@ function filterOptions(
  * belongs to a rival is a target, not a win, and the two must not look alike.
  */
 const FEATURE_LABELS: { key: string; label: string; short: string }[] = [
-  { key: 'featured_snippet', label: 'Featured snippet', short: 'Snippet' },
+  { key: 'featured_snippet', label: 'Featured Snippet', short: 'Snippet' },
   { key: 'ai_overview', label: 'AI Overview', short: 'AI' },
-  { key: 'people_also_ask', label: 'People also ask', short: 'PAA' },
-  { key: 'local_pack', label: 'Local pack', short: 'Local' },
-  { key: 'images', label: 'Image pack', short: 'Images' },
+  { key: 'people_also_ask', label: 'People Also Ask', short: 'PAA' },
+  { key: 'local_pack', label: 'Local Pack', short: 'Local' },
+  { key: 'images', label: 'Image Pack', short: 'Images' },
   { key: 'video', label: 'Video', short: 'Video' },
-  { key: 'knowledge_graph', label: 'Knowledge panel', short: 'Knowledge' },
+  { key: 'knowledge_graph', label: 'Knowledge Panel', short: 'Knowledge' },
 ];
 
 function FeatureBadges({ present, owned }: { present: string[]; owned: string[] }) {
@@ -152,7 +152,7 @@ function movementOf(r: TrackedKeywordRow): string {
 const MOVE_LABELS: Record<string, string> = {
   up: 'Moved up', down: 'Moved down', flat: 'Unchanged',
   entered: 'Entered the top 100', lost: 'Lost its position',
-  still_unranked: 'Still not ranking', first_position: 'First position recorded',
+  still_unranked: 'Still Not Ranking', first_position: 'First Position Recorded',
   first: 'Not checked yet', unknown: 'Could not check',
 };
 const MOVE_ORDER = [
@@ -571,7 +571,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
       {rows.length > 0 && (
         <Card className="dashboard-card">
           <CardHeader>
-            <CardTitle className="text-base">Tracked keywords</CardTitle>
+            <CardTitle className="text-base">Tracked Keywords</CardTitle>
             <CardDescription>
               Best position first. Change is against the previous check — up means up the page.
               Click a column to sort by it; the funnel on a column filters by what is in it.
@@ -637,7 +637,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       sort={sort}
                       onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
                       segment={{
-                        label: 'Position band',
+                        label: 'Position Band',
                         options: segmentOptions(rows, bandOf, BAND_LABELS, BAND_ORDER),
                         total: rows.length,
                         selected: bands,
@@ -681,7 +681,7 @@ export const WebsiteRankTrackerPanel: React.FC<{ website: UserWebsite }> = ({ we
                       sort={sort}
                       onSort={(k) => setSort((v) => nextSort(v, k, TEXT_SORT_KEYS))}
                       segment={{
-                        label: 'Ranking page',
+                        label: 'Ranking Page',
                         options: segmentOptions(rows, (r) => r.url),
                         total: rows.length,
                         selected: pages,

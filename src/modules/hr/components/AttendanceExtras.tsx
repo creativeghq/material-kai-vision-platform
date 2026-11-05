@@ -77,7 +77,7 @@ export function PunchHistoryDialog({ workspaceId, employeeId, name, onChanged }:
           <div className="flex gap-2 items-end">
             <Select value={add.type} onValueChange={(v) => setAdd((a) => ({ ...a, type: v as 'arrival' | 'departure' }))}>
               <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="arrival">Clock in</SelectItem><SelectItem value="departure">Clock out</SelectItem></SelectContent>
+              <SelectContent><SelectItem value="arrival">Clock In</SelectItem><SelectItem value="departure">Clock Out</SelectItem></SelectContent>
             </Select>
             <Input type="datetime-local" value={add.at} onChange={(e) => setAdd((a) => ({ ...a, at: e.target.value }))} className="flex-1" />
             <Button onClick={addManual} disabled={busy === 'add'}>{busy === 'add' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}</Button>

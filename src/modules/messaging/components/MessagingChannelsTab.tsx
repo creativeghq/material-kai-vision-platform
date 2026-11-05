@@ -708,7 +708,7 @@ const EditChannelModal: React.FC<{ channel: MessagingChannel; onClose: () => voi
               <Input type="number" value={form.daily_quota} onChange={(e) => setForm({ ...form, daily_quota: parseInt(e.target.value) || 0 })} />
             </div>
             <div className="space-y-2">
-              <Label>Rate Limit (per min)</Label>
+              <Label>Rate Limit (Per Min)</Label>
               <Input type="number" value={form.max_send_rate} onChange={(e) => setForm({ ...form, max_send_rate: parseInt(e.target.value) || 0 })} />
             </div>
           </div>

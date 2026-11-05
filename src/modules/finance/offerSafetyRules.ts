@@ -58,12 +58,12 @@ export const RECALL_HEADLINE = 'Product safety recall';
 
 /** The six elements a notice cannot be published without; the headline is the seventh. */
 export const RECALL_REQUIRED_FIELDS: { key: keyof RecallDraft; label: string }[] = [
-  { key: 'product_description', label: 'Product description (b)' },
-  { key: 'hazard_description', label: 'Hazard description (c)' },
+  { key: 'product_description', label: 'Product Description (b)' },
+  { key: 'hazard_description', label: 'Hazard Description (c)' },
   { key: 'consumer_action', label: 'What consumers should do (d)' },
   { key: 'remedies', label: 'Remedies (e)' },
-  { key: 'contact_channel', label: 'Contact channel (f)' },
-  { key: 'share_encouragement', label: 'Encouragement to share (g)' },
+  { key: 'contact_channel', label: 'Contact Channel (f)' },
+  { key: 'share_encouragement', label: 'Encouragement to Share (g)' },
 ];
 
 export function missingRecallElements(r: RecallDraft): string[] {

@@ -41,7 +41,7 @@ export interface CnCoverage {
 
 export const ROUTE_STATUS_LABEL: Record<PsdaRouteStatus, string> = {
   routed: 'A route is on file',
-  provider_unconfirmed: 'Provider route unconfirmed',
+  provider_unconfirmed: 'Provider Route Unconfirmed',
   credentials_missing: 'Direct route, no credential',
   undecided: 'No route decided',
 };
@@ -54,7 +54,7 @@ export const ROUTE_LABEL: Record<PsdaRoute, string> = {
 export const CN_STATUS_LABEL: Record<CnCoverageStatus, string> = {
   ready: 'Every line can state a CN code',
   copyable_from_product: 'Codes exist on the products, not on the lines',
-  classification_needed: 'Lines with no commodity code anywhere',
+  classification_needed: 'Lines with No Commodity Code Anywhere',
   no_movements: 'No movements to measure',
 };
 

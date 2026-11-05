@@ -38,7 +38,7 @@ const fmt = (n: number, currency: string) => {
 
 export const PaidFromSelect: React.FC<Props> = ({
   workspaceId, value, onChange, method, onMethodChange,
-  accounts: accountsProp, onAccountsLoaded, disabled, label = 'Paid from', className,
+  accounts: accountsProp, onAccountsLoaded, disabled, label = 'Paid From', className,
 }) => {
   const [rows, setRows] = React.useState<BankAccountBalance[]>(accountsProp ?? []);
 

@@ -64,7 +64,7 @@ export const ValuationWidget: React.FC<{ userId: string }> = ({ userId }) => {
         <Button className="mt-3" onClick={() => setOpen(true)}>Value my property</Button>
       ) : (
         <form onSubmit={submit} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-          <Input required placeholder="Your name" value={f.name} onChange={(e) => set('name', e.target.value)} />
+          <Input required placeholder="Your Name" value={f.name} onChange={(e) => set('name', e.target.value)} />
           <Input required type="email" placeholder="Email" value={f.email} onChange={(e) => set('email', e.target.value)} />
           <Input placeholder="Phone (optional)" value={f.phone} onChange={(e) => set('phone', e.target.value)} />
           <Input placeholder="Property address" value={f.address} onChange={(e) => set('address', e.target.value)} />

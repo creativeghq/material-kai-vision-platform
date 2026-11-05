@@ -142,7 +142,7 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
 
                 <div className="flex flex-wrap items-end gap-2 pt-1">
                   <div>
-                    <Label htmlFor="bl-desc" className="text-xs">Committed item</Label>
+                    <Label htmlFor="bl-desc" className="text-xs">Committed Item</Label>
                     <Input id="bl-desc" className="mt-1 h-8 w-48 text-xs" value={line.description}
                       onChange={(e) => setLine((l) => ({ ...l, description: e.target.value }))} />
                   </div>
@@ -158,7 +158,7 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
                       onChange={(e) => setLine((l) => ({ ...l, unit: e.target.value }))} />
                   </div>
                   <div>
-                    <Label htmlFor="bl-price" className="text-xs">Agreed price</Label>
+                    <Label htmlFor="bl-price" className="text-xs">Agreed Price</Label>
                     <Input id="bl-price" type="number" min="0" className="mt-1 h-8 w-24 text-xs"
                       value={line.price}
                       onChange={(e) => setLine((l) => ({ ...l, price: e.target.value }))} />
@@ -184,7 +184,7 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
 
             <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
               <div>
-                <Label htmlFor="bo-ref" className="text-xs">Contract reference</Label>
+                <Label htmlFor="bo-ref" className="text-xs">Contract Reference</Label>
                 <Input id="bo-ref" className="mt-1 h-8 w-40 text-xs" value={contract.reference}
                   onChange={(e) => setContract((c) => ({ ...c, reference: e.target.value }))} />
               </div>
@@ -195,7 +195,7 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
                   onChange={(e) => setContract((c) => ({ ...c, allowance: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="bo-ends" className="text-xs">Runs until</Label>
+                <Label htmlFor="bo-ends" className="text-xs">Runs Until</Label>
                 <Input id="bo-ends" type="date" className="mt-1 h-8 w-40 text-xs" value={contract.endsOn}
                   onChange={(e) => setContract((c) => ({ ...c, endsOn: e.target.value }))} />
               </div>
@@ -239,10 +239,10 @@ export const VerticalGapsPanel: React.FC<{ workspaceId: string }> = ({ workspace
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Held for</TableHead>
+                          <TableHead>Held For</TableHead>
                           <TableHead className="text-right">Qty</TableHead>
                           <TableHead>Pool</TableHead>
-                          <TableHead className="text-right">Days left</TableHead>
+                          <TableHead className="text-right">Days Left</TableHead>
                           <TableHead>State</TableHead>
                         </TableRow>
                       </TableHeader>

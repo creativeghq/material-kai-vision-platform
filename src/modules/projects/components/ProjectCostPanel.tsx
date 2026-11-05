@@ -10,7 +10,7 @@ import { projectsService, type ProjectDashboard, type ProjectMaterialsRow } from
 
 // --chart-1..3 in fixed order; dark-mode green is one step darker than the token to stay in band.
 const SEGMENTS = [
-  { key: 'materials', label: 'Materials & suppliers', swatch: 'bg-[hsl(var(--chart-2))]' },
+  { key: 'materials', label: 'Materials & Suppliers', swatch: 'bg-[hsl(var(--chart-2))]' },
   { key: 'labour', label: 'Labour', swatch: 'bg-[hsl(var(--chart-1))] dark:bg-[hsl(142_55%_44%)]' },
   { key: 'expenses', label: 'Expenses', swatch: 'bg-[hsl(var(--chart-3))]' },
 ] as const;
@@ -97,11 +97,11 @@ const Body: React.FC<{ data: ProjectDashboard; onOpenSection: (tab: string) => v
       )}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Contract value" value={pnl.contracted_revenue > 0 ? money(pnl.contracted_revenue) : '—'} hint="Accepted quotes" />
-        <Stat label="Spent so far" value={money(spent)} hint={base > 0 ? `${Math.round((spent / base) * 100)}% of ${baseLabel}` : undefined} />
-        <Stat label="On order" value={money(committed)} hint="Purchase orders not billed yet" />
+        <Stat label="Contract Value" value={pnl.contracted_revenue > 0 ? money(pnl.contracted_revenue) : '—'} hint="Accepted quotes" />
+        <Stat label="Spent So Far" value={money(spent)} hint={base > 0 ? `${Math.round((spent / base) * 100)}% of ${baseLabel}` : undefined} />
+        <Stat label="On Order" value={money(committed)} hint="Purchase orders not billed yet" />
         <Stat
-          label="Forecast margin"
+          label="Forecast Margin"
           value={pnl.contracted_revenue > 0 ? money(pnl.forecast_margin_amount) : '—'}
           hint={pnl.forecast_margin_pct !== null ? `${pnl.forecast_margin_pct}% of contract` : 'Needs an accepted quote'}
           tone={pnl.contracted_revenue > 0 && pnl.forecast_margin_amount < 0 ? 'bad' : undefined}
@@ -155,7 +155,7 @@ const Body: React.FC<{ data: ProjectDashboard; onOpenSection: (tab: string) => v
                 <li key={d.id} className="flex items-center gap-3 px-3 py-2 text-sm">
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{d.supplier_name ?? 'Supplier not set'}</p>
-                    <p className="truncate text-xs text-muted-foreground">{d.order_number ?? 'Purchase order'}{d.supplier_status ? ` · ${d.supplier_status}` : ''}</p>
+                    <p className="truncate text-xs text-muted-foreground">{d.order_number ?? 'Purchase Order'}{d.supplier_status ? ` · ${d.supplier_status}` : ''}</p>
                   </div>
                   <span className="text-xs tabular-nums text-muted-foreground">{d.amount_net !== null ? formatMoney(d.amount_net, d.currency ?? currency) : '—'}</span>
                   {d.eta ? (
@@ -182,7 +182,7 @@ const Body: React.FC<{ data: ProjectDashboard; onOpenSection: (tab: string) => v
 
 const MATERIAL_ROW_LABEL: Record<ProjectMaterialsRow['kind'], string> = {
   category: '',
-  uncategorised_product: 'Lines with no product category',
+  uncategorised_product: 'Lines with No Product Category',
   not_linked: 'Bills not linked to a purchase order line',
 };
 

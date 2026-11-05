@@ -2449,10 +2449,10 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         + 'Pass `company.company_type` straight from b2b_company_search; it decides the default role.',
       schema: z.object({
         company: z.object({
-          name: z.string().describe('Company name'),
+          name: z.string().describe('Company Name'),
           website: z.string().optional().describe('Company website URL'),
           email: z.string().optional().describe('Company email'),
-          phone: z.string().optional().describe('Company phone'),
+          phone: z.string().optional().describe('Company Phone'),
           industry: z.string().optional().describe('Industry'),
           employee_count: z.string().optional().describe('Employee count range'),
           address: z.string().optional().describe('Street address'),
@@ -2477,7 +2477,7 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
         }).describe('Company information to save'),
         contacts: z.array(z.object({
           name: z.string().describe('Contact full name'),
-          email: z.string().optional().describe('Contact email'),
+          email: z.string().optional().describe('Contact Email'),
           phone: z.string().optional().describe('Contact phone'),
           mobile: z.string().optional().describe('Contact mobile'),
           position: z.string().optional().describe('Job position/title'),

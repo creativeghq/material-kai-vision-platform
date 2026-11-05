@@ -81,7 +81,7 @@ export const WebsiteMarketControl: React.FC<{ websiteId: string }> = ({ websiteI
                 </SelectContent>
               </Select>
             </FormField>
-            <FormField label="Language (2-letter code)">
+            <FormField label="Language (2-Letter Code)">
               <Input value={language} maxLength={3} onChange={(e) => setLanguage(e.target.value)} placeholder="el" />
             </FormField>
           </FormGrid>

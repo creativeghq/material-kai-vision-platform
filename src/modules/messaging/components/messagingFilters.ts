@@ -35,7 +35,7 @@ export function buildMessagingLogFilters(logs: MessagingLog[]): FilterGroupDef[]
           column: 'status',
         },
         {
-          key: 'message_type', type: 'multi', label: 'Message type',
+          key: 'message_type', type: 'multi', label: 'Message Type',
           options: optionsFromRows(logs, (l) => l.message_type, humanizeLabel),
           accessor: (l) => l.message_type,
         },
@@ -81,7 +81,7 @@ export function buildMessagingOptoutFilters(optouts: MessagingOptout[]): FilterG
           key: 'channel_type', type: 'select', label: 'Channel',
           options: [
             { value: 'whatsapp', label: 'WhatsApp' },
-            { value: 'all', label: 'All channels' },
+            { value: 'all', label: 'All Channels' },
           ],
           column: 'channel_type',
         },
@@ -100,7 +100,7 @@ export function buildMessagingOptoutFilters(optouts: MessagingOptout[]): FilterG
     },
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
-      fields: [{ key: 'opted_out_at', type: 'dateRange', label: 'Opted out', accessor: (o) => o.opted_out_at }],
+      fields: [{ key: 'opted_out_at', type: 'dateRange', label: 'Opted Out', accessor: (o) => o.opted_out_at }],
     },
   ];
 }

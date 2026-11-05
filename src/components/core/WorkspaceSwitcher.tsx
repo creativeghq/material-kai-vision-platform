@@ -146,23 +146,23 @@ const CreateWorkspaceDialog: React.FC<{
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="dealer">Supplier (can add own products)</SelectItem>
-                  <SelectItem value="architect">Architect (catalog only)</SelectItem>
+                  <SelectItem value="architect">Architect (Catalog Only)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           )}
           <div className="space-y-1">
-            <Label>Catalog access</Label>
+            <Label>Catalog Access</Label>
             <Select value={catalogAccess} onValueChange={(v: any) => setCatalogAccess(v)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="operator_catalog">Full operator catalog</SelectItem>
-                <SelectItem value="own_products_only">Own products only</SelectItem>
+                <SelectItem value="operator_catalog">Full Operator Catalog</SelectItem>
+                <SelectItem value="own_products_only">Own Products Only</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
-            <Label htmlFor="child-discount-pct">Reseller discount %</Label>
+            <Label htmlFor="child-discount-pct">Reseller Discount %</Label>
             <Input
               id="child-discount-pct"
               type="number"

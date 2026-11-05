@@ -279,8 +279,8 @@ export const NewDeliveryNoteDialog: React.FC<{
             <Select value={kind} onValueChange={(v: any) => setKind(v)} disabled={editing}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="dispatch">Delivery note (dispatch · stock out)</SelectItem>
-                <SelectItem value="receipt">Goods-receipt note (receive · stock in)</SelectItem>
+                <SelectItem value="dispatch">Delivery Note (Dispatch · Stock Out)</SelectItem>
+                <SelectItem value="receipt">Goods-Receipt Note (Receive · Stock In)</SelectItem>
               </SelectContent>
             </Select>
           </FormField>
@@ -324,7 +324,7 @@ export const NewDeliveryNoteDialog: React.FC<{
           <FormSection title="Transport">
           {/* Transport details */}
           <FormGrid cols={3}>
-            <FormField label="Transport date">
+            <FormField label="Transport Date">
               <Input type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} />
             </FormField>
             <FormField label="Vehicle no.">
@@ -347,7 +347,7 @@ export const NewDeliveryNoteDialog: React.FC<{
           {/* myDATA v2.0.2: a ΔΠΠ must state its issuance reason — AADE rejects one without. */}
           {kind === 'receipt' ? (
             <FormGrid>
-              <FormField label="Issuance reason" hint="Required by myDATA.">
+              <FormField label="Issuance Reason" hint="Required by myDATA.">
                 <Select value={receivingPurpose} onValueChange={setReceivingPurpose}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Choose a reason…" /></SelectTrigger>
                   <SelectContent>
@@ -446,11 +446,11 @@ export const NewDeliveryNoteDialog: React.FC<{
           {/* Structured from/to addresses (myDATA 9.3) */}
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1 rounded-md border border-border/60 p-3">
-              <Label className="text-xs font-medium">Loading place (from)</Label>
+              <Label className="text-xs font-medium">Loading Place (From)</Label>
               <AddressFields value={fromAddr} onChange={setFromAddr} />
             </div>
             <div className="space-y-1 rounded-md border border-border/60 p-3">
-              <Label className="text-xs font-medium">Delivery place (to)</Label>
+              <Label className="text-xs font-medium">Delivery Place (To)</Label>
               <AddressFields value={toAddr} onChange={setToAddr} />
             </div>
           </div>
@@ -514,7 +514,7 @@ const AddressFields: React.FC<{ value: Addr; onChange: (a: Addr) => void }> = ({
   <div className="grid grid-cols-2 gap-2">
     <Input className="h-8 text-xs col-span-2" value={value.street} onChange={(e) => onChange({ ...value, street: e.target.value })} placeholder="Street" />
     <Input className="h-8 text-xs" value={value.number} onChange={(e) => onChange({ ...value, number: e.target.value })} placeholder="No." />
-    <Input className="h-8 text-xs" value={value.postal} onChange={(e) => onChange({ ...value, postal: e.target.value })} placeholder="Postal code" />
+    <Input className="h-8 text-xs" value={value.postal} onChange={(e) => onChange({ ...value, postal: e.target.value })} placeholder="Postal Code" />
     <Input className="h-8 text-xs col-span-2" value={value.city} onChange={(e) => onChange({ ...value, city: e.target.value })} placeholder="City" />
   </div>
 );

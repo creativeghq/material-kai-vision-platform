@@ -159,11 +159,11 @@ export const CbamPositionCard: React.FC<{ workspaceId: string }> = ({ workspaceI
               <TableHeader>
                 <TableRow>
                   <TableHead>Sector</TableHead>
-                  <TableHead>Goods code</TableHead>
-                  <TableHead>Country of origin</TableHead>
+                  <TableHead>Goods Code</TableHead>
+                  <TableHead>Country of Origin</TableHead>
                   <TableHead className="hidden text-right sm:table-cell">Entries</TableHead>
-                  <TableHead className="text-right">Net mass</TableHead>
-                  <TableHead className="hidden text-right md:table-cell">Carbon price paid</TableHead>
+                  <TableHead className="text-right">Net Mass</TableHead>
+                  <TableHead className="hidden text-right md:table-cell">Carbon Price Paid</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

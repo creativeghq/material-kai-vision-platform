@@ -288,7 +288,7 @@ export const TemplateLibraryPage: React.FC = () => {
     <>
       <SectionHeader
         icon={activeAdapter?.icon ?? (activeTab === MINE_TAB ? LayoutTemplate : Layers)}
-        title={activeAdapter?.plural ?? (activeTab === MINE_TAB ? 'My templates' : 'Starter templates')}
+        title={activeAdapter?.plural ?? (activeTab === MINE_TAB ? 'My Templates' : 'Starter templates')}
         subtitle={activeAdapter?.description
           ?? (activeTab === MINE_TAB
             ? 'Every template this workspace saved or built, across all types.'
@@ -347,7 +347,7 @@ export const TemplateLibraryPage: React.FC = () => {
     <>
       <SectionHeader
         icon={ExternalLink}
-        title="Other template libraries"
+        title="Other Template Libraries"
         subtitle="These have their own editors — the links go straight there."
       />
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">

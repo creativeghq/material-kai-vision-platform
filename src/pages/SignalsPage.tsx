@@ -186,7 +186,7 @@ export default function SignalsPage() {
       const d = describeSignalPayload(m.payload);
       return <div className="min-w-0"><div>{d.what}</div>{d.detail ? <div className="line-clamp-2 text-xs text-muted-foreground">{d.detail}</div> : null}</div>;
     } },
-    { id: 'saved', header: 'Saved signal', hideBelow: 'md', cell: (m) => signalById.get(m.signal_id)?.name ?? '—' },
+    { id: 'saved', header: 'Saved Signal', hideBelow: 'md', cell: (m) => signalById.get(m.signal_id)?.name ?? '—' },
     { id: 'matched', header: 'Matched', hideBelow: 'sm', cell: (m) => timeAgo(m.matched_at) },
     { id: 'source', header: 'Source', cell: (m) => <SourceLink url={describeSignalPayload(m.payload).url} /> },
     { id: 'dismiss', header: '', align: 'right', cell: (m) => (
@@ -201,7 +201,7 @@ export default function SignalsPage() {
     { id: 'watching', header: 'Watching', hideBelow: 'md', cell: (s) => <span className="line-clamp-1 text-muted-foreground">{watching(s) || '—'}</span> },
     { id: 'status', header: 'Status', cell: (s) => (
       <Badge variant={s.is_active ? 'success' : 'warning'}>{s.is_active ? 'Watching' : 'Paused'}</Badge>) },
-    { id: 'checked', header: 'Last checked', hideBelow: 'sm', cell: (s) => (s.last_evaluated_at ? timeAgo(s.last_evaluated_at) : 'Within the hour') },
+    { id: 'checked', header: 'Last Checked', hideBelow: 'sm', cell: (s) => (s.last_evaluated_at ? timeAgo(s.last_evaluated_at) : 'Within the hour') },
     { id: 'actions', header: '', align: 'right', cell: (s) => (
       <div className="flex justify-end gap-1">
         <Button variant="ghost" size="sm" aria-label={s.notify ? 'Mute alerts' : 'Turn on alerts'}
@@ -229,7 +229,7 @@ export default function SignalsPage() {
       const d = describeSignalPayload(c.payload);
       return <div className="min-w-0"><div>{d.what}</div>{d.detail ? <div className="line-clamp-2 text-xs text-muted-foreground">{d.detail}</div> : null}</div>;
     } },
-    { id: 'seen', header: 'First seen', hideBelow: 'sm', cell: (c) => timeAgo(c.observed_at) },
+    { id: 'seen', header: 'First Seen', hideBelow: 'sm', cell: (c) => timeAgo(c.observed_at) },
     { id: 'source', header: 'Source', cell: (c) => <SourceLink url={describeSignalPayload(c.payload).url} /> },
   ];
 
@@ -266,8 +266,8 @@ export default function SignalsPage() {
       {header}
       <div className="space-y-6 p-4 sm:p-6">
         <HubStatGrid>
-          <HubStatTile label="Companies tracked" value={coverage ? coverage.companies.toLocaleString() : '—'} help={coverageHelp} />
-          <HubStatTile label="Websites read" value={coverage ? coverage.companies_checked.toLocaleString() : '—'}
+          <HubStatTile label="Companies Tracked" value={coverage ? coverage.companies.toLocaleString() : '—'} help={coverageHelp} />
+          <HubStatTile label="Websites Read" value={coverage ? coverage.companies_checked.toLocaleString() : '—'}
             help="Homepages and careers pages read so far. The rest are queued." />
           <HubStatTile label="With a readable job board" value={coverage ? coverage.companies_with_board.toLocaleString() : '—'}
             help="Greenhouse, Lever, Ashby, Workable or Teamtailor boards, read daily." />
@@ -294,7 +294,7 @@ export default function SignalsPage() {
           <div className="overflow-hidden rounded-md border border-hairline bg-card">
             <HubToolbar filters={signals.length > 1 ? (
               <HubFilterSelect label="Signal" value={signalFilter} onChange={setSignalFilter}
-                options={[{ value: 'all', label: 'All signals' }, ...signals.map((s) => ({ value: s.id, label: s.name }))]} />
+                options={[{ value: 'all', label: 'All Signals' }, ...signals.map((s) => ({ value: s.id, label: s.name }))]} />
             ) : undefined} />
             <HubDataTable rows={visibleMatches} columns={matchColumns} rowId={(m) => m.id} loading={loading}
               className="rounded-none border-0"
@@ -343,9 +343,9 @@ export default function SignalsPage() {
                   <Select value={exploreDays} onValueChange={setExploreDays}>
                     <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="30">Last 30 days</SelectItem>
-                      <SelectItem value="90">Last 90 days</SelectItem>
-                      <SelectItem value="365">Last year</SelectItem>
+                      <SelectItem value="30">Last 30 Days</SelectItem>
+                      <SelectItem value="90">Last 90 Days</SelectItem>
+                      <SelectItem value="365">Last Year</SelectItem>
                     </SelectContent>
                   </Select>
                   <label className="flex items-center gap-2 text-sm">

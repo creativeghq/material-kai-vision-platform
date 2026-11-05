@@ -257,7 +257,7 @@ const MyOfficeImpl: React.FC = () => {
           caption={pipeline.ordersOpen === 1 ? 'Open Order' : 'Open Orders'}
           rows={[
             { label: 'Confirmed', value: countOrDash(pipeline.orders.confirmed), to: ordersLink('confirmed') },
-            { label: 'Partly fulfilled', value: countOrDash(pipeline.orders.partially_fulfilled), to: ordersLink('partially_fulfilled') },
+            { label: 'Partly Fulfilled', value: countOrDash(pipeline.orders.partially_fulfilled), to: ordersLink('partially_fulfilled') },
             { label: 'Draft', value: countOrDash(pipeline.orders.draft), to: ordersLink('draft') },
           ]}
           linkTo={ordersLink()}
@@ -305,7 +305,7 @@ const MyOfficeImpl: React.FC = () => {
           rows={[
             { label: 'Customers', value: crm.customers, to: companiesLink(CRM_KIND.customer) },
             { label: 'Suppliers', value: crm.suppliers, to: companiesLink(CRM_KIND.supplier) },
-            { label: 'Active projects', value: stats.projects, to: PROJECTS_LINK },
+            { label: 'Active Projects', value: stats.projects, to: PROJECTS_LINK },
           ]}
           linkTo={companiesLink()}
           linkLabel="All companies"

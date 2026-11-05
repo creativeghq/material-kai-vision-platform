@@ -196,12 +196,12 @@ function SeparationDialog({ workspaceId, employees, onDone }: { workspaceId: str
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>Effective date *</Label><Input type="date" value={f.effective} onChange={(e) => upd('effective', e.target.value)} /></div>
-            <div className="space-y-1"><Label>Notice date</Label><Input type="date" value={f.notice} onChange={(e) => upd('notice', e.target.value)} /></div>
+            <div className="space-y-1"><Label>Effective Date *</Label><Input type="date" value={f.effective} onChange={(e) => upd('effective', e.target.value)} /></div>
+            <div className="space-y-1"><Label>Notice Date</Label><Input type="date" value={f.notice} onChange={(e) => upd('notice', e.target.value)} /></div>
           </div>
           <div className="space-y-1"><Label>Reason</Label><Input value={f.reason} onChange={(e) => upd('reason', e.target.value)} placeholder="Shown on the Ergani declaration" /></div>
           <div className="space-y-1"><Label>Severance (€)</Label><Input type="number" min="0" step="0.01" value={f.severance} onChange={(e) => upd('severance', e.target.value)} /></div>
-          <div className="space-y-1"><Label>Internal note</Label><Textarea rows={2} value={f.note} onChange={(e) => upd('note', e.target.value)} /></div>
+          <div className="space-y-1"><Label>Internal Note</Label><Textarea rows={2} value={f.note} onChange={(e) => upd('note', e.target.value)} /></div>
           <p className="text-xs text-muted-foreground">
             The employee stays active until the departure is filed to Ergani — filing marks them terminated and sets their end date.
           </p>

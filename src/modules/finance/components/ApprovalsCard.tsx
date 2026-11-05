@@ -179,7 +179,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
               <TableHeader>
                 <TableRow>
                   <TableHead>Subject</TableHead>
-                  <TableHead className="hidden sm:table-cell">Applies to</TableHead>
+                  <TableHead className="hidden sm:table-cell">Applies To</TableHead>
                   <TableHead className="text-right">Band</TableHead>
                   <TableHead>Action</TableHead>
                   <TableHead className="hidden md:table-cell">Approver</TableHead>
@@ -192,7 +192,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
                   <TableRow key={p.id}>
                     <TableCell>{SUBJECT_LABEL[p.subject]}</TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      {p.workspace_role ? workspaceRoleLabel(p.workspace_role) : 'Every role'}
+                      {p.workspace_role ? workspaceRoleLabel(p.workspace_role) : 'Every Role'}
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-right tabular-nums">
                       {p.band_from} – {p.band_to ?? '∞'}
@@ -244,20 +244,20 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Applies to role</Label>
+              <Label className="text-xs">Applies to Role</Label>
               <Select
                 value={draft.workspace_role ?? '__all'}
                 onValueChange={(v) => setDraft((d) => (d ? { ...d, workspace_role: v === '__all' ? null : v } : d))}
               >
                 <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__all">Every role</SelectItem>
+                  <SelectItem value="__all">Every Role</SelectItem>
                   {roleOptions().map((r) => <SelectItem key={r} value={r}>{workspaceRoleLabel(r)}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Approver role</Label>
+              <Label className="text-xs">Approver Role</Label>
               <Select
                 value={draft.approver_role ?? '__none'}
                 onValueChange={(v) => setDraft((d) => (d ? { ...d, approver_role: v === '__none' ? null : v } : d))}
@@ -270,7 +270,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
               </Select>
             </div>
             <div>
-              <Label className="text-xs">Band from</Label>
+              <Label className="text-xs">Band From</Label>
               <Input
                 type="number" className="mt-1 h-8 text-xs" value={String(draft.band_from ?? 0)}
                 onChange={(e) => setDraft((d) => (d ? { ...d, band_from: Number(e.target.value) } : d))}
@@ -299,7 +299,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
             {draft.subject === 'margin_floor' && (
               <>
                 <div>
-                  <Label className="text-xs">Minimum margin %</Label>
+                  <Label className="text-xs">Minimum Margin %</Label>
                   <Input
                     type="number" className="mt-1 h-8 text-xs"
                     value={draft.min_margin_percent == null ? '' : String(draft.min_margin_percent)}
@@ -307,7 +307,7 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Maximum discount %</Label>
+                  <Label className="text-xs">Maximum Discount %</Label>
                   <Input
                     type="number" className="mt-1 h-8 text-xs"
                     value={draft.max_discount_percent == null ? '' : String(draft.max_discount_percent)}
@@ -320,22 +320,22 @@ export const ApprovalsCard: React.FC<{ workspaceId: string }> = ({ workspaceId }
             {draft.subject === 'credit_hold' && (
               <>
                 <div>
-                  <Label className="text-xs">Grace days</Label>
+                  <Label className="text-xs">Grace Days</Label>
                   <Input
                     type="number" className="mt-1 h-8 text-xs" value={String(draft.grace_days ?? 0)}
                     onChange={(e) => setDraft((d) => (d ? { ...d, grace_days: Number(e.target.value) } : d))}
                   />
                 </div>
                 <div>
-                  <Label className="text-xs">Counted as</Label>
+                  <Label className="text-xs">Counted As</Label>
                   <Select
                     value={draft.grace_basis ?? 'calendar'}
                     onValueChange={(v) => setDraft((d) => (d ? { ...d, grace_basis: v as 'calendar' | 'working' } : d))}
                   >
                     <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="calendar">Calendar days</SelectItem>
-                      <SelectItem value="working">Working days</SelectItem>
+                      <SelectItem value="calendar">Calendar Days</SelectItem>
+                      <SelectItem value="working">Working Days</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

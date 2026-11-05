@@ -71,7 +71,7 @@ export const WastageRatesCard: React.FC<Props> = ({ workspaceId, canEdit, onChan
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Cutting allowance</CardTitle>
+        <CardTitle>Cutting Allowance</CardTitle>
         <CardDescription>
           The extra material each laying pattern costs in cuts. Until a pattern has one, the
           visualizer reports the area and the piece count but refuses to call either an order

@@ -126,7 +126,7 @@ export const accountingExportService = {
       const net = num(c.subtotal_net), vat = num(c.vat_amount);
       const total = num(c.total) || num(c.amount);
       rows.push({
-        date: day(c.issued_at), kind: 'Credit note', doc_type: c.document_type ?? '5.1',
+        date: day(c.issued_at), kind: 'Credit Note', doc_type: c.document_type ?? '5.1',
         number: c.credit_note_number ?? '', series: c.series ?? '',
         counterpart: p.name, counterpart_vat: p.vat, net: -net, vat: -vat, total: -total,
         currency: c.currency ?? 'EUR',
@@ -165,7 +165,7 @@ export const accountingExportService = {
       const p = partyOf(parties, { company_id: x.supplier_company_id, contact_id: x.supplier_contact_id });
       const net = num(x.subtotal_net), vat = num(x.vat_amount);
       rows.push({
-        date: day(x.issued_at), kind: 'Supplier bill', doc_type: '', number: x.supplier_bill_number ?? '', series: '',
+        date: day(x.issued_at), kind: 'Supplier Bill', doc_type: '', number: x.supplier_bill_number ?? '', series: '',
         counterpart: p.name, counterpart_vat: p.vat, net, vat, total: num(x.total),
         currency: x.currency ?? 'EUR',
         rate: effRate(net, vat), mark: '', status: x.status ?? '',
@@ -175,7 +175,7 @@ export const accountingExportService = {
       const p = partyOf(parties, { company_id: x.supplier_company_id, contact_id: x.supplier_contact_id });
       const net = num(x.subtotal_net), vat = num(x.vat_amount);
       rows.push({
-        date: day(x.issued_at), kind: 'Supplier credit note', doc_type: '', number: x.supplier_credit_note_number ?? '', series: '',
+        date: day(x.issued_at), kind: 'Supplier Credit Note', doc_type: '', number: x.supplier_credit_note_number ?? '', series: '',
         counterpart: p.name, counterpart_vat: p.vat, net: -net, vat: -vat, total: -num(x.total),
         currency: x.currency ?? 'EUR',
         rate: effRate(net, vat), mark: x.external_mark ?? '', status: x.status ?? '',

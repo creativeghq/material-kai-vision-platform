@@ -9,7 +9,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { realEstatePublic, type PublicListingCard } from '@/modules/real-estate/services/realEstateService';
 
-const money = (n: number | null | undefined, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
+const money = (n: number | null | undefined, ccy = 'EUR') => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on Request' });
 
 function criteriaSummary(c: Record<string, any>): string {
   const parts: string[] = [];

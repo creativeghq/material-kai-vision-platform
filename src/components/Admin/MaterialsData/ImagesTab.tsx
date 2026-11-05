@@ -137,28 +137,28 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
       // dialog via ImageEmbeddingsInspector.
       if (imageData?.has_color_slig) {
         embeddings.push({
-          embedding_type: 'Color (aspect)',
+          embedding_type: 'Color (Aspect)',
           model_name: 'voyage-3',
           vector_dimensions: 1024,
         });
       }
       if (imageData?.has_texture_slig) {
         embeddings.push({
-          embedding_type: 'Texture (aspect)',
+          embedding_type: 'Texture (Aspect)',
           model_name: 'voyage-3',
           vector_dimensions: 1024,
         });
       }
       if (imageData?.has_style_slig) {
         embeddings.push({
-          embedding_type: 'Style (aspect)',
+          embedding_type: 'Style (Aspect)',
           model_name: 'voyage-3',
           vector_dimensions: 1024,
         });
       }
       if (imageData?.has_material_slig) {
         embeddings.push({
-          embedding_type: 'Material (aspect)',
+          embedding_type: 'Material (Aspect)',
           model_name: 'voyage-3',
           vector_dimensions: 1024,
         });

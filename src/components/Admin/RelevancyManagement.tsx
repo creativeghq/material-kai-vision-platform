@@ -84,7 +84,7 @@ function buildRelevancyFilters(tab: RelevancyTab): FilterGroupDef[] {
         },
         // image_product_associations has no relationship_type column.
         ...(tab === 'product-image' ? [] : [{
-          key: 'relationship_type' as const, type: 'multi' as const, label: 'Relationship type',
+          key: 'relationship_type' as const, type: 'multi' as const, label: 'Relationship Type',
           column: 'relationship_type', options: relTypeOptions,
         }]),
       ],

@@ -8,7 +8,7 @@ export type MaterialsTabKind = 'products' | 'images' | 'chunks' | 'embeddings';
 const SOURCE_TYPE_OPTIONS: FilterOption[] = [
   { value: 'pdf_processing', label: 'PDF processing' },
   { value: 'xml_import', label: 'XML import' },
-  { value: 'web_scraping', label: 'Web scraping' },
+  { value: 'web_scraping', label: 'Web Scraping' },
   { value: NONE_VALUE, label: 'Unknown' },
 ];
 
@@ -64,7 +64,7 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
           // Values come from the products_item_type_check constraint.
           key: 'item_type',
           type: 'multi',
-          label: 'Item type',
+          label: 'Item Type',
           column: 'item_type',
           options: [
             { value: 'good', label: 'Good' },
@@ -77,7 +77,7 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
         {
           key: 'has_embedding',
           type: 'bool',
-          label: 'Text embedding',
+          label: 'Text Embedding',
           description: 'Products with no vector are invisible to product-level search.',
           trueLabel: 'Embedded',
           falseLabel: 'Missing',
@@ -86,22 +86,22 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
 
     case 'images':
       return [
-        { key: 'has_slig_embedding', type: 'bool', label: 'Visual embedding', description: 'SigLIP2 768D vector in vecs.image_slig_embeddings.', column: 'has_slig_embedding', trueLabel: 'Present', falseLabel: 'Missing' },
-        { key: 'has_understanding_embedding', type: 'bool', label: 'Understanding embedding', description: 'Voyage 1024D vector derived from vision_analysis.', column: 'has_understanding_embedding', trueLabel: 'Present', falseLabel: 'Missing' },
-        { key: 'vision_analysis_failed', type: 'bool', label: 'Vision analysis', column: 'vision_analysis_failed', trueLabel: 'Failed', falseLabel: 'Succeeded' },
+        { key: 'has_slig_embedding', type: 'bool', label: 'Visual Embedding', description: 'SigLIP2 768D vector in vecs.image_slig_embeddings.', column: 'has_slig_embedding', trueLabel: 'Present', falseLabel: 'Missing' },
+        { key: 'has_understanding_embedding', type: 'bool', label: 'Understanding Embedding', description: 'Voyage 1024D vector derived from vision_analysis.', column: 'has_understanding_embedding', trueLabel: 'Present', falseLabel: 'Missing' },
+        { key: 'vision_analysis_failed', type: 'bool', label: 'Vision Analysis', column: 'vision_analysis_failed', trueLabel: 'Failed', falseLabel: 'Succeeded' },
         {
           key: 'extraction_layer',
           type: 'multi',
-          label: 'Extraction layer',
+          label: 'Extraction Layer',
           description: 'How the image was pulled off the page.',
           column: 'extraction_layer',
           // Values come from the document_images_extraction_layer_check constraint.
           options: [
             { value: 'embedded', label: 'Embedded' },
-            { value: 'region_crop', label: 'Region crop' },
-            { value: 'full_render', label: 'Full page render' },
-            { value: 'vision_guided', label: 'Vision guided' },
-            { value: 'manufacturer_original', label: 'Manufacturer original' },
+            { value: 'region_crop', label: 'Region Crop' },
+            { value: 'full_render', label: 'Full Page Render' },
+            { value: 'vision_guided', label: 'Vision Guided' },
+            { value: 'manufacturer_original', label: 'Manufacturer Original' },
             { value: 'restored', label: 'Restored' },
           ],
         },
@@ -113,7 +113,7 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
         {
           key: 'chunk_type_status',
           type: 'multi',
-          label: 'Classification status',
+          label: 'Classification Status',
           description: 'Distinguishes an "unclassified" verdict from a classifier crash.',
           column: 'chunk_type_status',
           options: [
@@ -122,16 +122,16 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
             { value: 'failed', label: 'Failed' },
           ],
         },
-        { key: 'chunk_type', type: 'text', label: 'Chunk type', description: 'Substring match on the classifier verdict.', column: 'chunk_type' },
-        { key: 'has_text_embedding', type: 'bool', label: 'Text embedding', column: 'has_text_embedding', trueLabel: 'Present', falseLabel: 'Missing' },
-        { key: 'quality_score', type: 'range', label: 'Quality score', column: 'quality_score', min: 0, max: 1, step: 0.05 },
+        { key: 'chunk_type', type: 'text', label: 'Chunk Type', description: 'Substring match on the classifier verdict.', column: 'chunk_type' },
+        { key: 'has_text_embedding', type: 'bool', label: 'Text Embedding', column: 'has_text_embedding', trueLabel: 'Present', falseLabel: 'Missing' },
+        { key: 'quality_score', type: 'range', label: 'Quality Score', column: 'quality_score', min: 0, max: 1, step: 0.05 },
       ];
 
     case 'embeddings':
       return [
         { key: 'embedding_model', type: 'text', label: 'Model', description: 'Substring match on the model that produced the vector.', column: 'embedding_model' },
         { key: 'embedding_dimension', type: 'range', label: 'Dimensions', column: 'embedding_dimension', min: 0, max: 2048, step: 128 },
-        { key: 'chunk_type', type: 'text', label: 'Chunk type', column: 'chunk_type' },
+        { key: 'chunk_type', type: 'text', label: 'Chunk Type', column: 'chunk_type' },
       ];
   }
 }

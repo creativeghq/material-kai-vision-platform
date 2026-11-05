@@ -148,7 +148,7 @@ export const ImportOpeningBalancesDialog: React.FC<{
                   <th className="px-3 py-1.5 text-left font-semibold">#</th>
                   <th className="px-3 py-1.5 text-left font-semibold">VAT</th>
                   <th className="px-3 py-1.5 text-left font-semibold">Company</th>
-                  <th className="px-3 py-1.5 text-left font-semibold">As of</th>
+                  <th className="px-3 py-1.5 text-left font-semibold">As Of</th>
                   <th className="px-3 py-1.5 text-right font-semibold">Amount</th>
                   <th className="px-3 py-1.5 text-left font-semibold">Status</th>
                 </tr>

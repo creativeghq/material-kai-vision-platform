@@ -344,7 +344,7 @@ export const RecurringPlansCard: React.FC<{ workspaceId: string }> = ({ workspac
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="rec-start">First one on</Label>
+                <Label htmlFor="rec-start">First One On</Label>
                 <Input id="rec-start" type="date" value={startOn} onChange={(e) => setStartOn(e.target.value)} />
               </div>
             </div>

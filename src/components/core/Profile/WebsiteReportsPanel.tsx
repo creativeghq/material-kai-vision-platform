@@ -27,11 +27,11 @@ const SECTIONS: { key: string; label: string; note: string }[] = [
   { key: 'rankings', label: 'Rank tracker', note: 'The keywords you chose, and how they moved' },
   { key: 'search_console', label: 'Search Console', note: 'Clicks, impressions, CTR and average position' },
   { key: 'analytics', label: 'Analytics', note: 'Sessions, users and conversions by channel' },
-  { key: 'site_health', label: 'Site health', note: 'Lighthouse scores for the homepage' },
-  { key: 'crawl', label: 'Full site crawl', note: 'Broken links, redirect chains, duplicates' },
+  { key: 'site_health', label: 'Site Health', note: 'Lighthouse scores for the homepage' },
+  { key: 'crawl', label: 'Full Site Crawl', note: 'Broken links, redirect chains, duplicates' },
   { key: 'ai_visibility', label: 'AI visibility', note: 'What AI assistants say when asked' },
   { key: 'competitors', label: 'Competitors', note: 'Your line beside theirs' },
-  { key: 'cannibalisation', label: 'Competing pages', note: 'Where your own pages split a query' },
+  { key: 'cannibalisation', label: 'Competing Pages', note: 'Where your own pages split a query' },
 ];
 
 const DEFAULT_SECTIONS = ['search_presence', 'rankings', 'search_console', 'site_health'];
@@ -141,12 +141,12 @@ export const WebsiteReportsPanel: React.FC<{ website: UserWebsite }> = ({ websit
         {creating && (
           <div className="space-y-3 rounded-sm border border-hairline bg-surface-sunken p-3">
             <div className="flex flex-wrap gap-2">
-              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 max-w-[280px]" placeholder="Report name" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} className="h-9 max-w-[280px]" placeholder="Report Name" />
               <Select value={cadence} onValueChange={setCadence}>
                 <SelectTrigger className="h-9 w-[170px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="monthly">Every month</SelectItem>
-                  <SelectItem value="weekly">Every week</SelectItem>
+                  <SelectItem value="monthly">Every Month</SelectItem>
+                  <SelectItem value="weekly">Every Week</SelectItem>
                   <SelectItem value="none">Only when I ask</SelectItem>
                 </SelectContent>
               </Select>

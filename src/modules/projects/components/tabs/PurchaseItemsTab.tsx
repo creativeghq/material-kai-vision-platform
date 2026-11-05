@@ -164,10 +164,10 @@ export const PurchaseItemsTab: React.FC<{
           <Select value={sheetMode} onValueChange={(v) => setSheetMode(v as typeof sheetMode)}>
             <SelectTrigger className="w-[150px] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="both">Elevation schedule + spec sheets</SelectItem>
-              <SelectItem value="schedule">Elevation schedule only</SelectItem>
-              <SelectItem value="order">Order sheet (per item)</SelectItem>
-              <SelectItem value="per_item">Spec sheets only</SelectItem>
+              <SelectItem value="both">Elevation Schedule + Spec Sheets</SelectItem>
+              <SelectItem value="schedule">Elevation Schedule Only</SelectItem>
+              <SelectItem value="order">Order Sheet (Per Item)</SelectItem>
+              <SelectItem value="per_item">Spec Sheets Only</SelectItem>
             </SelectContent>
           </Select>
           <Button size="sm" variant="outline" onClick={generateSheet} disabled={generatingSheet || rows.length === 0}>
@@ -281,15 +281,15 @@ const DOOR_FIELDS: Array<{ key: keyof PurchaseItemDetails; label: string; type?:
   { key: 'hardware', label: 'Hardware' },
   { key: 'opening', label: 'Opening', options: ['inward', 'outward'] },
   { key: 'handing', label: 'Handing', options: ['left', 'right'] },
-  { key: 'hinge_side', label: 'Hinge side' },
+  { key: 'hinge_side', label: 'Hinge Side' },
 ];
 
 const WINDOW_FIELDS: Array<{ key: keyof PurchaseItemDetails; label: string; type?: 'number'; options?: string[] }> = [
   { key: 'width_mm', label: 'Width (mm)', type: 'number' },
   { key: 'height_mm', label: 'Height (mm)', type: 'number' },
-  { key: 'frame_type', label: 'Frame type' },
+  { key: 'frame_type', label: 'Frame Type' },
   { key: 'glazing', label: 'Glazing' },
-  { key: 'opening_type', label: 'Opening type', options: ['tilt-turn', 'casement', 'sliding', 'fixed'] },
+  { key: 'opening_type', label: 'Opening Type', options: ['tilt-turn', 'casement', 'sliding', 'fixed'] },
   { key: 'finish', label: 'Finish' },
 ];
 
@@ -421,7 +421,7 @@ const PurchaseItemDialog: React.FC<{
           </FormSection>
 
           <FormSection title="Photo">
-            <FormField label="Catalog product" htmlFor="pi-catalog" optional hint="Link a catalog product for a real photo.">
+            <FormField label="Catalog Product" htmlFor="pi-catalog" optional hint="Link a catalog product for a real photo.">
               <div className="relative">
                 <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input id="pi-catalog" className="pl-8" placeholder="Search catalog products…" value={query}
@@ -451,7 +451,7 @@ const PurchaseItemDialog: React.FC<{
             </FormField>
           </FormSection>
 
-          <FormSection title="Measurements & spec">
+          <FormSection title="Measurements & Spec">
             <FormGrid>
               {fields.map(f => (
                 <FormField key={String(f.key)} label={f.label} htmlFor={`pi-spec-${String(f.key)}`}>
@@ -476,12 +476,12 @@ const PurchaseItemDialog: React.FC<{
             </FormGrid>
           </FormSection>
 
-          <FormSection title="Quantity & cost">
+          <FormSection title="Quantity & Cost">
             <FormGrid cols={3}>
               <FormField label="Quantity" htmlFor="pi-qty">
                 <Input id="pi-qty" type="number" min="1" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
               </FormField>
-              <FormField label="Unit cost" htmlFor="pi-cost">
+              <FormField label="Unit Cost" htmlFor="pi-cost">
                 <Input id="pi-cost" type="number" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} placeholder="—" />
               </FormField>
               <FormField label="Currency" htmlFor="pi-currency">

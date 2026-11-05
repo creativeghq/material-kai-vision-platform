@@ -39,7 +39,7 @@ type Step = 'widget' | 'content' | 'site' | 'code';
 
 const READINESS_BADGE = {
   ready: { variant: 'success', label: 'Ready' },
-  needs_setup: { variant: 'warning', label: 'Needs setup' },
+  needs_setup: { variant: 'warning', label: 'Needs Setup' },
   missing: { variant: 'neutral', label: 'Not available yet' },
 } as const;
 
@@ -353,7 +353,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
         onValueChange={(v) => setForm((f) => ({ ...f, scopeType: v as EmbedScopeType, scopeValues: [] }))}
       >
         {([
-          ['all', 'Everything published'],
+          ['all', 'Everything Published'],
           ['categories', 'Only certain categories'],
           ['products', 'Only specific products'],
         ] as [EmbedScopeType, string][]).map(([value, label]) => (
@@ -399,7 +399,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
 
   const renderScenes = () => (
     <div className="space-y-2">
-      <Label>Room photo</Label>
+      <Label>Room Photo</Label>
       {scenes === null ? <p className="text-sm text-muted-foreground">Loading room photos…</p> : (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <button
@@ -490,7 +490,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
       case 'place':
         return (
           <div className="space-y-2">
-            <Label>Products from</Label>
+            <Label>Products From</Label>
             <RadioGroup
               className="space-y-1.5"
               value={options.fromStore ? 'store' : 'catalogue'}
@@ -519,7 +519,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
             {renderProductList('pick-many')}
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-hairline p-3">
               <div className="space-y-0.5">
-                <Label>Clean cut-outs</Label>
+                <Label>Clean Cut-Outs</Label>
                 <p className="text-xs text-muted-foreground">
                   {cutoutTargets.length === 0
                     ? 'Publish or pick products first.'
@@ -549,7 +549,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
               </div>
               {form.placeAi && (
                 <div className="space-y-1.5">
-                  <Label htmlFor="embed-place-usd">Most per day (USD)</Label>
+                  <Label htmlFor="embed-place-usd">Most per Day (USD)</Label>
                   <MoneyInput
                     id="embed-place-usd"
                     value={form.usdCap}
@@ -591,7 +591,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
           <div className="space-y-3 rounded-md border border-hairline p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="space-y-0.5">
-                <Label htmlFor="embed-chat">Written answers</Label>
+                <Label htmlFor="embed-chat">Written Answers</Label>
                 <p className="text-xs text-muted-foreground">
                   Lets a visitor ask for a result to be explained in plain words. The calculators are free and always work; each answer costs a fraction of a cent and is triggered by your visitors.
                 </p>
@@ -600,7 +600,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
             </div>
             {form.chat && (
               <div className="space-y-1.5">
-                <Label htmlFor="embed-usd">Most per day (USD)</Label>
+                <Label htmlFor="embed-usd">Most per Day (USD)</Label>
                 <MoneyInput
                   id="embed-usd"
                   value={form.usdCap}
@@ -644,7 +644,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
         </span>
       </label>
       <div className="space-y-1.5">
-        <Label htmlFor="embed-rate">Requests per minute</Label>
+        <Label htmlFor="embed-rate">Requests per Minute</Label>
         <Input
           id="embed-rate"
           type="number"
@@ -667,7 +667,7 @@ export const EmbedWidgetDialog: React.FC<Props> = ({ open, onOpenChange, workspa
           </div>
           {form.allowGeneration && (
             <div className="space-y-1.5">
-              <Label htmlFor="embed-cap">Most per day</Label>
+              <Label htmlFor="embed-cap">Most per Day</Label>
               <Input
                 id="embed-cap"
                 type="number"

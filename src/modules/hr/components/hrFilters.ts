@@ -48,7 +48,7 @@ export function buildEmployeeFilters(rows: Employee[], departments: Department[]
           accessor: (e: Employee) => e.status,
         },
         {
-          key: 'employment_type', type: 'multi', label: 'Employment type',
+          key: 'employment_type', type: 'multi', label: 'Employment Type',
           options: [
             ...(Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[])
               .map((t) => ({ value: t, label: EMPLOYMENT_TYPE_LABELS[t], count: typeCounts.get(t) ?? 0 })),
@@ -67,12 +67,12 @@ export function buildEmployeeFilters(rows: Employee[], departments: Department[]
       key: 'availability', label: 'Availability', icon: CalendarDays,
       fields: [
         {
-          key: 'on_leave_today', type: 'bool', label: 'On leave today',
-          trueLabel: 'On leave today', falseLabel: 'Available today',
+          key: 'on_leave_today', type: 'bool', label: 'On Leave Today',
+          trueLabel: 'On Leave Today', falseLabel: 'Available today',
           accessor: (e: Employee) => e.on_leave_today,
         },
         {
-          key: 'remaining_leave_days', type: 'range', label: 'Leave days left',
+          key: 'remaining_leave_days', type: 'range', label: 'Leave Days Left',
           min: 0, max: 60, step: 1,
           accessor: (e: Employee) => e.remaining_leave_days,
         },
@@ -81,8 +81,8 @@ export function buildEmployeeFilters(rows: Employee[], departments: Department[]
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
-        { key: 'start_date', type: 'dateRange', label: 'Hire date', accessor: (e: Employee) => e.start_date },
-        { key: 'end_date', type: 'dateRange', label: 'End date', accessor: (e: Employee) => e.end_date },
+        { key: 'start_date', type: 'dateRange', label: 'Hire Date', accessor: (e: Employee) => e.start_date },
+        { key: 'end_date', type: 'dateRange', label: 'End Date', accessor: (e: Employee) => e.end_date },
       ],
     },
   ];
@@ -103,7 +103,7 @@ export function buildPostingFilters(rows: JobPosting[], departments: Department[
           accessor: (p: JobPosting) => [p.title, p.level, p.department?.name, p.location],
         },
         {
-          key: 'employment_type', type: 'multi', label: 'Employment type',
+          key: 'employment_type', type: 'multi', label: 'Employment Type',
           options: (Object.keys(EMPLOYMENT_TYPE_LABELS) as EmploymentType[]).map((t) => ({ value: t, label: EMPLOYMENT_TYPE_LABELS[t] })),
           accessor: (p: JobPosting) => p.employment_type ?? undefined,
         },
@@ -123,7 +123,7 @@ export function buildPostingFilters(rows: JobPosting[], departments: Department[
       key: 'location', label: 'Location', icon: MapPin,
       fields: [
         {
-          key: 'location_type', type: 'multi', label: 'Work setup',
+          key: 'location_type', type: 'multi', label: 'Work Setup',
           options: (Object.keys(LOCATION_TYPE_LABELS) as LocationType[]).map((t) => ({ value: t, label: LOCATION_TYPE_LABELS[t] })),
           // The legacy `remote` boolean predates location_type — fall back to it so old rows match.
           accessor: (p: JobPosting) => p.location_type ?? (p.remote ? 'remote' : undefined),
@@ -139,7 +139,7 @@ export function buildPostingFilters(rows: JobPosting[], departments: Department[
       key: 'compensation', label: 'Compensation', icon: Coins,
       fields: [
         {
-          key: 'salary', type: 'range', label: 'Salary band',
+          key: 'salary', type: 'range', label: 'Salary Band',
           description: 'Matches against the top of the posted range.',
           min: 0, max: salaryMax,
           accessor: (p: JobPosting) => p.salary_max ?? p.salary_min ?? 0,
@@ -150,7 +150,7 @@ export function buildPostingFilters(rows: JobPosting[], departments: Department[
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
         { key: 'created_at', type: 'dateRange', label: 'Created', accessor: (p: JobPosting) => p.created_at },
-        { key: 'closes_at', type: 'dateRange', label: 'Applications close', accessor: (p: JobPosting) => p.closes_at },
+        { key: 'closes_at', type: 'dateRange', label: 'Applications Close', accessor: (p: JobPosting) => p.closes_at },
       ],
     },
   ];

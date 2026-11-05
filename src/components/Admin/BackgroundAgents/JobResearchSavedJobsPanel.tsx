@@ -25,7 +25,7 @@ const FILTERS = [
   { key: 'saved' as const,    label: 'Saved' },
   { key: 'applied' as const,  label: 'Applied' },
   { key: 'interested' as const, label: 'Interested' },
-  { key: 'all' as const,      label: 'All matches' },
+  { key: 'all' as const,      label: 'All Matches' },
 ];
 type Filter = (typeof FILTERS)[number]['key'];
 

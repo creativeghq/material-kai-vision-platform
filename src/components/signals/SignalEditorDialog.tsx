@@ -115,13 +115,13 @@ export function SignalEditorDialog({ open, onOpenChange, workspaceId, availableK
               <SignalValuePicker kind={kind} dictionary={dictionary} value={values} onChange={setValues} />
             </FormField>
             {kind === 'hiring' ? (
-              <FormField label="Location contains" optional>
+              <FormField label="Location Contains" optional>
                 <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Athens" />
               </FormField>
             ) : null}
           </FormSection>
 
-          <FormSection title="Scope and alerts">
+          <FormSection title="Scope and Alerts">
             <label className="flex items-center gap-2 text-sm">
               <Checkbox checked={crmOnly} onCheckedChange={(v) => setCrmOnly(v === true)} />
               Only companies already in my CRM

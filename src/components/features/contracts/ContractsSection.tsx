@@ -350,7 +350,7 @@ export const ContractsSection: React.FC<{
                         <SelectItem value="finance">Finance</SelectItem>
                         <SelectItem value="hr">HR</SelectItem>
                         <SelectItem value="project">Projects</SelectItem>
-                        <SelectItem value="realestate">Real estate</SelectItem>
+                        <SelectItem value="realestate">Real Estate</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormField>
@@ -371,12 +371,12 @@ export const ContractsSection: React.FC<{
                 <FormField label="Counterparty" optional={!(createContext === 'finance' && !subject?.customer_company_id)} htmlFor="ct-counterparty">
                   <Input id="ct-counterparty" value={counterparty} onChange={(e) => setCounterparty(e.target.value)} placeholder="Signer / Company name" />
                 </FormField>
-                <FormField label="Counterparty email" htmlFor="ct-email">
+                <FormField label="Counterparty Email" htmlFor="ct-email">
                   <Input id="ct-email" type="email" value={counterpartyEmail} onChange={(e) => setCounterpartyEmail(e.target.value)} placeholder="signer@example.com" />
                 </FormField>
               </FormGrid>
             </FormSection>
-            <FormSection title="Value and term">
+            <FormSection title="Value and Term">
               <FormGrid cols={4}>
                 <FormField label="Value" htmlFor="ct-value">
                   <Input id="ct-value" type="number" min={0} value={value} onChange={(e) => setValue(e.target.value)} placeholder="0.00" />

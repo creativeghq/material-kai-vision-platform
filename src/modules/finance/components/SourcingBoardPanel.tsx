@@ -56,7 +56,7 @@ const AllocationCard: React.FC<{ row: AllocationRow; lane: 'needs' | 'on_order' 
     )}
     {lane === 'reserved' && (
       <div className="text-xs text-muted-foreground">
-        {row.warehouse_name ? `In ${row.warehouse_name}` : 'In stock'} · reserved {fmtDate(row.reserved_at)}
+        {row.warehouse_name ? `In ${row.warehouse_name}` : 'In Stock'} · reserved {fmtDate(row.reserved_at)}
       </div>
     )}
   </div>
@@ -112,7 +112,7 @@ export const SourcingBoardPanel: React.FC<{ workspaceId: string }> = ({ workspac
             onChange={(v) => setMine(v === 'mine')}
             options={[
               { value: 'all', label: 'All' },
-              { value: 'mine', label: 'My orders' },
+              { value: 'mine', label: 'My Orders' },
             ]}
           />
           <Button size="sm" variant="outline" onClick={load} disabled={loading}>
@@ -127,7 +127,7 @@ export const SourcingBoardPanel: React.FC<{ workspaceId: string }> = ({ workspac
       ) : (
         <div className="flex gap-4 flex-wrap items-start">
           <Lane title="Needs ordering" icon={PackageSearch} count={data?.counts.needs_ordering ?? 0} rows={data?.needs_ordering ?? []} lane="needs" />
-          <Lane title="On order" icon={Truck} count={data?.counts.on_order ?? 0} rows={data?.on_order ?? []} lane="on_order" />
+          <Lane title="On Order" icon={Truck} count={data?.counts.on_order ?? 0} rows={data?.on_order ?? []} lane="on_order" />
           <Lane title="Arrived · reserved" icon={PackageCheck} count={data?.counts.reserved ?? 0} rows={data?.reserved ?? []} lane="reserved" />
         </div>
       )}

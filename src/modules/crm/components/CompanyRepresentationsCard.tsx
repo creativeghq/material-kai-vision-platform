@@ -50,7 +50,7 @@ type LastContactSource = 'manual' | 'call' | 'meeting' | 'email_sent' | 'email_r
 interface LastContact { at: string; source: LastContactSource | string }
 const SOURCE_LABEL: Record<string, string> = {
   manual: 'set by hand', call: 'call', meeting: 'meeting', email_sent: 'email sent',
-  email_received: 'email received', whatsapp_received: 'WhatsApp received',
+  email_received: 'email received', whatsapp_received: 'WhatsApp Received',
 };
 
 /** The derived date, from crm_representation_last_contact; click to set a date by hand. */
@@ -78,7 +78,7 @@ function LastContactCell({ rep, last, onSaved, prefix }: {
 
   if (editing) {
     return (
-      <Input type="date" autoFocus defaultValue={shown} className="h-7 w-[140px] text-xs" aria-label="Last contact"
+      <Input type="date" autoFocus defaultValue={shown} className="h-7 w-[140px] text-xs" aria-label="Last Contact"
         onBlur={(e) => void save(e.currentTarget.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter') e.currentTarget.blur();
@@ -242,11 +242,11 @@ function AddRepresentationDialog({ open, onOpenChange, side, companyId, workspac
             </Select>
           </div>
           <div className="space-y-2">
-            <Label>Range covered</Label>
+            <Label>Range Covered</Label>
             <Select value={categoryId} onValueChange={setCategoryId}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={WHOLE_RANGE}>Whole range</SelectItem>
+                <SelectItem value={WHOLE_RANGE}>Whole Range</SelectItem>
                 {categories.map((c) => <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -254,7 +254,7 @@ function AddRepresentationDialog({ open, onOpenChange, side, companyId, workspac
           </div>
           {agencyId && (
             <div className="space-y-2">
-              <Label>Person at the agency</Label>
+              <Label>Person at the Agency</Label>
               {people.length === 0 ? (
                 <p className="text-xs text-muted-foreground">The agency has no contacts yet. Add one on its Contacts tab.</p>
               ) : (
@@ -355,7 +355,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                     <TableHead>Country</TableHead>
                     <TableHead>Makes</TableHead>
                     <TableHead>Ask</TableHead>
-                    <TableHead>Last contact</TableHead>
+                    <TableHead>Last Contact</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -402,7 +402,7 @@ export const CompanyRepresentationsCard: React.FC<{ companyId: string; workspace
                   <div className="flex flex-wrap items-center gap-2">
                     <HubCellLink to={`/crm/companies/${r.agent_company_id}`}>{display(r.agent)}</HubCellLink>
                     <Badge variant="neutral">{kindLabel(r.kind)}{r.territory ? ` · ${r.territory}` : ''}</Badge>
-                    <Badge variant="info">{rangeLabel(r) ?? 'Whole range'}</Badge>
+                    <Badge variant="info">{rangeLabel(r) ?? 'Whole Range'}</Badge>
                   </div>
                   <PersonCell person={r.contact} />
                   {agencyPeople(r).map((p) => <PersonCell key={p.id} person={p} />)}

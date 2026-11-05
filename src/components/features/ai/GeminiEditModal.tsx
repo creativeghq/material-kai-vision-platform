@@ -109,10 +109,10 @@ const WALL_FINISHES = [
 ];
 
 const WALL_ZONES = [
-  { label: 'All surfaces',    value: 'all visible wall surfaces from floor to ceiling, edge to edge' },
-  { label: 'Feature wall',    value: 'the main feature / accent wall only — all other walls stay identical' },
-  { label: 'Upper zone only', value: 'upper wall zone only (above 120cm), lower zone unchanged' },
-  { label: 'Lower dado only', value: 'lower dado zone only (below 90cm), upper walls unchanged' },
+  { label: 'All Surfaces',    value: 'all visible wall surfaces from floor to ceiling, edge to edge' },
+  { label: 'Feature Wall',    value: 'the main feature / accent wall only — all other walls stay identical' },
+  { label: 'Upper Zone Only', value: 'upper wall zone only (above 120cm), lower zone unchanged' },
+  { label: 'Lower Dado Only', value: 'lower dado zone only (below 90cm), upper walls unchanged' },
 ];
 
 const PLANT_OPTIONS = [
@@ -136,9 +136,9 @@ const STYLE_PRESETS = [
 ];
 
 const STYLE_INTENSITIES = [
-  { label: 'Subtle refresh',          value: 'subtle — update materials and accents while keeping the overall character' },
-  { label: 'Moderate transformation', value: 'moderate — clear style change across all surfaces and fixtures' },
-  { label: 'Complete retheme',        value: 'complete — total transformation, every element updated to match the new style' },
+  { label: 'Subtle Refresh',          value: 'subtle — update materials and accents while keeping the overall character' },
+  { label: 'Moderate Transformation', value: 'moderate — clear style change across all surfaces and fixtures' },
+  { label: 'Complete Retheme',        value: 'complete — total transformation, every element updated to match the new style' },
 ];
 
 // ── Spatial lock clause (auto-appended to every prompt) ──────────────────────

@@ -317,8 +317,8 @@ export const WebsiteSerpFeaturesPanel: React.FC<{ website: UserWebsite; onOpenRa
 
             {!unknownAll && (
               <div className="grid grid-cols-2 gap-4 px-4 sm:px-6 lg:grid-cols-4">
-                <Stat label="Pages read" value={data.answered} of={data.tracked} hint="tracked keywords whose latest check answered" />
-                <Stat label="You rank" value={data.ranking} of={data.answered} hint="keywords where you are in Google’s top 100" />
+                <Stat label="Pages Read" value={data.answered} of={data.tracked} hint="tracked keywords whose latest check answered" />
+                <Stat label="You Rank" value={data.ranking} of={data.answered} hint="keywords where you are in Google’s top 100" />
                 <Stat label="Blocks showing you" value={showsYou} hint="across all checked pages" />
                 <Stat label="Blocks without you" value={withoutYou} hint="on the page, showing someone else" tone={withoutYou > 0 ? 'warning' : undefined} />
               </div>

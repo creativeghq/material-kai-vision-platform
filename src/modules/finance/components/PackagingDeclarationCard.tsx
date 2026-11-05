@@ -108,7 +108,7 @@ export const PackagingDeclarationCard: React.FC<{ workspaceId: string }> = ({ wo
       <CardContent className="space-y-3 text-xs">
         <div className="flex flex-wrap items-end gap-2">
           <div>
-            <Label htmlFor="pkg-year" className="text-xs">Declaration year</Label>
+            <Label htmlFor="pkg-year" className="text-xs">Declaration Year</Label>
             <Input
               id="pkg-year" type="number" className="mt-1 h-8 w-28 text-xs" value={year}
               onChange={(e) => setYear(Number(e.target.value) || year)}
@@ -170,8 +170,8 @@ export const PackagingDeclarationCard: React.FC<{ workspaceId: string }> = ({ wo
                       <TableHead>Material</TableHead>
                       <TableHead className="text-right">Primary kg</TableHead>
                       <TableHead className="text-right">Sec.+tert. kg</TableHead>
-                      <TableHead className="text-right">Reusable first</TableHead>
-                      <TableHead className="text-right">Reusable total</TableHead>
+                      <TableHead className="text-right">Reusable First</TableHead>
+                      <TableHead className="text-right">Reusable Total</TableHead>
                       <TableHead className="text-right">Cycles</TableHead>
                     </TableRow>
                   </TableHeader>

@@ -150,7 +150,7 @@ export const StockValuationSection: React.FC<{ workspaceId: string }> = ({ works
               </Select>
             </div>
             <div>
-              <Label htmlFor="method-from" className="text-xs">In force from</Label>
+              <Label htmlFor="method-from" className="text-xs">In Force From</Label>
               <Input
                 id="method-from" type="date" className="mt-1 h-8 w-40 text-xs" value={effectiveFrom}
                 onChange={(e) => setEffectiveFrom(e.target.value)}

@@ -221,7 +221,7 @@ export const ContentDecayChart: React.FC<{ buckets: DecayBucket[]; loading?: boo
                     <TableRow>
                       <TableHead>Age</TableHead>
                       <TableHead className="text-right">% of final engagement</TableHead>
-                      <TableHead className="text-right">Posts measured</TableHead>
+                      <TableHead className="text-right">Posts Measured</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -278,10 +278,10 @@ export const PostingFrequencyTable: React.FC<{ rows: FrequencyRow[]; loading?: b
                 <TableHeader>
                   <TableRow>
                     <TableHead>Platform</TableHead>
-                    <TableHead className="text-right">Posts / week</TableHead>
-                    <TableHead className="text-right">Avg engagement rate</TableHead>
-                    <TableHead className="text-right">Avg engagement</TableHead>
-                    <TableHead className="text-right">Weeks observed</TableHead>
+                    <TableHead className="text-right">Posts / Week</TableHead>
+                    <TableHead className="text-right">Avg Engagement Rate</TableHead>
+                    <TableHead className="text-right">Avg Engagement</TableHead>
+                    <TableHead className="text-right">Weeks Observed</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

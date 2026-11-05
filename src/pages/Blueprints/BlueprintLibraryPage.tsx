@@ -281,7 +281,7 @@ export const BlueprintLibraryPage: React.FC = () => {
     <>
       <SectionHeader
         icon={LayoutTemplate}
-        title="My blueprints"
+        title="My Blueprints"
         subtitle="Everything this workspace built or copied. Pick a starter from the rail to preview and copy one."
       />
       {own.length === 0 ? emptyOwn : grid(own)}

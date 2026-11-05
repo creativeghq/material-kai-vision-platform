@@ -58,7 +58,7 @@ export function buildUserFilters(ctx: {
         },
         { key: 'status', type: 'multi', label: 'Status', options: statusOptions, accessor: (u) => u.status },
         {
-          key: 'profession', type: 'multi', label: 'Professional type',
+          key: 'profession', type: 'multi', label: 'Professional Type',
           options: professionOptions, accessor: (u) => u.professional_type,
         },
       ],
@@ -102,7 +102,7 @@ export function buildContactFilters(ctx: {
         // Server-backed (crm-api applies .eq on lifecycle_stage) — the rule in this file is
         // that a filter with no server support is worse than absent.
         {
-          key: 'lifecycle_stage', type: 'select', label: 'Lifecycle stage',
+          key: 'lifecycle_stage', type: 'select', label: 'Lifecycle Stage',
           description: 'Funnel position: subscriber → lead → MQL → SQL → opportunity → customer.',
           options: LIFECYCLE_STAGE_OPTIONS.map((o) => ({ value: o.value, label: o.label })),
         },
@@ -113,7 +113,7 @@ export function buildContactFilters(ctx: {
       key: 'membership', label: 'Membership', icon: Tags,
       fields: [
         {
-          key: 'company', type: 'select', label: 'Attached company',
+          key: 'company', type: 'select', label: 'Attached Company',
           description: 'Resolved to a contact-id allowlist across the company junction.',
           options: ctx.companyNameOptions,
         },
@@ -140,7 +140,7 @@ export function buildCompanyFilters(ctx: {
       fields: [
         { key: 'q', type: 'text', label: 'Search', placeholder: 'Search companies…' },
         {
-          key: 'profession', type: 'select', label: 'Business activity',
+          key: 'profession', type: 'select', label: 'Business Activity',
           description: 'The ΑΑΔΕ activity (ΚΑΔ) recorded on the company.',
           options: ctx.professionOptions,
         },

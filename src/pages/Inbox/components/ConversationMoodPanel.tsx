@@ -102,7 +102,7 @@ export const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: bo
                 the conversation has moved past must say so, not sit there looking current. */}
             {stale && (
               <div className="flex items-center gap-2">
-                <Badge variant="warning">Out of date</Badge>
+                <Badge variant="warning">Out of Date</Badge>
                 <span className="text-xs text-muted-foreground">
                   {busy ? 'Re-reading…' : 'Messages have arrived since this was read.'}
                 </span>

@@ -14,7 +14,7 @@ export type SurfaceKind = (typeof SURFACE_KINDS)[number];
 
 export const SURFACE_KIND_LABELS: Record<SurfaceKind, string> = {
   floor: 'Floor', wall: 'Wall', backsplash: 'Backsplash', countertop: 'Countertop',
-  shower_wall: 'Shower wall', stair: 'Stairs', ceiling: 'Ceiling', outdoor: 'Outdoor',
+  shower_wall: 'Shower Wall', stair: 'Stairs', ceiling: 'Ceiling', outdoor: 'Outdoor',
 };
 
 export interface VisualizerScene {

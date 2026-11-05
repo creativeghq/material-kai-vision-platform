@@ -5,7 +5,7 @@ export type TaskStatusValue = (typeof TASK_STATUSES)[number];
 
 export const TASK_STATUS_LABEL: Record<TaskStatusValue, string> = {
   todo: 'To do',
-  in_progress: 'In progress',
+  in_progress: 'In Progress',
   blocked: 'Blocked',
   done: 'Done',
 };

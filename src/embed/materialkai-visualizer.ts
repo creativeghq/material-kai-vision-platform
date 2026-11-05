@@ -574,8 +574,8 @@ export class MaterialKaiVisualizer extends HTMLElement {
     };
 
     row('Surface', `${c.surfaceM2.toFixed(2)} m²`);
-    row('Pieces before cuts', c.piecesNet === null ? '—' : String(c.piecesNet));
-    row('Cutting allowance', c.wastagePercent === null ? 'not set' : `${c.wastagePercent}%`);
+    row('Pieces Before Cuts', c.piecesNet === null ? '—' : String(c.piecesNet));
+    row('Cutting Allowance', c.wastagePercent === null ? 'not set' : `${c.wastagePercent}%`);
     if (c.orderable) {
       row('Order', `${c.piecesGross} pieces · ${c.m2Gross?.toFixed(2)} m²`);
       row('Boxes', String(c.boxes));
@@ -609,7 +609,7 @@ export class MaterialKaiVisualizer extends HTMLElement {
 
     const name = document.createElement('input');
     name.type = 'text';
-    name.placeholder = 'Your name';
+    name.placeholder = 'Your Name';
     const email = document.createElement('input');
     email.type = 'email';
     email.placeholder = 'you@example.com';

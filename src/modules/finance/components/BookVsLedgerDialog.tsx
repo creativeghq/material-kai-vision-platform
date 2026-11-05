@@ -10,10 +10,10 @@ import { mydataBookService, type BookVsLedgerRow } from '@/modules/finance/servi
 const VERDICT: Record<string, { label: string; variant: 'success' | 'warning' | 'error' | 'info' | 'neutral' }> = {
   matches: { label: 'Matches', variant: 'success' },
   differs: { label: 'Differs', variant: 'error' },
-  outside_ledger: { label: 'Issued elsewhere', variant: 'info' },
+  outside_ledger: { label: 'Issued Elsewhere', variant: 'info' },
   not_collected: { label: 'Not read yet', variant: 'neutral' },
   not_connected: { label: 'Not connected', variant: 'neutral' },
-  collector_failed: { label: 'Read failed', variant: 'warning' },
+  collector_failed: { label: 'Read Failed', variant: 'warning' },
 };
 
 const monthLabel = (iso: string) => new Date(`${iso.slice(0, 7)}-01T00:00:00`).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
@@ -66,7 +66,7 @@ export const BookVsLedgerDialog: React.FC<{ workspaceId: string; from: string; t
                     <TableHead>Month</TableHead>
                     <TableHead>Book</TableHead>
                     <TableHead className="text-right">AADE net</TableHead>
-                    <TableHead className="text-right">Our net</TableHead>
+                    <TableHead className="text-right">Our Net</TableHead>
                     <TableHead className="text-right">Difference</TableHead>
                     <TableHead>Verdict</TableHead>
                   </TableRow>

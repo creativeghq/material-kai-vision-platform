@@ -128,7 +128,7 @@ export const TaxDepreciationCard: React.FC<Props> = ({ workspaceId, canManage = 
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Statutory category</TableHead>
+                    <TableHead>Statutory Category</TableHead>
                     <TableHead className="text-right">Rate</TableHead>
                     <TableHead className="hidden sm:table-cell">From</TableHead>
                     <TableHead>State</TableHead>
@@ -182,14 +182,14 @@ export const TaxDepreciationCard: React.FC<Props> = ({ workspaceId, canManage = 
                   />
                 </div>
                 <div>
-                  <Label htmlFor="tax-from" className="text-xs">Effective from</Label>
+                  <Label htmlFor="tax-from" className="text-xs">Effective From</Label>
                   <Input
                     id="tax-from" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.from}
                     onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="tax-src" className="text-xs">Confirmed against</Label>
+                  <Label htmlFor="tax-src" className="text-xs">Confirmed Against</Label>
                   <Input
                     id="tax-src" className="mt-1 h-8 w-56 text-xs" placeholder="who confirmed it, and from what"
                     value={draft.note}

@@ -135,14 +135,14 @@ export const ApografiPanel: React.FC<{ workspaceId: string }> = ({ workspaceId }
 
         <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
           <div>
-            <Label htmlFor="apo-counted" className="text-xs">Counted on</Label>
+            <Label htmlFor="apo-counted" className="text-xs">Counted On</Label>
             <Input
               id="apo-counted" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.countedOn}
               onChange={(e) => setDraft((d) => ({ ...d, countedOn: e.target.value }))}
             />
           </div>
           <div>
-            <Label htmlFor="apo-ref" className="text-xs">Reference date</Label>
+            <Label htmlFor="apo-ref" className="text-xs">Reference Date</Label>
             <Input
               id="apo-ref" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.referenceDate}
               onChange={(e) => setDraft((d) => ({ ...d, referenceDate: e.target.value }))}
@@ -173,7 +173,7 @@ export const ApografiPanel: React.FC<{ workspaceId: string }> = ({ workspaceId }
                   <TableHead>Item</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
                   <TableHead>How</TableHead>
-                  <TableHead className="text-right">Unit value</TableHead>
+                  <TableHead className="text-right">Unit Value</TableHead>
                   <TableHead className="text-right">Total</TableHead>
                 </TableRow>
               </TableHeader>

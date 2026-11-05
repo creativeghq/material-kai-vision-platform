@@ -1209,7 +1209,7 @@ const App = () => (
                 <Route path="/recall/:token" element={<PageErrorBoundary name="Recall notice"><PublicRecallPage /></PageErrorBoundary>} />
                 {/* #441 -- a trade customer seeing their own account. The link is the identity:
                     personal, expiring, and no account for them to create and forget. */}
-                <Route path="/trade/:token" element={<PageErrorBoundary name="Trade portal"><TradePortalPage /></PageErrorBoundary>} />
+                <Route path="/trade/:token" element={<PageErrorBoundary name="Trade Portal"><TradePortalPage /></PageErrorBoundary>} />
 
                 {/* Admin: Modules registry */}
                 <Route

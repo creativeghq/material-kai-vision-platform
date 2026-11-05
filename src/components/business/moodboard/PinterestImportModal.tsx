@@ -290,7 +290,7 @@ export const PinterestImportModal: React.FC<PinterestImportModalProps> = ({
             /* ── Bulk Import ── */
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label>Pinterest URLs (one per line)</Label>
+                <Label>Pinterest URLs (One per Line)</Label>
                 <textarea
                   value={bulkUrls}
                   onChange={e => setBulkUrls(e.target.value)}

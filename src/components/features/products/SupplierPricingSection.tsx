@@ -151,9 +151,9 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
               <tr className="text-[11px] font-semibold text-muted-foreground">
                 <th className="text-left px-4 py-2">Supplier</th>
                 <th className="hidden md:table-cell text-left px-4 py-2">Their SKU</th>
-                <th className="text-right px-4 py-2">Your cost</th>
+                <th className="text-right px-4 py-2">Your Cost</th>
                 <th className="hidden sm:table-cell text-right px-4 py-2">MOQ</th>
-                <th className="hidden sm:table-cell text-right px-4 py-2">Lead time</th>
+                <th className="hidden sm:table-cell text-right px-4 py-2">Lead Time</th>
                 <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
               </tr>
             </thead>
@@ -195,7 +195,7 @@ export const SupplierPricingSection: React.FC<Props> = ({ productId, workspaceId
         {rows.length > 0 && (
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-t">
             <div>
-              <Label htmlFor={`moq-${productId}`} className="text-sm">Respect minimum order quantities</Label>
+              <Label htmlFor={`moq-${productId}`} className="text-sm">Respect Minimum Order Quantities</Label>
               <p className="text-xs text-muted-foreground">
                 When on, ordering this product rounds up to the chosen supplier's MOQ and shows their lead time.
               </p>
@@ -293,7 +293,7 @@ const SupplierRowDialog: React.FC<{
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Your cost</Label>
+              <Label className="text-xs text-muted-foreground">Your Cost</Label>
               <Input type="number" step="0.01" value={cost} onChange={(e) => setCost(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -303,11 +303,11 @@ const SupplierRowDialog: React.FC<{
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Minimum order qty</Label>
+              <Label className="text-xs text-muted-foreground">Minimum Order Qty</Label>
               <Input type="number" value={moq} onChange={(e) => setMoq(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Lead time (days)</Label>
+              <Label className="text-xs text-muted-foreground">Lead Time (Days)</Label>
               <Input type="number" value={lead} onChange={(e) => setLead(e.target.value)} />
             </div>
           </div>

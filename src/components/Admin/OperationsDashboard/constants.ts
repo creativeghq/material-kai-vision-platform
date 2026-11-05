@@ -53,8 +53,8 @@ export const EXT_SERVICE_LABELS: Record<string, string> = {
   'zerobounce-validate': 'ZeroBounce',
   'firecrawl-scrape': 'Firecrawl',
   // Retired 2026-08-23 but kept: historical ai_usage_logs rows still carry the old key.
-  'zernio-whatsapp': 'Zernio WhatsApp (retired)',
-  'whatsapp-service': 'WhatsApp service reply',
-  'whatsapp-template': 'WhatsApp template',
+  'zernio-whatsapp': 'Zernio WhatsApp (Retired)',
+  'whatsapp-service': 'WhatsApp Service Reply',
+  'whatsapp-template': 'WhatsApp Template',
   'resend-email': 'Resend Email',
 };

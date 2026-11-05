@@ -214,7 +214,7 @@ export const RequestsInboxPanel: React.FC = () => {
                                         type="number"
                                         min={0}
                                         step="any"
-                                        placeholder="Unit cost"
+                                        placeholder="Unit Cost"
                                         value={draft}
                                         onChange={(e) => setCostDrafts((s) => ({ ...s, [line.id]: e.target.value }))}
                                         className="h-7 w-24 text-xs"

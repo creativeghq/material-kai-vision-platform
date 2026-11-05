@@ -175,7 +175,7 @@ export const WebhooksTab: React.FC = () => {
                 <tr className="border-b border-border/60 text-left text-xs text-muted-foreground">
                   <th className="px-5 py-2 font-medium">Endpoint</th>
                   <th className="px-4 py-2 font-medium">Events</th>
-                  <th className="px-4 py-2 font-medium">Last delivery</th>
+                  <th className="px-4 py-2 font-medium">Last Delivery</th>
                   <th className="px-4 py-2 font-medium">Active</th>
                   <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                 </tr>

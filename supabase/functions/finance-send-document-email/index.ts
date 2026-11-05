@@ -82,7 +82,7 @@ Deno.serve(withApiLogging('finance-send-document-email', async (req) => {
   const { data: fs } = await db.from('finance_settings').select('business_name').eq('workspace_id', doc.workspace_id).maybeSingle();
   const sender = fs?.business_name || 'our company';
   const number = String((kind === 'credit_note' ? doc.credit_note_number : kind === 'delivery_note' ? doc.delivery_note_number : doc.order_number) ?? '');
-  const label = kind === 'credit_note' ? 'Credit note' : kind === 'delivery_note' ? 'Delivery note' : isPo ? 'Purchase order' : 'Order confirmation';
+  const label = kind === 'credit_note' ? 'Credit Note' : kind === 'delivery_note' ? 'Delivery Note' : isPo ? 'Purchase Order' : 'Order Confirmation';
 
   let viewUrl = '';
   const { data: token, error: tokenErr } = await db.rpc('mint_document_share_token', { p_kind: kind, p_id: id });

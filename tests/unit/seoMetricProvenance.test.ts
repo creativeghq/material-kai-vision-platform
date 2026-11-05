@@ -49,7 +49,7 @@ describe('#395 — the collector verdict reaches the reader', () => {
       .not.toMatch(/status === 'failed' \? 'collector_failed'/);
     expect(panel).toContain('source_status?.backlinks');
     // Every backlink figure goes through the verdict rather than printing a bare em dash.
-    for (const label of ['Backlinks', 'Referring domains', 'Domain rank', 'Spam score', 'Broken backlinks']) {
+    for (const label of ['Backlinks', 'Referring Domains', 'Domain Rank', 'Spam Score', 'Broken Backlinks']) {
       expect(panel, label).toContain(`<Figure label="${label}" value={s.`);
     }
     expect(panel.match(/status=\{blStatus\} \/>/g) ?? []).toHaveLength(6);
@@ -84,11 +84,11 @@ describe('#395 — Search Console figures are a value or a stated reason', () =>
     // "0 clicks, 0 impressions, 0.0% CTR, Avg position 0.0" — and position 0.0 is better than
     // first place.
     expect(gscPanel).toMatch(/sourceStatusPresentation/);
-    for (const label of ['Clicks', 'Impressions', 'Avg CTR', 'Avg position']) {
+    for (const label of ['Clicks', 'Impressions', 'Avg CTR', 'Avg Position']) {
       expect(gscPanel, label).toContain(`<GscMetric label="${label}"`);
     }
     expect(gscPanel, 'a raw zero-defaulted metric is back')
-      .not.toMatch(/<Metric label="Avg position" value=\{\(t\?\.position \?\? 0\)/);
+      .not.toMatch(/<Metric label="Avg Position" value=\{\(t\?\.position \?\? 0\)/);
   });
 
   it('every one of the four is given the verdict, not just some', () => {

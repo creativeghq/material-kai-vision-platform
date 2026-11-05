@@ -117,14 +117,14 @@ export function buildProjectFilters(rows: ProjectWithClient[]): FilterGroupDef[]
         {
           // The list now returns collaborator-shared projects too (RLS was always wider than the
           // old user_id filter), so who owns a project is a real dimension rather than a constant.
-          key: 'owner', type: 'multi', label: 'Owned by',
+          key: 'owner', type: 'multi', label: 'Owned By',
           options: optionsFromRows(rows, (p) => p.owner_name ?? undefined),
           accessor: (p: ProjectWithClient) => p.owner_name ?? undefined,
         },
         {
           key: 'is_mine', type: 'bool', label: 'Ownership',
           description: 'Projects you own, versus ones shared with you as a collaborator.',
-          trueLabel: 'Mine', falseLabel: 'Shared with me',
+          trueLabel: 'Mine', falseLabel: 'Shared with Me',
           accessor: (p: ProjectWithClient) => p.is_mine !== false,
         },
       ],
@@ -143,8 +143,8 @@ export function buildProjectFilters(rows: ProjectWithClient[]): FilterGroupDef[]
           accessor: (p: ProjectWithClient) => p.budget_currency,
         },
         {
-          key: 'over_budget', type: 'bool', label: 'Budget health',
-          trueLabel: 'Over budget', falseLabel: 'Within budget',
+          key: 'over_budget', type: 'bool', label: 'Budget Health',
+          trueLabel: 'Over Budget', falseLabel: 'Within budget',
           accessor: (p: ProjectWithClient) => Number(p.budget_amount ?? 0) > 0 && Number(p.actual_amount ?? 0) > Number(p.budget_amount),
         },
       ],
@@ -154,7 +154,7 @@ export function buildProjectFilters(rows: ProjectWithClient[]): FilterGroupDef[]
       fields: [
         { key: 'deadline', type: 'dateRange', label: 'Deadline', accessor: (p: ProjectWithClient) => p.deadline },
         { key: 'created_at', type: 'dateRange', label: 'Created', accessor: (p: ProjectWithClient) => p.created_at },
-        { key: 'last_activity_at', type: 'dateRange', label: 'Last activity', accessor: (p: ProjectWithClient) => p.last_activity_at },
+        { key: 'last_activity_at', type: 'dateRange', label: 'Last Activity', accessor: (p: ProjectWithClient) => p.last_activity_at },
       ],
     },
   ];

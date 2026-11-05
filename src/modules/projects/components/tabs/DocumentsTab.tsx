@@ -474,7 +474,7 @@ const NewDocumentDialog: React.FC<{ projectId: string; onClose: () => void; onSa
               <Input value={scale} onChange={(e) => setScale(e.target.value)} placeholder="1:50 (optional)" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Sheet size</Label>
+              <Label className="text-xs">Sheet Size</Label>
               <Input value={sheetSize} onChange={(e) => setSheetSize(e.target.value)} placeholder="A1 (optional)" />
             </div>
           </div>
@@ -555,10 +555,10 @@ export const UploadRevisionDialog: React.FC<{
             <input id="rev-file" type="file" className="text-xs" accept={pdfOnly ? 'application/pdf,.pdf' : undefined} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
           </FormField>
           <FormGrid>
-            <FormField label="Issued on" htmlFor="rev-issued" hint="The date printed on the sheet.">
+            <FormField label="Issued On" htmlFor="rev-issued" hint="The date printed on the sheet.">
               <Input id="rev-issued" type="date" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
             </FormField>
-            <FormField label="Issued for" htmlFor="rev-purpose">
+            <FormField label="Issued For" htmlFor="rev-purpose">
               <Select value={purpose || 'none'} onValueChange={(v) => setPurpose(v === 'none' ? '' : v as DrawingPurpose)}>
                 <SelectTrigger id="rev-purpose"><SelectValue placeholder="Not stated" /></SelectTrigger>
                 <SelectContent>
@@ -665,7 +665,7 @@ const EditDocumentDialog: React.FC<{
               <Input value={scale} onChange={(e) => setScale(e.target.value)} placeholder="1:50 (optional)" />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Sheet size</Label>
+              <Label className="text-xs">Sheet Size</Label>
               <Input value={sheetSize} onChange={(e) => setSheetSize(e.target.value)} placeholder="A1 (optional)" />
             </div>
           </div>

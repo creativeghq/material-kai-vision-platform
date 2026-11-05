@@ -176,7 +176,7 @@ export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
     new Set(products.map((p) => p?.category).filter((c): c is string => typeof c === 'string' && c.length > 0)),
   );
   return (
-    <Shell kicker="Material search" title={data?.title || `${count} products`}>
+    <Shell kicker="Material Search" title={data?.title || `${count} products`}>
       <div>
         <SectionH>Summary</SectionH>
         <Field k="Results" v={count} />
@@ -247,7 +247,7 @@ export const SourcingInspector: React.FC<{ data: any }> = ({ data }) => (
 );
 
 export const OrderInspector: React.FC<{ created?: any; sent?: any }> = ({ created, sent }) => (
-  <Shell kicker="Purchase order" title={sent?.order_number ? `PO ${sent.order_number}` : 'Purchase orders'}>
+  <Shell kicker="Purchase Order" title={sent?.order_number ? `PO ${sent.order_number}` : 'Purchase Orders'}>
     <div>
       <SectionH>Details</SectionH>
       {created && <Field k="Drafts created" v={created.purchase_orders_created ?? 0} />}

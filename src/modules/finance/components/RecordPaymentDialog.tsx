@@ -517,7 +517,7 @@ export const RecordPaymentDialog: React.FC<{
           categoryId: categoryId || null,
         });
         toast({
-          title: 'Payment recorded',
+          title: 'Payment Recorded',
           description: amt >= selectedOption.due ? 'The expense is settled.' : 'The expense is partly paid.',
         });
         onSaved({ paymentId: recordedPaymentId }); onOpenChange(false);
@@ -643,7 +643,7 @@ export const RecordPaymentDialog: React.FC<{
         // says the payment was recorded, so adding a bare "Payment recorded" beside it is the
         // confusing pair the audit describes.
         toast({
-          title: kind === 'refund' ? 'Refund recorded' : 'Payment recorded',
+          title: kind === 'refund' ? 'Refund recorded' : 'Payment Recorded',
           description: creditNoteRef ? 'Credit note issued to myDATA and the cash-out logged.' : undefined,
         });
       }
@@ -686,7 +686,7 @@ export const RecordPaymentDialog: React.FC<{
                 <Select value={kind} onValueChange={(v: any) => { setKind(v); setTargetInvoiceId(''); setInvoiceId(''); setExpenseId(''); }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="received">Received from customer</SelectItem>
+                    <SelectItem value="received">Received from Customer</SelectItem>
                     <SelectItem value="refund">Refund / Return (to customer)</SelectItem>
                   </SelectContent>
                 </Select>
@@ -718,7 +718,7 @@ export const RecordPaymentDialog: React.FC<{
               >
                 <Input type="text" inputMode="decimal" value={fxRate} onChange={(e) => setFxRate(e.target.value)} />
               </FormField>
-              <FormField label="Rate → EUR (base)" hint="drives realized FX gain/loss">
+              <FormField label="Rate → EUR (Base)" hint="drives realized FX gain/loss">
                 <Input type="text" inputMode="decimal" value={fxRateToBase} onChange={(e) => setFxRateToBase(e.target.value)} />
               </FormField>
             </FormGrid>
@@ -728,7 +728,7 @@ export const RecordPaymentDialog: React.FC<{
           <FormSection title="What it settles">
           {kind === 'expense' && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
-              <FormField label="Expense being paid">
+              <FormField label="Expense Being Paid">
               <Select value={expenseId} onValueChange={pickExpense}>
                 <SelectTrigger><SelectValue placeholder="Pick the expense this payment settles…" /></SelectTrigger>
                 <SelectContent>
@@ -851,7 +851,7 @@ export const RecordPaymentDialog: React.FC<{
           )}
 
           {kind === 'received' && (
-            <FormField label="Document to issue" className="rounded-md border border-border/60 p-3">
+            <FormField label="Document to Issue" className="rounded-md border border-border/60 p-3">
               <Select value={issueChoice} onValueChange={(v: any) => setIssueChoice(v)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -889,7 +889,7 @@ export const RecordPaymentDialog: React.FC<{
 
           {kind === 'refund' && (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
-              <FormField label="Invoice to credit">
+              <FormField label="Invoice to Credit">
                 <Select value={invoiceId} onValueChange={pickRefundInvoice}>
                   <SelectTrigger><SelectValue placeholder="Pick the invoice being refunded…" /></SelectTrigger>
                   <SelectContent>

@@ -55,7 +55,7 @@ describe('the price line says what the number is, and is derived once', () => {
   it('prints currency, unit and whether VAT is included', () => {
     expect(cardPriceLine(card())).toBe('€54.50 / m² incl. VAT');
     expect(cardPriceLine(card({ price_basis: 'net', unit: null }))).toBe('€54.50 excl. VAT');
-    expect(cardPriceLine(card({ price: null, price_basis: null }))).toBe('Price on request');
+    expect(cardPriceLine(card({ price: null, price_basis: null }))).toBe('Price on Request');
   });
   it('the card carries `price_line`; the in-app card prints it rather than re-deriving it', () => {
     expect(card().price_line).toBe('€54.50 / m² incl. VAT');

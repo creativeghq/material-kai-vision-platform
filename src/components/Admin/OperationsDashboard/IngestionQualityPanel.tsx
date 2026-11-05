@@ -69,7 +69,7 @@ export const IngestionQualityPanel: React.FC = () => {
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle>Ingestion quality</CardTitle>
+        <CardTitle>Ingestion Quality</CardTitle>
         <CardDescription>Latest audit of every processed document: what the PDF or page says versus what the platform stored</CardDescription>
       </CardHeader>
       <CardContent className="p-0">

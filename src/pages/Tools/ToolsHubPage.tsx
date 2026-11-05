@@ -49,7 +49,7 @@ interface ToolEntry {
 const TOOLS: ToolEntry[] = [
   {
     slug: 'product-search',
-    title: 'Material search',
+    title: 'Material Search',
     description:
       'Search the material catalog by name, brand or category and see matching products instantly.',
     icon: ScanSearch,
@@ -57,7 +57,7 @@ const TOOLS: ToolEntry[] = [
   },
   {
     slug: 'heat-pump',
-    title: 'Heat-pump sizer',
+    title: 'Heat-Pump Sizer',
     description:
       'Estimate the heat-pump capacity (kW) a space needs — from area, insulation, climate zone, ceiling height and emitter type.',
     icon: Thermometer,
@@ -65,7 +65,7 @@ const TOOLS: ToolEntry[] = [
   },
   {
     slug: 'heating-cost',
-    title: 'Heating cost comparison',
+    title: 'Heating Cost Comparison',
     description:
       'Compare the annual running cost of six heating methods — oil, gas, A/C, heat pump and fireplaces — for the same home.',
     icon: Flame,
@@ -73,7 +73,7 @@ const TOOLS: ToolEntry[] = [
   },
   {
     slug: 'kitchen-cost',
-    title: 'Kitchen cost calculator',
+    title: 'Kitchen Cost Calculator',
     description:
       'Configure a kitchen — run length, cabinet finish, worktop, drawers and mechanisms — and watch the price update as you go.',
     icon: CookingPot,
@@ -81,7 +81,7 @@ const TOOLS: ToolEntry[] = [
   },
   {
     slug: 'tile-installation',
-    title: 'Tile installation guide',
+    title: 'Tile Installation Guide',
     description:
       'Enter a room and a tile and watch the floor go down step by step in 3D, with the tiles, spacers, adhesive and grout it needs.',
     icon: Grid3x3,
@@ -89,7 +89,7 @@ const TOOLS: ToolEntry[] = [
   },
   {
     slug: 'price-scan',
-    title: 'Price scan',
+    title: 'Price Scan',
     description:
       'Type any product or brand and see live retailer prices from across the web, verified by direct page reads.',
     icon: ShoppingBag,
@@ -97,7 +97,7 @@ const TOOLS: ToolEntry[] = [
   },
   {
     slug: 'mention-scan',
-    title: 'Mention scan',
+    title: 'Mention Scan',
     description:
       'Find recent news, blog and editorial coverage of a brand or product, grouped by outlet.',
     icon: MessageSquareText,
@@ -105,7 +105,7 @@ const TOOLS: ToolEntry[] = [
   },
   {
     slug: 'project-plan',
-    title: 'Project plan estimator',
+    title: 'Project Plan Estimator',
     description:
       'Pick a renovation type and see the full scope of works, priced — fine-tune the numbers and the total updates live.',
     icon: ClipboardList,
@@ -131,7 +131,7 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
   {
     slug: 'installation-guides',
     to: '/guides',
-    title: 'Installation guides',
+    title: 'Installation Guides',
     description:
       'Upload a supplier\'s installation PDF and step through it in 3D, page by page beside the manual, with every part and step.',
     icon: BookOpen,
@@ -154,7 +154,7 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
   {
     slug: 'page-watches',
     to: '/monitoring/pages',
-    title: 'Page monitoring',
+    title: 'Page Monitoring',
     description:
       'Watch any non-product page — a supplier price list, a competitor spec sheet — and see exactly what changed between checks.',
     icon: FileSearch,
@@ -180,19 +180,19 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
 const AGENT_TOOLS: ToolEntry[] = [
   {
     slug: 'price-monitoring', to: '/agent-hub?capability=price-monitoring',
-    title: 'Price monitoring',
+    title: 'Price Monitoring',
     description: 'Track what competitors charge for your products across retailers — start tracking or pull the latest prices from chat.',
     icon: LineChart, badge: 'Studio · agent',
   },
   {
     slug: 'mention-monitoring', to: '/agent-hub?capability=mention-monitoring',
-    title: 'Mention monitoring',
+    title: 'Mention Monitoring',
     description: 'Watch news, blogs and LLM answers for your brand or products — summaries and sentiment, on demand.',
     icon: Radar, badge: 'Studio · agent',
   },
   {
     slug: 'email-campaign', to: '/agent-hub?capability=email-campaign',
-    title: 'Email campaigns',
+    title: 'Email Campaigns',
     description: 'Draft a campaign to a CRM audience in chat — the agent composes it and you send from the Email page.',
     icon: Megaphone, badge: 'Studio · agent',
   },

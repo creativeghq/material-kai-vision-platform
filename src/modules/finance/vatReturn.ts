@@ -111,7 +111,7 @@ export function vatDifferenceLines(snap: VatReturnSnapshot): VatDifferenceLine[]
   if (e.untransmitted_invoices.count > 0) {
     out.push({
       key: 'untransmitted_invoices',
-      label: 'Issued invoices with no MARK',
+      label: 'Issued Invoices with No MARK',
       detail: 'In your books and not at ΑΑΔΕ — either not transmitted yet, or the transmission failed.',
       count: e.untransmitted_invoices.count, net: e.untransmitted_invoices.net, explains: 'income',
     });
@@ -119,7 +119,7 @@ export function vatDifferenceLines(snap: VatReturnSnapshot): VatDifferenceLine[]
   if (e.bills_without_inbound.count > 0) {
     out.push({
       key: 'bills_without_inbound',
-      label: 'Supplier bills entered by hand',
+      label: 'Supplier Bills Entered by Hand',
       detail: 'Booked here without a document arriving from ΑΑΔΕ. Whether they are in their book too is not something this can answer — it is listed, not subtracted.',
       count: e.bills_without_inbound.count, net: e.bills_without_inbound.net, explains: null,
     });
@@ -229,5 +229,5 @@ export const PREFILL_STATUS_LABEL: Record<string, string> = {
   breach: 'Breaches the pre-fill rules',
   no_mydata_figures: 'No ΑΑΔΕ figures to check against',
   nothing_declared: 'Nothing declared yet',
-  not_found: 'Period not found',
+  not_found: 'Period Not Found',
 };

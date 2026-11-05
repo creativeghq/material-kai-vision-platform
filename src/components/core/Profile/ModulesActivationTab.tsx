@@ -202,7 +202,7 @@ export const ModulesActivationTab: React.FC<{ collapsible?: boolean }> = ({ coll
     for (const t of topLevel) {
       const key = t.meta.hub?.id ?? '__more__';
       const entry = byHub.get(key) ?? {
-        label: t.meta.hub?.label ?? 'Platform & integrations',
+        label: t.meta.hub?.label ?? 'Platform & Integrations',
         hub: t.meta.hub,
         entries: [],
         count: 0,

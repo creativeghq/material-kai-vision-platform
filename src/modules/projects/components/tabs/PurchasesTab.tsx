@@ -31,12 +31,12 @@ const PurchaseTiles: React.FC<{ summary: ProjectPurchaseSummary | null; failed: 
   const mixed = summary.currencies.length > 1;
   return (
     <HubStatGrid>
-      <HubStatTile label="To order" value={summary.to_order_count} help="Made-to-order items with no purchase order yet." />
-      <HubStatTile label="On order" value={summary.on_order} help="Purchase orders confirmed and not fully delivered." />
+      <HubStatTile label="To Order" value={summary.to_order_count} help="Made-to-order items with no purchase order yet." />
+      <HubStatTile label="On Order" value={summary.on_order} help="Purchase orders confirmed and not fully delivered." />
       <HubStatTile label="Delivered, not billed" value={summary.awaiting_bill} help="Goods have arrived and the supplier's bill does not cover them yet." />
       <HubStatTile
-        label="To pay"
-        value={mixed ? 'Mixed currencies' : formatMoney(summary.to_pay, summary.currencies[0] ?? 'EUR')}
+        label="To Pay"
+        value={mixed ? 'Mixed Currencies' : formatMoney(summary.to_pay, summary.currencies[0] ?? 'EUR')}
         help={mixed ? `Bills in ${summary.currencies.join(', ')} cannot be added together.` : 'What is still unpaid on this project\'s supplier bills.'}
       />
     </HubStatGrid>

@@ -10,19 +10,19 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 const FEATURE_LABELS: Record<string, string> = {
-  'price-monitoring': 'Price monitoring',
-  'mention-monitoring': 'Mention monitoring',
+  'price-monitoring': 'Price Monitoring',
+  'mention-monitoring': 'Mention Monitoring',
   'llm-mention-probe': 'LLM visibility probes',
-  'job-research-refresh': 'Job research',
-  'job-research-digest': 'Job digests',
+  'job-research-refresh': 'Job Research',
+  'job-research-digest': 'Job Digests',
   'seo-toolkit-audit': 'SEO audits',
-  'email-campaign': 'Email campaigns',
+  'email-campaign': 'Email Campaigns',
   'email-contacts-sync': 'CRM → Resend contact sync',
-  'finance-auto-statement': 'Automatic statements',
+  'finance-auto-statement': 'Automatic Statements',
   'finance-inbound-sync': 'myDATA inbound sync',
   'hr-checkin': 'HR late check-in alerts',
-  'check-material-alerts': 'Material alerts',
-  'user-website-recrawl': 'Website re-crawl',
+  'check-material-alerts': 'Material Alerts',
+  'user-website-recrawl': 'Website Re-Crawl',
 };
 
 export const CronPausedBanner: React.FC = () => {

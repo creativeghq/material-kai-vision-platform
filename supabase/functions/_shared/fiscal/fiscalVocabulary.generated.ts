@@ -191,7 +191,7 @@ export const MYDATA_REVERSE_DELIVERY_PURPOSES: readonly MydataNamedCode[] = [
   { code: 2, en: 'Refusal to issue / inadvertent non-issue', el: 'ΑΡΝΗΣΗ ΕΚΔΟΣΗΣ/ΕΚ ΠΑΡΑΔΡΟΜΗΣ ΜΗ ΕΚΔΟΣΗ' },
   { code: 3, en: 'Intra-Community acquisition',              el: 'ΕΝΔΟΚΟΙΝΟΤΙΚΗ ΑΠΟΚΤΗΣΗ' },
   { code: 4, en: 'Third-country acquisition',                el: 'ΑΠΟΚΤΗΣΗ ΤΡΙΤΗ ΧΩΡΑ' },
-  { code: 5, en: 'Reverse charge',                           el: 'ΑΝΤΙΣΤΡΟΦΗ ΥΠΟΧΡΕΩΣΗΣ' },
+  { code: 5, en: 'Reverse Charge',                           el: 'ΑΝΤΙΣΤΡΟΦΗ ΥΠΟΧΡΕΩΣΗΣ' },
 ];
 
 export function reverseDeliveryPurposeLabel(
@@ -288,7 +288,7 @@ export function acceptsOnDocumentType(
 export const MYDATA_MOVEMENT_DOC_TYPES: readonly { code: string; en: string; el: string }[] = [
   { code: '9.1',  en: 'Correlated delivery note',      el: 'Δελτίο Αποστολής Συσχετιζόμενο' },
   { code: '9.2',  en: 'Consolidated delivery note',    el: 'Συγκεντρωτικό Δελτίο Αποστολής' },
-  { code: '9.3',  en: 'Delivery note',                 el: 'Δελτίο Αποστολής' },
+  { code: '9.3',  en: 'Delivery Note',                 el: 'Δελτίο Αποστολής' },
   { code: '10.1', en: 'Correlated receiving note',     el: 'Δελτίο Ποσοτικής Παραλαβής Συσχετιζόμενο' },
   { code: '10.2', en: 'Non-correlated receiving note', el: 'Δελτίο Ποσοτικής Παραλαβής Μη Συσχετιζόμενο' },
 ];
@@ -389,7 +389,7 @@ export function mydataDocumentTypeName(code: string, lang: 'el' | 'en'): string 
 export const MYDATA_DELIVERY_STATUSES: readonly (MydataNamedCode & { key: string })[] = [
   { code: 1, key: 'Registered',         en: 'Registered',           el: 'Εκδόθηκε' },
   { code: 2, key: 'Cancelled',          en: 'Cancelled',            el: 'Ακυρώθηκε' },
-  { code: 3, key: 'InTransit',          en: 'In transit',           el: 'Σε διακίνηση' },
+  { code: 3, key: 'InTransit',          en: 'In Transit',           el: 'Σε διακίνηση' },
   { code: 4, key: 'Rejected',           en: 'Rejected',             el: 'Απορρίφθηκε' },
   { code: 5, key: 'DeliveredByCarrier', en: 'Delivered by carrier', el: 'Παραδόθηκε από μεταφορέα' },
   { code: 7, key: 'FailedDelivery',     en: 'Delivery failed',      el: 'Αποτυχία παράδοσης' },
@@ -457,8 +457,8 @@ export function transportTypeLabel(
 /** The five party roles Α.1123/2024 Παράρτημα activates in Phase Β (all `όχι` in Phase Α). */
 export const MYDATA_MOVEMENT_PARTY_ROLES: readonly { key: string; en: string; el: string }[] = [
   { key: 'sender',           en: 'Sender',            el: 'Αποστολέας' },
-  { key: 'sender_third',     en: 'Third-party sender', el: 'Αποστολέας Τρίτος' },
+  { key: 'sender_third',     en: 'Third-Party Sender', el: 'Αποστολέας Τρίτος' },
   { key: 'carrier',          en: 'Carrier',           el: 'Μεταφορέας' },
   { key: 'recipient',        en: 'Recipient',         el: 'Παραλήπτης' },
-  { key: 'recipient_third',  en: 'Third-party recipient', el: 'Παραλήπτης Τρίτος' },
+  { key: 'recipient_third',  en: 'Third-Party Recipient', el: 'Παραλήπτης Τρίτος' },
 ];

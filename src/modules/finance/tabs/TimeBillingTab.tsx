@@ -246,7 +246,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
               own time is the default and needs no picker, while somebody with no login cannot log
               their own and must be recorded by someone else. */}
           <div className="space-y-1">
-            <Label className="text-xs">Worked by</Label>
+            <Label className="text-xs">Worked By</Label>
             <select
               className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
               value={workerEmployeeId}

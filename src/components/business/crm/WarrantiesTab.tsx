@@ -44,7 +44,7 @@ interface WarrantiesTabProps {
 const WARRANTY_KINDS: Array<{ value: WarrantyKind; label: string }> = [
   { value: 'manufacturer', label: 'Manufacturer' },
   { value: 'extended', label: 'Extended' },
-  { value: 'installer', label: 'Installer / labour' },
+  { value: 'installer', label: 'Installer / Labour' },
   { value: 'insurance', label: 'Insurance' },
 ];
 
@@ -257,7 +257,7 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
                   <TableHead>Source</TableHead>
                   <TableHead>Serial</TableHead>
                   <TableHead>Installed</TableHead>
-                  <TableHead>Next service</TableHead>
+                  <TableHead>Next Service</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -485,7 +485,7 @@ const AddUnitDialog: React.FC<{
             <FormGrid>
               {saleLines.length > 0 && (
                 <FormField
-                  label="From an order"
+                  label="From an Order"
                   htmlFor="eq-order"
                   hint="Links the unit to the sale it came off, so the order can show its cover and this row can point back at the order."
                   className="sm:col-span-2"
@@ -514,14 +514,14 @@ const AddUnitDialog: React.FC<{
               <FormField label="Model" htmlFor="eq-model">
                 <Input id="eq-model" value={form.model} onChange={(e) => setForm({ ...form, model: e.target.value })} />
               </FormField>
-              <FormField label="Serial number" htmlFor="eq-serial">
+              <FormField label="Serial Number" htmlFor="eq-serial">
                 <Input id="eq-serial" value={form.serial_number} onChange={(e) => setForm({ ...form, serial_number: e.target.value })} />
               </FormField>
             </FormGrid>
           </FormSection>
           <FormSection title="Installation">
             <FormGrid>
-              <FormField label="Installed on" htmlFor="eq-installed">
+              <FormField label="Installed On" htmlFor="eq-installed">
                 <Input id="eq-installed" type="date" value={form.installed_on}
                   onChange={(e) => setForm({ ...form, installed_on: e.target.value })} />
               </FormField>
@@ -719,7 +719,7 @@ const AssetDetailDialog: React.FC<{
                 <TableRow>
                   <TableHead>What</TableHead>
                   <TableHead>How often</TableHead>
-                  <TableHead>Next due</TableHead>
+                  <TableHead>Next Due</TableHead>
                   <TableHead>Remind</TableHead>
                   <TableHead className="text-right"></TableHead>
                 </TableRow>
@@ -751,7 +751,7 @@ const AssetDetailDialog: React.FC<{
             <FormField label="What needs doing" htmlFor="sp-title" className="min-w-48 flex-1">
               <Input id="sp-title" value={plan.title} placeholder="Clean the filters" onChange={(e) => setPlan({ ...plan, title: e.target.value })} />
             </FormField>
-            <FormField label="Every (months)" htmlFor="sp-interval" className="w-28">
+            <FormField label="Every (Months)" htmlFor="sp-interval" className="w-28">
               <Input id="sp-interval" type="number" min={1} value={plan.interval_months}
                 onChange={(e) => setPlan({ ...plan, interval_months: e.target.value })} />
             </FormField>

@@ -174,12 +174,12 @@ export const AiEngineCard: React.FC<{
       <Rate
         big
         rate={engine.citation_rate}
-        label="Citation rate"
+        label="Citation Rate"
         help="Share of this assistant's answers that linked your site as a source. Only answerable when it returned sources at all — an assistant answering from memory reports Not measured, not 0%."
       />
       <Rate
         rate={engine.mention_rate}
-        label="Named rate"
+        label="Named Rate"
         help="Share of answers that named your brand anywhere in the prose, whether or not it linked you."
       />
 

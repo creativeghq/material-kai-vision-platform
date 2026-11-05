@@ -376,7 +376,7 @@ describe('a line conditional on a choice', () => {
       { id: 'h-std', parent_id: 'hsec', sort_order: 0, kind: 'task', label: 'Handles', option_group: 'Handle system', option_key: 'handles', tier: 'good', is_allowance: true, allowance_amount: 0, margin_pct: 0 },
       { id: 'h-gola', parent_id: 'hsec', sort_order: 1, kind: 'task', label: 'Gola profile', unit: 'm', option_group: 'Handle system', option_key: 'gola', quantity_formula: '= total_run_length', material_cost: 25, margin_pct: 0 },
       { id: 'h-vert', parent_id: 'hsec', sort_order: 2, kind: 'task', label: 'Gola verticals', unit: 'pcs', quantity_formula: '= opt_gola * total_units', is_schedule: true, default_selected: true, margin_pct: 0 },
-      { id: 'h-cap', parent_id: 'hsec', sort_order: 3, kind: 'task', label: 'Gola end caps', unit: 'pcs', quantity_formula: '= opt_gola * total_runs * 2', is_schedule: true, default_selected: true, margin_pct: 0 },
+      { id: 'h-cap', parent_id: 'hsec', sort_order: 3, kind: 'task', label: 'Gola End Caps', unit: 'pcs', quantity_formula: '= opt_gola * total_runs * 2', is_schedule: true, default_selected: true, margin_pct: 0 },
     ];
     const qty = (sel: Set<string> | null, label: string) =>
       computeBlueprint(golaItems, {}, sel, { schema, config: cfg() })
@@ -384,11 +384,11 @@ describe('a line conditional on a choice', () => {
 
     // Standard handles is the tier:'good' default — every gola part is 0, not "some of them".
     expect(qty(null, 'Gola verticals')).toBe(0);
-    expect(qty(null, 'Gola end caps')).toBe(0);
+    expect(qty(null, 'Gola End Caps')).toBe(0);
 
     const gola = new Set(['h-gola']);
     expect(qty(gola, 'Gola verticals')).toBe(3);
-    expect(qty(gola, 'Gola end caps')).toBe(4);
+    expect(qty(gola, 'Gola End Caps')).toBe(4);
   });
 });
 
@@ -824,7 +824,7 @@ describe('the services schedule', () => {
   it('reaches the schedule under the same labels the hardware does', () => {
     const d = deriveComposition(kitchen, kcfg([appliance({ type: 'dishwasher', supply: 'existing', placement: 'under' })]), applianceItems);
     const byKey = Object.fromEntries(d.schedule.map((r) => [r.key, r]));
-    expect(byKey.socket).toMatchObject({ quantity: 1, label: 'Power sockets', unit: 'pcs' });
+    expect(byKey.socket).toMatchObject({ quantity: 1, label: 'Power Sockets', unit: 'pcs' });
     expect(byKey.water_in.quantity).toBe(1);
     expect(byKey.waste_out.quantity).toBe(1);
   });
@@ -870,7 +870,7 @@ describe('the services schedule', () => {
     // of them derived, nothing counting them, and no issue raised. The one key pair where this
     // can happen is the one that reaches an electrician.
     const scheduleLine = {
-      id: 'sched-dedicated', parent_id: null, kind: 'task', label: 'Dedicated circuits',
+      id: 'sched-dedicated', parent_id: null, kind: 'task', label: 'Dedicated Circuits',
       is_schedule: true, quantity_formula: 'total_socket_dedicated', unit: 'pcs',
       material_cost: null, labor_rate: null, margin_pct: 0, default_quantity: 0,
     } as unknown as typeof applianceItems[number];

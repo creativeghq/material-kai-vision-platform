@@ -104,7 +104,7 @@ export default function MasterCatalogPage() {
     <div className="p-6 space-y-4">
       <SectionHeader
         icon={Boxes}
-        title="Master catalog"
+        title="Master Catalog"
         subtitle="Manufacturer-published product data outranks our catalog extraction. A published price is an offer to the operator, never a change to anyone's negotiated cost."
         actions={
           <Button size="sm" variant="outline" onClick={load} disabled={loading}>
@@ -139,8 +139,8 @@ export default function MasterCatalogPage() {
                       <tr className="border-b text-xs text-muted-foreground">
                         <th className="text-left font-medium px-4 py-2">Product</th>
                         <th className="text-left font-medium px-4 py-2">Supplier</th>
-                        <th className="text-right font-medium px-4 py-2">You pay</th>
-                        <th className="text-right font-medium px-4 py-2">They ask</th>
+                        <th className="text-right font-medium px-4 py-2">You Pay</th>
+                        <th className="text-right font-medium px-4 py-2">They Ask</th>
                         <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                       </tr>
                     </thead>
@@ -208,7 +208,7 @@ export default function MasterCatalogPage() {
                     <tr className="border-b text-xs text-muted-foreground">
                       <th className="text-left font-medium px-4 py-2">SKU</th>
                       <th className="text-left font-medium px-4 py-2">Name</th>
-                      <th className="text-right font-medium px-4 py-2">Your price</th>
+                      <th className="text-right font-medium px-4 py-2">Your Price</th>
                       <th className="text-left font-medium px-4 py-2">Source</th>
                       <th className="px-4 py-2"><span className="sr-only">Actions</span></th>
                     </tr>
@@ -355,7 +355,7 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
         </DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Product name</Label>
+            <Label className="text-xs text-muted-foreground">Product Name</Label>
             <Input value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-1.5">
@@ -368,13 +368,13 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
               <Input value={barcode} onChange={(e) => setBarcode(e.target.value)} />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Country of origin</Label>
+              <Label className="text-xs text-muted-foreground">Country of Origin</Label>
               <Input value={origin} onChange={(e) => setOrigin(e.target.value)} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">Your price</Label>
+              <Label className="text-xs text-muted-foreground">Your Price</Label>
               <Input type="number" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -384,7 +384,7 @@ const PublishDialog: React.FC<{ row: CatalogMasterProduct | null; onClose: () =>
           </div>
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-xs text-muted-foreground">Volume tiers</Label>
+              <Label className="text-xs text-muted-foreground">Volume Tiers</Label>
               <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={addTier}>
                 Add tier
               </Button>

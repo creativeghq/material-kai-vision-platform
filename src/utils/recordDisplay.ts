@@ -7,9 +7,9 @@
  * the dialog you opened FROM that table.
  */
 
-/** `quote_approved` → `Quote approved`. A stored enum is a value, not prose. */
+/** `quote_approved` → `Quote Approved`. */
 export function labelizeValue(value: string): string {
-  return value.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
 export type StatusBadgeVariant = 'success' | 'warning' | 'error' | 'info' | 'neutral';

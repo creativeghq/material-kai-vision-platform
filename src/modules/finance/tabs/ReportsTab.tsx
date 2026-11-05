@@ -30,25 +30,25 @@ type ReportGroup = 'overview' | 'sales' | 'purchases' | 'payments' | 'outstandin
 
 const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: 'range' | 'snapshot' }[] = [
   // Overview (Oxygen Ταμείο)
-  { value: 'cashflow_per_day', label: 'Daily cash flow',   group: 'overview', period: 'range' },
+  { value: 'cashflow_per_day', label: 'Daily Cash Flow',   group: 'overview', period: 'range' },
   { value: 'pnl_per_category', label: 'P&L by category',   group: 'overview', period: 'range' },
-  { value: 'profit_taken',     label: 'Profit taken',      group: 'overview', period: 'range' },
-  { value: 'owner_payments',   label: 'Paid to owners (per partner)', group: 'overview', period: 'range' },
+  { value: 'profit_taken',     label: 'Profit Taken',      group: 'overview', period: 'range' },
+  { value: 'owner_payments',   label: 'Paid to Owners (Per Partner)', group: 'overview', period: 'range' },
   // Sales
-  { value: 'sales_per_day',       label: 'Sales per day',           group: 'sales',       period: 'range' },
-  { value: 'sales_per_customer',  label: 'Sales per customer',      group: 'sales',       period: 'range' },
-  { value: 'sales_per_factory',   label: 'Sales per brand',         group: 'sales',       period: 'range' },
-  { value: 'sales_per_product',   label: 'Sales per product',       group: 'sales',       period: 'range' },
-  { value: 'sales_per_category',  label: 'Sales per category',      group: 'sales',       period: 'range' },
-  { value: 'sales_per_designer',  label: 'Sales per designer',      group: 'sales',       period: 'range' },
+  { value: 'sales_per_day',       label: 'Sales per Day',           group: 'sales',       period: 'range' },
+  { value: 'sales_per_customer',  label: 'Sales per Customer',      group: 'sales',       period: 'range' },
+  { value: 'sales_per_factory',   label: 'Sales per Brand',         group: 'sales',       period: 'range' },
+  { value: 'sales_per_product',   label: 'Sales per Product',       group: 'sales',       period: 'range' },
+  { value: 'sales_per_category',  label: 'Sales per Category',      group: 'sales',       period: 'range' },
+  { value: 'sales_per_designer',  label: 'Sales per Designer',      group: 'sales',       period: 'range' },
   // Purchases
-  { value: 'purchases_per_product', label: 'Purchases per product', group: 'purchases',   period: 'range' },
-  { value: 'receipts_per_product',  label: 'Receipts per product',  group: 'purchases',   period: 'range' },
-  { value: 'spend_per_supplier',    label: 'Spend per supplier',    group: 'purchases',   period: 'range' },
+  { value: 'purchases_per_product', label: 'Purchases per Product', group: 'purchases',   period: 'range' },
+  { value: 'receipts_per_product',  label: 'Receipts per Product',  group: 'purchases',   period: 'range' },
+  { value: 'spend_per_supplier',    label: 'Spend per Supplier',    group: 'purchases',   period: 'range' },
   // Payments / cash
-  { value: 'payments_out_per_counterparty', label: 'Money sent (per supplier)',  group: 'payments', period: 'range' },
-  { value: 'cash_out_per_category',        label: 'Money out (by category)',    group: 'payments', period: 'range' },
-  { value: 'payments_in_per_counterparty',  label: 'Money received (per customer)', group: 'payments', period: 'range' },
+  { value: 'payments_out_per_counterparty', label: 'Money Sent (Per Supplier)',  group: 'payments', period: 'range' },
+  { value: 'cash_out_per_category',        label: 'Money Out (By Category)',    group: 'payments', period: 'range' },
+  { value: 'payments_in_per_counterparty',  label: 'Money Received (Per Customer)', group: 'payments', period: 'range' },
   // VAT / tax
   { value: 'vat_return', label: 'VAT analysis (by rate)', group: 'vat', period: 'range' },
   { value: 'vat_by_code', label: 'VAT analysis (by myDATA code)', group: 'vat', period: 'range' },
@@ -56,11 +56,11 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'myf', label: 'MYF summary (per counterparty)', group: 'vat', period: 'range' },
   // Statutory statistical return for intra-EU goods movements. Rows come out one per
   // commodity code / partner / origin, so the generic table and its CSV export carry them.
-  { value: 'intrastat_dispatch', label: 'Intrastat — dispatches (sales)',   group: 'customs', period: 'range' },
-  { value: 'intrastat_arrival',  label: 'Intrastat — arrivals (purchases)', group: 'customs', period: 'range' },
+  { value: 'intrastat_dispatch', label: 'Intrastat — Dispatches (Sales)',   group: 'customs', period: 'range' },
+  { value: 'intrastat_arrival',  label: 'Intrastat — Arrivals (Purchases)', group: 'customs', period: 'range' },
   // Outstanding snapshots (no period)
-  { value: 'top_customer_outstanding', label: 'Top outstanding customers', group: 'outstanding', period: 'snapshot' },
-  { value: 'top_supplier_outstanding', label: 'Top outstanding suppliers', group: 'outstanding', period: 'snapshot' },
+  { value: 'top_customer_outstanding', label: 'Top Outstanding Customers', group: 'outstanding', period: 'snapshot' },
+  { value: 'top_supplier_outstanding', label: 'Top Outstanding Suppliers', group: 'outstanding', period: 'snapshot' },
   // Tasks
   { value: 'open_tasks', label: 'Open tasks / Follow-ups', group: 'tasks', period: 'snapshot' },
 ];
@@ -241,13 +241,13 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
     if (report !== 'profit_taken' || !drawdown) return totals;
     if (drawdown.mixed_currency) {
       // Claims and withdrawals in different currencies do not subtract. Saying so beats a number.
-      return [...totals, { label: 'Drawn from the bank', value: 'mixed currencies — see payments' }];
+      return [...totals, { label: 'Drawn from the Bank', value: 'mixed currencies — see payments' }];
     }
     return [
       ...totals,
-      { label: 'Drawn from the bank', value: formatMoney(drawdown.drawn, drawdown.currency) },
+      { label: 'Drawn from the Bank', value: formatMoney(drawdown.drawn, drawdown.currency) },
       drawdown.over_drawn > 0.005
-        ? { label: 'Drawn ahead of claims', value: formatMoney(drawdown.over_drawn, drawdown.currency) }
+        ? { label: 'Drawn Ahead of Claims', value: formatMoney(drawdown.over_drawn, drawdown.currency) }
         : { label: 'Claimed, still in the bank', value: formatMoney(drawdown.undrawn, drawdown.currency) },
     ];
   }, [report, totals, drawdown]);
@@ -294,11 +294,11 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="this_month">This month</SelectItem>
-                  <SelectItem value="last_month">Last month</SelectItem>
-                  <SelectItem value="last_quarter">Last 3 months</SelectItem>
-                  <SelectItem value="ytd">Year to date</SelectItem>
-                  <SelectItem value="last_year">Last year</SelectItem>
-                  <SelectItem value="custom">Custom range</SelectItem>
+                  <SelectItem value="last_month">Last Month</SelectItem>
+                  <SelectItem value="last_quarter">Last 3 Months</SelectItem>
+                  <SelectItem value="ytd">Year to Date</SelectItem>
+                  <SelectItem value="last_year">Last Year</SelectItem>
+                  <SelectItem value="custom">Custom Range</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -478,7 +478,7 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       for (const r of rows) payments += Number(r.payment_count || 0);
       return [
         { label: 'Payments', value: String(payments) },
-        ...moneyTotals(rows, 'total_paid', 'Money out'),
+        ...moneyTotals(rows, 'total_paid', 'Money Out'),
       ];
     }
     case 'owner_payments': {
@@ -486,15 +486,15 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       for (const r of rows) payments += Number(r.payment_count || 0);
       return [
         { label: 'Payments', value: String(payments) },
-        ...moneyTotals(rows, 'total_paid', 'Paid to owners'),
+        ...moneyTotals(rows, 'total_paid', 'Paid to Owners'),
       ];
     }
     case 'profit_taken': {
       let orders = 0;
       for (const r of rows) orders += Number(r.order_count || 0);
       return [
-        { label: 'Orders drawn from', value: String(orders) },
-        ...moneyTotals(rows, 'amount', 'Profit taken'),
+        { label: 'Orders Drawn From', value: String(orders) },
+        ...moneyTotals(rows, 'amount', 'Profit Taken'),
       ];
     }
     case 'pnl_per_category': {
@@ -527,7 +527,7 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       let qty = 0;
       for (const r of rows) qty += Number(r.total_quantity || 0);
       return [
-        { label: 'Total quantity', value: qty.toFixed(2) },
+        { label: 'Total Quantity', value: qty.toFixed(2) },
         ...moneyTotals(rows, 'total_cost', 'Total cost'),
       ];
     }
@@ -542,25 +542,25 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
     }
     case 'payments_out_per_counterparty': {
       return [
-        { label: 'Suppliers paid', value: String(rows.length) },
+        { label: 'Suppliers Paid', value: String(rows.length) },
         ...moneyTotals(rows, 'total_paid', 'Total sent'),
       ];
     }
     case 'payments_in_per_counterparty': {
       return [
-        { label: 'Customers paying', value: String(rows.length) },
+        { label: 'Customers Paying', value: String(rows.length) },
         ...moneyTotals(rows, 'total_received', 'Total received'),
       ];
     }
     case 'top_customer_outstanding': {
       return [
-        { label: 'Customers with open balance', value: String(rows.length) },
+        { label: 'Customers with Open Balance', value: String(rows.length) },
         ...moneyTotals(rows, 'outstanding', 'Total AR outstanding'),
       ];
     }
     case 'top_supplier_outstanding': {
       return [
-        { label: 'Suppliers with open balance', value: String(rows.length) },
+        { label: 'Suppliers with Open Balance', value: String(rows.length) },
         ...moneyTotals(rows, 'outstanding', 'Total AP outstanding'),
       ];
     }
@@ -575,8 +575,8 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       const reverseCharge = sum((r) => r.section === 'reverse_charge_output', 'vat');
       const payable = Math.round((outputVat - inputVat) * 100) / 100;
       return [
-        { label: 'Output VAT (sales)', value: formatMoney(outputVat) },
-        { label: 'Input VAT (purchases)', value: formatMoney(inputVat) },
+        { label: 'Output VAT (Sales)', value: formatMoney(outputVat) },
+        { label: 'Input VAT (Purchases)', value: formatMoney(inputVat) },
         ...(reverseCharge > 0
           // Stated in its own right, not merely folded into the two above: it is the one figure
           // on this report that is declared and reclaimed in the same breath.
@@ -591,7 +591,7 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       return [
         { label: 'Net', value: formatMoney(net) },
         { label: 'VAT', value: formatMoney(vat) },
-        { label: 'Code groups', value: String(rows.length) },
+        { label: 'Code Groups', value: String(rows.length) },
       ];
     }
     case 'mydata_reconciliation': {
@@ -600,14 +600,14 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
       return [
         { label: 'Accepted', value: String(count('accepted')) },
         { label: 'Not transmitted', value: String(count('not_transmitted')) },
-        { label: 'Needs attention', value: String(attention) },
+        { label: 'Needs Attention', value: String(attention) },
       ];
     }
     case 'myf': {
       const sum = (dir: string, key: string) => rows.filter((r) => r.direction === dir).reduce((s, r) => s + Number(r[key] || 0), 0);
       return [
-        { label: 'Sales net', value: formatMoney(sum('sales', 'net')) },
-        { label: 'Purchases net', value: formatMoney(sum('purchases', 'net')) },
+        { label: 'Sales Net', value: formatMoney(sum('sales', 'net')) },
+        { label: 'Purchases Net', value: formatMoney(sum('purchases', 'net')) },
         { label: 'Counterparties', value: String(rows.length) },
       ];
     }
@@ -632,7 +632,7 @@ function renderReport(
   }
   if (report === 'cash_out_per_category') {
     return (
-      <Table headers={['Category', 'Payments', 'Money out']} totals={totals} rows={rows.map((r: any) => [
+      <Table headers={['Category', 'Payments', 'Money Out']} totals={totals} rows={rows.map((r: any) => [
         r.is_owner_payment
           ? <span key="n">{r.category_name} <span className="text-[10px] text-muted-foreground">· paid to owners</span></span>
           : r.category_name,
@@ -653,7 +653,7 @@ function renderReport(
   }
   if (report === 'profit_taken') {
     return (
-      <Table headers={['Category', 'Orders', 'Profit taken']} totals={totals} rows={rows.map((r: any) => [
+      <Table headers={['Category', 'Orders', 'Profit Taken']} totals={totals} rows={rows.map((r: any) => [
         r.category_name,
         String(r.order_count ?? 0),
         formatMoney(Number(r.amount || 0), r.currency || 'EUR'),
@@ -741,7 +741,7 @@ function renderReport(
   if (report === 'open_tasks') {
     return (
       <Table
-        headers={['Quote', 'Kind', 'Scheduled for', 'In', 'Note']}
+        headers={['Quote', 'Kind', 'Scheduled For', 'In', 'Note']}
         totals={totals}
         rows={paginate(rows, page).map((r: any) => [
           r.quote_label, r.kind, r.scheduled_for ? formatDate(r.scheduled_for, { withTime: true }) : '—', `${r.days_until}d`, r.body ?? '—',
@@ -806,10 +806,10 @@ const BUCKET_META: Record<string, { label: string; cls: string; rank: number }> 
   not_transmitted: { label: 'Not transmitted', cls: 'bg-destructive/15 text-destructive border-destructive/30', rank: 0 },
   rejected: { label: 'Rejected', cls: 'bg-destructive/15 text-destructive border-destructive/30', rank: 1 },
   failed: { label: 'Failed', cls: 'bg-destructive/15 text-destructive border-destructive/30', rank: 2 },
-  offline_pending: { label: 'Offline — pending MARK', cls: 'bg-amber-500/15 text-amber-500 border-amber-500/30', rank: 3 },
+  offline_pending: { label: 'Offline — Pending MARK', cls: 'bg-amber-500/15 text-amber-500 border-amber-500/30', rank: 3 },
   accepted: { label: 'Accepted', cls: 'bg-emerald-500/15 text-emerald-500 border-emerald-500/30', rank: 9 },
 };
-const DOC_KIND_LABEL: Record<string, string> = { invoice: 'Invoice', credit_note: 'Credit note', delivery_note: 'Delivery note' };
+const DOC_KIND_LABEL: Record<string, string> = { invoice: 'Invoice', credit_note: 'Credit Note', delivery_note: 'Delivery Note' };
 
 const MyDataReconTable: React.FC<{
   rows: any[]; totals: { label: string; value: string }[]; page: number; onPageChange: (p: number) => void;

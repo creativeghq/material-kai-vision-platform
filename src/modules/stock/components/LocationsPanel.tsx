@@ -187,8 +187,8 @@ export const LocationsPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
                   <TableHead>Code</TableHead>
                   <TableHead>Kind</TableHead>
                   <TableHead>Barcode</TableHead>
-                  <TableHead>Walking path</TableHead>
-                  <TableHead>Next count</TableHead>
+                  <TableHead>Walking Path</TableHead>
+                  <TableHead>Next Count</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -230,14 +230,14 @@ export const LocationsPanel: React.FC<{ workspaceId: string }> = ({ workspaceId 
             />
           </div>
           <div>
-            <Label htmlFor="loc-barcode" className="text-xs">Location barcode</Label>
+            <Label htmlFor="loc-barcode" className="text-xs">Location Barcode</Label>
             <Input
               id="loc-barcode" className="mt-1 h-8 w-40 text-xs" value={draft.barcode}
               onChange={(e) => setDraft((d) => ({ ...d, barcode: e.target.value }))}
             />
           </div>
           <div>
-            <Label htmlFor="loc-path" className="text-xs">Walking path</Label>
+            <Label htmlFor="loc-path" className="text-xs">Walking Path</Label>
             <Input
               id="loc-path" className="mt-1 h-8 w-32 text-xs" value={draft.path}
               onChange={(e) => setDraft((d) => ({ ...d, path: e.target.value }))} placeholder="A/01/02"

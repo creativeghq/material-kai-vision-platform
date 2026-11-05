@@ -386,7 +386,7 @@ async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
 
   // ── Shared layout traits (used by top_week, top_month, moodboard, vr3d) ──
   const layoutTraits = [
-    { type: 'number', label: 'Items to show', name: 'data-count', min: 1, max: 12 },
+    { type: 'number', label: 'Items to Show', name: 'data-count', min: 1, max: 12 },
     { type: 'select', label: 'Layout', name: 'data-layout',
       options: [{ id: 'columns', label: 'Grid' }, { id: 'list', label: 'List' }] },
     { type: 'select', label: 'Columns', name: 'data-cols',
@@ -416,7 +416,7 @@ async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
       defaultAttrs: { 'data-category': '', 'data-show-details': 'true' },
       traits: [
         { type: 'select',   label: 'Category',         name: 'data-category',    options: categoryOptions },
-        { type: 'number',   label: 'Items to show',    name: 'data-count',       min: 1, max: 12 },
+        { type: 'number',   label: 'Items to Show',    name: 'data-count',       min: 1, max: 12 },
         { type: 'select',   label: 'Layout',           name: 'data-layout',
           options: [{ id: 'columns', label: 'Grid' }, { id: 'list', label: 'List' }] },
         { type: 'select',   label: 'Columns',          name: 'data-cols',
@@ -885,7 +885,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
             />
           </div>
           <div className="flex items-center gap-2 flex-1">
-            <Label htmlFor="preview-text" className="text-xs whitespace-nowrap text-muted-foreground w-20 shrink-0">Preview text</Label>
+            <Label htmlFor="preview-text" className="text-xs whitespace-nowrap text-muted-foreground w-20 shrink-0">Preview Text</Label>
             <Input
               id="preview-text" value={previewText} onChange={e => setPreviewText(e.target.value)}
               placeholder="Short teaser shown in Gmail, Outlook… (max ~90 chars)"
@@ -914,7 +914,7 @@ export const EmailTemplateBuilder: React.FC<EmailTemplateBuilderProps> = ({ back
               Sends the current design (with preheader + live data blocks) to an inbox before going live.
             </p>
             <div className="space-y-2 pt-1">
-              <Label htmlFor="test-email" className="text-xs">Recipient email</Label>
+              <Label htmlFor="test-email" className="text-xs">Recipient Email</Label>
               <Input
                 id="test-email" type="email" value={testEmail}
                 onChange={e => setTestEmail(e.target.value)}

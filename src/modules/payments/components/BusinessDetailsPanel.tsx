@@ -127,9 +127,9 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Field label="Legal / Trading name *" value={fields.business_name} onChange={update('business_name')} disabled={saving} placeholder="Acme Materials GmbH" />
+          <Field label="Legal / Trading Name *" value={fields.business_name} onChange={update('business_name')} disabled={saving} placeholder="Acme Materials GmbH" />
           <Field label="VAT number" value={fields.business_vat} onChange={update('business_vat')} disabled={saving} placeholder="EL123456789" />
-          <Field label="Tax office" value={fields.business_tax_office} onChange={update('business_tax_office')} disabled={saving} />
+          <Field label="Tax Office" value={fields.business_tax_office} onChange={update('business_tax_office')} disabled={saving} />
           <Field label="Phone" value={fields.business_phone} onChange={update('business_phone')} disabled={saving} />
           <Field label="Email" value={fields.business_email} onChange={update('business_email')} disabled={saving} type="email" />
           <Field label="Website" value={fields.business_website} onChange={update('business_website')} disabled={saving} placeholder="https://example.com" />
@@ -139,7 +139,7 @@ export const BusinessDetailsPanel: React.FC<Props> = (_props) => {
           <Label className="text-sm">Address</Label>
           <Input value={fields.business_address} onChange={update('business_address')} disabled={saving} placeholder="Street + number" />
           <div className="grid grid-cols-3 gap-2">
-            <Input value={fields.business_postal_code} onChange={update('business_postal_code')} disabled={saving} placeholder="Postal code" />
+            <Input value={fields.business_postal_code} onChange={update('business_postal_code')} disabled={saving} placeholder="Postal Code" />
             <Input value={fields.business_city} onChange={update('business_city')} disabled={saving} placeholder="City" className="col-span-1" />
             <Input value={fields.business_country_code} onChange={update('business_country_code')} disabled={saving} placeholder="Country (ISO)" maxLength={2} />
           </div>

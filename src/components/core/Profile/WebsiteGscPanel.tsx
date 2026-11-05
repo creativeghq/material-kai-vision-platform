@@ -281,14 +281,14 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
   const filterCount = (q ? 1 : 0) + (activePage ? 1 : 0) + (activeSegment ? 1 : 0);
   const clearFilters = () => { setSearch(''); setPageFilter(ALL_PAGES); setSegment(ALL_PAGES); setPage(1); };
   const segmentOptions = [
-    { value: ALL_PAGES, label: 'All countries & devices' },
+    { value: ALL_PAGES, label: 'All Countries & Devices' },
     ...(summary?.devices || []).filter((d) => d.value)
       .map((d) => ({ value: `device:${String(d.value).toLowerCase()}`, label: `Device · ${String(d.value).toLowerCase()}` })),
     ...(summary?.countries || []).filter((c) => c.value)
       .map((c) => ({ value: `country:${String(c.value).toLowerCase()}`, label: `Country · ${String(c.value).toUpperCase()}` })),
   ];
   const pageOptions = [
-    { value: ALL_PAGES, label: 'All pages' },
+    { value: ALL_PAGES, label: 'All Pages' },
     ...(summary?.top_pages || []).filter((p) => p.page).map((p) => ({ value: p.page as string, label: pathOf(p.page as string) })),
   ];
   if (activePage && !pageOptions.some((o) => o.value === activePage)) {
@@ -341,7 +341,7 @@ export const WebsiteGscPanel: React.FC<{ website: UserWebsite }> = ({ website })
             <GscMetric label="Clicks" value={t?.clicks != null ? fmt(t.clicks) : '—'} status={summary?.status} />
             <GscMetric label="Impressions" value={t?.impressions != null ? fmt(t.impressions) : '—'} status={summary?.status} />
             <GscMetric label="Avg CTR" value={t?.ctr != null ? `${t.ctr.toFixed(1)}%` : '—'} status={summary?.status} />
-            <GscMetric label="Avg position" value={t?.position != null ? t.position.toFixed(1) : '—'} status={summary?.status} />
+            <GscMetric label="Avg Position" value={t?.position != null ? t.position.toFixed(1) : '—'} status={summary?.status} />
           </div>
           {summary?.note && (
             // Which day this actually ends on, and whether the stored history is

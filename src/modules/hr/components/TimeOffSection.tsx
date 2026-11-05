@@ -222,7 +222,7 @@ function FileLeaveDialog({ workspaceId, absence, leaveTypes, onDone }: { workspa
             under your workspace's Ergani account. Pick the exact ministry leave type.
           </p>
           <div className="space-y-1">
-            <Label>Ergani leave type *</Label>
+            <Label>Ergani Leave Type *</Label>
             <Select value={code} onValueChange={setCode}>
               <SelectTrigger><SelectValue placeholder="Select leave code" /></SelectTrigger>
               <SelectContent className="max-h-72">

@@ -147,7 +147,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Inbound', to: '/warehouse?tab=inbound', icon: Ship },
     { label: 'Dispatch', to: '/warehouse?tab=dispatch', icon: Truck },
     { label: 'Movements', to: '/warehouse?tab=movements', icon: ArrowLeftRight },
-    { label: 'Stock counts', to: '/warehouse?tab=counts', icon: ClipboardList },
+    { label: 'Stock Counts', to: '/warehouse?tab=counts', icon: ClipboardList },
   ],
   // MoodBoards (nav id 'moodboard', route /moodboard). The board list is the Open target; the
   // high-value work is the AI presentation sheets — surface them as ONE agent deep-link so a click
@@ -155,30 +155,30 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // incl. the "design breakdown" board) instead of hunting for the per-board Sheets tab.
   // (sheets are an agent capability, not a page tab.
   moodboard: [
-    { label: 'Presentation sheets', to: '/agent-hub?capability=presentation-sheet', icon: LayoutTemplate },
+    { label: 'Presentation Sheets', to: '/agent-hub?capability=presentation-sheet', icon: LayoutTemplate },
   ],
   // Projects (nav id 'projects', route /projects). No URL tabs on the page, but the module owns
   // real agent + calculator capabilities that were invisible in the menu: the purchase-sheet builder
   // (agent) and the three estimators (real pages under /tools). Surface them here.
   projects: [
-    { label: 'Purchase sheet', to: '/agent-hub?capability=project', icon: ClipboardList },
-    { label: 'Project estimator', to: '/tools/project-plan', icon: Calculator },
-    { label: 'Heat-pump sizer', to: '/tools/heat-pump', icon: Flame },
-    { label: 'Heating cost compare', to: '/tools/heating-cost', icon: Thermometer },
-    { label: 'Tile installation guide', to: '/tools/tile-installation', icon: Grid3x3 },
-    { label: 'Installation guides', to: '/guides', icon: BookOpen, moduleSlug: 'installation-guides' },
+    { label: 'Purchase Sheet', to: '/agent-hub?capability=project', icon: ClipboardList },
+    { label: 'Project Estimator', to: '/tools/project-plan', icon: Calculator },
+    { label: 'Heat-Pump Sizer', to: '/tools/heat-pump', icon: Flame },
+    { label: 'Heating Cost Compare', to: '/tools/heating-cost', icon: Thermometer },
+    { label: 'Tile Installation Guide', to: '/tools/tile-installation', icon: Grid3x3 },
+    { label: 'Installation Guides', to: '/guides', icon: BookOpen, moduleSlug: 'installation-guides' },
   ],
   // Contracts (nav id 'contracts'). The tile itself deep-links into the agent (drafting +
   // send-for-signature); `/contracts` is the real list page, registered by the contracts module.
   // It used to surface as a SECOND "Contracts" card in the launcher's "More" group — deduped in
   // useLauncherApps, so the list has to be reachable from this card instead.
   contracts: [
-    { label: 'All contracts', to: '/contracts', icon: FileText },
+    { label: 'All Contracts', to: '/contracts', icon: FileText },
   ],
   // Quotes (nav id 'quotes', route /quotes). The list is the Open target; Price Monitoring is nested
   // here as an agent deep-link (folded in from a standalone tile to keep the Sales list lean).
   quotes: [
-    { label: 'Price monitoring', to: '/agent-hub?capability=price-monitoring', icon: TrendingUp },
+    { label: 'Price Monitoring', to: '/agent-hub?capability=price-monitoring', icon: TrendingUp },
   ],
   // Mention Monitoring now has its own Marketing tile pointing at the DASHBOARD; this is the agent
   // side of the same capability, so it hangs off that tile rather than off Social Media, where it
@@ -189,7 +189,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // SEO & Content (agent app, seo-toolkit). One tile for both research and article writing —
   // Content Writer merged in here as a section instead of a separate tile.
   seo: [
-    { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search },
+    { label: 'Keyword Research', to: '/agent-hub?capability=seo-research', icon: Search },
     { label: 'Write an article', to: '/agent-hub?capability=seo-article', icon: PenTool },
   ],
   // SEO Module (nav id 'seo-websites', /profile?tab=websites). The tile itself is the connected
@@ -199,14 +199,14 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // an entry point rather than a spend.
   // Both gates are real, and they are different questions.
   'seo-websites': [
-    { label: 'Connected websites', to: '/profile?tab=websites', icon: Globe },
-    { label: 'Keyword research', to: '/agent-hub?capability=seo-research', icon: Search, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Connected Websites', to: '/profile?tab=websites', icon: Globe },
+    { label: 'Keyword Research', to: '/agent-hub?capability=seo-research', icon: Search, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
     { label: 'Write an article', to: '/agent-hub?capability=seo-article', icon: PenTool, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
-    { label: 'Domain intel', to: '/agent-hub?capability=seo-domain', icon: Globe, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Domain Intel', to: '/agent-hub?capability=seo-domain', icon: Globe, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
     { label: 'Backlinks', to: '/agent-hub?capability=seo-backlinks', icon: Link2, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
-    { label: 'Content & tech', to: '/agent-hub?capability=seo-content', icon: FileSearch, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Content & Tech', to: '/agent-hub?capability=seo-content', icon: FileSearch, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
     { label: 'Beyond Google', to: '/agent-hub?capability=seo-multi-engine', icon: Layers, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
-    { label: 'Full site audit', to: '/agent-hub?capability=seo-composite', icon: BadgeCheck, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
+    { label: 'Full Site Audit', to: '/agent-hub?capability=seo-composite', icon: BadgeCheck, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
     { label: 'AI visibility', to: '/agent-hub?capability=ai-visibility', icon: Bot, moduleSlug: 'seo-toolkit', requireAnyCapability: ['agent.use'] },
   ],
   // Image Studio (agent app). Its path uses ?generation_mode= rather than ?capability=, so the
@@ -221,7 +221,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // Automations (nav id 'automations', route /automations). The page has no URL tabs and creating a
   // flow is an agent flow (not a page modal), so this surfaces the real `flows-toolkit` quick-starts.
   automations: [
-    { label: 'My flows', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:My%20flows', icon: ListChecks },
+    { label: 'My Flows', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:My%20Flows', icon: ListChecks },
     { label: 'Pause a flow', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Pause%20a%20flow', icon: PauseCircle },
   ],
   // Templates (#322). The library filters on ?type=, whose values are the LIVE_TEMPLATE_TYPES keys
@@ -236,14 +236,14 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Contracts', to: '/templates?type=contract', icon: FileText },
     { label: 'Onboarding', to: '/templates?type=hr_onboarding', icon: ClipboardList },
     { label: 'Listings', to: '/templates?type=property_listing', icon: Building2 },
-    { label: 'Customer terms', to: '/templates?type=crm_company', icon: Contact },
+    { label: 'Customer Terms', to: '/templates?type=crm_company', icon: Contact },
   ],
   // Blueprints — the source rail on BlueprintLibraryPage. "All" is what Open reaches, so it is not
   // repeated here. Giving this card sub-picks is also what takes it OUT of the launcher's Jump-to
   // rail: that rail is for apps with nothing to expand, computed from these entries rather than
   // listed by hand, so a card gains chips and leaves the rail in one move.
   blueprints: [
-    { label: 'My blueprints', to: '/blueprints?tab=mine', icon: LayoutTemplate },
+    { label: 'My Blueprints', to: '/blueprints?tab=mine', icon: LayoutTemplate },
   ],
   // Market Trends — the four sub-areas of MarketTrendsTab (its MARKET_TABS array).
   'market-trends': [
@@ -311,23 +311,23 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   // The channels marketing actually has to keep connected, plus the one-off scan that needs no
   // module (the Mention Monitoring tile is the subscribed version of the same capability).
   marketing: [
-    { label: 'Social accounts', to: '/profile?tab=social-accounts', icon: Share2 },
-    { label: 'My websites', to: '/profile?tab=websites', icon: Globe },
-    { label: 'Quick mention scan', to: '/tools/mention-scan', icon: Radar },
+    { label: 'Social Accounts', to: '/profile?tab=social-accounts', icon: Share2 },
+    { label: 'My Websites', to: '/profile?tab=websites', icon: Globe },
+    { label: 'Quick Mention Scan', to: '/tools/mention-scan', icon: Radar },
   ],
   // What a rep reaches for around a quote but never finds on the Quotes card: the catalog they
   // price from, a saved starting point, and their own trip card.
   sales: [
     // /discover is wrapped in <CapabilityGuard anyOf={PRODUCT_BROWSE_ANY}> — carry the same gate.
     { label: 'Find materials', to: '/discover?tab=products', icon: Search, requireAnyCapability: PRODUCT_BROWSE_ANY },
-    { label: 'Quote templates', to: '/templates?type=quote', icon: FilePlus },
-    { label: 'My trip expenses', to: '/trip-expenses', icon: Plane },
+    { label: 'Quote Templates', to: '/templates?type=quote', icon: FilePlus },
+    { label: 'My Trip Expenses', to: '/trip-expenses', icon: Plane },
   ],
   // Finance's own cards cover documents and stock; what they never cover is what the workspace
   // itself is paying for.
   finance: [
-    { label: 'Invoice templates', to: '/templates?type=invoice', icon: Receipt },
-    { label: 'Credits & top-ups', to: '/billing/credits', icon: Coins },
+    { label: 'Invoice Templates', to: '/templates?type=invoice', icon: Receipt },
+    { label: 'Credits & Top-Ups', to: '/billing/credits', icon: Coins },
     { label: 'Subscription', to: '/billing/subscriptions', icon: CreditCard },
   ],
   // Service is three agent surfaces (Inbox / WhatsApp / Reviews); the personal side of the same
@@ -336,23 +336,23 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   // separate screen, so this points at that filtered view of the one Inbox.
   service: [
     { label: 'Reviews about you', to: '/profile?tab=reviews', icon: Star },
-    { label: 'My appointments', to: '/profile?tab=schedule&section=appointments', icon: CalendarDays },
-    { label: 'Profile enquiries', to: filterUrl('/inbox', 'f', { source: 'public_profile' }), icon: MessagesSquare },
+    { label: 'My Appointments', to: '/profile?tab=schedule&section=appointments', icon: CalendarDays },
+    { label: 'Profile Enquiries', to: filterUrl('/inbox', 'f', { source: 'public_profile' }), icon: MessagesSquare },
   ],
   projects: [
-    { label: 'My tasks', to: '/projects/my-tasks', icon: ListChecks },
-    { label: 'Project templates', to: '/templates?type=project', icon: LayoutTemplate },
+    { label: 'My Tasks', to: '/projects/my-tasks', icon: ListChecks },
+    { label: 'Project Templates', to: '/templates?type=project', icon: LayoutTemplate },
   ],
   studio: [
-    { label: 'Kitchen calculator', to: '/tools/kitchen-cost', icon: Calculator },
+    { label: 'Kitchen Calculator', to: '/tools/kitchen-cost', icon: Calculator },
     { label: 'Identify a material', to: '/recognition', icon: ScanLine },
-    { label: 'Moodboard templates', to: '/templates?type=moodboard', icon: LayoutTemplate },
+    { label: 'Moodboard Templates', to: '/templates?type=moodboard', icon: LayoutTemplate },
   ],
   // HR's card is the manager view of everyone; these are the employee's own surfaces.
   people: [
-    { label: 'Onboarding templates', to: '/templates?type=hr_onboarding', icon: ClipboardCheck },
-    { label: 'My documents', to: '/profile?tab=documents', icon: FolderOpen },
-    { label: 'My calendar', to: '/profile?tab=schedule&section=calendar', icon: CalendarDays },
+    { label: 'Onboarding Templates', to: '/templates?type=hr_onboarding', icon: ClipboardCheck },
+    { label: 'My Documents', to: '/profile?tab=documents', icon: FolderOpen },
+    { label: 'My Calendar', to: '/profile?tab=schedule&section=calendar', icon: CalendarDays },
   ],
 };
 

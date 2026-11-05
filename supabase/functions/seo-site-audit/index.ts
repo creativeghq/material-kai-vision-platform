@@ -32,18 +32,18 @@ type Attribution = { workspace_id: string; user_id?: string | null };
 // DataForSEO instant-page `checks` that mean a real problem when true. (Other checks like
 // seo_friendly_url / has_html_doctype are GOOD when true, so we only whitelist negatives.)
 const BAD_CHECKS: Record<string, string> = {
-  no_title: 'Missing <title>', title_too_long: 'Title too long', title_too_short: 'Title too short',
-  no_description: 'Missing meta description', no_h1_tag: 'Missing H1 heading', no_image_alt: 'Images missing alt text',
-  no_favicon: 'Missing favicon', no_doctype: 'Missing doctype', is_http: 'Not served over HTTPS',
-  high_loading_time: 'Slow page load', high_waiting_time: 'High server response time', large_page_size: 'Large page size',
-  low_content_rate: 'Thin content', low_readability_rate: 'Low readability', duplicate_title_tag: 'Duplicate title tag',
+  no_title: 'Missing <title>', title_too_long: 'Title Too Long', title_too_short: 'Title Too Short',
+  no_description: 'Missing meta description', no_h1_tag: 'Missing H1 Heading', no_image_alt: 'Images Missing Alt Text',
+  no_favicon: 'Missing Favicon', no_doctype: 'Missing Doctype', is_http: 'Not served over HTTPS',
+  high_loading_time: 'Slow Page Load', high_waiting_time: 'High Server Response Time', large_page_size: 'Large Page Size',
+  low_content_rate: 'Thin Content', low_readability_rate: 'Low Readability', duplicate_title_tag: 'Duplicate title tag',
   duplicate_meta_tags: 'Duplicate meta tags', duplicate_description: 'Duplicate meta description',
-  no_content_encoding: 'No gzip/brotli compression', has_render_blocking_resources: 'Render-blocking resources',
+  no_content_encoding: 'No gzip/brotli compression', has_render_blocking_resources: 'Render-Blocking Resources',
   redirect: 'Homepage redirects', is_4xx_code: 'Returns a 4xx error', is_5xx_code: 'Returns a 5xx error',
-  canonical_another_domain: 'Canonical points to another domain', has_meta_refresh_redirect: 'Uses meta-refresh redirect',
-  frame: 'Uses <frame>/<iframe> for content', lorem_ipsum: 'Contains placeholder (lorem ipsum) text',
-  broken_links: 'Has broken links', broken_resources: 'Has broken resources', irrelevant_description: 'Meta description looks irrelevant',
-  irrelevant_title: 'Title looks irrelevant', small_page_size: 'Very small page (possibly empty)',
+  canonical_another_domain: 'Canonical Points to Another Domain', has_meta_refresh_redirect: 'Uses Meta-Refresh Redirect',
+  frame: 'Uses <frame>/<iframe> for content', lorem_ipsum: 'Contains Placeholder (Lorem Ipsum) Text',
+  broken_links: 'Has Broken Links', broken_resources: 'Has Broken Resources', irrelevant_description: 'Meta description looks irrelevant',
+  irrelevant_title: 'Title Looks Irrelevant', small_page_size: 'Very Small Page (Possibly Empty)',
 };
 
 /** Call MIVAA's quick-page audit for one URL (instant on-page + Lighthouse). */
@@ -93,7 +93,7 @@ const ISSUE_SECTIONS: Array<{
   { kind: 'onpage_non_indexable',     issue_type: 'non_indexable',     severity: 'error',
     label: 'Page cannot be indexed' },
   { kind: 'onpage_redirect_chains',   issue_type: 'redirect_chain',    severity: 'warning',
-    label: 'Redirect chain' },
+    label: 'Redirect Chain' },
   { kind: 'onpage_duplicate_tags',    issue_type: 'duplicate_tags',    severity: 'warning',
     label: 'Duplicate title or description' },
   { kind: 'onpage_duplicate_content', issue_type: 'duplicate_content', severity: 'warning',
@@ -102,7 +102,7 @@ const ISSUE_SECTIONS: Array<{
   // broken ones are selected here. Anything without a usable broken flag is dropped
   // rather than reported — an "unknown" link is not a broken link.
   { kind: 'onpage_links',             issue_type: 'broken_link',       severity: 'error',
-    label: 'Broken link', params: { limit: 500 },
+    label: 'Broken Link', params: { limit: 500 },
     filter: (it) => it?.is_broken === true || Number(it?.page_to_status_code) >= 400 },
   // Pages the crawler could not load at all. `onpage_pages` takes `limit`.
   { kind: 'onpage_pages',             issue_type: 'error_page',        severity: 'error',

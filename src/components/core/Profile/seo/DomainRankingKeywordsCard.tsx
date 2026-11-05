@@ -73,7 +73,7 @@ export const DomainRankingKeywordsCard: React.FC<{ website: UserWebsite }> = ({ 
   return (
     <Card className="dashboard-card">
       <CardHeader>
-        <CardTitle className="text-base">Top ranking keywords</CardTitle>
+        <CardTitle className="text-base">Top Ranking Keywords</CardTitle>
         <CardDescription>What the domain ranks for right now: the {kws.length} best-positioned keywords. Search and filters apply to these only.</CardDescription>
       </CardHeader>
       <CardContent className="p-0">

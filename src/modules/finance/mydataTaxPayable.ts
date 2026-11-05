@@ -40,8 +40,8 @@ export function mydataTaxPayableDelta(taxType: number, taxAmount: number, reduce
 export const MYDATA_TAX_TYPE_LABEL: Record<number, string> = {
   1: 'Withholding',
   2: 'Fees',
-  3: 'Other taxes',
-  4: 'Stamp duty',
+  3: 'Other Taxes',
+  4: 'Stamp Duty',
   5: 'Deductions',
 };
 

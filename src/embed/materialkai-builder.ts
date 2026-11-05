@@ -712,7 +712,7 @@ export class MaterialKaiBuilder extends HTMLElement {
     const msg = document.createElement('textarea');
     msg.placeholder = 'Anything else we should know?';
 
-    card.append(mk('Your name', name), mk('Email', email), mk('Message (optional)', msg));
+    card.append(mk('Your Name', name), mk('Email', email), mk('Message (optional)', msg));
 
     // The bot challenge lives in the LIGHT DOM and is projected in here through a slot.
     if (this.siteKey) {

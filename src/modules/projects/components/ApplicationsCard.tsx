@@ -98,7 +98,7 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/60 px-5 py-3">
         <div>
-          <CardTitle>Applications for payment</CardTitle>
+          <CardTitle>Applications for Payment</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             Cumulative valuations: each states the work done to date, and what is due is the
             difference from what was certified before it.
@@ -140,9 +140,9 @@ export const ApplicationsCard: React.FC<Props> = ({ projectId, workspaceId, curr
                 <tr className="border-b border-hairline bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
                   <th className="px-5 py-2 text-left">Ref</th>
                   <th className="hidden px-3 py-2 text-left sm:table-cell">To</th>
-                  <th className="hidden px-3 py-2 text-right md:table-cell">Gross to date</th>
+                  <th className="hidden px-3 py-2 text-right md:table-cell">Gross to Date</th>
                   <th className="hidden px-3 py-2 text-right lg:table-cell">Retention</th>
-                  <th className="hidden px-3 py-2 text-right lg:table-cell">Prev. certified</th>
+                  <th className="hidden px-3 py-2 text-right lg:table-cell">Prev. Certified</th>
                   <th className="px-3 py-2 text-right">Claimed</th>
                   <th className="px-3 py-2 text-right">Certified</th>
                   <th className="px-3 py-2 text-left">Status</th>
@@ -390,7 +390,7 @@ const NewApplicationDialog: React.FC<{
         <DialogHeader><DialogTitle>New application</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="space-y-1">
-            <Label className="text-xs">Valued to</Label>
+            <Label className="text-xs">Valued To</Label>
             <Input type="date" value={periodTo} onChange={(e) => setPeriodTo(e.target.value)} />
           </div>
           <div className="space-y-1">
@@ -403,7 +403,7 @@ const NewApplicationDialog: React.FC<{
             </p>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Payment due by</Label>
+            <Label className="text-xs">Payment Due By</Label>
             <Input type="date" value={dueOn} onChange={(e) => setDueOn(e.target.value)} />
           </div>
           <div className="flex justify-end gap-2 pt-1">

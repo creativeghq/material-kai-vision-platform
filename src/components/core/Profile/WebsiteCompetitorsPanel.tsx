@@ -24,11 +24,11 @@ const SOURCE_LABELS: Record<string, string> = { manual: 'Added by you', auto: 'S
 const STATE_LABELS: Record<string, string> = { active: 'Active', paused: 'Paused' };
 
 const METRICS: { key: string; label: string }[] = [
-  { key: 'organic_traffic', label: 'Organic traffic' },
+  { key: 'organic_traffic', label: 'Organic Traffic' },
   { key: 'ranking_keywords', label: 'Keywords' },
-  { key: 'organic_traffic_value', label: 'Traffic value' },
-  { key: 'referring_domains', label: 'Referring domains' },
-  { key: 'domain_rank', label: 'Domain rank' },
+  { key: 'organic_traffic_value', label: 'Traffic Value' },
+  { key: 'referring_domains', label: 'Referring Domains' },
+  { key: 'domain_rank', label: 'Domain Rank' },
 ];
 
 /** Distinct in both themes and distinguishable for the common colour-vision deficiencies. */
@@ -259,7 +259,7 @@ export const WebsiteCompetitorsPanel: React.FC<{ website: UserWebsite }> = ({ we
 
       <Card className="dashboard-card">
         <CardHeader>
-          <CardTitle className="text-base">Tracked domains</CardTitle>
+          <CardTitle className="text-base">Tracked Domains</CardTitle>
           <CardDescription>
             Each one is measured on the same domain-tracking run as your site, in the same market — a rival
             measured in a different country is a different question on the same axis.
@@ -295,7 +295,7 @@ export const WebsiteCompetitorsPanel: React.FC<{ website: UserWebsite }> = ({ we
               filters={
                 <>
                   <HubFilterSelect {...t.filterSelect('source', 'Any source')} />
-                  <HubFilterSelect {...t.filterSelect('state', 'Any status')} />
+                  <HubFilterSelect {...t.filterSelect('state', 'Any Status')} />
                 </>
               }
               actions={<HubResetFilters count={t.activeCount} onReset={t.clear} />}

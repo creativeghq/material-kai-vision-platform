@@ -302,9 +302,9 @@ const WebsiteSelect: React.FC<{
       onValueChange={(v) => onChange(v === DEFAULT_WEBSITE ? '' : v)}
       disabled={!sites}
     >
-      <SelectTrigger><SelectValue placeholder={field.placeholder || 'Default website'} /></SelectTrigger>
+      <SelectTrigger><SelectValue placeholder={field.placeholder || 'Default Website'} /></SelectTrigger>
       <SelectContent>
-        <SelectItem value={DEFAULT_WEBSITE}>Default website</SelectItem>
+        <SelectItem value={DEFAULT_WEBSITE}>Default Website</SelectItem>
         {(sites ?? []).map((s) => (
           <SelectItem key={s.id} value={s.id}>{s.display_name || s.url}</SelectItem>
         ))}

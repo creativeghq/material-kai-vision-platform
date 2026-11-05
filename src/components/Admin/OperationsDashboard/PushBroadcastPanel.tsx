@@ -121,7 +121,7 @@ export const PushBroadcastPanel: React.FC = () => {
               </div>
               <div className="flex items-center gap-2 text-sm">
                 <RadioGroupItem id="aud-selected" value="selected" />
-                <Label htmlFor="aud-selected">Selected users</Label>
+                <Label htmlFor="aud-selected">Selected Users</Label>
               </div>
             </RadioGroup>
           </div>

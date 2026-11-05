@@ -213,7 +213,7 @@ export const GLOBAL_SEARCH_KINDS: readonly GlobalSearchKindSpec[] = [
   },
   {
     kind: 'email_template',
-    label: 'Email templates',
+    label: 'Email Templates',
     icon: Mail,
     // `/emails/templates/:id/edit` is EntitlementGuard('email') + WorkspaceAdminGuard.
     moduleSlug: 'email',
@@ -222,7 +222,7 @@ export const GLOBAL_SEARCH_KINDS: readonly GlobalSearchKindSpec[] = [
   },
   {
     kind: 'conversation',
-    label: 'Agent chats',
+    label: 'Agent Chats',
     icon: MessageSquare,
     // `/agent-hub` is AuthGuard only, and AgentHub already reads `?conversation=`. RLS scopes
     // the rows to your own chats.

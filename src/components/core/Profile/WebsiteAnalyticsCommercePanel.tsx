@@ -38,7 +38,7 @@ export const WebsiteAnalyticsCommercePanel: React.FC<{ website: UserWebsite }> =
       />
 
       <GaBreakdownTable
-        title="Ad campaigns"
+        title="Ad Campaigns"
         description="What each campaign cost and what it returned. Needs a linked Google Ads account — cost is never inferred from sessions."
         websiteId={website.id}
         dimension="ads_campaign"

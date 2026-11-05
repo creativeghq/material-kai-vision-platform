@@ -214,7 +214,7 @@ export const TeamPanel: React.FC<{ workspaceId: string; workspaceName?: string }
 
           {role === 'support' && (
             <div className="space-y-1 sm:max-w-xs">
-              <Label>Access lasts</Label>
+              <Label>Access Lasts</Label>
               <Select value={String(accessMinutes)} onValueChange={(v) => { setAccessMinutes(Number(v)); setLink(null); }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>

@@ -27,11 +27,11 @@ import {
 /** AADE's own columns, in AADE's own order. `key` is the RPC field; the label is the
  *  English rendering of the Greek column heading the taxpayer sees on myAADE. */
 const MONEY_COLUMNS: { key: keyof BookMonthRow; label: string; hint: string }[] = [
-  { key: 'net_value', label: 'Net value', hint: 'Καθαρή Αξία' },
+  { key: 'net_value', label: 'Net Value', hint: 'Καθαρή Αξία' },
   { key: 'vat_amount', label: 'VAT', hint: 'ΦΠΑ' },
   { key: 'withheld_amount', label: 'Withheld', hint: 'Φόροι Παρακρ.' },
-  { key: 'other_taxes_amount', label: 'Other taxes', hint: 'Λοιποί Φόροι' },
-  { key: 'stamp_duty_amount', label: 'Digital fee', hint: 'Ψηφιακό Τέλος Συν.' },
+  { key: 'other_taxes_amount', label: 'Other Taxes', hint: 'Λοιποί Φόροι' },
+  { key: 'stamp_duty_amount', label: 'Digital Fee', hint: 'Ψηφιακό Τέλος Συν.' },
   { key: 'fees_amount', label: 'Fees', hint: 'Τέλη' },
   { key: 'deductions_amount', label: 'Deductions', hint: 'Κρατήσεις' },
   { key: 'third_party_amount', label: 'Third-party', hint: 'Έσοδα/Έξοδα Τρίτων' },
@@ -257,9 +257,9 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
               <SelectTrigger className="h-9 w-[168px]" aria-label="Period"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="this_year">This year</SelectItem>
-                <SelectItem value="last_quarter">Last 3 months</SelectItem>
-                <SelectItem value="last_year">Last year</SelectItem>
-                <SelectItem value="custom">Custom range</SelectItem>
+                <SelectItem value="last_quarter">Last 3 Months</SelectItem>
+                <SelectItem value="last_year">Last Year</SelectItem>
+                <SelectItem value="custom">Custom Range</SelectItem>
               </SelectContent>
             </Select>
             {period === 'custom' && (
@@ -296,8 +296,8 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
         activeId={view}
         onSelect={(id) => setView(id as 'summary' | 'documents')}
         items={[
-          { id: 'summary', label: 'Monthly summary' },
-          { id: 'documents', label: 'Income–expense book' },
+          { id: 'summary', label: 'Monthly Summary' },
+          { id: 'documents', label: 'Income–Expense Book' },
         ]}
       />
 
@@ -347,7 +347,7 @@ export const MydataBookTab: React.FC<Props> = ({ workspaceId }) => {
       <Card>
         <CardHeader className="flex-row items-start justify-between gap-3 space-y-0">
           <div>
-            <CardTitle>Aggregate book</CardTitle>
+            <CardTitle>Aggregate Book</CardTitle>
             <CardDescription>
               {formatDate(range.from)} — {formatDate(range.to)} · {totals.incomeDocs.toLocaleString()} income and{' '}
               {totals.expenseDocs.toLocaleString()} expense documents filed with AADE

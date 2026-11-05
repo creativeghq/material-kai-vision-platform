@@ -145,7 +145,7 @@ function ListingDetailModal({
         {contactOpen && !ownListing && (
           <div className="space-y-2 rounded-md border border-border/60 p-3">
             <div className="grid grid-cols-3 gap-2">
-              <div className="space-y-1"><Label>Qty wanted</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} placeholder={`${listing.unit}`} /></div>
+              <div className="space-y-1"><Label>Qty Wanted</Label><Input type="number" value={qty} onChange={(e) => setQty(e.target.value)} placeholder={`${listing.unit}`} /></div>
               <div className="col-span-2 space-y-1"><Label>Message</Label><Input value={message} onChange={(e) => setMessage(e.target.value)} placeholder="Optional note to the seller" /></div>
             </div>
           </div>

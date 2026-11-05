@@ -40,10 +40,10 @@ interface AnswerCheck {
 const ENGINE_LABEL: Record<string, string> = { google_ai_mode: 'Google AI Mode', chatgpt: 'ChatGPT', perplexity: 'Perplexity' };
 
 const SOURCE_TAG: Record<ArticleSuggestion['source'], { label: string; variant: 'info' | 'warning' | 'neutral' }> = {
-  coverage: { label: 'Reader expectation', variant: 'info' },
+  coverage: { label: 'Reader Expectation', variant: 'info' },
   answer_check: { label: 'AI answer', variant: 'warning' },
   analysis: { label: 'Analysis', variant: 'neutral' },
-  update: { label: 'Out of date', variant: 'warning' },
+  update: { label: 'Out of Date', variant: 'warning' },
   refresh: { label: 'What ranks now', variant: 'info' },
 };
 

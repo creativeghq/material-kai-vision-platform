@@ -48,7 +48,7 @@ export function buildModuleFilters(rows: ModuleFilterRow[]): FilterGroupDef[] {
           description: 'The same grouping the App Launcher uses.',
           options: [
             ...distinct(rows, (t) => t.meta.hub?.id, (v) => hubLabel.get(v) ?? humanizeLabel(v)),
-            { value: NONE_VALUE, label: 'Platform & integrations' },
+            { value: NONE_VALUE, label: 'Platform & Integrations' },
           ],
           accessor: (t: ModuleFilterRow) => t.meta.hub?.id ?? undefined,
         },
@@ -73,7 +73,7 @@ export function buildModuleFilters(rows: ModuleFilterRow[]): FilterGroupDef[] {
           accessor: (t: ModuleFilterRow) => t.row.is_addon,
         },
         {
-          key: 'purchasable', type: 'bool', label: 'Purchasable now',
+          key: 'purchasable', type: 'bool', label: 'Purchasable Now',
           description: 'Add-ons with a Stripe product bound — anything else needs a plan upgrade.',
           trueLabel: 'Buyable now', falseLabel: 'Not buyable',
           accessor: (t: ModuleFilterRow) => !!t.row.is_addon && !!t.row.addon_stripe_product_id,
@@ -84,7 +84,7 @@ export function buildModuleFilters(rows: ModuleFilterRow[]): FilterGroupDef[] {
       key: 'credits', label: 'Credits', icon: Coins,
       fields: [
         {
-          key: 'consumes_credits', type: 'bool', label: 'Credit usage',
+          key: 'consumes_credits', type: 'bool', label: 'Credit Usage',
           description: 'A subscription fee is not the whole cost for metered modules.',
           trueLabel: 'Uses credits', falseLabel: 'No credit usage',
           accessor: (t: ModuleFilterRow) => t.row.consumes_credits,

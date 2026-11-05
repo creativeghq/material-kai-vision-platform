@@ -648,7 +648,7 @@ export const propertyListingAdapter: TemplateAdapter<PropertyListingTemplatePayl
     const out: string[] = [];
     if (payload.property_type) out.push(String(payload.property_type));
     const tx = transactionType(payload.transaction_type);
-    if (tx) out.push(tx === 'sale' ? 'For sale' : tx === 'rent' ? 'To let' : tx.replace(/_/g, ' '));
+    if (tx) out.push(tx === 'sale' ? 'For Sale' : tx === 'rent' ? 'To let' : tx.replace(/_/g, ' '));
     const feats = (payload.features?.length ?? 0) + (payload.amenities?.length ?? 0);
     if (feats) out.push(`${feats} feature${feats === 1 ? '' : 's'}`);
     return out;

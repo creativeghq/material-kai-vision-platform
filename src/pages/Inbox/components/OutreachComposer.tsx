@@ -120,7 +120,7 @@ export const OutreachComposer: React.FC<{
                   {d === 1 ? '1 day' : d === 7 ? 'a week' : d === 14 ? '2 weeks' : `${d} days`}
                 </Button>
               ))}
-              <Input type="datetime-local" aria-label="Or pick a date and time" className="h-6 text-xs w-44" value={custom} min={toLocalInputValue(new Date())}
+              <Input type="datetime-local" aria-label="Or Pick a Date and Time" className="h-6 text-xs w-44" value={custom} min={toLocalInputValue(new Date())}
                 onChange={(e) => { setCustom(e.target.value); setFirstDays(e.target.value ? null : 3); }} />
             </div>
           ) : (

@@ -15,16 +15,16 @@ export const FACILITY_SECTORS = {
   ceramics: { codes: ['3(g)'], label: 'Ceramics fired in a kiln — tiles, sanitaryware, bricks, refractories' },
   glass: { codes: ['3(e)'], label: 'Glass, including glass fibre' },
   cement_lime: { codes: ['3(c)'], label: 'Cement clinker, lime, magnesium oxide' },
-  stone_minerals: { codes: ['3(f)'], label: 'Mineral substances and mineral fibres' },
-  quarrying: { codes: ['3(b)'], label: 'Quarries and open-cast mining' },
-  steel: { codes: ['2(b)'], label: 'Pig iron and steel' },
+  stone_minerals: { codes: ['3(f)'], label: 'Mineral Substances and Mineral Fibres' },
+  quarrying: { codes: ['3(b)'], label: 'Quarries and Open-Cast Mining' },
+  steel: { codes: ['2(b)'], label: 'Pig Iron and Steel' },
   metal_processing: { codes: ['2(c)'], label: 'Ferrous metal processing — rolling, forging, coating' },
-  foundry: { codes: ['2(d)'], label: 'Ferrous metal foundries' },
+  foundry: { codes: ['2(d)'], label: 'Ferrous Metal Foundries' },
   non_ferrous: { codes: ['2(e)'], label: 'Non-ferrous metals — aluminium, copper, zinc' },
-  metal_finishing: { codes: ['2(f)'], label: 'Surface treatment of metals and plastics' },
+  metal_finishing: { codes: ['2(f)'], label: 'Surface Treatment of Metals and Plastics' },
   wood_panels: { codes: ['6(c)'], label: 'Wood panels — chipboard, fibreboard, plywood' },
   paper: { codes: ['6(a)', '6(b)'], label: 'Pulp, paper and board' },
-  chemicals: { codes: ['4('], label: 'Chemical installations — organic and inorganic' },
+  chemicals: { codes: ['4('], label: 'Chemical Installations — Organic and Inorganic' },
 } as const;
 
 export type FacilitySector = keyof typeof FACILITY_SECTORS;

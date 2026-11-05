@@ -60,7 +60,7 @@ const dateGroup = (iso: string): { order: number; label: string } => {
   const s = startOfToday();
   if (t >= s) return { order: 1, label: 'Today' };
   if (t >= s - 86_400_000) return { order: 2, label: 'Yesterday' };
-  if (t >= s - 7 * 86_400_000) return { order: 3, label: 'Previous 7 days' };
+  if (t >= s - 7 * 86_400_000) return { order: 3, label: 'Previous 7 Days' };
   return { order: 4, label: 'Older' };
 };
 

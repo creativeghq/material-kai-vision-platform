@@ -177,7 +177,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
         <div className="space-y-3">
           {/* Bill link OR standalone supplier */}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <FormField label="Against supplier bill" optional>
+            <FormField label="Against Supplier Bill" optional>
               <Select value={billId || '__none'} onValueChange={(v) => { setBillId(v === '__none' ? '' : v); if (v !== '__none') setSupplier(null); }} disabled={!!supplierBillId}>
                 <SelectTrigger><SelectValue placeholder="Link a recorded bill…" /></SelectTrigger>
                 <SelectContent>

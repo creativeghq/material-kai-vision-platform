@@ -452,7 +452,7 @@ const COMPETITORS_TOOL = {
         items: {
           type: 'object',
           properties: {
-            name: { type: 'string', description: 'Company name' },
+            name: { type: 'string', description: 'Company Name' },
             website: { type: ['string', 'null'], description: 'Official homepage URL' },
             industry: { type: ['string', 'null'], description: 'Primary industry / sector' },
             city: { type: ['string', 'null'], description: 'Head-office city' },

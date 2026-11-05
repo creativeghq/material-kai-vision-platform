@@ -146,7 +146,7 @@ export function InvoiceTemplateCard({ workspaceId }: { workspaceId: string }) {
         </div>
 
         <div className="space-y-1.5">
-          <Label className="text-xs">Default invoice notes / footer</Label>
+          <Label className="text-xs">Default Invoice Notes / Footer</Label>
           <Textarea
             rows={3}
             value={defaultNotes}

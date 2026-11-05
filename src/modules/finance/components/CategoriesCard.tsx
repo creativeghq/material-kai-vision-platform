@@ -19,9 +19,9 @@ import { HubEmptyState } from '@/components/core/hub';
 const SYSTEM_CATEGORY_HELP: Record<string, string> = {
   orders: 'Built-in "Orders" category — every workspace has one; auto-attached to order costs. Cannot be renamed or deleted.',
   myaade: 'Built-in "myAADE" category — every workspace has one; the default landing category for expenses synced from myDATA. Cannot be renamed or deleted.',
-  profit_allocation: 'Built-in "Profit split" category — a share-out of profit to the partners (διανομή κερδών / dividend). Counted as an expense and shown on the P&L as "Paid to owners". Cannot be renamed or deleted.',
-  partner_withdrawal: 'Built-in "Partner withdrawals" category — money a partner takes from the business (ανάληψη εταίρου). Counted as an expense and shown on the P&L as "Paid to owners"; set the partner as payee so Reports → Paid to owners shows each one. Cannot be renamed or deleted.',
-  owner_pay: 'Built-in "Owner & partner pay" category — a partner fee or salary and the ΕΦΚΑ the business pays for them. Counted as an expense and shown on the P&L as "Paid to owners". Employees go under Salaries & wages. Cannot be renamed or deleted.',
+  profit_allocation: 'Built-in "Profit split" category — a share-out of profit to the partners (διανομή κερδών / dividend). Counted as an expense and shown on the P&L as "Paid to Owners". Cannot be renamed or deleted.',
+  partner_withdrawal: 'Built-in "Partner withdrawals" category — money a partner takes from the business (ανάληψη εταίρου). Counted as an expense and shown on the P&L as "Paid to Owners"; set the partner as payee so Reports → Paid to owners shows each one. Cannot be renamed or deleted.',
+  owner_pay: 'Built-in "Owner & partner pay" category — a partner fee or salary and the ΕΦΚΑ the business pays for them. Counted as an expense and shown on the P&L as "Paid to Owners". Employees go under Salaries & wages. Cannot be renamed or deleted.',
 };
 
 export const CategoriesCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {

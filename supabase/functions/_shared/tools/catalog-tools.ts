@@ -195,7 +195,7 @@ export const createCreateCatalogTool = (userId: string, workspaceId: string | nu
           catalog_id: catalog.id,
           step_id: 'create',
           status: 'done',
-          status_line: 'Catalog created',
+          status_line: 'Catalog Created',
           input: { title: catalog.title, subtitle: catalog.subtitle },
           output: { catalog_id: catalog.id },
         });

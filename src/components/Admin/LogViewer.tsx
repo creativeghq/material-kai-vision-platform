@@ -102,7 +102,7 @@ export function LogViewer() {
     {
       key: 'time', label: 'Time', icon: CalendarDays,
       fields: [{
-        key: 'timestamp', type: 'dateRange', label: 'Time window',
+        key: 'timestamp', type: 'dateRange', label: 'Time Window',
         description: 'Defaults to the last day so the page never loads all history.',
         column: 'timestamp',
       }],

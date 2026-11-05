@@ -11,10 +11,10 @@ import type { PriceAlertLogRow } from './priceAlertsService';
 
 /** Alert types the Python dispatcher emits (price_monitoring_notifications/service.py). */
 const ALERT_TYPE_LABELS: Record<string, string> = {
-  price_drop: 'Price drop',
+  price_drop: 'Price Drop',
   new_retailer: 'New retailer',
-  promo_started: 'Promo started',
-  anomaly_detected: 'Anomaly detected',
+  promo_started: 'Promo Started',
+  anomaly_detected: 'Anomaly Detected',
 };
 
 export const alertTypeLabel = (t: string) => ALERT_TYPE_LABELS[t] ?? t;
@@ -45,18 +45,18 @@ export function buildPriceAlertFilters(rows: PriceAlertLogRow[]): FilterGroupDef
       key: 'delivery', label: 'Delivery', icon: Send,
       fields: [
         {
-          key: 'channel', type: 'multi', label: 'Channel fired',
+          key: 'channel', type: 'multi', label: 'Channel Fired',
           options: optionsFromRows(rows, (r) => r.channels_fired ?? []),
           accessor: (r: PriceAlertLogRow) => r.channels_fired ?? [],
         },
         {
-          key: 'skipped', type: 'bool', label: 'Delivery problems',
+          key: 'skipped', type: 'bool', label: 'Delivery Problems',
           description: 'A channel was skipped — out of credits, or the send failed.',
           trueLabel: 'Had a skipped channel', falseLabel: 'Delivered cleanly',
           accessor: (r: PriceAlertLogRow) => (r.channels_skipped ?? []).length > 0,
         },
         {
-          key: 'credits_charged', type: 'range', label: 'Credits charged',
+          key: 'credits_charged', type: 'range', label: 'Credits Charged',
           min: 0, max: 10, step: 1,
           accessor: (r: PriceAlertLogRow) => r.credits_charged ?? 0,
         },
@@ -64,7 +64,7 @@ export function buildPriceAlertFilters(rows: PriceAlertLogRow[]): FilterGroupDef
     },
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
-      fields: [{ key: 'created_at', type: 'dateRange', label: 'Fired at', accessor: (r: PriceAlertLogRow) => r.created_at }],
+      fields: [{ key: 'created_at', type: 'dateRange', label: 'Fired At', accessor: (r: PriceAlertLogRow) => r.created_at }],
     },
   ];
 }

@@ -73,9 +73,9 @@ const SETTINGS_SECTIONS = [
 ] as const;
 
 const MONEY_PANES = [
-  { id: 'accounts', label: 'Bank accounts', icon: Landmark },
-  { id: 'payouts', label: 'Money out', icon: ArrowUpRight },
-  { id: 'providers', label: 'Payment providers', icon: CreditCard },
+  { id: 'accounts', label: 'Bank Accounts', icon: Landmark },
+  { id: 'payouts', label: 'Money Out', icon: ArrowUpRight },
+  { id: 'providers', label: 'Payment Providers', icon: CreditCard },
   { id: 'statements', label: 'Statements', icon: ScrollText },
   { id: 'digest', label: 'Digest', icon: Mail },
 ] as const;
@@ -356,12 +356,12 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           </div>
 
           <div className="space-y-1">
-            <Label>Default email subject</Label>
+            <Label>Default Email Subject</Label>
             <Input value={settings.statement_email_subject ?? ''} onChange={(e) => set('statement_email_subject', e.target.value)} placeholder="Your account statement" />
           </div>
 
           <div className="space-y-1">
-            <Label>Default email body</Label>
+            <Label>Default Email Body</Label>
             <Textarea rows={4} value={settings.statement_email_body ?? ''} onChange={(e) => set('statement_email_body', e.target.value)} placeholder="Optional intro text shown above the PDF link." />
           </div>
 
@@ -389,22 +389,22 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
                     <Select value={settings.auto_statement_frequency} onValueChange={(v) => set('auto_statement_frequency', v as any)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="every_n_days">Every N days</SelectItem>
+                        <SelectItem value="every_n_days">Every N Days</SelectItem>
                         <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly (day of month)</SelectItem>
+                        <SelectItem value="monthly">Monthly (Day of Month)</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   {settings.auto_statement_frequency === 'every_n_days' && (
                     <div className="space-y-1">
-                      <Label>Interval (days)</Label>
+                      <Label>Interval (Days)</Label>
                       <Input type="number" min="1" value={settings.auto_statement_interval_days ?? 30}
                         onChange={(e) => set('auto_statement_interval_days', Math.max(1, parseInt(e.target.value, 10) || 30))} />
                     </div>
                   )}
                   {settings.auto_statement_frequency === 'weekly' && (
                     <div className="space-y-1">
-                      <Label>Day of week</Label>
+                      <Label>Day of Week</Label>
                       <Select value={String(settings.auto_statement_day_of_week ?? 1)} onValueChange={(v) => set('auto_statement_day_of_week', parseInt(v, 10))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -417,7 +417,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
                   )}
                   {settings.auto_statement_frequency === 'monthly' && (
                     <div className="space-y-1">
-                      <Label>Day of month (1–28)</Label>
+                      <Label>Day of Month (1–28)</Label>
                       <Input type="number" min="1" max="28" value={settings.auto_statement_day_of_month}
                         onChange={(e) => set('auto_statement_day_of_month', Math.min(28, Math.max(1, parseInt(e.target.value, 10) || 1)))} />
                     </div>
@@ -442,7 +442,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
                     </Select>
                   </div>
                   <div className="space-y-1">
-                    <Label>Minimum balance</Label>
+                    <Label>Minimum Balance</Label>
                     <MoneyInput value={settings.auto_statement_min_balance}
                       onValueChange={(v) => set('auto_statement_min_balance', v ?? 0)} />
                   </div>
@@ -532,7 +532,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
         <CardContent className="space-y-4 p-5">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label>Default payment terms (days)</Label>
+              <Label>Default Payment Terms (Days)</Label>
               <Input type="number" min="0" value={settings.default_payment_terms_days}
                 onChange={(e) => set('default_payment_terms_days', parseInt(e.target.value, 10) || 0)} />
             </div>
@@ -563,7 +563,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
           </div>
 
           <div className="space-y-1">
-            <Label>Default catalog markup %</Label>
+            <Label>Default Catalog Markup %</Label>
             <MoneyInput value={settings.default_markup_pct ?? 0} displayDecimals={null}
               onValueChange={(v) => set('default_markup_pct', v ?? 0)} />
             <p className="text-[11px] text-muted-foreground">
@@ -804,13 +804,13 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
             <SelectContent>
               <SelectItem value="daily">Daily</SelectItem>
               <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly (1st of month)</SelectItem>
+              <SelectItem value="monthly">Monthly (1st of Month)</SelectItem>
             </SelectContent>
           </Select>
         </div>
         {settings.digest_frequency === 'weekly' && (
           <div className="space-y-1">
-            <Label>Day of week</Label>
+            <Label>Day of Week</Label>
             <Select
               value={settings.digest_day_of_week == null ? '1' : String(settings.digest_day_of_week)}
               onValueChange={(v) => onPatch({ digest_day_of_week: parseInt(v, 10) })}

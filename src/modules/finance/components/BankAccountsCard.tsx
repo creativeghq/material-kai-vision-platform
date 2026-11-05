@@ -183,7 +183,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium truncate">{r.name}</span>
                         {r.is_default && <Badge variant="outline" className="text-[10px]">Default</Badge>}
-                        {r.show_on_invoice && <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-500">On invoice</Badge>}
+                        {r.show_on_invoice && <Badge variant="outline" className="text-[10px] border-emerald-500/40 text-emerald-500">On Invoice</Badge>}
                         {!r.is_active && <span className={`text-[10px] capitalize ${statusTone('inactive')}`}>Inactive</span>}
                       </div>
                       <div className="text-[11px] text-muted-foreground">
@@ -244,7 +244,7 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
             {/* IBAN only for a bank account; a reference for anything but cash. A cash account is
                 just a name + balance — no bank numbers to fill in. */}
             {form.kind !== 'cash' && (
-              <FormSection title="Bank details">
+              <FormSection title="Bank Details">
                 <FormGrid>
                   {form.kind === 'bank' && (
                     <FormField label="IBAN" className="sm:col-span-2">
@@ -263,8 +263,8 @@ export const BankAccountsCard: React.FC<{ workspaceId: string }> = ({ workspaceI
                 </FormGrid>
               </FormSection>
             )}
-            <FormSection title="Balance and display">
-            <FormField label="Opening balance" hint="Balance before any platform-recorded movements. Money in/out is added on top.">
+            <FormSection title="Balance and Display">
+            <FormField label="Opening Balance" hint="Balance before any platform-recorded movements. Money in/out is added on top.">
               <Input className="h-9 text-sm text-right" type="text" inputMode="decimal" value={form.openingBalance}
                 onChange={(e) => patch('openingBalance', e.target.value)} placeholder="0.00" />
             </FormField>

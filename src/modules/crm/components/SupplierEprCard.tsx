@@ -312,14 +312,14 @@ export const SupplierEprCard: React.FC<Props> = ({ workspaceId, companyId }) => 
                   />
                 </div>
                 <div>
-                  <Label htmlFor="epr-num">Registration number</Label>
+                  <Label htmlFor="epr-num">Registration Number</Label>
                   <Input
                     id="epr-num" className="mt-1 h-8 w-40 font-mono text-xs" value={draft.number}
                     onChange={(e) => setDraft((d) => ({ ...d, number: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="epr-url">Register entry</Label>
+                  <Label htmlFor="epr-url">Register Entry</Label>
                   <Input
                     id="epr-url" className="mt-1 h-8 w-56 text-xs" placeholder="link to their entry"
                     value={draft.url}

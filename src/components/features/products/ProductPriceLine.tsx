@@ -36,7 +36,7 @@ export const ProductPriceLine: React.FC<{ workspaceId: string; productId: string
     <div className="flex flex-wrap items-center gap-2 rounded-lg border border-hairline bg-surface-sunken px-3 py-2">
       <Tag className="h-3.5 w-3.5 text-muted-foreground" />
       <span className="text-xs text-muted-foreground">
-        {price?.kind === 'your_price' ? 'Your price' : 'Retail'}
+        {price?.kind === 'your_price' ? 'Your Price' : 'Retail'}
       </span>
       {price?.price != null ? (
         <>

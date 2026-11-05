@@ -28,8 +28,8 @@ export const PROFESSIONAL_TYPE_OPTIONS: Option[] = [
 export const LIFECYCLE_STAGE_OPTIONS: Option[] = [
   { value: 'subscriber', label: 'Subscriber' },
   { value: 'lead', label: 'Lead' },
-  { value: 'mql', label: 'Marketing qualified' },
-  { value: 'sql', label: 'Sales qualified' },
+  { value: 'mql', label: 'Marketing Qualified' },
+  { value: 'sql', label: 'Sales Qualified' },
   { value: 'opportunity', label: 'Opportunity' },
   { value: 'customer', label: 'Customer' },
   { value: 'evangelist', label: 'Evangelist' },

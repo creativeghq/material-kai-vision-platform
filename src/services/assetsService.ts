@@ -21,14 +21,14 @@ export const ASSET_CATEGORY_LABEL: Record<AssetCategory, string> = {
   vehicle: 'Vehicle',
   phone: 'Phone',
   laptop: 'Laptop',
-  payment_card: 'Payment card',
+  payment_card: 'Payment Card',
   equipment: 'Equipment',
   other: 'Other',
 };
 
 export const ASSET_STATUS_LABEL: Record<AssetStatus, string> = {
   active: 'Active',
-  in_repair: 'In repair',
+  in_repair: 'In Repair',
   retired: 'Retired',
   returned: 'Returned',
 };

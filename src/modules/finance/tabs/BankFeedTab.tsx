@@ -321,7 +321,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           <Select value={provider || 'all'} onValueChange={(v) => setProvider(v === 'all' ? '' : v)}>
             <SelectTrigger aria-label="Provider filter" className="h-9 w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All providers</SelectItem>
+              <SelectItem value="all">All Providers</SelectItem>
               {PAYMENT_PROVIDER_SLUGS.map((p) => (
                 <SelectItem key={p} value={p}>{PROVIDER_LABEL[p]}</SelectItem>
               ))}
@@ -330,16 +330,16 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           <Select value={direction || 'all'} onValueChange={(v) => setDirection(v === 'all' ? '' : v)}>
             <SelectTrigger aria-label="Direction filter" className="h-9 w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">In & out</SelectItem>
-              <SelectItem value="in">Money in</SelectItem>
-              <SelectItem value="out">Money out</SelectItem>
+              <SelectItem value="all">In & Out</SelectItem>
+              <SelectItem value="in">Money In</SelectItem>
+              <SelectItem value="out">Money Out</SelectItem>
             </SelectContent>
           </Select>
           <Select value={statusF || 'all'} onValueChange={(v) => setStatusF(v === 'all' ? '' : v)}>
             <SelectTrigger aria-label="Match status filter" className="h-9 w-36"><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Any status</SelectItem>
-              <SelectItem value="review">Needs review</SelectItem>
+              <SelectItem value="all">Any Status</SelectItem>
+              <SelectItem value="review">Needs Review</SelectItem>
               <SelectItem value="matched">Matched</SelectItem>
               <SelectItem value="unmatched">Unmatched</SelectItem>
               <SelectItem value="ignored">Ignored</SelectItem>

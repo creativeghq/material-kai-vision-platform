@@ -225,10 +225,10 @@ export const ChatStartersTab: React.FC = () => {
           <>
             <Select value={filterAgent} onValueChange={setFilterAgent}>
               <SelectTrigger className="w-[200px] rounded-full">
-                <SelectValue placeholder="All agents" />
+                <SelectValue placeholder="All Agents" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All agents</SelectItem>
+                <SelectItem value="all">All Agents</SelectItem>
                 {AGENT_OPTIONS.map(a => (
                   <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
                 ))}
@@ -454,7 +454,7 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
           <FormSection title="Prompt">
             <FormGrid>
               <FormField
-                label="Prompt text"
+                label="Prompt Text"
                 hint="Phrase this to reliably trigger the intended skill — include the skill's trigger verbs (research, verify, identify, stage, extract) + the inputs it expects."
                 className="sm:col-span-2"
               >
@@ -465,14 +465,14 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
                   placeholder="What the agent receives when this starter is inserted. Use {variable} placeholders."
                 />
               </FormField>
-              <FormField label="Skill hint" optional>
+              <FormField label="Skill Hint" optional>
                 <Input
                   value={config.skill_hint ?? ''}
                   onChange={(e) => patchConfig({ skill_hint: e.target.value || null })}
                   placeholder="e.g. b2b-manufacturer-research"
                 />
               </FormField>
-              <FormField label="Credit estimate" optional>
+              <FormField label="Credit Estimate" optional>
                 <Input
                   value={config.credit_estimate ?? ''}
                   onChange={(e) => patchConfig({ credit_estimate: e.target.value || null })}
@@ -488,8 +488,8 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
                 <Select value={config.visibility ?? 'all'} onValueChange={(v) => patchConfig({ visibility: v as 'all' | 'admin' })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All users</SelectItem>
-                    <SelectItem value="admin">Admin / Owner only</SelectItem>
+                    <SelectItem value="all">All Users</SelectItem>
+                    <SelectItem value="admin">Admin / Owner Only</SelectItem>
                   </SelectContent>
                 </Select>
               </FormField>
@@ -500,7 +500,7 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
                     onCheckedChange={(c) => patchConfig({ requires_image: c })}
                     id="requires_image"
                   />
-                  <Label htmlFor="requires_image" className="text-sm">Requires image</Label>
+                  <Label htmlFor="requires_image" className="text-sm">Requires Image</Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch
@@ -508,7 +508,7 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
                     onCheckedChange={(c) => patch({ is_default: c })}
                     id="is_default"
                   />
-                  <Label htmlFor="is_default" className="text-sm">Default (pinned in picker)</Label>
+                  <Label htmlFor="is_default" className="text-sm">Default (Pinned in Picker)</Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch

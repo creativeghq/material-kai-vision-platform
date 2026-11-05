@@ -55,7 +55,7 @@ export function buildAppointmentFilters(rows: Appointment[]): FilterGroupDef[] {
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
-        { key: 'appointment_date', type: 'dateRange', label: 'Appointment date', accessor: (a: Appointment) => a.appointment_date },
+        { key: 'appointment_date', type: 'dateRange', label: 'Appointment Date', accessor: (a: Appointment) => a.appointment_date },
         { key: 'created_at', type: 'dateRange', label: 'Requested', accessor: (a: Appointment) => a.created_at },
       ],
     },

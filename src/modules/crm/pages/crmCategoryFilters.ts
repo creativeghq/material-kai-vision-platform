@@ -10,10 +10,10 @@ import type { CrmCategoryKind } from '@/services/crmCategoriesService';
 const KIND_OPTIONS: { value: CrmCategoryKind; label: string }[] = [
   { value: 'manual', label: 'Custom' },
   { value: 'industry', label: 'Industry' },
-  { value: 'lead_status', label: 'Lead status' },
-  { value: 'lead_source', label: 'Lead source' },
-  { value: 'professional_type', label: 'Professional type' },
-  { value: 'role', label: 'Access role' },
+  { value: 'lead_status', label: 'Lead Status' },
+  { value: 'lead_source', label: 'Lead Source' },
+  { value: 'professional_type', label: 'Professional Type' },
+  { value: 'role', label: 'Access Role' },
   { value: 'employment', label: 'Employment (HR)' },
 ];
 

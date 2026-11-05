@@ -162,8 +162,8 @@ const GetQuoteModal: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
         <DialogHeader><DialogTitle className="flex items-center gap-2"><Ship className="h-4 w-4" /> Get a shipping quote</DialogTitle></DialogHeader>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1"><Label>From (origin)</Label><Input autoFocus value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="e.g. Shanghai, CN" /></div>
-            <div className="space-y-1"><Label>To (destination)</Label><Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="e.g. Piraeus, GR" /></div>
+            <div className="space-y-1"><Label>From (Origin)</Label><Input autoFocus value={origin} onChange={(e) => setOrigin(e.target.value)} placeholder="e.g. Shanghai, CN" /></div>
+            <div className="space-y-1"><Label>To (Destination)</Label><Input value={destination} onChange={(e) => setDestination(e.target.value)} placeholder="e.g. Piraeus, GR" /></div>
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1">
@@ -182,7 +182,7 @@ const GetQuoteModal: React.FC<{ open: boolean; onOpenChange: (v: boolean) => voi
                 </Select>
               </div>
             )}
-            <div className="space-y-1"><Label>Ready date</Label><Input type="date" value={readyDate} onChange={(e) => setReadyDate(e.target.value)} /></div>
+            <div className="space-y-1"><Label>Ready Date</Label><Input type="date" value={readyDate} onChange={(e) => setReadyDate(e.target.value)} /></div>
           </div>
           <p className="text-[11px] text-muted-foreground">Your shipping request is sent for pricing — offers appear under Shipping once ready, then add one to the quote.</p>
         </div>

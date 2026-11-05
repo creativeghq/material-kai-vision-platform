@@ -60,7 +60,7 @@ export const CreateCatalogModal: React.FC<Props> = ({ open, onClose, onCreated }
             <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} placeholder="Curated for Vasilis Imports" />
           </div>
           <div className="space-y-2">
-            <Label>Client name (rendered on cover)</Label>
+            <Label>Client Name (Rendered on Cover)</Label>
             <Input value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Vasilis Imports" />
           </div>
           <div className="space-y-2">

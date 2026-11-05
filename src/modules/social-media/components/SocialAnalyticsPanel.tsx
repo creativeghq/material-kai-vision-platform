@@ -154,19 +154,19 @@ interface AccountMetrics {
 const METRIC_LABELS: Record<string, string> = {
   // LinkedIn member
   impressions: 'Impressions', reach: 'Reach', reactions: 'Reactions', comments: 'Comments',
-  shares: 'Reshares', saves: 'Saves', sends: 'Sends', engagementRate: 'Engagement rate',
+  shares: 'Reshares', saves: 'Saves', sends: 'Sends', engagementRate: 'Engagement Rate',
   // LinkedIn organisation
-  unique_impressions: 'Unique impressions', clicks: 'Clicks', likes: 'Likes',
-  engagement_rate: 'Engagement rate', organic_followers_gained: 'Organic followers gained',
-  followers_gained: 'Followers gained', followers_lost: 'Followers lost',
+  unique_impressions: 'Unique Impressions', clicks: 'Clicks', likes: 'Likes',
+  engagement_rate: 'Engagement Rate', organic_followers_gained: 'Organic Followers Gained',
+  followers_gained: 'Followers Gained', followers_lost: 'Followers Lost',
   // Instagram
-  views: 'Views', accounts_engaged: 'Accounts engaged', total_interactions: 'Interactions',
-  replies: 'Replies', reposts: 'Reposts', follows_and_unfollows: 'Follows & unfollows',
-  profile_links_taps: 'Profile link taps',
+  views: 'Views', accounts_engaged: 'Accounts Engaged', total_interactions: 'Interactions',
+  replies: 'Replies', reposts: 'Reposts', follows_and_unfollows: 'Follows & Unfollows',
+  profile_links_taps: 'Profile Link Taps',
   // Facebook Page
-  page_media_view: 'Media views', page_views_total: 'Page views',
-  page_post_engagements: 'Post engagements', page_video_views: 'Video views',
-  page_video_view_time: 'Video view time', page_follows: 'Follows',
+  page_media_view: 'Media Views', page_views_total: 'Page Views',
+  page_post_engagements: 'Post Engagements', page_video_views: 'Video Views',
+  page_video_view_time: 'Video View Time', page_follows: 'Follows',
 };
 
 const metricLabel = (key: string) =>
@@ -573,7 +573,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
    */
   const tabItems = useMemo(() => (
     accounts.length < 2 ? [] : [
-      { id: 'all', label: 'All accounts', count: accounts.length },
+      { id: 'all', label: 'All Accounts', count: accounts.length },
       ...accounts.map(a => ({
         id: a.id,
         label: a.handle ?? platformLabel(a.platform),
@@ -624,7 +624,7 @@ export const SocialAnalyticsPanel: React.FC = () => {
           items={tabItems}
           activeId={activeTab}
           onSelect={setActiveTab}
-          aria-label="Connected accounts"
+          aria-label="Connected Accounts"
         />
       )}
 
@@ -676,10 +676,10 @@ export const SocialAnalyticsPanel: React.FC = () => {
                     <TableHead>Account</TableHead>
                     <TableHead className="text-right">Followers</TableHead>
                     <TableHead className="text-right">Posts</TableHead>
-                    <TableHead className="text-right">Avg engagement</TableHead>
+                    <TableHead className="text-right">Avg Engagement</TableHead>
                     <TableHead className="text-right">Reach 7d</TableHead>
                     <TableHead className="text-right">Impressions 7d</TableHead>
-                    <TableHead className="text-right">As of</TableHead>
+                    <TableHead className="text-right">As Of</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

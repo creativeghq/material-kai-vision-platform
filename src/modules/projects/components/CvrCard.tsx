@@ -74,7 +74,7 @@ export const CvrCard: React.FC<Props> = ({ projectId, currency = 'EUR', reloadTo
   return (
     <Card>
       <CardHeader className="border-b border-border/60 px-5 py-3">
-        <CardTitle>Cost value reconciliation</CardTitle>
+        <CardTitle>Cost Value Reconciliation</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">
           Contracted value plus approved client variations, against actual cost, open commitments
           and approved subcontractor variations. Only approved variations count — the rest are a

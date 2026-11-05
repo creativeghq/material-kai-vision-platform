@@ -46,7 +46,7 @@ export const MYDATA_EXEMPTION_CATEGORIES: MydataExemptionCategory[] = [
   { code: 24, label: 'No VAT — art. 8 of the VAT Code', labelEl: 'Χωρίς ΦΠΑ - άρθρο 8 του Κώδικα ΦΠΑ' },
   { code: 25, label: 'No VAT — ΠΟΛ.1029/1995', labelEl: 'Χωρίς ΦΠΑ - ΠΟΛ.1029/1995' },
   { code: 26, label: 'No VAT — ΠΟΛ.1167/2015', labelEl: 'Χωρίς ΦΠΑ - ΠΟΛ.1167/2015' },
-  { code: 27, label: 'Other VAT exemptions', labelEl: 'Λοιπές Εξαιρέσεις ΦΠΑ' },
+  { code: 27, label: 'Other VAT Exemptions', labelEl: 'Λοιπές Εξαιρέσεις ΦΠΑ' },
   { code: 28, label: 'No VAT — art. 29 §1(b) of the VAT Code (Tax Free)', labelEl: 'Χωρίς ΦΠΑ – άρθρο 29 περ. β’ παρ.1 του Κώδικα ΦΠΑ, (Tax Free)' },
   { code: 29, label: 'No VAT — art. 56 of the VAT Code (OSS non-union scheme)', labelEl: 'Χωρίς ΦΠΑ – άρθρο 56 του Κώδικα ΦΠΑ (OSS_μη ενωσιακό καθεστώς)' },
   { code: 30, label: 'No VAT — art. 57 of the VAT Code (OSS union scheme)', labelEl: 'Χωρίς ΦΠΑ – άρθρο 57 του Κώδικα ΦΠΑ (OSS_ενωσιακό καθεστώς)' },

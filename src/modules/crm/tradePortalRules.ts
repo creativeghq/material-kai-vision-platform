@@ -116,7 +116,7 @@ export const VISIBILITY_LABEL: Record<StockVisibility, string> = {
 export const BAND_LABEL: Record<StockBand, string> = {
   none: 'None available',
   limited: 'Limited',
-  in_stock: 'In stock',
+  in_stock: 'In Stock',
 };
 
 export const APPROVAL_LABEL: Record<ApprovalStatus, string> = {

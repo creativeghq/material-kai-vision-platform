@@ -89,7 +89,7 @@ export const CmaReportDialog: React.FC<{ ws: string; propertyId?: string; open: 
               <Stat label="Comparables" value={String(report.stats.count)} />
               <Stat label="Median" value={perSqm(report.stats.median_per_sqm, ccy)} />
               <Stat label="Range" value={report.stats.min_per_sqm != null ? `${money(report.stats.min_per_sqm, ccy)}–${money(report.stats.max_per_sqm, ccy)}` : '—'} />
-              <Stat label="Avg days on market" value={report.stats.avg_days_on_market != null ? `${report.stats.avg_days_on_market}d` : '—'} />
+              <Stat label="Avg Days on Market" value={report.stats.avg_days_on_market != null ? `${report.stats.avg_days_on_market}d` : '—'} />
             </div>
 
             {report.comps.length > 0 && (

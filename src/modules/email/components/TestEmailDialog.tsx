@@ -132,7 +132,7 @@ export const TestEmailDialog: React.FC<TestEmailDialogProps> = ({ open, onOpenCh
             <Label htmlFor="subject">Subject</Label>
             <Input
               id="subject"
-              placeholder="Email subject"
+              placeholder="Email Subject"
               value={formData.subject}
               onChange={(e) => setFormData({ ...formData, subject: e.target.value })}
             />

@@ -429,7 +429,7 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         <DialogContent className="max-w-sm">
           <DialogHeader><DialogTitle>Save as Blueprint</DialogTitle></DialogHeader>
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">Blueprint name</Label>
+            <Label className="text-xs text-muted-foreground">Blueprint Name</Label>
             <Input value={saveAsTitle} onChange={(e) => setSaveAsTitle(e.target.value)} placeholder="e.g. Standard Bathroom Reno" />
           </div>
           <DialogFooter>

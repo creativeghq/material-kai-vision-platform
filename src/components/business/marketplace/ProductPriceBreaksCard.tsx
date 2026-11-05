@@ -118,7 +118,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
       </div>
 
       <div className="space-y-1">
-        <Label className="text-xs">Applies to</Label>
+        <Label className="text-xs">Applies To</Label>
         <LineIdentityPicker
           productId={productId}
           value={variantAttrs}
@@ -136,7 +136,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
             <TableRow>
               <TableHead>From</TableHead>
               <TableHead>Gives</TableHead>
-              <TableHead>Applies at</TableHead>
+              <TableHead>Applies At</TableHead>
               <TableHead className="w-8" />
             </TableRow>
           </TableHeader>
@@ -173,7 +173,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
 
       <div className="grid grid-cols-2 gap-x-2 gap-y-2 sm:grid-cols-5 items-end">
         <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">From quantity</Label>
+          <Label className="text-xs text-muted-foreground">From Quantity</Label>
           <Input className="h-8 text-xs" inputMode="decimal" value={qty}
             onChange={(e) => setQty(e.target.value)} placeholder="5" />
         </div>
@@ -190,7 +190,7 @@ export const ProductPriceBreaksCard: React.FC<{ productId: string; workspaceId: 
             <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="percent">Discount %</SelectItem>
-              <SelectItem value="price">Fixed price per unit</SelectItem>
+              <SelectItem value="price">Fixed Price per Unit</SelectItem>
             </SelectContent>
           </Select>
         </div>

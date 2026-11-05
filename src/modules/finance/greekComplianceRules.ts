@@ -24,7 +24,7 @@ export type MeasurementMethod = 'physical_count' | 'indirect' | 'roll_forward';
 export const MEASUREMENT_LABEL: Record<MeasurementMethod, string> = {
   physical_count: 'Counted',
   indirect: 'Indirect technique',
-  roll_forward: 'Rolled forward',
+  roll_forward: 'Rolled Forward',
 };
 
 /**

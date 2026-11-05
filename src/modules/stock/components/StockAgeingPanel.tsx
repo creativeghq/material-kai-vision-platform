@@ -118,7 +118,7 @@ export const StockAgeingPanel: React.FC<{ workspaceId: string }> = ({ workspaceI
         {position?.status === 'no_policy' && (
           <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
             <div>
-              <Label htmlFor="prov-from" className="text-xs">In force from</Label>
+              <Label htmlFor="prov-from" className="text-xs">In Force From</Label>
               <Input
                 id="prov-from" type="date" className="mt-1 h-8 w-40 text-xs" value={from}
                 onChange={(e) => setFrom(e.target.value)}
@@ -146,7 +146,7 @@ export const StockAgeingPanel: React.FC<{ workspaceId: string }> = ({ workspaceI
               <TableHeader>
                 <TableRow>
                   <TableHead>Item</TableHead>
-                  <TableHead>Lot / tone</TableHead>
+                  <TableHead>Lot / Tone</TableHead>
                   <TableHead>History</TableHead>
                   <TableHead className="text-right">Quantity</TableHead>
                   <TableHead className="text-right">Value</TableHead>

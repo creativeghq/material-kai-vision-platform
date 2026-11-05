@@ -202,9 +202,9 @@ export const ChannelsCostPanel: React.FC = () => {
       <CardContent className="space-y-4">
         <div className="grid gap-2 sm:grid-cols-4">
           {[
-            { label: 'Connected accounts', value: String(totalAccounts), note: 'across all workspaces' },
-            { label: 'Account ladder cost', value: money(accountLadder), note: '2 free · $6 · $3 · $1' },
-            { label: 'Channels revenue', value: money(revenue), note: 'add-on + seats + numbers + credits' },
+            { label: 'Connected Accounts', value: String(totalAccounts), note: 'across all workspaces' },
+            { label: 'Account Ladder Cost', value: money(accountLadder), note: '2 free · $6 · $3 · $1' },
+            { label: 'Channels Revenue', value: money(revenue), note: 'add-on + seats + numbers + credits' },
             { label: 'Net', value: money(net), note: 'after the unattributed ladder' },
           ].map(s => (
             <div key={s.label} className="rounded-sm border border-hairline bg-surface-sunken p-3">
@@ -248,7 +248,7 @@ export const ChannelsCostPanel: React.FC = () => {
                   <TableHead className="text-right">Allowance</TableHead>
                   <TableHead className="text-right">Numbers</TableHead>
                   <TableHead>Add-on</TableHead>
-                  <TableHead className="text-right">Our cost</TableHead>
+                  <TableHead className="text-right">Our Cost</TableHead>
                   <TableHead className="text-right">Revenue</TableHead>
                   <TableHead className="text-right">Net</TableHead>
                 </TableRow>
@@ -385,8 +385,8 @@ export const ChannelsCostPanel: React.FC = () => {
                     <TableHead>Category</TableHead>
                     <TableHead>Workspace</TableHead>
                     <TableHead className="text-right">Volume</TableHead>
-                    <TableHead className="text-right">Meta cost</TableHead>
-                    <TableHead className="text-right">We billed</TableHead>
+                    <TableHead className="text-right">Meta Cost</TableHead>
+                    <TableHead className="text-right">We Billed</TableHead>
                     <TableHead className="text-right">Margin</TableHead>
                   </TableRow>
                 </TableHeader>

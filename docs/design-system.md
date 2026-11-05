@@ -146,6 +146,16 @@ product"; the brand still lands on every page title, which is where it belongs.
 > Aleo's cmap has zero Greek glyphs, so Greek names in headings fell through to Georgia — a font
 > not installed on Linux. Font matching is per-character, so latin headings still get Aleo.
 
+### Casing
+
+A **name** on screen is Title Case: field label, table column, dropdown option, tab, section title,
+and every platform vocabulary row in the database ("Product Sales Income"). A **button**, menu
+action, empty state or message is sentence case ("Add product", "No invoices yet"). Small words
+stay lowercase inside a name; acronyms, units and `(optional)` keep their own form.
+`scripts/lib/labelCase.mjs` is the one definition. It leaves RPC arguments, stored error messages and
+HTTP headers alone: `p_description`, `error_message` and `user-agent` are not names on screen, even
+when they look like one. A stored value shown on screen goes through `labelizeValue` or `humanizeLabel`.
+
 ### Scale
 
 | Role | Size | Weight | Notes |

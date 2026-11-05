@@ -29,9 +29,9 @@ const PAGE_SIZE = 50;
 const REVIEW_MAX_CREDITS = 10;
 
 const SUMMARY_TILES: SeoMetricDescriptor[] = [
-  { key: 'pages_known', label: 'Pages known', format: 'count', upIsGood: true, help: 'URLs listed in the sitemap that are still live.' },
-  { key: 'pages_fetched', label: 'Pages read', format: 'count', upIsGood: true, help: 'Pages the crawler has read at least once. The rest are known but not fetched yet.' },
-  { key: 'pages_reviewed', label: 'Pages reviewed', format: 'count', upIsGood: true, help: 'Pages with at least one page review.' },
+  { key: 'pages_known', label: 'Pages Known', format: 'count', upIsGood: true, help: 'URLs listed in the sitemap that are still live.' },
+  { key: 'pages_fetched', label: 'Pages Read', format: 'count', upIsGood: true, help: 'Pages the crawler has read at least once. The rest are known but not fetched yet.' },
+  { key: 'pages_reviewed', label: 'Pages Reviewed', format: 'count', upIsGood: true, help: 'Pages with at least one page review.' },
   { key: 'recommendations_open', label: 'Open proposals', format: 'count', upIsGood: false, help: 'Proposals not yet seen on the live page by the crawler, and not dismissed.' },
   { key: 'recommendations_applied', label: 'Applied', format: 'count', upIsGood: true, help: 'Proposals the crawler found on the live page after they were made.' },
 ];
@@ -161,7 +161,7 @@ export const WebsitePagesPanel: React.FC<{ website: UserWebsite }> = ({ website 
               label="Show"
               value={filter}
               onChange={(v) => { setFilter(v); setOffset(0); }}
-              options={[{ value: 'all', label: 'All pages' }, ...PAGE_LIST_FILTERS.map((f) => ({ value: f, label: PAGE_LIST_FILTER_LABELS[f] }))]}
+              options={[{ value: 'all', label: 'All Pages' }, ...PAGE_LIST_FILTERS.map((f) => ({ value: f, label: PAGE_LIST_FILTER_LABELS[f] }))]}
             />
           )}
         />
@@ -347,7 +347,7 @@ const PageDrawer: React.FC<{ websiteId: string; pageId: string | null; onClose: 
                   <div className="flex items-center gap-2">
                     <Badge variant={VERDICT_TONE[detail.review.verdict]}>{PAGE_REVIEW_VERDICT_LABELS[detail.review.verdict]}</Badge>
                     <span className="text-xs text-muted-foreground">{timeAgo(detail.review.created_at)} · {detail.review.credits} credits</span>
-                    {changedSinceReview && <Badge variant="info">Page changed since</Badge>}
+                    {changedSinceReview && <Badge variant="info">Page Changed Since</Badge>}
                   </div>
                   {detail.review.summary && <p className="text-sm">{detail.review.summary}</p>}
                 </div>
@@ -402,7 +402,7 @@ const PageDrawer: React.FC<{ websiteId: string; pageId: string | null; onClose: 
                     <li key={q.query} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 px-2 py-1.5">
                       <span className="min-w-0 flex-1">
                         {q.query}
-                        {q.position != null && q.position >= 4 && q.position <= 20 && <Badge variant="info" className="ml-2">Striking distance</Badge>}
+                        {q.position != null && q.position >= 4 && q.position <= 20 && <Badge variant="info" className="ml-2">Striking Distance</Badge>}
                       </span>
                       <span className="text-xs tabular-nums text-muted-foreground">
                         {formatNumber(q.impressions)} impr · {formatNumber(q.clicks)} clicks · pos {q.position ?? '—'}

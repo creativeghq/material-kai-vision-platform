@@ -137,7 +137,7 @@ export const CostCodesPanel: React.FC<Props> = ({ workspaceId }) => {
     <Card>
       <CardHeader className="flex flex-row items-start justify-between gap-4 border-b border-border/60 px-5 py-3">
         <div>
-          <CardTitle>Cost codes</CardTitle>
+          <CardTitle>Cost Codes</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">
             How this workspace classifies what a job costs. Set one on a supplier bill, an expense
             or a timesheet, and the project&apos;s Cost by code report groups by it.

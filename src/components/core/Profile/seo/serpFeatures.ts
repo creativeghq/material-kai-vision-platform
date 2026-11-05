@@ -42,7 +42,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'featured_snippet',
-    label: 'Featured snippet',
+    label: 'Featured Snippet',
     group: 'answer',
     what: 'One result promoted above the rest with an extracted answer.',
     ifPresent: 'Someone owns position zero. Matching the question format they answered is the way to take it.',
@@ -63,7 +63,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'knowledge_graph',
-    label: 'Knowledge panel',
+    label: 'Knowledge Panel',
     group: 'answer',
     what: 'The entity card on the right — a brand, product, place or person Google recognises.',
     ifPresent: 'Google treats the subject as a known entity. Whoever owns that panel owns the query.',
@@ -74,7 +74,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'product_considerations',
-    label: 'Product considerations',
+    label: 'Product Considerations',
     group: 'answer',
     what: 'Google\'s summary of the attributes buyers weigh for this product.',
     ifPresent:
@@ -83,7 +83,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   // ── Visual & video ───────────────────────────────────────────────────────
   {
     key: 'images',
-    label: 'Image pack',
+    label: 'Image Pack',
     group: 'visual',
     what: 'A row of images embedded in the results page.',
     ifPresent:
@@ -94,7 +94,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'video',
-    label: 'Video results',
+    label: 'Video Results',
     group: 'visual',
     what: 'Individual video results in the organic list.',
     ifPresent: 'Video ranks here. A short demonstration can occupy a slot that text cannot reach.',
@@ -103,7 +103,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'video_carousel',
-    label: 'Video carousel',
+    label: 'Video Carousel',
     group: 'visual',
     what: 'A scrollable strip of videos, usually YouTube.',
     ifPresent:
@@ -121,7 +121,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   // ── Commercial ───────────────────────────────────────────────────────────
   {
     key: 'shopping',
-    label: 'Shopping ads',
+    label: 'Shopping Ads',
     group: 'commercial',
     what: 'Paid product listings with price and merchant.',
     ifPresent:
@@ -133,7 +133,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'popular_products',
-    label: 'Popular products',
+    label: 'Popular Products',
     group: 'commercial',
     what: 'An organic product carousel drawn from Merchant Center and structured data.',
     ifPresent:
@@ -144,7 +144,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'paid',
-    label: 'Text ads',
+    label: 'Text Ads',
     group: 'commercial',
     what: 'Sponsored text results above or below the organic list.',
     ifPresent: 'Competitors are paying for this query, which is usually a signal it converts.',
@@ -152,7 +152,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'local_pack',
-    label: 'Local pack',
+    label: 'Local Pack',
     group: 'commercial',
     what: 'The map with three nearby businesses.',
     ifPresent:
@@ -164,7 +164,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'commercial_units',
-    label: 'Commercial units',
+    label: 'Commercial Units',
     group: 'commercial',
     what: 'Merchant and offer modules Google assembles itself.',
     ifPresent: 'Structured product data is being consumed directly — feed quality shows up on the page.',
@@ -172,7 +172,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   // ── Social & discussion ──────────────────────────────────────────────────
   {
     key: 'discussions_and_forums',
-    label: 'Discussions & forums',
+    label: 'Discussions & Forums',
     group: 'social',
     what: 'Threads from Reddit, Quora and forums, surfaced as a block.',
     ifPresent:
@@ -181,7 +181,7 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   { key: 'twitter', label: 'Posts', group: 'social', what: 'Recent social posts.', ifPresent: 'Freshness matters on this query.' },
   {
     key: 'top_stories',
-    label: 'Top stories',
+    label: 'Top Stories',
     group: 'social',
     what: 'A news carousel.',
     ifPresent: 'This is a news-sensitive query — coverage and recency outrank evergreen depth.',
@@ -191,14 +191,14 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   // ── Navigation & refinement ──────────────────────────────────────────────
   {
     key: 'related_searches',
-    label: 'Related searches',
+    label: 'Related Searches',
     group: 'navigational',
     what: 'The refinement links at the foot of the page.',
     ifPresent: 'Google\'s own map of where this query goes next — a free content plan.',
   },
   {
     key: 'refine_products',
-    label: 'Product refinements',
+    label: 'Product Refinements',
     group: 'navigational',
     what: 'Filter chips for narrowing the product set.',
     ifPresent: 'The buyer is still narrowing down. Category and filter pages can capture the refined query.',
@@ -212,28 +212,28 @@ export const SERP_FEATURES: SerpFeatureDescriptor[] = [
   },
   {
     key: 'people_also_search',
-    label: 'People also search for',
+    label: 'People Also Search For',
     group: 'navigational',
     what: 'Alternative searches Google offers after someone returns from a result.',
     ifPresent: 'Searchers bounce back and try a variant — the variants are queries worth a page of their own.',
   },
   {
     key: 'google_reviews',
-    label: 'Google reviews',
+    label: 'Google Reviews',
     group: 'social',
     what: 'Star ratings and review snippets pulled from Google Business Profiles.',
     ifPresent: 'Reputation is on the results page itself — the review count and rating are part of the first impression.',
   },
   {
     key: 'short_videos',
-    label: 'Short videos',
+    label: 'Short Videos',
     group: 'visual',
     what: 'A strip of vertical short-form videos (Shorts, TikTok, Reels).',
     ifPresent: 'Short-form video earns a slot here that a page cannot.',
   },
   {
     key: 'organic',
-    label: 'Organic results',
+    label: 'Organic Results',
     group: 'navigational',
     what: 'The standard blue links.',
     ifPresent: 'The classic ten. Everything else on the page competes with them for attention.',

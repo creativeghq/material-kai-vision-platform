@@ -123,7 +123,7 @@ export const JobCostCard: React.FC<{
                 : 'on orders, not yet invoiced')
               : 'issued invoices'}
           />
-          <Stat label="Actual cost" value={money(pnl.actual_cost, currency)} hint="bills + labor + expenses" />
+          <Stat label="Actual Cost" value={money(pnl.actual_cost, currency)} hint="bills + labor + expenses" />
           <Stat
             label="Margin"
             value={money(pnl.margin_amount, currency)}
@@ -134,7 +134,7 @@ export const JobCostCard: React.FC<{
 
         {/* Cost breakdown — what makes up actual, plus the commitment still outstanding. */}
         <div className="rounded-lg border border-hairline divide-y divide-hairline text-sm">
-          <Row label="Supplier bills" value={money(pnl.supplier_cost, currency)} />
+          <Row label="Supplier Bills" value={money(pnl.supplier_cost, currency)} />
           <Row label="Labor" value={money(pnl.labor_cost, currency)}
             hint={pnl.labor.total_minutes > 0 ? `${hoursOf(pnl.labor.total_minutes)}h logged` : 'no time logged'} />
           <Row label="Expenses" value={money(pnl.expense_cost, currency)}
@@ -142,13 +142,13 @@ export const JobCostCard: React.FC<{
           {/* Pending claims are shown but excluded from cost: an unreviewed claim should be
               visible without silently moving the margin. */}
           {pnl.pending_expense_cost > 0 && (
-            <Row label="Pending claims" value={money(pnl.pending_expense_cost, currency)}
+            <Row label="Pending Claims" value={money(pnl.pending_expense_cost, currency)}
               hint="awaiting approval — not counted yet" muted />
           )}
-          <Row label="Committed (open POs)" value={money(pnl.committed_cost, currency)}
+          <Row label="Committed (Open POs)" value={money(pnl.committed_cost, currency)}
             hint="ordered, not yet billed" muted />
           <Row
-            label="Forecast margin"
+            label="Forecast Margin"
             value={money(pnl.forecast_margin_amount, currency)}
             hint={pnl.forecast_margin_pct == null ? 'no accepted quote' : `${pnl.forecast_margin_pct}% of contracted`}
             tone={marginTone(pnl.forecast_margin_amount)}

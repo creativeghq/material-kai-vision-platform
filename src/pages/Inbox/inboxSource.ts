@@ -74,7 +74,7 @@ const SOURCE_CHANNEL: Record<InboxSourceKey, InboxChannel | null> = {
  */
 const SOURCE_META: Record<InboxSourceKey, { label: string; Icon: LucideIcon; tone: SourceTone }> = {
   public_profile: {
-    label: 'Public profile', Icon: UserRound,
+    label: 'Public Profile', Icon: UserRound,
     tone: {
       tag: 'bg-teal-500/10 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/25 dark:border-teal-500/30',
       text: 'text-teal-700 dark:text-teal-300',
@@ -106,7 +106,7 @@ const SOURCE_META: Record<InboxSourceKey, { label: string; Icon: LucideIcon; ton
     },
   },
   social_comments: {
-    label: 'Social comments', Icon: MessagesSquare,
+    label: 'Social Comments', Icon: MessagesSquare,
     tone: {
       tag: 'bg-pink-500/10 dark:bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/25 dark:border-pink-500/30',
       text: 'text-pink-700 dark:text-pink-300',
@@ -114,7 +114,7 @@ const SOURCE_META: Record<InboxSourceKey, { label: string; Icon: LucideIcon; ton
     },
   },
   lead_form: {
-    label: 'Lead form', Icon: ClipboardList,
+    label: 'Lead Form', Icon: ClipboardList,
     tone: {
       tag: 'bg-orange-500/10 dark:bg-orange-500/15 text-orange-800 dark:text-orange-300 border-orange-500/25 dark:border-orange-500/30',
       text: 'text-orange-800 dark:text-orange-300',

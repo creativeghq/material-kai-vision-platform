@@ -150,14 +150,14 @@ export const ServicesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Income classification type</Label>
+                <Label className="text-xs">Income Classification Type</Label>
                 <Select value={form.incType ?? ''} onValueChange={(v) => setForm({ ...form, incType: v })}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Income classification category</Label>
+                <Label className="text-xs">Income Classification Category</Label>
                 <Select value={form.incCat ?? ''} onValueChange={(v) => setForm({ ...form, incCat: v })}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select…" /></SelectTrigger>
                   <SelectContent>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>

@@ -146,11 +146,11 @@ export function CatalogExportTab() {
             </Select>
           </div>
           <div>
-            <Label htmlFor="export-template">Channel field names</Label>
+            <Label htmlFor="export-template">Channel Field Names</Label>
             <Select value={templateId} onValueChange={setTemplateId}>
               <SelectTrigger id="export-template"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value={NO_TEMPLATE}>Our own column names</SelectItem>
+                <SelectItem value={NO_TEMPLATE}>Our Own Column Names</SelectItem>
                 {templates.map((t) => (
                   <SelectItem key={t.id} value={t.id}>{t.template_name}</SelectItem>
                 ))}

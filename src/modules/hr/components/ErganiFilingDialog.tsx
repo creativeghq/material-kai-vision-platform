@@ -109,7 +109,7 @@ export function ErganiFilingDialog({
               </div>
             )}
             <div className="space-y-1">
-              <Label className="text-xs">Document (JSON) — review before filing</Label>
+              <Label className="text-xs">Document (JSON) — Review Before Filing</Label>
               <Textarea value={doc} onChange={(e) => setDoc(e.target.value)} rows={16} className="font-mono text-xs" />
             </div>
           </div>

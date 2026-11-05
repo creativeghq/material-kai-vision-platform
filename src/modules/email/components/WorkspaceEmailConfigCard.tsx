@@ -131,7 +131,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-emerald-500" />
               <span className="text-sm font-medium">Platform default sender is active</span>
-              <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">In use</Badge>
+              <Badge className="bg-emerald-500/15 text-emerald-500 border-emerald-500/30">In Use</Badge>
             </div>
             <p className="text-xs text-muted-foreground">
               Your emails currently go out as{' '}
@@ -171,7 +171,7 @@ export const WorkspaceEmailConfigCard: React.FC<{ workspaceId: string; onSaved?:
               a "sender configured" banner reads as broken; the same field showing the address that
               is actually in use reads as "inherited, override if you want" — which is the truth. */}
           <div className="space-y-1">
-            <Label className="text-xs">From email</Label>
+            <Label className="text-xs">From Email</Label>
             <Input value={fromEmail} onChange={(e) => setFromEmail(e.target.value)} placeholder={platformSender?.email || 'billing@yourdomain.com'} />
           </div>
           <div className="space-y-1">

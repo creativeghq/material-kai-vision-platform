@@ -44,7 +44,7 @@ function scopeLabel(key: EmbedKey): string {
   if (key.scope_type === 'categories') return `${n} ${n === 1 ? 'category' : 'categories'}`;
   if (key.scope_type === 'products') return `${n} ${n === 1 ? 'product' : 'products'}`;
   if (key.scope_type === 'blueprints') return `${n} ${n === 1 ? 'blueprint' : 'blueprints'}`;
-  return 'Everything published';
+  return 'Everything Published';
 }
 
 function servesLabel(key: EmbedKey): string {

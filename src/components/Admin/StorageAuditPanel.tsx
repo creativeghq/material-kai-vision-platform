@@ -173,7 +173,7 @@ export function StorageAuditPanel() {
                 <th className="px-4 py-2 text-right">Objects</th>
                 <th className="px-4 py-2 text-right">Total</th>
                 <th className="px-4 py-2 text-right">Orphans</th>
-                <th className="px-4 py-2 text-right">Orphan size</th>
+                <th className="px-4 py-2 text-right">Orphan Size</th>
                 <th className="px-4 py-2 text-right">Oldest</th>
               </tr>
             </thead>

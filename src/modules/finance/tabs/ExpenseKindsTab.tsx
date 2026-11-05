@@ -152,7 +152,7 @@ export const ExpenseKindsTab: React.FC<{ workspaceId: string }> = ({ workspaceId
 
           <Card>
             <CardHeader className="border-b border-hairline px-5 py-3">
-              <CardTitle className="text-sm">By VAT treatment</CardTitle>
+              <CardTitle className="text-sm">By VAT Treatment</CardTitle>
             </CardHeader>
             <CardContent className="pt-4">
               <div className="flex flex-wrap items-end gap-x-8 gap-y-3">
@@ -174,7 +174,7 @@ export const ExpenseKindsTab: React.FC<{ workspaceId: string }> = ({ workspaceId
       {!error && segments.length > 0 && (
         <Card>
           <CardHeader className="border-b border-hairline px-5 py-3">
-            <CardTitle className="text-sm">Every segment</CardTitle>
+            <CardTitle className="text-sm">Every Segment</CardTitle>
             <p className="pt-1 text-[11px] text-muted-foreground">
               One row per kind, VAT treatment and origin. <strong>In books</strong> is what reached
               the P&amp;L; <strong>waiting</strong> is what has not.
@@ -191,7 +191,7 @@ export const ExpenseKindsTab: React.FC<{ workspaceId: string }> = ({ workspaceId
                     <th className="px-3 py-2 text-right">Net</th>
                     <th className="px-3 py-2 text-right">VAT amount</th>
                     <th className="px-3 py-2 text-right">Docs</th>
-                    <th className="px-3 py-2 text-right">In books</th>
+                    <th className="px-3 py-2 text-right">In Books</th>
                     <th className="px-3 py-2 text-right">Waiting</th>
                   </tr>
                 </thead>

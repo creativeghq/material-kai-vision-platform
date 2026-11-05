@@ -27,7 +27,7 @@ type Lang = 'en' | 'gr';
 type Field = { key: string; label: string; bilingual?: boolean; textarea?: boolean; placeholder?: string };
 
 const BILLING: Field[] = [
-  { key: 'business_name', label: 'Company name', bilingual: true, placeholder: 'Acme Tiles S.A.' },
+  { key: 'business_name', label: 'Company Name', bilingual: true, placeholder: 'Acme Tiles S.A.' },
   { key: 'business_profession', label: 'Activity', bilingual: true, placeholder: 'Wholesale of building materials' },
   { key: 'business_vat', label: 'VAT number', placeholder: 'EL123456789' },
   { key: 'business_gemi', label: 'GEMI number', placeholder: '123456789000' },
@@ -35,35 +35,35 @@ const BILLING: Field[] = [
   // 2-5 digit number -- no prefix, no fixed width -- so the column carries a digits-only
   // CHECK and no length constraint. Printed in the issuer block of every sales document.
   { key: 'business_amp', label: 'EPR / packaging reg. no. (AMP)', placeholder: '12345' },
-  { key: 'business_tax_office', label: 'Tax office', bilingual: true, placeholder: 'FAE Athinon' },
+  { key: 'business_tax_office', label: 'Tax Office', bilingual: true, placeholder: 'FAE Athinon' },
   { key: 'business_address', label: 'Street', bilingual: true, placeholder: 'Ermou' },
   { key: 'business_street_number', label: 'Number', placeholder: '15' },
-  { key: 'business_postal_code', label: 'Postal code', placeholder: '10563' },
+  { key: 'business_postal_code', label: 'Postal Code', placeholder: '10563' },
   { key: 'business_city', label: 'City', bilingual: true, placeholder: 'Athens' },
   { key: 'business_country', label: 'Country', bilingual: true, placeholder: 'Greece' },
-  { key: 'business_country_code', label: 'Country code', placeholder: 'GR' },
+  { key: 'business_country_code', label: 'Country Code', placeholder: 'GR' },
   { key: 'business_phone', label: 'Phone', placeholder: '+30 210 1234567' },
   { key: 'business_fax', label: 'Fax', placeholder: '+30 210 1234568' },
   { key: 'business_email', label: 'Email', placeholder: 'billing@acme.gr' },
   { key: 'business_other', label: 'Other', bilingual: true, placeholder: 'e.g. branch / notes' },
 ];
 const CUSTOMER_CONTACT: Field[] = [
-  { key: 'contact_title', label: 'Display name / Brand', bilingual: true, placeholder: 'Acme Tiles' },
-  { key: 'contact_email', label: 'Contact email', placeholder: 'hello@acme.gr' },
-  { key: 'contact_phone', label: 'Company phone', placeholder: '+30 210 1234567' },
+  { key: 'contact_title', label: 'Display Name / Brand', bilingual: true, placeholder: 'Acme Tiles' },
+  { key: 'contact_email', label: 'Contact Email', placeholder: 'hello@acme.gr' },
+  { key: 'contact_phone', label: 'Company Phone', placeholder: '+30 210 1234567' },
   { key: 'contact_fax', label: 'Fax', placeholder: '+30 210 1234568' },
   { key: 'contact_website', label: 'Website', placeholder: 'https://acme.gr' },
   { key: 'contact_linkedin', label: 'LinkedIn', placeholder: 'https://linkedin.com/company/acme' },
   { key: 'contact_facebook', label: 'Facebook', placeholder: 'https://facebook.com/acme' },
-  { key: 'contact_hours', label: 'Opening hours', placeholder: 'Mon–Fri 9:00–17:00' },
+  { key: 'contact_hours', label: 'Opening Hours', placeholder: 'Mon–Fri 9:00–17:00' },
 ];
 const PERSONAL: Field[] = [
-  { key: 'responsible_name', label: 'Responsible person', placeholder: 'Maria Papadopoulou' },
+  { key: 'responsible_name', label: 'Responsible Person', placeholder: 'Maria Papadopoulou' },
   { key: 'personal_landline', label: 'Landline', placeholder: '+30 210 1234567' },
   { key: 'personal_mobile', label: 'Mobile', placeholder: '+30 69x xxx xxxx' },
-  { key: 'notification_email', label: 'Notifications email', placeholder: 'alerts@acme.gr' },
-  { key: 'correspondence_address', label: 'Correspondence address', placeholder: 'Ermou 15, 10563 Athens' },
-  { key: 'personal_notes', label: 'Notes & instructions', textarea: true, placeholder: 'Anything we should know…' },
+  { key: 'notification_email', label: 'Notifications Email', placeholder: 'alerts@acme.gr' },
+  { key: 'correspondence_address', label: 'Correspondence Address', placeholder: 'Ermou 15, 10563 Athens' },
+  { key: 'personal_notes', label: 'Notes & Instructions', textarea: true, placeholder: 'Anything we should know…' },
 ];
 const COMPANY_TYPES = [
   'Sole proprietor / Freelancer', 'Small business (2–10 people)',
@@ -362,7 +362,7 @@ export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding 
 
           <TabsContent value="company" className="space-y-3">
             <div className="space-y-1">
-              <Label>Company type</Label>
+              <Label>Company Type</Label>
               <Select value={data.business_company_type ?? ''} onValueChange={(v) => set('business_company_type', v)}>
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>{COMPANY_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
@@ -373,13 +373,13 @@ export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding 
               <Select value={data.business_seasonal ? 'seasonal' : 'all_year'} onValueChange={(v) => set('business_seasonal', v === 'seasonal')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all_year">All year round</SelectItem>
+                  <SelectItem value="all_year">All Year Round</SelectItem>
                   <SelectItem value="seasonal">Seasonal</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Main activity</Label>
+              <Label>Main Activity</Label>
               <Select value={data.main_activity ?? ''} onValueChange={(v) => set('main_activity', v)}>
                 <SelectTrigger><SelectValue placeholder="Select…" /></SelectTrigger>
                 <SelectContent>
@@ -416,7 +416,7 @@ export const BusinessIdentityCard: React.FC<Props> = ({ workspaceId, onboarding 
             {/* Logo lives here now (the separate "Bank & Logo" tab was retired — bank
                 details are managed in Settings → Accounts and print from there). */}
             <div className="space-y-2 pt-2 border-t border-border/60">
-              <Label>Logo (printed on invoices)</Label>
+              <Label>Logo (Printed on Invoices)</Label>
               <div className="flex items-center gap-4">
                 <div className="h-20 w-40 rounded-md border border-border/60 bg-muted/20 flex items-center justify-center overflow-hidden">
                   {logoUrl ? <img src={logoUrl} alt="logo" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-muted-foreground flex items-center gap-1"><ImageIcon className="h-4 w-4" /> No logo</span>}

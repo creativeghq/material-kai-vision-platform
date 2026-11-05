@@ -348,7 +348,7 @@ export const SendEmailDialog: React.FC<SendEmailDialogProps> = ({
 
                 {selectedTemplate?.subject_template && (
                   <div className="space-y-1">
-                    <Label className="text-xs text-muted-foreground">Subject preview</Label>
+                    <Label className="text-xs text-muted-foreground">Subject Preview</Label>
                     <div className="rounded border bg-muted/30 p-2 text-sm font-medium">
                       {selectedTemplate.subject_template}
                     </div>

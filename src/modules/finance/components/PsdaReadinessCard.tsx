@@ -141,7 +141,7 @@ export const PsdaReadinessCard: React.FC<{ workspaceId: string }> = ({ workspace
               </div>
               {draft.route === 'direct_mydata' && (
                 <div>
-                  <Label htmlFor="psda-cred" className="text-xs">Credential reference</Label>
+                  <Label htmlFor="psda-cred" className="text-xs">Credential Reference</Label>
                   <Input
                     id="psda-cred" className="mt-1 h-8 w-56 text-xs"
                     placeholder="which stored key, not the key"

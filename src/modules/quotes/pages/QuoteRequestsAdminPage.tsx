@@ -395,7 +395,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
         {inbox.length > 0 && (
           <>
             <SectionHeader
-              title="Incoming requests"
+              title="Incoming Requests"
               subtitle="Specifications sent from your website. Nothing here has been priced yet."
             />
             <div className="dashboard-card overflow-x-auto">

@@ -32,14 +32,14 @@ interface Props {
 }
 
 const CATEGORIES: { value: PlannedPaymentCategory; label: string }[] = [
-  { value: 'supplier_bill', label: 'Supplier bill' },
+  { value: 'supplier_bill', label: 'Supplier Bill' },
   { value: 'rent', label: 'Rent' },
   { value: 'utility', label: 'Utility' },
   { value: 'tax', label: 'Tax' },
   { value: 'salary', label: 'Salary' },
   { value: 'loan', label: 'Loan' },
   { value: 'expense', label: 'Expense' },
-  { value: 'expected_receipt', label: 'Expected receipt (incoming)' },
+  { value: 'expected_receipt', label: 'Expected Receipt (Incoming)' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -245,7 +245,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
           </FormField>
           </FormSection>
 
-          <FormSection title="Amount and schedule">
+          <FormSection title="Amount and Schedule">
             <FormGrid cols={4}>
               <FormField label="Amount">
                 <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
@@ -261,7 +261,7 @@ export const NewPlannedPaymentDialog: React.FC<Props> = ({
               <FormField label="Date">
                 <Input type="date" value={scheduledFor} onChange={(e) => setScheduledFor(e.target.value)} />
               </FormField>
-              <FormField label="Reminder date" optional>
+              <FormField label="Reminder Date" optional>
                 <Input type="date" value={reminderAt} onChange={(e) => setReminderAt(e.target.value)} />
               </FormField>
             </FormGrid>

@@ -159,9 +159,9 @@ const MyAadeModulePage: React.FC = () => {
                   )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-xs">
-                  <KV label="Trade name" value={result.basic_rec.commer_title} />
-                  <KV label="Legal form" value={result.basic_rec.legal_status_descr} />
-                  <KV label="Tax office" value={result.basic_rec.doy_descr ? `${result.basic_rec.doy_descr} (${result.basic_rec.doy ?? '—'})` : null} />
+                  <KV label="Trade Name" value={result.basic_rec.commer_title} />
+                  <KV label="Legal Form" value={result.basic_rec.legal_status_descr} />
+                  <KV label="Tax Office" value={result.basic_rec.doy_descr ? `${result.basic_rec.doy_descr} (${result.basic_rec.doy ?? '—'})` : null} />
                   <KV label="Start date" value={result.basic_rec.regist_date} />
                   <KV
                     label="Address"

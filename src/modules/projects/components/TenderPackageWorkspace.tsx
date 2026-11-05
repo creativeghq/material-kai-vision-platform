@@ -332,7 +332,7 @@ const BidAnalysisSection: React.FC<{
           <thead>
             <tr className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
               <th className="px-3 py-1.5 text-left">Subcontractor</th>
-              <th className="px-3 py-1.5 text-right">As submitted</th>
+              <th className="px-3 py-1.5 text-right">As Submitted</th>
               <th className="px-3 py-1.5 text-right">Not priced</th>
               <th className="px-3 py-1.5 text-right">Comparable</th>
               <th className="px-3 py-1.5 text-left">Flags</th>
@@ -474,7 +474,7 @@ const NewPackageItem: React.FC<{
         <Input inputMode="decimal" value={quantity} onChange={(e) => setQuantity(e.target.value)} className="h-9" />
       </div>
       <div className="space-y-1">
-        <Label className="text-xs">Cost code</Label>
+        <Label className="text-xs">Cost Code</Label>
         <CostCodePicker value={costCodeId} onChange={setCostCodeId} className="h-9" />
       </div>
       <div className="col-span-6 flex justify-end gap-2">

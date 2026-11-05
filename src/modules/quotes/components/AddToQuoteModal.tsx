@@ -237,7 +237,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
                     placeholder="e.g. 120×60×45"
                   />
                 </FormField>
-                <FormField label="Installation requirements" htmlFor="add-to-quote-install" optional className="sm:col-span-2">
+                <FormField label="Installation Requirements" htmlFor="add-to-quote-install" optional className="sm:col-span-2">
                   <Textarea
                     id="add-to-quote-install"
                     value={installationRequirements}

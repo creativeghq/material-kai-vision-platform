@@ -83,7 +83,7 @@ export function EditSeparationDialog({
               <Input type="date" value={effective} onChange={(e) => setEffective(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Notice given</Label>
+              <Label>Notice Given</Label>
               <Input type="date" value={notice} onChange={(e) => setNotice(e.target.value)} />
             </div>
           </div>

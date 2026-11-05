@@ -174,7 +174,7 @@ export const DeliveryEvidenceCard: React.FC<{
               </Select>
             </div>
             <div>
-              <Label htmlFor="pod-recipient" className="text-xs">Received by</Label>
+              <Label htmlFor="pod-recipient" className="text-xs">Received By</Label>
               <Input
                 id="pod-recipient" className="mt-1 h-8 w-44 text-xs" value={proof.recipient}
                 onChange={(e) => setProof((p) => ({ ...p, recipient: e.target.value }))}

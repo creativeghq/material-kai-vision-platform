@@ -179,7 +179,7 @@ export const DealDetailPage: React.FC = () => {
               )}
               <Row label="Value" value={money(deal.value)} />
               <Row icon={Percent} label="Probability" value={deal.probability != null ? `${deal.probability}%` : 'From stage'} />
-              <Row icon={CalendarClock} label="Expected close" value={deal.expected_close_date ? formatDate(deal.expected_close_date) : '—'} />
+              <Row icon={CalendarClock} label="Expected Close" value={deal.expected_close_date ? formatDate(deal.expected_close_date) : '—'} />
             </CardContent>
           </Card>
 

@@ -91,7 +91,7 @@ export const SelfHostingRequestDialog: React.FC<Props> = ({ open, onClose }) => 
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="sh-name">Your name</Label>
+              <Label htmlFor="sh-name">Your Name</Label>
               <Input id="sh-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="space-y-1.5">
@@ -100,7 +100,7 @@ export const SelfHostingRequestDialog: React.FC<Props> = ({ open, onClose }) => 
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="sh-size">Team size</Label>
+            <Label htmlFor="sh-size">Team Size</Label>
             <Input
               id="sh-size" value={teamSize} onChange={(e) => setTeamSize(e.target.value)}
               placeholder="e.g. 25 people, 3 workspaces"

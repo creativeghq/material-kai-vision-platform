@@ -28,7 +28,7 @@ interface Props {
 }
 
 const TITLE: Record<CardTerminalTarget['kind'], string> = {
-  invoice_payment: 'Card payment on the terminal',
+  invoice_payment: 'Card Payment on the Terminal',
   eftpos_receipt: 'Card receipt (8.4) for this sale',
   refund: 'Refund to the card',
 };
@@ -164,7 +164,7 @@ export const CardTerminalPaymentDialog: React.FC<Props> = ({
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Paid by</Label>
+                <Label>Paid By</Label>
                 <Select value={method} onValueChange={(v) => setMethod(v as '7' | '8')}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -182,7 +182,7 @@ export const CardTerminalPaymentDialog: React.FC<Props> = ({
               terminal <span className="font-mono">{terminalId}</span>, then enter the transaction id the terminal printed.
             </p>
             <div className="space-y-1.5">
-              <Label htmlFor="ctp-txn">Transaction id</Label>
+              <Label htmlFor="ctp-txn">Transaction Id</Label>
               <Input id="ctp-txn" value={txnId} onChange={(e) => setTxnId(e.target.value)} autoFocus />
             </div>
           </div>

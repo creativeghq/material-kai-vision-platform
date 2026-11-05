@@ -34,7 +34,7 @@ import { refreshTrackedKeywords } from './useWebsiteKeywords';
 /** The verdict, in the reader's words. The engine takes the first three. */
 const REASON: Record<string, { label: string; explain: string; tone: 'success' | 'info' | 'warning' }> = {
   earning_clicks: {
-    label: 'Earning clicks',
+    label: 'Earning Clicks',
     explain: 'People are already clicking through on this query — it is working, and worth watching.',
     tone: 'success',
   },
@@ -44,7 +44,7 @@ const REASON: Record<string, { label: string; explain: string; tone: 'success' |
     tone: 'info',
   },
   striking_distance: {
-    label: 'Near page one',
+    label: 'Near Page One',
     explain: 'Close enough to the first page that a small move is worth measuring.',
     tone: 'info',
   },

@@ -136,7 +136,7 @@ export const DeliveryNoteDetailPage: React.FC = () => {
     await load();
   });
   const sendFiscal = () => run('fiscal', async () => {
-    const t = issuedToast('Delivery note', await transmitAfterIssue('delivery_note', note.id, note.workspace_id));
+    const t = issuedToast('Delivery Note', await transmitAfterIssue('delivery_note', note.id, note.workspace_id));
     toast(t.variant ? t : { title: 'Sent to myDATA', description: t.description });
     await load();
   });
@@ -212,17 +212,17 @@ export const DeliveryNoteDetailPage: React.FC = () => {
                 ? (relation.to ? <Link className="text-primary hover:underline" to={relation.to}>{relation.label}</Link> : relation.label)
                 : null}
             </HubProperty>
-            <HubProperty label="Document type">{movementDocTypeLabel(docType)}</HubProperty>
+            <HubProperty label="Document Type">{movementDocTypeLabel(docType)}</HubProperty>
             {note.kind === 'dispatch' && (
               <HubProperty label="Purpose">{note.move_purpose ? `${note.move_purpose} — ${movePurposeLabel(note.move_purpose)}` : null}</HubProperty>
             )}
             <HubProperty label="Issued">{note.issued_at ? formatDate(note.issued_at) : null}</HubProperty>
-            <HubProperty label="Transport date">{note.transport_date ? formatDate(note.transport_date) : null}</HubProperty>
+            <HubProperty label="Transport Date">{note.transport_date ? formatDate(note.transport_date) : null}</HubProperty>
             <HubProperty label="Vehicle">{note.vehicle_number}</HubProperty>
-            <HubProperty label="Loading place">
+            <HubProperty label="Loading Place">
               {address([note.ship_from_street, note.ship_from_number, note.ship_from_postal, note.ship_from_city]) || note.default_loading_place}
             </HubProperty>
-            <HubProperty label="Delivery place">
+            <HubProperty label="Delivery Place">
               {address([note.ship_to_street, note.ship_to_number, note.ship_to_postal, note.ship_to_city]) || note.default_delivery_place}
             </HubProperty>
           </HubPropertyList>

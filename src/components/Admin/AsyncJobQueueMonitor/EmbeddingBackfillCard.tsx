@@ -22,10 +22,10 @@ interface Backlog {
 }
 
 const FIELDS: { key: keyof Backlog; label: string }[] = [
-  { key: 'products_missing_text',         label: 'Products missing text' },
-  { key: 'chunks_missing_text',           label: 'Chunks missing text' },
-  { key: 'images_partial',                label: 'Images partial' },
-  { key: 'images_classification_pending', label: 'Images pending classify' },
+  { key: 'products_missing_text',         label: 'Products Missing Text' },
+  { key: 'chunks_missing_text',           label: 'Chunks Missing Text' },
+  { key: 'images_partial',                label: 'Images Partial' },
+  { key: 'images_classification_pending', label: 'Images Pending Classify' },
 ];
 
 export const EmbeddingBackfillCard: React.FC = () => {

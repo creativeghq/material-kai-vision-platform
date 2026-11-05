@@ -227,10 +227,10 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
                 <Label htmlFor="alw-room" className="text-xs">Room</Label>
                 <Select value={allowance.roomId || 'none'} onValueChange={(v) => setAllowance((a) => ({ ...a, roomId: v === 'none' ? '' : v }))}>
                   <SelectTrigger id="alw-room" className="mt-1 h-8 w-40 text-xs">
-                    <SelectValue placeholder="Whole project" />
+                    <SelectValue placeholder="Whole Project" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Whole project</SelectItem>
+                    <SelectItem value="none">Whole Project</SelectItem>
                     {rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
@@ -312,7 +312,7 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
                   onChange={(e) => setPick((p) => ({ ...p, quantity: e.target.value }))} />
               </div>
               <div>
-                <Label htmlFor="sel-price" className="text-xs">Unit price</Label>
+                <Label htmlFor="sel-price" className="text-xs">Unit Price</Label>
                 <Input id="sel-price" type="number" min="0" className="mt-1 h-8 w-24 text-xs" value={pick.price}
                   onChange={(e) => setPick((p) => ({ ...p, price: e.target.value }))} />
               </div>

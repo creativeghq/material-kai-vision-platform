@@ -37,7 +37,7 @@ export function buildFlowRunFilters(runs: FlowRun[], flows: Flow[]): FilterGroup
           column: 'flow_id',
         },
         {
-          key: 'trigger_type', type: 'multi', label: 'Trigger type',
+          key: 'trigger_type', type: 'multi', label: 'Trigger Type',
           options: optionsFromRows(runs, (r) => r.trigger_type, humanizeLabel),
           accessor: (r) => r.trigger_type,
         },

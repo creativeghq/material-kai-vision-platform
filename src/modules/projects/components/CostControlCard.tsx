@@ -19,10 +19,10 @@ import {
 } from '../services/projectsService';
 
 const KINDS: Array<{ kind: CostLineKind; label: string }> = [
-  { kind: 'supplier_bills', label: 'Supplier bills' },
-  { kind: 'purchase_orders', label: 'Purchase orders' },
+  { kind: 'supplier_bills', label: 'Supplier Bills' },
+  { kind: 'purchase_orders', label: 'Purchase Orders' },
   { kind: 'expenses', label: 'Expenses' },
-  { kind: 'time', label: 'Time entries' },
+  { kind: 'time', label: 'Time Entries' },
   { kind: 'invoices', label: 'Invoices' },
 ];
 
@@ -106,11 +106,11 @@ export const CostControlCard: React.FC<{
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Cost code</TableHead>
+                  <TableHead>Cost Code</TableHead>
                   <TableHead className="text-right">Budget</TableHead>
                   <TableHead className="text-right">Actual</TableHead>
-                  <TableHead className="text-right">On order</TableHead>
-                  <TableHead className="text-right">To complete</TableHead>
+                  <TableHead className="text-right">On Order</TableHead>
+                  <TableHead className="text-right">To Complete</TableHead>
                   <TableHead className="text-right">Forecast</TableHead>
                   <TableHead className="text-right">Variance</TableHead>
                   <TableHead />
@@ -192,7 +192,7 @@ export const CostControlCard: React.FC<{
                     <TableHead>Item</TableHead>
                     <TableHead>Supplier</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="text-right">{lines?.kind === 'time' ? 'Hours' : 'Net amount'}</TableHead>
+                    <TableHead className="text-right">{lines?.kind === 'time' ? 'Hours' : 'Net Amount'}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -254,7 +254,7 @@ const BudgetDialog: React.FC<{
             <Input type="number" min={0} step="0.01" value={budget} onChange={(e) => setBudget(e.target.value)} className="mt-1" />
           </div>
           <div>
-            <Label className="text-xs">Estimate to complete (optional)</Label>
+            <Label className="text-xs">Estimate to Complete (optional)</Label>
             <Input type="number" min={0} step="0.01" value={etc} onChange={(e) => setEtc(e.target.value)} className="mt-1"
               placeholder="Leave empty to derive it" />
           </div>

@@ -1155,7 +1155,7 @@ const RetailerTable: React.FC<{
               )}
               {r.current_availability === 'out_of_stock' && (
                 <Badge variant="outline" className="text-[10px] border-orange-300 text-orange-700">
-                  Out of stock
+                  Out of Stock
                 </Badge>
               )}
               {r.current_availability === 'limited' && (

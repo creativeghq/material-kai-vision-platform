@@ -205,7 +205,7 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
             />
           </div>
           <div>
-            <Label htmlFor="folder-basis" className="text-xs">Apportion by</Label>
+            <Label htmlFor="folder-basis" className="text-xs">Apportion By</Label>
             <Select value={newBasis} onValueChange={(v) => setNewBasis(v as AllocationBasis)}>
               <SelectTrigger id="folder-basis" className="mt-1 h-8 w-64 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -281,7 +281,7 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
                   <SelectTrigger id="cost-stage" className="mt-1 h-8 w-36 text-xs"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="forecast">Forecast</SelectItem>
-                    <SelectItem value="actual">Actual invoice</SelectItem>
+                    <SelectItem value="actual">Actual Invoice</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -317,7 +317,7 @@ export const ImportFoldersPanel: React.FC<{ workspaceId: string }> = ({ workspac
                       <TableHead className="text-right">Quantity</TableHead>
                       <TableHead className="text-right">Basis</TableHead>
                       <TableHead className="text-right">On-cost</TableHead>
-                      <TableHead className="text-right">Per unit</TableHead>
+                      <TableHead className="text-right">Per Unit</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

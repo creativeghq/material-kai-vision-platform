@@ -24,9 +24,9 @@ import {
 
 const ROLE_LABEL: Record<EudrRole, string> = {
   operator: 'Operator',
-  downstream_operator: 'Downstream operator',
+  downstream_operator: 'Downstream Operator',
   trader: 'Trader',
-  out_of_scope: 'Out of scope',
+  out_of_scope: 'Out of Scope',
 };
 
 const ROLE_TONE: Record<EudrRole, 'warning' | 'info' | 'neutral'> = {
@@ -136,7 +136,7 @@ export const OrderEudrCard: React.FC<{
                 <TableHead>Line</TableHead>
                 <TableHead>CN</TableHead>
                 <TableHead>Origin</TableHead>
-                <TableHead>Our role</TableHead>
+                <TableHead>Our Role</TableHead>
                 <TableHead>Species</TableHead>
                 <TableHead>Statement</TableHead>
                 <TableHead />
@@ -247,7 +247,7 @@ export const OrderEudrCard: React.FC<{
               />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="eudr-mass" className="text-xs">Net mass (kg)</Label>
+              <Label htmlFor="eudr-mass" className="text-xs">Net Mass (kg)</Label>
               <Input
                 id="eudr-mass" type="number" className="h-9 w-32" value={netMass}
                 onChange={(e) => setNetMass(e.target.value)}

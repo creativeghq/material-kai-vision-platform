@@ -74,7 +74,7 @@ describe('inbox source — an explicit source outranks the transport', () => {
     const enquiry = EXAMPLES.public_profile;
     expect(enquiry.channel, 'the enquiry must still reply over email').toBe('email');
     expect(inboxSourceKey(enquiry)).toBe('public_profile');
-    expect(inboxThreadSource(enquiry).label).toBe('Public profile');
+    expect(inboxThreadSource(enquiry).label).toBe('Public Profile');
     // …and the thread NEXT to it, on the same channel, still reads as email.
     expect(inboxSourceKey(EXAMPLES.email)).toBe('email');
   });

@@ -38,10 +38,10 @@ interface Props {
 }
 
 const CADENCE_OPTIONS = [
-  { value: 'once', label: 'Just review once (no monitor)' },
-  { value: '24',   label: 'Watch daily' },
-  { value: '168',  label: 'Watch weekly' },
-  { value: '720',  label: 'Watch monthly' },
+  { value: 'once', label: 'Just Review Once (No Monitor)' },
+  { value: '24',   label: 'Watch Daily' },
+  { value: '168',  label: 'Watch Weekly' },
+  { value: '720',  label: 'Watch Monthly' },
 ] as const;
 
 export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
@@ -114,7 +114,7 @@ export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
             />
           </div>
           <div>
-            <Label className="text-xs">Constraints to respect (optional)</Label>
+            <Label className="text-xs">Constraints to Respect (optional)</Label>
             <Textarea
               value={constraints}
               onChange={(e) => setConstraints(e.target.value)}

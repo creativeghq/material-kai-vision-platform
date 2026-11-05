@@ -41,7 +41,7 @@ export interface WhatsAppNumber {
   is_default: boolean;
 }
 
-export const whatsAppNumberLabel = (n: WhatsAppNumber) => n.display_name || n.sender_id || 'WhatsApp number';
+export const whatsAppNumberLabel = (n: WhatsAppNumber) => n.display_name || n.sender_id || 'WhatsApp Number';
 
 export class MessagingService {
   /**

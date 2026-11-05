@@ -63,7 +63,7 @@ export const WebsiteAnalyticsTechPanel: React.FC<{ website: UserWebsite }> = ({ 
       />
 
       <GaBreakdownTable
-        title="Operating systems"
+        title="Operating Systems"
         websiteId={website.id}
         dimension="os"
         breakdown={breakdownOf(b, 'os')}

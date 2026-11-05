@@ -74,7 +74,7 @@ const ConfigCard: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
       <CardContent className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <Label htmlFor="revm-key" className="text-xs">Merchant secret API key</Label>
+            <Label htmlFor="revm-key" className="text-xs">Merchant Secret API Key</Label>
             <Input id="revm-key" type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)}
               placeholder={status.has_secret_key ? '•••••••• (saved — leave blank to keep)' : 'sk_… from Revolut → Merchant API'} />
           </div>

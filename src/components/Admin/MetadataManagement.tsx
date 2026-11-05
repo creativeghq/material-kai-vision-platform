@@ -149,7 +149,7 @@ export const MetadataManagement: React.FC = () => {
           accessor: (i: MetadataItem) => [i.field_name, i.field_value, i.product_name, i.document_name],
         },
         {
-          key: 'field_name', type: 'multi', label: 'Field name',
+          key: 'field_name', type: 'multi', label: 'Field Name',
           options: optionsFromRows(metadata, (i: MetadataItem) => i.field_name),
           accessor: (i: MetadataItem) => i.field_name,
         },
@@ -675,7 +675,7 @@ export const MetadataManagement: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <Label className="w-32 shrink-0">Max products</Label>
+                  <Label className="w-32 shrink-0">Max Products</Label>
                   <div className="flex gap-2">
                     {[50, 100, 200, 500].map((n) => (
                       <Button

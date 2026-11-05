@@ -96,7 +96,7 @@ export const BranchesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
         {adding && (
           <div className="grid grid-cols-2 gap-2 rounded-md border border-border/60 p-3">
             <div className="space-y-1">
-              <Label className="text-xs">Branch number</Label>
+              <Label className="text-xs">Branch Number</Label>
               <Input className="h-8 text-xs" value={form.branch_code} onChange={(e) => setForm({ ...form, branch_code: e.target.value })} placeholder="1" />
             </div>
             <div className="space-y-1">
@@ -112,7 +112,7 @@ export const BranchesCard: React.FC<{ workspaceId: string }> = ({ workspaceId })
               <Input className="h-8 text-xs" value={form.street_number} onChange={(e) => setForm({ ...form, street_number: e.target.value })} />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Postal code</Label>
+              <Label className="text-xs">Postal Code</Label>
               <Input className="h-8 text-xs" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} />
             </div>
             <div className="space-y-1">

@@ -97,9 +97,9 @@ export interface PriceUpdateResult {
 
 export const BLANKET_LABEL: Record<BlanketStatus, string> = {
   open: 'Open and drawing down',
-  fully_drawn: 'Fully drawn',
-  over_released: 'Released beyond the commitment',
-  expired_undrawn: 'Window closed with quantity undrawn',
+  fully_drawn: 'Fully Drawn',
+  over_released: 'Released Beyond the Commitment',
+  expired_undrawn: 'Window Closed with Quantity Undrawn',
   cancelled: 'Cancelled',
   no_lines: 'No lines',
   not_found: 'No such contract',
@@ -117,7 +117,7 @@ export const HOLD_VERDICT_LABEL: Record<HoldVerdict, string> = {
 export const PROCESSING_LABEL: Record<ProcessingStatus, string> = {
   planned: 'Planned',
   sent: 'Sent to the outworker',
-  in_progress: 'Being worked',
+  in_progress: 'Being Worked',
   returned: 'Returned',
   cancelled: 'Cancelled',
 };

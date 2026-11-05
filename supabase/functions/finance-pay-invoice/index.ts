@@ -197,7 +197,7 @@ async function handleProofAction(req: Request, supabase: any, body: ProofActionB
   const res = await recordInvoicePayment(supabase, inv.id, {
     provider: 'bank_proof',
     providerRef: proof.id,
-    providerLabel: 'Bank transfer',
+    providerLabel: 'Bank Transfer',
     amount,
     currency: String(inv.currency ?? 'EUR'),
     method: 'bank_transfer',

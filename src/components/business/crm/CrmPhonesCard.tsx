@@ -98,7 +98,7 @@ export const CrmPhonesCard: React.FC<Props> = ({ workspaceId, companyId, contact
           <Input value={form.label ?? ''} onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))} placeholder="e.g. Reception" />
         </div>
         <div className="space-y-1.5">
-          <Label className="text-xs">Phone number *</Label>
+          <Label className="text-xs">Phone Number *</Label>
           <Input type="tel" value={form.phone ?? ''} onChange={(e) => setForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+30 210 123 4567" />
         </div>
         <div className="space-y-1.5">

@@ -297,7 +297,7 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
               contactId={client.client_contact_id}
               value={addrUnitId}
               onChange={(id) => setAddrUnitId(id)}
-              label="Project address"
+              label="Project Address"
               disabled={processing}
             />
           </div>

@@ -584,7 +584,7 @@ export const CRMManagement: React.FC = () => {
     // Account TIER — global, platform-wide. Team roles are per-workspace (Profile → Team).
     { key: 'role', label: 'Set account tier', placeholder: 'Pick a tier', options: roleOptions },
     { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
-    { key: 'profession', label: 'Professional type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
+    { key: 'profession', label: 'Professional Type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
     { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: userAssignableCategoryOptions },
   ];
   /*

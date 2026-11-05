@@ -204,7 +204,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
 
   // ── CRM (workspace-scoped) ────────────────────────────────────────────
   {
-    id: 'customer_health', name: 'Customer health', category: 'CRM',
+    id: 'customer_health', name: 'Customer Health', category: 'CRM',
     moduleSlug: 'crm',
     desc: 'One customer, every signal: order value against the previous window, whether they are waiting on a reply from us, money outstanding and overdue, and what we have open with them. Each signal carries its own verdict and its own status, so \'nothing billed yet\' is never reported as \'owes nothing\'.',
     examples: [
@@ -214,7 +214,7 @@ const KAI_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
-    id: 'manage_deal', name: 'Deal pipeline', category: 'CRM',
+    id: 'manage_deal', name: 'Deal Pipeline', category: 'CRM',
     moduleSlug: 'deals',
     desc: 'The deal pipeline for every deal type — list open deals, read the weighted forecast, create a deal for a contact, move one to a stage by name, or mark it lost. Stages differ per deal type and are read from the data.',
     examples: [
@@ -1617,7 +1617,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'calculate_heat_pump_sizing' },
         autoFields: true,
         form: [
-          { key: 'floor_area_m2', label: 'Heated floor area (m²)', kind: 'number', required: true, placeholder: '120' },
+          { key: 'floor_area_m2', label: 'Heated Floor Area (m²)', kind: 'number', required: true, placeholder: '120' },
         ],
       },
       {
@@ -1629,8 +1629,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'calculate_heating_cost_comparison' },
         autoFields: true,
         form: [
-          { key: 'floor_area_m2', label: 'Heated floor area (m²)', kind: 'number', required: true, placeholder: '200' },
-          { key: 'specific_energy_kwh_m2_yr', label: 'Energy intensity (kWh/m²·yr)', kind: 'number', required: true, placeholder: '132', help: 'From the ΠΕΑ energy certificate. ~40–60 well-insulated, ~70–90 partial, ~90–120 uninsulated.' },
+          { key: 'floor_area_m2', label: 'Heated Floor Area (m²)', kind: 'number', required: true, placeholder: '200' },
+          { key: 'specific_energy_kwh_m2_yr', label: 'Energy Intensity (kWh/m²·yr)', kind: 'number', required: true, placeholder: '132', help: 'From the ΠΕΑ energy certificate. ~40–60 well-insulated, ~70–90 partial, ~90–120 uninsulated.' },
         ],
       },
       {
@@ -1645,7 +1645,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'calculate_kitchen_cost' },
         autoFields: true,
         form: [
-          { key: 'run_length_m', label: 'Base cabinet run (m)', kind: 'number', required: true, placeholder: '6', help: 'Add up the walls the kitchen runs along.' },
+          { key: 'run_length_m', label: 'Base Cabinet Run (m)', kind: 'number', required: true, placeholder: '6', help: 'Add up the walls the kitchen runs along.' },
         ],
       },
     ],
@@ -1672,8 +1672,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         workflow_id: 'catalog-build',
         promptTemplate: 'Start a new catalog titled "{{title}}" for {{client}}, then walk me through attaching source PDFs, extracting sections, generating the PDF, and publishing.',
         form: [
-          { key: 'title', label: 'Catalog title', kind: 'text', required: true, placeholder: 'Spring 2026 — Porcelain Range' },
-          { key: 'client', label: 'Client name', kind: 'text', required: true, placeholder: 'Vasilis Imports' },
+          { key: 'title', label: 'Catalog Title', kind: 'text', required: true, placeholder: 'Spring 2026 — Porcelain Range' },
+          { key: 'client', label: 'Client Name', kind: 'text', required: true, placeholder: 'Vasilis Imports' },
         ],
       },
       {
@@ -1702,12 +1702,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // prose 'table list' / 'image grid', which the enum rejects outright — the
           // agent had to translate them back on every run.
           { key: 'layout', label: 'Layout', kind: 'select', default: 'list', options: [
-            { value: 'list', label: 'Table list (quote-style)' },
-            { value: 'grid', label: 'Image grid (cards)' },
+            { value: 'list', label: 'Table List (Quote-Style)' },
+            { value: 'grid', label: 'Image Grid (Cards)' },
           ] },
           { key: 'proforma', label: 'Totals block?', kind: 'select', default: '', options: [
             { value: '', label: 'No — plain catalog' },
-            { value: ', as a proforma with a totals block', label: 'Yes — proforma with totals' },
+            { value: ', as a proforma with a totals block', label: 'Yes — Proforma with Totals' },
           ] },
         ],
       },
@@ -1729,10 +1729,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // Values are adjust_catalog_pricing's `basis` z.enum, not the parenthetical
           // prose they used to be — the enum accepts only 'payable' | 'net'.
           { key: 'basis', label: 'Which total?', kind: 'select', default: 'payable', options: [
-            { value: 'payable', label: 'Payable — VAT included' },
-            { value: 'net', label: 'Net — before VAT' },
+            { value: 'payable', label: 'Payable — VAT Included' },
+            { value: 'net', label: 'Net — Before VAT' },
           ] },
-          { key: 'target', label: 'Target total or change', kind: 'text', required: true, placeholder: '€2,438  ·  +400  ·  +15%  ·  +25 per item' },
+          { key: 'target', label: 'Target Total or Change', kind: 'text', required: true, placeholder: '€2,438  ·  +400  ·  +15%  ·  +25 per item' },
         ],
       },
     ],
@@ -1756,7 +1756,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
           { key: 'subject', label: 'Brand / Product / Keyword to track', kind: 'text', required: true, placeholder: 'Flobali' },
           { key: 'sources', label: 'Sources', kind: 'select', default: 'news, blogs, RSS and LLM responses', options: [
             { value: 'news, blogs, RSS and LLM responses', label: 'News + blogs + RSS + LLM (all)' },
-            { value: 'news and blogs', label: 'News + blogs only' },
+            { value: 'news and blogs', label: 'News + Blogs Only' },
             { value: 'LLM responses', label: 'LLM responses only' },
           ] },
         ],
@@ -1782,7 +1782,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['track_product_prices', 'get_price_summary'],
     quick_starts: [
       { label: 'Track prices', description: 'Start monitoring competitor prices on a product', prompt: 'Start tracking competitor prices for one of my products — help me pick which one.', icon: 'Plus' },
-      { label: 'Price check', description: 'See current competitor prices for a product', prompt: 'Show me what competitors are charging for one of my tracked products.', icon: 'Search' },
+      { label: 'Price Check', description: 'See current competitor prices for a product', prompt: 'Show me what competitors are charging for one of my tracked products.', icon: 'Search' },
     ],
   },
   {
@@ -1795,7 +1795,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_contracts'],
     quick_starts: [
       {
-        label: 'My contracts', description: 'List recent contracts', icon: 'ListChecks',
+        label: 'My Contracts', description: 'List recent contracts', icon: 'ListChecks',
         prompt: 'List my recent contracts and their status.',
         done: 'I\'ve pulled up your contracts and where each one stands.',
         promptTemplate: 'List my {{context}} contracts and their status.',
@@ -1806,7 +1806,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'hr', label: 'HR' },
             { value: 'finance', label: 'Finance' },
             { value: 'project', label: 'Project' },
-            { value: 'realestate', label: 'Real estate' },
+            { value: 'realestate', label: 'Real Estate' },
           ] },
         ],
       },
@@ -1855,15 +1855,15 @@ export const TOOLKITS: ToolkitDefinition[] = [
           { key: 'query', label: 'Sender, subject or words', kind: 'text', required: true },
           // mail_search.source — Gmail is refused server-side for anyone but the platform operator.
           { key: 'source', label: 'Mailbox', kind: 'select', default: 'all', options: [
-            { value: 'all', label: 'All mailboxes' },
+            { value: 'all', label: 'All Mailboxes' },
             { value: 'inbox', label: 'Workspace Inbox' },
-            { value: 'gmail', label: 'Gmail (operator)' },
+            { value: 'gmail', label: 'Gmail (Operator)' },
           ] },
         ],
       },
       { label: 'Book an emailed invoice', description: 'Invoice attachment → supplier bill → payment', icon: 'Receipt', prompt: 'Find the latest invoice emailed to us, book it as a supplier bill and prepare the payment.' },
-      { label: 'Email → order', description: 'Read an order from an email and make the quote and order', icon: 'ShoppingCart', prompt: 'Read the order in the latest customer email and turn it into a quote, then an order.' },
-      { label: 'Unread with files', description: 'What arrived with attachments', icon: 'Inbox', prompt: 'Show my unread emails that have attachments.' },
+      { label: 'Email → Order', description: 'Read an order from an email and make the quote and order', icon: 'ShoppingCart', prompt: 'Read the order in the latest customer email and turn it into a quote, then an order.' },
+      { label: 'Unread with Files', description: 'What arrived with attachments', icon: 'Inbox', prompt: 'Show my unread emails that have attachments.' },
     ],
   },
   {
@@ -1876,7 +1876,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_reviews'],
     quick_starts: [
       {
-        label: 'Unanswered reviews', description: 'Reviews you have not replied to', icon: 'ListChecks',
+        label: 'Unanswered Reviews', description: 'Reviews you have not replied to', icon: 'ListChecks',
         prompt: 'Show the reviews about me that I haven\'t replied to yet.',
         done: 'I\'ve pulled up the reviews still waiting on a reply.',
         run: { tool: 'manage_reviews', fixedArgs: { action: 'list', only_unanswered: true } },
@@ -1895,7 +1895,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_appointments'],
     quick_starts: [
       {
-        label: 'This week', description: 'Upcoming appointments', icon: 'CalendarDays',
+        label: 'This week', description: 'Upcoming Appointments', icon: 'CalendarDays',
         prompt: 'What appointments do I have coming up this week?',
         done: 'I\'ve pulled up your appointments for the next 7 days.',
         run: { tool: 'manage_appointments', fixedArgs: { action: 'list', days: 7 } },
@@ -1926,7 +1926,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_real_estate'],
     quick_starts: [
       {
-        label: 'My listings', description: 'List active properties', icon: 'ListChecks',
+        label: 'My Listings', description: 'List active properties', icon: 'ListChecks',
         prompt: 'Show my real-estate listings.',
         done: 'I\'ve pulled up your property listings.',
         run: { tool: 'manage_real_estate', fixedArgs: { action: 'list_properties' } },
@@ -1939,12 +1939,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'manage_real_estate', fixedArgs: { action: 'create_listing' }, coerce: { price: 'number', area: 'number' } },
         form: [
           { key: 'title', label: 'Title', kind: 'text', required: true, placeholder: '3-bed maisonette with sea view' },
-          { key: 'town', label: 'Town / area', kind: 'text', required: true, placeholder: 'Voula' },
+          { key: 'town', label: 'Town / Area', kind: 'text', required: true, placeholder: 'Voula' },
           { key: 'price', label: 'Price (€)', kind: 'number', required: true, placeholder: '450000' },
           { key: 'area', label: 'Area (m²)', kind: 'number', placeholder: '120' },
           // property_type / transaction_type are free strings in the schema, not enums —
           // a select here would invent options the tool never declared.
-          { key: 'property_type', label: 'Property type', kind: 'text', placeholder: 'apartment / maisonette / plot' },
+          { key: 'property_type', label: 'Property Type', kind: 'text', placeholder: 'apartment / maisonette / plot' },
           { key: 'transaction_type', label: 'Transaction', kind: 'text', placeholder: 'sale / rent' },
         ],
       },
@@ -1966,7 +1966,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     quick_starts: [
       { label: 'Source a product', description: 'Find a supplier', prompt: 'Help me source a product from a supplier.', icon: 'Search' },
       {
-        label: 'Sourcing board', description: 'Open demand and how it is supplied', icon: 'ListChecks',
+        label: 'Sourcing Board', description: 'Open demand and how it is supplied', icon: 'ListChecks',
         prompt: 'Show me the sourcing board.',
         done: 'Here is the sourcing board.',
         run: { tool: 'source_product', fixedArgs: { action: 'board' } },
@@ -1980,7 +1980,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     icon: 'ReceiptText',
     tool_ids: ['create_trip_card', 'add_trip_expense', 'list_trip_cards', 'submit_trip_card'],
     quick_starts: [
-      { label: 'My trip cards', description: 'List expense cards', prompt: 'Show my trip expense cards.', icon: 'ListChecks' },
+      { label: 'My Trip Cards', description: 'List expense cards', prompt: 'Show my trip expense cards.', icon: 'ListChecks' },
       { label: 'New trip card', description: 'Start a trip expense card', prompt: 'Start a new trip expense card for me.', icon: 'Plus' },
     ],
   },
@@ -2018,7 +2018,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'],
     quick_starts: [
       {
-        label: 'Recent expenses', description: 'What we have booked', icon: 'ListChecks',
+        label: 'Recent Expenses', description: 'What we have booked', icon: 'ListChecks',
         prompt: 'Show my recent expenses.',
         done: 'Here are the expenses we have booked.',
         run: { tool: 'list_recent_expenses' },
@@ -2038,7 +2038,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
           { key: 'booked', label: 'Show', kind: 'select', options: [
             { value: 'all', label: 'Everything from myDATA' },
             { value: 'only_unbooked', label: 'Not booked yet' },
-            { value: 'only_booked', label: 'Already booked' },
+            { value: 'only_booked', label: 'Already Booked' },
           ] },
         ],
       },
@@ -2073,7 +2073,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'vehicle', label: 'Vehicle' },
             { value: 'phone', label: 'Phone' },
             { value: 'laptop', label: 'Laptop' },
-            { value: 'payment_card', label: 'Payment card' },
+            { value: 'payment_card', label: 'Payment Card' },
             { value: 'equipment', label: 'Equipment' },
             { value: 'other', label: 'Other' },
           ] },
@@ -2091,12 +2091,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'vehicle', label: 'Vehicle' },
             { value: 'phone', label: 'Phone' },
             { value: 'laptop', label: 'Laptop' },
-            { value: 'payment_card', label: 'Payment card' },
+            { value: 'payment_card', label: 'Payment Card' },
             { value: 'equipment', label: 'Equipment' },
             { value: 'other', label: 'Other' },
           ] },
           { key: 'identifier', label: 'Identifier', kind: 'text', placeholder: 'Plate / IMEI / serial / last 4' },
-          { key: 'acquisition_type', label: 'Acquired as', kind: 'select', options: [
+          { key: 'acquisition_type', label: 'Acquired As', kind: 'select', options: [
             { value: 'owned', label: 'Owned' },
             { value: 'leased', label: 'Leased' },
             { value: 'financed', label: 'Financed' },
@@ -2117,7 +2117,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     quick_starts: [
       { label: 'Search docs', description: 'Find something in your docs', prompt: 'Search my workspace documents for…', icon: 'Search' },
       {
-        label: 'Our templates', description: 'List the audit and document templates we keep', icon: 'ListChecks',
+        label: 'Our Templates', description: 'List the audit and document templates we keep', icon: 'ListChecks',
         prompt: 'List the document templates we keep in Audits & Templates, with what each one is for.',
         done: 'Here are the templates we keep.',
         run: { tool: 'document_templates', fixedArgs: { action: 'list' } },
@@ -2157,7 +2157,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_messaging'],
     quick_starts: [
       {
-        label: 'My channels', description: 'List connected WhatsApp numbers', icon: 'ListChecks',
+        label: 'My Channels', description: 'List connected WhatsApp numbers', icon: 'ListChecks',
         prompt: 'List my connected WhatsApp channels.',
         done: 'I\'ve pulled up your connected WhatsApp numbers.',
         run: { tool: 'manage_messaging', fixedArgs: { action: 'list_channels' } },
@@ -2171,7 +2171,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // card supplies it (invariant 9). A quick-start must never pre-approve a send.
         run: { tool: 'manage_messaging', fixedArgs: { action: 'send' } },
         form: [
-          { key: 'to', label: 'To (phone)', kind: 'text', required: true, placeholder: '+30 69XXXXXXXX' },
+          { key: 'to', label: 'To (Phone)', kind: 'text', required: true, placeholder: '+30 69XXXXXXXX' },
           { key: 'content', label: 'Message', kind: 'textarea', required: true },
         ],
       },
@@ -2196,7 +2196,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         autoFields: true,
       },
       {
-        label: 'Deal pipeline', description: 'Open deals and the weighted forecast', icon: 'FolderKanban',
+        label: 'Deal Pipeline', description: 'Open deals and the weighted forecast', icon: 'FolderKanban',
         prompt: 'Show me the deal pipeline.',
         done: 'I\'ve pulled up your deal pipeline with the weighted forecast.',
         promptTemplate: 'Show me the deal pipeline.',
@@ -2214,7 +2214,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Add {{name}} to the CRM.',
         run: { tool: 'manage_crm', fixedArgs: { action: 'create_contact' } },
         form: [
-          { key: 'name', label: 'Full name', kind: 'text', required: true, placeholder: 'Μαρία Παπαδοπούλου' },
+          { key: 'name', label: 'Full Name', kind: 'text', required: true, placeholder: 'Μαρία Παπαδοπούλου' },
           { key: 'email', label: 'Email', kind: 'text' },
           { key: 'phone', label: 'Phone', kind: 'text' },
           { key: 'company_name', label: 'Company', kind: 'text' },
@@ -2240,7 +2240,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Bank accounts', description: 'See or add where we pay a counterparty', icon: 'Landmark',
+        label: 'Bank Accounts', description: 'See or add where we pay a counterparty', icon: 'Landmark',
         prompt: 'Show me the bank accounts on file for one of our counterparties — I will say which.',
         done: 'Here are the bank accounts on file.',
         promptTemplate: 'Show the bank accounts on file for {{company_query}}.',
@@ -2261,7 +2261,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_finance'],
     quick_starts: [
       {
-        label: 'Unpaid invoices', description: 'List invoices still owed', icon: 'FileText',
+        label: 'Unpaid Invoices', description: 'List invoices still owed', icon: 'FileText',
         prompt: 'Show me all unpaid invoices.',
         done: 'I\'ve pulled up the invoices still owed.',
         promptTemplate: 'Show me unpaid {{direction}} invoices.',
@@ -2271,13 +2271,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // are opposite sides of the trade and must never be netted together, so the
           // filter is offered explicitly rather than guessed from the sentence.
           { key: 'direction', label: 'Direction', kind: 'select', default: 'in', options: [
-            { value: 'in', label: 'Sales — owed to us' },
+            { value: 'in', label: 'Sales — Owed to Us' },
             { value: 'out', label: 'Purchases — we owe' },
           ] },
         ],
       },
       {
-        label: 'Customer balance', description: 'What does a customer owe?', icon: 'Wallet',
+        label: 'Customer Balance', description: 'What does a customer owe?', icon: 'Wallet',
         prompt: 'What is the open balance for a customer? Help me pick which one.',
         done: 'I\'ve worked out what that customer owes.',
         promptTemplate: 'What is the open balance for {{customer_name}}?',
@@ -2287,7 +2287,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Recent orders', description: 'List orders across the workspace', icon: 'ShoppingCart',
+        label: 'Recent Orders', description: 'List orders across the workspace', icon: 'ShoppingCart',
         prompt: 'List our recent orders.',
         done: 'I\'ve pulled up your recent orders.',
         run: { tool: 'manage_finance', fixedArgs: { action: 'list_orders' } },
@@ -2307,13 +2307,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // CRM categories can supply, so it stays a prompt.
       { label: 'Draft a campaign', description: 'Compose a draft campaign to a CRM audience', prompt: 'Draft an email campaign — show me my templates and audience categories first.', icon: 'Plus' },
       {
-        label: 'My campaigns', description: 'List recent email campaigns', icon: 'ListChecks',
+        label: 'My Campaigns', description: 'List recent email campaigns', icon: 'ListChecks',
         prompt: 'List my recent email campaigns and their status.',
         done: 'I\'ve pulled up your recent campaigns and where each one stands.',
         run: { tool: 'manage_email_campaign', fixedArgs: { action: 'list' } },
       },
       {
-        label: 'My templates', description: 'List available email templates', icon: 'Palette',
+        label: 'My Templates', description: 'List available email templates', icon: 'Palette',
         prompt: 'List my email templates.',
         done: 'I\'ve pulled up your email templates.',
         run: { tool: 'manage_email_campaign', fixedArgs: { action: 'list_templates' } },
@@ -2335,19 +2335,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'keywords', label: 'Role / Keywords', kind: 'text', required: true, placeholder: 'senior python developer' },
           { key: 'remote', label: 'Remote only?', kind: 'select', default: ' (remote only)', options: [
-            { value: ' (remote only)', label: 'Remote only' },
-            { value: '', label: 'Any location' },
+            { value: ' (remote only)', label: 'Remote Only' },
+            { value: '', label: 'Any Location' },
           ] },
         ],
       },
       {
-        label: 'My job searches', description: 'List your active searches', icon: 'ListChecks',
+        label: 'My Job Searches', description: 'List your active searches', icon: 'ListChecks',
         prompt: 'List my job searches.',
         done: 'I\'ve pulled up your active job searches.',
         run: { tool: 'list_my_job_searches' },
       },
       {
-        label: 'Preview digest', description: "Today's consolidated digest", icon: 'Newspaper',
+        label: 'Preview Digest', description: "Today's consolidated digest", icon: 'Newspaper',
         prompt: "Preview today's job digest.",
         done: 'I\'ve built today\'s digest — here\'s the preview.',
         run: { tool: 'get_job_digest_preview' },
@@ -2374,11 +2374,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Which companies are hiring right now?',
         promptTemplate: 'Which companies started hiring for "{{keywords}}" in the last 30 days? Say how many companies were read.',
         form: [
-          { key: 'keywords', label: 'Role / skill', kind: 'text', required: true, placeholder: 'export manager, showroom' },
+          { key: 'keywords', label: 'Role / Skill', kind: 'text', required: true, placeholder: 'export manager, showroom' },
         ],
       },
       {
-        label: 'My signals', description: 'Your saved signals', icon: 'ListChecks',
+        label: 'My Signals', description: 'Your saved signals', icon: 'ListChecks',
         prompt: 'List my saved signals.',
         done: 'Here are the signals you are watching.',
         run: { tool: 'manage_signal', fixedArgs: { action: 'list' } },
@@ -2415,7 +2415,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'find_companies_using_technology' },
       },
       {
-        label: 'Company stack', description: 'One company, everything we know', icon: 'Building2',
+        label: 'Company Stack', description: 'One company, everything we know', icon: 'Building2',
         prompt: 'What signals do we have on a company?',
         promptTemplate: 'What signals do we have on {{domain}}? Include its technologies and open roles.',
         form: [
@@ -2442,7 +2442,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Intent matches', description: 'New matches on your signals', icon: 'ListChecks',
+        label: 'Intent Matches', description: 'New matches on your signals', icon: 'ListChecks',
         prompt: 'Show the new matches on my signals.',
         done: 'Here is what your signals found lately.',
         run: { tool: 'manage_signal', fixedArgs: { action: 'matches' } },
@@ -2461,13 +2461,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_my_hr'],
     quick_starts: [
       {
-        label: 'My leave balance', description: 'Allowance, taken and remaining days', icon: 'CalendarOff',
+        label: 'My Leave Balance', description: 'Allowance, taken and remaining days', icon: 'CalendarOff',
         prompt: 'How much leave do I have left?',
         done: 'I\'ve worked out your leave balance.',
         run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_profile' } },
       },
       {
-        label: 'My time off', description: 'Your absences and their approval status', icon: 'ListChecks',
+        label: 'My Time Off', description: 'Your absences and their approval status', icon: 'ListChecks',
         prompt: 'Show my time off and the status of each request.',
         done: 'I\'ve pulled up your absences and where each request stands.',
         run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_timeoff' } },
@@ -2484,13 +2484,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'unpaid', label: 'Unpaid' },
             { value: 'other', label: 'Other' },
           ] },
-          { key: 'start_date', label: 'First day', kind: 'text', required: true, placeholder: 'YYYY-MM-DD' },
-          { key: 'end_date', label: 'Last day (inclusive)', kind: 'text', required: true, placeholder: 'YYYY-MM-DD' },
+          { key: 'start_date', label: 'First Day', kind: 'text', required: true, placeholder: 'YYYY-MM-DD' },
+          { key: 'end_date', label: 'Last Day (Inclusive)', kind: 'text', required: true, placeholder: 'YYYY-MM-DD' },
           { key: 'note', label: 'Note for HR (optional)', kind: 'textarea', placeholder: 'e.g. family trip' },
         ],
       },
       {
-        label: 'My documents', description: 'Your HR documents', icon: 'FolderKanban',
+        label: 'My Documents', description: 'Your HR documents', icon: 'FolderKanban',
         prompt: 'List my HR documents.',
         done: 'I\'ve pulled up your HR documents.',
         run: { tool: 'manage_my_hr', fixedArgs: { action: 'my_documents' } },
@@ -2535,7 +2535,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
           argMap: { employee: 'employee_name' },
         },
         form: [
-          { key: 'employee', label: 'Employee name', kind: 'text', required: true, placeholder: 'Maria' },
+          { key: 'employee', label: 'Employee Name', kind: 'text', required: true, placeholder: 'Maria' },
           { key: 'absence_type', label: 'Type', kind: 'select', default: 'sick', options: [
             { value: 'sick', label: 'Sick' },
             { value: 'vacation', label: 'Vacation' },
@@ -2558,13 +2558,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_stock'],
     quick_starts: [
       {
-        label: 'Low stock', description: 'Items at/below reorder point', icon: 'AlertTriangle',
+        label: 'Low Stock', description: 'Items at/below reorder point', icon: 'AlertTriangle',
         prompt: "What's low on stock?",
         done: 'I\'ve pulled up everything at or below its reorder point.',
         run: { tool: 'manage_stock', fixedArgs: { action: 'list_low_stock' } },
       },
       {
-        label: 'Stock overview', description: 'Items, warehouses, low/out-of-stock', icon: 'LayoutDashboard',
+        label: 'Stock Overview', description: 'Items, warehouses, low/out-of-stock', icon: 'LayoutDashboard',
         prompt: 'Give me a stock overview.',
         done: 'I\'ve pulled together your stock overview.',
         run: { tool: 'manage_stock', fixedArgs: { action: 'overview' } },
@@ -2576,7 +2576,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'How many "{{item}}" do we have in stock?',
         run: { tool: 'manage_stock', fixedArgs: { action: 'check_stock' }, argMap: { item: 'item_query' } },
         form: [
-          { key: 'item', label: 'Item name or SKU', kind: 'text', required: true, placeholder: 'Oak plank' },
+          { key: 'item', label: 'Item Name or SKU', kind: 'text', required: true, placeholder: 'Oak plank' },
         ],
       },
       {
@@ -2591,7 +2591,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
           coerce: { quantity: 'number' },
         },
         form: [
-          { key: 'item', label: 'Item name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
+          { key: 'item', label: 'Item Name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
           { key: 'quantity', label: 'Quantity', kind: 'number', required: true, placeholder: '50' },
         ],
       },
@@ -2613,7 +2613,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Is "{{product_name}}" ready to show on my own website? Give me the snippet if it is.',
         run: { tool: 'embed_readiness', argMap: { product_name: 'product_name' } },
         form: [
-          { key: 'product_name', label: 'Product name', kind: 'text', required: true, placeholder: 'Fenwick lounge chair' },
+          { key: 'product_name', label: 'Product Name', kind: 'text', required: true, placeholder: 'Fenwick lounge chair' },
         ],
       },
       {
@@ -2646,17 +2646,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
     quick_starts: [
       {
-        label: 'Product provenance', description: 'Where a product came from', icon: 'Network',
+        label: 'Product Provenance', description: 'Where a product came from', icon: 'Network',
         prompt: 'Show the provenance of a product.',
         done: 'I\'ve traced where that product came from.',
         promptTemplate: 'Where did "{{product}}" come from? Show its provenance.',
         run: { tool: 'product_provenance', argMap: { product: 'sku' } },
         form: [
-          { key: 'product', label: 'Product name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
+          { key: 'product', label: 'Product Name or SKU', kind: 'text', required: true, placeholder: 'White tile 60x60' },
         ],
       },
       {
-        label: 'Brand overview', description: 'Everything about one brand', icon: 'Building2',
+        label: 'Brand Overview', description: 'Everything about one brand', icon: 'Building2',
         prompt: 'Give me an overview of a brand.',
         done: 'I\'ve pulled together everything on that brand.',
         promptTemplate: 'Give me a brand overview for "{{brand}}".',
@@ -2720,7 +2720,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // lists the workspace's OWN flows; the platform's built-in automations are the operator's
         // global set, which is invisible here by design. Most workspaces have built none, so the
         // old copy announced success over an empty list and read as a bug.
-        label: 'My flows', description: 'Automations this workspace has built', icon: 'ListChecks',
+        label: 'My Flows', description: 'Automations this workspace has built', icon: 'ListChecks',
         prompt: 'List my flows.',
         done: 'I\'ve pulled up the automations this workspace has built.',
         run: { tool: 'manage_flows', fixedArgs: { action: 'list' } },
@@ -2733,7 +2733,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Create a new flow.',
         promptTemplate: 'Create a flow named "{{name}}" that runs when {{trigger}} and then {{what_it_does}}.',
         form: [
-          { key: 'name', label: 'Flow name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
+          { key: 'name', label: 'Flow Name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
           { key: 'trigger', label: 'When should it run?', kind: 'text', required: true, placeholder: 'a quote is approved' },
           { key: 'what_it_does', label: 'What should it do?', kind: 'text', required: true, placeholder: 'send me a notification' },
         ],
@@ -2747,7 +2747,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Pause one of my flows.',
         promptTemplate: 'Pause the flow "{{name}}".',
         form: [
-          { key: 'name', label: 'Flow name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
+          { key: 'name', label: 'Flow Name', kind: 'text', required: true, placeholder: 'Notify me on new quote' },
         ],
       },
     ],
@@ -2762,7 +2762,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['manage_social'],
     quick_starts: [
       {
-        label: 'My accounts', description: 'Connected social accounts', icon: 'Users',
+        label: 'My Accounts', description: 'Connected social accounts', icon: 'Users',
         prompt: 'List my connected social accounts.',
         done: 'I\'ve pulled up your connected social accounts.',
         run: { tool: 'manage_social', fixedArgs: { action: 'list_accounts' } },
@@ -2780,7 +2780,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // product.
         run: { tool: 'manage_social', fixedArgs: { action: 'publish' }, argMap: { content: 'caption' } },
         form: [
-          { key: 'content', label: 'Post content', kind: 'text', required: true, placeholder: 'Our new porcelain range just landed…' },
+          { key: 'content', label: 'Post Content', kind: 'text', required: true, placeholder: 'Our new porcelain range just landed…' },
           { key: 'platform', label: 'Publish to', kind: 'select', required: true, default: 'instagram', options: [
             { value: 'instagram', label: 'Instagram' },
             { value: 'facebook', label: 'Facebook' },
@@ -2789,7 +2789,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Best time to post', description: 'When your audience is active', icon: 'CalendarPlus',
+        label: 'Best Time to Post', description: 'When your audience is active', icon: 'CalendarPlus',
         prompt: 'When is the best time to post?',
         done: 'I\'ve worked out when your audience is most active.',
         run: { tool: 'manage_social', fixedArgs: { action: 'best_time' } },
@@ -2799,13 +2799,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // sentence. Both emit chunks AgentHub already titles (social_post_analytics,
       // social_insights), which is what makes a direct `run` render instead of going quiet.
       {
-        label: 'Post analytics', description: 'Engagement on everything you published', icon: 'BarChart3',
+        label: 'Post Analytics', description: 'Engagement on everything you published', icon: 'BarChart3',
         prompt: 'Show me the analytics for my social posts.',
         done: 'I have pulled the engagement figures for your posts.',
         run: { tool: 'manage_social', fixedArgs: { action: 'post_analytics' } },
       },
       {
-        label: 'Audience insights', description: 'Followers and reach per account', icon: 'Users',
+        label: 'Audience Insights', description: 'Followers and reach per account', icon: 'Users',
         prompt: 'How is my social audience doing?',
         done: 'I have pulled your follower and reach figures.',
         run: { tool: 'manage_social', fixedArgs: { action: 'account_insights' } },
@@ -2841,7 +2841,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'solution', label: 'Solution / Library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
           { key: 'current_approach', label: 'How we do it today', kind: 'textarea', placeholder: 'Supabase JS client + hand-written SQL in edge functions' },
-          { key: 'constraints', label: 'Constraints to respect', kind: 'text', placeholder: 'Must run on Deno; no new paid services' },
+          { key: 'constraints', label: 'Constraints to Respect', kind: 'text', placeholder: 'Must run on Deno; no new paid services' },
         ],
       },
       {
@@ -2860,7 +2860,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'solution', label: 'Solution / Library', kind: 'text', required: true, placeholder: 'Drizzle ORM' },
           { key: 'component', label: 'Area it affects', kind: 'text', placeholder: 'ocr, image-embeddings' },
-          { key: 'review_interval_hours', label: 'Review cadence (hours)', kind: 'number', default: '168', help: '24 = daily, 168 = weekly, 720 = monthly' },
+          { key: 'review_interval_hours', label: 'Review Cadence (Hours)', kind: 'number', default: '168', help: '24 = daily, 168 = weekly, 720 = monthly' },
         ],
       },
     ],
@@ -2891,7 +2891,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         autoFields: true,
       },
       {
-        label: 'Variations not agreed', description: 'Changes still waiting on a decision', icon: 'GitPullRequestArrow',
+        label: 'Variations Not Agreed', description: 'Changes still waiting on a decision', icon: 'GitPullRequestArrow',
         prompt: 'Which variations have not been agreed yet?',
         done: 'Those are the ones still open.',
         promptTemplate: 'List the undecided variations on the project "{{project_name}}".',
@@ -2951,12 +2951,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Create a project called "{{name}}".',
         run: { tool: 'create_project' },
         form: [
-          { key: 'name', label: 'Project name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
+          { key: 'name', label: 'Project Name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
           { key: 'description', label: 'Description', kind: 'textarea', placeholder: 'Optional summary' },
         ],
       },
       {
-        label: 'My projects', description: 'List your projects', icon: 'ListChecks',
+        label: 'My Projects', description: 'List your projects', icon: 'ListChecks',
         prompt: 'List my projects.',
         done: 'I\'ve pulled up your projects.',
         run: { tool: 'list_my_projects' },
@@ -2968,7 +2968,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Find the "{{query}}" project.',
         run: { tool: 'find_project' },
         form: [
-          { key: 'query', label: 'Project name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
+          { key: 'query', label: 'Project Name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
         ],
       },
       {
@@ -2986,7 +2986,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Purchase sheet', description: 'PDF of the doors/windows spec', icon: 'FileText',
+        label: 'Purchase Sheet', description: 'PDF of the doors/windows spec', icon: 'FileText',
         prompt: 'Generate the purchase sheet for one of my projects.',
         done: 'I\'ve generated the purchase sheet.',
         run: { tool: 'generate_purchase_sheet' },
@@ -3021,7 +3021,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Last assessment', description: 'Read the most recent report', icon: 'FileSearch',
+        label: 'Last Assessment', description: 'Read the most recent report', icon: 'FileSearch',
         prompt: 'Show the latest assessment for one of my projects.',
         done: 'Here is the latest assessment.',
         run: { tool: 'get_project_assessment' },
@@ -3062,7 +3062,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'assess_finance' },
       },
       {
-        label: 'Last finance review', description: 'Read the most recent report', icon: 'FileSearch',
+        label: 'Last Finance Review', description: 'Read the most recent report', icon: 'FileSearch',
         prompt: 'Show the latest finance assessment.',
         done: 'Here is the latest finance assessment.',
         run: { tool: 'get_finance_assessment' },
@@ -3091,7 +3091,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Last listing review', description: 'Read the most recent report', icon: 'FileSearch',
+        label: 'Last Listing Review', description: 'Read the most recent report', icon: 'FileSearch',
         prompt: 'Show the latest assessment for one of my listings.',
         done: 'Here is the latest assessment.',
         run: { tool: 'get_property_assessment' },
@@ -3122,12 +3122,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Create a quote named "{{name}}" with these items: {{items}}',
         run: { tool: 'create_quote' },
         form: [
-          { key: 'name', label: 'Quote name', kind: 'text', placeholder: 'Living room — tiles' },
+          { key: 'name', label: 'Quote Name', kind: 'text', placeholder: 'Living room — tiles' },
           { key: 'items', label: 'Items (name, qty, unit, price)', kind: 'textarea', required: true, placeholder: 'Tagina, 75 sqm, €34/sqm\nKeros, 18 sqm, €15/sqm' },
         ],
       },
       {
-        label: 'My quotes', description: 'List recent quotes', icon: 'ListChecks',
+        label: 'My Quotes', description: 'List recent quotes', icon: 'ListChecks',
         prompt: 'Show my recent quotes.',
         done: 'I\'ve pulled up your recent quotes.',
         run: { tool: 'list_my_quotes' },
@@ -3151,9 +3151,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // Each opens the guided SheetWizardModal (pick moodboard → inputs → generate)
       // with the type pre-selected. The "New sheet" entry opens it at the type picker.
       { label: 'New sheet', description: 'Pick any sheet type → guided build', prompt: 'Create a presentation sheet for one of my moodboards.', icon: 'Plus', opensSheetWizard: '' },
-      { label: 'Material board', description: 'Pick products → A3 PDF', prompt: 'Build a material board sheet.', icon: 'Grid3x3', opensSheetWizard: 'material_board' },
-      { label: 'Color palette', description: 'Auto-extract colors from a moodboard', prompt: 'Generate a color palette sheet.', icon: 'Palette', opensSheetWizard: 'color_palette' },
-      { label: 'Full deck', description: 'Multi-page presentation deck', prompt: 'Build a multi-page Full Deck.', icon: 'LayoutTemplate', opensSheetWizard: 'full_deck' },
+      { label: 'Material Board', description: 'Pick products → A3 PDF', prompt: 'Build a material board sheet.', icon: 'Grid3x3', opensSheetWizard: 'material_board' },
+      { label: 'Color Palette', description: 'Auto-extract colors from a moodboard', prompt: 'Generate a color palette sheet.', icon: 'Palette', opensSheetWizard: 'color_palette' },
+      { label: 'Full Deck', description: 'Multi-page presentation deck', prompt: 'Build a multi-page Full Deck.', icon: 'LayoutTemplate', opensSheetWizard: 'full_deck' },
     ],
   },
   {
@@ -3208,17 +3208,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // room (`resolveImageSlots`), so with a swatch the edit copies THAT material as pixels.
         generation: { imageKeys: ['swatch', 'photo'], mode: 'image-edit' },
         form: [
-          { key: 'swatch', label: 'Material photo (optional)', kind: 'image', required: false, help: 'A photo of the tile, stone or finish itself. With one, the model reproduces that exact material; without, it works from your description.' },
-          { key: 'photo', label: 'Your room photo', kind: 'image', required: true, help: 'Upload a photo of the room you want to restyle.' },
-          { key: 'material', label: 'Material / Finish to apply', kind: 'text', required: true, placeholder: 'e.g. warm oak herringbone, Carrara marble, matte charcoal microcement' },
+          { key: 'swatch', label: 'Material Photo (optional)', kind: 'image', required: false, help: 'A photo of the tile, stone or finish itself. With one, the model reproduces that exact material; without, it works from your description.' },
+          { key: 'photo', label: 'Your Room Photo', kind: 'image', required: true, help: 'Upload a photo of the room you want to restyle.' },
+          { key: 'material', label: 'Material / Finish to Apply', kind: 'text', required: true, placeholder: 'e.g. warm oak herringbone, Carrara marble, matte charcoal microcement' },
           { key: 'surface', label: 'Apply to', kind: 'select', default: 'floor', options: [
             { value: 'floor', label: 'Floor' },
             { value: 'wall', label: 'Wall' },
-            { value: 'feature wall', label: 'Feature wall' },
+            { value: 'feature wall', label: 'Feature Wall' },
             { value: 'ceiling', label: 'Ceiling' },
             { value: 'countertop', label: 'Countertop' },
           ] },
-          { key: 'notes', label: 'Anything to preserve or emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. keep the rug and the pendant light' },
+          { key: 'notes', label: 'Anything to Preserve or Emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. keep the rug and the pendant light' },
         ],
       },
       {
@@ -3232,7 +3232,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Make a targeted edit to this room photo.',
         generation: { imageKeys: ['photo'], opensModal: 'gemini-edit' },
         form: [
-          { key: 'photo', label: 'Room photo', kind: 'image', required: true, help: 'Upload the photo you want to edit.' },
+          { key: 'photo', label: 'Room Photo', kind: 'image', required: true, help: 'Upload the photo you want to edit.' },
         ],
       },
       {
@@ -3257,7 +3257,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Remove every movable item from this room photo — furniture, rugs, art, lamps, plants, and personal clutter — and leave the architecture exactly as it is. Keep in place: {{keep}}',
         generation: { imageKeys: ['photo'], mode: 'unstage' },
         form: [
-          { key: 'photo', label: 'Room photo', kind: 'image', required: true, help: 'Upload the furnished room you want emptied.' },
+          { key: 'photo', label: 'Room Photo', kind: 'image', required: true, help: 'Upload the furnished room you want emptied.' },
           { key: 'keep', label: 'Anything that should stay? (optional)', kind: 'textarea', placeholder: 'e.g. the built-in wardrobe, the curtains, the ceiling pendant' },
         ],
       },
@@ -3271,11 +3271,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // Photo captured here, then the staging wizard collects style + furniture.
         generation: { imageKeys: ['photo'], opensModal: 'virtual-staging' },
         form: [
-          { key: 'photo', label: 'Empty room photo', kind: 'image', required: true, help: 'Upload a photo of the empty room to furnish. If yours is furnished, run "Empty a room" first.' },
+          { key: 'photo', label: 'Empty Room Photo', kind: 'image', required: true, help: 'Upload a photo of the empty room to furnish. If yours is furnished, run "Empty a room" first.' },
         ],
       },
       {
-        label: 'Redesign from a photo',
+        label: 'Redesign from a Photo',
         description: 'Change the style, materials, or finishes on an existing room photo',
         icon: 'Sparkles',
         imageRequired: true,
@@ -3283,8 +3283,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Redesign this room in a {{style}} style — update the materials and finishes while keeping the exact layout and architecture. {{notes}}',
         generation: { imageKeys: ['photo'], mode: 'redesign' },
         form: [
-          { key: 'photo', label: 'Room photo', kind: 'image', required: true },
-          { key: 'style', label: 'Target style', kind: 'text', required: true, placeholder: 'e.g. warm minimal, Mediterranean, Scandinavian' },
+          { key: 'photo', label: 'Room Photo', kind: 'image', required: true },
+          { key: 'style', label: 'Target Style', kind: 'text', required: true, placeholder: 'e.g. warm minimal, Mediterranean, Scandinavian' },
           { key: 'notes', label: 'Notes (optional)', kind: 'textarea', placeholder: 'e.g. keep the flooring, warmer tones, more plants' },
         ],
       },
@@ -3298,24 +3298,24 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // No forced mode — the interior agent routes to the lighting tool.
         generation: { imageKeys: ['photo'] },
         form: [
-          { key: 'photo', label: 'Room photo', kind: 'image', required: true },
+          { key: 'photo', label: 'Room Photo', kind: 'image', required: true },
           // Values are apply_lighting_preset's z.enum tokens, NOT prose. They used
           // to be readable labels ("Natural Daylight", "Showroom Spots") that the
           // agent had to map back through the tool description — an unchecked
           // translation layer that would silently rot the day the enum changed.
           // The options-drift guard now holds these to the schema.
-          { key: 'preset', label: 'Lighting mood', kind: 'select', default: 'golden_hour', options: [
-            { value: 'golden_hour', label: 'Golden hour' },
-            { value: 'bright_midday', label: 'Bright midday' },
-            { value: 'soft_overcast', label: 'Soft overcast' },
-            { value: 'warm_evening', label: 'Warm evening' },
+          { key: 'preset', label: 'Lighting Mood', kind: 'select', default: 'golden_hour', options: [
+            { value: 'golden_hour', label: 'Golden Hour' },
+            { value: 'bright_midday', label: 'Bright Midday' },
+            { value: 'soft_overcast', label: 'Soft Overcast' },
+            { value: 'warm_evening', label: 'Warm Evening' },
             { value: 'night', label: 'Night' },
-            { value: 'dramatic_spots', label: 'Dramatic spots' },
+            { value: 'dramatic_spots', label: 'Dramatic Spots' },
           ] },
         ],
       },
       {
-        label: 'Floor plan → 3D',
+        label: 'Floor Plan → 3D',
         description: 'Turn an attached 2D floor plan into one top-down 3D view of the whole home',
         icon: 'LayoutTemplate',
         imageRequired: true,
@@ -3328,7 +3328,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Floor plan → room view',
+        label: 'Floor Plan → Room View',
         description: 'Render an attached 2D floor plan as an eye-level interior photo of one space',
         icon: 'LayoutTemplate',
         imageRequired: true,
@@ -3346,39 +3346,39 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // _shared/product-prompt-builder.ts — and NOTHING in the product could reach
       // them. No quick-start, no button anywhere.
       {
-        label: 'Product shot',
+        label: 'Product Shot',
         description: 'Render one product on seamless white — a catalog hero image',
         icon: 'Package',
         prompt: 'Render a catalog hero shot of this product on seamless white.',
         promptTemplate: 'Render a catalog hero shot of "{{product}}" on a seamless white background. {{details}}',
         generation: { imageKeys: ['photo'], mode: 'product-shot' },
         form: [
-          { key: 'product', label: 'Product name', kind: 'text', required: true, placeholder: 'e.g. Fenwick oak lounge chair' },
-          { key: 'photo', label: 'Product photo (optional)', kind: 'image', help: 'Upload one if you have it — the product is preserved. Without it the shot is built from the name and details.' },
+          { key: 'product', label: 'Product Name', kind: 'text', required: true, placeholder: 'e.g. Fenwick oak lounge chair' },
+          { key: 'photo', label: 'Product Photo (optional)', kind: 'image', help: 'Upload one if you have it — the product is preserved. Without it the shot is built from the name and details.' },
           { key: 'details', label: 'Materials, finish, dimensions (optional)', kind: 'textarea', placeholder: 'e.g. solid oak frame, boucle upholstery, 78cm wide' },
         ],
       },
       {
-        label: 'Product in a room',
+        label: 'Product in a Room',
         description: 'Stage a product in a styled room — a lifestyle shot',
         icon: 'Palette',
         prompt: 'Stage this product in a styled room.',
         promptTemplate: 'Stage "{{product}}" in a {{style}} {{roomType}}, photographed as a lifestyle shot. {{details}}',
         generation: { imageKeys: ['photo'], mode: 'product-lifestyle' },
         form: [
-          { key: 'product', label: 'Product name', kind: 'text', required: true, placeholder: 'e.g. Fenwick oak lounge chair' },
-          { key: 'photo', label: 'Product photo (optional)', kind: 'image', help: 'With a photo the product is preserved and only the room is generated around it.' },
+          { key: 'product', label: 'Product Name', kind: 'text', required: true, placeholder: 'e.g. Fenwick oak lounge chair' },
+          { key: 'photo', label: 'Product Photo (optional)', kind: 'image', help: 'With a photo the product is preserved and only the room is generated around it.' },
           // Keyed `roomType` and valued with generate_gemini's OWN documented vocabulary,
           // not prose. Keying it `room` matched virtual_staging.room — a different tool
           // with a different enum ("Living Room", "Balcony", "Swimming Pool") — and the
           // options-drift guard caught the collision immediately.
           { key: 'roomType', label: 'Room', kind: 'select', default: 'living_room', options: [
-            { value: 'living_room', label: 'Living room' },
+            { value: 'living_room', label: 'Living Room' },
             { value: 'bedroom', label: 'Bedroom' },
             { value: 'kitchen', label: 'Kitchen' },
             { value: 'bathroom', label: 'Bathroom' },
-            { value: 'dining_room', label: 'Dining room' },
-            { value: 'home_office', label: 'Home office' },
+            { value: 'dining_room', label: 'Dining Room' },
+            { value: 'home_office', label: 'Home Office' },
             { value: 'outdoor', label: 'Outdoor' },
           ] },
           { key: 'style', label: 'Style', kind: 'text', required: true, placeholder: 'e.g. warm minimal, Japandi, Mediterranean' },
@@ -3386,7 +3386,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Seamless texture',
+        label: 'Seamless Texture',
         description: 'Turn a material into a tileable swatch you can apply anywhere',
         icon: 'Grid3x3',
         prompt: 'Create a seamless tileable texture of this material.',
@@ -3394,7 +3394,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         generation: { imageKeys: ['photo'], mode: 'material-texture' },
         form: [
           { key: 'material', label: 'Material', kind: 'text', required: true, placeholder: 'e.g. olive green boucle, honed Carrara marble, brushed brass' },
-          { key: 'photo', label: 'Swatch photo (optional)', kind: 'image', help: 'A close-up of the real material, if you have one.' },
+          { key: 'photo', label: 'Swatch Photo (optional)', kind: 'image', help: 'A close-up of the real material, if you have one.' },
           { key: 'details', label: 'Scale / Notes (optional)', kind: 'textarea', placeholder: 'e.g. fine grain, matte, subtle variation' },
         ],
       },
@@ -3408,12 +3408,12 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // No forced mode — the interior agent routes to the VR tool.
         generation: { imageKeys: ['photo'] },
         form: [
-          { key: 'photo', label: 'Room image', kind: 'image', required: true },
+          { key: 'photo', label: 'Room Image', kind: 'image', required: true },
           // Values are generate_vr_world's `model` z.enum, not the invented
           // 'draft' / 'high-quality' pair they used to be — those matched no enum
           // member, so the agent had to guess the mapping on every single run.
           { key: 'model', label: 'Quality', kind: 'select', default: 'marble-1.1', options: [
-            { value: 'marble-1.1', label: 'High quality (190 credits)' },
+            { value: 'marble-1.1', label: 'High Quality (190 Credits)' },
           ] },
         ],
       },
@@ -3430,13 +3430,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Generate a {{video_type}} video from this room image using the {{model}} model, {{aspect_ratio}}, {{duration_seconds}} seconds long. {{notes}}',
         generation: { imageKeys: ['photo'] },
         form: [
-          { key: 'photo', label: 'Room image', kind: 'image', required: true },
-          { key: 'video_type', label: 'Video type', kind: 'select', default: 'walkthrough', options: [
+          { key: 'photo', label: 'Room Image', kind: 'image', required: true },
+          { key: 'video_type', label: 'Video Type', kind: 'select', default: 'walkthrough', options: [
             { value: 'walkthrough', label: 'Walkthrough — camera moves through the room' },
             { value: 'product_spotlight', label: 'Product spotlight — focus on one material' },
-            { value: 'before_after', label: 'Before / after transition' },
-            { value: 'floorplan_flythrough', label: 'Floor-plan flythrough' },
-            { value: 'social_reel', label: 'Social reel — 9:16 short form' },
+            { value: 'before_after', label: 'Before / After Transition' },
+            { value: 'floorplan_flythrough', label: 'Floor-Plan Flythrough' },
+            { value: 'social_reel', label: 'Social Reel — 9:16 Short Form' },
           ] },
           // The promptTemplate has always interpolated {{model}} and the form never
           // collected it, so every rendered sentence read "using the  model" and the
@@ -3444,9 +3444,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // z.enum — the drift guard resolves this key against it, not against
           // generate_vr_world.model, by matching the offered values.
           { key: 'model', label: 'Model', kind: 'select', default: 'veo-2', options: [
-            { value: 'veo-2', label: 'Veo 2 — 50 credits' },
-            { value: 'kling-v3.0', label: 'Kling v3.0 — 20 credits' },
-            { value: 'runway-gen4-turbo', label: 'Runway Gen-4 Turbo — 40 credits' },
+            { value: 'veo-2', label: 'Veo 2 — 50 Credits' },
+            { value: 'kling-v3.0', label: 'Kling v3.0 — 20 Credits' },
+            { value: 'runway-gen4-turbo', label: 'Runway Gen-4 Turbo — 40 Credits' },
             { value: 'wan-3.0-480p', label: 'Wan3.0 480p — 30s with audio, 30 credits' },
             { value: 'wan-3.0-720p', label: 'Wan3.0 720p — 30s with audio, 55 credits' },
             { value: 'wan-3.0-1080p', label: 'Wan3.0 1080p — 30s with audio, 110 credits' },
@@ -3457,13 +3457,13 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: 'ray-3.2-720p', label: 'Luma Ray3.2 720p — first-to-last frame, 20 credits' },
             { value: 'ray-3.2-1080p', label: 'Luma Ray3.2 1080p — first-to-last frame, 70 credits' },
           ] },
-          { key: 'aspect_ratio', label: 'Aspect ratio', kind: 'select', default: '16:9', options: [
+          { key: 'aspect_ratio', label: 'Aspect Ratio', kind: 'select', default: '16:9', options: [
             { value: '16:9', label: '16:9 — standard' },
             { value: '9:16', label: '9:16 — social reel' },
             { value: '1:1', label: '1:1 — square' },
           ] },
-          { key: 'duration_seconds', label: 'Duration (seconds)', kind: 'number', default: '8', help: '4–30 seconds; clamped to the model ceiling (Veo 8s, Kling 10s, H3 Max 15s, Wan/Seedance 30s)' },
-          { key: 'notes', label: 'Anything to emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. slow pan across the kitchen island' },
+          { key: 'duration_seconds', label: 'Duration (Seconds)', kind: 'number', default: '8', help: '4–30 seconds; clamped to the model ceiling (Veo 8s, Kling 10s, H3 Max 15s, Wan/Seedance 30s)' },
+          { key: 'notes', label: 'Anything to Emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. slow pan across the kitchen island' },
         ],
       },
     ],
@@ -3497,19 +3497,19 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'My rankings', description: 'What your own site ranks for — rank tracker + Search Console', icon: 'Globe',
+        label: 'My Rankings', description: 'What your own site ranks for — rank tracker + Search Console', icon: 'Globe',
         prompt: 'Which keywords does my website rank for right now? Use our own rank tracker and Search Console data.',
         done: 'Here is what your site ranks for, from your own tracker and Search Console.',
         promptTemplate: 'Which keywords does my website rank for right now, over the last {{days}} days? Use our own rank tracker and Search Console data.',
         run: { tool: 'seo_my_rankings', coerce: { days: 'number' } },
         form: [
-          { key: 'days', label: 'Look-back window (days)', kind: 'number', default: '28' },
+          { key: 'days', label: 'Look-Back Window (Days)', kind: 'number', default: '28' },
         ],
       },
       {
         // autoFields: the `kind` enum (eleven reports) becomes the select, so the picker offers
         // exactly what the tool accepts and nothing hand-mirrored can drift.
-        label: 'Site report', description: 'Health, crawl, Search Console, AI visibility — your own site, first-party', icon: 'BadgeCheck',
+        label: 'Site Report', description: 'Health, crawl, Search Console, AI visibility — your own site, first-party', icon: 'BadgeCheck',
         prompt: 'Give me the health report for our own website.',
         done: 'Here is that report on your own site.',
         promptTemplate: 'Give me the {{kind}} report for our own website.',
@@ -3545,7 +3545,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Expand the seed phrase "{{seed}}" into {{count}} keyword suggestions with volume + competition.',
         run: { tool: 'seo_keyword_suggestions', argMap: { seed: 'keyword', count: 'limit' }, coerce: { limit: 'number' } },
         form: [
-          { key: 'seed', label: 'Seed phrase', kind: 'text', required: true, placeholder: 'travertine sealer' },
+          { key: 'seed', label: 'Seed Phrase', kind: 'text', required: true, placeholder: 'travertine sealer' },
           { key: 'count', label: 'How many suggestions?', kind: 'number', default: '30' },
         ],
       },
@@ -3582,8 +3582,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Find SEO keyword gaps where {{competitor}} ranks but {{your_domain}} does not.',
         run: { tool: 'seo_keyword_gap', argMap: { competitor: 'competitor_domain' } },
         form: [
-          { key: 'your_domain', label: 'Your domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
-          { key: 'competitor', label: 'Competitor domain', kind: 'text', required: true, placeholder: 'carrelagedirect.fr' },
+          { key: 'your_domain', label: 'Your Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
+          { key: 'competitor', label: 'Competitor Domain', kind: 'text', required: true, placeholder: 'carrelagedirect.fr' },
         ],
       },
       {
@@ -3612,7 +3612,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
     quick_starts: [
       {
-        label: 'Backlinks summary', description: 'Total backlinks + referring domains + spam score', icon: 'Link2',
+        label: 'Backlinks Summary', description: 'Total backlinks + referring domains + spam score', icon: 'Link2',
         prompt: 'Pull a backlinks summary for a domain.',
         done: 'I\'ve pulled the backlink profile for that domain.',
         promptTemplate: 'Pull a backlinks summary for {{domain}}.',
@@ -3622,7 +3622,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Anchor texts', description: 'Top anchor patterns', icon: 'Link2',
+        label: 'Anchor Texts', description: 'Top anchor patterns', icon: 'Link2',
         prompt: 'List the top anchor texts pointing to a domain.',
         done: 'I\'ve pulled the top anchor texts pointing at that domain.',
         promptTemplate: 'List the top anchor texts pointing to {{domain}}.',
@@ -3654,11 +3654,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'seo_site_crawl_start', argMap: { domain: 'target' }, coerce: { max_pages: 'number' } },
         form: [
           { key: 'domain', label: 'Domain', kind: 'text', required: true, placeholder: 'flobali.gr' },
-          { key: 'max_pages', label: 'Max pages', kind: 'number', default: '100' },
+          { key: 'max_pages', label: 'Max Pages', kind: 'number', default: '100' },
         ],
       },
       {
-        label: 'Tech stack', description: 'Detect CMS, analytics, frameworks', icon: 'FileSearch',
+        label: 'Tech Stack', description: 'Detect CMS, analytics, frameworks', icon: 'FileSearch',
         prompt: 'Identify the tech stack of a domain.',
         done: 'I\'ve detected what that site is built on.',
         promptTemplate: 'Identify the tech stack of {{domain}}.',
@@ -3694,7 +3694,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
     quick_starts: [
       {
-        label: 'YouTube search', description: 'Top YouTube videos for a keyword', icon: 'Layers',
+        label: 'YouTube Search', description: 'Top YouTube videos for a keyword', icon: 'Layers',
         prompt: 'Search YouTube for "porcelain tile installation" — show top videos with view counts.',
         done: 'I\'ve pulled the top YouTube videos for that keyword.',
         promptTemplate: 'Search YouTube for "{{keyword}}" — show the top videos with view counts.',
@@ -3717,7 +3717,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // autoFields surfaces the required `store` enum (google_play | app_store) —
         // the tool was in this cluster with no quick-start, so picking a store was
         // only possible by naming it in chat.
-        label: 'App-store keywords', description: 'Keywords a mobile app ranks for', icon: 'Layers',
+        label: 'App-Store Keywords', description: 'Keywords a mobile app ranks for', icon: 'Layers',
         prompt: 'Which keywords does a mobile app rank for?',
         done: 'I\'ve pulled the keywords that app ranks for.',
         run: { tool: 'seo_app_keywords' },
@@ -3727,7 +3727,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Reddit threads', description: 'Real user discussion + pain points', icon: 'Layers',
+        label: 'Reddit Threads', description: 'Real user discussion + pain points', icon: 'Layers',
         prompt: 'Find Reddit threads discussing a topic.',
         done: 'I\'ve found the Reddit discussion on that topic.',
         promptTemplate: 'Find Reddit threads discussing "{{topic}}".',
@@ -3748,7 +3748,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     tool_ids: ['seo_site_review', 'seo_brand_search_audit'],
     quick_starts: [
       {
-        label: 'Full site review', description: 'Rank + keywords + competitors + backlinks in one call', icon: 'BadgeCheck',
+        label: 'Full Site Review', description: 'Rank + keywords + competitors + backlinks in one call', icon: 'BadgeCheck',
         prompt: 'Run a full site review of a domain.',
         done: 'I\'ve run the full site review.',
         promptTemplate: 'Run a full site review of {{domain}}.',
@@ -3758,7 +3758,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Brand SERP audit', description: 'Knowledge Panel + AI Overview brand mention', icon: 'BadgeCheck',
+        label: 'Brand SERP Audit', description: 'Knowledge Panel + AI Overview brand mention', icon: 'BadgeCheck',
         prompt: 'Run a brand-search audit for a brand.',
         done: 'I\'ve audited how that brand shows up in search.',
         promptTemplate: 'Run a brand-search audit for "{{brand}}".',
@@ -3822,7 +3822,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         prompt: 'Show me the LLM visibility snapshot for one of my tracked brands, including how it has moved since the last probe.',
         promptTemplate: 'Show me the LLM visibility snapshot for "{{subject}}", including how it has moved since the last probe.',
         form: [
-          { key: 'subject', label: 'Tracked brand / subject', kind: 'text', required: true, placeholder: 'Flobali' },
+          { key: 'subject', label: 'Tracked Brand / Subject', kind: 'text', required: true, placeholder: 'Flobali' },
         ],
       },
       {
@@ -3865,16 +3865,16 @@ export const TOOLKITS: ToolkitDefinition[] = [
         icon: 'Newspaper',
         promptTemplate: 'Call create_seo_article ONCE, and no other SEO tool, to generate a complete SEO article targeting the keyword "{{keyword}}" (website_id: {{website_id}}; market ISO code: {{country}} — if blank, leave language_code and location_code unset so the business\'s own market is used). Pass each text below verbatim as the create_seo_article param of the same name; omit any that is empty.\n\nwriter_notes:\n{{writer_notes}}\n\nmust_cover:\n{{must_cover}}\n\nlink_pages:\n{{link_pages}}',
         form: [
-          { key: 'keyword', label: 'Target keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
+          { key: 'keyword', label: 'Target Keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
           { key: 'country', label: 'Target market (blank = your business country)', kind: 'country_code' },
           { key: 'website_id', label: 'Website', kind: 'website' },
-          { key: 'writer_notes', label: 'Angle / notes for the writer', kind: 'textarea' },
-          { key: 'must_cover', label: 'Must cover', kind: 'textarea', help: 'One point per line.' },
-          { key: 'link_pages', label: 'Pages of ours to link (URLs)', kind: 'textarea', help: 'One URL per line.' },
+          { key: 'writer_notes', label: 'Angle / Notes for the Writer', kind: 'textarea' },
+          { key: 'must_cover', label: 'Must Cover', kind: 'textarea', help: 'One point per line.' },
+          { key: 'link_pages', label: 'Pages of Ours to Link (URLs)', kind: 'textarea', help: 'One URL per line.' },
         ],
       },
       {
-        label: 'Just research', description: 'Stop at research stage', icon: 'Search',
+        label: 'Just Research', description: 'Stop at research stage', icon: 'Search',
         prompt: 'Run only Stage 1 (keyword research).',
         done: 'I\'ve finished the keyword research stage and stopped there.',
         promptTemplate: 'Run only Stage 1 (keyword research) for the seed keyword "{{keyword}}".',
@@ -3882,8 +3882,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // to `topic` left target_keyword unset, so the call never validated.
         run: { tool: 'seo_keyword_research', argMap: { keyword: 'target_keyword' } },
         form: [
-          { key: 'topic', label: 'Topic / niche', kind: 'text', required: true, placeholder: 'sustainable building materials' },
-          { key: 'keyword', label: 'Seed keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
+          { key: 'topic', label: 'Topic / Niche', kind: 'text', required: true, placeholder: 'sustainable building materials' },
+          { key: 'keyword', label: 'Seed Keyword', kind: 'text', required: true, placeholder: 'recycled concrete aggregates' },
         ],
       },
     ],
@@ -3914,7 +3914,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         autoFields: true,
       },
       {
-        label: 'Scrape materials from a page', description: 'Pull products off a supplier URL',
+        label: 'Scrape Materials from a Page', description: 'Pull products off a supplier URL',
         icon: 'Globe',
         prompt: 'Scrape the materials from https://example-supplier.com/collections/porcelain',
         done: 'I\'ve scraped the products off that page.',
@@ -3936,8 +3936,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'b2b_company_search', argMap: { industry: 'category', count: 'limit' } },
         autoFields: true,
         form: [
-          { key: 'industry', label: 'Product / industry', kind: 'text', required: true, placeholder: 'porcelain tile' },
-          { key: 'country', label: 'Country / region', kind: 'text', placeholder: 'Spain — leave empty for every market' },
+          { key: 'industry', label: 'Product / Industry', kind: 'text', required: true, placeholder: 'porcelain tile' },
+          { key: 'country', label: 'Country / Region', kind: 'text', placeholder: 'Spain — leave empty for every market' },
           { key: 'count', label: 'How many?', kind: 'number', default: '8' },
         ],
       },
@@ -3950,8 +3950,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'b2b_company_search', argMap: { industry: 'category', count: 'limit' }, fixedArgs: { company_types: ['manufacturer'] } },
         autoFields: true,
         form: [
-          { key: 'industry', label: 'Product / industry', kind: 'text', required: true, placeholder: 'porcelain tile' },
-          { key: 'country', label: 'Country / region', kind: 'text', placeholder: 'Spain — leave empty for every market' },
+          { key: 'industry', label: 'Product / Industry', kind: 'text', required: true, placeholder: 'porcelain tile' },
+          { key: 'country', label: 'Country / Region', kind: 'text', placeholder: 'Spain — leave empty for every market' },
           { key: 'count', label: 'How many?', kind: 'number', default: '8' },
         ],
       },
@@ -3964,8 +3964,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'b2b_company_search', argMap: { industry: 'category', count: 'limit' }, fixedArgs: { company_types: ['stock_trader'] } },
         autoFields: true,
         form: [
-          { key: 'industry', label: 'Product / industry', kind: 'text', required: true, placeholder: 'ceramic tiles' },
-          { key: 'country', label: 'Country / region', kind: 'text', placeholder: 'Italy — leave empty for every market' },
+          { key: 'industry', label: 'Product / Industry', kind: 'text', required: true, placeholder: 'ceramic tiles' },
+          { key: 'country', label: 'Country / Region', kind: 'text', placeholder: 'Italy — leave empty for every market' },
           { key: 'count', label: 'How many?', kind: 'number', default: '8' },
         ],
       },
@@ -3978,8 +3978,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         // every click fail validation before it reached Apollo.
         run: { tool: 'company_enrichment', argMap: { company: 'company_name' } },
         form: [
-          { key: 'company', label: 'Company name', kind: 'text', required: true, placeholder: 'Paradyż' },
-          { key: 'domain', label: 'Company domain', kind: 'text', placeholder: 'example.com' },
+          { key: 'company', label: 'Company Name', kind: 'text', required: true, placeholder: 'Paradyż' },
+          { key: 'domain', label: 'Company Domain', kind: 'text', placeholder: 'example.com' },
           { key: 'country', label: 'Country', kind: 'country', placeholder: 'Any market' },
         ],
       },
@@ -3990,8 +3990,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
         promptTemplate: 'Find decision-maker contacts ({{titles}}) at {{domain}}.',
         run: { tool: 'contact_discovery', argMap: { titles: 'roles' }, coerce: { roles: 'csv' } },
         form: [
-          { key: 'domain', label: 'Company domain', kind: 'text', required: true, placeholder: 'example.com' },
-          { key: 'titles', label: 'Target roles', kind: 'text', default: 'CEO, Procurement, Sales' },
+          { key: 'domain', label: 'Company Domain', kind: 'text', required: true, placeholder: 'example.com' },
+          { key: 'titles', label: 'Target Roles', kind: 'text', default: 'CEO, Procurement, Sales' },
         ],
       },
     ],
@@ -4008,17 +4008,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
     quick_starts: [
       {
-        label: 'Deep research', description: 'Multi-step open-ended research', icon: 'Bot',
+        label: 'Deep Research', description: 'Multi-step open-ended research', icon: 'Bot',
         prompt: 'Run a deep research analysis.',
         done: 'I\'ve finished the research and written it up.',
         promptTemplate: 'Run a deep research analysis on: {{topic}}',
         run: { tool: 'research_analysis', argMap: { topic: 'query' } },
         form: [
-          { key: 'topic', label: 'Research question', kind: 'textarea', required: true, placeholder: "the EU Green Deal's impact on construction materials" },
+          { key: 'topic', label: 'Research Question', kind: 'textarea', required: true, placeholder: "the EU Green Deal's impact on construction materials" },
         ],
       },
       {
-        label: 'Platform analytics', description: 'Usage / metric breakdowns', icon: 'Bot',
+        label: 'Platform Analytics', description: 'Usage / metric breakdowns', icon: 'Bot',
         prompt: 'Run an analytics question against the platform.',
         done: 'I\'ve run that analytics breakdown.',
         promptTemplate: 'Run a platform analytics question: {{question}}',
@@ -4028,7 +4028,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Business breakdown', description: 'Revenue / customer / GMV', icon: 'Bot',
+        label: 'Business Breakdown', description: 'Revenue / customer / GMV', icon: 'Bot',
         prompt: 'Run a business-side analysis.',
         done: 'I\'ve run that business breakdown.',
         promptTemplate: 'Run a business-side analysis: {{question}}',
@@ -4059,7 +4059,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
     quick_starts: [
       {
-        label: 'Pricing KB lookup', description: 'Admin-curated price data', icon: 'Wrench',
+        label: 'Pricing KB Lookup', description: 'Admin-curated price data', icon: 'Wrench',
         prompt: 'Pull a pricing-KB entry.',
         done: 'I\'ve pulled the pricing-KB entry.',
         promptTemplate: 'Pull the pricing-KB entry for "{{query}}".',
@@ -4085,32 +4085,32 @@ export const TOOLKITS: ToolkitDefinition[] = [
         done: 'I\'ve asked to start the ingestion.',
         promptTemplate: 'Ingest the attached catalogue PDF as "{{title}}" in category {{category}}. Stop after discovery for review and do not embed yet.',
         form: [
-          { key: 'title', label: 'Catalogue name', kind: 'text', required: true, placeholder: 'Keros Actual 2026' },
-          { key: 'category', label: 'Material category key', kind: 'text', required: true, placeholder: 'tiles' },
+          { key: 'title', label: 'Catalogue Name', kind: 'text', required: true, placeholder: 'Keros Actual 2026' },
+          { key: 'category', label: 'Material Category Key', kind: 'text', required: true, placeholder: 'tiles' },
         ],
       },
       {
-        label: 'Ingestion status', description: 'Where a catalogue is and what waits on you', icon: 'Wrench',
+        label: 'Ingestion Status', description: 'Where a catalogue is and what waits on you', icon: 'Wrench',
         prompt: 'Show the status of my latest catalogue ingestion.',
         done: 'Here is where that ingestion stands.',
         promptTemplate: 'Show the ingestion status of "{{document}}".',
         run: { tool: 'ingest_catalog', argMap: { document: 'document' }, fixedArgs: { action: 'status' } },
         form: [
-          { key: 'document', label: 'Catalogue (file name)', kind: 'text', required: true, placeholder: 'keros_actual' },
+          { key: 'document', label: 'Catalogue (File Name)', kind: 'text', required: true, placeholder: 'keros_actual' },
         ],
       },
       {
-        label: 'Review discovered products', description: 'The list a parked ingestion waits on', icon: 'Wrench',
+        label: 'Review Discovered Products', description: 'The list a parked ingestion waits on', icon: 'Wrench',
         prompt: 'Show the discovered products waiting for my review.',
         done: 'Here is the discovered product list.',
         promptTemplate: 'Show the discovered products of "{{document}}" waiting for review.',
         run: { tool: 'ingest_catalog', argMap: { document: 'document' }, fixedArgs: { action: 'review' } },
         form: [
-          { key: 'document', label: 'Catalogue (file name)', kind: 'text', required: true, placeholder: 'keros_actual' },
+          { key: 'document', label: 'Catalogue (File Name)', kind: 'text', required: true, placeholder: 'keros_actual' },
         ],
       },
       {
-        label: 'Ingestion corrections', description: 'What the pipeline fixed, degraded or left for you', icon: 'Wrench',
+        label: 'Ingestion Corrections', description: 'What the pipeline fixed, degraded or left for you', icon: 'Wrench',
         prompt: 'Show what the ingestion pipeline corrected, degraded or left for a decision.',
         done: 'Here is what the ingestion pipeline changed on its own.',
         promptTemplate: 'Show the ingestion corrections for "{{document}}".',

@@ -34,10 +34,10 @@ export function OverviewSection({ workspaceId }: { workspaceId: string | null; c
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <HrStat icon={Users} label="Headcount" value={data.headcount} />
         <HrStat icon={UserCheck} label="Active" value={data.active} />
-        <HrStat icon={CalendarOff} label="On leave today" value={data.on_leave_today} />
+        <HrStat icon={CalendarOff} label="On Leave Today" value={data.on_leave_today} />
         <HrStat icon={Briefcase} label="Open positions" value={data.open_positions} />
-        <HrStat icon={ClipboardList} label="Onboarding tasks" value={data.onboarding_pending} hint="pending" />
-        <HrStat icon={Plane} label="Absence days" value={data.total_absence_days} hint="approved, all types" />
+        <HrStat icon={ClipboardList} label="Onboarding Tasks" value={data.onboarding_pending} hint="pending" />
+        <HrStat icon={Plane} label="Absence Days" value={data.total_absence_days} hint="approved, all types" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

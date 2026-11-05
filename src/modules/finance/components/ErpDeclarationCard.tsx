@@ -177,7 +177,7 @@ export const ErpDeclarationCard: React.FC<{ workspaceId: string }> = ({ workspac
 
             <div className="flex flex-wrap items-end gap-2 rounded-md border border-hairline p-2">
               <div>
-                <Label htmlFor="erp-name" className="text-xs">Commercial name</Label>
+                <Label htmlFor="erp-name" className="text-xs">Commercial Name</Label>
                 <Input
                   id="erp-name" className="mt-1 h-8 w-48 text-xs" value={draft.name}
                   onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
@@ -191,7 +191,7 @@ export const ErpDeclarationCard: React.FC<{ workspaceId: string }> = ({ workspac
                 />
               </div>
               <div>
-                <Label htmlFor="erp-rel" className="text-xs">First released</Label>
+                <Label htmlFor="erp-rel" className="text-xs">First Released</Label>
                 <Input
                   id="erp-rel" type="date" className="mt-1 h-8 w-40 text-xs" value={draft.released}
                   onChange={(e) => setDraft((d) => ({ ...d, released: e.target.value }))}

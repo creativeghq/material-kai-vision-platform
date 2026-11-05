@@ -22,55 +22,55 @@ const SEO_CARD_TITLES: Record<string, string> = {
   seo_ai_keyword_volume_card: 'AI search volume',
   seo_ai_overview_card: 'Google AI Overview',
   seo_amazon_asin_card: 'Amazon ASIN',
-  seo_app_keywords_card: 'App store keywords',
-  seo_backlinks_anchors_card: 'Anchor texts',
+  seo_app_keywords_card: 'App Store Keywords',
+  seo_backlinks_anchors_card: 'Anchor Texts',
   seo_backlinks_competitors_card: 'Link competitors',
-  seo_backlinks_summary_card: 'Backlink profile',
-  seo_backlinks_timeseries_card: 'Backlink history',
-  seo_brand_audit_card: 'Brand search',
+  seo_backlinks_summary_card: 'Backlink Profile',
+  seo_backlinks_timeseries_card: 'Backlink History',
+  seo_brand_audit_card: 'Brand Search',
   seo_categories_card: 'Categories',
-  seo_dataforseo_raw_card: 'DataForSEO call',
+  seo_dataforseo_raw_card: 'DataForSEO Call',
   seo_domain_competitors_card: 'Competitors',
-  seo_domain_intersection_card: 'Keyword intersection',
-  seo_domain_snapshot_card: 'Domain snapshot',
-  seo_domain_tech_card: 'Tech stack',
+  seo_domain_intersection_card: 'Keyword Intersection',
+  seo_domain_snapshot_card: 'Domain Snapshot',
+  seo_domain_tech_card: 'Tech Stack',
   seo_gbp_info_card: 'Business Profile',
-  seo_google_maps_card: 'Map results',
+  seo_google_maps_card: 'Map Results',
   seo_gsc_movers_card: 'Rank movers',
-  seo_gsc_striking_distance_card: 'Striking distance',
-  seo_historical_rank_card: 'Visibility history',
+  seo_gsc_striking_distance_card: 'Striking Distance',
+  seo_historical_rank_card: 'Visibility History',
   seo_historical_serps_card: 'Historical SERPs',
   seo_intent_card: 'Search intent',
-  seo_keyword_difficulty_card: 'Keyword difficulty',
-  seo_keyword_gap_card: 'Keyword gap',
-  seo_keyword_ideas_card: 'Keyword ideas',
-  seo_keyword_overview_card: 'Keyword overview',
-  seo_keywords_card: 'Keyword suggestions',
-  seo_keywords_for_site_card: 'Keyword universe',
+  seo_keyword_difficulty_card: 'Keyword Difficulty',
+  seo_keyword_gap_card: 'Keyword Gap',
+  seo_keyword_ideas_card: 'Keyword Ideas',
+  seo_keyword_overview_card: 'Keyword Overview',
+  seo_keywords_card: 'Keyword Suggestions',
+  seo_keywords_for_site_card: 'Keyword Universe',
   seo_llm_mentions_card: 'LLM mentions',
-  seo_local_pack_card: 'Local pack',
-  seo_my_rankings_card: 'Your rankings',
-  seo_onpage_issues_card: 'Site-audit issues',
+  seo_local_pack_card: 'Local Pack',
+  seo_my_rankings_card: 'Your Rankings',
+  seo_onpage_issues_card: 'Site-Audit Issues',
   seo_opportunities_card: 'What to work on',
   seo_pinterest_card: 'Pinterest',
-  seo_ranked_keywords_card: 'Ranking keywords',
+  seo_ranked_keywords_card: 'Ranking Keywords',
   seo_reddit_card: 'Reddit',
-  seo_referring_domains_card: 'Referring domains',
-  seo_related_keywords_card: 'Related keywords',
-  seo_relevant_pages_card: 'Top pages',
-  seo_page_review_card: 'Page review',
-  seo_presence_plan_card: 'Presence plan',
-  seo_score_url_card: 'Page score',
+  seo_referring_domains_card: 'Referring Domains',
+  seo_related_keywords_card: 'Related Keywords',
+  seo_relevant_pages_card: 'Top Pages',
+  seo_page_review_card: 'Page Review',
+  seo_presence_plan_card: 'Presence Plan',
+  seo_score_url_card: 'Page Score',
   seo_search_volume_card: 'Search volume & CPC',
-  seo_serp_content_card: 'Ranking page ranges',
+  seo_serp_content_card: 'Ranking Page Ranges',
   seo_sentiment_card: 'Sentiment',
   seo_serp_audit_card: 'Live SERP',
-  seo_site_crawl_started_card: 'Site crawl started',
-  seo_site_crawl_status_card: 'Site crawl status',
-  seo_site_report_card: 'Site report',
-  seo_site_review_card: 'Site review',
+  seo_site_crawl_started_card: 'Site Crawl Started',
+  seo_site_crawl_status_card: 'Site Crawl Status',
+  seo_site_report_card: 'Site Report',
+  seo_site_review_card: 'Site Review',
   seo_subdomains_card: 'Subdomains',
-  seo_traffic_estimation_card: 'Traffic estimation',
+  seo_traffic_estimation_card: 'Traffic Estimation',
   seo_trends_card: 'Google Trends',
   seo_trustpilot_search_card: 'Trustpilot',
   seo_url_audit_card: 'URL audit',
@@ -122,7 +122,7 @@ const SERP_BLOCK_LABELS: Record<string, string> = {
   featured_snippet: 'Snippet',
   ai_overview: 'AI Overview',
   people_also_ask: 'PAA',
-  local_pack: 'Local pack',
+  local_pack: 'Local Pack',
   images: 'Images',
   video: 'Video',
   knowledge_graph: 'Knowledge',
@@ -304,13 +304,13 @@ function RankedKeywordsTable({ items, crawlDate, max = 100 }: { items: any[]; cr
             <TableHead className="text-right">Pos.</TableHead>
             <TableHead className="text-right">Change</TableHead>
             <TableHead className="text-right">Volume</TableHead>
-            <TableHead className="hidden md:table-cell text-right">Trend (yr)</TableHead>
+            <TableHead className="hidden md:table-cell text-right">Trend (Yr)</TableHead>
             <TableHead className="hidden md:table-cell text-right">CPC</TableHead>
             <TableHead className="hidden md:table-cell text-right">Comp.</TableHead>
             <TableHead className="text-right">KD</TableHead>
-            <TableHead className="text-right">Est. traffic</TableHead>
+            <TableHead className="text-right">Est. Traffic</TableHead>
             <TableHead className="hidden md:table-cell">SERP blocks</TableHead>
-            <TableHead>Ranking page</TableHead>
+            <TableHead>Ranking Page</TableHead>
             <TableHead className="hidden md:table-cell">SERP crawled</TableHead>
           </TableRow>
         </TableHeader>
@@ -375,7 +375,7 @@ function TrackedKeywordsTable({ rows, max = 30 }: { rows: any[]; max?: number })
             <TableHead className="text-right">Position</TableHead>
             <TableHead className="text-right">Change</TableHead>
             <TableHead className="text-right">Volume</TableHead>
-            <TableHead>Ranking page</TableHead>
+            <TableHead>Ranking Page</TableHead>
             <TableHead className="hidden md:table-cell">Checked</TableHead>
           </TableRow>
         </TableHeader>
@@ -410,59 +410,59 @@ function TrackedKeywordsTable({ rows, max = 30 }: { rows: any[]; max?: number })
  * DataForSEO OnPage `checks`. A check is an ISSUE when true; `issueWhenFalse` inverts that.
  */
 const CHECK_META: Record<string, { label: string; issueWhenFalse?: boolean }> = {
-  no_title: { label: 'Missing title tag' },
-  no_description: { label: 'Missing meta description' },
+  no_title: { label: 'Missing Title Tag' },
+  no_description: { label: 'Missing Meta Description' },
   no_h1: { label: 'No H1 heading' },
-  no_image_alt: { label: 'Images missing alt text' },
-  no_image_title: { label: 'Images missing title attribute' },
+  no_image_alt: { label: 'Images Missing Alt Text' },
+  no_image_title: { label: 'Images Missing Title Attribute' },
   no_favicon: { label: 'No favicon' },
   no_content_encoding: { label: 'No gzip/brotli compression' },
-  no_doctype: { label: 'Missing doctype' },
+  no_doctype: { label: 'Missing Doctype' },
   no_encoding_meta_tag: { label: 'No charset meta tag' },
-  high_loading_time: { label: 'Slow page load' },
-  high_waiting_time: { label: 'Slow server response' },
+  high_loading_time: { label: 'Slow Page Load' },
+  high_waiting_time: { label: 'Slow Server Response' },
   is_redirect: { label: 'Page is a redirect' },
   is_4xx_code: { label: 'Returns a 4xx error' },
   is_5xx_code: { label: 'Returns a 5xx error' },
-  is_broken: { label: 'Broken page' },
+  is_broken: { label: 'Broken Page' },
   is_https: { label: 'Not served over HTTPS', issueWhenFalse: true },
-  is_http: { label: 'Served over plain HTTP' },
+  is_http: { label: 'Served Over Plain HTTP' },
   canonical: { label: 'No canonical tag', issueWhenFalse: true },
   seo_friendly_url: { label: 'URL is not SEO-friendly', issueWhenFalse: true },
-  has_render_blocking_resources: { label: 'Render-blocking resources' },
-  has_meta_refresh_redirect: { label: 'Uses meta-refresh redirect' },
-  redirect_chain: { label: 'Part of a redirect chain' },
-  canonical_chain: { label: 'Canonical chain' },
+  has_render_blocking_resources: { label: 'Render-Blocking Resources' },
+  has_meta_refresh_redirect: { label: 'Uses Meta-Refresh Redirect' },
+  redirect_chain: { label: 'Part of a Redirect Chain' },
+  canonical_chain: { label: 'Canonical Chain' },
   duplicate_title_tag: { label: 'Duplicate title tag' },
   duplicate_meta_tags: { label: 'Duplicate meta tags' },
   duplicate_description: { label: 'Duplicate meta description' },
   duplicate_content: { label: 'Duplicate content' },
-  title_too_long: { label: 'Title too long' },
-  title_too_short: { label: 'Title too short' },
-  low_content_rate: { label: 'Low text-to-HTML ratio' },
-  high_content_rate: { label: 'Unusually high text-to-HTML ratio' },
-  small_page_size: { label: 'Very small page' },
-  large_page_size: { label: 'Very large page size' },
-  low_readability_rate: { label: 'Poor readability' },
-  irrelevant_description: { label: 'Description not relevant to content' },
-  irrelevant_title: { label: 'Title not relevant to content' },
-  irrelevant_meta_keywords: { label: 'Irrelevant meta keywords' },
-  deprecated_html_tags: { label: 'Uses deprecated HTML tags' },
+  title_too_long: { label: 'Title Too Long' },
+  title_too_short: { label: 'Title Too Short' },
+  low_content_rate: { label: 'Low Text-to-HTML Ratio' },
+  high_content_rate: { label: 'Unusually High Text-to-HTML Ratio' },
+  small_page_size: { label: 'Very Small Page' },
+  large_page_size: { label: 'Very Large Page Size' },
+  low_readability_rate: { label: 'Poor Readability' },
+  irrelevant_description: { label: 'Description Not Relevant to Content' },
+  irrelevant_title: { label: 'Title Not Relevant to Content' },
+  irrelevant_meta_keywords: { label: 'Irrelevant Meta Keywords' },
+  deprecated_html_tags: { label: 'Uses Deprecated HTML Tags' },
   flash: { label: 'Uses Flash' },
-  frame: { label: 'Uses frames' },
-  lorem_ipsum: { label: 'Placeholder (lorem ipsum) text' },
-  has_misspelling: { label: 'Spelling errors' },
-  broken_links: { label: 'Broken links' },
-  broken_resources: { label: 'Broken resources' },
-  links_external: { label: 'External links' },
-  no_image_alt_text: { label: 'Images missing alt text' },
+  frame: { label: 'Uses Frames' },
+  lorem_ipsum: { label: 'Placeholder (Lorem Ipsum) Text' },
+  has_misspelling: { label: 'Spelling Errors' },
+  broken_links: { label: 'Broken Links' },
+  broken_resources: { label: 'Broken Resources' },
+  links_external: { label: 'External Links' },
+  no_image_alt_text: { label: 'Images Missing Alt Text' },
   duplicate_title: { label: 'Duplicate titles' },
-  no_meta_description: { label: 'Missing meta descriptions' },
-  no_content: { label: 'Pages with no content' },
-  low_character_count: { label: 'Very thin content' },
-  high_character_count: { label: 'Overly long pages' },
-  small_page_size_pages: { label: 'Very small pages' },
-  non_indexable: { label: 'Non-indexable pages' },
+  no_meta_description: { label: 'Missing Meta Descriptions' },
+  no_content: { label: 'Pages with No Content' },
+  low_character_count: { label: 'Very Thin Content' },
+  high_character_count: { label: 'Overly Long Pages' },
+  small_page_size_pages: { label: 'Very Small Pages' },
+  non_indexable: { label: 'Non-Indexable Pages' },
 };
 
 const humanizeCheckKey = (k: string): string => {
@@ -494,7 +494,7 @@ const kwSubline = (kwData: any): string | undefined => {
 };
 
 /** Accordion of FAILED on-page checks (booleans). Renders nothing when all pass. */
-function FailedChecksAccordion({ checks, label = 'On-page issues' }: { checks: any; label?: string }) {
+function FailedChecksAccordion({ checks, label = 'On-Page Issues' }: { checks: any; label?: string }) {
   if (!checks || typeof checks !== 'object') return null;
   const failed = Object.entries(checks).filter(([k, v]) => {
     const meta = CHECK_META[k];
@@ -522,7 +522,7 @@ function FailedChecksAccordion({ checks, label = 'On-page issues' }: { checks: a
 }
 
 /** Accordion of non-zero site-wide issue COUNTS (crawl summary). Renders nothing when all zero. */
-function IssueCountsAccordion({ checks, label = 'Site-wide issues' }: { checks: any; label?: string }) {
+function IssueCountsAccordion({ checks, label = 'Site-Wide Issues' }: { checks: any; label?: string }) {
   const rows = topEntries(checks, 40);
   if (rows.length === 0) return null;
   return (
@@ -662,8 +662,8 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         )}
         {ip?.meta && (ip.meta.internal_links_count != null || ip.meta.external_links_count != null || ip.meta.images_count != null) && (
           <div className="grid grid-cols-3 gap-2">
-            {ip.meta.internal_links_count != null && <Stat label="Internal links" value={fmtNum(ip.meta.internal_links_count)} />}
-            {ip.meta.external_links_count != null && <Stat label="External links" value={fmtNum(ip.meta.external_links_count)} />}
+            {ip.meta.internal_links_count != null && <Stat label="Internal Links" value={fmtNum(ip.meta.internal_links_count)} />}
+            {ip.meta.external_links_count != null && <Stat label="External Links" value={fmtNum(ip.meta.external_links_count)} />}
             {ip.meta.images_count != null && <Stat label="Images" value={fmtNum(ip.meta.images_count)} />}
           </div>
         )}
@@ -678,7 +678,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
             Saved on this page under Site health → Pages
           </a>
         )}
-        <FailedChecksAccordion checks={ip?.page_metrics?.checks ?? ip?.checks} label="On-page issues" />
+        <FailedChecksAccordion checks={ip?.page_metrics?.checks ?? ip?.checks} label="On-Page Issues" />
       </Card>
     );
   }
@@ -797,7 +797,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
     const unavailable: any[] = data.unavailable || [];
     const KIND_LABEL: Record<string, string> = {
       not_crawled: 'Not crawled', crawled_not_indexed: 'Crawled, not indexed',
-      quick_win: 'Quick win', consolidate: 'Consolidate', refresh: 'Refresh', fix_page: 'Fix page', new_page: 'New page',
+      quick_win: 'Quick Win', consolidate: 'Consolidate', refresh: 'Refresh', fix_page: 'Fix Page', new_page: 'New page',
     };
     return (
       <Card className="space-y-3">
@@ -880,10 +880,10 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           <div className="grid grid-cols-3 gap-2">
             <Stat label="Words" value={fmtNum(data.fetched.word_count)} />
             <Stat label="Status" value={String(data.fetched.http_status ?? '—')} />
-            <Stat label="Critical issues" value={String(critical)} />
+            <Stat label="Critical Issues" value={String(critical)} />
           </div>
         )}
-        <FailedChecksAccordion checks={data.fixes} label="Issues found" />
+        <FailedChecksAccordion checks={data.fixes} label="Issues Found" />
         {(data.checks_skipped || []).length > 0 && (
           // Named, never hidden: a reader comparing this to a generated article's score must be
           // able to see which categories were not part of it.
@@ -904,9 +904,9 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         <Header icon="🌐" title={`Domain Snapshot — ${data.domain}`} subtitle={data.country || ''} />
         <Primer>A one-glance health check of this domain's organic footprint: how many keywords it ranks for, the traffic that earns, its authority rank and its backlink count.</Primer>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <Stat label="Ranking keywords" value={fmtNum(m.count)} />
-          <Stat label="Est. traffic /mo" value={fmtNum(m.etv)} />
-          <Stat label="Domain rank" value={it.metrics_info?.rank ?? '—'} />
+          <Stat label="Ranking Keywords" value={fmtNum(m.count)} />
+          <Stat label="Est. Traffic /Mo" value={fmtNum(m.etv)} />
+          <Stat label="Domain Rank" value={it.metrics_info?.rank ?? '—'} />
           <Stat label="Backlinks" value={fmtNum(it.backlinks_info?.backlinks)} />
         </div>
       </Card>
@@ -994,16 +994,16 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         <Primer>Links from other sites are a top ranking signal. More referring domains beats more raw backlinks. Spam score (0–100) flags toxic links — high is a risk worth cleaning up.</Primer>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <Stat label="Backlinks" value={fmtNum(s.backlinks)} />
-          <Stat label="Referring domains" value={fmtNum(s.referring_domains)} />
-          <Stat label="Domain rank" value={s.rank ?? '—'} />
-          <Stat label="Spam score" value={s.spam_score != null ? (
+          <Stat label="Referring Domains" value={fmtNum(s.referring_domains)} />
+          <Stat label="Domain Rank" value={s.rank ?? '—'} />
+          <Stat label="Spam Score" value={s.spam_score != null ? (
             <span className={Number.isFinite(spam) ? (spam >= 30 ? BAD : spam >= 15 ? WARN : GOOD) : ''}>{s.spam_score}</span>
           ) : '—'} />
         </div>
         {(s.referring_main_domains != null || s.referring_pages != null) && (
           <div className="grid grid-cols-2 gap-2">
-            {s.referring_main_domains != null && <Stat label="Referring root domains" value={fmtNum(s.referring_main_domains)} />}
-            {s.referring_pages != null && <Stat label="Referring pages" value={fmtNum(s.referring_pages)} />}
+            {s.referring_main_domains != null && <Stat label="Referring Root Domains" value={fmtNum(s.referring_main_domains)} />}
+            {s.referring_pages != null && <Stat label="Referring Pages" value={fmtNum(s.referring_pages)} />}
           </div>
         )}
         {(() => {
@@ -1109,17 +1109,17 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         {ready && (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              <Stat label="Pages crawled" value={fmtNum(s.crawl_progress?.pages_crawled)} />
-              <Stat label="Internal links" value={fmtNum(s.page_metrics?.links_internal)} />
-              <Stat label="Broken links" value={<span className={Number(s.page_metrics?.broken_links) > 0 ? WARN : GOOD}>{fmtNum(s.page_metrics?.broken_links)}</span>} />
+              <Stat label="Pages Crawled" value={fmtNum(s.crawl_progress?.pages_crawled)} />
+              <Stat label="Internal Links" value={fmtNum(s.page_metrics?.links_internal)} />
+              <Stat label="Broken Links" value={<span className={Number(s.page_metrics?.broken_links) > 0 ? WARN : GOOD}>{fmtNum(s.page_metrics?.broken_links)}</span>} />
               <Stat label="Duplicate titles" value={<span className={Number(s.page_metrics?.duplicate_title) > 0 ? WARN : GOOD}>{fmtNum(s.page_metrics?.duplicate_title)}</span>} />
             </div>
             {s.page_metrics?.onpage_score != null && (
               <div className="grid grid-cols-2 gap-2">
-                <Stat label="On-page score" value={fmtNum(s.page_metrics.onpage_score)} />
+                <Stat label="On-Page Score" value={fmtNum(s.page_metrics.onpage_score)} />
               </div>
             )}
-            <IssueCountsAccordion checks={s.page_metrics?.checks} label="Site-wide issues" />
+            <IssueCountsAccordion checks={s.page_metrics?.checks} label="Site-Wide Issues" />
           </>
         )}
       </Card>
@@ -1258,9 +1258,9 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         <Header icon="🔍" title={`Site Review — ${data.domain}`} subtitle={data.country || ''} />
         <Primer>A combined health report: organic footprint, backlink strength, best keywords and closest competitors — the top-line view of where this site stands.</Primer>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-          <Stat label="Ranking keywords" value={fmtNum(dr.count)} />
-          <Stat label="Est. traffic /mo" value={fmtNum(dr.etv)} />
-          <Stat label="Referring domains" value={fmtNum(bs.referring_domains)} />
+          <Stat label="Ranking Keywords" value={fmtNum(dr.count)} />
+          <Stat label="Est. Traffic /Mo" value={fmtNum(dr.etv)} />
+          <Stat label="Referring Domains" value={fmtNum(bs.referring_domains)} />
           <Stat label="Backlinks" value={fmtNum(bs.backlinks)} />
         </div>
         {rk.length > 0 && (
@@ -1411,7 +1411,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           <Stat label="Registered" value={it.created_datetime?.slice(0, 10) || 'unknown'} />
           <Stat label="Expires" value={it.expiration_datetime?.slice(0, 10) || 'unknown'} />
           <Stat label="Registrar" value={it.registrar || 'unknown'} />
-          <Stat label="First seen" value={it.first_seen?.slice(0, 10) || 'unknown'} />
+          <Stat label="First Seen" value={it.first_seen?.slice(0, 10) || 'unknown'} />
         </div>
       </Card>
     );
@@ -1614,7 +1614,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
               <Stat label="Tracked" value={fmtNum(tr.tracked)} />
               <Stat label="Checks that answered" value={`0 / ${fmtNum(s.checked ?? tr.tracked)}`} />
               <Stat label="Positions" value={<span className={WARN}>Unknown</span>} />
-              <Stat label="Last tried" value={dayOf(s.captured_at)} />
+              <Stat label="Last Tried" value={dayOf(s.captured_at)} />
             </div>
             <p className={`text-[11px] ${WARN}`}>{tr.note || statusPresentation('collector_failed').explain}</p>
             <Empty>
@@ -1628,7 +1628,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
               <Stat label="Ranking" value={`${fmtNum(s.ranking)} / ${fmtNum(answered)}`} />
               <Stat label="Top 10" value={fmtNum((s.distribution?.top_3 ?? 0) + (s.distribution?.top_10 ?? 0))} />
               <Stat label="Not ranking" value={fmtNum(s.not_ranking)} />
-              <Stat label="Avg position" value={s.avg_position != null ? `#${s.avg_position}` : '—'} />
+              <Stat label="Avg Position" value={s.avg_position != null ? `#${s.avg_position}` : '—'} />
             </div>
             {tr.note && <p className={`text-[11px] ${WARN}`}>{tr.note}</p>}
             {ranking.length === 0 ? (
@@ -1656,7 +1656,7 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
               <div className="grid grid-cols-3 gap-2">
                 <Stat label="Clicks" value={fmtNum(gsc.totals?.clicks)} />
                 <Stat label="Impressions" value={fmtNum(gsc.totals?.impressions)} />
-                <Stat label="Avg position" value={gsc.totals?.position ? `#${gsc.totals.position}` : '—'} />
+                <Stat label="Avg Position" value={gsc.totals?.position ? `#${gsc.totals.position}` : '—'} />
               </div>
               {queries.length === 0 ? (
                 <Empty>No queries with impressions in this window.</Empty>
@@ -1761,10 +1761,10 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
         ) : (
           <>
             <div className="grid grid-cols-3 gap-2">
-              <Stat label="Referring domains" value={fmtNum(last.referring_domains)} />
+              <Stat label="Referring Domains" value={fmtNum(last.referring_domains)} />
               <Stat label="Backlinks" value={fmtNum(last.backlinks)} />
               <Stat
-                label="Domains gained"
+                label="Domains Gained"
                 value={rdGrowth == null ? '—' : <span className={rdGrowth >= 0 ? GOOD : BAD}>{rdGrowth >= 0 ? '+' : ''}{fmtNum(rdGrowth)}</span>}
               />
             </div>
@@ -1826,8 +1826,8 @@ export function SEOGenericCard({ data }: { data: SEOGenericCardData }) {
           <>
             <div className="grid grid-cols-3 gap-2">
               <Stat label="Keywords" value={fmtNum(last.count)} />
-              <Stat label="Est. traffic" value={fmtNum(last.etv)} />
-              <Stat label="Traffic value" value={last.estimated_paid_traffic_cost != null ? `$${fmtNum(last.estimated_paid_traffic_cost)}` : '—'} />
+              <Stat label="Est. Traffic" value={fmtNum(last.etv)} />
+              <Stat label="Traffic Value" value={last.estimated_paid_traffic_cost != null ? `$${fmtNum(last.estimated_paid_traffic_cost)}` : '—'} />
             </div>
             <ItemList
               max={6}

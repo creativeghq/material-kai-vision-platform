@@ -44,7 +44,7 @@ export function requirementsOf(r: ProductEmbedReadiness): ReadinessRequirement[]
   return [
     {
       key: 'price',
-      label: 'Published price',
+      label: 'Published Price',
       met: r.has_published_price,
       hardGate: true,
       consequence: 'Without it the embed cannot return this product at all — it is the only hard gate.',
@@ -52,7 +52,7 @@ export function requirementsOf(r: ProductEmbedReadiness): ReadinessRequirement[]
     },
     {
       key: 'attributes',
-      label: 'Attributes filled in',
+      label: 'Attributes Filled In',
       met: r.has_attributes,
       consequence:
         'The spec builder matches on attributes and builds its question list from them. With none, every visitor spec falls through to a quote request instead of a price.',
@@ -67,7 +67,7 @@ export function requirementsOf(r: ProductEmbedReadiness): ReadinessRequirement[]
     },
     {
       key: 'options',
-      label: 'Configurable options',
+      label: 'Configurable Options',
       met: r.option_group_count > 0,
       consequence: 'Options are what make the embed a configurator rather than a picture. Each one targets a material in the model.',
       detail:
@@ -80,7 +80,7 @@ export function requirementsOf(r: ProductEmbedReadiness): ReadinessRequirement[]
     },
     {
       key: 'key',
-      label: 'Covered by an embed key',
+      label: 'Covered by an Embed Key',
       met: r.covering_key_ids.length > 0,
       consequence: 'A key is how the product reaches someone else\'s website. Without one it is only visible inside the platform.',
       detail:

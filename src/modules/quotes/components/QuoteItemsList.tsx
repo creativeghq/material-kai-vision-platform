@@ -778,7 +778,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 </span>
                                 {editable && onUpdateItem ? (
                                   <FFETextAreaCell
-                                    ariaLabel="Installation requirements"
+                                    ariaLabel="Installation Requirements"
                                     value={item.installation_requirements || ''}
                                     placeholder="e.g. Requires electrical outlet, wall mounting brackets..."
                                     onSave={v => handleFFESave(item.id, 'installation_requirements', v)}

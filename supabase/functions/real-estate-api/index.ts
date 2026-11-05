@@ -104,7 +104,7 @@ async function emitBuyerMatchAlert(supabase: any, workspaceId: string, property:
     const { data: prof } = await supabase.from('user_profiles').select('email, phone').eq('user_id', agentUserId).maybeSingle();
     const names = matches.map((m: any) => m.contact?.name || m.contact?.email || 'a buyer').slice(0, 5).join(', ');
     const label = property.title || property.reference_code || 'your listing';
-    const lead = reason === 'price_drop' ? 'Price drop' : 'New listing';
+    const lead = reason === 'price_drop' ? 'Price Drop' : 'New listing';
     await emitFlowEvent('realestate.buyer_matches_found', {
       workspace_id: workspaceId,
       user_id: agentUserId,
@@ -468,7 +468,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
           await emitFlowEvent('realestate.listing_published', {
             workspace_id: workspaceId, user_id: userId, type: 'realestate_listing_published',
             property_id: id,
-            title: 'Listing published',
+            title: 'Listing Published',
             body: `${data.title || 'A listing'}${data.town ? ` in ${data.town}` : ''} is now live.`,
             action_url: `/properties/${id}`,
             listing_title: data.title, town: data.town, price: data.price, currency: data.currency ?? 'EUR',

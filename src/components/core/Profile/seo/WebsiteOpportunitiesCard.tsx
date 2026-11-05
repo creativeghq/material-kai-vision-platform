@@ -21,13 +21,13 @@ export interface WebsiteOpportunity {
 }
 
 const KIND_LABEL: Record<string, string> = {
-  quick_win: 'Quick win',
+  quick_win: 'Quick Win',
   refresh: 'Refresh',
   consolidate: 'Consolidate',
   new_page: 'New page',
   not_crawled: 'Not crawled',
   crawled_not_indexed: 'Crawled, not indexed',
-  fix_page: 'Fix page',
+  fix_page: 'Fix Page',
 };
 
 const KIND_TONE: Record<string, 'success' | 'warning' | 'info' | 'neutral'> = {

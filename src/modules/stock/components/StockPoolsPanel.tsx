@@ -76,7 +76,7 @@ export const StockPoolsPanel: React.FC<{ workspaceId: string }> = ({ workspaceId
                   <TableHead>Tone</TableHead>
                   <TableHead>Calibre</TableHead>
                   <TableHead>Grade</TableHead>
-                  <TableHead className="text-right">On hand</TableHead>
+                  <TableHead className="text-right">On Hand</TableHead>
                   <TableHead className="text-right">Free</TableHead>
                   <TableHead />
                 </TableRow>

@@ -114,7 +114,7 @@ export const DopcPanel: React.FC<{
                   <TableCell className="tabular-nums">{d.issued_on ?? '—'}</TableCell>
                   <TableCell>
                     <Badge variant={d.superseded_at ? 'neutral' : 'success'}>
-                      {d.superseded_at ? 'Superseded' : 'In force'}
+                      {d.superseded_at ? 'Superseded' : 'In Force'}
                     </Badge>
                   </TableCell>
                   <TableCell>
@@ -144,9 +144,9 @@ export const DopcPanel: React.FC<{
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Essential characteristic</TableHead>
-                  <TableHead>Declared performance</TableHead>
-                  <TableHead>Harmonised specification</TableHead>
+                  <TableHead>Essential Characteristic</TableHead>
+                  <TableHead>Declared Performance</TableHead>
+                  <TableHead>Harmonised Specification</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

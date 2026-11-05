@@ -127,7 +127,7 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
                   <TableHeader>
                     <TableRow>
                       <TableHead>Terminal</TableHead>
-                      <TableHead className="hidden md:table-cell">Provider / model</TableHead>
+                      <TableHead className="hidden md:table-cell">Provider / Model</TableHead>
                       <TableHead>Route</TableHead>
                       <TableHead>Trade</TableHead>
                       <TableHead className="hidden md:table-cell text-right">Window</TableHead>
@@ -205,7 +205,7 @@ export const PosInterconnectionCard: React.FC<{ workspaceId: string }> = ({ work
             )}
 
             <div className="rounded-md border border-hairline bg-surface-sunken p-2 text-[11px] text-muted-foreground">
-              <Label className="text-xs font-medium">Establishment code</Label>
+              <Label className="text-xs font-medium">Establishment Code</Label>
               <p className="mt-1">{BRANCH_IS_IDENTITY}</p>
             </div>
           </>

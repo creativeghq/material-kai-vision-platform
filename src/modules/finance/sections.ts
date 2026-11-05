@@ -49,7 +49,7 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
   { value: FINANCE_TAB.dashboard, label: 'Dashboard', icon: PieChart, landing: true },
   { value: FINANCE_TAB.receivables, label: 'Receivables', icon: ArrowDownCircle, count: 'ar' },
   { value: FINANCE_TAB.payables, label: 'Payables', icon: ArrowUpCircle, count: 'ap' },
-  { value: FINANCE_TAB.bankFeed, label: 'Bank feed', icon: Landmark },
+  { value: FINANCE_TAB.bankFeed, label: 'Bank Feed', icon: Landmark },
   { value: FINANCE_TAB.supplierPortal, label: 'Supplier Portal', icon: Truck, hideForAccountant: true },
 
   { value: FINANCE_TAB.orders, label: 'Orders', icon: ShoppingCart, group: 'documents', docType: 'orders' },

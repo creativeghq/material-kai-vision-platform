@@ -1221,7 +1221,7 @@ export const MarketTrendsTab: React.FC = () => {
               color="text-cyan-600"
             />
             <KpiCard
-              label="Save-to-Quote Conversion"
+              label="Save-To-Quote Conversion"
               value={`${lifecycleKpi.saveToQuoteRate}%`}
               sub="Share of saved materials that eventually become quote requests"
               icon={Award}

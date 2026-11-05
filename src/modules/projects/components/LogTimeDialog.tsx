@@ -135,7 +135,7 @@ export const LogTimeDialog: React.FC<{
           </div>
 
           <div className="space-y-1.5">
-            <Label htmlFor="lt-rate">Charge rate per hour</Label>
+            <Label htmlFor="lt-rate">Charge Rate per Hour</Label>
             <Input id="lt-rate" inputMode="decimal" placeholder="0.00" value={rate} onChange={(e) => setRate(e.target.value)} />
             <p className="text-[11px] text-muted-foreground">
               What this hour is worth on the job. Not the employee&apos;s payroll cost — the two are

@@ -137,7 +137,7 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
                       <Badge variant="outline" className="text-xs">recovered {run.recovery_attempts}×</Badge>
                     )}
                     {run.delegated_to_python && (
-                      <Badge variant="outline" className="text-xs">Python backend</Badge>
+                      <Badge variant="outline" className="text-xs">Python Backend</Badge>
                     )}
                   </div>
 

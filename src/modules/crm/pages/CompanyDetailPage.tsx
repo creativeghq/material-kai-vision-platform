@@ -1063,10 +1063,10 @@ export const CompanyDetailPage: React.FC = () => {
                           </CardHeader>
                           <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                              <InlineSelect alwaysEdit={isNew} label="Pricing level" value={company.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
-                              <InlineText alwaysEdit={isNew} type="number" label="Customer discount % (override)" value={company.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 50" copy={false} hint="Overrides the level's discount. Empty = use the level." />
+                              <InlineSelect alwaysEdit={isNew} label="Pricing Level" value={company.user_level_key ?? undefined} unsetValue="__default__" placeholder="Standard" options={pricingLevels.map((l) => ({ value: l.level_key, label: l.label }))} onSave={(v) => savePricing({ user_level_key: v })} hint="Tier this customer buys at — discount applies off retail on quotes." />
+                              <InlineText alwaysEdit={isNew} type="number" label="Customer Discount % (Override)" value={company.discount_percent ?? undefined} onSave={(v) => savePricing({ discount_percent: v })} placeholder="e.g. 50" copy={false} hint="Overrides the level's discount. Empty = use the level." />
                               <div className="md:col-span-2">
-                                <InlineText alwaysEdit={isNew} multiline label="Discount notes" value={company.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 50% per 2025 agreement." copy={false} />
+                                <InlineText alwaysEdit={isNew} multiline label="Discount Notes" value={company.discount_notes} onSave={(v) => patchInline({ discount_notes: v })} placeholder="e.g. Long-term partner — 50% per 2025 agreement." copy={false} />
                               </div>
                             </div>
                           </CardContent>
@@ -1075,20 +1075,20 @@ export const CompanyDetailPage: React.FC = () => {
                           <CardHeader><CardTitle className="flex items-center gap-2"><Receipt className="h-4 w-4"/>Invoicing &amp; VAT</CardTitle></CardHeader>
                           <CardContent className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-                              <InlineSelect alwaysEdit={isNew} label="Segment" value={company.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />
+                              <InlineSelect alwaysEdit={isNew} label="Segment" value={company.contact_group ?? undefined} unsetValue="none" placeholder="Unsegmented" options={[{ value: 'b2b', label: 'B2B' }, { value: 'retail', label: 'Retail' }, { value: 'wholesale', label: 'Wholesale' }, { value: 'public_sector', label: 'Public Sector' }]} onSave={(v) => patchInline({ contact_group: v })} hint="Groups this party for filtering and statement batches." />
                               {/* #446: withholding is a SEPARATE fact from the segment. The
                                   segment drives B2G document type; this drives arthro 64 - 4% on
                                   goods, 8% on services - which is deducted from what they pay us.
                                   Without it a fully-paid public-sector sale reads part-unpaid. */}
                               <InlineSelect
                                 alwaysEdit={isNew}
-                                label="Withholds tax (φορέας γενικής κυβέρνησης)"
+                                label="Withholds Tax (φορέας γενικής κυβέρνησης)"
                                 value={company.is_government_body ? 'yes' : 'no'}
-                                options={[{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes — withholds άρθρο 64' }]}
+                                options={[{ value: 'no', label: 'No' }, { value: 'yes', label: 'Yes — Withholds άρθρο 64' }]}
                                 onSave={(v) => patchInline({ is_government_body: v === 'yes' })}
                                 hint="A public body pays 96% of a goods invoice and remits 4% to the state. Recording it here is what stops the rest reading as debt."
                               />
-                              <InlineSelect alwaysEdit={isNew} label="Default VAT-exemption category" value={company.vat_exemption_reason ?? undefined} unsetValue="__none" placeholder="None" options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))} displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined} onSave={(v) => patchInline({ vat_exemption_reason: v })} hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here." />
+                              <InlineSelect alwaysEdit={isNew} label="Default VAT-Exemption Category" value={company.vat_exemption_reason ?? undefined} unsetValue="__none" placeholder="None" options={MYDATA_EXEMPTION_CATEGORIES.map((c) => ({ value: String(c.code), searchText: `${c.code} ${c.label}`, label: <span><span className="font-mono text-[10px] mr-2">{c.code}</span>{c.label}</span> }))} displayValue={company.vat_exemption_reason ? <span><span className="font-mono text-[10px] mr-2">{company.vat_exemption_reason}</span>{MYDATA_EXEMPTION_CATEGORIES.find((c) => String(c.code) === company.vat_exemption_reason)?.label}</span> : undefined} onSave={(v) => patchInline({ vat_exemption_reason: v })} hint="Reason a line carries no separately-shown VAT (myDATA codes 1–31). The rate itself (24/13/6%) is set per product/line, not here." />
                             </div>
                             <div className="flex items-center justify-between gap-4">
                               <div className="space-y-1">
@@ -1105,13 +1105,13 @@ export const CompanyDetailPage: React.FC = () => {
                                 </CollapsibleTrigger>
                                 <CollapsibleContent>
                                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 p-3 pt-0">
-                                    <InlineText alwaysEdit={isNew} label="Billing name" value={company.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
+                                    <InlineText alwaysEdit={isNew} label="Billing Name" value={company.billing_name} onSave={(v) => patchInline({ billing_name: v })} placeholder="Legal entity name" />
                                     <InlineText alwaysEdit={isNew} label="Billing VAT (ΑΦΜ)" value={company.billing_vat} onSave={(v) => patchInline({ billing_vat: v })} placeholder="EL123456789" />
-                                    <InlineText alwaysEdit={isNew} label="Tax office (ΔΟΥ)" value={company.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Tax Office (ΔΟΥ)" value={company.billing_tax_office} onSave={(v) => patchInline({ billing_tax_office: v })} />
                                     <InlineSelect alwaysEdit={isNew} label="VAT country" value={company.billing_country_code ?? undefined} placeholder="Not set" options={VAT_COUNTRY_OPTIONS.map((o) => ({ value: o.code, searchText: `${o.code} ${o.name}`, label: <span><span className="font-mono text-[10px] mr-2">{o.code}</span>{o.name}</span> }))} displayValue={company.billing_country_code ? <span className="font-mono">{company.billing_country_code}</span> : undefined} onSave={(v) => patchInline({ billing_country_code: v })} />
                                     <InlineText alwaysEdit={isNew} label="Street" value={company.billing_street} onSave={(v) => patchInline({ billing_street: v })} />
                                     <InlineText alwaysEdit={isNew} label="Number" value={company.billing_street_number} onSave={(v) => patchInline({ billing_street_number: v })} />
-                                    <InlineText alwaysEdit={isNew} label="Postal code" value={company.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
+                                    <InlineText alwaysEdit={isNew} label="Postal Code" value={company.billing_postal_code} onSave={(v) => patchInline({ billing_postal_code: v })} />
                                     <InlineText alwaysEdit={isNew} label="City" value={company.billing_city} onSave={(v) => patchInline({ billing_city: v })} />
                                   </div>
                                 </CollapsibleContent>
@@ -1427,12 +1427,12 @@ export const CompanyDetailPage: React.FC = () => {
                   /* #441 -- their statement, their prices, their stock, and a delegated admin who
                      caps her own foremen without phoning us. */
                   ...(activeWorkspaceId ? [{
-                    id: 'portal', label: 'Trade portal', icon: Users, group: 'Commercial',
+                    id: 'portal', label: 'Trade Portal', icon: Users, group: 'Commercial',
                     node: <TradePortalCard workspaceId={activeWorkspaceId} companyId={company.id} />,
                   }] : []),
                   /* Their own tenant, not a login into ours — the trade portal above is the other answer. */
                   ...(activeWorkspaceId ? [{
-                    id: 'workspace', label: 'Platform access', icon: Building2, group: 'Commercial',
+                    id: 'workspace', label: 'Platform Access', icon: Building2, group: 'Commercial',
                     node: (
                       <CompanyWorkspaceCard
                         workspaceId={activeWorkspaceId}

@@ -169,7 +169,7 @@ const AnswerDialog: React.FC<{ request: PendingQuoteRequest | null; onOpenChange
             ))}
             <Button size="sm" variant="outline" onClick={() => setOffers((r) => [...r, emptyRow()])}><Plus className="h-4 w-4 mr-1" /> Add offer</Button>
           </div>
-          <div className="space-y-1"><Label className="text-xs">Note to the tenant (optional)</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. rates valid 7 days, incl. THC" /></div>
+          <div className="space-y-1"><Label className="text-xs">Note to the Tenant (optional)</Label><Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. rates valid 7 days, incl. THC" /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

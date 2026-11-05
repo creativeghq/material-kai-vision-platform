@@ -24,7 +24,7 @@ import {
 export const GUIDE_STATUS: Record<GuideStatus, { label: string; variant: 'neutral' | 'info' | 'warning' | 'success' | 'error' }> = {
   draft: { label: 'Not read', variant: 'neutral' },
   extracting: { label: 'Reading', variant: 'info' },
-  review: { label: 'To review', variant: 'warning' },
+  review: { label: 'To Review', variant: 'warning' },
   published: { label: 'Published', variant: 'success' },
   failed: { label: 'Failed', variant: 'error' },
 };
@@ -144,7 +144,7 @@ export default function GuidesPage() {
     <div className="min-h-screen bg-background">
       <PageHeader
         icon={BookOpen}
-        title="Installation guides"
+        title="Installation Guides"
         subtitle="Supplier manuals turned into interactive step-by-step 3D guides, with the manual beside them page for page."
         actions={<Button onClick={() => setCreating(true)} className="gap-1.5"><Plus className="h-4 w-4" />New guide</Button>}
       />

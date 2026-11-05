@@ -68,8 +68,8 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
       { value: 'overview', label: 'Overview' },
       { value: 'pages', label: 'Pages' },
       { value: 'geo', label: 'Geography' },
-      { value: 'tech', label: 'Devices & events' },
-      { value: 'commerce', label: 'Products & ads' },
+      { value: 'tech', label: 'Devices & Events' },
+      { value: 'commerce', label: 'Products & Ads' },
       { value: 'funnel', label: 'Funnel' },
       { value: 'retention', label: 'Retention' },
     ],
@@ -78,31 +78,31 @@ export const SEO_SECTIONS: readonly SeoSection[] = [
   { value: 'ai', label: 'AI Citations', icon: Sparkles, group: 'visibility', views: AI_CITATIONS_VIEWS },
   {
     value: 'authority', label: 'Authority', icon: Radar, group: 'visibility',
-    views: [{ value: 'summary', label: 'Backlinks & authority' }, { value: 'history', label: 'Audit history' }],
+    views: [{ value: 'summary', label: 'Backlinks & Authority' }, { value: 'history', label: 'Audit history' }],
   },
   {
     value: 'competitors', label: 'Competitors', icon: Swords, group: 'visibility',
-    views: [{ value: 'domains', label: 'Competitors' }, { value: 'gap', label: 'Keyword gap' }],
+    views: [{ value: 'domains', label: 'Competitors' }, { value: 'gap', label: 'Keyword Gap' }],
   },
 
   {
     value: 'articles', label: 'Articles', icon: FileText, group: 'content',
-    views: [{ value: 'articles', label: 'Articles' }, { value: 'brand', label: 'Brand profile' }],
+    views: [{ value: 'articles', label: 'Articles' }, { value: 'brand', label: 'Brand Profile' }],
   },
 
   {
-    value: 'health', label: 'Site health', icon: Gauge, group: 'technical',
+    value: 'health', label: 'Site Health', icon: Gauge, group: 'technical',
     views: [
-      { value: 'crawl', label: 'Site crawl' },
+      { value: 'crawl', label: 'Site Crawl' },
       { value: 'pages', label: 'Pages' },
-      { value: 'homepage', label: 'Page health' },
+      { value: 'homepage', label: 'Page Health' },
       { value: 'llms', label: 'llms.txt' },
     ],
   },
 
   {
     value: 'reports', label: 'Reports', icon: FileBarChart, group: 'activity',
-    views: [{ value: 'reports', label: 'Reports' }, { value: 'runs', label: 'Toolkit runs' }, { value: 'schedules', label: 'Schedules' }],
+    views: [{ value: 'reports', label: 'Reports' }, { value: 'runs', label: 'Toolkit Runs' }, { value: 'schedules', label: 'Schedules' }],
   },
 ];
 

@@ -43,9 +43,9 @@ interface Props {
 type BulkScope = 'global' | 'per_search';
 
 const SITE_TYPE_OPTIONS = [
-  { value: 'perplexity_domain', label: 'Perplexity domain filter (Sonar)' },
-  { value: 'rss_feed_default', label: 'Default RSS feed' },
-  { value: 'careers_page_default', label: 'Default career page' },
+  { value: 'perplexity_domain', label: 'Perplexity Domain Filter (Sonar)' },
+  { value: 'rss_feed_default', label: 'Default RSS Feed' },
+  { value: 'careers_page_default', label: 'Default Career Page' },
 ] as const;
 
 export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
@@ -171,7 +171,7 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
           </TabsList>
           <TabsContent value="single">
             <FormGrid>
-              <FormField label="Site type" className="sm:col-span-2">
+              <FormField label="Site Type" className="sm:col-span-2">
                 <Select value={siteType} onValueChange={setSiteType}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -200,7 +200,7 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
                   }
                 />
               </FormField>
-              <FormField label="Display name" optional>
+              <FormField label="Display Name" optional>
                 <Input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
@@ -246,7 +246,7 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
               </FormField>
 
               {bulkScope === 'global' && (
-                <FormField label="Site type" className="sm:col-span-2">
+                <FormField label="Site Type" className="sm:col-span-2">
                   <Select value={bulkSiteType} onValueChange={setBulkSiteType}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -279,7 +279,7 @@ export function JobSitesFormModal({ state, onClose, onSubmit }: Props) {
                     <Select value={bulkField} onValueChange={v => setBulkField(v as 'careers_page_urls' | 'rss_feed_urls')}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="careers_page_urls">Career pages (Firecrawl scrape)</SelectItem>
+                        <SelectItem value="careers_page_urls">Career Pages (Firecrawl Scrape)</SelectItem>
                         <SelectItem value="rss_feed_urls">RSS / Atom feeds</SelectItem>
                       </SelectContent>
                     </Select>

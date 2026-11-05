@@ -117,13 +117,13 @@ export const ListingPerformancePanel: React.FC<{ ws: string | null; propertyId: 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-        <Tile label="Days on market" value={perf.days_on_market ?? '—'} hint={perf.days_on_market == null ? 'not published' : undefined} />
+        <Tile label="Days on Market" value={perf.days_on_market ?? '—'} hint={perf.days_on_market == null ? 'not published' : undefined} />
         <Tile label="Views (30d)" value={perf.views_30d} hint={`${perf.views_total} all time`} />
         <Tile label="Views (7d)" value={perf.views_7d} />
         <Tile label="Leads" value={perf.inquiries_total} hint={`${perf.inquiries_30d} in 30d`} />
         <Tile label="Viewings" value={perf.viewings_total} hint={`${perf.viewings_completed} completed`} />
         <Tile
-          label="Price change"
+          label="Price Change"
           value={perf.price_change_pct != null ? `${perf.price_change_pct > 0 ? '+' : ''}${perf.price_change_pct}%` : '—'}
           hint={perf.price_changes ? `${perf.price_changes} change${perf.price_changes === 1 ? '' : 's'}` : 'unchanged'}
         />

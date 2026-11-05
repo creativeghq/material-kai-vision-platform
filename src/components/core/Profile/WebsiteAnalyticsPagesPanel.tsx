@@ -57,12 +57,12 @@ export const WebsiteAnalyticsPagesPanel: React.FC<{ website: UserWebsite }> = ({
       />
 
       <GaBreakdownTable
-        title="Landing pages"
+        title="Landing Pages"
         description="Where sessions STARTED. A page high here and low in the table above is a doorway people leave from."
         websiteId={website.id}
         dimension="landing_page"
         breakdown={landing}
-        head="Landing page"
+        head="Landing Page"
         renderName={(row) => pathLink(row.value)}
         columns={[
           sessionsColumn,

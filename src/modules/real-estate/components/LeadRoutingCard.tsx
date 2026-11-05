@@ -114,12 +114,12 @@ export const LeadRoutingCard: React.FC<{ ws: string | null; canManage: boolean }
         {draft && (
           <div className="space-y-3 rounded-lg border p-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div><Label className="text-xs">Rule name</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="South desk" /></div>
+              <div><Label className="text-xs">Rule Name</Label><Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="South desk" /></div>
               <div><Label className="text-xs">Priority</Label><Input type="number" value={draft.priority} onChange={(e) => setDraft({ ...draft, priority: e.target.value })} /></div>
-              <div><Label className="text-xs">Towns (comma-separated)</Label><Input value={draft.towns} onChange={(e) => setDraft({ ...draft, towns: e.target.value })} placeholder="Glyfada, Voula" /></div>
+              <div><Label className="text-xs">Towns (Comma-Separated)</Label><Input value={draft.towns} onChange={(e) => setDraft({ ...draft, towns: e.target.value })} placeholder="Glyfada, Voula" /></div>
               <div><Label className="text-xs">Regions</Label><Input value={draft.regions} onChange={(e) => setDraft({ ...draft, regions: e.target.value })} placeholder="Attica" /></div>
-              <div><Label className="text-xs">Postcode prefixes</Label><Input value={draft.postcodes} onChange={(e) => setDraft({ ...draft, postcodes: e.target.value })} placeholder="166, 167" /></div>
-              <div><Label className="text-xs">Agent user IDs (comma-separated)</Label><Input value={draft.agents} onChange={(e) => setDraft({ ...draft, agents: e.target.value })} placeholder="uuid, uuid" /></div>
+              <div><Label className="text-xs">Postcode Prefixes</Label><Input value={draft.postcodes} onChange={(e) => setDraft({ ...draft, postcodes: e.target.value })} placeholder="166, 167" /></div>
+              <div><Label className="text-xs">Agent User IDs (Comma-Separated)</Label><Input value={draft.agents} onChange={(e) => setDraft({ ...draft, agents: e.target.value })} placeholder="uuid, uuid" /></div>
             </div>
             <p className="text-[11px] text-muted-foreground">Every agent must be a member of this workspace — the API rejects anyone who isn’t.</p>
             <div className="flex justify-end gap-2">

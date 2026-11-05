@@ -32,7 +32,7 @@ const DATE_PRESETS: { label: string; days: number | 'mtd' | 'ytd' }[] = [
   { label: '30 days', days: 30 },
   { label: '90 days', days: 90 },
   { label: 'This month', days: 'mtd' },
-  { label: 'Year to date', days: 'ytd' },
+  { label: 'Year to Date', days: 'ytd' },
 ];
 
 const iso = (d: Date) => toLocalISODate(d);

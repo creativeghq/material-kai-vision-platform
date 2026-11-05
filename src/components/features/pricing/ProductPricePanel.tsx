@@ -84,7 +84,7 @@ export const ProductPricePanel: React.FC<{ productId: string }> = ({ productId }
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Purchase price</div>
           <div className="text-lg font-semibold tabular-nums">{fmt(cost)}</div>
-          <div className="text-[10px] text-muted-foreground">{price?.mode === 'own_product' ? 'Your cost' : 'Your cost (from catalog)'}{unit ? ` · per ${unit}` : ''}</div>
+          <div className="text-[10px] text-muted-foreground">{price?.mode === 'own_product' ? 'Your Cost' : 'Your cost (from catalog)'}{unit ? ` · per ${unit}` : ''}</div>
         </div>
         <div>
           <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Retail price</div>

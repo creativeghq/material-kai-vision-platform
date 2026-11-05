@@ -183,7 +183,7 @@ export const ResellerApplicationsTab: React.FC = () => {
                       {app.status === 'aade_verified' && (
                         <div className="flex items-center gap-1.5">
                           <Label htmlFor={`discount-${app.id}`} className="text-xs text-muted-foreground whitespace-nowrap">
-                            Reseller discount %
+                            Reseller Discount %
                           </Label>
                           <Input
                             id={`discount-${app.id}`}

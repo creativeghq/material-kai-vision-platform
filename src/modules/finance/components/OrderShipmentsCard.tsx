@@ -91,7 +91,7 @@ export const OrderShipmentsCard: React.FC<{
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Tracking number</Label>
+              <Label>Tracking Number</Label>
               <Input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 1234567890" />
             </div>
             <div className="space-y-1">
@@ -99,7 +99,7 @@ export const OrderShipmentsCard: React.FC<{
               <Input type="number" min="1" value={parcels} onChange={(e) => setParcels(e.target.value)} />
             </div>
             <div className="space-y-1">
-              <Label>Tracking link (optional)</Label>
+              <Label>Tracking Link (optional)</Label>
               <Input value={customUrl} onChange={(e) => setCustomUrl(e.target.value)} placeholder="Leave blank to use the carrier's own page" />
             </div>
             <div className="flex gap-2 sm:col-span-2">

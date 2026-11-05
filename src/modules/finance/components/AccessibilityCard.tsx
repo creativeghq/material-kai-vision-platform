@@ -145,7 +145,7 @@ export const AccessibilityCard: React.FC<{ workspaceId: string }> = ({ workspace
           <p className="text-sm font-medium">Record an assessment</p>
           <div className="grid gap-2 sm:grid-cols-2">
             <div>
-              <Label htmlFor="eaa-date" className="text-xs">Assessed on</Label>
+              <Label htmlFor="eaa-date" className="text-xs">Assessed On</Label>
               <Input
                 id="eaa-date" type="date" className="mt-1 h-8 text-xs" value={form.assessed_on}
                 onChange={(e) => setForm((f) => ({ ...f, assessed_on: e.target.value }))}
@@ -168,7 +168,7 @@ export const AccessibilityCard: React.FC<{ workspaceId: string }> = ({ workspace
             />
           </div>
           <div>
-            <Label htmlFor="eaa-annex" className="text-xs">Annex VI documentation</Label>
+            <Label htmlFor="eaa-annex" className="text-xs">Annex VI Documentation</Label>
             <Textarea
               id="eaa-annex" className="mt-1 text-xs" rows={2} value={form.annex_vi_documentation}
               onChange={(e) => setForm((f) => ({ ...f, annex_vi_documentation: e.target.value }))}
@@ -204,7 +204,7 @@ export const AccessibilityCard: React.FC<{ workspaceId: string }> = ({ workspace
         </div>
 
         <div className="space-y-2 rounded-md border border-hairline p-3">
-          <Label htmlFor="eaa-statement" className="text-sm font-medium">Accessibility statement</Label>
+          <Label htmlFor="eaa-statement" className="text-sm font-medium">Accessibility Statement</Label>
           <Textarea
             id="eaa-statement" className="text-xs" rows={5} value={statement}
             onChange={(e) => setStatement(e.target.value)}

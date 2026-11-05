@@ -60,7 +60,7 @@ export function describeDeadline(deadline: string | null | undefined): DeadlineV
   const days = daysUntil(deadline);
   if (days === null || !deadline) return null;
   if (days < 0) return { label: `${Math.abs(days)}d overdue`, tone: 'overdue', days };
-  if (days === 0) return { label: 'Due today', tone: 'soon', days };
+  if (days === 0) return { label: 'Due Today', tone: 'soon', days };
   if (days <= 7) return { label: `${days}d left`, tone: 'soon', days };
   return { label: `Due ${formatDate(deadline)}`, tone: 'normal', days };
 }

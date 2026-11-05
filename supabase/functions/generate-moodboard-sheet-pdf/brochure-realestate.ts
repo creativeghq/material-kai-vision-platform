@@ -23,7 +23,7 @@ function json(body: any, status = 200): Response {
 
 const ACCENT = rgb(0.85, 0.15, 0.45); // magenta accent (matches the platform primary)
 const money = (n: number | null, ccy: string) =>
-  formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on request' });
+  formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on Request' });
 
 /** Facts shown on the brochure, chosen by category so a plot/warehouse reads correctly. */
 function factsFor(p: any): Array<[string, string]> {
@@ -47,11 +47,11 @@ function factsFor(p: any): Array<[string, string]> {
     add('Bathrooms', p.bathrooms);
     add('Built area', p.area_built, ' m²');
     add('Floor', p.floor);
-    add('Year built', p.year_built);
+    add('Year Built', p.year_built);
     add('Parking', p.parking_spaces);
   }
-  add('Energy class', p.energy_class);
-  if (p.transaction_type === 'short_let') add('Max guests', p.max_guests);
+  add('Energy Class', p.energy_class);
+  if (p.transaction_type === 'short_let') add('Max Guests', p.max_guests);
   return out.slice(0, 10);
 }
 

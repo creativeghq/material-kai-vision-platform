@@ -30,7 +30,7 @@ const AADE: Record<PnlAadeStatus, PnlVerdict> = {
 const BOOKS: Record<PnlBooksStatus, PnlVerdict> = {
   ok: { label: 'From your documents', detail: 'Derived from the invoices, bills and orders in this workspace.', tone: 'ok', hasFigures: true },
   no_data: { label: 'No documents', detail: 'Nothing has been issued or booked in this range.', tone: 'ok', hasFigures: true },
-  mixed_currency: { label: 'Mixed currencies', detail: 'This range holds more than one currency, so there is no single total to show. Open Reports → P&L by category, which reports per currency.', tone: 'unknown', hasFigures: false },
+  mixed_currency: { label: 'Mixed Currencies', detail: 'This range holds more than one currency, so there is no single total to show. Open Reports → P&L by category, which reports per currency.', tone: 'unknown', hasFigures: false },
 };
 
 /** An unrecognised status is UNKNOWN, never a figure rendered as fact. */
@@ -47,16 +47,16 @@ export const booksVerdict = (s: PnlBooksStatus | string | null | undefined): Pnl
 
 /** Why a received document cannot become an expense. `bookable` is the one state that can. */
 export const BOOKING_STATE_COPY: Record<string, { label: string; detail: string }> = {
-  bookable: { label: 'Ready to book', detail: 'These become supplier bills, and then reach Payables and the P&L.' },
+  bookable: { label: 'Ready to Book', detail: 'These become supplier bills, and then reach Payables and the P&L.' },
   booked: { label: 'Already in Expenses', detail: 'A supplier bill exists for these.' },
-  settled_outside: { label: 'Settled outside the books', detail: 'Paid, but not through this platform — deliberately kept out of the P&L. Undo it from the row menu.' },
+  settled_outside: { label: 'Settled Outside the Books', detail: 'Paid, but not through this platform — deliberately kept out of the P&L. Undo it from the row menu.' },
   dismissed: { label: 'Dismissed', detail: 'Set aside by hand — not ours to book.' },
   cancelled: { label: 'Cancelled at ΑΑΔΕ', detail: 'The issuer cancelled these. A void document is not an expense.' },
   payroll: { label: 'Payroll', detail: 'Not a purchase, so it is never a supplier bill. It reaches the year through HR payroll, and through the last line of the myDATA Book — which adds it to ΑΑΔΕ\u2019s expense total.' },
-  own_entity: { label: 'Your own books entries', detail: 'Depreciation and year-end regularisation you filed yourself. ΑΑΔΕ keeps these out of the expense book, so the myDATA Book adds them back on its last line rather than this queue booking them.' },
-  credit_note: { label: 'Supplier credit notes', detail: 'These REDUCE an expense, so they are issued against the bill they correct rather than booked as one.' },
-  no_value: { label: 'Delivery notes', detail: 'Goods moved, no money stated. The invoice that prices them is booked instead.' },
-  out_of_scope: { label: 'Other document types', detail: 'Not a purchase document — nothing to book.' },
+  own_entity: { label: 'Your Own Books Entries', detail: 'Depreciation and year-end regularisation you filed yourself. ΑΑΔΕ keeps these out of the expense book, so the myDATA Book adds them back on its last line rather than this queue booking them.' },
+  credit_note: { label: 'Supplier Credit Notes', detail: 'These REDUCE an expense, so they are issued against the bill they correct rather than booked as one.' },
+  no_value: { label: 'Delivery Notes', detail: 'Goods moved, no money stated. The invoice that prices them is booked instead.' },
+  out_of_scope: { label: 'Other Document Types', detail: 'Not a purchase document — nothing to book.' },
 };
 
 export const bookingStateCopy = (s: string) =>

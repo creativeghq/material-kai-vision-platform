@@ -32,9 +32,9 @@ export const CoveragePanel: React.FC<Props> = ({ coverage, priceLine, compact = 
       </div>
 
       <Row label="Surface">{c.surfaceM2.toFixed(2)} m²</Row>
-      <Row label="One piece">{c.pieceM2 === null ? '—' : `${c.pieceM2.toFixed(3)} m²`}</Row>
-      <Row label="Pieces before cuts">{c.piecesNet ?? '—'}</Row>
-      <Row label="Cutting allowance">
+      <Row label="One Piece">{c.pieceM2 === null ? '—' : `${c.pieceM2.toFixed(3)} m²`}</Row>
+      <Row label="Pieces Before Cuts">{c.piecesNet ?? '—'}</Row>
+      <Row label="Cutting Allowance">
         {c.wastagePercent === null
           ? <span className="font-normal text-muted-foreground">not set</span>
           : `${c.wastagePercent}%`}

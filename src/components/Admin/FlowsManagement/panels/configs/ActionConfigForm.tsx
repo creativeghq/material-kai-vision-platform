@@ -157,7 +157,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
       return (
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">To (phone number)</Label>
+            <Label className="text-xs">To (Phone Number)</Label>
             <Input
               value={cfg.to || ''}
               onChange={(e) => onChange({ ...cfg, to: e.target.value })}
@@ -188,7 +188,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             24h window require a Meta-approved template name.
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">To (phone number)</Label>
+            <Label className="text-xs">To (Phone Number)</Label>
             <Input
               value={cfg.to || ''}
               onChange={(e) => onChange({ ...cfg, to: e.target.value })}
@@ -207,7 +207,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Template name (optional)</Label>
+            <Label className="text-xs">Template Name (optional)</Label>
             <Input
               value={cfg.template_id || ''}
               onChange={(e) => onChange({ ...cfg, template_id: e.target.value })}
@@ -224,7 +224,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
       return (
         <div className="space-y-3">
           <div className="space-y-1.5">
-            <Label className="text-xs">To (email)</Label>
+            <Label className="text-xs">To (Email)</Label>
             <Input
               value={cfg.to || ''}
               onChange={(e) => onChange({ ...cfg, to: e.target.value })}
@@ -385,7 +385,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Items (JSON path)</Label>
+            <Label className="text-xs">Items (JSON Path)</Label>
             <Input
               value={cfg.items || ''}
               onChange={(e) => onChange({ ...cfg, items: e.target.value })}
@@ -682,7 +682,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <FieldsJsonEditor
-            label="Fields to update (JSON)"
+            label="Fields to Update (JSON)"
             value={cfg.fields}
             onChange={(fields) => onChange({ ...cfg, fields })}
             hint="Allowlisted contact fields only (name, email, phone, status, lead_status…). Values may use {{trigger.data.x}}."
@@ -726,7 +726,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Document id</Label>
+            <Label className="text-xs">Document Id</Label>
             <Input
               value={cfg.document_id || ''}
               onChange={(e) => onChange({ ...cfg, document_id: e.target.value })}
@@ -734,7 +734,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Target id</Label>
+            <Label className="text-xs">Target Id</Label>
             <Input
               value={cfg.target_id || ''}
               onChange={(e) => onChange({ ...cfg, target_id: e.target.value })}
@@ -778,8 +778,8 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="in">Money in</SelectItem>
-                  <SelectItem value="out">Money out</SelectItem>
+                  <SelectItem value="in">Money In</SelectItem>
+                  <SelectItem value="out">Money Out</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -793,7 +793,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Scheduled for</Label>
+            <Label className="text-xs">Scheduled For</Label>
             <Input
               type="date"
               value={cfg.scheduled_for || ''}
@@ -920,7 +920,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Due date</Label>
+              <Label className="text-xs">Due Date</Label>
               <Input
                 type="date"
                 value={cfg.due_date || ''}
@@ -929,15 +929,15 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               <p className="text-[11px] text-muted-foreground">Left blank = no due date.</p>
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Visible to</Label>
+              <Label className="text-xs">Visible To</Label>
               <Select
                 value={cfg.visibility || 'internal'}
                 onValueChange={(v) => onChange({ ...cfg, visibility: v as 'internal' | 'client_visible' })}
               >
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="internal">The team only</SelectItem>
-                  <SelectItem value="client_visible">The client too</SelectItem>
+                  <SelectItem value="internal">The Team Only</SelectItem>
+                  <SelectItem value="client_visible">The Client Too</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -960,7 +960,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <FieldsJsonEditor
-            label="Fields to update (JSON)"
+            label="Fields to Update (JSON)"
             value={cfg.fields}
             onChange={(fields) => onChange({ ...cfg, fields })}
             hint="Allowlisted product fields only (name, description, status, sku, category…). Values may use {{trigger.data.x}}."
@@ -1208,7 +1208,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Company types</Label>
+            <Label className="text-xs">Company Types</Label>
             <div className="grid grid-cols-2 gap-1.5">
               {B2B_COMPANY_TYPES.map((type) => {
                 const selected = cfg.company_types?.length ? cfg.company_types : ['manufacturer'];
@@ -1243,10 +1243,10 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               onValueChange={(val) => onChange({ ...cfg, region: val || undefined, country: val ? undefined : cfg.country })}
             >
               <SelectTrigger className="h-8 text-sm">
-                <SelectValue placeholder="All Markets (30 countries)" />
+                <SelectValue placeholder="All Markets (30 Countries)" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Markets (30 countries)</SelectItem>
+                <SelectItem value="all">All Markets (30 Countries)</SelectItem>
                 <SelectItem value="cee">Central & Eastern Europe</SelectItem>
                 <SelectItem value="balkans">Balkans & Turkey</SelectItem>
                 <SelectItem value="baltic_nordic">Baltic & Nordic</SelectItem>
@@ -1372,7 +1372,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Company Name (if no domain)</Label>
+            <Label className="text-xs">Company Name (If No Domain)</Label>
             <Input
               value={cfg.company_name || ''}
               onChange={(e) => onChange({ ...cfg, company_name: e.target.value })}
@@ -1443,7 +1443,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             flow's workspace to <em>sending</em>. Tenant-scoped flows only.
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Campaign id</Label>
+            <Label className="text-xs">Campaign Id</Label>
             <Input
               value={cfg.campaign_id || ''}
               onChange={(e) => onChange({ ...cfg, campaign_id: e.target.value })}
@@ -1464,7 +1464,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             <code>price_alert_log</code> audit row. Identify the subject with a product or tracked-query id.
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Recipient user id</Label>
+            <Label className="text-xs">Recipient User Id</Label>
             <Input
               value={cfg.user_id || ''}
               onChange={(e) => onChange({ ...cfg, user_id: e.target.value })}
@@ -1473,17 +1473,17 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="text-xs">Alert type</Label>
+            <Label className="text-xs">Alert Type</Label>
             <Select
               value={cfg.alert_type || 'price_drop'}
               onValueChange={(v) => onChange({ ...cfg, alert_type: v })}
             >
               <SelectTrigger className="h-8 text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="price_drop">Price drop</SelectItem>
+                <SelectItem value="price_drop">Price Drop</SelectItem>
                 <SelectItem value="new_retailer">New retailer</SelectItem>
-                <SelectItem value="promo_started">Promo started</SelectItem>
-                <SelectItem value="anomaly_detected">Anomaly detected</SelectItem>
+                <SelectItem value="promo_started">Promo Started</SelectItem>
+                <SelectItem value="anomaly_detected">Anomaly Detected</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -1508,7 +1508,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1.5">
-              <Label className="text-xs">Product id (optional)</Label>
+              <Label className="text-xs">Product Id (optional)</Label>
               <Input
                 value={cfg.product_id || ''}
                 onChange={(e) => onChange({ ...cfg, product_id: e.target.value })}
@@ -1517,7 +1517,7 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs">Tracked-query id (optional)</Label>
+              <Label className="text-xs">Tracked-Query Id (optional)</Label>
               <Input
                 value={cfg.tracked_query_id || ''}
                 onChange={(e) => onChange({ ...cfg, tracked_query_id: e.target.value })}

@@ -147,7 +147,7 @@ export const ImportStatementDialog: React.FC<{
 
         <div className="space-y-4">
           <div>
-            <Label htmlFor="stmt-file" className="text-xs">Statement file (CSV)</Label>
+            <Label htmlFor="stmt-file" className="text-xs">Statement File (CSV)</Label>
             <input
               id="stmt-file" type="file" accept=".csv,text/csv,text/plain"
               className="mt-1 block w-full text-sm"
@@ -160,7 +160,7 @@ export const ImportStatementDialog: React.FC<{
               <div className="grid gap-3 sm:grid-cols-2">
                 <ColumnSelect id="c-date" label="Date" headers={headers} value={dateCol} onChange={setDateCol} />
                 <div className="space-y-1">
-                  <Label htmlFor="c-fmt" className="text-xs">Date format *</Label>
+                  <Label htmlFor="c-fmt" className="text-xs">Date Format *</Label>
                   <Select value={dateFormat} onValueChange={setDateFormat}>
                     <SelectTrigger id="c-fmt" className="h-8"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -170,9 +170,9 @@ export const ImportStatementDialog: React.FC<{
                     </SelectContent>
                   </Select>
                 </div>
-                <ColumnSelect id="c-amt" label="Amount (signed)" headers={headers} value={amountCol} onChange={setAmountCol} optional />
+                <ColumnSelect id="c-amt" label="Amount (Signed)" headers={headers} value={amountCol} onChange={setAmountCol} optional />
                 <div className="space-y-1">
-                  <Label htmlFor="c-dec" className="text-xs">Decimal mark *</Label>
+                  <Label htmlFor="c-dec" className="text-xs">Decimal Mark *</Label>
                   <Select value={decimalMark} onValueChange={(v) => setDecimalMark(v as '.' | ',')}>
                     <SelectTrigger id="c-dec" className="h-8"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -181,9 +181,9 @@ export const ImportStatementDialog: React.FC<{
                     </SelectContent>
                   </Select>
                 </div>
-                <ColumnSelect id="c-cr" label="Credit (money in)" headers={headers} value={creditCol} onChange={setCreditCol} optional />
-                <ColumnSelect id="c-dr" label="Debit (money out)" headers={headers} value={debitCol} onChange={setDebitCol} optional />
-                <ColumnSelect id="c-ref" label="Reference / description" headers={headers} value={refCol} onChange={setRefCol} optional />
+                <ColumnSelect id="c-cr" label="Credit (Money In)" headers={headers} value={creditCol} onChange={setCreditCol} optional />
+                <ColumnSelect id="c-dr" label="Debit (Money Out)" headers={headers} value={debitCol} onChange={setDebitCol} optional />
+                <ColumnSelect id="c-ref" label="Reference / Description" headers={headers} value={refCol} onChange={setRefCol} optional />
                 <ColumnSelect id="c-party" label="Counterparty" headers={headers} value={partyCol} onChange={setPartyCol} optional />
                 <ColumnSelect id="c-id" label="Bank's transaction id" headers={headers} value={idCol} onChange={setIdCol} optional />
               </div>

@@ -20,9 +20,9 @@ import {
 type Props = { workspaceId: string | null | undefined };
 
 const STATUS_FILTERS: { value: TransmissionStatusFilter; label: string }[] = [
-  { value: 'all', label: 'All attempts' },
+  { value: 'all', label: 'All Attempts' },
   { value: 'accepted', label: 'Accepted' },
-  { value: 'offline', label: 'Queued (AADE offline)' },
+  { value: 'offline', label: 'Queued (AADE Offline)' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'error', label: 'Errored' },
   { value: 'cancelled', label: 'Cancelled' },
@@ -53,8 +53,8 @@ const STATUS_HELP: Record<string, string> = {
 
 const DOC_LABEL: Record<string, string> = {
   invoices: 'Invoice',
-  credit_notes: 'Credit note',
-  delivery_notes: 'Delivery note',
+  credit_notes: 'Credit Note',
+  delivery_notes: 'Delivery Note',
 };
 
 /** The document's own page, so a failing transmission is one click from the thing that failed. */

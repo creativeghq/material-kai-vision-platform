@@ -66,13 +66,13 @@ export const FiscalRecordPanel: React.FC<{
         </HubProperty>
         <HubProperty label="MARK">{record.fiscal_mark ? <span className="font-mono text-xs">{record.fiscal_mark}</span> : null}</HubProperty>
         <HubProperty label="UID">{record.fiscal_uid ? <span className="break-all font-mono text-xs">{record.fiscal_uid}</span> : null}</HubProperty>
-        <HubProperty label="Authentication code">{authCode ? <span className="break-all font-mono text-xs">{authCode}</span> : null}</HubProperty>
+        <HubProperty label="Authentication Code">{authCode ? <span className="break-all font-mono text-xs">{authCode}</span> : null}</HubProperty>
         <HubProperty label="Transmitted">{record.fiscal_submitted_at ? formatDate(record.fiscal_submitted_at, { withTime: true }) : null}</HubProperty>
         {record.fiscal_cancellation_mark && (
           <HubProperty label="Cancellation MARK"><span className="font-mono text-xs">{record.fiscal_cancellation_mark}</span></HubProperty>
         )}
         {record.fiscal_error && !held && (
-          <HubProperty label="Provider response"><span className="text-destructive">{record.fiscal_error}</span></HubProperty>
+          <HubProperty label="Provider Response"><span className="text-destructive">{record.fiscal_error}</span></HubProperty>
         )}
       </HubPropertyList>
       {(links.length > 0 || (!held && onSend)) && (

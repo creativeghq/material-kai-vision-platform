@@ -256,7 +256,7 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
                     emphasiseCount={id === 'INBOX'}
                     onClick={() => { g.setQuery(''); g.setLabelId(id); }} />
                   {id === 'INBOX' && (
-                    <NavRow icon={<AlarmClock className="w-4 h-4 shrink-0" />} label="Follow up"
+                    <NavRow icon={<AlarmClock className="w-4 h-4 shrink-0" />} label="Follow Up"
                       active={!g.appliedQuery && followUpView}
                       onClick={() => { g.setQuery(''); g.setLabelId(SNOOZED_VIEW); }} />
                   )}
@@ -264,7 +264,7 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
               );
             })}
             <NavRow icon={<CalendarClock className="w-4 h-4 shrink-0" />} label="Scheduled" active={false} onClick={() => setShowScheduled(true)} />
-            <NavRow icon={<Archive className="w-4 h-4 shrink-0" />} label="All mail" active={!g.appliedQuery && g.labelId === ''}
+            <NavRow icon={<Archive className="w-4 h-4 shrink-0" />} label="All Mail" active={!g.appliedQuery && g.labelId === ''}
               onClick={() => { g.setQuery(''); g.setLabelId(''); }} />
           </nav>
           {userLabels.length > 0 && (
@@ -293,7 +293,7 @@ export const GmailInbox: React.FC<{ mode: InboxMode; setMode: (m: InboxMode) => 
           <Button size="icon" className="h-9 w-9 shrink-0 md:hidden" onClick={() => setComposing(true)} title="Compose"><Plus className="w-4 h-4" /></Button>
         </div>
         {!g.appliedQuery && (
-          <div role="tablist" aria-label="Follow up" className={`${followUpView ? 'flex' : 'flex md:hidden'} items-center gap-3 px-3 border-b border-hairline text-xs`}>
+          <div role="tablist" aria-label="Follow Up" className={`${followUpView ? 'flex' : 'flex md:hidden'} items-center gap-3 px-3 border-b border-hairline text-xs`}>
             <button role="tab" aria-selected={g.labelId === 'INBOX'} onClick={() => g.setLabelId('INBOX')} className="py-1.5 md:hidden">Inbox</button>
             {FOLLOW_UP_TABS.map((t) => (
               <button key={t.id} role="tab" aria-selected={g.labelId === t.id} onClick={() => g.setLabelId(t.id)} className="py-1.5">{t.label}</button>

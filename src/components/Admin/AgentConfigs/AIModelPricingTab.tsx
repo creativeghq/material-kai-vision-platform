@@ -99,11 +99,11 @@ type PriceField =
   | 'markup_multiplier';
 
 const PRICE_FIELD_LABELS: Record<PriceField, string> = {
-  input_price_per_million: 'Input price',
-  output_price_per_million: 'Output price',
-  hourly_rate_usd: 'Hourly rate',
-  cost_per_generation: 'Cost per generation',
-  cost_per_unit: 'Cost per unit',
+  input_price_per_million: 'Input Price',
+  output_price_per_million: 'Output Price',
+  hourly_rate_usd: 'Hourly Rate',
+  cost_per_generation: 'Cost per Generation',
+  cost_per_unit: 'Cost per Unit',
   markup_multiplier: 'Markup',
 };
 
@@ -131,7 +131,7 @@ const BILLING_LABELS: Record<ModelPricing['billing_type'], string> = {
   token_based: 'Token',
   time_based: 'Time',
   per_generation: 'Per Gen',
-  per_unit: 'Per unit',
+  per_unit: 'Per Unit',
 };
 
 const PRICING_FIELDS: HubTableField<ModelPricing>[] = [
@@ -150,7 +150,7 @@ const PRICING_FIELDS: HubTableField<ModelPricing>[] = [
     id: 'billing',
     sortValue: (m) => m.billing_type,
     filterValue: (m) => m.billing_type,
-    filterLabel: 'Billing type',
+    filterLabel: 'Billing Type',
     filterOptionLabel: (v) => BILLING_LABELS[v as ModelPricing['billing_type']] ?? v,
   },
   { id: 'input', sortValue: (m) => m.input_price_per_million },
@@ -479,10 +479,10 @@ export const AIModelPricingTab: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model key</TableHead>
+                  <TableHead>Model Key</TableHead>
                   <TableHead className="text-right">Calls</TableHead>
                   <TableHead className="text-right">Billed</TableHead>
-                  <TableHead className="hidden sm:table-cell">Last used</TableHead>
+                  <TableHead className="hidden sm:table-cell">Last Used</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -518,8 +518,8 @@ export const AIModelPricingTab: React.FC = () => {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Model key</TableHead>
-                  <TableHead className="hidden sm:table-cell">Prices through</TableHead>
+                  <TableHead>Model Key</TableHead>
+                  <TableHead className="hidden sm:table-cell">Prices Through</TableHead>
                   <TableHead className="text-right">Calls</TableHead>
                   <TableHead className="text-right">Billed</TableHead>
                 </TableRow>
@@ -623,7 +623,7 @@ export const AIModelPricingTab: React.FC = () => {
                 onChange={(v) => pricingTable.setFilter('provider', v)}
               />
               <HubFilterSelect
-                label="Billing type"
+                label="Billing Type"
                 value={pricingTable.filters.billing ?? HUB_FILTER_ALL}
                 options={pricingTable.filterOptions.billing}
                 onChange={(v) => pricingTable.setFilter('billing', v)}

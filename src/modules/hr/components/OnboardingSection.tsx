@@ -99,7 +99,7 @@ export function OnboardingSection({ workspaceId, canManage }: { workspaceId: str
                         {t.due_date && (
                           <span
                             className={`text-[10px] shrink-0 ${t.status !== 'done' && new Date(t.due_date) < new Date(new Date().toDateString()) ? 'text-destructive font-medium' : 'text-muted-foreground'}`}
-                            title={t.status !== 'done' && new Date(t.due_date) < new Date(new Date().toDateString()) ? 'Overdue' : 'Due date'}
+                            title={t.status !== 'done' && new Date(t.due_date) < new Date(new Date().toDateString()) ? 'Overdue' : 'Due Date'}
                           >
                             due {new Date(t.due_date).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                           </span>
@@ -166,7 +166,7 @@ function AddTaskDialog({ workspaceId, employees, onDone }: { workspaceId: string
             </Select>
           </div>
           <div className="space-y-1"><Label>Task *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Sign NDA" /></div>
-          <div className="space-y-1"><Label>Due date</Label><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>
+          <div className="space-y-1"><Label>Due Date</Label><Input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>Cancel</Button>

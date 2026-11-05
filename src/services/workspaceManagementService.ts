@@ -398,7 +398,7 @@ const INVITE_COPY: Record<InviteKind, {
   guest: {
     roleLabel: 'Guest',
     heading: 'Something has been shared with you',
-    portal: 'Shared with me',
+    portal: 'Shared with Me',
     portalDetail: 'Only what was shared with you, for as long as it is shared.',
     cta: 'Open what was shared',
     subject: (i, w) => `${i} shared something with you on ${w}`,

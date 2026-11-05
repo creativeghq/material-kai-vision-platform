@@ -134,8 +134,8 @@ export const InvoicingTab: React.FC<{ projectId: string; projectName?: string }>
     <div className="space-y-4">
       {summary && (
         <HubStatGrid>
-          <HubStatTile label="Invoiced" value={mixed ? 'Mixed currencies' : money(summary.totals.receivable_total, currency)} help="Issued invoices on this project." />
-          <HubStatTile label="Customers owe" value={mixed ? 'Mixed currencies' : money(summary.totals.receivable_due, currency)} help="What is still unpaid on those invoices." />
+          <HubStatTile label="Invoiced" value={mixed ? 'Mixed Currencies' : money(summary.totals.receivable_total, currency)} help="Issued invoices on this project." />
+          <HubStatTile label="Customers Owe" value={mixed ? 'Mixed Currencies' : money(summary.totals.receivable_due, currency)} help="What is still unpaid on those invoices." />
         </HubStatGrid>
       )}
 
@@ -214,7 +214,7 @@ export const InvoicingTab: React.FC<{ projectId: string; projectName?: string }>
           <DialogHeader><DialogTitle>New invoice</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Accepted quote</Label>
+              <Label>Accepted Quote</Label>
               <Select
                 value={quoteId}
                 onValueChange={(v) => {
@@ -251,7 +251,7 @@ export const InvoicingTab: React.FC<{ projectId: string; projectName?: string }>
             )}
             {mode !== 'full' && (
               <div className="space-y-1">
-                <Label>Percent of the quote</Label>
+                <Label>Percent of the Quote</Label>
                 <Input type="number" min="1" max={remaining} value={percent} onChange={(e) => setPercent(e.target.value)} />
                 <p className="text-[11px] text-muted-foreground">
                   Every line is billed at this percentage, preserving the itemisation.

@@ -36,7 +36,7 @@ const TONE: Record<string, 'success' | 'warning' | 'error' | 'neutral'> = {
 };
 
 const SEVERITY_LABEL: Record<string, string> = {
-  attention: 'Needs attention', watch: 'Watch', good: 'Fine', none: 'Nothing recorded',
+  attention: 'Needs Attention', watch: 'Watch', good: 'Fine', none: 'Nothing recorded',
 };
 
 export const CustomerHealthStrip: React.FC<{ companyId: string }> = ({ companyId }) => {

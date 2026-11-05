@@ -58,7 +58,7 @@ describe('the label is stated, not inferred', () => {
     expect(strip, 'the price label is not read from `kind`').toMatch(/kind === 'your_price'/);
     // The defect: a sub-account at 0% discount had its BUY price labelled "Retail".
     expect(strip, 'the label is still inferred from the discount')
-      .not.toMatch(/disc\s*>\s*0\s*\?\s*'Your price'/);
+      .not.toMatch(/disc\s*>\s*0\s*\?\s*'Your Price'/);
   });
 
   it('Discover does the same', () => {

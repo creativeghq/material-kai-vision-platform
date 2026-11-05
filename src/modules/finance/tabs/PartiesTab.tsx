@@ -68,15 +68,15 @@ function withAccount(r: PartyRow, balances: Map<string, PartyBalance[]> | null):
 }
 
 const LEDGER_KIND_LABEL: Record<string, string> = {
-  invoice: 'Invoice', credit_note: 'Credit note', payment: 'Payment', receipt: 'Receipt',
-  supplier_bill: 'Supplier bill', supplier_credit_note: 'Supplier credit note',
+  invoice: 'Invoice', credit_note: 'Credit Note', payment: 'Payment', receipt: 'Receipt',
+  supplier_bill: 'Supplier Bill', supplier_credit_note: 'Supplier Credit Note',
   // Not a document — an expectation. Labelled so it can never be mistaken for one on a printed
   // Καρτέλα. (`manual_receivable`/`manual_payable` used to sit here; nothing has ever emitted
   // them, so they were two labels for rows that do not exist.)
   order: 'Order (un-invoiced)',
-  opening_balance: 'Opening balance', inbound_invoice: 'Supplier invoice (AADE)',
-  inbound_credit_note: 'Supplier credit note (AADE)', paid_at_issue: 'Paid at issue',
-  settled_outside: 'Settled outside',
+  opening_balance: 'Opening Balance', inbound_invoice: 'Supplier Invoice (AADE)',
+  inbound_credit_note: 'Supplier Credit Note (AADE)', paid_at_issue: 'Paid at Issue',
+  settled_outside: 'Settled Outside',
 };
 /** Greek labels for the printed Καρτέλα — the print is the surface an accountant reads. */
 const LEDGER_KIND_LABEL_EL: Record<string, string> = {
@@ -89,7 +89,7 @@ const LEDGER_KIND_LABEL_EL: Record<string, string> = {
 };
 
 const SEGMENT_LABELS: Record<string, string> = {
-  b2b: 'B2B', retail: 'Retail', wholesale: 'Wholesale', public_sector: 'Public sector',
+  b2b: 'B2B', retail: 'Retail', wholesale: 'Wholesale', public_sector: 'Public Sector',
 };
 
 type PartyRole = 'customer' | 'supplier' | 'both';
@@ -123,7 +123,7 @@ function buildPartyFilters(rows: PartyListRow[]): FilterGroupDef[] {
           options: [
             { value: 'customer', label: 'Customers' },
             { value: 'supplier', label: 'Suppliers' },
-            { value: 'both', label: 'Both (customer + supplier)' },
+            { value: 'both', label: 'Both (Customer + Supplier)' },
           ],
         },
         {
@@ -135,7 +135,7 @@ function buildPartyFilters(rows: PartyListRow[]): FilterGroupDef[] {
           accessor: (r: PartyRow) => r.contact_group ?? undefined,
         },
         {
-          key: 'over_limit', type: 'bool', label: 'Credit limit',
+          key: 'over_limit', type: 'bool', label: 'Credit Limit',
           description: 'Outstanding receivable exceeds the party’s credit limit.',
           trueLabel: 'Over credit limit', falseLabel: 'Within credit limit',
           accessor: (r: PartyRow) => r.over_credit_limit,
@@ -143,7 +143,7 @@ function buildPartyFilters(rows: PartyListRow[]): FilterGroupDef[] {
         {
           // The whole point of surfacing `credit_releasable`: "who is holding money we could
           // simply keep?" was a question with no answer short of opening every party in turn.
-          key: 'credit_releasable', type: 'bool', label: 'Money on account',
+          key: 'credit_releasable', type: 'bool', label: 'Money on Account',
           description: 'Cash of theirs settled against nothing, with nothing outstanding on their side — it can be released to income.',
           trueLabel: 'Releasable credit', falseLabel: 'Nothing to release',
           accessor: (r: PartyRow) => r.credit_releasable,
@@ -162,11 +162,11 @@ function buildPartyFilters(rows: PartyListRow[]): FilterGroupDef[] {
           min: payable.min, max: payable.max, accessor: (r: PartyListRow) => r.payable_outstanding,
         },
         {
-          key: 'statement_payable', type: 'range', label: 'Due to supplier (statement)',
+          key: 'statement_payable', type: 'range', label: 'Due to Supplier (Statement)',
           min: statementPayable.min, max: statementPayable.max, accessor: (r: PartyListRow) => r.acct_payable ?? 0,
         },
         {
-          key: 'on_account_credit', type: 'range', label: 'On account',
+          key: 'on_account_credit', type: 'range', label: 'On Account',
           min: onAccount.min, max: onAccount.max, accessor: (r: PartyRow) => r.on_account_credit,
         },
       ],
@@ -371,7 +371,7 @@ export const PartiesTab: React.FC<Props> = ({ workspaceId, statementsEnabled, au
                   {/* Their money we are sitting on. It is not a receivable and not a payable —
                       it is a liability with no document, which is exactly why it never appeared
                       on this table and could sit for a year without anyone noticing. */}
-                  <th className="px-4 py-2 text-right">On account</th>
+                  <th className="px-4 py-2 text-right">On Account</th>
                   <th className="px-4 py-2 text-right">Net</th>
                   <th className="px-4 py-2 text-right" title="The party's statement: documents, AADE documents not yet booked, opening balance and payments, incl. un-invoiced orders">Statement</th>
                 </tr>
@@ -1111,7 +1111,7 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
                     <th className="px-4 py-2 text-left">Direction</th>
                     <th className="px-4 py-2 text-left">Method</th>
                     <th className="px-4 py-2 text-left">Reference</th>
-                    <th className="px-4 py-2 text-left">Applied to</th>
+                    <th className="px-4 py-2 text-left">Applied To</th>
                     <th className="px-4 py-2 text-right">Amount</th>
                   </>}
                   rows={payments.length}
@@ -1219,8 +1219,8 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
                             <th className="px-3 py-2 text-left">Document</th>
                             <th className="px-3 py-2 text-right">Debit</th>
                             <th className="px-3 py-2 text-right">Credit</th>
-                            <th className="px-3 py-2 text-right">Cumulative debit</th>
-                            <th className="px-3 py-2 text-right">Cumulative credit</th>
+                            <th className="px-3 py-2 text-right">Cumulative Debit</th>
+                            <th className="px-3 py-2 text-right">Cumulative Credit</th>
                             <th className="px-3 py-2 text-right">Balance</th>
                           </tr>
                         </thead>

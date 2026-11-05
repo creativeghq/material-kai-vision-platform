@@ -143,8 +143,8 @@ export const AddIssuerToCrmDialog: React.FC<{
         ) : (
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label className="text-xs">Supplier name</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={isGreekVat(issuerVat) ? 'Leave blank to fetch from ΑΑΔΕ' : 'Supplier name'} />
+              <Label className="text-xs">Supplier Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={isGreekVat(issuerVat) ? 'Leave blank to fetch from ΑΑΔΕ' : 'Supplier Name'} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs">VAT number</Label>

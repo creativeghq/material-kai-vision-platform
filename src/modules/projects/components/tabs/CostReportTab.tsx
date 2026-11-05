@@ -59,13 +59,13 @@ export const CostReportTab: React.FC<{ projectId: string; onOpenSection: (tab: P
       ) : (
         <HubStatGrid>
           <HubStatTile
-            label="Customers owe"
+            label="Customers Owe"
             category={`of ${formatMoney(t.receivable_total, currency)} billed`}
             value={<span className="inline-flex items-center gap-1.5"><ArrowDownLeft className="h-4 w-4 text-emerald-700 dark:text-emerald-400" />{formatMoney(t.receivable_due, currency)}</span>}
             onClick={() => onOpenSection('billing')}
           />
           <HubStatTile
-            label="We owe suppliers"
+            label="We Owe Suppliers"
             category={`of ${formatMoney(t.payable_total, currency)} billed`}
             value={<span className="inline-flex items-center gap-1.5"><ArrowUpRight className="h-4 w-4 text-amber-800 dark:text-amber-400" />{formatMoney(t.payable_due, currency)}</span>}
             onClick={() => onOpenSection('purchases')}

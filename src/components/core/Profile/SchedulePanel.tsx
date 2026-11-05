@@ -30,7 +30,7 @@ const SECTIONS: Record<ScheduleSectionId, React.ComponentType> = {
 const TABS: HubTabItem[] = [
   { id: 'appointments', label: 'Bookings', icon: CalendarCheck },
   { id: 'availability', label: 'Availability', icon: Clock },
-  { id: 'calendar', label: 'My calendar', icon: CalendarDays },
+  { id: 'calendar', label: 'My Calendar', icon: CalendarDays },
 ];
 
 const OFFERED = new Set<string>(SCHEDULE_SECTION_IDS);

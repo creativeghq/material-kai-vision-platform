@@ -16,7 +16,7 @@ const TABS = [
   { value: 'finance', label: 'Finance' },
   { value: 'hr', label: 'HR' },
   { value: 'project', label: 'Projects' },
-  { value: 'realestate', label: 'Real estate' },
+  { value: 'realestate', label: 'Real Estate' },
 ] as const;
 
 type TabValue = typeof TABS[number]['value'];
@@ -66,7 +66,7 @@ export default function ContractsPage() {
               <ContractsSection
                 workspaceId={ws}
                 context={t.value}
-                heading={t.value === 'all' ? 'All contracts' : `${t.label} contracts`}
+                heading={t.value === 'all' ? 'All Contracts' : `${t.label} contracts`}
                 filterGroups={buildContractFilters}
                 // Only the visible tab gets it — otherwise all four mounted sections would each
                 // pop their own create dialog for the same template.

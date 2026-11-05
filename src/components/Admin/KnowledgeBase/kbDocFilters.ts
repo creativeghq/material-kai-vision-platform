@@ -66,7 +66,7 @@ export function buildKbDocFilters(categories: KbFilterCategory[]): FilterGroupDe
       key: 'embeddings', label: 'Embedding', icon: Database,
       fields: [
         {
-          key: 'embedding_status', type: 'multi', label: 'Embedding status',
+          key: 'embedding_status', type: 'multi', label: 'Embedding Status',
           description: 'Docs without a successful embedding are invisible to agent retrieval.',
           options: EMBEDDING_OPTIONS,
           column: 'embedding_status',

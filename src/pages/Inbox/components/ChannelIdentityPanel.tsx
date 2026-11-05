@@ -159,7 +159,7 @@ export const ChannelIdentityPanel: React.FC<{
       {isWhatsApp && windowState && (
         <div className="p-5 border-b border-hairline space-y-2.5">
           <SectionTitle icon={<MessagesSquare className="h-4 w-4" />}>Service window</SectionTitle>
-          <Row label="Free-form replies">
+          <Row label="Free-Form Replies">
             <Badge variant={windowState.open ? 'success' : 'warning'} className="text-[10px]">
               {windowState.label}
             </Badge>
@@ -215,7 +215,7 @@ export const ChannelIdentityPanel: React.FC<{
           <Row label="Last from them"><span className="tabular-nums">{formatDate(lastInbound)}</span></Row>
         )}
         {isMember && !!meta.zernio_conversation_id && (
-          <Row label="Conversation id">
+          <Row label="Conversation Id">
             <span className="text-[11px] font-mono text-muted-foreground break-all">
               {String(meta.zernio_conversation_id)}
             </span>

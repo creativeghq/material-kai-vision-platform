@@ -102,7 +102,7 @@ export const CAPABILITIES: readonly CapabilityDef[] = [
   // `profile_reviews` is scoped to the signed-in user, and Profile → Reviews is the surface that
   // shows exactly that set — so the reviews card has a real page to hand off to. openInLabel
   // because "Open in Service Hub" would name a hub, not the screen it lands on.
-  { id: 'reviews', label: 'Reviews', hub: 'service', openInLabel: 'Reviews', pageRoute: '/profile?tab=reviews', agentId: 'social-media', agentTool: 'manage_reviews', toolkitId: 'reviews', quickStartLabel: 'Unanswered reviews', recordTable: 'profile_reviews', moduleSlug: 'reviews' },
+  { id: 'reviews', label: 'Reviews', hub: 'service', openInLabel: 'Reviews', pageRoute: '/profile?tab=reviews', agentId: 'social-media', agentTool: 'manage_reviews', toolkitId: 'reviews', quickStartLabel: 'Unanswered Reviews', recordTable: 'profile_reviews', moduleSlug: 'reviews' },
 
   // ── Sales ──
   { id: 'quote', label: 'Quote', hub: 'sales', pageRoute: '/quotes', agentId: 'erp', agentTool: 'create_quote', toolkitId: 'quotes', recordTable: 'quotes', canvasKind: 'quote', moduleSlug: 'quotes' },

@@ -36,11 +36,11 @@ export type BrandProposalSource = typeof BRAND_PROPOSAL_SOURCES[number];
 export const BRAND_FIELD_LABELS: Record<BrandProposableField, string> = {
   tone_attributes: 'Tone',
   personality_traits: 'Personality',
-  terminology_preferences: 'Preferred terminology',
-  avoid_list: 'Words to avoid',
-  messaging_pillars: 'Messaging pillars',
-  active_hypotheses: 'Active hypotheses',
-  writing_style: 'Writing style',
+  terminology_preferences: 'Preferred Terminology',
+  avoid_list: 'Words to Avoid',
+  messaging_pillars: 'Messaging Pillars',
+  active_hypotheses: 'Active Hypotheses',
+  writing_style: 'Writing Style',
   icp: 'Ideal customer',
   positioning: 'Positioning',
 };
@@ -48,7 +48,7 @@ export const BRAND_FIELD_LABELS: Record<BrandProposableField, string> = {
 export const BRAND_SOURCE_LABELS: Record<BrandProposalSource, string> = {
   agent: 'Agent',
   mention: 'A mention',
-  unmet_request: 'An unmet request',
+  unmet_request: 'An Unmet Request',
   editor_diff: 'An editor\'s changes',
   member: 'A team member',
 };

@@ -36,7 +36,7 @@ export const OrderAgingInlineEditor: React.FC<{
   // The order may point at a category that has since been deactivated (not in `categories`). Keep it
   // in the list — marked inactive — so it renders as the current value instead of showing blank.
   const inactiveCurrent = categoryId && !categories.some((c) => c.id === categoryId)
-    ? { id: categoryId, name: categoryName ? `${categoryName} (inactive)` : 'Current category (inactive)' }
+    ? { id: categoryId, name: categoryName ? `${categoryName} (inactive)` : 'Current Category (Inactive)' }
     : null;
 
   // Re-seed from props whenever the popover opens (row may have changed under us since last open).
@@ -79,7 +79,7 @@ export const OrderAgingInlineEditor: React.FC<{
           </Select>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs">Expected payment date</Label>
+          <Label className="text-xs">Expected Payment Date</Label>
           <Input type="date" className="h-9" value={date} onChange={(e) => setDate(e.target.value)} />
           <p className="text-[11px] text-muted-foreground">Un-invoiced orders age against this date. Leave empty to keep it as “expected” (won’t age).</p>
         </div>

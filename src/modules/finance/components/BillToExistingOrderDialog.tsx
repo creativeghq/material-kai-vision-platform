@@ -100,8 +100,8 @@ export const BillToExistingOrderDialog: React.FC<{
               <div key={r.order_id} className="flex items-center gap-3 py-2.5">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium">{r.order_number ?? 'Purchase order'}</span>
-                    {r.same_supplier && <Badge variant="success">Same supplier</Badge>}
+                    <span className="truncate text-sm font-medium">{r.order_number ?? 'Purchase Order'}</span>
+                    {r.same_supplier && <Badge variant="success">Same Supplier</Badge>}
                     {Math.abs(Number(r.net_delta)) < 0.01 && <Badge variant="info">Exact</Badge>}
                   </div>
                   <div className="truncate text-xs text-muted-foreground">

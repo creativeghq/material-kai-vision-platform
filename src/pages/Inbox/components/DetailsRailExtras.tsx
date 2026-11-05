@@ -47,7 +47,7 @@ export const AddSenderToCrm: React.FC<{ thread: InboxThread; onAdded: () => void
       <SectionTitle icon={<UserPlus className="h-4 w-4" />}>Not in your CRM</SectionTitle>
       <p className="text-xs text-muted-foreground">{email} wrote to you. Add them as a contact so quotes, orders and this conversation stay together.</p>
       <div className="flex gap-1.5">
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Their name" className="h-8 text-xs" />
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Their Name" className="h-8 text-xs" />
         <Button size="sm" className="h-8 text-xs shrink-0" disabled={busy} onClick={add}>
           {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Add to CRM'}
         </Button>
@@ -144,7 +144,7 @@ function AddTaskDialog({ projects, defaultProjectId, threadId, onClose, onDone }
             {projects.map((p) => <option key={p.id} value={p.id}>{p.name || 'Project'}</option>)}
           </select>
           <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing" aria-label="Task" />
-          <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} className="w-44" aria-label="Due date" />
+          <Input type="date" value={due} onChange={(e) => setDue(e.target.value)} className="w-44" aria-label="Due Date" />
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>

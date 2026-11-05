@@ -56,7 +56,7 @@ const RUN_FIELDS: HubTableField<IntegrityRun>[] = [
     id: 'by',
     sortValue: (r) => r.triggered_by,
     filterValue: (r) => (r.triggered_by === 'cron' ? 'cron' : r.autoheal ? 'admin · heal' : 'admin'),
-    filterLabel: 'Triggered by',
+    filterLabel: 'Triggered By',
   },
   { id: 'checks', sortValue: (r) => r.checks_run },
   { id: 'open', sortValue: (r) => r.findings_open },
@@ -416,7 +416,7 @@ export default function DataHealthPage() {
                   filters={
                     <>
                       <HubFilterSelect
-                        label="Triggered by"
+                        label="Triggered By"
                         value={runTable.filters.by ?? HUB_FILTER_ALL}
                         options={runTable.filterOptions.by}
                         onChange={(v) => runTable.setFilter('by', v)}

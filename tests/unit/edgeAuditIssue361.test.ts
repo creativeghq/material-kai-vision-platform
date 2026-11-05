@@ -165,9 +165,9 @@ describe('EG-16 — supplier cost is labelled honestly and printed only on reque
   it('is not labelled "Unit price"', () => {
     expect(
       src,
-      'unit_cost is the SUPPLIER cost. Labelled "Unit price" on a spec sheet, an operator ' +
+      'unit_cost is the SUPPLIER cost. Labelled "Unit Price" on a spec sheet, an operator ' +
         'reasonably reads it as the customer-facing figure and forwards the 7-day link.',
-    ).not.toMatch(/rows\.push\(\['Unit price'/);
+    ).not.toMatch(/rows\.push\(\['Unit Price'/);
     expect(src).toContain("'Supplier cost'");
   });
 

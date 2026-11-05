@@ -24,9 +24,9 @@ const OUTCOMES: { value: LostSale['outcome']; label: string }[] = [
   { value: 'not_stocked', label: 'We do not stock it' },
   { value: 'out_of_stock', label: 'We stock it and had none' },
   { value: 'price', label: 'Price' },
-  { value: 'lead_time', label: 'Lead time' },
-  { value: 'wrong_spec', label: 'Wrong specification' },
-  { value: 'other', label: 'Something else' },
+  { value: 'lead_time', label: 'Lead Time' },
+  { value: 'wrong_spec', label: 'Wrong Specification' },
+  { value: 'other', label: 'Something Else' },
 ];
 
 export const LostSaleDialog: React.FC<{

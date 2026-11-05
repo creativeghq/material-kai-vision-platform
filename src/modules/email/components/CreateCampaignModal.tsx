@@ -26,7 +26,7 @@ import { onEnterOrSpace } from '@/utils/a11y';
 /** The two radio lists, as data — six near-identical option blocks were copied out by hand,
  *  which is how one of them ended up with no handler at all (the disabled "filtered" row). */
 const AUDIENCE_OPTIONS: Array<{ value: string; title: string; hint: string; disabled?: boolean }> = [
-  { value: 'all_users', title: 'All users', hint: 'Send to all registered users' },
+  { value: 'all_users', title: 'All Users', hint: 'Send to all registered users' },
   { value: 'all_contacts', title: 'All contacts', hint: 'Send to all email contacts' },
   { value: 'both', title: 'Users + contacts', hint: 'Send to both users and contacts' },
   { value: 'selected', title: 'Select recipients', hint: 'Search and select specific users/contacts' },
@@ -327,7 +327,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
             <TabsContent value="details" className="space-y-5">
           <FormSection title="Campaign">
             <FormGrid cols={1}>
-              <FormField label="Campaign name" htmlFor="name">
+              <FormField label="Campaign Name" htmlFor="name">
                 <Input
                   id="name"
                   value={formData.name}
@@ -350,7 +350,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
           <FormSection title="Message">
             <FormGrid cols={1}>
-              <FormField label="Email template" htmlFor="template">
+              <FormField label="Email Template" htmlFor="template">
                 <Select value={formData.template_id || undefined} onValueChange={(v) => setFormData({ ...formData, template_id: v })}>
                   <SelectTrigger id="template"><SelectValue placeholder="Select a template" /></SelectTrigger>
                   <SelectContent>
@@ -360,7 +360,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                   </SelectContent>
                 </Select>
               </FormField>
-              <FormField label="Subject line" htmlFor="subject" optional>
+              <FormField label="Subject Line" htmlFor="subject" optional>
                 <Input
                   id="subject"
                   value={formData.subject_line}
@@ -368,7 +368,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                   placeholder="Email subject line"
                 />
               </FormField>
-              <FormField label="Preview text" htmlFor="preview" optional>
+              <FormField label="Preview Text" htmlFor="preview" optional>
                 <Input
                   id="preview"
                   value={formData.preview_text}
@@ -381,7 +381,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
           <FormSection title="Sender">
             <FormGrid>
-              <FormField label="From name" htmlFor="from_name" optional>
+              <FormField label="From Name" htmlFor="from_name" optional>
                 <Input
                   id="from_name"
                   value={formData.from_name}
@@ -389,7 +389,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
                   placeholder="Materials Hub"
                 />
               </FormField>
-              <FormField label="From email" htmlFor="from_email" optional>
+              <FormField label="From Email" htmlFor="from_email" optional>
                 <Input
                   id="from_email"
                   type="email"
@@ -418,7 +418,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
 
             {/* Audience Type Selection */}
             <div className="space-y-2">
-              <Label>Audience type</Label>
+              <Label>Audience Type</Label>
               <RadioGroup
                 value={formData.audience_type}
                 onValueChange={(v) => setFormData({ ...formData, audience_type: v })}
@@ -529,7 +529,7 @@ export const CreateCampaignModal: React.FC<CreateCampaignModalProps> = ({
             {/* Specific Emails Input */}
             {formData.audience_type === 'specific' && (
               <div className="space-y-2">
-                <Label htmlFor="specific_emails">Email Addresses (one per line)</Label>
+                <Label htmlFor="specific_emails">Email Addresses (One per Line)</Label>
                 <Textarea
                   id="specific_emails"
                   value={formData.specific_emails}

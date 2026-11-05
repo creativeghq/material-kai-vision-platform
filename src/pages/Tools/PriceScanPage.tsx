@@ -126,7 +126,7 @@ export default function PriceScanPage() {
           <CardHeader>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <Label htmlFor="product-name">Product name</Label>
+                <Label htmlFor="product-name">Product Name</Label>
                 <Input
                   id="product-name"
                   placeholder="e.g. Hansgrohe Talis E single-lever basin mixer"

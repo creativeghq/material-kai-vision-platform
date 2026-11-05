@@ -32,8 +32,8 @@ const SCOPE_TONE: Record<CbamScopeStatus, 'warning' | 'neutral' | 'error' | 'inf
 
 const SCOPE_LABEL: Record<CbamScopeStatus, string> = {
   in_scope: 'Annex I',
-  out_of_scope: 'Out of scope',
-  exempt_origin: 'Annex III origin',
+  out_of_scope: 'Out of Scope',
+  exempt_origin: 'Annex III Origin',
   unlisted: 'Unclassified',
   undeclared: 'No CN code',
 };
@@ -161,7 +161,7 @@ export const OrderCbamCard: React.FC<{
                 <TableHead>Line</TableHead>
                 <TableHead>CN</TableHead>
                 <TableHead>Origin</TableHead>
-                <TableHead className="text-right">Net mass</TableHead>
+                <TableHead className="text-right">Net Mass</TableHead>
                 <TableHead>Scope</TableHead>
               </TableRow>
             </TableHeader>
@@ -213,7 +213,7 @@ export const OrderCbamCard: React.FC<{
           </p>
           <div className="flex flex-wrap items-end gap-2">
             <div className="space-y-1">
-              <Label htmlFor="cbam-entry-date" className="text-xs">Entry date</Label>
+              <Label htmlFor="cbam-entry-date" className="text-xs">Entry Date</Label>
               <Input
                 id="cbam-entry-date" type="date" value={entryDate}
                 onChange={(e) => setEntryDate(e.target.value)} className="h-9 w-40"

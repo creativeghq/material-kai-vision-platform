@@ -34,15 +34,15 @@ export function buildDocsFilters(rows: WorkspaceDoc[], myUserId: string | undefi
       key: 'people', label: 'Author', icon: User,
       fields: [
         {
-          key: 'author', type: 'multi', label: 'Written by',
+          key: 'author', type: 'multi', label: 'Written By',
           options: [
-            { value: NONE_VALUE, label: 'Unknown author' },
+            { value: NONE_VALUE, label: 'Unknown Author' },
             ...optionsFromRows(rows, (d) => d.author_name ?? undefined),
           ],
           accessor: (d: WorkspaceDoc) => d.author_name ?? undefined,
         },
         ...(myUserId ? [{
-          key: 'mine', type: 'bool' as const, label: 'Just mine',
+          key: 'mine', type: 'bool' as const, label: 'Just Mine',
           trueLabel: 'Written by me', falseLabel: 'Written by others',
           accessor: (d: WorkspaceDoc) => d.created_by === myUserId,
         }] : []),
@@ -67,7 +67,7 @@ export function buildDocsFilters(rows: WorkspaceDoc[], myUserId: string | undefi
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
-        { key: 'updated_at', type: 'dateRange', label: 'Last updated', accessor: (d: WorkspaceDoc) => d.updated_at },
+        { key: 'updated_at', type: 'dateRange', label: 'Last Updated', accessor: (d: WorkspaceDoc) => d.updated_at },
         { key: 'created_at', type: 'dateRange', label: 'Created', accessor: (d: WorkspaceDoc) => d.created_at },
       ],
     },

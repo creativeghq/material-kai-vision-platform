@@ -43,7 +43,7 @@ export function buildMentionFeedFilters(rows: MentionRow[]): FilterGroupDef[] {
       key: 'outlet', label: 'Outlet', icon: Globe,
       fields: [
         {
-          key: 'outlet_type', type: 'multi', label: 'Outlet type',
+          key: 'outlet_type', type: 'multi', label: 'Outlet Type',
           options: optionsFromRows(rows, (r) => r.outlet_type, humanizeLabel),
           accessor: (r) => r.outlet_type,
         },
@@ -53,7 +53,7 @@ export function buildMentionFeedFilters(rows: MentionRow[]): FilterGroupDef[] {
           accessor: (r) => r.outlet_domain,
         },
         {
-          key: 'source', type: 'multi', label: 'Discovery source',
+          key: 'source', type: 'multi', label: 'Discovery Source',
           options: optionsFromRows(rows, (r) => r.source, humanizeLabel),
           accessor: (r) => r.source,
         },
@@ -90,7 +90,7 @@ export function buildTrackedMentionFilters(
           accessor: (r) => [r.subject_label, r.brand_name, r.product_id ? productName(r.product_id) : undefined],
         },
         {
-          key: 'subject_type', type: 'multi', label: 'Subject type',
+          key: 'subject_type', type: 'multi', label: 'Subject Type',
           options: optionsFromRows(rows, (r) => r.subject_type, humanizeLabel),
           accessor: (r) => r.subject_type,
         },
@@ -100,7 +100,7 @@ export function buildTrackedMentionFilters(
           accessor: (r) => !!r.is_active,
         },
         {
-          key: 'has_error', type: 'bool', label: 'Last refresh',
+          key: 'has_error', type: 'bool', label: 'Last Refresh',
           trueLabel: 'Errored', falseLabel: 'Clean',
           accessor: (r) => !!r.last_error,
         },
@@ -115,13 +115,13 @@ export function buildTrackedMentionFilters(
           accessor: (r) => r.current_mention_count_7d ?? 0,
         },
         {
-          key: 'current_sentiment_avg', type: 'range', label: 'Sentiment avg',
+          key: 'current_sentiment_avg', type: 'range', label: 'Sentiment Avg',
           description: 'Rolling average in [-1, 1]. Below -0.3 is the negative-trend threshold.',
           min: -1, max: 1, step: 0.1,
           accessor: (r) => r.current_sentiment_avg,
         },
         {
-          key: 'total_credits_used', type: 'range', label: 'Credits used', unit: ' cr',
+          key: 'total_credits_used', type: 'range', label: 'Credits Used', unit: ' cr',
           min: 0, max: credits, accessor: (r) => r.total_credits_used ?? 0,
         },
       ],
@@ -129,8 +129,8 @@ export function buildTrackedMentionFilters(
     {
       key: 'dates', label: 'Dates', icon: CalendarDays,
       fields: [
-        { key: 'last_refreshed_at', type: 'dateRange', label: 'Last refresh', accessor: (r) => r.last_refreshed_at },
-        { key: 'next_check_at', type: 'dateRange', label: 'Next check', accessor: (r) => r.next_check_at },
+        { key: 'last_refreshed_at', type: 'dateRange', label: 'Last Refresh', accessor: (r) => r.last_refreshed_at },
+        { key: 'next_check_at', type: 'dateRange', label: 'Next Check', accessor: (r) => r.next_check_at },
         { key: 'created_at', type: 'dateRange', label: 'Created', accessor: (r) => r.created_at },
       ],
     },

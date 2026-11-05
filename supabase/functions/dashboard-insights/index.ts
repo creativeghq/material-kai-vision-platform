@@ -135,7 +135,7 @@ function buildFallbackInsights(snap: Snapshot): Insights {
   if (snap.projects.active > 0) {
     const nextName = snap.projects.next[0]?.name;
     out.push({
-      title: 'Active projects',
+      title: 'Active Projects',
       body: nextName
         ? `${snap.projects.active} project${snap.projects.active !== 1 ? 's are' : ' is'} in progress — “${nextName}” is next up.`
         : `${snap.projects.active} project${snap.projects.active !== 1 ? 's are' : ' is'} currently in progress.`,

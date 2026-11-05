@@ -60,14 +60,14 @@ export const MANDATE_LABEL: Record<MandateStatus, string> = {
   compliant: 'Lawful channel on every document',
   fallback_used: 'ERP fallback used under a recorded outage',
   fallback_unreconciled: 'Fallback relying on an outage nobody closed',
-  channel_unrecorded: 'Documents with no channel recorded',
+  channel_unrecorded: 'Documents with No Channel Recorded',
   declaration_late: 'Declared start date is too late',
   declaration_missing: 'Δήλωση Έναρξης not filed',
 };
 
 export const INBOUND_LABEL: Record<InboundStatus, string> = {
   accepting: 'Accepting structured e-invoices',
-  receipt_date_missing: 'Receipt dates missing',
+  receipt_date_missing: 'Receipt Dates Missing',
   no_structured_document_yet: 'No structured document received yet',
   nothing_received: 'Nothing received since the duty fell due',
 };

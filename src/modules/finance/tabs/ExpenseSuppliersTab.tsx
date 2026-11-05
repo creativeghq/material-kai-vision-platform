@@ -68,13 +68,13 @@ function buildExpenseSupplierFilters(rows: ExpenseIssuerRow[]): FilterGroupDef[]
           accessor: (r: ExpenseIssuerRow) => !!r.crm_company_id,
         },
         {
-          key: 'in_books', type: 'bool', label: 'In the books',
+          key: 'in_books', type: 'bool', label: 'In the Books',
           description: 'Whether any of their documents became a supplier bill.',
           trueLabel: 'Some in books', falseLabel: 'None in books',
           accessor: (r: ExpenseIssuerRow) => r.in_books > 0,
         },
         {
-          key: 'category', type: 'multi', label: 'Files as', searchable: true,
+          key: 'category', type: 'multi', label: 'Files As', searchable: true,
           options: [
             ...optionsFromRows(rows, (r: ExpenseIssuerRow) => r.learned_category_name ?? undefined),
             { value: NONE_VALUE, label: 'No filing rule yet' },
@@ -87,12 +87,12 @@ function buildExpenseSupplierFilters(rows: ExpenseIssuerRow[]): FilterGroupDef[]
       key: 'activity', label: 'Activity', icon: CalendarDays,
       fields: [
         {
-          key: 'last_issue_date', type: 'dateRange', label: 'Last document',
+          key: 'last_issue_date', type: 'dateRange', label: 'Last Document',
           description: 'When they last issued anything against us — how to find the ones who went quiet.',
           accessor: (r: ExpenseIssuerRow) => r.last_issue_date ?? undefined,
         },
         {
-          key: 'first_issue_date', type: 'dateRange', label: 'First document',
+          key: 'first_issue_date', type: 'dateRange', label: 'First Document',
           accessor: (r: ExpenseIssuerRow) => r.first_issue_date ?? undefined,
         },
       ],
@@ -105,7 +105,7 @@ function buildExpenseSupplierFilters(rows: ExpenseIssuerRow[]): FilterGroupDef[]
           min: docs.min, max: docs.max, accessor: (r: ExpenseIssuerRow) => r.docs,
         },
         {
-          key: 'total_net', type: 'range', label: 'Net total', unit: '€',
+          key: 'total_net', type: 'range', label: 'Net Total', unit: '€',
           min: net.min, max: net.max, accessor: (r: ExpenseIssuerRow) => Number(r.total_net ?? 0),
         },
       ],
@@ -272,7 +272,7 @@ export const ExpenseSuppliersTab: React.FC<{
                   <tr className="bg-surface-sunken">
                     <th className="px-5 py-2 text-left text-[11px] font-semibold text-muted-foreground">Supplier</th>
                     <th className="px-3 py-2 text-right text-[11px] font-semibold text-muted-foreground">Docs</th>
-                    <th className="px-3 py-2 text-right text-[11px] font-semibold text-muted-foreground">To file</th>
+                    <th className="px-3 py-2 text-right text-[11px] font-semibold text-muted-foreground">To File</th>
                     <th className="px-3 py-2 text-right text-[11px] font-semibold text-muted-foreground">Net</th>
                     <th className="px-3 py-2 text-left text-[11px] font-semibold text-muted-foreground">Span</th>
                     {!isAccountant && <th className="px-5 py-2 text-left text-[11px] font-semibold text-muted-foreground">File as</th>}

@@ -1127,8 +1127,8 @@ Deno.serve(withApiLogging('crawl-user-website', async (req) => {
     }
     await supabase.from('user_websites').update({
       last_crawled_at: new Date().toISOString(),
-      last_crawl_error: e?.message?.slice(0, 500) || 'Crawl failed',
+      last_crawl_error: e?.message?.slice(0, 500) || 'Crawl Failed',
     }).eq('id', website.id);
-    return jsonResponse({ success: false, error: e?.message || 'Crawl failed' }, 500);
+    return jsonResponse({ success: false, error: e?.message || 'Crawl Failed' }, 500);
   }
 }));

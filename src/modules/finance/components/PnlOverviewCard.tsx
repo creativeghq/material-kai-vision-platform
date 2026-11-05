@@ -150,14 +150,14 @@ export const PnlOverviewCard: React.FC<Props> = ({ overview, segments, periodLab
 
             <div className="grid grid-cols-2 gap-4 border-t border-hairline px-5 py-4 sm:grid-cols-4">
               <Figure
-                label="Paid to owners"
+                label="Paid to Owners"
                 value={overview?.owner_payments ?? null}
                 currency={ccy}
                 verdict={books}
                 sub="Pay, profit split and withdrawals — included in Expenses"
               />
               <Figure
-                label="Profit before owner payments"
+                label="Profit Before Owner Payments"
                 value={overview?.net_before_owner_payments ?? null}
                 currency={ccy}
                 verdict={books}

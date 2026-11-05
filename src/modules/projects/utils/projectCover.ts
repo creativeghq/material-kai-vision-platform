@@ -22,8 +22,8 @@ export const PROJECT_COVER_LIBRARY: Record<ProjectCoverConcept, ProjectCoverLibr
   kitchen: { label: 'Kitchen', src: asset('kitchen'), subject: 'a modern kitchen with an oak-fronted island, a honed stone worktop and a wall of tall matte cabinets' },
   bathroom: { label: 'Bathroom', src: asset('bathroom'), subject: 'a serene bathroom with a walk-in shower, large-format stone tiles, a floating oak vanity and a round mirror' },
   bedroom: { label: 'Bedroom', src: asset('bedroom'), subject: 'a calm master bedroom with a low upholstered bed, linen bedding, a plastered headboard wall and bedside pendant lights' },
-  living: { label: 'Living room', src: asset('living'), subject: 'a bright living room with a deep linen sofa, a travertine coffee table, built-in oak shelving and a large window' },
-  dining: { label: 'Dining room', src: asset('dining'), subject: 'a dining room with a long oak table, sculptural chairs, a linen pendant light and a low sideboard' },
+  living: { label: 'Living Room', src: asset('living'), subject: 'a bright living room with a deep linen sofa, a travertine coffee table, built-in oak shelving and a large window' },
+  dining: { label: 'Dining Room', src: asset('dining'), subject: 'a dining room with a long oak table, sculptural chairs, a linen pendant light and a low sideboard' },
   office: { label: 'Office', src: asset('office'), subject: 'a home office with a built-in oak desk, open shelving, a leather chair and a window view of greenery' },
   outdoor: { label: 'Outdoor', src: asset('outdoor'), subject: 'a garden terrace with a timber pergola, an outdoor sofa, large stone pavers, olive trees and a small pool' },
   hallway: { label: 'Hallway', src: asset('hallway'), subject: 'an entrance hall with a bench, wall hooks, a long runner rug, a slim console table and a mirror' },
@@ -34,7 +34,7 @@ export const PROJECT_COVER_LIBRARY: Record<ProjectCoverConcept, ProjectCoverLibr
   house: { label: 'House', src: asset('house'), subject: 'the exterior of a contemporary Mediterranean villa at dusk with warm interior light, stone walls, olive trees and a pool' },
   apartment: { label: 'Apartment', src: asset('apartment'), subject: 'an open-plan city apartment with a compact kitchen, a sofa, tall windows and a herringbone parquet floor' },
   renovation: { label: 'Renovation', src: asset('renovation'), subject: 'an interior renovation in progress: a bright empty room with freshly plastered walls, stacked tile samples, a ladder, a paint roller tray and drop sheets, sunlight through the window' },
-  real_estate: { label: 'Real estate', src: asset('real_estate'), subject: 'the facade of a contemporary low-rise apartment building with balconies, planted terraces and a landscaped entrance in morning light' },
+  real_estate: { label: 'Real Estate', src: asset('real_estate'), subject: 'the facade of a contemporary low-rise apartment building with balconies, planted terraces and a landscaped entrance in morning light' },
   default: { label: 'Materials', src: asset('default'), subject: 'a flat-lay of interior material samples on a linen surface: marble, oak, brass, terrazzo and fabric swatches beside a hand-drawn floor plan sketch' },
 };
 

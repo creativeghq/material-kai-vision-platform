@@ -342,7 +342,7 @@ export const VatReturnPanel: React.FC<{ workspaceId: string; filingFrequency: Va
                   <TableHeader>
                     <TableRow>
                       <TableHead>Side</TableHead>
-                      <TableHead className="text-right">Yours (net)</TableHead>
+                      <TableHead className="text-right">Yours (Net)</TableHead>
                       <TableHead className="text-right">ΑΑΔΕ (net)</TableHead>
                       <TableHead className="text-right">Difference</TableHead>
                       <TableHead className="hidden md:table-cell">ΑΑΔΕ</TableHead>

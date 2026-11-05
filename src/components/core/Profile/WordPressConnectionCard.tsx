@@ -88,7 +88,7 @@ export const WordPressConnectionCard: React.FC<{ workspaceId: string }> = ({ wor
         ) : (
           <div className="grid gap-3 sm:grid-cols-3">
             <div className="space-y-1.5">
-              <Label htmlFor="wp-site">Site address</Label>
+              <Label htmlFor="wp-site">Site Address</Label>
               <Input id="wp-site" placeholder="https://example.com" value={form.site_url} onChange={(e) => setForm({ ...form, site_url: e.target.value })} />
             </div>
             <div className="space-y-1.5">
@@ -96,7 +96,7 @@ export const WordPressConnectionCard: React.FC<{ workspaceId: string }> = ({ wor
               <Input id="wp-user" autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="wp-pass">Application password</Label>
+              <Label htmlFor="wp-pass">Application Password</Label>
               <Input id="wp-pass" type="password" autoComplete="new-password" value={form.application_password}
                 onChange={(e) => setForm({ ...form, application_password: e.target.value })} />
             </div>

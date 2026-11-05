@@ -28,15 +28,15 @@ interface WorkspaceFlow {
 const TRIGGER_LABELS: Record<string, string> = {
   manual: 'Manual',
   scheduled: 'On a schedule',
-  invoice_paid: 'Invoice paid',
-  payment_received: 'Payment received',
-  payment_reversed: 'Payment reversed',
-  quote_approved: 'Quote approved',
-  deal_stage_changed: 'Deal moved stage',
-  deal_won: 'Deal won',
-  deal_lost: 'Deal lost',
-  'inbox.message_received': 'Inbox message',
-  appointment_booked: 'Appointment booked',
+  invoice_paid: 'Invoice Paid',
+  payment_received: 'Payment Received',
+  payment_reversed: 'Payment Reversed',
+  quote_approved: 'Quote Approved',
+  deal_stage_changed: 'Deal Moved Stage',
+  deal_won: 'Deal Won',
+  deal_lost: 'Deal Lost',
+  'inbox.message_received': 'Inbox Message',
+  appointment_booked: 'Appointment Booked',
 };
 
 export default function FlowsPage() {

@@ -142,7 +142,7 @@ export function ProductCertificates({
                 <th className="hidden sm:table-cell px-3 py-2">Result</th>
                 <th className="hidden md:table-cell px-3 py-2">Number</th>
                 <th className="hidden md:table-cell px-3 py-2">Issuer</th>
-                <th className="px-3 py-2">Valid until</th>
+                <th className="px-3 py-2">Valid Until</th>
                 <th className="px-3 py-2">Status</th>
                 {canEdit && <th className="px-3 py-2"><span className="sr-only">Actions</span></th>}
               </tr>

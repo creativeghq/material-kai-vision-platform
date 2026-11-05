@@ -365,7 +365,7 @@ const AddProductDialog: React.FC<{
 
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1"><Label>Quantity</Label><Input type="number" min="1" step="1" value={qty} onChange={(e) => setQty(e.target.value)} /></div>
-          <div className="space-y-1"><Label>Sold price (optional)</Label><Input type="number" min="0" step="0.01" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} placeholder="—" /></div>
+          <div className="space-y-1"><Label>Sold Price (optional)</Label><Input type="number" min="0" step="0.01" value={soldPrice} onChange={(e) => setSoldPrice(e.target.value)} placeholder="—" /></div>
         </div>
 
         <DialogFooter>

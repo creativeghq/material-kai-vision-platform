@@ -103,7 +103,7 @@ export const AmendRequestDialog: React.FC<{
             </div>
           )}
           <div className="space-y-1">
-            <Label className="text-xs">Answer needed by</Label>
+            <Label className="text-xs">Answer Needed By</Label>
             <Input type="date" value={dueAt} onChange={(e) => setDueAt(e.target.value)} />
           </div>
           {docs.length > 0 && (

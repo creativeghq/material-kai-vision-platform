@@ -16,5 +16,5 @@ export const PATTERN_LABELS: Record<Pattern, string> = {
   diagonal: 'Diagonal',
   herringbone: 'Herringbone',
   diagonal_herringbone: 'Herringbone at 45°',
-  basket_weave: 'Basket weave',
+  basket_weave: 'Basket Weave',
 };
