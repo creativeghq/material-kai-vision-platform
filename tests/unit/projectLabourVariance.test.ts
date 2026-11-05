@@ -58,7 +58,7 @@ describe('the roll-up has a reader, and it states its coverage', () => {
   const card = read('src/modules/projects/components/ProjectLabourCard.tsx');
 
   it('is mounted — the derivation had no consumer in the app at all', () => {
-    expect(read('src/modules/projects/components/tabs/FinanceTab.tsx')).toContain('<ProjectLabourCard');
+    expect(read('src/modules/projects/components/tabs/CostReportTab.tsx')).toContain('<ProjectLabourCard');
   });
 
   it('renders a stated reason instead of a number it does not have', () => {

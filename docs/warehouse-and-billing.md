@@ -142,7 +142,7 @@ From an `accepted` quote on a project, generate draft invoices in four modes. In
 - **Full** — `issue_invoice_from_quote(p_quote_id)`: idempotent (returns existing non-void invoice for the quote), `invoice_kind='full'`, totals + items copied verbatim from the quote.
 - **Progress / milestone / final** — `create_project_progress_invoice(p_quote_id, p_percent, p_kind)`: validates percent ∈ (0,100], scales all monetary totals + line amounts by `percent/100`, appends `"(progress N%)"` to descriptions. **Quantity is not scaled** (only unit price / line total). Not idempotent — multiple tranches allowed.
 
-Frontend: `BillingTab.tsx` on the project detail page (gated `can('finance.manage')`) — lists project invoices, "New invoice" dialog with quote selector + mode picker + percent input; navigates to `/finance/invoices/:id` (not auto-issued). Service: `projectsService.{listProjectInvoices, createFullInvoiceFromQuote, createProgressInvoice}`.
+Frontend: `InvoicingTab.tsx` on the project detail page (gated `can('finance.manage')`) — lists project invoices, "New invoice" dialog with quote selector + mode picker + percent input; navigates to `/finance/invoices/:id` (not auto-issued). Service: `projectsService.{listProjectInvoices, createFullInvoiceFromQuote, createProgressInvoice}`.
 
 ### Gaps
 - **No over-billing guard** — sum of `progress_pct` per quote is unconstrained (multiple 80% invoices possible).

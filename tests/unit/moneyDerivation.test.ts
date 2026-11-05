@@ -478,8 +478,8 @@ describe('project job cost has exactly one derivation', () => {
     // Not a style rule: the number the operator types is bounded by this, and the SQL refuses
     // anything over it. If the dialog stops reading it, it goes back to offering 50 on a quote
     // with 30 left and the only feedback is a raw 23514 after the round trip.
-    const tab = strippedSource(join(ROOT, 'src/modules/projects/components/tabs/BillingTab.tsx'));
-    expect(tab, 'BillingTab must read the billing progress')
+    const tab = strippedSource(join(ROOT, 'src/modules/projects/components/tabs/InvoicingTab.tsx'));
+    expect(tab, 'InvoicingTab must read the billing progress')
       .toMatch(/quoteBillingProgress\(/);
     expect(tab, 'the percent input must be bounded by the remainder, not by a constant 100')
       .toMatch(/max=\{remaining\}/);

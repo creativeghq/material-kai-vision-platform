@@ -22,7 +22,7 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 
 const service = read('src/modules/projects/services/selectionsService.ts');
 const panel = read('src/modules/projects/components/SelectionsPanel.tsx');
-const finance = read('src/modules/projects/components/tabs/FinanceTab.tsx');
+const finance = read('src/modules/projects/components/tabs/QuotesTab.tsx');
 const cvr = read('src/modules/projects/components/CvrCard.tsx');
 const variations = read('src/modules/projects/services/variationsService.ts');
 
@@ -114,7 +114,7 @@ describe('pending is not committed', () => {
 });
 
 describe('the board is reachable', () => {
-  it('it sits on the project finance tab', () => {
+  it('it sits on the project quotes tab', () => {
     expect(finance).toContain('SelectionsPanel');
   });
 

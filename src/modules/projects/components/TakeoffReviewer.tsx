@@ -17,7 +17,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useNavigate } from 'react-router-dom';
+import { ToastAction } from '@/components/core/ui/toast';
+import { quoteUrl } from '@/modules/quotes/routes';
 import { humanizeLabel } from '@/utils/humanize';
 import { unitSuffix } from '@/lib/units';
 import { formatNumber } from '@/utils/decimal';
@@ -25,12 +27,11 @@ import {
   takeoffService, type RevisionTakeoff, type TakeoffMeasurement,
 } from '../services/takeoffService';
 import { drawingMarkupsService } from '../services/drawingMarkupsService';
-import { schedulesService, type ProjectSchedule, type ScheduleItem } from '../services/schedulesService';
 import {
   toNormalised, calibrationFactor, boxRect, lengthInPageWidths, areaInPageWidths, type NormPoint,
 } from '../lib/drawingMarkup';
 import {
-  groupMeasurements, confirmable, billable, roomAreaDisagreement, cellRect, isMixed, sourceFamily,
+  groupMeasurements, confirmable, quotable, roomAreaDisagreement, cellRect, isMixed, sourceFamily,
   type TakeoffGroup, type SourceFamily,
 } from '../lib/takeoffGroups';
 import { TAKEOFF_ELEMENT_TYPES, type TakeoffElementType } from '../takeoffVocabulary';
@@ -62,11 +63,10 @@ interface Props {
   revisionId: string;
   projectId: string;
   label: string;
-  canSendToBill: boolean;
   onChanged: () => void;
 }
 
-export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label, canSendToBill, onChanged }) => {
+export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label, onChanged }) => {
   const { toast } = useToast();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const surfaceRef = useRef<HTMLDivElement | null>(null);
@@ -91,7 +91,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
   const [calibrating, setCalibrating] = useState<{ a: NormPoint; b: NormPoint } | null>(null);
   const [known, setKnown] = useState('');
   const [knownUnit, setKnownUnit] = useState('m');
-  const [billOpen, setBillOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
 
   const load = useCallback(async () => {
     try { setData(await takeoffService.revision(revisionId)); }
@@ -174,7 +174,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
   const onPage = all.filter((m) => m.page === page && (showRejected || m.review_status !== 'rejected'));
   const groups = useMemo(() => groupMeasurements(all.filter((m) => showRejected || m.review_status !== 'rejected')), [all, showRejected]);
   const selectedRows = all.filter((m) => selected.has(m.id));
-  const toBill = billable(selectedRows);
+  const toQuote = quotable(selectedRows);
 
   const pointFromEvent = (e: React.MouseEvent): NormPoint => {
     const box = canvasRef.current?.getBoundingClientRect();
@@ -405,12 +405,10 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
           </div>
           {rev.takeoff_status === 'failed' && <p className="text-xs text-destructive">{rev.takeoff_error}</p>}
           {rev.takeoff_status === 'done' && rev.takeoff_error && <p className="text-xs text-amber-800 dark:text-amber-300">{rev.takeoff_error}</p>}
-          {canSendToBill && (
-            <Button size="sm" disabled={busy || toBill.length === 0} onClick={() => setBillOpen(true)}
-              title={toBill.length === 0 ? 'Tick confirmed rows that are not on the bill yet' : undefined}>
-              <ListPlus className="h-3.5 w-3.5" /> Send {toBill.length || ''} to bill
-            </Button>
-          )}
+          <Button size="sm" disabled={busy || toQuote.length === 0} onClick={() => setQuoteOpen(true)}
+            title={toQuote.length === 0 ? 'Tick confirmed rows that are not on a quote yet' : undefined}>
+            <ListPlus className="h-3.5 w-3.5" /> Add {toQuote.length || ''} to quote
+          </Button>
         </CardHeader>
         <CardContent className="max-h-[70vh] overflow-y-auto p-0">
           {running && all.length === 0 ? (
@@ -483,7 +481,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
                               <span>p.{m.page}</span>
                               <span>{SOURCE_LABEL[m.source] ?? m.source}</span>
                               {m.confidence != null && <span>{Math.round(m.confidence * 100)}%</span>}
-                              {m.schedule_item_id && <span className="text-primary">on bill</span>}
+                              {m.quote_item_id && <span className="text-primary">on a quote</span>}
                               {m.needs_remeasure && <span className="text-amber-800 dark:text-amber-300">changed in a newer revision</span>}
                             </span>
                             {m.source_ref && <span className="block truncate text-muted-foreground" title={m.source_ref}>{m.source_ref}</span>}
@@ -503,7 +501,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
                                 <Check className="h-3.5 w-3.5" />
                               </button>
                             )}
-                            {m.review_status !== 'rejected' && !m.schedule_item_id && (
+                            {m.review_status !== 'rejected' && !m.quote_item_id && (
                               <button type="button" title="Reject" aria-label={`Reject ${m.label}`} disabled={busy} className="text-muted-foreground hover:text-destructive"
                                 onClick={() => void act('Could not reject', () => takeoffService.setStatus([m.id], 'rejected'))}>
                                 <X className="h-3.5 w-3.5" />
@@ -515,7 +513,7 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
                                 <RefreshCw className="h-3.5 w-3.5" />
                               </button>
                             )}
-                            {(m.source === 'manual' || m.source === 'counted') && !m.schedule_item_id && (
+                            {(m.source === 'manual' || m.source === 'counted') && !m.quote_item_id && (
                               <button type="button" title="Delete" disabled={busy} className="text-muted-foreground hover:text-destructive"
                                 onClick={() => void act('Could not delete', () => takeoffService.remove(m.id))}>
                                 <Trash2 className="h-3.5 w-3.5" />
@@ -558,12 +556,12 @@ export const TakeoffReviewer: React.FC<Props> = ({ revisionId, projectId, label,
         </DialogContent>
       </Dialog>
 
-      {billOpen && (
-        <SendToBillDialog
+      {quoteOpen && (
+        <AddToQuoteDialog
           projectId={projectId}
-          rows={toBill}
-          onClose={() => setBillOpen(false)}
-          onSent={() => { setBillOpen(false); setSelected(new Set()); void load(); onChanged(); }}
+          rows={toQuote}
+          onClose={() => setQuoteOpen(false)}
+          onSent={() => { setQuoteOpen(false); setSelected(new Set()); void load(); onChanged(); }}
         />
       )}
     </div>
@@ -574,94 +572,84 @@ function pageScaleFor(data: RevisionTakeoff, page: number): number | null {
   return data.pages.find((p) => p.page === page)?.effective_scale_m ?? null;
 }
 
-const SendToBillDialog: React.FC<{
+const AddToQuoteDialog: React.FC<{
   projectId: string;
   rows: TakeoffMeasurement[];
   onClose: () => void;
   onSent: () => void;
 }> = ({ projectId, rows, onClose, onSent }) => {
   const { toast } = useToast();
-  const { activeWorkspaceId } = useWorkspace();
-  const [schedules, setSchedules] = useState<ProjectSchedule[] | null>(null);
-  const [scheduleId, setScheduleId] = useState<string>('');
-  const [items, setItems] = useState<ScheduleItem[]>([]);
-  const [target, setTarget] = useState<string>('new');
+  const navigate = useNavigate();
+  const [quotes, setQuotes] = useState<Awaited<ReturnType<typeof takeoffService.draftQuotes>> | null>(null);
+  const [quoteId, setQuoteId] = useState('new');
+  const [target, setTarget] = useState('new');
   const [description, setDescription] = useState(rows.length === 1 ? rows[0].label : humanizeLabel(rows[0]?.element_type ?? 'item'));
-  const [itemRef, setItemRef] = useState('');
   const [busy, setBusy] = useState(false);
   const units = [...new Set(rows.map((r) => r.unit))];
 
   useEffect(() => {
-    schedulesService.list(projectId).then((s) => { setSchedules(s); setScheduleId(s[0]?.id ?? ''); })
-      .catch((e: Error) => toast({ title: 'Could not load schedules', description: e.message, variant: 'destructive' }));
+    takeoffService.draftQuotes(projectId)
+      .then((q) => { setQuotes(q); setQuoteId(q[0]?.id ?? 'new'); })
+      .catch((e: Error) => toast({ title: 'Could not load the quotes', description: e.message, variant: 'destructive' }));
   }, [projectId, toast]);
-  useEffect(() => {
-    if (!scheduleId) { setItems([]); return; }
-    schedulesService.items(scheduleId).then(setItems).catch(() => setItems([]));
-  }, [scheduleId]);
 
-  const takeoffLines = items.filter((i) => i.quantity_source === 'takeoff' && i.unit === units[0]);
+  const lines = (quotes?.find((q) => q.id === quoteId)?.lines ?? []).filter((l) => l.custom_unit === units[0]);
 
   const send = async () => {
     setBusy(true);
     try {
-      let sid = scheduleId;
-      if (!sid) {
-        if (!activeWorkspaceId) throw new Error('No active workspace.');
-        sid = (await schedulesService.createSchedule({ workspace_id: activeWorkspaceId, project_id: projectId, name: 'Takeoff BoQ', is_contract: true })).id;
-        setScheduleId(sid);
-      }
-      await takeoffService.sendToBill({
-        scheduleId: sid, measurementIds: rows.map((r) => r.id),
-        description: target === 'new' ? description : null, itemRef: target === 'new' ? itemRef : null,
-        existingItemId: target === 'new' ? null : target,
+      const res = await takeoffService.addToQuote({
+        projectId, measurementIds: rows.map((r) => r.id),
+        description: target === 'new' ? description : null,
+        quoteId: quoteId === 'new' ? null : quoteId,
+        quoteItemId: target === 'new' ? null : target,
       });
-      toast({ title: 'Sent to the bill', description: 'The line quantity is the sum of these confirmed measurements.' });
+      toast({
+        title: 'Added to the quote',
+        description: 'The quantity comes from these confirmed measurements. Set the rate on the quote.',
+        action: <ToastAction altText="Open the quote" onClick={() => navigate(quoteUrl(res.quote_id))}>Open the quote</ToastAction>,
+      });
       onSent();
     } catch (e) {
-      toast({ title: 'Could not send to the bill', description: (e as Error).message, variant: 'destructive' });
+      toast({ title: 'Could not add to the quote', description: (e as Error).message, variant: 'destructive' });
     } finally { setBusy(false); }
   };
 
   return (
     <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent>
-        <DialogHeader><DialogTitle>Send {rows.length} measurement{rows.length === 1 ? '' : 's'} to the bill</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Add {rows.length} measurement{rows.length === 1 ? '' : 's'} to a quote</DialogTitle></DialogHeader>
         {units.length > 1 ? (
-          <p className="text-sm text-destructive">A bill line has one unit and these are in {units.map(unitSuffix).join(', ')}. Send each unit separately.</p>
+          <p className="text-sm text-destructive">A quote line has one unit and these are in {units.map(unitSuffix).join(', ')}. Add each unit separately.</p>
         ) : (
           <FormGrid>
-            <FormField label="Schedule">
-              {schedules && schedules.length === 0 ? (
-                <p className="text-sm text-muted-foreground">A schedule called "Takeoff BoQ" will be created.</p>
-              ) : (
-                <Select value={scheduleId} onValueChange={(v) => { setScheduleId(v); setTarget('new'); }}>
-                  <SelectTrigger><SelectValue placeholder="Choose a schedule" /></SelectTrigger>
-                  <SelectContent>{(schedules ?? []).map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                </Select>
-              )}
+            <FormField label="Quote">
+              <Select value={quoteId} onValueChange={(v) => { setQuoteId(v); setTarget('new'); }}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="new">New draft quote</SelectItem>
+                  {(quotes ?? []).map((q) => <SelectItem key={q.id} value={q.id}>{q.name || q.quote_number || 'Untitled draft'}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </FormField>
             <FormField label="Line">
               <Select value={target} onValueChange={setTarget}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="new">New line</SelectItem>
-                  {takeoffLines.map((i) => <SelectItem key={i.id} value={i.id}>Add to: {[i.item_ref, i.description].filter(Boolean).join(' ')}</SelectItem>)}
+                  {lines.map((l) => <SelectItem key={l.id} value={l.id}>Add to: {l.custom_product_name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </FormField>
             {target === 'new' && (
-              <>
-                <FormField label="Description"><Input value={description} onChange={(e) => setDescription(e.target.value)} /></FormField>
-                <FormField label="Ref (optional)"><Input value={itemRef} onChange={(e) => setItemRef(e.target.value)} /></FormField>
-              </>
+              <FormField label="Description"><Input value={description} onChange={(e) => setDescription(e.target.value)} /></FormField>
             )}
           </FormGrid>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button disabled={busy || schedules === null || units.length !== 1 || (target === 'new' && !description.trim())} onClick={() => void send()}>
-            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Send
+          <Button disabled={busy || quotes === null || units.length !== 1 || (target === 'new' && !description.trim())} onClick={() => void send()}>
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Add to quote
           </Button>
         </DialogFooter>
       </DialogContent>

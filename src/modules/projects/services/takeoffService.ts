@@ -1,4 +1,4 @@
-/** Drawing takeoff (#532): proposals off the sheet, a person's verdict on each, and the bill they feed. */
+/** Drawing takeoff (#532): proposals off the sheet, a person's verdict on each, and the quote lines they feed. */
 import { supabase } from '@/integrations/supabase/client';
 import type {
   TakeoffElementType, TakeoffKind, TakeoffReviewStatus, TakeoffSource,
@@ -24,7 +24,7 @@ export interface TakeoffMeasurement {
   detail: Record<string, unknown>;
   review_status: TakeoffReviewStatus;
   needs_remeasure: boolean;
-  schedule_item_id: string | null;
+  quote_item_id: string | null;
   /** Derived in SQL through the sheet's scale. NULL = not measurable yet (no scale), never 0. */
   effective_value: number | null;
 }
@@ -86,10 +86,14 @@ export interface TakeoffDrawingSummary {
 
 export interface ProjectTakeoffSummary {
   drawings: TakeoffDrawingSummary[];
-  /** Bill lines fed by a confirmed measurement that a newer revision moved. */
-  remeasure: Array<{ schedule_item_id: string; description: string; item_ref: string | null }>;
-  /** Drawings whose current revision is unread while an older revision still feeds the bill. */
-  not_analysed: Array<{ document_id: string; revision_id: string; label: string; rev_label: string; billed_rev_label: string }>;
+  /** Takeoff lines on a live quote whose quantity no longer matches, or whose area a newer revision moved. */
+  remeasure: Array<{
+    quote_item_id: string; quote_id: string; quote_number: string | null; quote_status: string;
+    description: string; unit: string | null; quoted_quantity: number; drawing_quantity: number | null;
+    changed_in_revision: boolean;
+  }>;
+  /** Drawings whose current revision is unread while an older revision still feeds a quote. */
+  not_analysed: Array<{ document_id: string; revision_id: string; label: string; rev_label: string; quoted_rev_label: string }>;
 }
 
 function readable(error: { message: string; code?: string }): Error {
@@ -194,23 +198,40 @@ export const takeoffService = {
     if (error) throw readable(error);
   },
 
-  async sendToBill(input: {
-    scheduleId: string; measurementIds: string[]; description?: string | null;
-    itemRef?: string | null; existingItemId?: string | null;
-  }): Promise<string> {
-    const { data, error } = await (supabase as any).rpc('takeoff_send_to_bill', {
-      p_schedule_id: input.scheduleId,
+  async addToQuote(input: {
+    projectId: string; measurementIds: string[]; description?: string | null;
+    quoteId?: string | null; quoteItemId?: string | null;
+  }): Promise<{ quote_id: string; quote_item_id: string; quantity: number }> {
+    const { data, error } = await (supabase as any).rpc('takeoff_add_to_quote', {
+      p_project_id: input.projectId,
       p_measurement_ids: input.measurementIds,
       p_description: input.description ?? null,
-      p_item_ref: input.itemRef ?? null,
-      p_schedule_item_id: input.existingItemId ?? null,
+      p_quote_id: input.quoteId ?? null,
+      p_quote_item_id: input.quoteItemId ?? null,
     });
     if (error) throw readable(error);
-    return data as string;
+    return data as { quote_id: string; quote_item_id: string; quantity: number };
   },
 
-  async detachBillLine(itemId: string): Promise<void> {
-    const { error } = await (supabase as any).rpc('takeoff_detach_bill_line', { p_item_id: itemId });
+  async refreshQuoteLine(quoteItemId: string): Promise<void> {
+    const { error } = await (supabase as any).rpc('takeoff_refresh_quote_line', { p_quote_item_id: quoteItemId });
     if (error) throw readable(error);
+  },
+
+  /** Draft quotes on the project, with the takeoff lines each already holds. */
+  async draftQuotes(projectId: string): Promise<Array<{
+    id: string; name: string | null; quote_number: string | null;
+    lines: Array<{ id: string; custom_product_name: string | null; custom_unit: string | null }>;
+  }>> {
+    const { data, error } = await (supabase as any)
+      .from('quotes')
+      .select('id, name, quote_number, quote_items(id, custom_product_name, custom_unit, added_from)')
+      .eq('project_id', projectId).eq('status', 'draft')
+      .order('created_at', { ascending: false });
+    if (error) throw readable(error);
+    return (data ?? []).map((q: any) => ({
+      id: q.id, name: q.name, quote_number: q.quote_number,
+      lines: (q.quote_items ?? []).filter((i: any) => i.added_from === 'takeoff'),
+    }));
   },
 };

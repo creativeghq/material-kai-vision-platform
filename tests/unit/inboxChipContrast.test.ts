@@ -204,7 +204,7 @@ const PALETTES: Array<{ what: string; strings: string[] }> = [
       'src/modules/projects/components/ProjectExpensesCard.tsx',
       'src/modules/projects/components/tabs/ClientViewTab.tsx',
       'src/modules/projects/components/tabs/DocumentsTab.tsx',
-      'src/modules/projects/components/tabs/FinanceTab.tsx',
+      'src/modules/projects/components/tabs/CostReportTab.tsx',
       'src/modules/projects/components/tabs/OverviewTab.tsx',
       'src/modules/projects/components/tabs/ProductsTab.tsx',
       'src/modules/projects/components/tabs/RequestsTab.tsx',

@@ -12,11 +12,20 @@ import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 import { CreateQuoteModal } from '@/modules/quotes/components/CreateQuoteModal';
 import { quoteUrl } from '@/modules/quotes/routes';
+import { usePermissions } from '@/hooks/usePermissions';
+import { ModuleTabGate } from '@/components/core/ModuleTabGate';
+import { SelectionsPanel } from '../SelectionsPanel';
+import { TakeoffQuoteWarnings } from '../TakeoffQuoteWarnings';
+import { VariationsCard } from '../VariationsCard';
 
 interface QuotesTabProps {
   projectId: string;
   /** A guest gets the customer view of a quote and cannot create one. */
   canManage?: boolean;
+  workspaceId?: string | null;
+  currency?: string | null;
+  /** Selections and variations change what the customer pays, so they carry the finance gate. */
+  canFinance?: boolean;
 }
 
 interface QuoteRow {
@@ -44,7 +53,26 @@ interface ChainGroup {
 // dashes only null/undefined, so €0.00 now reads as €0.00.
 import { formatMoney } from '@/utils/decimal';
 
-export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId, canManage = true }) => {
+export const QuotesTab: React.FC<QuotesTabProps> = ({ projectId, canManage = true, workspaceId, currency, canFinance = false }) => {
+  const { isWorkspaceManager } = usePermissions();
+  const [revision, setRevision] = useState(0);
+  return (
+    <div className="space-y-4">
+      {canManage && <TakeoffQuoteWarnings projectId={projectId} onChanged={() => setRevision((r) => r + 1)} />}
+      <QuoteList key={revision} projectId={projectId} canManage={canManage} />
+      {canFinance && workspaceId && (
+        <ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Customer selections and variations for this project.">
+          <div className="space-y-4">
+            <SelectionsPanel workspaceId={workspaceId} projectId={projectId} />
+            <VariationsCard projectId={projectId} workspaceId={workspaceId} currency={currency ?? 'EUR'} isOwner={isWorkspaceManager} />
+          </div>
+        </ModuleTabGate>
+      )}
+    </div>
+  );
+};
+
+const QuoteList: React.FC<Pick<QuotesTabProps, 'projectId' | 'canManage'>> = ({ projectId, canManage = true }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [quotes, setQuotes] = useState<QuoteRow[]>([]);

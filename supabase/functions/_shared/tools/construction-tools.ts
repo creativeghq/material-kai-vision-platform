@@ -19,7 +19,7 @@ import { moduleGate, roleGate, type WorkspaceRolePredicate } from './module-gate
 import { resolveProjectId as sbResolveProjectId } from '../assessment.ts';
 import { TAKEOFF_ELEMENT_TYPES } from '../takeoffVocabulary.generated.ts';
 
-type ProjectView = 'pnl' | 'finance_summary' | 'cost_by_code' | 'labor' | 'inspections';
+type ProjectView = 'pnl' | 'finance_summary' | 'cost_by_code' | 'labor' | 'inspections' | 'early_warning';
 
 const PROJECT_VIEW_GATES: Record<ProjectView, WorkspaceRolePredicate | null> = {
   pnl: 'is_workspace_finance_viewer',
@@ -27,6 +27,7 @@ const PROJECT_VIEW_GATES: Record<ProjectView, WorkspaceRolePredicate | null> = {
   cost_by_code: 'is_workspace_finance_viewer',
   labor: 'is_workspace_finance_viewer',
   inspections: null,
+  early_warning: 'is_workspace_finance_viewer',
 };
 
 function readView(db: ReturnType<typeof callerDbClient>, view: ProjectView, projectId: string) {
@@ -36,6 +37,7 @@ function readView(db: ReturnType<typeof callerDbClient>, view: ProjectView, proj
     case 'cost_by_code': return db.rpc('get_project_cost_by_code', { p_project_id: projectId });
     case 'labor': return db.rpc('get_project_labor', { p_project_id: projectId });
     case 'inspections': return db.rpc('get_project_inspections', { p_project_id: projectId });
+    case 'early_warning': return db.rpc('get_project_command_centre', { p_project_id: projectId, p_today: new Date().toISOString().slice(0, 10) });
   }
 }
 
@@ -51,6 +53,14 @@ async function readProjectView(
   }
   const { data, error } = await readView(db, view, projectId);
   if (error) return { refusal: JSON.stringify({ success: false, error: error.message }) };
+  if (view === 'early_warning') {
+    const c = (data ?? {}) as Record<string, unknown>;
+    return { payload: {
+      success: true, project_id: projectId, view, url: `/projects/${projectId}`,
+      flags: c.flags ?? [], contract: c.contract, retention: c.retention, open_items: c.open_items,
+      how_to_read_this: 'Each flag is derived by the platform with its severity and value. Report them, highest severity first, and say what to look at; add no flag and work out no figure of your own. No flags means no derived warning, not that the job is certainly fine.',
+    } };
+  }
   return { payload: { success: true, project_id: projectId, view, url: `/projects/${projectId}?tab=finance`, data } };
 }
 
@@ -168,11 +178,11 @@ export const createProjectCvrTool = (
         + 'finance_summary (receivables, payables and cost against budget — "is this project over '
         + 'budget"), cost_by_code (supplier, labour and expense cost per cost code), labor (hours and '
         + 'labour cost per person), inspections (site inspections with pass/fail counts and open '
-        + 'failures). All derived by the platform — report the figures, never recompute them.',
+        + 'failures), early_warning (the derived warnings on the job: forecast margin, budget, overbilling, unagreed variations, overdue certificates, late deliveries, critical snags — use for "what should I worry about"). All derived by the platform — report the figures, never recompute them.',
       schema: z.object({
         project_id: z.string().optional().describe('The project id, when you already have it'),
         project_name: z.string().optional().describe('The project name, if you do not have the id'),
-        view: z.enum(['cvr', 'pnl', 'finance_summary', 'cost_by_code', 'labor', 'inspections']).optional()
+        view: z.enum(['cvr', 'pnl', 'finance_summary', 'cost_by_code', 'labor', 'inspections', 'early_warning']).optional()
           .describe('Which report (default cvr — the construction cost value reconciliation).'),
       }),
     },
@@ -211,7 +221,7 @@ export const createProjectApplicationsTool = (
       const payload = {
         success: true,
         project_id: id,
-        url: `/projects/${id}?tab=finance`,
+        url: `/projects/${id}?tab=billing`,
         // A certified application has been AGREED and NOT PAID. Reported as outstanding, because
         // calling it settled makes a job that is owed everything look square.
         outstanding: rows
@@ -296,7 +306,7 @@ export const createListVariationsTool = (
       const payload = {
         success: true,
         project_id: id,
-        url: `/projects/${id}?tab=finance`,
+        url: `/projects/${id}?tab=quotes`,
         // Two totals, never one. A client variation is money IN and a supplier variation money
         // OUT; netting them is the defect anti-regression rule 1 exists to prevent.
         approved_to_client: approved.filter((r) => r.direction === 'client').reduce((s, r) => s + money(r.value), 0),
@@ -389,7 +399,7 @@ export const createTenderStatusTool = (
       const payload = {
         success: true,
         project_id: id,
-        url: `/projects/${id}?tab=finance`,
+        url: `/projects/${id}?tab=purchases`,
         count: pkgs.length,
         packages: pkgs.map((p) => {
           const bs = byPackage.get(String(p.id)) ?? [];
@@ -550,7 +560,7 @@ export const createBidAnalysisTool = (
       const payload = {
         success: true,
         project_id: id,
-        url: `/projects/${id}?tab=finance`,
+        url: `/projects/${id}?tab=purchases`,
         count: out.length,
         packages: out,
         how_to_read_this:
@@ -646,8 +656,8 @@ export const createDrawingTakeoffTool = (
             problem: d.takeoff_error, pages: d.pages, cad_pages: d.vector_pages, scanned_pages: d.scan_pages,
             to_review: d.proposed, confirmed: d.confirmed, needs_scale: d.needs_scale, groups: d.groups,
           })),
-          bill_lines_to_remeasure: (summary as any)?.remeasure ?? [],
-          note: 'Totals are derived by the platform. Confirmed figures reach the bill only when someone sends them there in the Takeoff screen.',
+          quote_lines_to_check: (summary as any)?.remeasure ?? [],
+          note: 'Totals are derived by the platform. Confirmed figures reach a quote only when someone adds them there in the Takeoff screen.',
         };
         try { onChunk?.({ type: 'construction_takeoff', ...payload, timestamp: Date.now() }); } catch { /* stream may be closed */ }
         return JSON.stringify(payload);
@@ -708,7 +718,7 @@ export const createDrawingTakeoffTool = (
         if (updError) return JSON.stringify({ success: false, error: updError.message });
         const payload = {
           success: true, project_id: id, url: `${url}&revision=${target.revision_id}`, drawing: target.label, confirmed: list.length,
-          message: 'Confirmed. Send them to the bill from the Takeoff screen.',
+          message: 'Confirmed. Add them to a quote from the Takeoff screen.',
         };
         try { onChunk?.({ type: 'construction_takeoff', ...payload, timestamp: Date.now() }); } catch { /* stream may be closed */ }
         return JSON.stringify(payload);
@@ -721,7 +731,7 @@ export const createDrawingTakeoffTool = (
       description:
         'Quantities taken off a project drawing PDFs. status: per drawing, what was read (CAD-exported vs '
         + 'scanned pages), how many proposals wait for review, confirmed totals per element (doors, windows, '
-        + 'rooms m², walls m), what needs a scale, and bill lines a newer revision moved. analyze: start '
+        + 'rooms m², walls m), what needs a scale, and quote lines whose drawings have since changed. analyze: start '
         + 'reading one uploaded drawing (costs a credit). confirm_printed: confirm the rows transcribed from '
         + 'tables PRINTED on a drawing; it always asks the user to Approve first, never set confirm yourself. '
         + 'Counted and measured figures are confirmed only by a person on the sheet, so never offer to confirm '

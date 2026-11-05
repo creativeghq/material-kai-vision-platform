@@ -69,7 +69,7 @@ export const ProjectCommandCentre: React.FC<{
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => onOpenSection('finance')}>
-          Finance<ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+          Cost report<ArrowRight className="ml-1.5 h-3.5 w-3.5" />
         </Button>
       </CardHeader>
       <CardContent>

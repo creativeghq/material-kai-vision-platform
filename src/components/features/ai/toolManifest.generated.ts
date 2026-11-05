@@ -1753,7 +1753,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'project_id', type: 'string', optional: true, description: 'The project id, when you already have it' },
       { name: 'project_name', type: 'string', optional: true, description: 'The project name, if you do not have the id' },
-      { name: 'view', type: 'enum', enum: ['cvr', 'pnl', 'finance_summary', 'cost_by_code', 'labor', 'inspections'], optional: true, description: 'Which report (default cvr — the construction cost value reconciliation).' },
+      { name: 'view', type: 'enum', enum: ['cvr', 'pnl', 'finance_summary', 'cost_by_code', 'labor', 'inspections', 'early_warning'], optional: true, description: 'Which report (default cvr — the construction cost value reconciliation).' },
     ],
   },
   {

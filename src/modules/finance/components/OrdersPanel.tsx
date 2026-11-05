@@ -37,6 +37,8 @@ import {
   DropdownMenuLabel,
 } from '@/components/core/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
+import { isApprovalRefusal, raiseProjectApproval } from '@/modules/projects/services/projectApprovals';
+import { DELIVERY_STAGE_LABEL, purchaseOrderProgress, type PurchaseProgress } from '@/modules/finance/services/purchaseProgress';
 import { useQuotaErrorHandler } from '@/hooks/useQuotaErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
@@ -170,7 +172,10 @@ export const OrdersPanel: React.FC<{
       order kinds the New-order menu offers (customer → sell, supplier → buy). Omit on the
       global Finance list / project tab — there's no single party, so both kinds stay. */
   partyRoles?: { customer: boolean; supplier: boolean };
-}> = ({ workspaceId, companyId, contactId, projectId, projectName, partyRoles }) => {
+  /** One kind only: a project's Invoicing shows its sales orders and Purchases its purchase orders. */
+  orderType?: OrderType;
+  onChanged?: () => void;
+}> = ({ workspaceId, companyId, contactId, projectId, projectName, partyRoles, orderType: fixedType, onChanged }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<OrderListRow[]>([]);
   // Outstanding € per order for the visible page (total − settled), so the list doubles as a
@@ -183,7 +188,7 @@ export const OrdersPanel: React.FC<{
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   // Inside a CRM party (company/contact) the list is already scoped — hide the filter cluster.
-  const embedded = !!(companyId || contactId);
+  const embedded = !!(companyId || contactId || fixedType);
   // Filters live in the URL on the standalone Finance list, so a filtered view is shareable AND
   // so another surface can link straight into one. The dashboard's Orders block addresses
   // `Confirmed` / `Draft` this way; without the URL half it would open the tab showing everything
@@ -269,8 +274,9 @@ export const OrdersPanel: React.FC<{
   // unclassified party → offer both kinds, unchanged. A customer-only party can't be a
   // supplier we buy from, so Purchase is hidden — and vice versa.
   const roleUnset = !partyRoles || (!partyRoles.customer && !partyRoles.supplier);
-  const showSales = roleUnset || !!partyRoles?.customer;
-  const showPurchase = roleUnset || !!partyRoles?.supplier;
+  const showSales = fixedType ? fixedType === 'sales' : roleUnset || !!partyRoles?.customer;
+  const showPurchase = fixedType ? fixedType === 'purchase' : roleUnset || !!partyRoles?.supplier;
+  const [progress, setProgress] = useState<Map<string, PurchaseProgress> | null>(null);
 
   // Everything — filters, free text, paging AND the party-name join — runs in SQL, so the browser
   // only ever holds one page and the filters always cover the WHOLE workspace, not a capped slice.
@@ -281,6 +287,7 @@ export const OrdersPanel: React.FC<{
       const res = await ordersService.search({
         workspaceId, companyId, contactId, projectId,
         ...orderSearchParams(filterValues),
+        ...(fixedType ? { orderType: fixedType } : {}),
         search: searchQ || undefined,
         limit: TABLE_PAGE_SIZE,
         offset: (page - 1) * TABLE_PAGE_SIZE,
@@ -291,6 +298,9 @@ export const OrdersPanel: React.FC<{
       if (clamped !== page) { setPage(clamped); return; }
       setRows(res.rows);
       setTotal(res.count);
+      if (fixedType === 'purchase') {
+        purchaseOrderProgress(res.rows.map((r) => r.id)).then(setProgress).catch(() => setProgress(null));
+      }
       // Outstanding for just this page — one batched query. The figure is derived in SQL by
       // `get_order_settlements` (the same definition behind the payment badge), so this row can
       // never show "Paid" next to a non-zero balance again.
@@ -320,7 +330,7 @@ export const OrdersPanel: React.FC<{
   // One key for every server-side filter parameter, so adding a dimension to the group def can't
   // leave the query stale the way an ad-hoc dependency list would.
   const filterKey = JSON.stringify(orderSearchParams(filterValues));
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, filterKey, searchQ, page]);
+  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [workspaceId, companyId, contactId, projectId, fixedType, filterKey, searchQ, page]);
   // A narrowed set is a different list — restart at the first page.
   useEffect(() => { setPage(1); }, [filterKey]);
 
@@ -358,7 +368,7 @@ export const OrdersPanel: React.FC<{
       <Card>
         <CardHeader className="border-b border-border/60 px-5 py-3 flex-row items-center justify-between gap-3 flex-wrap space-y-0">
           <CardTitle className="flex items-center gap-2">
-            <ShoppingCart className="h-4 w-4" /> Orders
+            <ShoppingCart className="h-4 w-4" /> {fixedType === 'purchase' ? 'Purchase orders' : fixedType === 'sales' ? 'Sales orders' : 'Orders'}
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
             {/* Filters only matter on the global Finance list. Inside a single party the list is
@@ -375,7 +385,9 @@ export const OrdersPanel: React.FC<{
             )}
             {/* One entry point, one dropdown — the order kind is an explicit choice in the menu
                 (a "pre-order" is just a sales order saved as a draft). */}
-            <DropdownMenu>
+            {fixedType === 'purchase' ? (
+              <Button size="sm" variant="outline" onClick={() => openCreate('purchase', true)}><Plus className="h-4 w-4 mr-1" /> New purchase order</Button>
+            ) : <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button size="sm"><Plus className="h-4 w-4 mr-1" /> New order <ChevronDown className="h-4 w-4 ml-1" /></Button>
               </DropdownMenuTrigger>
@@ -400,7 +412,7 @@ export const OrdersPanel: React.FC<{
                   </>
                 )}
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu>}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -418,12 +430,14 @@ export const OrdersPanel: React.FC<{
             ) : (
               <HubEmptyState
                 icon={ShoppingCart}
-                title="No orders yet"
-                description="An accepted quote turns into an order automatically. You can also raise one directly — a sales order for what a customer owes you, a purchase order for what you owe a supplier."
+                title={fixedType === 'purchase' ? 'No purchase orders yet' : fixedType === 'sales' ? 'No sales orders yet' : 'No orders yet'}
+                description={fixedType === 'purchase'
+                  ? 'Raise one here, or tick made-to-order items above and press Raise PO. Awarding a tender creates one too.'
+                  : 'An accepted quote turns into an order automatically. You can also raise one directly — a sales order for what a customer owes you, a purchase order for what you owe a supplier.'}
                 action={
                   <>
-                    <Button size="sm" onClick={() => openCreate('sales', false)}><Plus /> New sales order</Button>
-                    <Button size="sm" variant="outline" onClick={() => openCreate('purchase', false)}><Plus /> New purchase order</Button>
+                    {showSales && <Button size="sm" onClick={() => openCreate('sales', false)}><Plus /> New sales order</Button>}
+                    {showPurchase && <Button size="sm" variant="outline" onClick={() => openCreate('purchase', fixedType === 'purchase')}><Plus /> New purchase order</Button>}
                   </>
                 }
               />
@@ -436,8 +450,9 @@ export const OrdersPanel: React.FC<{
                 <tr className="border-b border-border/60">
                   <th className="px-4 py-2 text-left">Order</th>
                   <th className="px-4 py-2 text-left">Party</th>
-                  <th className="px-4 py-2 text-left">Type</th>
-                  <th className="px-4 py-2 text-left">Status</th>
+                  {!fixedType && <th className="px-4 py-2 text-left">Type</th>}
+                  <th className="px-4 py-2 text-left">{fixedType === 'purchase' ? 'Delivery' : 'Status'}</th>
+                  {fixedType === 'purchase' && <th className="px-4 py-2 text-left">Billed</th>}
                   <th className="px-4 py-2 text-left">Payment</th>
                   <th className="px-4 py-2 text-right">Total</th>
                   <th className="px-4 py-2 text-right" title="Still to collect (sales) or pay (purchase) — total minus settled">Outstanding</th>
@@ -458,7 +473,7 @@ export const OrdersPanel: React.FC<{
                       <button type="button" onClick={(e) => { e.stopPropagation(); setOpenId(r.id); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.order_number ?? r.id.slice(0, 8)}</button>
                     </td>
                     <td className="px-4 py-2">{r.party_name ?? '—'}</td>
-                    <td className="px-4 py-2">
+                    {!fixedType && <td className="px-4 py-2">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs capitalize text-muted-foreground">{r.order_type}</span>
                         {r.order_type === 'purchase' && r.three_way_match_status && (r.three_way_match_status === 'variance' || r.three_way_match_status === 'awaiting_bill') && (
@@ -467,8 +482,25 @@ export const OrdersPanel: React.FC<{
                           </span>
                         )}
                       </div>
+                    </td>}
+                    <td className="px-4 py-2">
+                      <span className={`text-xs ${statusTone(r.status)}`}>
+                        {fixedType === 'purchase' && progress?.get(r.id)
+                          ? DELIVERY_STAGE_LABEL[progress.get(r.id)!.delivery_stage]
+                          : ORDER_STATUS_LABEL[r.status]}
+                      </span>
                     </td>
-                    <td className="px-4 py-2"><span className={`text-xs ${statusTone(r.status)}`}>{ORDER_STATUS_LABEL[r.status]}</span></td>
+                    {fixedType === 'purchase' && (
+                      <td className="px-4 py-2 text-xs text-muted-foreground tabular-nums">
+                        {(() => {
+                          const p = progress?.get(r.id);
+                          if (!p) return '—';
+                          if (p.billing_stage === 'not_billed') return 'Not billed';
+                          if (p.billing_stage === 'billed') return 'Billed';
+                          return `${formatMoney(p.billed_net, r.currency)} of ${formatMoney(p.order_net, r.currency)}`;
+                        })()}
+                      </td>
+                    )}
                     {/* The DERIVED payment status, not the cached orders.payment_status column —
                         the derived one was already in hand and discarded. */}
                     <td className="px-4 py-2 text-xs text-muted-foreground">
@@ -528,9 +560,9 @@ export const OrdersPanel: React.FC<{
         categories={categories}
         open={createOpen}
         onOpenChange={(v) => { setCreateOpen(v); if (!v) setTemplatePrefill(null); }}
-        onCreated={() => { setCreateOpen(false); setTemplatePrefill(null); void load(); }}
+        onCreated={() => { setCreateOpen(false); setTemplatePrefill(null); void load(); onChanged?.(); }}
       />
-      <OrderDetailDialog orderId={openId} categories={categories} open={openId !== null} onClose={() => setOpenId(null)} onChanged={() => void load()} onOpenOrder={(id) => setOpenId(id)} />
+      <OrderDetailDialog orderId={openId} categories={categories} open={openId !== null} onClose={() => setOpenId(null)} onChanged={() => { void load(); onChanged?.(); }} onOpenOrder={(id) => setOpenId(id)} />
     </div>
   );
 };
@@ -1888,6 +1920,21 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
       onChanged();
       toast({ title: `Marked ${ORDER_STATUS_LABEL[status]}` });
     } catch (err: any) {
+      if (isApprovalRefusal(err)) {
+        try {
+          const r = await raiseProjectApproval({
+            workspaceId: order.workspace_id, subject: 'project_purchase_order', table: 'orders',
+            id: order.id, amount: Number(order.total), reason: `Purchase order ${order.order_number ?? ''}`.trim(),
+          });
+          toast({
+            title: r === 'raised' ? 'Approval requested' : 'Already waiting for approval',
+            description: 'An approver signs it under Finance → Approvals; then confirm the order again.',
+          });
+        } catch (raiseErr: any) {
+          toast({ title: 'Failed', description: raiseErr?.message, variant: 'destructive' });
+        }
+        return;
+      }
       toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
     } finally { setSaving(false); }
   };

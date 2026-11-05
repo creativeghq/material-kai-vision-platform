@@ -2916,6 +2916,14 @@ export const TOOLKITS: ToolkitDefinition[] = [
         autoFields: true,
       },
       {
+        label: 'What should worry me?', description: 'The warnings the platform derives on this job', icon: 'AlertTriangle',
+        prompt: 'What should I worry about on this project?',
+        done: 'That is what the platform flags on this job.',
+        promptTemplate: 'Show the early warnings for the project "{{project_name}}".',
+        run: { tool: 'project_cvr', fixedArgs: { view: 'early_warning' } },
+        autoFields: true,
+      },
+      {
         label: 'What do the drawings say?', description: 'Doors, windows, rooms and walls taken off the PDFs', icon: 'FileSearch',
         prompt: 'What quantities have we taken off the drawings on this project?',
         done: 'That is what the drawings say so far.',

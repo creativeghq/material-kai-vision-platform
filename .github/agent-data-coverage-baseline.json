@@ -57,6 +57,7 @@
     "get_products_in_project",
     "get_profit_drawdown",
     "get_project_applications",
+    "get_project_command_centre",
     "get_project_cost_by_code",
     "get_project_cvr",
     "get_project_finance_summary",

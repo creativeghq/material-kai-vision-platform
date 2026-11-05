@@ -1,4 +1,4 @@
-/** Specification → Takeoff: drop drawing PDFs, read them, confirm what they say, send it to the bill (#532). */
+/** Specification → Takeoff: drop drawing PDFs, read them, confirm what they say, add it to a quote (#532). */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, Upload, ScanLine, RefreshCw, FilePlus2 } from 'lucide-react';
@@ -21,7 +21,7 @@ const statusBadge = (d: TakeoffDrawingSummary) =>
       : d.takeoff_status === 'done' ? <Badge variant="success">Read</Badge>
         : <Badge variant="neutral">Not analysed</Badge>;
 
-export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }> = ({ projectId, canSendToBill }) => {
+export const TakeoffTab: React.FC<{ projectId: string }> = ({ projectId }) => {
   const { toast } = useToast();
   const [sp, setSp] = useSearchParams();
   const fileInput = useRef<HTMLInputElement | null>(null);
@@ -104,7 +104,7 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
             <CardTitle className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-primary" /> Takeoff</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Upload the drawings and the engineer's study as PDF. Printed tables are read, symbols are counted and
-              runs are measured on CAD-exported pages; nothing reaches the bill until you confirm it.
+              runs are measured on CAD-exported pages; nothing reaches a quote until you confirm it.
             </p>
           </div>
           {uploadButton}
@@ -181,7 +181,6 @@ export const TakeoffTab: React.FC<{ projectId: string; canSendToBill: boolean }>
           revisionId={selected.revision_id}
           projectId={projectId}
           label={selected.label}
-          canSendToBill={canSendToBill}
           onChanged={() => void load()}
         />
       )}

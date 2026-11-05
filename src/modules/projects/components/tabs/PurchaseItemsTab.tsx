@@ -31,6 +31,7 @@ import { HubEmptyState } from '@/components/core/hub';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Link } from 'react-router-dom';
 import { FINANCE_BASE } from '@/modules/finance/routes';
+import { humanizeLabel } from '@/utils/humanize';
 
 const TYPE_LABELS: Record<string, string> = { door: 'Door', window: 'Window', other: 'Other' };
 const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -44,9 +45,9 @@ const money = (n: number | null | undefined, c: string | null | undefined) => fo
 // describe this item" is how the row and the PO come to disagree about what was ordered.
 const specSummary = purchaseItemSpecSummary;
 
-export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: string | null; projectName: string }> = ({
-  projectId, workspaceId, projectName,
-}) => {
+export const PurchaseItemsTab: React.FC<{
+  projectId: string; workspaceId?: string | null; projectName: string; canFinance?: boolean; onChanged?: () => void;
+}> = ({ projectId, workspaceId, projectName, canFinance = false, onChanged }) => {
   const { toast } = useToast();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [rows, setRows] = useState<ProjectPurchaseItem[]>([]);
@@ -70,6 +71,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
       const res = await projectsService.raisePurchaseOrders(projectId, [...selected]);
       setSelected(new Set());
       await load();
+      onChanged?.();
       const made = res.orders.length;
       const lines = res.orders.reduce((n, o) => n + o.itemCount, 0);
       if (made === 0) {
@@ -131,6 +133,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
     try {
       await projectsService.deletePurchaseItem(id);
       setRows(prev => prev.filter(r => r.id !== id));
+      onChanged?.();
     } catch { toast({ title: 'Failed to remove', variant: 'destructive' }); }
     finally { setBusy(null); }
   };
@@ -154,7 +157,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
-          <h3 className="text-sm font-medium flex items-center gap-2"><Hammer className="h-4 w-4" /> Purchase Items</h3>
+          <h3 className="text-sm font-medium flex items-center gap-2"><Hammer className="h-4 w-4" /> Made to order</h3>
           <p className="text-xs text-muted-foreground mt-0.5">Made-to-order doors, windows &amp; custom purchases — with a spec sheet for the supplier.</p>
         </div>
         <div className="flex items-center gap-2">
@@ -173,10 +176,11 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
           </Button>
           {/* The thing the PDF could never be: a row the platform can count as committed cost,
               receive against, three-way match, and hand to the supplier portal (#378 C2). */}
-          <Button size="sm" variant="outline" onClick={raiseOrders} disabled={raising || selected.size === 0}>
+          {canFinance && <Button size="sm" variant="outline" onClick={raiseOrders} disabled={raising || selected.size === 0}
+            title={selected.size === 0 ? 'Tick the items to order' : undefined}>
             {raising ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <ShoppingCart className="h-3.5 w-3.5 mr-1" />}
             Raise PO{selected.size > 0 ? ` (${selected.size})` : ''}
-          </Button>
+          </Button>}
           <Button size="sm" onClick={() => setDialogItem('new')}>
             <Plus /> Add item
           </Button>
@@ -200,7 +204,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
               <div key={it.id} className="p-4 flex items-center gap-3 flex-wrap">
                 {/* Only an unordered item can be selected — an item already on a PO would be
                     ordered twice, and the service refuses it anyway. */}
-                <Checkbox
+                {canFinance && <Checkbox
                   className="shrink-0"
                   checked={selected.has(it.id)}
                   disabled={!!it.order_id}
@@ -210,7 +214,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
                     if (v === true) next.add(it.id); else next.delete(it.id);
                     return next;
                   })}
-                />
+                />}
                 <div className="h-14 w-14 rounded-md overflow-hidden bg-muted/40 border border-white/10 flex items-center justify-center shrink-0">
                   {it.design_image_url
                     ? <img src={it.design_image_url} alt={it.name} className="h-full w-full object-cover" />
@@ -224,14 +228,14 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
                   <p className="text-xs text-muted-foreground">{specSummary(it) || 'No spec yet'}</p>
                   {it.order_id && (
                     <Link to={`${FINANCE_BASE}/orders/${it.order_id}`} className="text-[11px] text-primary hover:underline">
-                      On a purchase order →
+                      {humanizeLabel(it.status)} on a purchase order →
                     </Link>
                   )}
                 </div>
 
                 <div className="text-right w-[120px]">
-                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Qty × Unit</p>
-                  <p className="text-sm">{it.quantity} × {money(it.unit_cost, it.currency)}</p>
+                  <p className="text-[10px] text-muted-foreground">{canFinance ? 'Qty × Unit' : 'Qty'}</p>
+                  <p className="text-sm tabular-nums">{canFinance ? `${it.quantity} × ${money(it.unit_cost, it.currency)}` : it.quantity}</p>
                 </div>
 
                 <Button size="icon" variant="ghost" className="h-8 w-8" title={it.design_image_url ? 'Regenerate image' : 'Generate image from spec'}
@@ -258,7 +262,7 @@ export const PurchaseItemsTab: React.FC<{ projectId: string; workspaceId?: strin
           workspaceId={workspaceId}
           rooms={rooms}
           onClose={() => setDialogItem(null)}
-          onSaved={() => { setDialogItem(null); load(); }}
+          onSaved={() => { setDialogItem(null); load(); onChanged?.(); }}
         />
       )}
       {dialogItem && !workspaceId && (() => { toast({ title: 'This project has no workspace — purchase items need one.', variant: 'destructive' }); setDialogItem(null); return null; })()}

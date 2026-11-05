@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import {
-  groupMeasurements, confirmable, billable, roomAreaDisagreement, cellRect, isMixed,
+  groupMeasurements, confirmable, quotable, roomAreaDisagreement, cellRect, isMixed,
 } from '../../src/modules/projects/lib/takeoffGroups';
 import { lengthInPageWidths, areaInPageWidths } from '../../src/modules/projects/lib/drawingMarkup';
 
@@ -16,9 +16,8 @@ const SERVICE = read('src/modules/projects/services/takeoffService.ts');
 const REVIEWER = read('src/modules/projects/components/TakeoffReviewer.tsx');
 const TAB = read('src/modules/projects/components/tabs/TakeoffTab.tsx');
 const REGISTER = read('src/modules/projects/components/tabs/DocumentsTab.tsx');
-const CARD = read('src/modules/projects/components/PricedScheduleCard.tsx');
+const WARNINGS = read('src/modules/projects/components/TakeoffQuoteWarnings.tsx');
 const PAGE = read('src/modules/projects/pages/ProjectDetailPage.tsx');
-const FINANCE = read('src/modules/projects/components/tabs/FinanceTab.tsx');
 
 const HANDLER = FN.slice(FN.indexOf('Deno.serve('));
 const SCHEMA = FN.slice(FN.indexOf('const READ_SCHEMA'), FN.indexOf('function json'));
@@ -111,7 +110,7 @@ describe('the security invariants on this path', () => {
 describe('a person decides, and the bill is the sum', () => {
   const row = (over: Partial<Parameters<typeof groupMeasurements>[0][number]>) => ({
     id: Math.random().toString(36), element_type: 'door' as const, unit: 'pcs', label: 'D', kind: 'count', source: 'detected',
-    review_status: 'proposed' as const, effective_value: 1, value: 1, detail: {}, schedule_item_id: null, ...over,
+    review_status: 'proposed' as const, effective_value: 1, value: 1, detail: {}, quote_item_id: null, ...over,
   });
 
   it('a confirmed total is NULL when any contributor cannot be valued — never a partial sum', () => {
@@ -127,9 +126,9 @@ describe('a person decides, and the bill is the sum', () => {
     expect(ok).toHaveLength(1);
   });
 
-  it('only confirmed rows not already on a line can be sent to the bill', () => {
-    const rows = [row({ review_status: 'confirmed' }), row({ review_status: 'confirmed', schedule_item_id: 'x' }), row({})];
-    expect(billable(rows)).toHaveLength(1);
+  it('only confirmed rows not already on a line can be added to a quote', () => {
+    const rows = [row({ review_status: 'confirmed' }), row({ review_status: 'confirmed', quote_item_id: 'x' }), row({})];
+    expect(quotable(rows)).toHaveLength(1);
   });
 
   it('a printed room area that disagrees with its outline is flagged, not silently replaced', () => {
@@ -189,20 +188,19 @@ describe('a person decides, and the bill is the sum', () => {
     expect(REVIEWER).toContain('useState<Set<string>>(new Set())');
   });
 
-  it('the bill shows a takeoff line as derived and offers detaching, not typing over it', () => {
-    expect(CARD).toContain("i.quantity_source === 'takeoff'");
-    expect(CARD).toContain('takeoffService.detachBillLine(i.id)');
-    expect(SERVICE).toContain("rpc('takeoff_send_to_bill'");
+  it('a takeoff reaches a quote only through the RPC, and a changed drawing is a choice, never a silent reprice', () => {
+    expect(SERVICE).toContain("rpc('takeoff_add_to_quote'");
+    expect(WARNINGS).toContain('takeoffService.refreshQuoteLine');
+    expect(WARNINGS).toContain("l.quote_status === 'draft'");
   });
 });
 
 describe('it is reachable', () => {
-  it('Takeoff and Bill sit under Specification, and Finance links to the bill', () => {
-    expect(PAGE).toContain("tabs: ['products', 'plan', 'takeoff', 'bill', 'purchases']");
+  it('Takeoff sits under Specification, and Commercial answers one question per tab', () => {
+    expect(PAGE).toContain("tabs: ['products', 'plan', 'takeoff']");
+    expect(PAGE).toContain("tabs: ['quotes', 'contracts', 'billing', 'purchases', 'finance']");
     expect(PAGE).toContain('<TakeoffTab');
-    expect(PAGE).toContain('<BillTab');
-    expect(FINANCE).toContain('<PricedScheduleSummary');
-    expect(FINANCE).not.toContain('<PricedScheduleCard');
+    expect(PAGE).not.toContain('BillTab');
   });
 
   it('uploads accept PDF only', () => {
@@ -215,8 +213,8 @@ describe('it is reachable', () => {
     expect(TAB).toMatch(/pdfOnly[\s\S]{0,400}onSaved=\{\(revisionId\) => \{[^}]*analyze\(revisionId\)/);
   });
 
-  it('the bill says when it still quotes a revision nobody has read', () => {
-    expect(read('src/modules/projects/components/tabs/BillTab.tsx')).toContain('summary?.not_analysed');
+  it('the Quotes tab says when a quote still uses a revision nobody has read', () => {
+    expect(WARNINGS).toContain('summary?.not_analysed');
   });
 
   it('the drawings register opens a drawing in Takeoff', () => {

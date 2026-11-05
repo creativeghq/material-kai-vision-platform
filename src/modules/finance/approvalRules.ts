@@ -7,7 +7,7 @@
  */
 
 export type ApprovalSubject =
-  | 'credit_hold' | 'margin_floor' | 'pos_variance' | 'project_variation' | 'project_application';
+  | 'credit_hold' | 'margin_floor' | 'pos_variance' | 'project_variation' | 'project_application' | 'project_purchase_order';
 export type ApprovalAction = 'warn' | 'block' | 'approve';
 export type ApprovalDecision = 'allow' | 'warn' | 'block' | 'approve';
 
@@ -46,6 +46,7 @@ export const SUBJECT_LABEL: Record<ApprovalSubject, string> = {
   pos_variance: 'Till variance',
   project_variation: 'Project variation',
   project_application: 'Project application',
+  project_purchase_order: 'Project purchase order',
 };
 
 /** Whether a verdict should stop the write rather than merely inform. */

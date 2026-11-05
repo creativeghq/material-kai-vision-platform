@@ -370,6 +370,15 @@ export interface CostControlRow {
   actual_cost: number; committed_cost: number; etc_override: number | null; etc_effective: number;
   forecast_cost: number; variance: number | null;
 }
+export interface ProjectPurchaseSummary {
+  to_order_count: number;
+  draft_orders: number;
+  on_order: number;
+  awaiting_bill: number;
+  to_pay: number;
+  currencies: string[];
+}
+
 export type CostLineKind = 'supplier_bills' | 'purchase_orders' | 'expenses' | 'time' | 'invoices';
 export interface CostLine {
   id: string; date: string | null; label: string; counterparty: string | null; amount: number | null;
@@ -490,6 +499,7 @@ export interface ProjectPurchaseItem {
   unit_cost: number | null;
   currency: string;
   supplier_company_id: string | null;
+  cost_code_id?: string | null;
   status: string;
   details: PurchaseItemDetails;
   design_image_url: string | null;
@@ -1648,6 +1658,12 @@ class ProjectsService {
     };
   }
 
+  async purchaseSummary(projectId: string): Promise<ProjectPurchaseSummary> {
+    const { data, error } = await (supabase as any).rpc('get_project_purchase_summary', { p_project_id: projectId });
+    if (error) throw error;
+    return data as ProjectPurchaseSummary;
+  }
+
   // ---------- PROJECT FINANCE: attach payables / receivables ----------
 
   async getProjectFinanceSummary(projectId: string): Promise<ProjectFinanceSummary> {
@@ -2246,6 +2262,17 @@ class ProjectsService {
           `Purchase order created, but the items could not be marked as ordered (${stampErr.message}). `
           + 'Check the project purchases tab before raising it again.',
         );
+      }
+
+      // After the stamp: a failure here must not leave the items open to a second order.
+      // Lines keep the items' order, so a line's sort_order names its item.
+      for (const [i, it] of group.entries()) {
+        if (!it.cost_code_id) continue;
+        const { error: codeErr } = await (supabase as any)
+          .from('order_items').update({ cost_code_id: it.cost_code_id }).eq('order_id', orderId).eq('sort_order', i);
+        if (codeErr) {
+          throw new Error(`Purchase order created and the items marked as ordered, but cost codes could not be copied to its lines (${codeErr.message}). Set them on the order.`);
+        }
       }
 
       result.orders.push({ orderId, supplierCompanyId, itemCount: group.length });

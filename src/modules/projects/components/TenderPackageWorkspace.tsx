@@ -26,7 +26,6 @@ import {
   type PackageItem, type TenderBid, type BidAnalysisRow, type BidSummaryRow,
 } from '../services/tendersService';
 import { bidClarifications, clarificationsAsText } from '../lib/bidClarifications';
-import { schedulesService } from '../services/schedulesService';
 
 const n = (v: number | string | null | undefined) => Number(v ?? 0);
 
@@ -84,27 +83,14 @@ export const TenderPackageWorkspace: React.FC<Props> = ({
     [companies, bids],
   );
 
-  /**
-   * Pull the enquiry from the project's accepted contract schedule. Quantities and cost codes
-   * come across; rates deliberately do not.
-   */
-  const pullFromSchedule = () =>
-    act('Could not build the package from the schedule', async () => {
-      const schedules = await schedulesService.list(projectId);
-      const contract = schedules.find((s) => s.is_contract) ?? schedules[0];
-      if (!contract) throw new Error('This project has no priced schedule to pull from.');
-      const lines = await schedulesService.items(contract.id);
-      if (lines.length === 0) throw new Error('That schedule has no lines yet.');
-      await tendersService.addItemsFromSchedule(
+  /** Pull the enquiry from the project's accepted quote. Quantities and cost codes come across; rates never do. */
+  const pullFromQuote = () =>
+    act('Could not build the package from the quote', async () => {
+      const lines = await tendersService.linesFromProjectQuote(projectId);
+      await tendersService.addItemsFromQuote(
         workspaceId,
         packageId,
-        lines.map((l) => ({
-          item_ref: l.item_ref,
-          description: l.description,
-          unit: l.unit,
-          quantity: l.quantity,
-          cost_code_id: l.cost_code_id,
-        })),
+        lines,
       );
       toast({
         title: `${lines.length} items added`,
@@ -121,8 +107,8 @@ export const TenderPackageWorkspace: React.FC<Props> = ({
           <span className="text-xs text-muted-foreground">{items.length}</span>
           {!locked && (
             <div className="ml-auto flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => void pullFromSchedule()} disabled={busy}>
-                <Download className="h-3.5 w-3.5" /> From the schedule
+              <Button size="sm" variant="outline" onClick={() => void pullFromQuote()} disabled={busy}>
+                <Download className="h-3.5 w-3.5" /> From the quote
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setAdding(true)} disabled={busy}>
                 <Plus className="h-3.5 w-3.5" /> Add item
@@ -135,11 +121,11 @@ export const TenderPackageWorkspace: React.FC<Props> = ({
           <HubEmptyState
             icon={ListOrdered}
             title="Nothing to price yet"
-            description="Pull the lines straight from the priced schedule, or type them. Quantities and cost codes come across; rates do not — that is what you are asking for."
+            description="Pull the lines straight from the accepted quote, or type them. Quantities and cost codes come across; rates do not — that is what you are asking for."
             action={!locked ? (
               <div className="flex gap-2">
-                <Button size="sm" onClick={() => void pullFromSchedule()} disabled={busy}>
-                  <Download className="h-3.5 w-3.5" /> From the schedule
+                <Button size="sm" onClick={() => void pullFromQuote()} disabled={busy}>
+                  <Download className="h-3.5 w-3.5" /> From the quote
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => setAdding(true)} disabled={busy}>
                   <Plus className="h-3.5 w-3.5" /> Type them

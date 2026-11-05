@@ -12,7 +12,7 @@ export interface GroupableMeasurement {
   effective_value: number | null;
   value: number | null;
   detail: Record<string, unknown>;
-  schedule_item_id: string | null;
+  quote_item_id: string | null;
 }
 
 export interface TakeoffGroup<M extends GroupableMeasurement> {
@@ -83,9 +83,9 @@ export function confirmable<M extends GroupableMeasurement>(rows: readonly M[], 
     && (family == null || sourceFamily(m.source) === family));
 }
 
-/** Confirmed rows not yet on a bill line, all in one unit — what "Send to bill" may take. */
-export function billable<M extends GroupableMeasurement>(rows: readonly M[]): M[] {
-  return rows.filter((m) => m.review_status === 'confirmed' && !m.schedule_item_id && m.effective_value != null);
+/** Confirmed rows not yet on a quote line — what "Add to quote" may take. */
+export function quotable<M extends GroupableMeasurement>(rows: readonly M[]): M[] {
+  return rows.filter((m) => m.review_status === 'confirmed' && !m.quote_item_id && m.effective_value != null);
 }
 
 /**

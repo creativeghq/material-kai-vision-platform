@@ -37,7 +37,6 @@ import {
   BarChart3,
   MoreHorizontal,
   ScanLine,
-  ListOrdered,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -73,7 +72,7 @@ import { OverviewTab } from '../components/tabs/OverviewTab';
 import { RoomsTab } from '../components/tabs/RoomsTab';
 import { MoodboardsTab } from '../components/tabs/MoodboardsTab';
 import { QuotesTab } from '../components/tabs/QuotesTab';
-import { BillingTab } from '../components/tabs/BillingTab';
+import { InvoicingTab } from '../components/tabs/InvoicingTab';
 import { TasksAndScheduleTab } from '../components/tabs/TasksAndScheduleTab';
 import { SiteTab } from '../components/tabs/SiteTab';
 import { DocumentsTab } from '../components/tabs/DocumentsTab';
@@ -85,11 +84,10 @@ import { ClientViewTab } from '../components/tabs/ClientViewTab';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
 import { ProductsTab } from '../components/tabs/ProductsTab';
-import { FinanceTab } from '../components/tabs/FinanceTab';
+import { CostReportTab } from '../components/tabs/CostReportTab';
 import { PlanTab } from '../components/tabs/PlanTab';
-import { PurchaseItemsTab } from '../components/tabs/PurchaseItemsTab';
+import { PurchasesTab } from '../components/tabs/PurchasesTab';
 import { TakeoffTab } from '../components/tabs/TakeoffTab';
-import { BillTab } from '../components/tabs/BillTab';
 import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { PROJECT_STATUS_BADGE, PROJECT_STATUS_LABELS } from '../projectStatus';
@@ -126,8 +124,8 @@ type ProjectStage = 'overview' | 'design' | 'specification' | 'commercial' | 'de
 const TAB_GROUPS: ReadonlyArray<{ id: ProjectStage; label: string; icon: LucideIcon; tabs: readonly ProjectTab[] }> = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['overview'] },
   { id: 'design', label: 'Design', icon: PenTool, tabs: ['rooms', 'moodboards', 'sheets'] },
-  { id: 'specification', label: 'Specification', icon: Ruler, tabs: ['products', 'plan', 'takeoff', 'bill', 'purchases'] },
-  { id: 'commercial', label: 'Commercial', icon: Briefcase, tabs: ['quotes', 'contracts', 'billing', 'finance'] },
+  { id: 'specification', label: 'Specification', icon: Ruler, tabs: ['products', 'plan', 'takeoff'] },
+  { id: 'commercial', label: 'Commercial', icon: Briefcase, tabs: ['quotes', 'contracts', 'billing', 'purchases', 'finance'] },
   { id: 'delivery', label: 'Delivery', icon: HardHat, tabs: ['tasks', 'site', 'documents'] },
   { id: 'client', label: 'Client', icon: Users, tabs: ['client-view', 'requests', 'handover'] },
   { id: 'review', label: 'Review', icon: BarChart3, tabs: ['assessment', 'timeline'] },
@@ -141,7 +139,6 @@ const TAB_ICONS: Record<ProjectTab, LucideIcon> = {
   moodboards: Palette,
   plan: ClipboardList,
   takeoff: ScanLine,
-  bill: ListOrdered,
   purchases: Hammer,
   quotes: FileText,
   billing: Receipt,
@@ -198,9 +195,7 @@ export const ProjectDetailPage: React.FC = () => {
   // cannot drift — a trigger added without an entry here reintroduces the blank-panel state.
   const availableTabs = PROJECT_TABS.filter((t) => {
     if (t === 'finance') return canFinance;
-    if (t === 'billing') return isManager;
-    // The bill carries rates, so it keeps the gate the priced schedule had under Finance.
-    if (t === 'bill') return canFinance;
+    if (t === 'billing') return canFinance;
     if (t === 'quotes') return isTeam || collabRole === 'client';
     return isTeam || !OWNER_ONLY_TABS.has(t);
   });
@@ -226,7 +221,7 @@ export const ProjectDetailPage: React.FC = () => {
     .map((g) => ({ ...g, tabs: g.tabs.filter((t) => availableTabs.includes(t)) }))
     .filter((g) => g.tabs.length > 0);
   const stage = stages.find((g) => g.tabs.includes(tab)) ?? stages[0];
-  // Coming back to a stage reopens the section you left it on — Commercial returns to Finance if
+  // Coming back to a stage reopens the section you left it on — Commercial returns to the Cost report if
   // that is where you were, not to Quotes every time.
   const lastSection = useRef<Partial<Record<ProjectStage, ProjectTab>>>({});
   useEffect(() => { lastSection.current[stage.id] = tab; }, [stage.id, tab]);
@@ -464,13 +459,12 @@ export const ProjectDetailPage: React.FC = () => {
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isTeam} showBudget={canFinance} /></TabsContent>
           {isTeam && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
           {isTeam && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isTeam} /></TabsContent>}
-          {isTeam && <TabsContent value="takeoff"><TakeoffTab projectId={project.id} canSendToBill={canFinance} /></TabsContent>}
-          {canFinance && <TabsContent value="bill"><BillTab projectId={project.id} currency={project.budget_currency} /></TabsContent>}
-          {isTeam && <TabsContent value="purchases"><PurchaseItemsTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} /></TabsContent>}
+          {isTeam && <TabsContent value="takeoff"><TakeoffTab projectId={project.id} /></TabsContent>}
+          {isTeam && <TabsContent value="purchases"><PurchasesTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} currency={project.budget_currency} canFinance={canFinance} /></TabsContent>}
           <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
-          <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} canManage={isTeam} /></ModuleTabGate></TabsContent>
-          {isManager && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><BillingTab projectId={project.id} /></ModuleTabGate></TabsContent>}
-          {canFinance && <TabsContent value="finance"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Orders, invoices and payments for this project."><FinanceTab projectId={project.id} projectName={project.name} /></ModuleTabGate></TabsContent>}
+          <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} canManage={isTeam} workspaceId={project.workspace_id} currency={project.budget_currency} canFinance={canFinance} /></ModuleTabGate></TabsContent>
+          {canFinance && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><InvoicingTab projectId={project.id} projectName={project.name} /></ModuleTabGate></TabsContent>}
+          {canFinance && <TabsContent value="finance"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Cost, margin and budget for this project."><CostReportTab projectId={project.id} onOpenSection={setTab} /></ModuleTabGate></TabsContent>}
           <TabsContent value="sheets"><SheetsTab projectId={project.id} isOwner={isTeam} /></TabsContent>
           {isTeam && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isTeam} /></TabsContent>}
           {isTeam && <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" defaultCounterparty={{ name: project.client_contact?.name || project.client_company?.name, email: project.client_contact?.email }} /></ModuleTabGate></TabsContent>}

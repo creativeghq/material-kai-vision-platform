@@ -7,8 +7,8 @@ export const isApprovalRefusal = (e: unknown): boolean =>
 /** Raises one pending request for the item unless one is already waiting. */
 export async function raiseProjectApproval(input: {
   workspaceId: string;
-  subject: 'project_variation' | 'project_application';
-  table: 'project_variations' | 'project_applications';
+  subject: 'project_variation' | 'project_application' | 'project_purchase_order';
+  table: 'project_variations' | 'project_applications' | 'orders';
   id: string;
   amount: number;
   reason: string;

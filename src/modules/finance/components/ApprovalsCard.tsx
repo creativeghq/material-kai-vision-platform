@@ -28,7 +28,7 @@ import {
 } from '@/modules/finance/services/approvalService';
 
 const SUBJECTS: ApprovalSubject[] = [
-  'credit_hold', 'margin_floor', 'pos_variance', 'project_variation', 'project_application',
+  'credit_hold', 'margin_floor', 'pos_variance', 'project_variation', 'project_application', 'project_purchase_order',
 ];
 const ACTIONS: ApprovalAction[] = ['warn', 'block', 'approve'];
 

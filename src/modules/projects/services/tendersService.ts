@@ -168,13 +168,38 @@ export const tendersService = {
     return (data ?? []) as unknown as PackageItem[];
   },
 
+  /** The accepted quote's lines (the newest live quote's when none is accepted), without its rates. */
+  async linesFromProjectQuote(projectId: string): Promise<Array<{
+    item_ref: string | null; description: string; unit: string | null; quantity: number | null; cost_code_id: string | null;
+  }>> {
+    const { data: quotes, error } = await (supabase as any)
+      .from('quotes').select('id, status').eq('project_id', projectId)
+      .in('status', ['accepted', 'draft', 'submitted', 'quoted']).order('created_at', { ascending: false });
+    if (error) throw readable(error);
+    const accepted = (quotes ?? []).filter((q: any) => q.status === 'accepted');
+    const ids = (accepted.length ? accepted : (quotes ?? []).slice(0, 1)).map((q: any) => q.id);
+    if (ids.length === 0) throw new Error('This project has no quote to pull from.');
+    const { data: lines, error: lineErr } = await (supabase as any)
+      .from('quote_items').select('custom_product_name, custom_unit, quantity, cost_code_id, products(name)')
+      .in('quote_id', ids).order('added_at');
+    if (lineErr) throw readable(lineErr);
+    if (!lines?.length) throw new Error('That quote has no lines yet.');
+    return lines.map((l: any) => ({
+      item_ref: null,
+      description: l.custom_product_name ?? l.products?.name ?? 'Item',
+      unit: l.custom_unit,
+      quantity: l.quantity,
+      cost_code_id: l.cost_code_id,
+    }));
+  },
+
   /**
-   * Build the enquiry from an existing priced schedule, copying the DESCRIPTION, UNIT, QUANTITY
+   * Build the enquiry from an existing quote, copying the DESCRIPTION, UNIT, QUANTITY
    * and COST CODE but never the rate. The whole point of tendering is to find out what somebody
    * else charges; sending our own rate out with the enquiry answers the question before it is
    * asked.
    */
-  async addItemsFromSchedule(
+  async addItemsFromQuote(
     workspaceId: string,
     packageId: string,
     lines: Array<{ item_ref: string | null; description: string; unit: string | null; quantity: number | null; cost_code_id: string | null }>,
