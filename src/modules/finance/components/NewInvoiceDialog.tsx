@@ -7,6 +7,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { issuableDocTypeCodes } from '../issuableDocTypes';
+import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -1576,7 +1577,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </div>
                 {docTypes.length === 0 && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400">
-                    No document types are available. Enable a type in Settings → Documents → Document Types &amp; Series, and switch its numbering series back on if it was turned off.
+                    No document types are available. Enable a type in <Link to="/finance?tab=settings&section=documents" className="underline underline-offset-2">Settings → Documents → Document Types &amp; Series</Link>, and switch its numbering series back on if it was turned off.
                   </p>
                 )}
                 {buyerIsConsumer && (
