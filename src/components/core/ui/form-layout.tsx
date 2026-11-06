@@ -7,17 +7,22 @@ import { Label } from '@/components/core/ui/label';
 const FormSection = ({
   title,
   description,
+  action,
   className,
   children,
 }: {
   title: string;
   description?: React.ReactNode;
+  action?: React.ReactNode;
   className?: string;
   children: React.ReactNode;
 }) => (
   <section className={cn('space-y-2', className)}>
     <div className="space-y-0.5">
-      <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
+      <div className="flex items-baseline justify-between gap-2">
+        <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
+        {action}
+      </div>
       {description && <p className="text-xs text-muted-foreground">{description}</p>}
     </div>
     {children}

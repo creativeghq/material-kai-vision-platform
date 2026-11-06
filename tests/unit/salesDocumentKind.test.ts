@@ -195,6 +195,6 @@ describe('the 2x2 that decides the document code', () => {
     // to be on screen rather than in a rule nobody can see.
     expect(mydataSalesDocumentReason(BUSINESS, 'services')).toMatch(/service/i);
     expect(mydataSalesDocumentReason(CONSUMER, 'goods')).toMatch(/consumer/i);
-    expect(mydataSalesDocumentReason(BUSINESS, 'unknown')).toMatch(/cannot be read/i);
+    expect(mydataSalesDocumentReason(BUSINESS, 'unknown')).toMatch(/catalogue product/i);
   });
 });

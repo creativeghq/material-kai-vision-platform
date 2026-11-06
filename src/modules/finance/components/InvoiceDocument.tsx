@@ -40,7 +40,7 @@ export function InvoiceDocument({
     boxSizing: 'border-box',
     padding: '14mm',
     margin: '0 auto',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+    boxShadow: '0 0 0 1px rgba(0,0,0,0.1)',
   };
 
   const muted: React.CSSProperties = { color: colors.muted };

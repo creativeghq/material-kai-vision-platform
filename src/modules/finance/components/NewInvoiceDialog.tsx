@@ -13,6 +13,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
+import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
@@ -1376,10 +1377,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
         {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}
         <div className="flex-1 min-h-0 flex">
-          <div className="flex-1 min-w-0 overflow-y-auto bg-muted/20">
-          <div className="mx-auto max-w-3xl rounded-lg border border-border/50 bg-background px-6 py-6 my-6 shadow-sm">
+          <div className="flex-1 min-w-0 overflow-y-auto bg-background">
+          <div className="mx-auto max-w-3xl px-6 pb-6 pt-2">
             <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="sticky top-0 z-10 grid w-full grid-cols-4 bg-background">
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="items">Items{itemCount ? ` · ${itemCount}` : ''}</TabsTrigger>
                 <TabsTrigger value="taxes">Taxes</TabsTrigger>
@@ -1389,12 +1390,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <TabsContent value="details" className="mt-5 space-y-5">
             {/* Parties + document */}
             <div className="grid items-start gap-5 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
-            <FormSection title={selfPricing ? 'Billed to (you)' : 'Billed to'}>
-              {!selfPricing && (
-                <div className="flex justify-end">
-                  <button type="button" className="text-xs text-primary hover:underline" onClick={() => setClientDialogOpen(true)}>+ Add new client</button>
-                </div>
+            <FormSection
+              title={selfPricing ? 'Billed To (You)' : 'Billed To'}
+              action={!selfPricing && (
+                <button type="button" className="text-xs text-primary hover:underline" onClick={() => setClientDialogOpen(true)}>+ Add new client</button>
               )}
+            >
               {selfPricing ? (
                 <div className="rounded-md border border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                   This is a self-billed document, so the counterpart is your own business — there is no
@@ -1535,22 +1536,20 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <div className="flex flex-wrap items-center gap-2">
                   {(() => {
                     const chips = ((buyerIsConsumer
-                      ? [['11.1', 'Receipt'], ['11.2', 'Service receipt'], ['9.3', 'Delivery Note']]
-                      : [['1.1', 'Sales invoice'], ['2.1', 'Service invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery Note']]) as ReadonlyArray<readonly [string, string]>)
+                      ? [['11.1', 'Receipt'], ['11.2', 'Service Receipt'], ['9.3', 'Delivery Note']]
+                      : [['1.1', 'Sales Invoice'], ['2.1', 'Service Invoice'], ['11.1', 'Receipt'], ['9.3', 'Delivery Note']]) as ReadonlyArray<readonly [string, string]>)
                       .filter(([code]) => docTypes.some((t) => t.code === code));
                     // A chip is a document FAMILY: it stays lit while a more specific type of
                     // its family (1.2, 2.3, …) is picked from the dropdown beside it.
                     const activeChip = (chips.find(([c]) => c === documentType) ?? chips.find(([c]) => c.split('.')[0] === documentType.split('.')[0]))?.[0];
-                    return chips.map(([code, label]) => (
-                      <button
-                        key={code}
-                        type="button"
-                        onClick={() => { setDocTypePinned(false); setDocumentType(code); applyDocDefault(code); }}
-                        className={`px-3.5 py-1.5 text-sm font-medium transition-colors ${activeChip === code ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}
-                      >
-                        {label}
-                      </button>
-                    ));
+                    return (
+                      <HubSegmented
+                        aria-label="Document Type"
+                        options={chips.map(([value, label]) => ({ value, label }))}
+                        value={activeChip ?? ''}
+                        onChange={(code) => { setDocTypePinned(false); setDocumentType(code); applyDocDefault(code); }}
+                      />
+                    );
                   })()}
                   {(() => {
                     // Restrict the long tail to receipts + movement docs for consumers, and list
@@ -1562,7 +1561,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     const isChipCode = COMMON_DOC_CODES.includes(documentType) || (buyerIsConsumer && documentType === '11.2');
                     return (
                       <Select value={isChipCode ? '' : documentType} onValueChange={(v) => { setDocTypePinned(true); setDocumentType(v); applyDocDefault(v); }}>
-                        <SelectTrigger className="h-9 w-auto gap-1 rounded-full px-3.5 text-sm font-medium"><SelectValue placeholder="More types…" /></SelectTrigger>
+                        <SelectTrigger aria-label="More Document Types" className="h-8 w-auto max-w-full gap-1 px-3 text-xs font-medium"><SelectValue placeholder="More types…" /></SelectTrigger>
                         <SelectContent>
                           {groups.map((g) => (
                             <React.Fragment key={g.family}>
@@ -1606,7 +1605,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   </p>
                 )}
                 <p className="text-[11px] text-muted-foreground">
-                  {nextNumber ? `Series ${nextNumber.series ?? ''} · next number ${nextNumber.number}` : 'A new series starts at 1 when the first document of this type is issued'}
+                  {nextNumber ? `Next number: ${nextNumber.series ?? ''}${nextNumber.number}` : 'A new series starts at 1 when the first document of this type is issued'}
                 </p>
                 {seriesOptions.length > 1 && (
                   <Select value={chosenSeriesId} onValueChange={setChosenSeriesId}>
@@ -1622,7 +1621,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <Input id="ni-issue-date" type="date" className="h-9" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
               </FormField>
               <FormField label="Related Document" htmlFor="ni-related" optional>
-                <Input id="ni-related" className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="e.g. related invoice no. or myDATA MARK" />
+                <Input id="ni-related" className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="Invoice no. or MARK" />
               </FormField>
               {/* Document language selector deferred until translations launch — invoices are English-only for now. */}
               {kadOptions.length > 1 && (
@@ -2285,15 +2284,15 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           </div>
 
           {/* Live preview — same renderer + active workspace template/colors as the real PDF. */}
-          <div className="hidden lg:flex w-[620px] xl:w-[680px] shrink-0 flex-col border-l border-border/60 bg-muted/40">
-            <div className="flex items-center justify-between px-4 h-10 shrink-0 border-b border-border/60 bg-background/60">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">Live preview</span>
+          <div className="hidden lg:flex w-[620px] xl:w-[680px] shrink-0 flex-col border-l border-hairline bg-surface-sunken">
+            <div className="flex items-center justify-between px-4 h-10 shrink-0 border-b border-hairline">
+              <span className="text-xs font-semibold text-muted-foreground">Live Preview</span>
               <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => setShowPreview(true)}>
                 <Eye className="h-3.5 w-3.5" /> Full size
               </Button>
             </div>
-            <div className="flex-1 overflow-auto p-5 no-card-hover">
-              <div style={{ zoom: 0.72 }}><InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} /></div>
+            <div className="flex-1 overflow-auto p-4 no-card-hover">
+              <div className="mx-auto w-fit [zoom:0.7] xl:[zoom:0.78]"><InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} /></div>
             </div>
           </div>
         </div>

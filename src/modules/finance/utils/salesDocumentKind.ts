@@ -119,6 +119,6 @@ export function mydataSalesDocumentReason(
     case 'mixed':
       return `Products and services on one document, to ${who} — a sales invoice may carry a service line.`;
     default:
-      return `No line names a catalogue product, so the supply cannot be read — proposing the sales document for ${who}.`;
+      return `Proposed for ${who}. Add a catalogue product and this follows the lines.`;
   }
 }
