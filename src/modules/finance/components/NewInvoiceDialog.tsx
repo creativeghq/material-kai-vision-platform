@@ -1370,26 +1370,25 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 gap-0 flex flex-col" onOpenAutoFocus={(e) => { const search = document.getElementById('ni-customer-search'); if (search) { e.preventDefault(); search.focus(); } }}>
         <DialogHeader className="border-b border-border/60 px-5 py-3 shrink-0">
           <DialogTitle>New Invoice</DialogTitle><DialogDescription className="sr-only">Create a sales invoice or receipt and add its line items.</DialogDescription>
         </DialogHeader>
 
         {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}
         <div className="flex-1 min-h-0 flex">
-          <div className="flex-1 min-w-0 overflow-y-auto bg-background">
-          <div className="mx-auto max-w-3xl px-6 pb-6 pt-2">
+          <div className="flex-1 min-w-0 overflow-y-auto">
+          <div className="mx-auto max-w-3xl px-5 pb-6 pt-2">
             <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
-              <TabsList className="sticky top-0 z-10 grid w-full grid-cols-4 bg-background">
+              <TabsList className="sticky top-0 z-10 grid w-full grid-cols-4 bg-card">
                 <TabsTrigger value="details">Details</TabsTrigger>
                 <TabsTrigger value="items">Items{itemCount ? ` · ${itemCount}` : ''}</TabsTrigger>
                 <TabsTrigger value="taxes">Taxes</TabsTrigger>
                 <TabsTrigger value="options">Options</TabsTrigger>
               </TabsList>
 
-              <TabsContent value="details" className="mt-5 space-y-5">
+              <TabsContent value="details" tabIndex={-1} className="mt-5 space-y-5">
             {/* Parties + document */}
-            <div className="grid items-start gap-5 grid-cols-[repeat(auto-fit,minmax(18rem,1fr))]">
             <FormSection
               title={selfPricing ? 'Billed To (You)' : 'Billed To'}
               action={!selfPricing && (
@@ -1493,7 +1492,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               ) : (
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input className="pl-8" placeholder="Search contacts or companies…" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
+                  <Input id="ni-customer-search" className="pl-8" placeholder="Search contacts or companies…" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
                   {customerOptions.length > 0 && (
                     <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md max-h-72 overflow-y-auto">
                       {customerOptions.map((o) => (
@@ -1524,9 +1523,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               )}
             </FormSection>
 
-            <FormSection title="Document">
-            <FormGrid>
-              <FormField label="Document Type" className="sm:col-span-2">
+            <FormSection title="Document" className="border-t border-hairline pt-4">
+            <FormGrid cols={4}>
+              <FormField label="Type" className="col-span-full">
                 {/* One control: common types as chips + the long myDATA tail in a "More types" dropdown.
                     For a private individual (no VAT) only retail receipts (11.x) + movement docs (9.x)
                     are offered — AADE rejects an invoice (1.x/2.x) issued to a VAT-less buyer.
@@ -1573,6 +1572,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       </Select>
                     );
                   })()}
+                  <span className="ml-auto whitespace-nowrap text-xs text-muted-foreground tabular-nums">
+                    {nextNumber ? `Next number: ${nextNumber.series ?? ''}${nextNumber.number}` : 'New series, starts at 1'}
+                  </span>
                 </div>
                 {docTypes.length === 0 && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400">
@@ -1604,9 +1606,6 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       : `The buyer is outside the EU (${customerAddr?.country_code}): an export is ${supplyKind === 'services' ? '2.3' : '1.3'} at 0% VAT, with its exemption cause (art. 29 for goods).`}
                   </p>
                 )}
-                <p className="text-[11px] text-muted-foreground">
-                  {nextNumber ? `Next number: ${nextNumber.series ?? ''}${nextNumber.number}` : 'A new series starts at 1 when the first document of this type is issued'}
-                </p>
                 {seriesOptions.length > 1 && (
                   <Select value={chosenSeriesId} onValueChange={setChosenSeriesId}>
                     <SelectTrigger aria-label="Numbering Series" className="h-9"><SelectValue /></SelectTrigger>
@@ -1625,7 +1624,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </FormField>
               {/* Document language selector deferred until translations launch — invoices are English-only for now. */}
               {kadOptions.length > 1 && (
-                <FormField label="Activity (KAD) Printed on the Document" htmlFor="ni-kad" className="sm:col-span-2">
+                <FormField label="Activity (KAD) Printed on the Document" htmlFor="ni-kad" className="col-span-full">
                   <Select value={activityCode || kadOptions.find((k) => k.primary)?.code || ''} onValueChange={setActivityCode}>
                     <SelectTrigger id="ni-kad" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>{kadOptions.map((k) => <SelectItem key={k.code} value={k.code}>{k.code} — {k.description_en || k.description}{k.primary ? ' (default)' : ''}</SelectItem>)}</SelectContent>
@@ -1633,7 +1632,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </FormField>
               )}
               {branches.length > 1 && (
-                <FormField label="Establishment" htmlFor="ni-branch" className="sm:col-span-2">
+                <FormField label="Establishment" htmlFor="ni-branch" className="col-span-full">
                   <Select value={branchCode} onValueChange={setBranchCode}>
                     <SelectTrigger id="ni-branch" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}</SelectContent>
@@ -1642,10 +1641,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               )}
             </FormGrid>
             </FormSection>
-            </div>
 
-            <FormSection title="Terms">
-            <FormGrid>
+            <FormSection title="Terms" className="border-t border-hairline pt-4">
+            <FormGrid cols={4}>
               <FormField label="Payment Terms (Days)" htmlFor="ni-terms">
                 <Input id="ni-terms" type="number" min="0" className="h-9" value={paymentTermsDays} onChange={(e) => setPaymentTermsDays(e.target.value)} />
               </FormField>
@@ -1668,7 +1666,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </FormSection>
 
             {/* Shipping — combined invoice + delivery note (document-level, kept high near the doc type) */}
-            <FormSection title="Shipping">
+            <FormSection title="Shipping" className="border-t border-hairline pt-4">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium">Invoice with shipping</div>
@@ -1709,7 +1707,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </FormSection>
               </TabsContent>
 
-              <TabsContent value="items" className="mt-5 space-y-5">
+              <TabsContent value="items" tabIndex={-1} className="mt-5 space-y-5">
             {/* Line items */}
             <FormSection title="Items / Services">
               <div className="flex items-center justify-end">
@@ -1973,7 +1971,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </FormSection>
               </TabsContent>
 
-              <TabsContent value="taxes" className="mt-5 space-y-5">
+              <TabsContent value="taxes" tabIndex={-1} className="mt-5 space-y-5">
             {/* Document taxes */}
             <FormSection title="Withholding & Fees">
             <FormGrid>
@@ -2225,7 +2223,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </FormSection>
               </TabsContent>
 
-              <TabsContent value="options" className="mt-5 space-y-5">
+              <TabsContent value="options" tabIndex={-1} className="mt-5 space-y-5">
             <FormField label="Notes" htmlFor="ni-notes" optional>
               <Textarea id="ni-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
             </FormField>

@@ -20,7 +20,7 @@ const FormSection = ({
   <section className={cn('space-y-2', className)}>
     <div className="space-y-0.5">
       <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-xs font-semibold text-muted-foreground">{title}</h3>
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
         {action}
       </div>
       {description && <p className="text-xs text-muted-foreground">{description}</p>}
