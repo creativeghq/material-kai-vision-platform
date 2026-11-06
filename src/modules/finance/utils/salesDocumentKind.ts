@@ -105,6 +105,12 @@ export function mydataSaleRegimeExemption(regime: SaleRegime, supply: SupplyKind
   return null;
 }
 
+/** Sales (1.x) and service (2.x) invoices: AADE's withholding table covers goods as well as services. */
+export function documentTakesWithholding(documentType: string): boolean {
+  const family = documentType.split('.')[0];
+  return family === '1' || family === '2';
+}
+
 /** Why that code, so an operator can see the reasoning before transmitting it. */
 export function mydataSalesDocumentReason(
   buyer: BuyerIdentity | null | undefined,

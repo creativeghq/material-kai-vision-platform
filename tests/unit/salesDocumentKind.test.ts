@@ -106,6 +106,7 @@ describe('nobody re-derives the rule', () => {
 /** The SECOND axis: what is being supplied. */
 import {
   supplyKindOf, mydataSalesDocumentType, mydataSalesDocumentReason, mydataSaleRegimeExemption,
+  documentTakesWithholding,
 } from '@/modules/finance/utils/salesDocumentKind';
 
 const BUSINESS = { isCompany: true };
@@ -196,5 +197,12 @@ describe('the 2x2 that decides the document code', () => {
     expect(mydataSalesDocumentReason(BUSINESS, 'services')).toMatch(/service/i);
     expect(mydataSalesDocumentReason(CONSUMER, 'goods')).toMatch(/consumer/i);
     expect(mydataSalesDocumentReason(BUSINESS, 'unknown')).toMatch(/catalogue product/i);
+  });
+});
+
+describe('documentTakesWithholding', () => {
+  it('offers withholding on sales and service invoices, because the table has goods codes', () => {
+    for (const code of ['1.1', '1.2', '2.1', '2.3']) expect(documentTakesWithholding(code)).toBe(true);
+    for (const code of ['11.1', '11.2', '9.3', '5.1']) expect(documentTakesWithholding(code)).toBe(false);
   });
 });

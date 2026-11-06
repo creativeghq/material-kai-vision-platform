@@ -37,7 +37,7 @@ import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet }
 import { vatOfRaw, round2 } from '@/modules/finance/lib/vatMath';
 import {
   buyerIsConsumer as isConsumerBuyer, supplyKindOf, mydataSalesDocumentType,
-  mydataSalesDocumentReason,
+  mydataSalesDocumentReason, documentTakesWithholding,
 } from '@/modules/finance/utils/salesDocumentKind';
 import { saleRegimeForCountry } from '@/lib/vatCountries';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
@@ -167,6 +167,14 @@ const DETAIL_TYPE_DOC_CODES = new Set(['1.5']);
 // The four document types offered as quick-pick chips; everything else lives in the "More types" dropdown.
 const COMMON_DOC_CODES = ['1.1', '2.1', '11.1', '9.3'];
 
+
+/** One on/off option: the box sits beside its label, not across the column from it. */
+const OptionCheck = ({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (checked: boolean) => void }) => (
+  <label htmlFor={id} className="flex cursor-pointer items-center gap-2 text-sm">
+    <Checkbox id={id} className="h-4 w-4 rounded" checked={checked} onCheckedChange={(v) => onChange(v === true)} />
+    <span>{label}</span>
+  </label>
+);
 
 /** A myDATA tax-category reference row (withholding / fees / other taxes / stamp duty). */
 type TaxRef = { code: string; description: string; rate: number | null; rate_kind: 'percent' | 'amount' | 'per_unit' };
@@ -977,11 +985,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (documentType !== proposedDocType) setDocumentType(proposedDocType);
   }, [proposedDocType]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Withholding tax is a service-invoice concept (myDATA doc family 2.x — Παροχή
-  // Υπηρεσιών). It is only offered/applied on service invoices; switching to a
-  // goods/other document clears any chosen code so a hidden withholding can never
-  // ride along on a non-service invoice.
-  const isServiceDoc = documentType.split('.')[0] === '2';
+  // Switching to a document that takes no withholding clears the code, so a hidden one
+  // can never ride along.
+  const takesWithholding = documentTakesWithholding(documentType);
   /** 3.x — Τίτλος Κτήσης. Classifies into the EXPENSE ledger, not the income one. */
   const isExpenseDoc = documentType.split('.')[0] === '3';
 
@@ -989,10 +995,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // defaults have loaded (covers the common case where the operator never changes the
   // doc-type Select). Preserves an explicit choice via `cur ||`. #207
   useEffect(() => {
-    if (!isServiceDoc) { setWithholdingCode(''); setWithholdingAmount(''); return; }
+    if (!takesWithholding) { setWithholdingCode(''); setWithholdingAmount(''); return; }
     const def = docDefaults[documentType];
     if (def?.wh) setWithholdingCode((cur) => cur || def.wh!);
-  }, [documentType, docDefaults, isServiceDoc]);
+  }, [documentType, docDefaults, takesWithholding]);
 
   const applyDocDefault = (code: string) => {
     const def = docDefaults[code];
@@ -1001,8 +1007,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setLines((ls) => ls.map((l) => l.income_classification_type ? l : { ...l, income_classification_type: def.type!, income_classification_category: def.category ?? l.income_classification_category }));
     }
     // Pre-fill the configured default withholding for this doc type (only when the
-    // operator hasn't already chosen one, and only on service docs). #207
-    if (def?.wh && code.split('.')[0] === '2') setWithholdingCode((cur) => cur || def.wh!);
+    // operator hasn't already chosen one). #207
+    if (def?.wh && documentTakesWithholding(code)) setWithholdingCode((cur) => cur || def.wh!);
   };
 
   const handleSave = async (draftOnly = false) => {
@@ -1378,7 +1384,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}
         <div className="flex-1 min-h-0 flex">
           <div className="flex-1 min-w-0 overflow-y-auto">
-          <div className="mx-auto max-w-3xl px-5 pb-6 pt-2">
+          <div className="mx-auto max-w-4xl px-5 pb-6 pt-2">
             <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
               <TabsList className="sticky top-0 z-10 grid w-full grid-cols-4 bg-card">
                 <TabsTrigger value="details">Details</TabsTrigger>
@@ -1975,7 +1981,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             {/* Document taxes */}
             <FormSection title="Withholding & Fees">
             <FormGrid>
-              {isServiceDoc ? (
+              {takesWithholding ? (
                 <FormField label="Withholding Tax" htmlFor="ni-withholding">
                   <Select value={withholdingCode || 'none'} onValueChange={(v) => { setWithholdingCode(v === 'none' ? '' : v); setWithholdingAmount(''); }}>
                     <SelectTrigger id="ni-withholding" className="h-9"><SelectValue /></SelectTrigger>
@@ -1988,9 +1994,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </FormField>
               ) : (
                 <div className="min-w-0 space-y-1">
-                  <p className="text-xs font-semibold">Withholding tax</p>
+                  <p className="text-xs font-semibold">Withholding Tax</p>
                   <p className="text-xs text-muted-foreground">
-                    Available on service invoices (document type 2.x). Switch the document type to a service invoice to apply a withholding rate.
+                    Available on sales and service invoices. Switch the document type to apply a withholding rate.
                   </p>
                 </div>
               )}
@@ -2004,8 +2010,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 The declaration a per-line box cannot make: SEVERAL rows of the same bucket,
                 each named. A recycling levy is one AADE code (fees 17) charged at a different
                 rate per AHHE appliance class, so the class lives in the row's own label. */}
-            <FormSection title="Charges & Levies (Document Level)">
-              <div className="flex items-center justify-end">
+            <FormSection
+              title="Charges & Levies (Document Level)"
+              className="border-t border-hairline pt-4"
+              action={(
                 <Button
                   type="button" size="sm" variant="outline" className="h-7 text-xs"
                   onClick={() => setDocTaxes((rows) => [...rows, {
@@ -2015,10 +2023,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 >
                   Add charge
                 </Button>
-              </div>
+              )}
+            >
               {docTaxes.length === 0 ? (
                 <p className="text-[11px] text-muted-foreground">
-                  None. Use these for a levy the document charges as a whole &mdash; a recycling fee per
+                  Use these for a levy the document charges as a whole &mdash; a recycling fee per
                   &Alpha;&Eta;&Eta;&Epsilon; class, &Epsilon;&Phi;&Kappa;, a stamp duty. Adding one here replaces the per-line
                   &ldquo;Advanced taxes&rdquo; boxes: myDATA takes one declaration or the other, never both.
                 </p>
@@ -2132,7 +2141,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             </FormSection>
 
             {/* Payment */}
-            <FormSection title="Payment">
+            <FormSection title="Payment" className="border-t border-hairline pt-4">
               <FormGrid>
                 <FormField label="Payment Method (myDATA)" htmlFor="ni-payment-method">
                   <Select value={paymentMethodCode} onValueChange={setPaymentMethodCode}>
@@ -2224,65 +2233,67 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </TabsContent>
 
               <TabsContent value="options" tabIndex={-1} className="mt-5 space-y-5">
-            <FormField label="Notes" htmlFor="ni-notes" optional>
-              <Textarea id="ni-notes" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
-            </FormField>
+            <FormSection title="Printed on the Document">
+              <FormField label="Notes" htmlFor="ni-notes" optional>
+                <Textarea id="ni-notes" rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes shown on the invoice" />
+              </FormField>
+              <FormField label="Info Box" htmlFor="ni-info-box" optional hint="Up to 250 characters.">
+                <Input id="ni-info-box" className="h-9" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="e.g. warranty or delivery terms" />
+              </FormField>
+              <FormGrid>
+                <FormField label="Logo" htmlFor="newinvoice-logo-mode">
+                  <Select value={logoMode} onValueChange={(v: any) => setLogoMode(v)}>
+                    <SelectTrigger id="newinvoice-logo-mode" className="h-9"><SelectValue /></SelectTrigger>
+                    <SelectContent><SelectItem value="auto">Business Logo</SelectItem><SelectItem value="none">No Logo</SelectItem></SelectContent>
+                  </Select>
+                </FormField>
+                <div className="space-y-2 sm:pt-6">
+                  <OptionCheck id="newinvoice-print-qr" label="Print Online Code / QR" checked={printOnlineCode} onChange={setPrintOnlineCode} />
+                  <OptionCheck id="newinvoice-print-terms" label="Print Terms & Comments" checked={printTerms} onChange={setPrintTerms} />
+                </div>
+              </FormGrid>
+            </FormSection>
 
-            {/* B2G (public-sector e-invoicing). Hidden for retail (11.x) docs. */}
+            <FormSection title="When Issued" className="border-t border-hairline pt-4">
+              <div className="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
+                <OptionCheck id="newinvoice-submit-mydata" label="Send to AADE on Issue" checked={submitNow} onChange={setSubmitNow} />
+                <OptionCheck id="newinvoice-send-email" label="Send by Email on Create" checked={sendEmail} onChange={setSendEmail} />
+                <OptionCheck id="newinvoice-include-myf" label="Include in MYF Report" checked={includeInMyf} onChange={setIncludeInMyf} />
+                <OptionCheck id="newinvoice-move-stock" label="Move Stock on Issue" checked={moveStock} onChange={setMoveStock} />
+              </div>
+            </FormSection>
+
+            {/* Hidden for retail (11.x) documents. */}
             {!documentType.startsWith('11') && (
-              <FormSection title="Public Sector (B2G)">
-                <label htmlFor="newinvoice-b2g" className="flex items-center justify-between cursor-pointer text-xs">
-                  <span>B2G — public-sector invoice</span>
-                  <Checkbox id="newinvoice-b2g" className="h-4 w-4 rounded" checked={isB2g} onCheckedChange={(v) => setIsB2g(v === true)} />
-                </label>
+              <FormSection title="Public Sector (B2G)" className="border-t border-hairline pt-4">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <label htmlFor="newinvoice-b2g" className="cursor-pointer text-sm font-medium">Public-Sector Invoice</label>
+                    <p className="text-xs text-muted-foreground">Sent on the same myDATA envelope, with the references from the contracting authority.</p>
+                  </div>
+                  <Switch id="newinvoice-b2g" checked={isB2g} onCheckedChange={setIsB2g} />
+                </div>
                 {isB2g && (
-                  <>
-                    <p className="text-[11px] text-muted-foreground">Transmitted on the same myDATA envelope with the public-buyer reference block. Fill the references provided by the contracting authority.</p>
-                    <FormGrid>
-                      <FormField label="Contract Reference (ΑΔΑΜ)" htmlFor="ni-b2g-contract"><Input id="ni-b2g-contract" className="h-8 text-xs" value={b2gContractRef} onChange={(e) => setB2gContractRef(e.target.value)} placeholder="e.g. 20SYMV006467658" /></FormField>
-                      <FormField label="Buyer Reference" htmlFor="ni-b2g-buyer-ref"><Input id="ni-b2g-buyer-ref" className="h-8 text-xs" value={b2gBuyerRef} onChange={(e) => setB2gBuyerRef(e.target.value)} placeholder="contracting authority" /></FormField>
-                      <FormField label="Buyer Legal Registration Id" htmlFor="ni-b2g-buyer-reg" optional hint="Defaults to the buyer's VAT number."><Input id="ni-b2g-buyer-reg" className="h-8 text-xs" value={b2gBuyerReg} onChange={(e) => setB2gBuyerReg(e.target.value)} /></FormField>
-                      <FormField label="Buyer Identifier (ΚΗΜΔΗΣ/KAE)" htmlFor="ni-b2g-buyer-id"><Input id="ni-b2g-buyer-id" className="h-8 text-xs" value={b2gBuyerIdentifier} onChange={(e) => setB2gBuyerIdentifier(e.target.value)} placeholder="e.g. 1007.909.0001" /></FormField>
-                      <FormField label="Budget Identifier" htmlFor="ni-b2g-budget"><Input id="ni-b2g-budget" className="h-8 text-xs" value={b2gBudgetIdentifier} onChange={(e) => setB2gBudgetIdentifier(e.target.value)} placeholder="ΚΑΕ / budget code" /></FormField>
-                      <FormField label="Payment Due Date" htmlFor="ni-b2g-due"><Input id="ni-b2g-due" type="date" className="h-8 text-xs" value={b2gDueDate} onChange={(e) => setB2gDueDate(e.target.value)} /></FormField>
-                      <FormField label="CPV code" htmlFor="ni-b2g-cpv" hint="Used on lines whose product has none."><Input id="ni-b2g-cpv" className="h-8 text-xs" value={b2gCpv} onChange={(e) => setB2gCpv(e.target.value)} placeholder="e.g. 44111000-4" /></FormField>
-                      <FormField label="Purchase Order Reference" htmlFor="ni-b2g-po" optional><Input id="ni-b2g-po" className="h-8 text-xs" value={b2gPoRef} onChange={(e) => setB2gPoRef(e.target.value)} /></FormField>
-                    </FormGrid>
-                  </>
+                  <FormGrid>
+                      <FormField label="Contract Reference (ΑΔΑΜ)" htmlFor="ni-b2g-contract"><Input id="ni-b2g-contract" className="h-9" value={b2gContractRef} onChange={(e) => setB2gContractRef(e.target.value)} placeholder="e.g. 20SYMV006467658" /></FormField>
+                      <FormField label="Buyer Reference" htmlFor="ni-b2g-buyer-ref"><Input id="ni-b2g-buyer-ref" className="h-9" value={b2gBuyerRef} onChange={(e) => setB2gBuyerRef(e.target.value)} placeholder="contracting authority" /></FormField>
+                      <FormField label="Buyer Legal Registration Id" htmlFor="ni-b2g-buyer-reg" optional hint="Defaults to the buyer's VAT number."><Input id="ni-b2g-buyer-reg" className="h-9" value={b2gBuyerReg} onChange={(e) => setB2gBuyerReg(e.target.value)} /></FormField>
+                      <FormField label="Buyer Identifier (ΚΗΜΔΗΣ/KAE)" htmlFor="ni-b2g-buyer-id"><Input id="ni-b2g-buyer-id" className="h-9" value={b2gBuyerIdentifier} onChange={(e) => setB2gBuyerIdentifier(e.target.value)} placeholder="e.g. 1007.909.0001" /></FormField>
+                      <FormField label="Budget Identifier" htmlFor="ni-b2g-budget"><Input id="ni-b2g-budget" className="h-9" value={b2gBudgetIdentifier} onChange={(e) => setB2gBudgetIdentifier(e.target.value)} placeholder="ΚΑΕ / budget code" /></FormField>
+                      <FormField label="Payment Due Date" htmlFor="ni-b2g-due"><Input id="ni-b2g-due" type="date" className="h-9" value={b2gDueDate} onChange={(e) => setB2gDueDate(e.target.value)} /></FormField>
+                      <FormField label="CPV code" htmlFor="ni-b2g-cpv" hint="Used on lines whose product has none."><Input id="ni-b2g-cpv" className="h-9" value={b2gCpv} onChange={(e) => setB2gCpv(e.target.value)} placeholder="e.g. 44111000-4" /></FormField>
+                      <FormField label="Purchase Order Reference" htmlFor="ni-b2g-po" optional><Input id="ni-b2g-po" className="h-9" value={b2gPoRef} onChange={(e) => setB2gPoRef(e.target.value)} /></FormField>
+                  </FormGrid>
                 )}
               </FormSection>
             )}
-
-            {/* Document & delivery options (Ρυθμίσεις Παραστατικού) */}
-            <FormSection title="Document & Delivery Options">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
-                <label htmlFor="newinvoice-submit-mydata" className="flex items-center justify-between cursor-pointer">
-                  <span>Send to AADE on Issue</span>
-                  <Checkbox id="newinvoice-submit-mydata" className="h-4 w-4 rounded" checked={submitNow} onCheckedChange={(v) => setSubmitNow(v === true)} />
-                </label>
-                <label htmlFor="newinvoice-print-qr" className="flex items-center justify-between cursor-pointer"><span>Print online code / QR</span><Checkbox id="newinvoice-print-qr" className="h-4 w-4 rounded" checked={printOnlineCode} onCheckedChange={(v) => setPrintOnlineCode(v === true)} /></label>
-                <label htmlFor="newinvoice-include-myf" className="flex items-center justify-between cursor-pointer"><span>Include in MYF report</span><Checkbox id="newinvoice-include-myf" className="h-4 w-4 rounded" checked={includeInMyf} onCheckedChange={(v) => setIncludeInMyf(v === true)} /></label>
-                <label htmlFor="newinvoice-move-stock" className="flex items-center justify-between cursor-pointer"><span>Move stock on issue (decrement warehouse)</span><Checkbox id="newinvoice-move-stock" className="h-4 w-4 rounded" checked={moveStock} onCheckedChange={(v) => setMoveStock(v === true)} /></label>
-                <label htmlFor="newinvoice-print-terms" className="flex items-center justify-between cursor-pointer"><span>Print terms & comments</span><Checkbox id="newinvoice-print-terms" className="h-4 w-4 rounded" checked={printTerms} onCheckedChange={(v) => setPrintTerms(v === true)} /></label>
-                <label htmlFor="newinvoice-send-email" className="flex items-center justify-between cursor-pointer"><span>Send by email on create</span><Checkbox id="newinvoice-send-email" className="h-4 w-4 rounded" checked={sendEmail} onCheckedChange={(v) => setSendEmail(v === true)} /></label>
-                <div className="flex items-center justify-between"><label htmlFor="newinvoice-logo-mode">Logo</label>
-                  <Select value={logoMode} onValueChange={(v: any) => setLogoMode(v)}>
-                    <SelectTrigger id="newinvoice-logo-mode" className="h-7 w-28 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="auto">Business Logo</SelectItem><SelectItem value="none">No logo</SelectItem></SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <FormField label="Info Box" htmlFor="ni-info-box" optional hint="Printed on the document, up to 250 characters.">
-                <Input id="ni-info-box" className="h-8 text-xs" maxLength={250} value={infoBox} onChange={(e) => setInfoBox(e.target.value)} placeholder="Extra printed note, e.g. warranty / delivery terms" />
-              </FormField>
-            </FormSection>
               </TabsContent>
             </Tabs>
           </div>
           </div>
 
           {/* Live preview — same renderer + active workspace template/colors as the real PDF. */}
-          <div className="hidden lg:flex w-[620px] xl:w-[680px] shrink-0 flex-col border-l border-hairline bg-surface-sunken">
+          <div className="hidden lg:flex w-[560px] xl:w-[600px] shrink-0 flex-col border-l border-hairline bg-surface-sunken">
             <div className="flex items-center justify-between px-4 h-10 shrink-0 border-b border-hairline">
               <span className="text-xs font-semibold text-muted-foreground">Live Preview</span>
               <Button size="sm" variant="ghost" className="h-7 gap-1.5 text-xs" onClick={() => setShowPreview(true)}>
@@ -2290,7 +2301,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </Button>
             </div>
             <div className="flex-1 overflow-auto p-4 no-card-hover">
-              <div className="mx-auto w-fit [zoom:0.7] xl:[zoom:0.78]"><InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} /></div>
+              <div className="mx-auto w-fit [zoom:0.64] xl:[zoom:0.69]"><InvoiceDocument spec={previewSpec} colors={previewColors} data={previewData} /></div>
             </div>
           </div>
         </div>
