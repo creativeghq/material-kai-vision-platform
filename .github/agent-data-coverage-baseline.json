@@ -112,6 +112,7 @@
     "resolve_purchase_prices",
     "resolve_sourcing_options",
     "search_orders",
+    "search_products_by_colour_hex",
     "search_products_by_specs",
     "search_workspace_docs_fts",
     "seo_website_ga_summary",
