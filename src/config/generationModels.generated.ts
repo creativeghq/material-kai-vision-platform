@@ -645,6 +645,29 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "gemini-omni-1.1-flash-360p",
     "tier": "budget",
+    "status": "dead",
+    "enabled": false,
+    "sort_order": 196
+  },
+  {
+    "id": "gemini-omni-1.2-flash-720p",
+    "display_name": "Gemini Omni 1.2 Flash 720p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "google",
+    "slug": "gemini-omni-1.2-flash",
+    "version": null,
+    "adapter": "gemini_omni",
+    "input_requirements": {
+      "max_images": 1,
+      "min_images": 1,
+      "image_roles": [
+        "source"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "gemini-omni-1.2-flash-720p",
+    "tier": "standard",
     "status": "active",
     "enabled": true,
     "sort_order": 196
@@ -693,6 +716,29 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "gemini-omni-1.1-flash-720p",
     "tier": "standard",
+    "status": "dead",
+    "enabled": false,
+    "sort_order": 197
+  },
+  {
+    "id": "gemini-omni-1.2-flash-1080p",
+    "display_name": "Gemini Omni 1.2 Flash 1080p",
+    "capability": "video",
+    "sub_capability": "image-to-video",
+    "provider": "google",
+    "slug": "gemini-omni-1.2-flash",
+    "version": null,
+    "adapter": "gemini_omni",
+    "input_requirements": {
+      "max_images": 1,
+      "min_images": 1,
+      "image_roles": [
+        "source"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "gemini-omni-1.2-flash-1080p",
+    "tier": "premium",
     "status": "active",
     "enabled": true,
     "sort_order": 197
@@ -740,8 +786,8 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "gemini-omni-1.1-flash-1080p",
     "tier": "premium",
-    "status": "active",
-    "enabled": true,
+    "status": "dead",
+    "enabled": false,
     "sort_order": 198
   },
   {
@@ -812,8 +858,8 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "veo-2",
     "tier": "premium",
-    "status": "active",
-    "enabled": true,
+    "status": "dead",
+    "enabled": false,
     "sort_order": 200
   },
   {
@@ -948,7 +994,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '1809bf50de4adfde243de06633888cf5';
+export const PROJECTION_FINGERPRINT = 'f3589dde9c002231c959d32660314da9';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
