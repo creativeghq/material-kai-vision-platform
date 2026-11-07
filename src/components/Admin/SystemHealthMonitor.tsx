@@ -129,6 +129,8 @@ interface CloudflareHealth {
   email_routing: CloudflareCheck;
   /** Cloudflare API: token valid + the inbound Worker actually deployed. */
   workers: CloudflareCheck;
+  /** Mail the Worker accepted but has not handed to the platform yet. Stuck = mail nobody has. */
+  inbound_spool?: CloudflareCheck;
   /**
    * Delivery OUTCOMES over the last week. Deliberately not folded into `status`: zero inbound mail
    * on a low-volume receiving domain is a legitimate quiet, and the MX check above is what says
@@ -727,11 +729,12 @@ export const SystemHealthMonitor: React.FC = () => {
             </p>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {([
                   { key: 'turnstile', label: 'Turnstile', icon: '🛡️', check: cloudflare.turnstile },
                   { key: 'email_routing', label: 'Email Routing (MX)', icon: '📬', check: cloudflare.email_routing },
                   { key: 'workers', label: 'Inbound Worker', icon: '⚙️', check: cloudflare.workers },
+                  { key: 'inbound_spool', label: 'Inbound Retry Queue', icon: '📥', check: cloudflare.inbound_spool },
                 ] as const).map(({ key, label, icon, check }) => (
                   <div key={key} className="flex flex-col gap-2 rounded-lg border p-3">
                     <div className="flex items-center justify-between gap-2">

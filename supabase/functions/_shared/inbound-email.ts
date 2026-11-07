@@ -573,7 +573,10 @@ export async function logInbound(
   }
 }
 
-/** Already routed this Message-ID to this address? Cloudflare retries, and a duplicate must not double-post. */
+/**
+ * Already DELIVERED this Message-ID to this address? A run still `processing` is not delivered:
+ * it goes to claimInbound, which takes over a stale claim or answers "retry later" for a live one.
+ */
 export async function alreadyProcessed(
   db: DbClient,
   rawMessageId: string | null,
@@ -585,7 +588,7 @@ export async function alreadyProcessed(
     .from('agent_email_inbound_log')
     .select('id')
     .eq('message_id', messageId)
-    .in('outcome', ['routed_inbox', 'processing']);
+    .eq('outcome', 'routed_inbox');
   if (matchedAddressId) q = q.eq('matched_address_id', matchedAddressId);
   const { data, error } = await q.limit(1).maybeSingle();
   if (error) throw new Error(`inbound dedupe read failed: ${error.message}`);

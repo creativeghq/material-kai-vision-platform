@@ -17,6 +17,17 @@ workers_dev = false
 RECEIVING_DOMAIN = "mail.materialshub.gr"
 WEBHOOK_URL = "https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/email-webhooks"
 
+[[r2_buckets]]
+binding = "SPOOL"
+bucket_name = "inbound-email-spool"
+
+# Re-delivers anything the inline hand-off could not, every 2 minutes.
+[triggers]
+crons = ["*/2 * * * *"]
+
+[observability]
+enabled = true
+
 # Secret — set with `wrangler secret put INBOUND_WEBHOOK_SECRET`, never in this file.
 # The SAME value must be set as INBOUND_WEBHOOK_SECRET on the Supabase edge functions, or the
 # inbound branch fails closed (503) and no mail is accepted.

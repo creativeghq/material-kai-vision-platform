@@ -41,7 +41,7 @@ customer's mail ──► MX: mail.materialshub.gr ──► Email Routing ─�
 ```
 
 The raw `.eml` is a **bronze** artifact: immutable, re-derivable, never mutated. It is also why a
-20 MiB attachment never travels in an edge-function request body.
+25 MiB attachment never travels in an edge-function request body.
 
 ## Setup (Phase 0 — operator, ~30 min)
 
@@ -119,5 +119,23 @@ rewritten. A DMARC-fail rule alone would quarantine every legitimate forward.
 | Routing rules per domain | 200 | No — exactly one catch-all |
 | Destination addresses per account | 200 | No — we process in a Worker, never forward to mailboxes |
 | Domains per zone | 30 | No — one subdomain. Would bind if tenant domains were onboarded here, which is the second reason to prefer forwarding |
-| Inbound message size | 25 MiB | Yes — capped at 20 MiB in `src/index.ts`, rejected at SMTP |
+| Inbound message size | 25 MiB | Yes — Cloudflare's own ceiling; the Worker adds no lower cap |
+
+## A failure delays mail, it never bounces it
+
+Cloudflare turns **every** `setReject()` into a permanent 5xx — there is no "try later" reply, so
+the sending server never retries. The first version rejected on any platform hiccup and bounced
+8 supplier price lists in one afternoon (2026-10-25). Now:
+
+1. The raw message is written to the R2 bucket `inbound-email-spool` before anything can fail.
+2. The Worker hands it to `email-webhooks` (3 attempts over ~8 s). Delivered → spool copy deleted.
+3. Still failing → the message is **accepted** and stays in the spool; the cron trigger
+   (`*/2 * * * *`) re-delivers it until the platform has it. `email-webhooks` is idempotent on
+   Message-ID and answers 409 while another run holds the claim, so a retry never double-posts and
+   never drops the only copy.
+4. Only a definitive answer bounces: wrong domain, over 25 MiB, unknown recipient — or the one
+   last resort, R2 itself refusing the write.
+
+`health-check` reads the spool every 10 minutes (`cloudflare.inbound_spool`): mail waiting is
+`degraded`, mail waiting over 30 minutes is `unhealthy` and pages Sentry.
 | Header size | 16 KB | No |

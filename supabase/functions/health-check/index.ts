@@ -399,6 +399,48 @@ async function checkCloudflareWorkers(cfg: CloudflareConfig): Promise<Cloudflare
   }
 }
 
+const INBOUND_SPOOL_BUCKET = 'inbound-email-spool';
+/** The Worker retries every 2 minutes; a message still spooled after this is mail nobody has. */
+const SPOOL_STUCK_MINUTES = 30;
+
+/** Mail the Worker accepted but could not hand to the platform yet. Waiting is fine; stuck is an outage. */
+async function checkInboundSpool(cfg: CloudflareConfig): Promise<CloudflareCheck> {
+  if (!cfg.apiToken || !cfg.accountId) {
+    return { status: 'unknown', latency_ms: 0, message: 'Not measured — needs CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID' };
+  }
+  const start = Date.now();
+  try {
+    const res = await fetch(
+      `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(cfg.accountId)}/r2/buckets/${INBOUND_SPOOL_BUCKET}/objects?prefix=spool/&per_page=100`,
+      { headers: { Authorization: `Bearer ${cfg.apiToken}` }, signal: AbortSignal.timeout(8000) },
+    );
+    const latency_ms = Date.now() - start;
+    const json = await res.json().catch(() => ({})) as {
+      success?: boolean; result?: Array<{ key?: string; last_modified?: string; size?: number }>;
+    };
+    if (!res.ok || json.success !== true) {
+      return { status: 'unhealthy', latency_ms, error: `Inbound spool unreadable (HTTP ${res.status}) — waiting mail cannot be counted` };
+    }
+    const items = json.result ?? [];
+    const oldest = items.reduce<number | null>((min, o) => {
+      const t = o.last_modified ? Date.parse(o.last_modified) : NaN;
+      return Number.isFinite(t) && (min === null || t < min) ? t : min;
+    }, null);
+    const oldestMinutes = oldest === null ? 0 : Math.round((Date.now() - oldest) / 60_000);
+    const detail = { pending: items.length, oldest_minutes: oldestMinutes };
+    if (items.length === 0) return { status: 'healthy', latency_ms, message: 'No mail waiting', detail };
+    if (oldestMinutes >= SPOOL_STUCK_MINUTES) {
+      return {
+        status: 'unhealthy', latency_ms, detail,
+        error: `${items.length} inbound email(s) accepted but not delivered — oldest waiting ${oldestMinutes} min`,
+      };
+    }
+    return { status: 'degraded', latency_ms, detail, message: `${items.length} inbound email(s) waiting for retry` };
+  } catch (e) {
+    return { status: 'unknown', latency_ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
 /** Worst-of, with `unknown` ranked between healthy and degraded — it is not a pass. */
 function worstCloudflareStatus(parts: CloudflareCheck[]): CloudflareCheck['status'] {
   const rank = { healthy: 0, unknown: 1, degraded: 2, unhealthy: 3 } as const;
@@ -549,7 +591,7 @@ serve(withApiLogging('health-check', async (req) => {
   const [
     claude, slig, paddleocr, voyage_ai,
     embeddings, ai_services, vercel,
-    turnstile, emailRoutingMx, workers, inboundDelivery,
+    turnstile, emailRoutingMx, workers, inboundSpool, inboundDelivery,
     ...externalResults
   ] = await Promise.all([
     checkClaude(),
@@ -563,6 +605,7 @@ serve(withApiLogging('health-check', async (req) => {
     checkTurnstile(cfConfig),
     checkEmailRoutingMx(cfConfig),
     checkCloudflareWorkers(cfConfig),
+    checkInboundSpool(cfConfig),
     // Delivery OUTCOMES for the Email Routing → Worker → email-webhooks path. Read through the
     // caller's own client so the RPC's is_platform_admin() self-guard applies.
     (async () => {
@@ -578,10 +621,11 @@ serve(withApiLogging('health-check', async (req) => {
   ]);
 
   const cloudflare = {
-    status: worstCloudflareStatus([turnstile, emailRoutingMx, workers]),
+    status: worstCloudflareStatus([turnstile, emailRoutingMx, workers, inboundSpool]),
     turnstile,
     email_routing: emailRoutingMx,
     workers,
+    inbound_spool: inboundSpool,
     // Never rolled into the status above. Zero inbound mail on a low-volume receiving domain is a
     // legitimate quiet, not a fault — the MX check is what says whether mail COULD arrive. Shown
     // so an operator can tell the two apart instead of guessing from a colour.
@@ -600,6 +644,7 @@ serve(withApiLogging('health-check', async (req) => {
       ['claude', claude], ['voyage_ai', voyage_ai],
       ['mivaa.embeddings', embeddings], ['mivaa.ai_services', ai_services], ['vercel', vercel],
       ['cloudflare.turnstile', turnstile], ['cloudflare.email_routing', emailRoutingMx], ['cloudflare.workers', workers],
+      ['cloudflare.inbound_spool', inboundSpool],
     ];
     await recordAndPage(supabase, [
       ...core.map(([service, r]) => ({ service, paged: true, ...r })),

@@ -269,8 +269,9 @@ async function handleInbound(
     workspaceId: address.workspace_id, envelope: logBase.envelope, matchedAddressId: address.id,
   });
   if (claim.kind === 'duplicate') {
-    await logInbound(db, { ...logBase, outcome: 'duplicate' });
-    return inboundJson({ ok: true, outcome: 'duplicate' });
+    // Another run holds a live claim and has not delivered yet. Not "done": if it fails, the
+    // Worker's spooled copy is the only one left, so it must keep it and retry.
+    return inboundJson({ pending: true, outcome: 'in_progress' }, 409);
   }
 
   try {

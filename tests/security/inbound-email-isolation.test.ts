@@ -60,11 +60,34 @@ describe('#342 the Cloudflare Email Worker resolves no tenancy', () => {
     expect(code).toMatch(/setReject/);
   });
 
-  it('rejects rather than silently dropping when the platform is unreachable', () => {
-    // A dropped message is a lost customer order that nobody finds out about. Every failure
-    // path must end in setReject so the sending server retries.
-    const rejects = (code.match(/setReject/g) || []).length;
-    expect(rejects).toBeGreaterThanOrEqual(5);
+  // Cloudflare turns EVERY setReject() into a permanent 5xx, so the sender never retries: a
+  // "Temporary failure" reject bounced 8 supplier price lists on 2026-10-25.
+  it('spools the message before the first hand-off, so a platform failure cannot bounce it', () => {
+    const emailHandler = code.slice(code.indexOf('async email('), code.indexOf('async scheduled('));
+    const spool = emailHandler.indexOf('SPOOL.put(');
+    const firstDelivery = emailHandler.indexOf('deliverWithRetries(');
+    expect(spool).toBeGreaterThan(-1);
+    expect(firstDelivery).toBeGreaterThan(spool);
+  });
+
+  it('refuses only a definitive no — never because a delivery attempt failed', () => {
+    const emailHandler = code.slice(code.indexOf('async email('), code.indexOf('async scheduled('));
+    const reasons = [...emailHandler.matchAll(/setReject\('([^']+)'\)/g)].map((m) => m[1]);
+    expect(reasons.sort()).toEqual([
+      'Mailbox unavailable', 'Mailbox unavailable', 'Message too large', 'Temporary failure, please retry',
+    ].sort());
+    expect(emailHandler).toMatch(/if \(spooled\) \{[\s\S]*?return;\s*\}[\s\S]*?setReject\('Temporary failure, please retry'\)/);
+  });
+
+  it('removes a spooled message only after the platform has it or refused the recipient', () => {
+    const scheduled = code.slice(code.indexOf('async scheduled('));
+    expect(scheduled).toMatch(/kind === 'retry'[\s\S]*?continue;[\s\S]*?SPOOL\.delete/);
+  });
+
+  it('has a scheduled trigger and the spool binding wired in wrangler.toml', () => {
+    const toml = readFileSync(join(ROOT, 'cloudflare/email-worker/wrangler.toml'), 'utf8');
+    expect(toml).toMatch(/\[triggers\][\s\S]*crons\s*=/);
+    expect(toml).toMatch(/binding\s*=\s*"SPOOL"[\s\S]*bucket_name\s*=\s*"inbound-email-spool"|bucket_name\s*=\s*"inbound-email-spool"[\s\S]*binding\s*=\s*"SPOOL"/);
   });
 });
 
