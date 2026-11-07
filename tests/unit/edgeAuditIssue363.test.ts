@@ -50,8 +50,7 @@ describe('#363 EE-2 — image and video spend reaches ai_usage_logs', () => {
   const PER_UNIT_PRODUCERS = [
     'generateImageWithGemini',
     'generateMultiImageWithGemini',
-    'generateVideoWithVeo',
-    'generateVideoWithVeoRaw',
+    'generateVideoWithGeminiOmni',
     'generateVideoWithKling',
     'generateImageWithGrok',
     'editImageWithGrok',

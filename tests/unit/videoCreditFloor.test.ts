@@ -14,7 +14,9 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 
 /** Mirrors `ai_model_pricing.cost_per_unit` where `unit_label = 'second'`. */
 const PROVIDER_USD_PER_SECOND: Record<string, number> = {
-  'veo-2': 0.35,
+  // Gemini Omni 1.2 Flash: $12/1M output tokens x 5,792 tok/s (720p) or 8,688 (1080p).
+  'gemini-omni-1.2-flash-720p': 0.0695,
+  'gemini-omni-1.2-flash-1080p': 0.1043,
   'kling-v3.0': 0.10,
   'runway-gen4-turbo': 0.15,
   // Wan3.0 (model id wan3.0-video), one row per tier — the rate differs 4x across them, so a
@@ -133,12 +135,12 @@ describe('every surface advertises the price the generator actually charges', ()
   });
 
   it('the agent tool description quotes the charged price', () => {
-    expect(read(TOOL)).toContain('veo-2 50cr');
+    expect(read(TOOL)).toContain('gemini-omni-1.2-flash-720p 20cr');
   });
 });
 
 describe('the second copy of the video prices agrees with the first', () => {
-  // `generate-social-video` keeps its own CREDIT_COSTS. For veo-2 it delegates to
+  // `generate-social-video` keeps its own CREDIT_COSTS. For most models it delegates to
   // generate-interior-video-v2 and never charges from its own map — but the map still feeds the
   // "insufficient credits, required: N" message, so a stale entry quotes a price nobody charges,
   // and it goes live the moment anyone removes the delegation. Two files, one number, nothing
@@ -187,8 +189,8 @@ describe('a billable service is never priced at zero by accident', () => {
   });
 
   it('the fallback table carries the priciest model', () => {
-    // Veo was absent while Kling and Runway were present, so a DB outage dropped only the most
-    // expensive model's cost to null.
-    expect(src).toMatch(/'veo-2':\s*\{\s*cost_per_unit:\s*0\.35/);
+    // Veo was absent while Kling and Runway were present, so a DB outage dropped only the
+    // Google model's cost to null.
+    expect(src).toMatch(/'gemini-omni-1\.2-flash-1080p':\s*\{\s*cost_per_unit:\s*0\.1043/);
   });
 });

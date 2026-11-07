@@ -3443,8 +3443,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // four models lived only in the schema. Values are generate_video's `model`
           // z.enum — the drift guard resolves this key against it, not against
           // generate_vr_world.model, by matching the offered values.
-          { key: 'model', label: 'Model', kind: 'select', default: 'veo-2', options: [
-            { value: 'veo-2', label: 'Veo 2 — 50 Credits' },
+          { key: 'model', label: 'Model', kind: 'select', default: 'gemini-omni-1.2-flash-720p', options: [
+            { value: 'gemini-omni-1.2-flash-720p', label: 'Gemini Omni 720p — 15s with audio, 20 credits' },
+            { value: 'gemini-omni-1.2-flash-1080p', label: 'Gemini Omni 1080p — 15s with audio, 30 credits' },
             { value: 'kling-v3.0', label: 'Kling v3.0 — 20 Credits' },
             { value: 'runway-gen4-turbo', label: 'Runway Gen-4 Turbo — 40 Credits' },
             { value: 'wan-3.0-480p', label: 'Wan3.0 480p — 30s with audio, 30 credits' },

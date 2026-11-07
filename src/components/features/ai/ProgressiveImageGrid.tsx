@@ -33,7 +33,8 @@ const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   // row was written with credits_used undefined, and the run then threw "Unknown model" and
   // refunded undefined credits. Wan's price was also advertised at 10 while the generator
   // charged 12.
-  { value: 'veo-2', label: 'Veo 2', description: 'Google Veo 2 — high quality', credits: 50 },
+  { value: 'gemini-omni-1.2-flash-720p', label: 'Gemini Omni 720p', description: 'Google Omni — 15s with audio, 720p', credits: 20 },
+  { value: 'gemini-omni-1.2-flash-1080p', label: 'Gemini Omni 1080p', description: 'Google Omni — 15s with audio, 1080p', credits: 30 },
   { value: 'kling-v3.0', label: 'Kling 3.0', description: 'Kling 3.0 — cinematic + audio', credits: 20 },
   { value: 'runway-gen4-turbo', label: 'Runway Gen-4', description: 'Runway Gen-4 — premium output', credits: 40 },
   // Wan is the only entry here that reaches 30 seconds and the only one that returns

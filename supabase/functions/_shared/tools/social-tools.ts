@@ -477,7 +477,7 @@ export const createManageSocialTool = (
           + 'normally what you want — generate_image put it there.',
         ),
         video_model: z.enum([
-          'h3-max-768p', 'h3-max-480p', 'veo-2', 'kling-3.0',
+          'h3-max-768p', 'h3-max-480p', 'gemini-omni-1.2-flash-720p', 'gemini-omni-1.2-flash-1080p', 'kling-3.0',
           'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
           'seedance-2.5-480p', 'seedance-2.5-720p', 'ray-3.2-720p', 'ray-3.2-1080p',
         ]).optional().describe(

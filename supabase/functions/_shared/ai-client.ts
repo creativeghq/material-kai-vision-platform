@@ -71,7 +71,7 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // Lazy getter (NOT a module-load capture) so values bootstrapped into Deno.env
 // inside the request handler are picked up. Used by the raw-fetch Gemini multi-image
-// + Veo paths (the AI SDK `google` proxy covers the single-image path separately).
+// path (the AI SDK `google` proxy covers the single-image path separately).
 const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 // Lazy getter (same rationale as GOOGLE_API_KEY) for the xAI Grok/Aurora image
 // + edit + masked-inpaint paths (generateImageWithGrok / editImageWithGrok).
@@ -306,12 +306,11 @@ const DEFAULT_CLAUDE_MODEL = CLAUDE_OPUS;
 // ── Billing identity for the per-unit models ───────────────────────────────
 // `generation_models.id` values, NOT the provider strings this file passes to the SDKs. They
 // differ, and that is the whole reason these constants exist rather than reusing `modelId`:
-// the KlingAI SDK wants 'kling-v3.0-i2v', Veo's raw API wants 'veo-2.0-generate-001', and
+// the KlingAI SDK wants 'kling-v3.0-i2v', and
 // xAI's endpoint wants the slug 'grok-imagine-image-quality' — none of which is a key the
 // pricing table knows.
 const MAX_VIDEO_DOWNLOAD_BYTES = 48 * 1024 * 1024;
 
-const VEO_PRICING_MODEL_ID = 'veo-2';
 const KLING_PRICING_MODEL_ID = 'kling-v3.0';
 const GROK_PRICING_MODEL_ID = 'xai-aurora';
 
@@ -1221,208 +1220,6 @@ async function generateMultiImageWithGemini(
   };
 }
 
-// ── Veo: Video generation ──
-export type VeoModel = 'veo-2.0-generate-001';
-
-export interface VeoVideoResult {
-  base64: string;
-  mimeType: string;
-  model: VeoModel;
-}
-
-export async function generateVideoWithVeo(
-  prompt: string,
-  config?: UnitBillingConfig & {
-    model?: VeoModel;
-    aspectRatio?: '16:9' | '9:16' | '1:1';
-    durationSeconds?: number;
-    resolution?: '1280x720' | '1920x1080';
-    /** Source image URL or base64 data URL for image-to-video conditioning */
-    imageUrl?: string;
-  },
-): Promise<VeoVideoResult> {
-  const modelId: VeoModel = config?.model ?? 'veo-2.0-generate-001';
-  const _start = Date.now();
-  const seconds = config?.durationSeconds ?? 8;
-
-  // Image-to-video: use raw Google API (the AI SDK experimental_generateVideo
-  // does not support image conditioning — it silently does text-to-video only).
-  if (config?.imageUrl) {
-    return generateVideoWithVeoRaw(prompt, config.imageUrl, modelId, config);
-  }
-
-  try {
-    // Text-to-video via AI SDK
-    const { video } = await generateVideo({
-      model: google.video(modelId),
-      prompt,
-      aspectRatio: config?.aspectRatio ?? '16:9',
-      durationSeconds: seconds,
-      resolution: config?.resolution ?? '1280x720',
-      pollTimeoutMs: 600000,
-    } as any);
-
-    // `veo-2` is the generation_models id; its pricing_key is deliberately NULL — nobody has
-    // verified a per-second rate for it — so this logs the call with a null cost and a warning
-    // rather than a guessed number. The row still exists, which is the point: `ops.silent_zero`
-    // can see "video generated, cost unknown", and a missing price row is a fixable gap.
-    await _logUnitCall({
-      task: config?.task ?? 'veo_video_generation',
-      modelKey: VEO_PRICING_MODEL_ID,
-      units: seconds,
-      latencyMs: Date.now() - _start,
-      userId: config?.userId,
-      workspaceId: config?.workspaceId,
-    });
-
-    return {
-      base64: (video as any).base64,
-      mimeType: (video as any).mimeType ?? 'video/mp4',
-      model: modelId,
-    };
-  } catch (err) {
-    await _logUnitCall({
-      task: config?.task ?? 'veo_video_generation',
-      modelKey: VEO_PRICING_MODEL_ID,
-      units: 0,
-      latencyMs: Date.now() - _start,
-      errorMessage: err instanceof Error ? err.message : String(err),
-      userId: config?.userId,
-      workspaceId: config?.workspaceId,
-    });
-    throw err;
-  }
-}
-
-/**
- * Image-to-video via the Google Generative Language API directly.
- * Fetches the source image, submits as a long-running operation, polls until
- * done, then downloads and returns the video as base64.
- */
-async function generateVideoWithVeoRaw(
-  prompt: string,
-  imageUrl: string,
-  modelId: VeoModel,
-  config?: UnitBillingConfig & { aspectRatio?: string; durationSeconds?: number; resolution?: string },
-): Promise<VeoVideoResult> {
-  if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
-  const _start = Date.now();
-  const billSeconds = config?.durationSeconds ?? 8;
-  const logVeo = (units: number, errorMessage?: string) => _logUnitCall({
-    task: config?.task ?? 'veo_video_generation',
-    modelKey: VEO_PRICING_MODEL_ID,
-    units,
-    latencyMs: Date.now() - _start,
-    ...(errorMessage ? { errorMessage } : {}),
-    userId: config?.userId,
-    workspaceId: config?.workspaceId,
-  });
-
-  // Fetch source image → base64, through the shared SSRF guard (invariant 7, #365 `AD-27` —
-  // the thirteenth site of this shape). `imageUrl` reaches here from a tool call, so it is a URL
-  // this runtime resolves on behalf of whoever asked: a bare fetch followed 302s, had no size
-  // cap, and would happily read `169.254.169.254`. The guard is https-only, refuses redirects,
-  // rejects private/link-local targets and caps the read against bytes actually delivered.
-  const { bytes: imgBytes, mimeType } = await fetchImageGuarded(imageUrl);
-
-  // Safe base64 encoder (avoids call-stack overflow on large images)
-  let binary = '';
-  const chunk = 8192;
-  for (let i = 0; i < imgBytes.length; i += chunk) {
-    binary += String.fromCharCode(...imgBytes.subarray(i, i + chunk));
-  }
-  const imageBase64 = btoa(binary);
-
-  // Submit long-running operation
-  const submitRes = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:predictLongRunning?key=${GOOGLE_API_KEY()}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{
-          prompt,
-          image: { bytesBase64Encoded: imageBase64, mimeType },
-        }],
-        parameters: {
-          aspectRatio: config?.aspectRatio ?? '16:9',
-          durationSeconds: config?.durationSeconds ?? 8,
-        },
-      }),
-    },
-  );
-
-  if (!submitRes.ok) {
-    const err = await submitRes.text();
-    throw new Error(`Veo submit failed (${submitRes.status}): ${err}`);
-  }
-
-  const operation = await submitRes.json() as { name: string; done?: boolean };
-  const opName = operation.name;
-  if (!opName) throw new Error('Veo: no operation name returned');
-
-  // Poll until done (10 min max, 10s intervals)
-  const deadline = Date.now() + 600_000;
-  while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 10_000));
-
-    const pollRes = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/${opName}?key=${GOOGLE_API_KEY()}`,
-    );
-    if (!pollRes.ok) continue;
-
-    const opData = await pollRes.json() as {
-      done?: boolean;
-      error?: { message: string };
-      response?: { generateVideoResponse?: { generatedSamples?: Array<{ video?: { uri?: string; encodedVideo?: string; mimeType?: string } }> } };
-    };
-
-    if (opData.error) throw new Error(`Veo generation failed: ${opData.error.message}`);
-
-    if (opData.done) {
-      // Try both response shapes Google has used
-      const generateVideoResponse =
-        (opData.response as any)?.generateVideoResponse ??
-        (opData.response as any);
-      const sample = generateVideoResponse?.generatedSamples?.[0];
-      if (!sample?.video) {
-        throw new Error(`Veo: no video in response. Response: ${JSON.stringify(opData.response).slice(0, 500)}`);
-      }
-
-      // Prefer inline base64, fall back to downloading from URI
-      if (sample.video.encodedVideo) {
-        void logVeo(billSeconds);
-        return { base64: sample.video.encodedVideo, mimeType: sample.video.mimeType ?? 'video/mp4', model: modelId };
-      }
-
-      if (sample.video.uri) {
-        // The URI is a generativelanguage.googleapis.com endpoint — requires API key
-        const videoFetchUrl = sample.video.uri.includes('?')
-          ? `${sample.video.uri}&key=${GOOGLE_API_KEY()}`
-          : `${sample.video.uri}?key=${GOOGLE_API_KEY()}`;
-        // Not `fetchBinaryGuarded` here, deliberately: this URI comes back from Google's own
-        // API in response to our authenticated request, so there is no user-influenced host
-        // to validate, and the guard's `redirect: 'error'` would break the download outright
-        // — these endpoints 302 to a storage CDN as a matter of course.
-        const vidRes = await fetch(videoFetchUrl);
-        if (!vidRes.ok) throw new Error(`Veo: failed to download video (${vidRes.status}): ${await vidRes.text()}`);
-        const vidBytes = await readCapped(vidRes, MAX_VIDEO_DOWNLOAD_BYTES);
-        let vidBinary = '';
-        for (let i = 0; i < vidBytes.length; i += chunk) {
-          vidBinary += String.fromCharCode(...vidBytes.subarray(i, i + chunk));
-        }
-        void logVeo(billSeconds);
-        return { base64: btoa(vidBinary), mimeType: 'video/mp4', model: modelId };
-      }
-
-      throw new Error('Veo: video has neither encodedVideo nor uri');
-    }
-  }
-
-  void logVeo(0, 'timed out waiting for video generation');
-  throw new Error('Veo: timed out waiting for video generation');
-}
-
 // ── Kling AI: Video generation ──
 export interface KlingVideoResult {
   base64: string;
@@ -1680,19 +1477,17 @@ export async function generateVideoWithWan(
   }
 }
 
-// ── Gemini Omni 1.1 Flash (Google) ─────────────────────────────────────────
-// GA id. Google bills video output by TOKEN — $17.50/1M at 5,792 tokens per second of
-// 720p — so the per-second rows in `ai_model_pricing` are that rate expressed per second
-// at each resolution's token scale (360p ⅓, 1080p 1.5x, 4K 3x of 720p).
-const GEMINI_OMNI_MODEL_ID = 'gemini-omni-1.1-flash';
+// ── Gemini Omni 1.2 Flash (Google) ─────────────────────────────────────────
+// Google's only video model on the Gemini API (every Veo id is shut down). Raw REST because
+// it lives on the Interactions API, not the predictLongRunning shape the AI SDK's video() speaks.
+const GEMINI_OMNI_MODEL_ID = 'gemini-omni-1.2-flash';
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-export type GeminiOmniResolution = '360p' | '720p' | '1080p' | '4k';
+export type GeminiOmniResolution = '720p' | '1080p';
 
 const GEMINI_OMNI_PRICING_MODEL_ID: Record<GeminiOmniResolution, string> = {
-  '360p': 'gemini-omni-1.1-flash-360p',
-  '720p': 'gemini-omni-1.1-flash-720p',
-  '1080p': 'gemini-omni-1.1-flash-1080p',
-  '4k': 'gemini-omni-1.1-flash-4k',
+  '720p': 'gemini-omni-1.2-flash-720p',
+  '1080p': 'gemini-omni-1.2-flash-1080p',
 };
 
 export interface GeminiOmniVideoResult {
@@ -1703,6 +1498,14 @@ export interface GeminiOmniVideoResult {
   resolution: GeminiOmniResolution;
 }
 
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(binary);
+}
+
 export async function generateVideoWithGeminiOmni(
   prompt: string,
   config?: UnitBillingConfig & {
@@ -1711,78 +1514,117 @@ export async function generateVideoWithGeminiOmni(
     durationSeconds?: number;
     resolution?: GeminiOmniResolution;
     aspectRatio?: '16:9' | '9:16' | '1:1';
-    pollTimeoutMs?: number;
+    timeoutMs?: number;
     /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
     logUsage?: boolean;
   },
 ): Promise<GeminiOmniVideoResult> {
   const _start = Date.now();
   const resolution = config?.resolution ?? '720p';
-  const seconds = Math.max(2, Math.min(30, Math.round(config?.durationSeconds ?? 5)));
+  const seconds = Math.max(3, Math.min(15, Math.round(config?.durationSeconds ?? 10)));
   const modelKey = GEMINI_OMNI_PRICING_MODEL_ID[resolution];
+  const timeoutMs = config?.timeoutMs ?? 300_000;
 
-  // Lazy and via resolveSecret for the usual reason: `Deno.env.set` is a no-op on edge,
-  // so a module-load capture never sees an admin-configured key.
   const apiKey = await _secret('GOOGLE_GENERATIVE_AI_API_KEY');
   if (!apiKey) {
-    throw new Error(
-      'GOOGLE_GENERATIVE_AI_API_KEY is not configured — cannot generate with Gemini Omni',
-    );
+    throw new Error('GOOGLE_GENERATIVE_AI_API_KEY is not configured — cannot generate with Gemini Omni');
   }
 
-  // Same floor as every other video path: the prompt is free text a user typed.
   const verdict = assertTransferAllowed([prompt], {
     destinationIsEea: false,
-    providerLabel: 'Gemini Omni 1.1 Flash (Google)',
+    providerLabel: 'Gemini Omni 1.2 Flash (Google)',
   });
   if (!verdict.allowed) {
     throw new Error(verdict.message ?? 'Blocked: personal data may not leave the EEA.');
   }
 
+  const logOmni = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'gemini_omni_video_generation',
+    modelKey,
+    units,
+    latencyMs: Date.now() - _start,
+    ...(errorMessage ? { errorMessage } : {}),
+    userId: config?.userId,
+    workspaceId: config?.workspaceId,
+  });
+
   try {
-    const { video } = await generateVideo({
-      model: google.video(GEMINI_OMNI_MODEL_ID),
-      prompt,
-      duration: seconds,
-      providerOptions: {
-        google: {
+    const input: Array<Record<string, unknown>> = [];
+    if (config?.imageUrl) {
+      const { bytes, mimeType } = await fetchImageGuarded(config.imageUrl);
+      input.push({ type: 'image', data: bytesToBase64(bytes), mime_type: mimeType });
+    }
+    input.push({ type: 'text', text: prompt });
+
+    const headers = { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey };
+    const res = await fetch(`${GEMINI_API_BASE}/interactions`, {
+      method: 'POST',
+      headers,
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify({
+        model: GEMINI_OMNI_MODEL_ID,
+        input,
+        response_format: {
+          type: 'video',
+          // Omni has no 1:1; a square request is rendered landscape rather than refused.
+          aspect_ratio: config?.aspectRatio === '9:16' ? '9:16' : '16:9',
           resolution,
-          aspectRatio: config?.aspectRatio ?? '16:9',
-          ...(config?.imageUrl ? { image: { url: config.imageUrl } } : {}),
+          duration: `${seconds}s`,
+          delivery: 'uri',
         },
-      },
-      pollTimeoutMs: config?.pollTimeoutMs ?? 600_000,
-    } as any);
-
-    const bytes: Uint8Array = (video as any).uint8Array;
-    if (!bytes?.length) throw new Error('Gemini Omni returned an empty video');
-
-    if (config?.logUsage !== false) await _logUnitCall({
-      task: config?.task ?? 'gemini_omni_video_generation',
-      modelKey,
-      units: seconds,
-      latencyMs: Date.now() - _start,
-      userId: config?.userId,
-      workspaceId: config?.workspaceId,
+        background: false,
+        store: false,
+        stream: false,
+      }),
     });
+    if (!res.ok) {
+      throw new Error(`Gemini Omni failed (${res.status}): ${(await res.text()).slice(0, 500)}`);
+    }
+    const body = await res.json();
+    if (body?.status && body.status !== 'completed') {
+      throw new Error(`Gemini Omni interaction ended '${body.status}'`);
+    }
+    const video = (body?.steps ?? [])
+      .filter((st: { type?: string }) => st?.type === 'model_output')
+      .flatMap((st: { content?: unknown[] }) => st.content ?? [])
+      .find((c: { type?: string }) => c?.type === 'video') as
+        { data?: string; uri?: string; mime_type?: string } | undefined;
+    if (!video?.data && !video?.uri) throw new Error('Gemini Omni returned no video');
+
+    let bytes: Uint8Array;
+    if (video.data) {
+      bytes = Uint8Array.from(atob(video.data), (c) => c.charCodeAt(0));
+    } else {
+      // URI delivery: the file is ACTIVE only once processing ends, then downloaded by id.
+      const fileId = /files\/([^/:?]+)/.exec(video.uri!)?.[1];
+      if (!fileId) throw new Error('Gemini Omni returned an unrecognised video uri');
+      const deadline = _start + timeoutMs;
+      for (;;) {
+        const f = await fetch(`${GEMINI_API_BASE}/files/${fileId}`, { headers });
+        if (!f.ok) throw new Error(`Gemini Omni file lookup failed (${f.status})`);
+        const state = (await f.json())?.state;
+        if (state === 'ACTIVE') break;
+        if (state === 'FAILED') throw new Error('Gemini Omni video file FAILED');
+        if (Date.now() > deadline) throw new Error('Gemini Omni video file did not become ACTIVE in time');
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      const dl = await fetch(`${GEMINI_API_BASE}/files/${fileId}:download?alt=media`, { headers });
+      if (!dl.ok) throw new Error(`Gemini Omni download failed (${dl.status})`);
+      bytes = await readCapped(dl, MAX_VIDEO_DOWNLOAD_BYTES);
+    }
+    if (!bytes.length) throw new Error('Gemini Omni returned an empty video');
+
+    if (config?.logUsage !== false) await logOmni(seconds);
 
     return {
       bytes,
-      mimeType: (video as any).mediaType ?? 'video/mp4',
+      mimeType: video.mime_type ?? 'video/mp4',
       model: GEMINI_OMNI_MODEL_ID,
       durationSeconds: seconds,
       resolution,
     };
   } catch (err) {
-    await _logUnitCall({
-      task: config?.task ?? 'gemini_omni_video_generation',
-      modelKey,
-      units: 0,
-      latencyMs: Date.now() - _start,
-      errorMessage: err instanceof Error ? err.message : String(err),
-      userId: config?.userId,
-      workspaceId: config?.workspaceId,
-    });
+    await logOmni(0, err instanceof Error ? err.message : String(err));
     throw err;
   }
 }

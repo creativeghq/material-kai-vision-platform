@@ -1439,7 +1439,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Multi-model interior design video generation with async polling fallback",
-    "description": "Generates interior design videos via veo-2 (50cr, 8s), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (30/55/110cr, 30s with audio), seedance-2.5-480p/720p (60/125cr, 30s one-pass) h3-max-768p/480p (25/15cr, 15s with stereo audio, rendered in seconds) or ray-3.2-720p/1080p (20/70cr, 5-10s, first-to-last frame interpolation). Model is auto-selected from video_type wh",
+    "description": "Generates interior design videos via gemini-omni-1.2-flash-720p/1080p (20/30cr, 3-15s with native audio), kling-v3.0 (20cr, 10s), runway-gen4-turbo (40cr, 10s), wan-3.0-480p/720p/1080p (30/55/110cr, 30s with audio), seedance-2.5-480p/720p (60/125cr, 30s one-pass) h3-max-768p/480p (25/15cr, 15s with stereo audio, rendered in seconds) or ray-3.2-720p/1080p (20/70cr, 5-10s, first-to-last frame interp",
     "fields": {
       "source_image_url": {
         "type": "string",
@@ -1459,7 +1459,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "model": {
         "type": "string",
         "enum": [
-          "veo-2",
+          "gemini-omni-1.2-flash-720p",
+          "gemini-omni-1.2-flash-1080p",
           "kling-v3.0",
           "runway-gen4-turbo",
           "wan-3.0-480p",
@@ -1488,7 +1489,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       },
       "duration_seconds": {
         "type": "integer",
-        "description": "Requested duration. veo-2 capped at 8s."
+        "description": "Requested duration, clamped to the model ceiling (omni/h3-max 15s, runway/ray 5 or 10s)."
       },
       "workspace_id": {
         "type": "string"
@@ -1720,8 +1721,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "Generate a short-form social video (MiniMax H3 by default; Kling, Veo 2, Wan3.0, Seedance 2.5 and Ray3.2 selectable)",
-    "description": "Generates a short-form social video. DEFAULT h3-max-768p (25cr): 5-15s with stereo audio, rendered in seconds, delegated to generate-interior-video-v2. veo-2 (50cr), wan-3.0-480p/720p/1080p (30/55/110cr) and seedance-2.5-480p/720p (60/125cr) ray-3.2-720p/1080p (20/70cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits debited upfront, non-refundabl",
+    "summary": "Generate a short-form social video (MiniMax H3 by default; Kling, Gemini Omni, Wan3.0, Seedance 2.5 and Ray3.2 selectable)",
+    "description": "Generates a short-form social video. DEFAULT h3-max-768p (25cr): 5-15s with stereo audio, rendered in seconds, delegated to generate-interior-video-v2. gemini-omni-1.2-flash-720p/1080p (20/30cr), wan-3.0-480p/720p/1080p (30/55/110cr) and seedance-2.5-480p/720p (60/125cr) ray-3.2-720p/1080p (20/70cr) are delegated the same way. kling-3.0 (20cr) is the one model run here, through Replicate. Credits ",
     "fields": {
       "source_image_url": {
         "type": "string",
@@ -1737,7 +1738,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "h3-max-768p",
           "h3-max-480p",
           "kling-3.0",
-          "veo-2",
+          "gemini-omni-1.2-flash-720p",
+          "gemini-omni-1.2-flash-1080p",
           "wan-3.0-480p",
           "wan-3.0-720p",
           "wan-3.0-1080p",

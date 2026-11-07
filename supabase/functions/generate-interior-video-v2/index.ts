@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js';
 import { replicateToken } from '../_shared/replicate-token.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
-  generateVideoWithVeo,
+  generateVideoWithGeminiOmni,
   generateVideoWithKling,
   generateVideoWithWan,
   generateVideoWithSeedance,
@@ -27,7 +27,8 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // The budget tier stays VACANT until a replacement is verified against a funded account
 // (issue #4 Phase 5): the last occupant 404'd upstream and hard-failed every call.
-type VideoModel = 'veo-2' | 'kling-v3.0' | 'runway-gen4-turbo'
+type VideoModel = 'gemini-omni-1.2-flash-720p' | 'gemini-omni-1.2-flash-1080p'
+  | 'kling-v3.0' | 'runway-gen4-turbo'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
   | 'h3-max-768p' | 'h3-max-480p'
@@ -38,7 +39,8 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 // Every price here must cover the provider bill for a MAX-LENGTH clip of that model, because
 // MAX_DURATION_SECONDS below is what the caller can actually ask for and the fee is flat.
 const CREDIT_COSTS: Record<VideoModel, number> = {
-  'veo-2':              50,
+  'gemini-omni-1.2-flash-720p':  20,
+  'gemini-omni-1.2-flash-1080p': 30,
   'kling-v3.0':         20,
   'runway-gen4-turbo':  40,
   'wan-3.0-480p':       30,
@@ -54,7 +56,8 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 
 // Longest clip each model will produce.
 const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
-  'veo-2':              8,
+  'gemini-omni-1.2-flash-720p':  15,
+  'gemini-omni-1.2-flash-1080p': 15,
   'kling-v3.0':         10,
   'runway-gen4-turbo':  10,
   'wan-3.0-480p':       30,
@@ -97,6 +100,12 @@ const H3MAX_RESOLUTION: Partial<Record<VideoModel, '480P' | '768P'>> = {
   'h3-max-480p': '480P',
 };
 
+/** And again for Omni (1080p is upscaled, 1.5x the 720p token cost). */
+const OMNI_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
+  'gemini-omni-1.2-flash-720p':  '720p',
+  'gemini-omni-1.2-flash-1080p': '1080p',
+};
+
 /** And again for Ray, where 720p -> 1080p is a 4x jump in rate. */
 const RAY_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
   'ray-3.2-720p':  '720p',
@@ -105,7 +114,8 @@ const RAY_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
 
 /** Which provider each model bills. Must match both the dispatch below and `generation_models.provider`. */
 const MODEL_PROVIDER: Record<VideoModel, string> = {
-  'veo-2':             'google',
+  'gemini-omni-1.2-flash-720p':  'google',
+  'gemini-omni-1.2-flash-1080p': 'google',
   'kling-v3.0':        'klingai',
   'runway-gen4-turbo': 'replicate',
   'wan-3.0-480p':      'alibaba',
@@ -124,15 +134,15 @@ const MODEL_PROVIDER: Record<VideoModel, string> = {
 // so every video type debited, failed at the provider and refunded, for everybody.
 const TYPE_MODEL_PREFERENCE: Record<VideoType, VideoModel[]> = {
   // An 8-second silent clip is not a walkthrough: Wan gives 30s, scored, multi-reference.
-  walkthrough:          ['wan-3.0-720p', 'veo-2', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
-  floorplan_flythrough: ['wan-3.0-720p', 'veo-2', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
-  product_spotlight:    ['kling-v3.0', 'h3-max-768p', 'runway-gen4-turbo', 'wan-3.0-720p', 'veo-2'],
+  walkthrough:          ['wan-3.0-720p', 'gemini-omni-1.2-flash-720p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
+  floorplan_flythrough: ['wan-3.0-720p', 'gemini-omni-1.2-flash-720p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
+  product_spotlight:    ['kling-v3.0', 'h3-max-768p', 'gemini-omni-1.2-flash-720p', 'runway-gen4-turbo', 'wan-3.0-720p'],
   // Ray3.2 is the ONLY model that interpolates first frame -> last frame, so a substitute
   // starts from the source and drifts instead of landing on `endFrameUrl`. Still better than
   // refusing, but the response says which model actually ran.
   before_after:         ['ray-3.2-720p', 'runway-gen4-turbo', 'kling-v3.0', 'wan-3.0-720p'],
   // A reel is 15s on a phone, not 30 on a monitor — H3 Max with stereo audio for 25 credits.
-  social_reel:          ['h3-max-768p', 'wan-3.0-480p', 'runway-gen4-turbo', 'kling-v3.0'],
+  social_reel:          ['h3-max-768p', 'gemini-omni-1.2-flash-720p', 'wan-3.0-480p', 'runway-gen4-turbo', 'kling-v3.0'],
 };
 
 const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = Object.fromEntries(
@@ -140,7 +150,7 @@ const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = Object.fromEntries(
 ) as Record<VideoType, VideoModel>;
 
 /** A probe verdict that means the credential is deployed. `ok` is verified; the other is unverified
- *  but has a key, and excluding it would drop Veo, whose submit shape simply has no probe. */
+ *  but has a key, and excluding it would drop Google, whose submit shape simply has no probe. */
 const USABLE_PROBE_STATUS = new Set(['ok', 'no_probe_implemented']);
 
 /** Providers whose credential is deployed, read from the registry the health agent already stamps.
@@ -293,7 +303,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     // Extra images held CONSISTENT across the clip — the product itself, its finish,
     // the room it goes in — which is the whole reason a generated interior is usable
     // as a sales asset rather than a plausible lookalike. Wan and Seedance take them;
-    // Veo, Ray and H3 Max do not.
+    // Omni, Ray and H3 Max do not.
     reference_image_urls,
     last_frame_url,
     generate_audio,
@@ -322,8 +332,8 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     ? reference_image_urls.filter((u: unknown): u is string => typeof u === 'string' && !!u).slice(0, 19)
     : [];
 
-  // Invariant 7 (#364 EX-7). These URLs are handed to Replicate / Veo / Kling, which fetch them
-  // from THEIR network — and the Veo and Kling branches also make us fetch them ourselves. A
+  // Invariant 7 (#364 EX-7). These URLs are handed to Replicate / Omni / Kling, which fetch them
+  // from THEIR network — and the Omni and Kling branches also make us fetch them ourselves. A
   // provider fetching an internal address on our behalf is the same primitive as fetching it
   // here, so validate before either happens rather than at whichever call site fetches first.
   try {
@@ -406,7 +416,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   const fiveOrTenOnly = Boolean(RAY_RESOLUTION[resolvedModel]) || resolvedModel === 'runway-gen4-turbo';
   const durationSeconds = fiveOrTenOnly
     ? (clampedDuration > 7 ? 10 : 5)
-    : clampedDuration;
+    : OMNI_RESOLUTION[resolvedModel] ? Math.max(3, clampedDuration) : clampedDuration;
 
   // `ai_model_pricing` keys differ from the model ids this function uses: the price
   // table carries `kling-3.0`, here it is `kling-v3.0`. Identity map only — no prices
@@ -510,25 +520,25 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
   try {
     // ③ Generate video
-    if (resolvedModel === 'veo-2') {
-      // Use existing Veo integration from ai-client.ts
-      const defaultPrompt = video_type === 'walkthrough'
-        ? 'Smooth cinematic walkthrough of the interior space, slow dolly forward, professional real estate video'
-        : video_type === 'floorplan_flythrough'
-        ? 'Aerial cinematic flythrough of the floorplan, smooth overhead camera movement'
-        : 'Professional interior design showcase video, smooth camera movement';
-
-      const veoResult = await generateVideoWithVeo(
-        prompt || defaultPrompt,
+    if (OMNI_RESOLUTION[resolvedModel]) {
+      // Gemini Omni — 3-15s with native audio, so a prompt can describe what is heard.
+      const omniResult = await generateVideoWithGeminiOmni(
+        prompt || 'Professional interior design showcase video, smooth camera movement',
         {
           imageUrl: source_image_url,
-          aspectRatio: aspect_ratio as '16:9' | '9:16',
+          aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
           durationSeconds,
+          resolution: OMNI_RESOLUTION[resolvedModel],
+          task: 'interior_video_generation_v2',
+          userId,
+          workspaceId: workspace_id ?? undefined,
+          // `logVideoUsage` below owns this call's ai_usage_logs row.
+          logUsage: false,
         },
       );
 
-      const videoUrl = await uploadVideoToStorage(supabase, veoResult.base64, jobId, true, uploadCtx);
-      await logVideoUsage(durationSeconds);
+      const videoUrl = await uploadVideoToStorage(supabase, omniResult.bytes, jobId, false, uploadCtx);
+      await logVideoUsage(omniResult.durationSeconds);
 
       // This write is the ONLY record that the job finished, and the "your video is ready"
       // notification fires immediately after it. Discarding the result meant an RLS denial or a

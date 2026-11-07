@@ -329,22 +329,22 @@ Returns video_url when complete, or prediction_id if still processing (poll chec
         // a failed generation. 'wan2.1-i2v-720p' dropped 2026-08-12 (issue #4) — 404
         // upstream, so it was a fourth way to say the same thing.
         model: z.enum([
-          'veo-2', 'kling-v3.0', 'runway-gen4-turbo',
+          'gemini-omni-1.2-flash-720p', 'gemini-omni-1.2-flash-1080p', 'kling-v3.0', 'runway-gen4-turbo',
           'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
           'seedance-2.5-480p', 'seedance-2.5-720p',
           'h3-max-768p', 'h3-max-480p',
           'ray-3.2-720p', 'ray-3.2-1080p',
         ]).optional()
-          .describe('Override model selection: veo-2 50cr, kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 30cr, wan-3.0-720p 55cr, wan-3.0-1080p 110cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, h3-max-768p 25cr, h3-max-480p 15cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)'),
+          .describe('Override model selection: gemini-omni-1.2-flash-720p 20cr, gemini-omni-1.2-flash-1080p 30cr (Google, 3-15s with native audio described in the prompt), kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 30cr, wan-3.0-720p 55cr, wan-3.0-1080p 110cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, h3-max-768p 25cr, h3-max-480p 15cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),
         aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()
           .describe('16:9 for standard video, 9:16 for social reels (default: 16:9)'),
         // 16 was the ceiling when nothing here could exceed 10 seconds. Wan and Seedance
-        // reach 30, and the generator clamps DOWN per model (8 for veo-2, 10 for Kling),
+        // reach 30, and the generator clamps DOWN per model (15 for Omni, 10 for Kling),
         // so a wider range here cannot overspend — it can only stop capping the two
         // models whose whole point is the long clip.
         duration_seconds: z.number().int().min(4).max(30).optional()
-          .describe('Duration in seconds, clamped to the model ceiling (veo-2 8s, kling 10s, h3-max 15s, wan/seedance 30s). Default: 8'),
+          .describe('Duration in seconds, clamped to the model ceiling (kling 10s, runway/ray 5 or 10s, omni/h3-max 15s, wan/seedance 30s). Default: 8'),
         before_image_url: z.string().optional()
           .describe('Required only for before_after type: the "before" state image URL'),
       }),

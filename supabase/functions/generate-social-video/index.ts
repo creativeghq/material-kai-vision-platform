@@ -49,23 +49,19 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // 'kling-1.6-pro' removed 2026-08-12 (issue #4): `klingai/kling-1.6-pro` returns 404 from
 // GET /v1/models — a read that needs no credit, so it is deleted upstream, not a symptom of
 // our unfunded account's 402. It was selectable at 15 credits and always hard-failed.
-type VideoModel = 'kling-3.0' | 'veo-2'
+type VideoModel = 'kling-3.0' | 'gemini-omni-1.2-flash-720p' | 'gemini-omni-1.2-flash-1080p'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
   | 'h3-max-768p' | 'h3-max-480p'
   | 'ray-3.2-720p' | 'ray-3.2-1080p';
 
-// `veo-2` here is NOT what gets charged: the veo branch below returns early, delegating to
-// generate-interior-video-v2, which debits its own CREDIT_COSTS. This entry is only read by the
-// insufficient-credits preflight message, so a stale number quotes the customer a price nobody
-// charges. It sat at 30 after the generator moved to 50 — the same value in two files with no
-// mechanism keeping them equal, which is why the floor test now checks both.
+// Delegated models are NOT charged from here: generate-interior-video-v2 debits its own
+// CREDIT_COSTS. These entries feed only the insufficient-credits preflight message, and must
+// equal the generator's — pinned by tests/unit/videoCreditFloor.test.ts.
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'kling-3.0':     20,
-  'veo-2':         50,
-  // Delegated like veo-2, so these are preflight-message values only — but they must
-  // still equal generate-interior-video-v2's map, because a stale number here quotes
-  // the customer a price nobody charges. Pinned by tests/unit/videoCreditFloor.test.ts.
+  'gemini-omni-1.2-flash-720p':  20,
+  'gemini-omni-1.2-flash-1080p': 30,
   'wan-3.0-480p':  30,
   'wan-3.0-720p':  55,
   'wan-3.0-1080p': 110,
@@ -81,7 +77,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 //: Wan exists for — 30 seconds with sound, against the 10 silent seconds this function
 //: could offer before.
 const DELEGATED_MODELS = new Set<string>([
-  'veo-2', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
+  'gemini-omni-1.2-flash-720p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
   'seedance-2.5-480p', 'seedance-2.5-720p',
   'h3-max-768p', 'h3-max-480p',
   'ray-3.2-720p', 'ray-3.2-1080p',
@@ -330,7 +326,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
   if (!source_image_url) return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
 
   // Invariant 7 (#364 EX-7). `source_image_url` is handed to Replicate (and forwarded to
-  // generate-interior-video-v2 for veo-2), which fetches it from THEIR network. Validate before
+  // generate-interior-video-v2 for delegated models), which fetches it from THEIR network. Validate before
   // it leaves rather than at whichever call site downloads something first.
   try {
     await assertSafeUrl(source_image_url, { allowSchemes: ['https:'] });
@@ -379,7 +375,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
           source_image_url,
           prompt,
           aspect_ratio,
-          // The generator clamps per model (8s for veo-2, 30s for Wan and Seedance). Clamping to 8
+          // The generator clamps per model (15s for Omni, 30s for Wan and Seedance). Clamping to 8
           // here as well would have silently capped every Wan reel at 8 seconds — the
           // exact thing Wan was added to fix.
           duration_seconds,
