@@ -40111,6 +40111,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      search_products_by_colour_hex: {
+        Args: {
+          p_hex: string
+          p_limit?: number
+          p_max_delta_e?: number
+          p_workspace_id?: string
+        }
+        Returns: {
+          colour: string
+          delta_e: number
+          matched_hex: string
+          product_id: string
+          product_name: string
+        }[]
+      }
+      hex_to_lab: { Args: { p_hex: string }; Returns: number[] }
       search_chunks_by_embedding: {
         Args: {
           p_limit?: number

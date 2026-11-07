@@ -304,6 +304,21 @@ async function getDebitCredits() {
   return _debitCredits;
 }
 
+async function coloursNearHexes(hexes: string[] | undefined, workspaceId: string) {
+  const wanted = (hexes ?? []).filter((h) => /^#?[0-9a-f]{6}$/i.test(h.trim())).slice(0, 4);
+  const results = await Promise.all(wanted.map(async (hex) => {
+    const { data, error } = await supabase.rpc('search_products_by_colour_hex', {
+      p_hex: hex.trim(), p_max_delta_e: 10, p_limit: 10, p_workspace_id: workspaceId,
+    });
+    if (error) {
+      console.warn('colour hex search failed', error.message);
+      return [];
+    }
+    return (data ?? []).map((r: Record<string, unknown>) => ({ query_hex: hex.trim(), ...r }));
+  }));
+  return results.flat();
+}
+
 /**
  * LangChain Tool: Material Search using MIVAA API
  * Supports optional search_spec for explainable search — the LLM fills in the spec
@@ -371,9 +386,11 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
             (n, k) => n + (Array.isArray(ranked?.[k]) ? ranked[k].length : 0),
             0,
           );
-          if (hitCount === 0) {
+          const colourMatches = await coloursNearHexes(search_spec?.color_hex, workspaceId);
+          if (hitCount === 0 && colourMatches.length === 0) {
             Object.assign(ranked ?? {}, await describeEmptyResult('products', workspaceId));
           }
+          if (colourMatches.length) Object.assign(ranked ?? {}, { colour_hex_matches: colourMatches });
           return JSON.stringify(fenceSearchPayload(ranked));
         } catch (fetchError) {
           clearTimeout(timeoutId);
@@ -406,7 +423,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
         search_spec: z.object({
           intent: z.string().describe('Brief description of what the user is looking for'),
           color_keywords: z.array(z.string()).optional().describe('Color terms extracted from query (e.g. ["warm grey", "charcoal"])'),
-          color_hex: z.array(z.string()).optional().describe('Approximate hex codes for the colors (e.g. ["#8B8680", "#36454F"])'),
+          color_hex: z.array(z.string()).optional().describe('Hex codes for the colors (e.g. ["#8B8680", "#36454F"]). Each is also matched against the colour measured from every catalogue tile, returned as colour_hex_matches nearest first'),
           material_types: z.array(z.string()).optional().describe('Material types (e.g. ["porcelain", "marble", "wood"])'),
           style_keywords: z.array(z.string()).optional().describe('Style/aesthetic terms (e.g. ["minimalist", "industrial", "japandi"])'),
           texture_finish: z.string().optional().describe('Texture or finish description (e.g. "matte honed", "glossy polished")'),
