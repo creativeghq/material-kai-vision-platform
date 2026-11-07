@@ -37772,6 +37772,7 @@ export type Database = {
           currency: string
           order_id: string
           order_type: string
+          display: Json
           outstanding: number
           payment_status: string
           settled: number

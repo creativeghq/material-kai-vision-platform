@@ -14,6 +14,8 @@ export interface LineIdentityOption {
   options: string[];
   /** The subset physically in stock. Empty for non-size fields. */
   stocked: string[];
+  /** Per value: what a person reads (Title Case) and, for a colour, its swatch hex. `value` stays the stored key. */
+  display?: Array<{ value: string; label: string; hex: string | null }>;
 }
 
 /**

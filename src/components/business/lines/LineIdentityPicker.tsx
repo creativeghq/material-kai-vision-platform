@@ -57,7 +57,10 @@ export const LineIdentityPicker: React.FC<LineIdentityPickerProps> = ({
     onChange({ selected_attributes: next, ...lineIdentityService.project(next) });
   };
 
-  const summary = chosen.length ? chosen.map(([, v]) => v).join(' · ') : 'Choose variant';
+  const displayOf = (field: string, v: string) =>
+    opts.find((o) => o.field_name === field)?.display?.find((d) => d.value === v);
+  const summary = chosen.length ? chosen.map(([f, v]) => displayOf(f, v)?.label ?? v).join(' · ') : 'Choose variant';
+  const chosenHex = chosen.map(([f, v]) => displayOf(f, v)?.hex).find(Boolean);
 
   return (
     <Popover>
@@ -70,6 +73,7 @@ export const LineIdentityPicker: React.FC<LineIdentityPickerProps> = ({
           className={`h-7 px-2 text-xs font-normal ${chosen.length ? '' : 'text-muted-foreground'} ${className ?? ''}`}
           title="Which variant is this line?"
         >
+          {chosenHex && <span className="mr-1.5 h-3 w-3 shrink-0 rounded-sm border border-hairline" style={{ backgroundColor: chosenHex }} />}
           <span className="truncate max-w-[14rem]">{summary}</span>
           <ChevronDown className="h-3 w-3 ml-1 shrink-0" />
         </Button>
@@ -91,16 +95,20 @@ export const LineIdentityPicker: React.FC<LineIdentityPickerProps> = ({
                 <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NONE} className="text-xs text-muted-foreground">—</SelectItem>
-                  {ranked.map((v) => (
+                  {ranked.map((v) => {
+                    const d = o.display?.find((x) => x.value === v);
+                    return (
                     <SelectItem key={v} value={v} className="text-xs">
                       <span className="flex items-center gap-1.5">
-                        {v}
+                        {d?.hex && <span className="h-3.5 w-3.5 shrink-0 rounded-sm border border-hairline" style={{ backgroundColor: d.hex }} />}
+                        {d?.label ?? v}
                         {/* Stocked sizes rank first and say so — promising a size that is not on
                             the shelf is the mistake this ordering exists to prevent. */}
                         {inStock.has(v) && <PackageCheck className="h-3 w-3 text-success" aria-label="in stock" />}
                       </span>
                     </SelectItem>
-                  ))}
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>

@@ -4,7 +4,7 @@
 // from product metadata) and carries full myDATA detail — measurement unit, VAT category,
 // income classification — set per line OR via the GLOBAL defaults bar above the rows.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye } from 'lucide-react';
+import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye, Wrench } from 'lucide-react';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { issuableDocTypeCodes } from '../issuableDocTypes';
 import { Link } from 'react-router-dom';
@@ -427,6 +427,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // Product search (per active row)
   const [prodSearch, setProdSearch] = useState('');
   const [prodResults, setProdResults] = useState<any[]>([]);
+  const [prodImages, setProdImages] = useState<Map<string, string>>(new Map());
   const [prodOpenRow, setProdOpenRow] = useState<number | null>(null);
 
   // Shipping
@@ -677,6 +678,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const t = setTimeout(async () => {
       const { data } = await supabase.from('products').select('id, name, sku, item_type, metadata, mydata_income_classification_type, mydata_income_classification_category, mydata_income_classification_type_retail, mydata_income_classification_category_retail').ilike('name', `%${term}%`).limit(8);
       setProdResults(data ?? []);
+      const ids = (data ?? []).map((r: { id: string }) => r.id);
+      if (ids.length === 0) return;
+      const { data: imgs } = await supabase.rpc('get_product_variant_images', { p_pairs: ids.map((id: string) => ({ product_id: id })) });
+      const m = new Map<string, string>();
+      for (const r of (imgs ?? []) as Array<{ product_id: string; image_url: string | null }>) if (r.image_url) m.set(r.product_id, r.image_url);
+      setProdImages(m);
     }, 200);
     return () => clearTimeout(t);
   }, [prodSearch, prodOpenRow]);
@@ -1865,17 +1872,45 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               onKeyDown={(e) => { if (e.key === 'Escape') setProdOpenRow(null); }}
                             />
                             {prodOpenRow === idx && !l.product_id && (matchedServices(prodSearch.trim()).length > 0 || prodResults.length > 0) && (
-                              <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-md border border-border/60 bg-popover p-1 shadow-overlay">
+                              <div className="absolute left-0 top-full z-20 mt-1 max-h-96 w-full min-w-[26rem] overflow-auto rounded-md border border-hairline bg-popover p-1 shadow-overlay">
                                 {matchedServices(prodSearch.trim()).map((s) => (
-                                  <button key={`s-${s.id}`} type="button" tabIndex={-1} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickService(idx, s)}>
-                                    <span>{s.name}</span><span className="text-[10px] text-muted-foreground">Service</span>
+                                  <button key={`s-${s.id}`} type="button" tabIndex={-1} className="flex w-full items-center gap-3 rounded-sm px-2 py-2 text-left hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickService(idx, s)}>
+                                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-sm border border-hairline bg-surface-sunken"><Wrench className="h-5 w-5 text-muted-foreground" /></span>
+                                    <span className="min-w-0 flex-1">
+                                      <span className="block truncate text-sm font-medium">{s.name}</span>
+                                      {s.list_price != null && <span className="block text-xs text-muted-foreground tabular-nums">{formatMoney(Number(s.list_price), currency)}</span>}
+                                    </span>
+                                    <Badge variant="info" className="shrink-0">Service</Badge>
                                   </button>
                                 ))}
-                                {prodResults.map((pr) => (
-                                  <button key={pr.id} type="button" tabIndex={-1} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickProduct(idx, pr)}>
-                                    <span>{pr.name}{pr.sku ? ` · ${pr.sku}` : ''}</span><span className="text-[10px] text-muted-foreground">{pr.item_type === 'service' ? 'Service' : 'Product'}</span>
-                                  </button>
-                                ))}
+                                {prodResults.map((pr) => {
+                                  const img = prodImages.get(pr.id);
+                                  const m = (pr.metadata ?? {}) as Record<string, unknown>;
+                                  const count = (k: string) => (Array.isArray(m[k]) ? (m[k] as unknown[]).length : 0);
+                                  const formats = count('available_formats') || count('available_sizes');
+                                  const colours = count('color');
+                                  const sub = [
+                                    typeof m.brand === 'string' ? m.brand : (typeof m.factory_name === 'string' ? m.factory_name : null),
+                                    pr.sku,
+                                    formats > 1 ? `${formats} formats` : null,
+                                    colours > 1 ? `${colours} colours` : null,
+                                  ].filter(Boolean).join(' · ');
+                                  const isService = pr.item_type === 'service';
+                                  return (
+                                    <button key={pr.id} type="button" tabIndex={-1} className="flex w-full items-center gap-3 rounded-sm px-2 py-2 text-left hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickProduct(idx, pr)}>
+                                      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-sm border border-hairline bg-surface-sunken">
+                                        {img
+                                          ? <img src={img} alt="" loading="lazy" className="h-full w-full object-cover" />
+                                          : isService ? <Wrench className="h-5 w-5 text-muted-foreground" /> : <Package className="h-5 w-5 text-muted-foreground" />}
+                                      </span>
+                                      <span className="min-w-0 flex-1">
+                                        <span className="block truncate text-sm font-medium">{pr.name}</span>
+                                        {sub && <span className="block truncate text-xs text-muted-foreground">{sub}</span>}
+                                      </span>
+                                      <Badge variant={isService ? 'info' : 'neutral'} className="shrink-0">{isService ? 'Service' : 'Product'}</Badge>
+                                    </button>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
