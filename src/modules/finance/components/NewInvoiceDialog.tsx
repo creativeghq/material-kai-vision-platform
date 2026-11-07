@@ -51,7 +51,10 @@ import {
   MYDATA_TAX_TYPE_LABEL, MYDATA_TAX_TYPE_REF_CATEGORY,
   defaultReducesPayable, mydataTaxPayableDelta,
 } from '@/modules/finance/mydataTaxPayable';
-import { SELECTABLE_MOVE_PURPOSES } from '@/services/fiscal/fiscalVocabulary';
+import {
+  SELECTABLE_MOVE_PURPOSES, MYDATA_INFORMATIONAL_INCOME_TYPES,
+  mydataIncomeClassificationType, mydataIncomeClassificationCategory,
+} from '@/services/fiscal/fiscalVocabulary';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 import { unitDef } from '@/lib/units';
@@ -119,6 +122,8 @@ interface LineItem {
   /** The price the catalogue last resolved for this line. A variant change re-prices only while
    *  `unit_price` still equals it, so a price the operator typed is never overwritten. */
   auto_price?: string;
+  /** The picked product's own myDATA income codes, wholesale and retail. */
+  product_income?: { type: string | null; category: string | null; typeRetail: string | null; categoryRetail: string | null };
   expanded?: boolean;
   advancedOpen?: boolean;
 }
@@ -670,7 +675,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const term = prodSearch.trim();
     if (term.length < PRODUCT_SUGGEST_MIN) { setProdResults([]); return; }
     const t = setTimeout(async () => {
-      const { data } = await supabase.from('products').select('id, name, sku, item_type, metadata').ilike('name', `%${term}%`).limit(8);
+      const { data } = await supabase.from('products').select('id, name, sku, item_type, metadata, mydata_income_classification_type, mydata_income_classification_category, mydata_income_classification_type_retail, mydata_income_classification_category_retail').ilike('name', `%${term}%`).limit(8);
       setProdResults(data ?? []);
     }, 200);
     return () => clearTimeout(t);
@@ -768,6 +773,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       unit: meta.unit ?? '',
       ...(meta.unit ? { measurement_unit_code: unitDef(meta.unit)?.mydataCode?.toString() ?? '' } : {}),
       selected_attributes: attrs,
+      product_income: {
+        type: p.mydata_income_classification_type ?? null,
+        category: p.mydata_income_classification_category ?? null,
+        typeRetail: p.mydata_income_classification_type_retail ?? null,
+        categoryRetail: p.mydata_income_classification_category_retail ?? null,
+      },
       color: projected.selected_color ?? '',
       size: projected.selected_size ?? '',
       ...(price ? { unit_price: price, auto_price: price } : {}),
@@ -1055,6 +1066,26 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (def?.wh && documentTakesWithholding(code)) setWithholdingCode((cur) => cur || def.wh!);
   };
 
+  /**
+   * The income pair a line is filed under: the operator's choice, else the product's own codes,
+   * else this document type's configured default, else what the type implies. Same precedence as
+   * the envelope builder, so the screen shows what is transmitted; a service line on a goods
+   * document is Service Provision Income, never Commodity Sales.
+   */
+  const incomeOf = (l: LineItem): { type: string; category: string; auto: boolean } => {
+    if (l.income_classification_type || l.income_classification_category) {
+      return { type: l.income_classification_type, category: l.income_classification_category, auto: false };
+    }
+    if (isExpenseDoc || MYDATA_INFORMATIONAL_INCOME_TYPES.includes(documentType)) return { type: '', category: '', auto: true };
+    const retail = documentType.startsWith('11.');
+    const pi = l.product_income;
+    const def = docDefaults[documentType];
+    const type = (retail ? pi?.typeRetail : pi?.type) || def?.type || mydataIncomeClassificationType(documentType);
+    let category = (retail ? pi?.categoryRetail : pi?.category) || def?.category || mydataIncomeClassificationCategory(documentType);
+    if (l.item_type === 'service' && category === 'category1_1') category = 'category1_3';
+    return { type, category, auto: true };
+  };
+
   const handleSave = async (draftOnly = false) => {
     const issuing = !draftOnly;
     // A self-billed document has no customer — the counterpart is us. It needs the supplier
@@ -1225,8 +1256,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
             : (pct === 0 && customerAddr?.vat_exemption_reason
                 ? (parseInt(String(customerAddr.vat_exemption_reason), 10) || null)
                 : null),
-          income_classification_type: l.income_classification_type || null,
-          income_classification_category: l.income_classification_category || null,
+          income_classification_type: incomeOf(l).type || null,
+          income_classification_category: incomeOf(l).category || null,
           // myDATA per-line tax categories + amounts (a 'percent' category computes net × rate%).
           fees_category: l.fees_category ? parseInt(l.fees_category, 10) : null,
           fees_amount: Number(taxAmountOf(feesRefs, l.fees_category, l.fees, net, q).toFixed(2)),
@@ -1793,7 +1824,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       </Select>
                       <Select value={gIncCat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncCat(val); applyGlobal('income_classification_category', val); }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income Category" /></SelectTrigger>
-                        <SelectContent><SelectItem value="none">Income category…</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.description}</SelectItem>)}</SelectContent>
+                        <SelectContent><SelectItem value="none">Income category…</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
                       </Select>
                     </PopoverContent>
                   </Popover>
@@ -1837,12 +1868,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-auto rounded-md border border-border/60 bg-popover p-1 shadow-overlay">
                                 {matchedServices(prodSearch.trim()).map((s) => (
                                   <button key={`s-${s.id}`} type="button" tabIndex={-1} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickService(idx, s)}>
-                                    <span>{s.name}</span><span className="text-[10px] text-muted-foreground">service</span>
+                                    <span>{s.name}</span><span className="text-[10px] text-muted-foreground">Service</span>
                                   </button>
                                 ))}
                                 {prodResults.map((pr) => (
                                   <button key={pr.id} type="button" tabIndex={-1} className="flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs hover:bg-muted" onMouseDown={(e) => e.preventDefault()} onClick={() => pickProduct(idx, pr)}>
-                                    <span>{pr.name}{pr.sku ? ` · ${pr.sku}` : ''}</span><span className="text-[10px] text-muted-foreground">product</span>
+                                    <span>{pr.name}{pr.sku ? ` · ${pr.sku}` : ''}</span><span className="text-[10px] text-muted-foreground">{pr.item_type === 'service' ? 'Service' : 'Product'}</span>
                                   </button>
                                 ))}
                               </div>
@@ -1911,17 +1942,30 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                           <div className="space-y-1"><Label className="text-xs text-muted-foreground">Discount ({currency})</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" /></div>
                           <div className="space-y-1"><Label className="text-xs text-muted-foreground">Unit Cost (COGS)</Label><Input className="h-7 text-xs text-right" type="text" inputMode="decimal" value={l.unit_cost} onChange={(e) => update(idx, { unit_cost: e.target.value })} placeholder="—" /></div>
                           <div className="space-y-1 sm:col-span-2">
-                            <Label className="text-xs text-muted-foreground">Kind of Expense (Income Classification)</Label>
-                            <div className="grid grid-cols-2 gap-2">
-                              <Select value={l.income_classification_type || 'none'} onValueChange={(v) => update(idx, { income_classification_type: v === 'none' ? '' : v })}>
-                                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
-                                <SelectContent><SelectItem value="none">—</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code}</SelectItem>)}</SelectContent>
-                              </Select>
-                              <Select value={l.income_classification_category || 'none'} onValueChange={(v) => update(idx, { income_classification_category: v === 'none' ? '' : v })}>
-                                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Category" /></SelectTrigger>
-                                <SelectContent><SelectItem value="none">—</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.description}</SelectItem>)}</SelectContent>
-                              </Select>
-                            </div>
+                            {(() => {
+                              const inc = incomeOf(l);
+                              // Choosing either half pins both, so a later doc-type change cannot re-derive one half under the other.
+                              const pin = (patch: Partial<LineItem>) => update(idx, {
+                                income_classification_type: inc.type, income_classification_category: inc.category, ...patch,
+                              });
+                              return (
+                                <>
+                                  <Label className="text-xs text-muted-foreground">
+                                    Income Classification (myDATA){inc.auto && inc.type ? <span className="ml-1 font-normal">· set from the document type</span> : null}
+                                  </Label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <Select value={inc.type || 'none'} onValueChange={(v) => pin({ income_classification_type: v === 'none' ? '' : v })}>
+                                      <SelectTrigger className="h-7 text-xs" title="Income type (E3 code)"><SelectValue placeholder="Type" /></SelectTrigger>
+                                      <SelectContent><SelectItem value="none">—</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                    <Select value={inc.category || 'none'} onValueChange={(v) => pin({ income_classification_category: v === 'none' ? '' : v })}>
+                                      <SelectTrigger className="h-7 text-xs" title="Income category"><SelectValue placeholder="Category" /></SelectTrigger>
+                                      <SelectContent><SelectItem value="none">—</SelectItem>{incCats.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </div>
                           {vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0)) === 0 && (
                             <div className="space-y-1">
