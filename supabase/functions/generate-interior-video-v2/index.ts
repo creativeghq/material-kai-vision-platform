@@ -400,12 +400,11 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     ? Math.min(Math.round(requestedDuration), MAX_DURATION_SECONDS[resolvedModel])
     : Math.min(8, MAX_DURATION_SECONDS[resolvedModel]);
 
-  // Ray takes 5 or 10 and nothing between — those are the two durations Luma publishes a
-  // price for — and the snap happens HERE rather than inside the shared client so that the
-  // number stored on `generation_videos.duration_s` and logged to `ai_usage_logs` is the
-  // clip that was actually made. Snapping downstream would have recorded the UI's default 8
-  // against a 10-second video: a plausible number, off by two, in the row an operator reads.
-  const durationSeconds = RAY_RESOLUTION[resolvedModel]
+  // Ray (Luma's two priced durations) and Runway Gen-4 (Replicate 422s anything else) take 5
+  // or 10 only. Snapped HERE so `generation_videos.duration_s` and `ai_usage_logs` record the
+  // clip actually made, not the requested 8.
+  const fiveOrTenOnly = Boolean(RAY_RESOLUTION[resolvedModel]) || resolvedModel === 'runway-gen4-turbo';
+  const durationSeconds = fiveOrTenOnly
     ? (clampedDuration > 7 ? 10 : 5)
     : clampedDuration;
 

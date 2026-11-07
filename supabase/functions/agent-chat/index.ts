@@ -3880,6 +3880,10 @@ async function executeAgent(
       }
     };
   } catch (graphError) {
+    // A disconnect is a cancellation for the handler's cancel path, never a provider failure.
+    if (abortSignal?.aborted || (graphError instanceof Error && graphError.name === 'AbortError')) {
+      throw graphError;
+    }
     console.error('❌ LangGraph execution error:', graphError);
 
     // We answer 200 with the failure in the body, so `withApiLogging` never sees this and the
@@ -4403,6 +4407,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     const turnStartedAtIso = new Date().toISOString();
     /** The last image this turn produced, so a recovered message can still carry it. */
     let lastGeminiImage: Record<string, unknown> | null = null;
+    let lastVideo: { video_url: string; job_id: string; status: 'completed'; credits_used?: number } | null = null;
     // Tracks whether the agent has produced any real output beyond status/heartbeat.
     // Used for partner-mode refunds: if executeAgent crashes before the first
     // tool_call / text_chunk / final_result, the underlying Anthropic + tool spend
@@ -4533,6 +4538,14 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                     image_url: chunk.image_url,
                     mode: chunk.mode,
                     model: chunk.model,
+                    credits_used: chunk.credits_used,
+                  };
+                }
+                if (chunk?.type === 'video_generated' && chunk.video_url) {
+                  lastVideo = {
+                    video_url: chunk.video_url,
+                    job_id: chunk.job_id,
+                    status: 'completed',
                     credits_used: chunk.credits_used,
                   };
                 }
@@ -4791,6 +4804,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                 nextSteps: nextSteps.length > 0 ? nextSteps : undefined,
                 generation_job: finalResult.generationJob ?? undefined,
                 geminiImageData: lastGeminiImage ?? undefined,
+                videoData: lastVideo ?? undefined,
               }),
               'agent-chat-message-recovery',
             );
@@ -4805,6 +4819,28 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             || (error instanceof Error && error.name === 'AbortError');
           if (wasCancelled) {
             console.log('🛑 Turn cancelled — client disconnected; stopped between steps.');
+            // Media finished before the disconnect is paid for and stored — save it as the reply.
+            if (conversation_id && (lastVideo || lastGeminiImage) && audience !== 'customer' && !isEvalRun) {
+              const v = lastVideo as { credits_used?: number } | null;
+              void runInBackground(
+                recoverAssistantMessage(
+                  supabase, conversation_id, turnId, turnStartedAtIso,
+                  v
+                    ? `Your video is ready!${v.credits_used ? ` ${v.credits_used} credits used.` : ''}`
+                    : 'Your image is ready.',
+                  {
+                    agentId,
+                    model: getModelNameForAgent(agentId, modelOverride),
+                    turn_id: turnId,
+                    recovered_by_server: true,
+                    cancelled_by_client: true,
+                    geminiImageData: lastGeminiImage ?? undefined,
+                    videoData: lastVideo ?? undefined,
+                  },
+                ),
+                'agent-chat-message-recovery',
+              );
+            }
           } else {
             console.error('❌ Streaming error:', error);
             console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
@@ -4814,7 +4850,6 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // producing any real content. (No-op for internal users.)
           await refundIfNotConsumed(error instanceof Error ? error.message : 'agent_crash_pre_stream');
 
-          // Stop heartbeat on error
           if (heartbeatInterval) {
             clearInterval(heartbeatInterval);
             heartbeatInterval = null;
@@ -4825,7 +4860,6 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           if (!streamClosed && !wasCancelled) {
             const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-            // Try to send error using safe enqueue
             safeEnqueue({
               type: 'final_result',
               text: `Error: ${errorMessage}`,
@@ -4839,13 +4873,11 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               errorMessage: errorMessage
             });
 
-            // Try to send done chunk
             safeEnqueue({ type: 'done' });
 
             streamClosed = true;
           }
         } finally {
-          // Stop heartbeat on cleanup
           if (heartbeatInterval) {
             clearInterval(heartbeatInterval);
             heartbeatInterval = null;
