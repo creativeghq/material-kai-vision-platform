@@ -17,9 +17,6 @@ export const RAW_EMAIL_BUCKET = 'pdf-documents';
 /** Where an INBOUND attachment lands — the PRIVATE bucket (#357 AE-9). */
 export const ATTACHMENT_BUCKET = 'pdf-documents';
 
-/** Cap per attachment. Cloudflare caps the whole message at 25 MiB; this bounds one part. */
-const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
-
 /** How far back the subject+sender heuristic (ladder step 3) is allowed to look. */
 const THREAD_HEURISTIC_DAYS = 30;
 
@@ -426,7 +423,7 @@ export interface ParsedInbound {
   references: string | null;
   text: string | null;
   html: string | null;
-  attachments: Array<{ filename: string; mimeType: string; base64: string; size: number; contentId?: string | null }>;
+  attachments: Array<{ filename: string; mimeType: string; content: Uint8Array<ArrayBuffer>; size: number; contentId?: string | null }>;
 }
 
 function addressList(list: unknown): string[] {
@@ -437,7 +434,8 @@ function addressList(list: unknown): string[] {
 
 /** Raw RFC822 → the fields the Inbox needs. No interpretation beyond decoding. */
 export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedInbound> {
-  const email = await PostalMime.parse(raw, { attachmentEncoding: 'base64' });
+  // Raw bytes, never base64: string round-trips of a 20 MB part hit the edge limit (546).
+  const email = await PostalMime.parse(raw, { attachmentEncoding: 'arraybuffer' });
 
   const headers = new Map<string, string>();
   for (const h of (email.headers || []) as Array<{ key: string; value: string }>) {
@@ -446,22 +444,33 @@ export async function parseRawEmail(raw: ArrayBuffer): Promise<ParsedInbound> {
     if (!headers.has(h.key.toLowerCase())) headers.set(h.key.toLowerCase(), h.value);
   }
 
-  const attachments = ((email.attachments || []) as Array<{
-    filename?: string; mimeType?: string; content?: string; disposition?: string; contentId?: string;
+  const all = ((email.attachments || []) as Array<{
+    filename?: string; mimeType?: string; content?: ArrayBuffer | Uint8Array | string; contentId?: string;
   }>)
     .map((a, i) => {
-      const base64 = typeof a.content === 'string' ? a.content : '';
-      // base64 → bytes, without decoding it.
-      const size = Math.floor((base64.length * 3) / 4);
+      const content: Uint8Array<ArrayBuffer> = a.content instanceof ArrayBuffer
+        ? new Uint8Array(a.content)
+        : a.content instanceof Uint8Array ? new Uint8Array(a.content) : new Uint8Array(0);
       return {
         filename: a.filename || `attachment-${i + 1}`,
         mimeType: a.mimeType || 'application/octet-stream',
-        base64,
-        size,
+        content,
+        size: content.byteLength,
         contentId: a.contentId ? a.contentId.trim().replace(/^<|>$/g, '') || null : null,
       };
     })
-    .filter((a) => a.base64 && a.size <= MAX_ATTACHMENT_BYTES);
+    .filter((a) => a.size > 0);
+
+  // A forward can carry the same file twice (outer message + the embedded original).
+  const seen = new Set<string>();
+  const attachments: ParsedInbound['attachments'] = [];
+  for (const a of all) {
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', a.content));
+    const key = `${a.filename}|${Array.from(digest.subarray(0, 12)).join('.')}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    attachments.push(a);
+  }
 
   return {
     headers,
@@ -509,10 +518,9 @@ export async function storeAttachments(
   for (const [i, att] of attachments.entries()) {
     const safeName = att.filename.replace(/[^\w.\-]+/g, '_').slice(0, 120);
     const path = `inbox/${threadId}/${Date.now()}-${i}-${safeName}`;
-    const bytes = Uint8Array.from(atob(att.base64), (c) => c.charCodeAt(0));
     const { error } = await db.storage
       .from(ATTACHMENT_BUCKET)
-      .upload(path, bytes, { contentType: att.mimeType, upsert: false });
+      .upload(path, att.content, { contentType: att.mimeType, upsert: false });
     if (error) {
       /** AN EXPLICIT FAILURE MARKER, not a silent skip (pipeline convention 1, #357 AE-9). */
       console.error(`[inbound-email] attachment "${att.filename}" (${att.mimeType}) failed to store:`, error.message);
