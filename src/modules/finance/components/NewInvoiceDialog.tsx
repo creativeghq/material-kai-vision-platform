@@ -56,7 +56,8 @@ import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 import { unitDef } from '@/lib/units';
 import { UNIT_LABEL_BY_CODE } from '@/modules/finance/invoice-templates/labels';
-import { projectIdentity, variantKey, SIZE_KEYS, COLOR_KEYS } from '@/services/lineIdentityRules';
+import { projectIdentity, variantKey, availabilityKey, SIZE_KEYS, COLOR_KEYS, type VariantAvailability } from '@/services/lineIdentityRules';
+import { ordersService } from '@/modules/finance/services/ordersService';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -115,6 +116,9 @@ interface LineItem {
   /** `products.item_type` for the picked product. Absent on a hand-typed line, which votes
    *  for NOTHING when the document type is proposed — "we do not know" is not "goods". */
   item_type?: string | null;
+  /** The price the catalogue last resolved for this line. A variant change re-prices only while
+   *  `unit_price` still equals it, so a price the operator typed is never overwritten. */
+  auto_price?: string;
   expanded?: boolean;
   advancedOpen?: boolean;
 }
@@ -673,11 +677,75 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   }, [prodSearch, prodOpenRow]);
 
   const update = (idx: number, patch: Partial<LineItem>) => setLines((prev) => prev.map((l, i) => (i === idx ? { ...l, ...patch } : l)));
+
+  // Free stock (on hand − reserved) per catalog line's product + chosen variant, from the same
+  // SQL derivation the order form reads.
+  const stockPairsSig = JSON.stringify(
+    lines.filter((l) => l.product_id && l.item_type !== 'service')
+      .map((l) => [l.product_id, variantKey(l.selected_attributes ?? {}) ?? null]),
+  );
+  const [stockByKey, setStockByKey] = useState<Map<string, VariantAvailability>>(new Map());
+  useEffect(() => {
+    const pairs = (JSON.parse(stockPairsSig) as Array<[string, string | null]>)
+      .map(([productId, vk]) => ({ productId, variantKey: vk }));
+    if (pairs.length === 0) { setStockByKey(new Map()); return; }
+    let cancelled = false;
+    void ordersService.availabilityFor(pairs).then((m) => { if (!cancelled) setStockByKey(m); });
+    return () => { cancelled = true; };
+  }, [stockPairsSig]);
+  const stockLabel = (l: LineItem): { text: string; tone: string } | null => {
+    if (!l.product_id || l.item_type === 'service') return null;
+    const vk = variantKey(l.selected_attributes ?? {}) ?? null;
+    const a = stockByKey.get(availabilityKey(l.product_id, vk));
+    if (!a) return null;
+    const free = vk ? a.exact : a.productTotal;
+    const extra = vk && a.unassigned > 0 ? ` (+${a.unassigned} unassigned)` : '';
+    const scope = vk ? 'this variant' : 'all variants';
+    if (free <= 0 && !extra) return { text: `No free stock for ${scope}`, tone: 'text-warning' };
+    return { text: `${free} free · ${scope}${extra}`, tone: free > 0 ? 'text-success' : 'text-warning' };
+  };
   const addLine = () => setLines((prev) => [...prev, emptyLine({ measurement_unit_code: gUnit, vat_category: gVat, income_classification_type: gIncType, income_classification_category: gIncCat })]);
   const removeLine = (idx: number) => setLines((prev) => prev.filter((_, i) => i !== idx));
 
   // Apply a global default to every existing row.
   const applyGlobal = (field: keyof LineItem, value: string) => setLines((prev) => prev.map((l) => ({ ...l, [field]: value })));
+
+  /** Buyer-, variant- and volume-aware sell price for a catalog line; '' when none resolves. */
+  const resolveCatalogPrice = async (
+    productId: string, attrs: Record<string, string>, quantity: string, unitLabel: string | null,
+  ): Promise<string> => {
+    try {
+      const qty = parseDecimalOr(quantity ?? '', 0);
+      // Together or not at all — see the note on ordersService.resolveLinePricing.
+      const breakArgs = unitLabel && qty > 0 ? { p_quantity: qty, p_unit: unitLabel } : {};
+      const { data } = await supabase.rpc('get_product_price_for_workspace', {
+        p_workspace_id: workspaceId,
+        p_product_id: productId,
+        p_company_id: customer?.type === 'company' ? customer.id : null,
+        p_contact_id: customer?.type === 'contact' ? customer.id : null,
+        p_audience: 'seller',
+        p_variant_key: variantKey(attrs) ?? null,
+        ...breakArgs,
+      });
+      const row = Array.isArray(data) ? data[0] : data;
+      return row?.suggested_sell != null ? String(row.suggested_sell) : '';
+    } catch { return ''; }
+  };
+
+  /** A new variant is a different item: re-price it unless the operator has typed their own price. */
+  const changeVariant = async (idx: number, next: { selected_attributes: Record<string, string>; selected_color: string | null; selected_size: string | null }) => {
+    const line = lines[idx];
+    update(idx, {
+      selected_attributes: next.selected_attributes,
+      color: next.selected_color ?? '',
+      size: next.selected_size ?? '',
+    });
+    if (!line?.product_id) return;
+    const untouched = !line.unit_price.trim() || line.unit_price === '0' || line.unit_price === line.auto_price;
+    if (!untouched) return;
+    const price = await resolveCatalogPrice(line.product_id, next.selected_attributes, line.quantity, line.unit || null);
+    if (price) update(idx, { unit_price: price, auto_price: price });
+  };
 
   const pickProduct = async (idx: number, p: any) => {
     const meta = pickFromMeta(p.metadata);
@@ -687,30 +755,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (meta.color) attrs[COLOR_KEYS[0]] = meta.color;
     if (meta.size) attrs[SIZE_KEYS[0]] = meta.size;
     const projected = projectIdentity(attrs);
-    let price = '';
-    try {
-      // This call used to pass workspace + product ONLY, so an invoice line was priced at bare
-      // retail: no customer level or override, and no volume break (#332 step 1c). The same
-      // product on a quote and on an invoice for the same buyer produced different money.
-      const line = lines[idx];
-      const qty = parseDecimalOr(line?.quantity ?? '', 0);
-      const unit = meta.unit || null;
-      // Together or not at all — see the note on ordersService.resolveLinePricing.
-      const breakArgs = unit && qty > 0 ? { p_quantity: qty, p_unit: unit } : {};
-      const { data } = await supabase.rpc('get_product_price_for_workspace', {
-        p_workspace_id: workspaceId,
-        p_product_id: p.id,
-        p_company_id: customer?.type === 'company' ? customer.id : null,
-        p_contact_id: customer?.type === 'contact' ? customer.id : null,
-        p_audience: 'seller',
-        // #374 Phase 4 — an invoice line priced product-wide while the quote for the same
-        // buyer priced the variant is the same product costing different money on two documents.
-        p_variant_key: variantKey(attrs) ?? null,
-        ...breakArgs,
-      });
-      const row = Array.isArray(data) ? data[0] : data;
-      if (row?.suggested_sell != null) price = String(row.suggested_sell);
-    } catch { /* price optional */ }
+    const price = await resolveCatalogPrice(p.id, attrs, lines[idx]?.quantity ?? '', meta.unit || null);
     // Cost is internal and optional; an unknown or foreign-currency cost stays blank rather than
     // landing as a wrong margin.
     const pc = (await productDetailService.costs([p.id])).get(p.id);
@@ -725,9 +770,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       selected_attributes: attrs,
       color: projected.selected_color ?? '',
       size: projected.selected_size ?? '',
-      ...(price ? { unit_price: price } : {}),
+      ...(price ? { unit_price: price, auto_price: price } : {}),
       ...(cost && !lines[idx]?.unit_cost.trim() ? { unit_cost: cost } : {}),
-      expanded: true,
     });
     setProdOpenRow(null); setProdSearch(''); setProdResults([]);
   };
@@ -1804,12 +1848,22 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                               </div>
                             )}
                           </div>
-                          {(l.product_id || l.color || l.size) && (
-                            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                              {l.product_id && <span className="inline-flex items-center gap-1 text-primary"><Package className="h-3 w-3" /> Linked product</span>}
-                              {(l.color || l.size) && <span>· {[l.color, l.size].filter(Boolean).join(' / ')}</span>}
-                            </div>
-                          )}
+                          {l.product_id ? (() => {
+                            const stock = stockLabel(l);
+                            return (
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+                                <span className="inline-flex items-center gap-1 text-primary"><Package className="h-3 w-3" /> Linked product</span>
+                                <LineIdentityPicker
+                                  productId={l.product_id}
+                                  value={l.selected_attributes ?? {}}
+                                  onChange={(next) => { void changeVariant(idx, next); }}
+                                />
+                                {stock && <span className={`tabular-nums ${stock.tone}`}>{stock.text}</span>}
+                              </div>
+                            );
+                          })() : (l.color || l.size) ? (
+                            <div className="text-[11px] text-muted-foreground">{[l.color, l.size].filter(Boolean).join(' / ')}</div>
+                          ) : null}
                         </div>
                         <div className="w-14"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.quantity} onChange={(e) => update(idx, { quantity: e.target.value })} placeholder="Qty" /></div>
                         <div className="w-16">
@@ -1840,25 +1894,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       {l.expanded && (
                         <div className="grid grid-cols-2 gap-2 border-t border-border/40 bg-muted/20 p-3 sm:grid-cols-3">
                           <div className="space-y-1"><Label className="text-xs text-muted-foreground">SKU</Label><Input className="h-7 text-xs" value={l.sku} onChange={(e) => update(idx, { sku: e.target.value })} /></div>
-                          {l.product_id ? (
-                            /* #374 Phase 5 — a catalog line picks its variant from the field
-                               registry, exactly like the quote and order lines do, so an invoice
-                               can finally record a finish or a wood species instead of only the
-                               two axes these free-text boxes allowed. A line with NO catalog
-                               product has no registry to consult and keeps the text inputs. */
-                            <div className="space-y-1 sm:col-span-2">
-                              <Label className="text-xs text-muted-foreground">Variant</Label>
-                              <LineIdentityPicker
-                                productId={l.product_id}
-                                value={l.selected_attributes ?? {}}
-                                onChange={(next) => update(idx, {
-                                  selected_attributes: next.selected_attributes,
-                                  color: next.selected_color ?? '',
-                                  size: next.selected_size ?? '',
-                                })}
-                              />
-                            </div>
-                          ) : (
+                          {/* A catalog line picks its variant on the row itself; only a hand-typed line keeps free text. */}
+                          {l.product_id ? null : (
                             <>
                               <div className="space-y-1"><Label className="text-xs text-muted-foreground">Color</Label><Input className="h-7 text-xs" value={l.color} onChange={(e) => update(idx, { color: e.target.value })} /></div>
                               <div className="space-y-1"><Label className="text-xs text-muted-foreground">Size / Format</Label><Input className="h-7 text-xs" value={l.size} onChange={(e) => update(idx, { size: e.target.value })} /></div>
