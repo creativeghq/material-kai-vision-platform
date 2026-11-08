@@ -39,7 +39,8 @@ import { ProductStockPanel } from '@/components/business/marketplace/ProductStoc
 import { ProductServiceDefaultsPanel } from '@/components/features/products/ProductServiceDefaultsPanel';
 import { ProductCostCard } from '@/components/business/marketplace/ProductCostCard';
 import { ProductPackagingCard } from '@/components/business/marketplace/ProductPackagingCard';
-import { pickPackagingValue } from './productDisplayUnits';
+import { pickPackagingValue, packagingByFormat } from './productDisplayUnits';
+import { PackagingByFormatTable } from './PackagingByFormatTable';
 import {
   numericSet,
   formatRange,
@@ -2440,7 +2441,14 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                         })}
                       </>
                     )}
-                    {packagingRows.length > 0 && (
+                    {packagingByFormat(pkg).length > 0 && fieldRegistry.hasSection(uploadCat, 'packaging') ? (
+                      <>
+                        <div className="pt-2 pb-1">
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Packaging</p>
+                        </div>
+                        <PackagingByFormatTable packaging={pkg} />
+                      </>
+                    ) : packagingRows.length > 0 && (
                       <>
                         <div className="pt-2 pb-1">
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-semibold">Packaging</p>
