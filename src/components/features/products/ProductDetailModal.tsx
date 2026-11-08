@@ -1756,7 +1756,27 @@ It becomes searchable from this product and by the agents. Its visibility stays 
   const leftovers = computeLeftovers();
   const extrasFor = (key: string): Array<{ label: string; value: string }> =>
     (leftovers.get(key) ?? []).map(f => ({ label: f.label, value: f.value }));
-  // The general specification rows ('other' + merged sections + unplaced extras) live in Key Specifications.
+  const isCardSectionKey = (key: string) => !SPECIAL_SECTION_KEYS.has(key) && !MERGED_INTO_SPECS.has(key)
+    && key !== 'application' && key !== 'other';
+  // A section with ONE row is a fact, not a card: it joins Key Specifications instead.
+  const foldedSectionKeys = new Set<string>();
+  const foldedSpecRows: Array<{ label: string; value: unknown }> = [];
+  {
+    const sections = fieldRegistry.sections(resolveProductCategory(product.metadata, product.type, product.category));
+    const sectionKeys = new Set(sections.map(s => s.key));
+    for (const s of sections.filter(s => isCardSectionKey(s.key))) {
+      const rows = Object.entries(registrySectionData(s, extrasFor(s.key)).data);
+      if (rows.length !== 1) continue;
+      foldedSectionKeys.add(s.key);
+      foldedSpecRows.push({ label: rows[0][0], value: rows[0][1] });
+    }
+    for (const [key, fields] of leftovers.entries()) {
+      if (sectionKeys.has(key) || !isCardSectionKey(key) || fields.length !== 1) continue;
+      foldedSectionKeys.add(key);
+      foldedSpecRows.push({ label: fields[0].label, value: fields[0].value });
+    }
+  }
+  // The general specification rows ('other' + merged sections + unplaced extras + single-row sections) live in Key Specifications.
   const generalSpecRows = (() => {
     const sections = fieldRegistry.sections(resolveProductCategory(product.metadata, product.type, product.category));
     const extras = [
@@ -1770,6 +1790,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
     const data: Record<string, unknown> = {};
     for (const s of generalSections) Object.assign(data, registrySectionData(s).data);
     for (const e of extras) if (!(e.label in data)) data[e.label] = e.value;
+    for (const r of foldedSpecRows) if (!(r.label in data)) data[r.label] = r.value;
     return Object.entries(data).map(([label, value]) => ({ label, value }));
   })();
 
@@ -2653,8 +2674,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           // skipped here. Each rendered key is marked consumed so the catch-all
           // neither drops nor duplicates it.
           const cardSections = registrySections
-            .filter(section => !SPECIAL_SECTION_KEYS.has(section.key) && !MERGED_INTO_SPECS.has(section.key)
-              && section.key !== 'application' && section.key !== 'other');
+            .filter(section => isCardSectionKey(section.key) && !foldedSectionKeys.has(section.key));
 
           // ── Detected text (vision OCR) — brand names, codes, dimensions
           // visible on the material image. Skipped when empty.
@@ -2788,7 +2808,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
           const wideRegistryCards = registryCards.filter(c => isWideCard(c.key)).map(c => c.node);
           const cardKeys = new Set(cardSections.map(section => section.key));
           const stragglers = [...leftovers.entries()]
-            .filter(([key]) => !cardKeys.has(key) && key !== 'other' && key !== 'application' && !SPECIAL_SECTION_KEYS.has(key) && !MERGED_INTO_SPECS.has(key))
+            .filter(([key]) => !cardKeys.has(key) && isCardSectionKey(key) && !foldedSectionKeys.has(key))
             .sort((x, y) => sectionRank(x[0]) - sectionRank(y[0]));
           const rowsOf = (fields: Array<{ label: string; value: string }>) =>
             Object.fromEntries(fields.map(f => [f.label, f.value]));
