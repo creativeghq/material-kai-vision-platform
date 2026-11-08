@@ -37,7 +37,9 @@ export const RequestsTab: React.FC<{
   collabRole?: CollaboratorRole | null;
   /** `?request=` from the notification's action_url — the thread to open on arrival. */
   focusRequestId?: string | null;
-}> = ({ projectId, isOwner, collabRole = null, focusRequestId }) => {
+  /** The guest's activity panel above the list; off where the page already shows it. */
+  showUpdates?: boolean;
+}> = ({ projectId, isOwner, collabRole = null, focusRequestId, showUpdates = !isOwner }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [requests, setRequests] = useState<ProjectRequestWithMessages[]>([]);
@@ -141,7 +143,7 @@ export const RequestsTab: React.FC<{
 
   return (
     <div className="space-y-4">
-    {!isOwner && <ClientTimelinePanel projectId={projectId} />}
+    {showUpdates && <ClientTimelinePanel projectId={projectId} />}
     <Card className="dashboard-card">
       <CardHeader className="border-b border-hairline px-5 py-3 flex-row items-center justify-between space-y-0 gap-3 flex-wrap">
         <div>

@@ -2951,6 +2951,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         done: 'I\'ve created that project.',
         promptTemplate: 'Create a project called "{{name}}".',
         run: { tool: 'create_project' },
+        autoFields: true,
         form: [
           { key: 'name', label: 'Project Name', kind: 'text', required: true, placeholder: 'Athens loft renovation' },
           { key: 'description', label: 'Description', kind: 'textarea', placeholder: 'Optional summary' },

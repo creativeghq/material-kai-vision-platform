@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { CONTRACT_CONTEXTS } from '@/services/contracts/contractVocabulary';
+import { PROJECT_KINDS } from '@/modules/projects/projectKindVocabulary';
 
 const ADAPTERS = readFileSync(join(process.cwd(), 'src/services/templates/adapters.ts'), 'utf8')
   .replace(/\r\n/g, '\n');
@@ -23,6 +24,7 @@ const DB_ENUMS: Record<string, { constraint: string; values: string[] }> = {
   viewPreference: { constraint: 'moodboards_view_preference_check', values: ['grid', 'list'] },
   mediaType: { constraint: 'moodboard_items_media_type_check', values: ['image', 'video', 'vr_world'] },
   contractContext: { constraint: 'contracts_context_check', values: ['hr', 'finance', 'project', 'realestate'] },
+  projectKind: { constraint: 'projects_kind_check', values: ['general', 'design_supply', 'fit_out', 'construction'] },
   propertyType: { constraint: 'properties_property_type_check', values: ['residential', 'commercial', 'land', 'other'] },
   transactionType: {
     constraint: 'properties_transaction_type_check',
@@ -36,6 +38,7 @@ const DB_ENUMS: Record<string, { constraint: string; values: string[] }> = {
 /** Vocabularies an adapter now takes from a shared source rather than spelling out (#391). */
 const IMPORTED_ONE_OFS: Record<string, readonly string[]> = {
   contractContext: CONTRACT_CONTEXTS,
+  projectKind: PROJECT_KINDS,
 };
 
 /**

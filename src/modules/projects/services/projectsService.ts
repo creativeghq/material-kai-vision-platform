@@ -1,3 +1,4 @@
+import type { ProjectKind, ProjectPart } from '../projectKinds';
 import { supabase } from '@/integrations/supabase/client';
 import type { TaskPriority, TaskStatusValue } from '../taskVocabulary';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
@@ -32,6 +33,9 @@ export type TaskVisibility = 'internal' | 'client_visible';
 
 export interface Project {
   id: string;
+  kind: ProjectKind;
+  /** Explicit section list; null = the kind's defaults. */
+  sections: ProjectPart[] | null;
   user_id: string;
   workspace_id: string | null;
   name: string;
@@ -192,44 +196,6 @@ export interface ProjectCollaborator {
   created_at: string;
 }
 
-export type ProjectProductStatus = 'selection' | 'confirmed' | 'ordered' | 'shipped' | 'delivered';
-
-export const PROJECT_PRODUCT_STATUSES: ProjectProductStatus[] =
-  ['selection', 'confirmed', 'ordered', 'shipped', 'delivered'];
-
-export interface ProjectProduct {
-  id: string;
-  project_id: string;
-  workspace_id: string | null;
-  product_id: string | null;
-  source_quote_item_id: string | null;
-  status: ProjectProductStatus;
-  custom_name: string | null;
-  custom_sku: string | null;
-  custom_description: string | null;
-  quantity: number;
-  unit: string | null;
-  sold_price: number | null;
-  quoted_price: number | null;
-  price_source: string | null;
-  price_currency: string;
-  room_id: string | null;
-  notes: string | null;
-  position: number;
-  created_at: string;
-  updated_at: string;
-  // joined / derived (read-only)
-  product?: { id: string; name: string; sku: string | null } | null;
-  quote_item?: { unit_price: number | null; discounted_price: number | null; room: string | null; dimensions: string | null } | null;
-}
-
-export interface ProjectProductWithDisplay extends ProjectProduct {
-  display_name: string;
-  display_sku: string | null;
-  /** Reference price: quote line (live) for quote-linked rows, else the row's quoted_price. */
-  reference_price: number | null;
-}
-
 /** Shape returned by the get_product_price_for_workspace RPC. */
 export interface ResolvedPrice {
   mode: 'own_product' | 'operator_catalog' | string;
@@ -350,17 +316,6 @@ export function parseProjectPnl(data: unknown): ProjectPnl {
   };
 }
 
-export interface ProjectDelivery {
-  id: string;
-  order_number: string | null;
-  supplier_name: string | null;
-  eta: string | null;
-  supplier_status: string | null;
-  amount_net: number | null;
-  currency: string | null;
-  is_late: boolean;
-}
-
 export type CollaboratorRole = 'client' | 'editor' | 'architect' | 'subcontractor';
 
 export interface ClientTimelineItem { kind: 'request' | 'inspection' | 'snag'; id: string; title: string; status: string; at: string }
@@ -410,26 +365,6 @@ export interface ProjectCommandCentre {
     labour_by_week: Array<{ week: string; minutes: number }>;
   };
   flags: Array<{ key: CommandCentreFlagKey; severity: 'high' | 'medium' | 'info'; value: number }>;
-}
-
-export interface ProjectDashboard {
-  pnl: ProjectPnl;
-  budget_amount: number | null;
-  budget_currency: string | null;
-  /** False when budget and costs are in different currencies; headroom is then null. */
-  budget_comparable: boolean;
-  budget_headroom: number | null;
-  deliveries: ProjectDelivery[];
-  open_purchase_orders: number;
-  crew: Array<{ day: string; workers: number; minutes: number }>;
-  materials_by_category: ProjectMaterialsRow[];
-}
-
-export interface ProjectMaterialsRow {
-  kind: 'category' | 'uncategorised_product' | 'not_linked';
-  category_id: string | null;
-  name: string | null;
-  amount: number;
 }
 
 /** A row of `list_project_visits`: a meeting (timestamptz) or a booking (local date + time). */
@@ -536,6 +471,18 @@ export interface InvitationPreview {
   is_expired: boolean;
 }
 
+export interface ProjectSetup {
+  has_client: boolean;
+  rooms: number;
+  moodboards: number;
+  plans: number;
+  takeoff_drawings: number;
+  quotes: number;
+  tasks: number;
+  collaborators: number;
+  sections_with_data: string[];
+}
+
 export interface CreateProjectInput {
   name: string;
   description?: string;
@@ -547,6 +494,7 @@ export interface CreateProjectInput {
   budget_amount?: number | null;
   budget_currency?: string;
   workspace_id?: string | null;
+  kind?: ProjectKind;
   rooms?: Array<{ name: string; room_type?: RoomType | null }>;
 }
 
@@ -565,6 +513,9 @@ export interface UpdateProjectInput {
   cover_image_url?: string | null;
   /** The building this job is at (#378 N4). `null` detaches it. */
   property_id?: string | null;
+  kind?: ProjectKind;
+  /** `null` returns the project to its kind's default sections. */
+  sections?: ProjectPart[] | null;
 }
 
 export interface CreateRoomInput {
@@ -805,6 +756,13 @@ class ProjectsService {
     return (data || []) as ProjectWithClient[];
   }
 
+  /** Counts behind Get Started, and the parts holding records (`get_project_setup`). */
+  async getProjectSetup(id: string): Promise<ProjectSetup> {
+    const { data, error } = await supabase.rpc('get_project_setup' as never, { p_project_id: id } as never);
+    if (error) throw error;
+    return data as unknown as ProjectSetup;
+  }
+
   async getProject(id: string): Promise<ProjectWithClient | null> {
     const { data, error } = await (supabase as any)
       .from('projects')
@@ -853,6 +811,7 @@ class ProjectsService {
         deadline: input.deadline ?? null,
         budget_amount: input.budget_amount ?? null,
         budget_currency: input.budget_currency ?? 'EUR',
+        ...(input.kind ? { kind: input.kind } : {}),
       })
       .select()
       .single();
@@ -1450,161 +1409,7 @@ class ProjectsService {
     return data as string;
   }
 
-  // ---------- PROJECT PRODUCTS ----------
-
-  async listProjectProducts(projectId: string): Promise<ProjectProductWithDisplay[]> {
-    const { data, error } = await (supabase as any)
-      .from('project_products')
-      .select(`
-        *,
-        product:products(id, name, sku),
-        quote_item:quote_items!source_quote_item_id(unit_price, discounted_price, room, dimensions)
-      `)
-      .eq('project_id', projectId)
-      .order('position', { ascending: true })
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    return ((data || []) as ProjectProduct[]).map((r) => this._decorateProduct(r));
-  }
-
-  private _decorateProduct(r: ProjectProduct): ProjectProductWithDisplay {
-    const display_name = r.product?.name || r.custom_name || 'Untitled item';
-    const display_sku = r.product?.sku ?? r.custom_sku ?? null;
-    // Quote-linked rows track the quote line live; manual rows use their own quoted_price.
-    const reference_price = r.source_quote_item_id
-      ? (r.quote_item?.discounted_price ?? r.quote_item?.unit_price ?? null)
-      : r.quoted_price;
-    return { ...r, display_name, display_sku, reference_price };
-  }
-
-  async addProjectProduct(input: {
-    project_id: string;
-    workspace_id?: string | null;
-    product_id?: string | null;
-    custom_name?: string | null;
-    custom_sku?: string | null;
-    custom_description?: string | null;
-    quantity?: number;
-    unit?: string | null;
-    sold_price?: number | null;
-    quoted_price?: number | null;
-    price_source?: string | null;
-    price_currency?: string;
-    room_id?: string | null;
-    status?: ProjectProductStatus;
-    notes?: string | null;
-  }): Promise<ProjectProduct> {
-    if (!input.product_id && !input.custom_name?.trim()) {
-      throw new Error('Pick a catalog product or give the custom line a name.');
-    }
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await (supabase as any)
-      .from('project_products')
-      .insert({
-        project_id: input.project_id,
-        workspace_id: input.workspace_id ?? null,
-        product_id: input.product_id ?? null,
-        custom_name: input.custom_name ?? null,
-        custom_sku: input.custom_sku ?? null,
-        custom_description: input.custom_description ?? null,
-        quantity: input.quantity ?? 1,
-        unit: input.unit ?? null,
-        sold_price: input.sold_price ?? null,
-        quoted_price: input.quoted_price ?? null,
-        price_source: input.price_source ?? (input.product_id ? null : 'manual'),
-        price_currency: input.price_currency ?? 'EUR',
-        room_id: input.room_id ?? null,
-        status: input.status ?? 'selection',
-        notes: input.notes ?? null,
-        created_by: user?.id ?? null,
-      })
-      .select()
-      .single();
-    if (error) throw error;
-    return data as ProjectProduct;
-  }
-
-  async updateProjectProduct(id: string, input: Partial<{
-    status: ProjectProductStatus;
-    sold_price: number | null;
-    quoted_price: number | null;
-    price_source: string | null;
-    price_currency: string;
-    quantity: number;
-    unit: string | null;
-    room_id: string | null;
-    notes: string | null;
-    custom_name: string | null;
-    custom_sku: string | null;
-    custom_description: string | null;
-    position: number;
-  }>): Promise<ProjectProduct> {
-    const { data, error } = await (supabase as any)
-      .from('project_products')
-      .update(input)
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data as ProjectProduct;
-  }
-
-  async deleteProjectProduct(id: string): Promise<void> {
-    const { error } = await (supabase as any).from('project_products').delete().eq('id', id);
-    if (error) throw error;
-  }
-
-  /**
-   * Import every line of the project's quotes into project_products, live-linked by
-   * source_quote_item_id. Idempotent: a quote line already imported is skipped (the
-   * partial unique index on source_quote_item_id guards against duplicates anyway).
-   * Returns the count of newly-imported lines.
-   */
-  async importProductsFromQuotes(projectId: string, opts: { acceptedOnly?: boolean } = {}): Promise<number> {
-    const project = await this.getProject(projectId);
-    let q = (supabase as any)
-      .from('quote_items')
-      .select('id, product_id, quantity, custom_product_name, custom_sku, custom_unit, unit_price, room_id, quote:quotes!inner(project_id, status, currency)')
-      .eq('quote.project_id', projectId);
-    if (opts.acceptedOnly) q = q.eq('quote.status', 'accepted');
-    const { data: items, error } = await q;
-    if (error) throw error;
-    const rows = (items || []) as any[];
-    if (rows.length === 0) return 0;
-
-    // Skip lines already linked.
-    const { data: existing } = await (supabase as any)
-      .from('project_products')
-      .select('source_quote_item_id')
-      .eq('project_id', projectId)
-      .not('source_quote_item_id', 'is', null);
-    const linked = new Set((existing || []).map((e: any) => e.source_quote_item_id));
-
-    const { data: { user } } = await supabase.auth.getUser();
-    const toInsert = rows
-      .filter((it) => !linked.has(it.id))
-      .map((it, idx) => ({
-        project_id: projectId,
-        workspace_id: project?.workspace_id ?? null,
-        product_id: it.product_id ?? null,
-        source_quote_item_id: it.id,
-        custom_name: it.product_id ? null : (it.custom_product_name || 'Custom item'),
-        custom_sku: it.product_id ? null : (it.custom_sku ?? null),
-        quantity: it.quantity ?? 1,
-        unit: it.custom_unit ?? null,
-        quoted_price: it.unit_price ?? null,
-        price_source: 'quote',
-        price_currency: it.quote?.currency ?? 'EUR',
-        room_id: it.room_id ?? null,
-        status: 'selection',
-        position: idx,
-        created_by: user?.id ?? null,
-      }));
-    if (toInsert.length === 0) return 0;
-    const { error: insErr } = await (supabase as any).from('project_products').insert(toInsert);
-    if (insErr) throw insErr;
-    return toInsert.length;
-  }
+  // ---------- PRODUCT PRICING ----------
 
   /**
    * Role-correct price for a catalog product, via the existing pricing-hierarchy RPC.
@@ -1625,12 +1430,7 @@ class ProjectsService {
     opts?: {
       quantity?: number | null;
       unit?: string | null;
-      /**
-       * #374 Phase 4 — which variant to price. `project_products` does not capture a variant
-       * yet, so today's callers pass nothing and get the product-wide row exactly as before;
-       * the parameter exists so a project line that gains one is priced like a quote line
-       * rather than silently falling back to base.
-       */
+      /** #374 Phase 4 — which variant to price; omitted prices the product-wide row. */
       variantKey?: string | null;
     },
   ): Promise<ResolvedPrice> {
@@ -1762,40 +1562,6 @@ class ProjectsService {
     return data as ProjectCommandCentre;
   }
 
-  async getProjectDashboard(projectId: string): Promise<ProjectDashboard> {
-    const { data, error } = await (supabase as any)
-      .rpc('get_project_dashboard', { p_project_id: projectId, p_today: todayLocalISO() });
-    if (error) throw error;
-    const r = (data || {}) as Record<string, any>;
-    return {
-      pnl: parseProjectPnl(r.pnl),
-      budget_amount: r.budget_amount == null ? null : Number(r.budget_amount),
-      budget_currency: r.budget_currency ?? null,
-      budget_comparable: !!r.budget_comparable,
-      budget_headroom: r.budget_headroom == null ? null : Number(r.budget_headroom),
-      deliveries: ((r.deliveries ?? []) as any[]).map((d) => ({
-        id: d.id,
-        order_number: d.order_number ?? null,
-        supplier_name: d.supplier_name ?? null,
-        eta: d.eta ?? null,
-        supplier_status: d.supplier_status ?? null,
-        amount_net: d.amount_net == null ? null : Number(d.amount_net),
-        currency: d.currency ?? null,
-        is_late: !!d.is_late,
-      })),
-      open_purchase_orders: Number(r.open_purchase_orders ?? 0),
-      materials_by_category: ((r.materials_by_category ?? []) as any[]).map((m) => ({
-        kind: m.kind,
-        category_id: m.category_id ?? null,
-        name: m.name ?? null,
-        amount: Number(m.amount ?? 0),
-      })),
-      crew: ((r.crew ?? []) as any[]).map((c) => ({
-        day: String(c.day).slice(0, 10), workers: Number(c.workers ?? 0), minutes: Number(c.minutes ?? 0),
-      })),
-    };
-  }
-
 
   async listProjectVisits(projectId: string): Promise<ProjectVisit[]> {
     const { data, error } = await (supabase as any).rpc('list_project_visits', { p_project_id: projectId });
@@ -1889,23 +1655,6 @@ class ProjectsService {
     const table = kind === 'invoice' ? 'invoices' : 'supplier_bills';
     const { error } = await (supabase as any).from(table).update({ project_id: projectId }).eq('id', id);
     if (error) throw error;
-  }
-
-  // ---------- TIMELINE (Phase 3) ----------
-
-  async listEvents(projectId: string, opts: { limit?: number; eventTypes?: string[] } = {}): Promise<ProjectEvent[]> {
-    let q = (supabase as any)
-      .from('project_events')
-      .select('*')
-      .eq('project_id', projectId)
-      .order('occurred_at', { ascending: false })
-      .limit(opts.limit ?? 100);
-    if (opts.eventTypes && opts.eventTypes.length > 0) {
-      q = q.in('event_type', opts.eventTypes);
-    }
-    const { data, error } = await q;
-    if (error) throw error;
-    return (data || []) as ProjectEvent[];
   }
 
   // ---------- SHEETS (cross-moodboard roll-up — Phase 3) ----------

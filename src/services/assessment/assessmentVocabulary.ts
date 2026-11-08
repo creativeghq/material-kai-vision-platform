@@ -187,8 +187,8 @@ export const ACTION_EFFORT_LABELS: Record<ActionEffort, string> = {
  */
 export const ASSESSMENT_DESTINATIONS: Record<AssessmentSubject, readonly string[]> = {
   project: [
-    'overview', 'rooms', 'products', 'plan', 'purchases', 'quotes', 'billing', 'finance',
-    'sheets', 'client-view', 'contracts', 'tasks', 'site', 'documents', 'requests',
+    'overview', 'rooms', 'products', 'plan', 'purchases', 'quotes', 'changes', 'billing', 'finance',
+    'sheets', 'contracts', 'tasks', 'site', 'documents', 'handover', 'requests',
   ],
   // FINANCE_TAB values from src/modules/finance/routes.ts — the KEYS, not the labels.
   finance: [

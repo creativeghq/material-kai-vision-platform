@@ -190,9 +190,9 @@ describe('PQ-13 / PQ-14 — a candidate list is scoped, and money input is valid
     ).toMatch(/throw itemsError/);
   });
 
-  it('a project product price cannot be saved negative', () => {
-    const tab = read('src/modules/projects/components/tabs/ProductsTab.tsx');
-    expect(tab, 'the sold-price guard no longer rejects a negative').toMatch(/sold < 0/);
+  it('a project selection price cannot be saved negative', () => {
+    const tab = read('src/modules/projects/components/tabs/SelectionsTab.tsx');
+    expect(tab, 'the price guard no longer rejects a negative').toMatch(/Number\.isFinite\(n\) && n >= 0/);
     expect(tab, 'quantity is back to `Number(qty) || 1`, which turns 0 into 1 and accepts -3')
       .not.toMatch(/Number\(qty\)\s*\|\|\s*1/);
   });

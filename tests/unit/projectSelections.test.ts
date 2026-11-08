@@ -6,24 +6,24 @@
  * estimate, and an overage becomes a change order rather than absorbed work.
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
 import {
   SELECTION_STATUS_LABEL, POSITION_LABEL, allowanceIsFrozen, isOverage, isUnderage,
   overageNeedsBilling, positionNeedsAttention, totalIsAFloor,
-  FROZEN_IS_THE_POINT, UNDERAGE_IS_NOT_A_CHANGE_ORDER, COMMITTED_VS_PENDING,
-  type AllowanceRow, type SelectionPosition, type SelectionStatus, type SelectionPositionStatus,
+  FROZEN_IS_THE_POINT, UNDERAGE_IS_NOT_A_CHANGE_ORDER, FULFILMENT_LABEL, FULFILMENT_TONE,
+  type AllowanceRow, type SelectionFulfilment, type SelectionPosition, type SelectionStatus, type SelectionPositionStatus,
 } from '@/modules/projects/selectionRules';
 
 const ROOT = join(__dirname, '..', '..');
 const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 
 const service = read('src/modules/projects/services/selectionsService.ts');
-const panel = read('src/modules/projects/components/SelectionsPanel.tsx');
-const finance = read('src/modules/projects/components/tabs/QuotesTab.tsx');
-const cvr = read('src/modules/projects/components/CvrCard.tsx');
+const panel = read('src/modules/projects/components/tabs/SelectionsTab.tsx');
+const projects = read('src/modules/projects/services/projectsService.ts');
+const cvr = read('src/modules/projects/components/CostCodesCard.tsx');
 const variations = read('src/modules/projects/services/variationsService.ts');
 
 const row = (over: Partial<AllowanceRow>): AllowanceRow => ({
@@ -51,7 +51,7 @@ describe('an allowance you can edit is not a budget', () => {
     const statuses: SelectionPositionStatus[] =
       ['ok', 'overage_unbilled', 'unpriced_selections', 'unfrozen', 'no_allowances', 'no_project'];
     for (const s of statuses) expect(POSITION_LABEL[s]).toBeTruthy();
-    for (const s of ['proposed', 'client_approved', 'declined', 'ordered'] as SelectionStatus[]) {
+    for (const s of ['proposed', 'client_approved', 'declined'] as SelectionStatus[]) {
       expect(SELECTION_STATUS_LABEL[s]).toBeTruthy();
     }
   });
@@ -97,21 +97,40 @@ describe('an unpriced selection makes the total a floor', () => {
 });
 
 
-describe('pending is not committed', () => {
-  it('an unapproved purchase order is shown apart and not added into cost', () => {
-    expect(COMMITTED_VS_PENDING).toMatch(/not added into the total/);
-    expect(variations).toContain('pending_cost');
-    expect(cvr).toContain('pending_cost');
-    expect(cvr).toMatch(/not yet a spend/);
+describe('what the client picked is recorded once', () => {
+  it('there is no second product list on a project', () => {
+    expect(existsSync(join(ROOT, 'src/modules/projects/components/tabs/ProductsTab.tsx'))).toBe(false);
+    expect(existsSync(join(ROOT, 'src/modules/projects/components/SelectionsPanel.tsx'))).toBe(false);
+    expect(projects).not.toContain('project_products');
   });
-});
 
-describe('the board is reachable', () => {
-  it('it sits on the project quotes tab', () => {
-    expect(finance).toContain('SelectionsPanel');
+  it('order progress is derived from the order line, never typed', () => {
+    expect(Object.keys(SELECTION_STATUS_LABEL)).not.toContain('ordered');
+    expect(service).toContain('project_selection_lines');
+    expect(service).not.toMatch(/fulfilment\s*:/);
+    expect(panel).not.toMatch(/FULFILMENT_LABEL\)\.map|Object\.keys\(FULFILMENT_LABEL/);
+    const all: SelectionFulfilment[] = ['not_ordered', 'specified', 'approved', 'ordered', 'acknowledged',
+      'shipped', 'received', 'delivered', 'installed', 'damaged', 'cancelled'];
+    for (const f of all) { expect(FULFILMENT_LABEL[f]).toBeTruthy(); expect(FULFILMENT_TONE[f]).toBeTruthy(); }
+  });
+
+  it('budget figures sit behind the finance gate', () => {
+    expect(panel).toMatch(/canFinance \? selectionsService\.position/);
+    expect(panel).toMatch(/\{canFinance && position && \(/);
+  });
+
+  it('an empty board offers the add action', () => {
+    expect(panel).toMatch(/<HubEmptyState[\s\S]{0,400}action=\{addButton\}/);
   });
 
   it('a failed read is unknown, not "within budget"', () => {
     expect(panel).toMatch(/not a statement that every pick is[\s\S]{0,30}inside its budget/);
+  });
+});
+
+describe('pending is not committed', () => {
+  it('an unapproved purchase order is shown apart from cost', () => {
+    expect(variations).toContain('pending_cost');
+    expect(cvr).toContain('pending_cost');
   });
 });

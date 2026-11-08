@@ -95,7 +95,14 @@ export const PurchaseItemsTab: React.FC<{
       toast({ title: 'Failed to raise the purchase order', description: err?.message, variant: 'destructive' });
     } finally { setRaising(false); }
   };
-  const [dialogItem, setDialogItem] = useState<ProjectPurchaseItem | 'new' | null>(null);
+  const [dialogItem, setDialogItemRaw] = useState<ProjectPurchaseItem | 'new' | null>(null);
+  const setDialogItem = (next: ProjectPurchaseItem | 'new' | null) => {
+    if (next && !workspaceId) {
+      toast({ title: 'This project has no workspace — purchase items need one.', variant: 'destructive' });
+      return;
+    }
+    setDialogItemRaw(next);
+  };
   const [sheetMode, setSheetMode] = useState<'both' | 'schedule' | 'per_item' | 'order'>('both');
   const [generatingSheet, setGeneratingSheet] = useState(false);
 
@@ -265,7 +272,6 @@ export const PurchaseItemsTab: React.FC<{
           onSaved={() => { setDialogItem(null); load(); onChanged?.(); }}
         />
       )}
-      {dialogItem && !workspaceId && (() => { toast({ title: 'This project has no workspace — purchase items need one.', variant: 'destructive' }); setDialogItem(null); return null; })()}
       {connectEmailGate}
     </div>
   );

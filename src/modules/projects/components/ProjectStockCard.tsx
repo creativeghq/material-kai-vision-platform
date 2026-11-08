@@ -3,6 +3,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Loader2, Boxes } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
@@ -27,13 +29,15 @@ const DOC_LABEL: Record<StockHold['demand_type'], string> = {
   quote_item: 'Quote',
 };
 
-export const ProjectStockCard: React.FC<{ projectId: string }> = ({ projectId }) => {
+export const ProjectStockCard: React.FC<{ projectId: string; onOpenSection?: (tab: string) => void }> = ({ projectId, onOpenSection }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<StockHold[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setFailed(false);
     try {
       const { data, error } = await (supabase as never as {
         rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: StockHold[] | null; error: Error | null }>;
@@ -41,6 +45,7 @@ export const ProjectStockCard: React.FC<{ projectId: string }> = ({ projectId })
       if (error) throw error;
       setRows(data ?? []);
     } catch (err) {
+      setFailed(true);
       toast({ title: 'Could not load stock holds', description: getErrorMessage(err), variant: 'destructive' });
     } finally {
       setLoading(false);
@@ -67,13 +72,19 @@ export const ProjectStockCard: React.FC<{ projectId: string }> = ({ projectId })
         </CardTitle>
       </CardHeader>
       <CardContent className="pb-4 pt-0">
-        {rows.length === 0 ? (
-          // "Nothing held" is a complete answer, and saying WHERE a hold comes from is the useful
-          // half: material is reserved by the quote or the sales order, not by the job itself.
-          <p className="text-sm text-muted-foreground">
-            No stock is held for this job. Material is reserved by a quote or a confirmed sales
-            order on it — there is no separate hold at the project level.
-          </p>
+        {failed ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-sm text-amber-800 dark:text-amber-300">Stock holds could not be loaded. They are unknown, not none.</p>
+            <Button size="sm" variant="outline" onClick={() => void load()}>Retry</Button>
+          </div>
+        ) : rows.length === 0 ? (
+          <HubEmptyState
+            icon={Boxes}
+            className="py-6"
+            title="No stock held for this job"
+            description="Material is reserved by a quote or a confirmed sales order on the project, not by the project itself."
+            action={onOpenSection ? <Button size="sm" variant="outline" onClick={() => onOpenSection('quotes')}>Open quotes</Button> : undefined}
+          />
         ) : (
           <div className="table-scroll">
             <table className="w-full text-sm">

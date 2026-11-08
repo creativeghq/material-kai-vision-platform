@@ -120,7 +120,7 @@ export const TEMPLATE_SCHEMAS: Record<LiveTemplateEntityType, TemplateSchema> = 
     moduleSlug: 'projects',
     // `deadline` is captured by nobody on purpose: an absolute date is meaningless when the
     // template is reused next quarter, and a silently stale deadline reads as a real commitment.
-    captureFields: ['name', 'description', 'budget_amount', 'budget_currency'],
+    captureFields: ['name', 'description', 'kind', 'budget_amount', 'budget_currency'],
     captureChildren: [
       {
         table: 'project_rooms',

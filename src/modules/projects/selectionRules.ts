@@ -7,7 +7,13 @@
  * tested without a client.
  */
 
-export type SelectionStatus = 'proposed' | 'client_approved' | 'declined' | 'ordered';
+/** The client's decision. How far the ORDER has got is not typed here — see SelectionFulfilment. */
+export type SelectionStatus = 'proposed' | 'client_approved' | 'declined';
+
+/** Derived in SQL by `project_selection_fulfilment` from the linked order line. */
+export type SelectionFulfilment =
+  | 'not_ordered' | 'specified' | 'approved' | 'ordered' | 'acknowledged' | 'shipped'
+  | 'received' | 'delivered' | 'installed' | 'damaged' | 'cancelled';
 
 export type SelectionPositionStatus =
   | 'ok' | 'overage_unbilled' | 'unpriced_selections' | 'unfrozen' | 'no_allowances' | 'no_project';
@@ -40,28 +46,79 @@ export interface SelectionPosition {
   rows: AllowanceRow[];
 }
 
-export interface ProjectSelection {
+/** One row of `project_selection_lines` — every figure on it is derived server-side. */
+export interface ProjectSelectionLine {
   id: string;
   allowance_id: string | null;
+  allowance_label: string | null;
   room_id: string | null;
+  room_name: string | null;
   product_id: string | null;
-  stock_pool_id: string | null;
+  product_name: string | null;
+  product_sku: string | null;
   description: string;
   quantity: number;
   unit: string | null;
   unit_price: number | null;
+  line_total: number | null;
   currency: string;
   status: SelectionStatus;
   client_approved_at: string | null;
+  client_approved_name: string | null;
   order_item_id: string | null;
+  order_id: string | null;
+  order_number: string | null;
+  order_type: 'sales' | 'purchase' | null;
+  fulfilment: SelectionFulfilment;
   variation_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface SelectionOrderCandidate {
+  order_item_id: string;
+  order_id: string;
+  order_number: string | null;
+  order_type: 'sales' | 'purchase';
+  description: string | null;
+  quantity: number;
+  product_match: boolean;
+  linked_selection_id: string | null;
+  fulfilment: SelectionFulfilment;
 }
 
 export const SELECTION_STATUS_LABEL: Record<SelectionStatus, string> = {
   proposed: 'Proposed',
   client_approved: 'Approved by the Client',
   declined: 'Declined',
+};
+
+export const FULFILMENT_LABEL: Record<SelectionFulfilment, string> = {
+  not_ordered: 'Not Ordered',
+  specified: 'On a Draft Order',
+  approved: 'Order Approved',
   ordered: 'Ordered',
+  acknowledged: 'Acknowledged',
+  shipped: 'Shipped',
+  received: 'Received',
+  delivered: 'Delivered',
+  installed: 'Installed',
+  damaged: 'Damaged',
+  cancelled: 'Order Cancelled',
+};
+
+export const FULFILMENT_TONE: Record<SelectionFulfilment, 'success' | 'warning' | 'error' | 'info' | 'neutral'> = {
+  not_ordered: 'neutral',
+  specified: 'neutral',
+  approved: 'info',
+  ordered: 'info',
+  acknowledged: 'info',
+  shipped: 'info',
+  received: 'success',
+  delivered: 'success',
+  installed: 'success',
+  damaged: 'error',
+  cancelled: 'error',
 };
 
 export const POSITION_LABEL: Record<SelectionPositionStatus, string> = {
@@ -100,8 +157,3 @@ export const FROZEN_IS_THE_POINT =
 
 export const UNDERAGE_IS_NOT_A_CHANGE_ORDER =
   'An underage is the customer’s money. It is reported, never billed.';
-
-/** Buildertrend's split: raised is not approved, and unapproved money is not a spend. */
-export const COMMITTED_VS_PENDING =
-  'Pending is a purchase order nobody has approved. It is shown apart from committed cost and is '
-  + 'not added into the total, because an unapproved order is not yet money spent.';

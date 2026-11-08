@@ -8,16 +8,17 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import type {
-  SelectionPosition, ProjectSelection, SelectionStatus,
+  SelectionPosition, ProjectSelectionLine, SelectionStatus, SelectionOrderCandidate,
 } from '@/modules/projects/selectionRules';
 
 export type {
-  SelectionStatus, SelectionPositionStatus, AllowanceRow, SelectionPosition, ProjectSelection,
+  SelectionStatus, SelectionPositionStatus, AllowanceRow, SelectionPosition, ProjectSelectionLine,
+  SelectionFulfilment, SelectionOrderCandidate,
 } from '@/modules/projects/selectionRules';
 export {
-  SELECTION_STATUS_LABEL, POSITION_LABEL, allowanceIsFrozen, isOverage, isUnderage,
-  overageNeedsBilling, positionNeedsAttention, totalIsAFloor,
-  FROZEN_IS_THE_POINT, UNDERAGE_IS_NOT_A_CHANGE_ORDER, COMMITTED_VS_PENDING,
+  SELECTION_STATUS_LABEL, POSITION_LABEL, FULFILMENT_LABEL, FULFILMENT_TONE,
+  allowanceIsFrozen, isOverage, isUnderage, overageNeedsBilling, positionNeedsAttention,
+  totalIsAFloor, FROZEN_IS_THE_POINT, UNDERAGE_IS_NOT_A_CHANGE_ORDER,
 } from '@/modules/projects/selectionRules';
 
 export const selectionsService = {
@@ -29,14 +30,20 @@ export const selectionsService = {
     return data as unknown as SelectionPosition;
   },
 
-  async selections(projectId: string): Promise<ProjectSelection[]> {
-    const { data, error } = await supabase
-      .from('project_selections')
-      .select('id, allowance_id, room_id, product_id, stock_pool_id, description, quantity, unit, unit_price, currency, status, client_approved_at, order_item_id, variation_id')
-      .eq('project_id', projectId)
-      .order('created_at');
+  async lines(projectId: string): Promise<ProjectSelectionLine[]> {
+    const { data, error } = await supabase.rpc('project_selection_lines' as never, {
+      p_project: projectId,
+    } as never);
     if (error) throw error;
-    return (data ?? []) as unknown as ProjectSelection[];
+    return (data ?? []) as unknown as ProjectSelectionLine[];
+  },
+
+  async orderCandidates(selectionId: string): Promise<SelectionOrderCandidate[]> {
+    const { data, error } = await supabase.rpc('project_selection_order_candidates' as never, {
+      p_selection: selectionId,
+    } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as SelectionOrderCandidate[];
   },
 
   async createAllowance(input: {
@@ -108,6 +115,34 @@ export const selectionsService = {
         updated_at: new Date().toISOString(),
       })
       .eq('id', selectionId);
+    if (error) throw error;
+  },
+
+  async updateSelection(selectionId: string, patch: {
+    roomId?: string | null; allowanceId?: string | null; quantity?: number;
+    unitPrice?: number | null; currency?: string;
+  }): Promise<void> {
+    const row: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (patch.roomId !== undefined) row.room_id = patch.roomId;
+    if (patch.allowanceId !== undefined) row.allowance_id = patch.allowanceId;
+    if (patch.quantity !== undefined) row.quantity = patch.quantity;
+    if (patch.unitPrice !== undefined) row.unit_price = patch.unitPrice;
+    if (patch.currency !== undefined) row.currency = patch.currency;
+    const { error } = await supabase.from('project_selections').update(row as never).eq('id', selectionId);
+    if (error) throw error;
+  },
+
+  /** The server refuses a line that is not on an order of this project. */
+  async linkOrderItem(selectionId: string, orderItemId: string | null): Promise<void> {
+    const { error } = await supabase
+      .from('project_selections')
+      .update({ order_item_id: orderItemId, updated_at: new Date().toISOString() })
+      .eq('id', selectionId);
+    if (error) throw error;
+  },
+
+  async deleteSelection(selectionId: string): Promise<void> {
+    const { error } = await supabase.from('project_selections').delete().eq('id', selectionId);
     if (error) throw error;
   },
 

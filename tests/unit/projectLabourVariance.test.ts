@@ -1,6 +1,6 @@
 /** A job's labour actual is a VALUE or a stated reason there is none — never a zero (#378 N1). */
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 // The PURE module, not the service: importing the service pulls in the Supabase client, which
@@ -55,10 +55,13 @@ describe('the payroll comparison keeps absent and zero apart', () => {
 });
 
 describe('the roll-up has a reader, and it states its coverage', () => {
-  const card = read('src/modules/projects/components/ProjectLabourCard.tsx');
+  const card = read('src/modules/projects/components/JobCostCard.tsx');
 
   it('is mounted — the derivation had no consumer in the app at all', () => {
-    expect(read('src/modules/projects/components/tabs/CostReportTab.tsx')).toContain('<ProjectLabourCard');
+    expect(read('src/modules/projects/components/tabs/CostReportTab.tsx')).toContain('<JobCostCard');
+    expect(card, 'the payroll comparison rides on get_project_pnl, not a second fetch').toContain('const { labor } = pnl');
+    expect(card).not.toContain('timeTrackingService');
+    expect(existsSync(join(ROOT, 'src/modules/projects/components/ProjectLabourCard.tsx'))).toBe(false);
   });
 
   it('renders a stated reason instead of a number it does not have', () => {

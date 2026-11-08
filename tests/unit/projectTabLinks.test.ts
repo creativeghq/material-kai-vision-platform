@@ -21,6 +21,15 @@ function declaredTabs(): string[] {
   return [...src.slice(at, end).matchAll(/'([a-z-]+)'/g)].map((m) => m[1]);
 }
 
+/** Retired ids `resolveProjectTab` still maps onto a section, so stored links keep landing. */
+function aliasTabs(): string[] {
+  const src = readFileSync(join(ROOT, REGISTRY), 'utf8');
+  const at = src.indexOf('export const PROJECT_TAB_ALIASES = {');
+  expect(at, `${REGISTRY} no longer declares PROJECT_TAB_ALIASES`).toBeGreaterThan(-1);
+  const block = src.slice(at, src.indexOf('} as const', at));
+  return [...block.matchAll(/^\s*'?([a-z-]+)'?:\s*'[a-z-]+'/gm)].map((m) => m[1]);
+}
+
 /**
  * The tabs the page actually renders. Triggers are no longer literal: the strip is built from
  * `TAB_GROUPS` (one line of stages, each opening its sections), so a section is reachable exactly
@@ -72,7 +81,7 @@ describe('a project tab link lands on that tab', () => {
   });
 
   it('every ?tab= link in the repo names a tab this page declares', () => {
-    const tabs = new Set(declaredTabs());
+    const tabs = new Set([...declaredTabs(), ...aliasTabs()]);
     const offenders = linkSites()
       .filter(({ tab }) => !tabs.has(tab))
       .map(({ file, tab }) => `${file} → ?tab=${tab}`);

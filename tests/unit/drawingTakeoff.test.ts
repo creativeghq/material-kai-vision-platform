@@ -196,10 +196,11 @@ describe('a person decides, and the bill is the sum', () => {
 });
 
 describe('it is reachable', () => {
-  it('Takeoff sits under Specification, and Commercial answers one question per tab', () => {
-    expect(PAGE).toContain("tabs: ['products', 'plan', 'takeoff']");
-    expect(PAGE).toContain("tabs: ['quotes', 'contracts', 'billing', 'purchases', 'finance']");
-    expect(PAGE).toContain('<TakeoffTab');
+  it('Takeoff is the drawings view of Estimate, under Specification', () => {
+    expect(PAGE).toContain("tabs: ['products', 'plan']");
+    expect(PAGE).toContain("tabs: ['quotes', 'changes', 'contracts', 'billing', 'purchases', 'finance']");
+    expect(PAGE).toMatch(/<EstimateTab[^>]*showTakeoff=\{offers\('takeoff'\)\}/);
+    expect(read('src/modules/projects/components/tabs/EstimateTab.tsx')).toContain('<TakeoffTab');
     expect(PAGE).not.toContain('BillTab');
   });
 

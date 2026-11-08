@@ -13,9 +13,7 @@ import {
   CheckSquare,
   LayoutDashboard,
   Activity,
-  FileImage,
   UserPlus,
-  Eye,
   Presentation,
   Receipt,
   Package,
@@ -34,9 +32,9 @@ import {
   Briefcase,
   HardHat,
   Users,
-  BarChart3,
   MoreHorizontal,
-  ScanLine,
+  GitCompareArrows,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePermissions } from '@/hooks/usePermissions';
@@ -65,12 +63,20 @@ import {
   type ProjectMember,
   type ProjectWithClient,
   type ProjectStatus,
+  type ProjectSetup,
 } from '../services/projectsService';
-import { PROJECT_TABS, PROJECT_SECTION_LABELS, type ProjectTab } from '../projectSections';
+import { PROJECT_TABS, PROJECT_SECTION_LABELS, resolveProjectTab, type ProjectTab } from '../projectSections';
+import { projectParts, type ProjectPart } from '../projectKinds';
 
 import { OverviewTab } from '../components/tabs/OverviewTab';
 import { RoomsTab } from '../components/tabs/RoomsTab';
 import { MoodboardsTab } from '../components/tabs/MoodboardsTab';
+import { EstimateTab } from '../components/tabs/EstimateTab';
+import { ChangesTab } from '../components/tabs/ChangesTab';
+import { SelectionsTab } from '../components/tabs/SelectionsTab';
+import { PresentationsTab } from '../components/tabs/PresentationsTab';
+import { ClientProjectHome } from '../components/ClientProjectHome';
+import { ProjectSectionsDialog } from '../components/ProjectSectionsDialog';
 import { QuotesTab } from '../components/tabs/QuotesTab';
 import { InvoicingTab } from '../components/tabs/InvoicingTab';
 import { TasksAndScheduleTab } from '../components/tabs/TasksAndScheduleTab';
@@ -79,15 +85,10 @@ import { DocumentsTab } from '../components/tabs/DocumentsTab';
 import { RequestsTab } from '../components/tabs/RequestsTab';
 import { AssessmentPanel } from '@/components/features/assessment/AssessmentPanel';
 import { TimelineTab } from '../components/tabs/TimelineTab';
-import { SheetsTab } from '../components/tabs/SheetsTab';
-import { ClientViewTab } from '../components/tabs/ClientViewTab';
 import { ContractsSection } from '@/components/features/contracts/ContractsSection';
 import { WarrantiesTab } from '@/components/business/crm/WarrantiesTab';
-import { ProductsTab } from '../components/tabs/ProductsTab';
 import { CostReportTab } from '../components/tabs/CostReportTab';
-import { PlanTab } from '../components/tabs/PlanTab';
 import { PurchasesTab } from '../components/tabs/PurchasesTab';
-import { TakeoffTab } from '../components/tabs/TakeoffTab';
 import { InviteCollaboratorsModal } from '../components/InviteCollaboratorsModal';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
 import { PROJECT_STATUS_BADGE, PROJECT_STATUS_LABELS } from '../projectStatus';
@@ -104,63 +105,40 @@ import { projectCoverInput } from '../utils/projectPresentation';
  * no equivalent.
  */
 
-/** Tabs only the owner sees. `finance` needs `finance.manage` on top and is handled separately. */
-const OWNER_ONLY_TABS = new Set<ProjectTab>([
-  'products', 'plan', 'takeoff', 'purchases', 'billing', 'client-view', 'contracts', 'handover', 'timeline',
-  // An assessment names margin, uncosted labour and overdue invoices. It is an internal document
-  // and a collaborator (the client) must never be handed one — which is also why the two tables
-  // carry no collaborator read policy at all.
-  'assessment',
-]);
-
 /**
- * The strip is ONE line. Nineteen sections wrapped onto two rows, and a second row of tabs is the
- * first row's problem twice over: nothing says which row is primary, and which section falls onto
- * the second row is a different one at every width. So the strip shows the STAGES of a project —
- * design it, specify it, sell it, build it, hand it over, review it — and the selected stage opens
- * its own sections in a side rail beside the content.
+ * The strip shows the STAGES of a job and the selected stage opens its sections in a rail. Which
+ * sections exist is the project's kind (or its own list), widened by any section holding records.
  */
-type ProjectStage = 'overview' | 'design' | 'specification' | 'commercial' | 'delivery' | 'client' | 'review';
+type ProjectStage = 'overview' | 'design' | 'specification' | 'commercial' | 'delivery' | 'client';
 const TAB_GROUPS: ReadonlyArray<{ id: ProjectStage; label: string; icon: LucideIcon; tabs: readonly ProjectTab[] }> = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['overview'] },
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard, tabs: ['overview', 'timeline', 'assessment'] },
   { id: 'design', label: 'Design', icon: PenTool, tabs: ['rooms', 'moodboards', 'sheets'] },
-  { id: 'specification', label: 'Specification', icon: Ruler, tabs: ['products', 'plan', 'takeoff'] },
-  { id: 'commercial', label: 'Commercial', icon: Briefcase, tabs: ['quotes', 'contracts', 'billing', 'purchases', 'finance'] },
-  { id: 'delivery', label: 'Delivery', icon: HardHat, tabs: ['tasks', 'site', 'documents'] },
-  { id: 'client', label: 'Client', icon: Users, tabs: ['client-view', 'requests', 'handover'] },
-  { id: 'review', label: 'Review', icon: BarChart3, tabs: ['assessment', 'timeline'] },
+  { id: 'specification', label: 'Specification', icon: Ruler, tabs: ['products', 'plan'] },
+  { id: 'commercial', label: 'Commercial', icon: Briefcase, tabs: ['quotes', 'changes', 'contracts', 'billing', 'purchases', 'finance'] },
+  { id: 'delivery', label: 'Delivery', icon: HardHat, tabs: ['tasks', 'site', 'documents', 'handover'] },
+  { id: 'client', label: 'Client', icon: Users, tabs: ['requests'] },
 ];
 
-/** Glyph per section. The LABEL is `PROJECT_SECTION_LABELS`, shared with every link that points here. */
 const TAB_ICONS: Record<ProjectTab, LucideIcon> = {
   overview: LayoutDashboard,
+  timeline: Activity,
+  assessment: Gauge,
   rooms: Home,
-  products: Package,
   moodboards: Palette,
+  sheets: Presentation,
+  products: Package,
   plan: ClipboardList,
-  takeoff: ScanLine,
-  purchases: Hammer,
   quotes: FileText,
-  billing: Receipt,
-  finance: Wallet,
-  sheets: FileImage,
-  'client-view': Presentation,
+  changes: GitCompareArrows,
   contracts: FileSignature,
-  // What was INSTALLED here, and what it is still covered by (#378 C5). customer_assets.project_id
-  // and register_customer_asset have carried a project since the installed base shipped, and the
-  // panel has always taken a projectId. It was mounted on the CRM company and contact only, so the
-  // place equipment is actually fitted had no way to record it, and asset.service_due /
-  // warranty_expiring fired on assets nobody registered.
-  handover: ShieldCheck,
+  billing: Receipt,
+  purchases: Hammer,
+  finance: Wallet,
   tasks: CheckSquare,
-  // Snags + site log. Client-visible snags surface on the client view at handover.
   site: ClipboardList,
   documents: FileStack,
-  // Requests are client-facing by design, so collaborators get this section too.
+  handover: ShieldCheck,
   requests: MessageSquare,
-  assessment: Gauge,
-  // Timeline is owner-only — it would expose internal task + status churn to clients.
-  timeline: Activity,
 };
 
 export const ProjectDetailPage: React.FC = () => {
@@ -179,6 +157,10 @@ export const ProjectDetailPage: React.FC = () => {
   const [coverCandidate, setCoverCandidate] = useState<ProjectCoverCandidate | null>(null);
   const [members, setMembers] = useState<ProjectMember[]>([]);
   const [collabRole, setCollabRole] = useState<CollaboratorRole | null>(null);
+  const [sectionsOpen, setSectionsOpen] = useState(false);
+  /** Parts holding records — shown whatever the kind says, so hiding a section never hides data. */
+  const [setup, setSetup] = useState<ProjectSetup | null>(null);
+  const withData = React.useMemo<ReadonlySet<string>>(() => new Set(setup?.sections_with_data ?? []), [setup]);
 
   // Three viewers: the owner, a teammate (project_members), and a client (project_collaborators,
   // read-only). The team gets the working surface; transfer and delete stay with the owner.
@@ -191,18 +173,14 @@ export const ProjectDetailPage: React.FC = () => {
   // (operator / dealer / architect) — not project-client end-users or staff.
   const canDeleteProject = isOwner && ['operator', 'dealer', 'architect'].includes(persona);
 
-  // The tabs actually rendered for THIS viewer. Kept next to the value passed to <Tabs> so the two
-  // cannot drift — a trigger added without an entry here reintroduces the blank-panel state.
+  const parts = project ? projectParts(project) : new Set<ProjectPart>();
+  const offers = (p: ProjectPart) => parts.has(p) || withData.has(p);
   const availableTabs = PROJECT_TABS.filter((t) => {
-    if (t === 'finance') return canFinance;
-    if (t === 'billing') return canFinance;
-    if (t === 'quotes') return isTeam || collabRole === 'client';
-    return isTeam || !OWNER_ONLY_TABS.has(t);
+    if (!isTeam) return false;
+    if (t === 'finance' || t === 'billing') return canFinance && offers(t);
+    return offers(t);
   });
-  // Validated against what THIS viewer gets, so `?tab=timeline` on a collaborator's link falls
-  // back to Overview instead of rendering a blank panel. Safe to read `isTeam` here: the page
-  // returns a loader above and only reaches the tabs once the project has resolved.
-  const requested = sp.get('tab') as ProjectTab | null;
+  const { tab: requested, alias } = resolveProjectTab(sp.get('tab'));
   const tab: ProjectTab = requested && availableTabs.includes(requested) ? requested : 'overview';
   const setTab = useCallback((next: string) => {
     setSp((prev) => {
@@ -220,7 +198,7 @@ export const ProjectDetailPage: React.FC = () => {
   const stages = TAB_GROUPS
     .map((g) => ({ ...g, tabs: g.tabs.filter((t) => availableTabs.includes(t)) }))
     .filter((g) => g.tabs.length > 0);
-  const stage = stages.find((g) => g.tabs.includes(tab)) ?? stages[0];
+  const stage = stages.find((g) => g.tabs.includes(tab)) ?? stages[0] ?? TAB_GROUPS[0];
   // Coming back to a stage reopens the section you left it on — Commercial returns to the Cost report if
   // that is where you were, not to Quotes every time.
   const lastSection = useRef<Partial<Record<ProjectStage, ProjectTab>>>({});
@@ -231,6 +209,13 @@ export const ProjectDetailPage: React.FC = () => {
     const remembered = lastSection.current[next.id];
     setTab(remembered && next.tabs.includes(remembered) ? remembered : next.tabs[0]);
   };
+
+  const loadSetup = useCallback(() => {
+    if (!id) return;
+    projectsService.getProjectSetup(id).then(setSetup).catch(() => setSetup(null));
+  }, [id]);
+  // Re-read on section change: adding the first room or quote ticks its step and pins its section.
+  useEffect(() => { loadSetup(); }, [loadSetup, sp]);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -317,6 +302,8 @@ export const ProjectDetailPage: React.FC = () => {
 
   if (!project) return null;
 
+  if (!isTeam) return <ClientProjectHome project={project} collabRole={collabRole} />;
+
   // The two counts the strip carries. `0` renders nothing — an empty count is noise.
   const sectionCount = (t: ProjectTab): number =>
     t === 'moodboards' ? project.moodboard_count : t === 'quotes' ? project.accepted_quote_count : 0;
@@ -337,12 +324,6 @@ export const ProjectDetailPage: React.FC = () => {
         subtitle={tab === 'overview' ? undefined : project.description || undefined}
         actions={
           <>
-            {!isTeam && (
-              <Badge variant="outline" className="hidden sm:inline-flex bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30">
-                <Eye className="h-3 w-3 mr-1" />
-                Shared with you
-              </Badge>
-            )}
             {myMembership && (
               <Badge variant="info" className="hidden sm:inline-flex">
                 {myMembership.role === 'manager' ? 'Project manager' : 'Team Member'}
@@ -377,6 +358,12 @@ export const ProjectDetailPage: React.FC = () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   {/* Reuse this project's rooms + task tree on the next job (#322). */}
+                  {isManager && (
+                    <DropdownMenuItem onSelect={() => setSectionsOpen(true)}>
+                      <SlidersHorizontal className="h-4 w-4 mr-2" />
+                      Sections
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onSelect={() => setSaveTemplateOpen(true)}>
                     <Layers className="h-4 w-4 mr-2" />
                     Save as template
@@ -445,6 +432,7 @@ export const ProjectDetailPage: React.FC = () => {
               <div className="min-w-0 flex-1">
 
           <TabsContent value="overview"><OverviewTab project={project} isOwner={isTeam} canEditProject={isManager} canFinance={canFinance} onOpenSection={setTab} coverCandidate={coverCandidate}
+            setup={isManager ? setup : null} onInvite={() => setShowInvite(true)}
             team={isTeam ? {
               members,
               canManage: isManager,
@@ -456,33 +444,30 @@ export const ProjectDetailPage: React.FC = () => {
               },
             } : undefined}
             onProjectPatched={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)} /></TabsContent>
+          <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>
+          <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isManager} subjectName={project.name} /></ModuleTabGate></TabsContent>
           <TabsContent value="rooms"><RoomsTab projectId={project.id} budgetCurrency={project.budget_currency} isOwner={isTeam} showBudget={canFinance} /></TabsContent>
-          {isTeam && <TabsContent value="products"><ProductsTab projectId={project.id} workspaceId={project.workspace_id} /></TabsContent>}
-          {isTeam && <TabsContent value="plan"><PlanTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} isOwner={isTeam} /></TabsContent>}
-          {isTeam && <TabsContent value="takeoff"><TakeoffTab projectId={project.id} /></TabsContent>}
-          {isTeam && <TabsContent value="purchases"><PurchasesTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} currency={project.budget_currency} canFinance={canFinance} /></TabsContent>}
-          <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} /></TabsContent>
-          <TabsContent value="quotes">{isTeam ? <ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} canManage={isTeam} workspaceId={project.workspace_id} currency={project.budget_currency} canFinance={canFinance} /></ModuleTabGate> : <QuotesTab projectId={project.id} canManage={isTeam} workspaceId={project.workspace_id} currency={project.budget_currency} canFinance={canFinance} />}</TabsContent>
-          {canFinance && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><InvoicingTab projectId={project.id} projectName={project.name} /></ModuleTabGate></TabsContent>}
-          {canFinance && <TabsContent value="finance"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Cost, margin and budget for this project."><CostReportTab projectId={project.id} onOpenSection={setTab} /></ModuleTabGate></TabsContent>}
-          <TabsContent value="sheets"><SheetsTab projectId={project.id} isOwner={isTeam} /></TabsContent>
-          {isTeam && <TabsContent value="client-view"><ClientViewTab projectId={project.id} projectName={project.name} isOwner={isTeam} /></TabsContent>}
-          {isTeam && <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" defaultCounterparty={{ name: project.client_contact?.name || project.client_company?.name, email: project.client_contact?.email }} /></ModuleTabGate></TabsContent>}
-          {isTeam && (
-            <TabsContent value="handover">
-              <WarrantiesTab
-                companyId={project.client_company_id ?? undefined}
-                contactId={project.client_company_id ? undefined : (project.client_contact_id ?? undefined)}
-                projectId={project.id}
-              />
-            </TabsContent>
-          )}
+          <TabsContent value="moodboards"><MoodboardsTab projectId={project.id} canCreate={isTeam} /></TabsContent>
+          <TabsContent value="sheets"><PresentationsTab projectId={project.id} projectName={project.name} isOwner={isTeam} initialView={alias === 'client-view' ? 'client-views' : undefined} /></TabsContent>
+          <TabsContent value="products"><SelectionsTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} canFinance={canFinance} /></TabsContent>
+          <TabsContent value="plan"><EstimateTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} showTakeoff={offers('takeoff')} initialView={alias === 'takeoff' ? 'drawings' : undefined} /></TabsContent>
+          <TabsContent value="quotes"><ModuleTabGate moduleSlug="quotes" moduleName="Quotes" blurb="Build and send client quotes for this project."><QuotesTab projectId={project.id} canManage={isTeam} /></ModuleTabGate></TabsContent>
+          <TabsContent value="changes"><ChangesTab projectId={project.id} workspaceId={project.workspace_id} currency={project.budget_currency} canFinance={canFinance} /></TabsContent>
+          <TabsContent value="contracts"><ModuleTabGate moduleSlug="contracts" moduleName="Contracts & e-Signature" blurb="Draft and e-sign contracts for this project."><ContractsSection workspaceId={project.workspace_id} context="project" subject={{ project_id: project.id }} heading="Project contracts" defaultCounterparty={{ name: project.client_contact?.name || project.client_company?.name, email: project.client_contact?.email }} /></ModuleTabGate></TabsContent>
+          {canFinance && <TabsContent value="billing"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Invoice and bill this project."><InvoicingTab projectId={project.id} projectName={project.name} workspaceId={project.workspace_id} canManage={isManager} showApplications={offers('applications')} /></ModuleTabGate></TabsContent>}
+          <TabsContent value="purchases"><PurchasesTab projectId={project.id} workspaceId={project.workspace_id} projectName={project.name} currency={project.budget_currency} canFinance={canFinance} showTenders={offers('tenders')} /></TabsContent>
+          {canFinance && <TabsContent value="finance"><ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Cost, margin and budget for this project."><CostReportTab projectId={project.id} onOpenSection={setTab} showCvr={offers('cvr')} /></ModuleTabGate></TabsContent>}
           <TabsContent value="tasks"><TasksAndScheduleTab projectId={project.id} isOwner={isTeam} /></TabsContent>
           <TabsContent value="site"><SiteTab projectId={project.id} isOwner={isTeam} /></TabsContent>
           <TabsContent value="documents"><DocumentsTab projectId={project.id} isOwner={isTeam} /></TabsContent>
-          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isTeam} collabRole={collabRole} focusRequestId={sp.get('request')} /></TabsContent>
-          {isTeam && <TabsContent value="assessment"><ModuleTabGate moduleSlug="project-assessment" moduleName="AI Assessment" blurb="Ask whether this project is on track and what to fix first."><AssessmentPanel subject="project" subjectId={project.id} canRun={isTeam} subjectName={project.name} /></ModuleTabGate></TabsContent>}
-          {isTeam && <TabsContent value="timeline"><TimelineTab projectId={project.id} /></TabsContent>}
+          <TabsContent value="handover">
+            <WarrantiesTab
+              companyId={project.client_company_id ?? undefined}
+              contactId={project.client_company_id ? undefined : (project.client_contact_id ?? undefined)}
+              projectId={project.id}
+            />
+          </TabsContent>
+          <TabsContent value="requests"><RequestsTab projectId={project.id} isOwner={isTeam} collabRole={collabRole} focusRequestId={sp.get('request')} showUpdates={false} /></TabsContent>
               </div>
             </Tabs>
           </TabsContent>
@@ -495,6 +480,16 @@ export const ProjectDetailPage: React.FC = () => {
           projectName={project.name}
           open={showInvite}
           onClose={() => setShowInvite(false)}
+        />
+      )}
+
+      {isManager && (
+        <ProjectSectionsDialog
+          open={sectionsOpen}
+          onOpenChange={setSectionsOpen}
+          project={project}
+          withData={withData}
+          onSaved={(patch) => setProject(prev => prev ? { ...prev, ...patch } : null)}
         />
       )}
 

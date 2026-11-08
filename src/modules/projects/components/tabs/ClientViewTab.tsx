@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Plus, FileText, Share2, Link2, Trash2, RefreshCw, Eye,
   MessageSquare, Check, Pencil, X, ExternalLink, GripVertical, Presentation, FileImage,
@@ -19,7 +18,7 @@ import { roomPlannerService } from '@/services/roomPlannerService';
 import { supabase } from '@/integrations/supabase/client';
 
 import { projectsService } from '../../services/projectsService';
-import { goToSectionLabel, projectSectionPath } from '../../projectSections';
+import { openSignedPdf } from './openSignedPdf';
 import {
   clientViewsService,
   type ClientView,
@@ -28,10 +27,14 @@ import {
 import { SHEET_TYPE_LABELS, type SheetType } from '@/services/moodboardSheetsService';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
+import { humanizeLabel } from '@/utils/humanize';
+
+/** Team-only: the caller (PresentationsTab) does not render it for a collaborator. */
 interface ClientViewTabProps {
   projectId: string;
   projectName: string;
-  isOwner: boolean;
+  /** Switches the Presentations section to its Sheets view when there is nothing to bundle yet. */
+  onShowSheets?: () => void;
 }
 
 type AvailableSheet = Awaited<ReturnType<typeof projectsService.listProjectSheets>>[number];
@@ -79,8 +82,7 @@ const emptyForm = (): FormState => ({
   roomLayoutId: '',
 });
 
-export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, projectName, isOwner }) => {
-  const navigate = useNavigate();
+export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, projectName, onShowSheets }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const [views, setViews] = useState<ClientView[]>([]);
@@ -131,9 +133,9 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
     } finally {
       setLoading(false);
     }
-  }, [projectId, toast]);
+  }, [projectId, activeWorkspaceId, toast]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { void load(); }, [load]);
 
   const sheetById = useMemo(() => new Map(sheets.map((s) => [s.id, s])), [sheets]);
 
@@ -148,7 +150,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       title: view.title,
       subtitle: view.cover?.subtitle || '',
       clientName: view.cover?.client_name || '',
-      date: (view.cover?.date || new Date().toISOString()).slice(0, 10),
+      date: view.cover?.date ? view.cover.date.slice(0, 10) : todayLocalISO(),
       selectedSheetIds: [...(view.sheet_ids || [])],
       embedVr: view.embed_vr,
       embedLighting: view.embed_lighting,
@@ -248,9 +250,10 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const openPdf = async (view: ClientView) => {
     setBusyId(view.id);
     try {
-      const url = await clientViewsService.refreshPdfUrl(view.id);
-      if (url) window.open(url, '_blank');
-      else toast({ title: 'No PDF yet — generate it first' });
+      const opened = await openSignedPdf(() => clientViewsService.refreshPdfUrl(view.id));
+      if (!opened) toast({ title: 'No PDF yet — generate it first' });
+    } catch (err: any) {
+      toast({ title: 'Could not open the PDF', description: err?.message, variant: 'destructive' });
     } finally {
       setBusyId(null);
     }
@@ -313,16 +316,6 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
     return <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   }
 
-  if (!isOwner) {
-    return (
-      <Card className="dashboard-card">
-        <CardContent className="p-6 text-sm text-muted-foreground">
-          Client presentations are managed by the project owner.
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-5">
       <SectionHeader
@@ -370,12 +363,12 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                 <HubEmptyState
                   icon={FileImage}
                   title="No sheets yet"
-                  description="A client view is built from presentation sheets. Make them on this project's moodboards first — the Sheets tab, or ask the agent."
-                  action={(
-                    <Button variant="outline" onClick={() => navigate(projectSectionPath(projectId, 'sheets'))}>
-                      <FileImage className="h-4 w-4 mr-1" /> {goToSectionLabel('sheets')}
+                  description="A client view is built from this project's sheets: technical plans, or material boards and decks made on its moodboards."
+                  action={onShowSheets ? (
+                    <Button variant="outline" onClick={() => { setEditorOpen(false); onShowSheets(); }}>
+                      <FileImage className="h-4 w-4 mr-1" /> Go to Sheets
                     </Button>
-                  )}
+                  ) : undefined}
                 />
               ) : (
                 <div className="space-y-3">
@@ -532,7 +525,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                       <div className="flex items-center gap-2">
                         <h4 className="font-semibold truncate">{view.title}</h4>
                         <Badge variant="outline" className={STATUS_TONE[view.pdf_generation_status] || STATUS_TONE.draft}>
-                          {view.pdf_generation_status}
+                          {humanizeLabel(view.pdf_generation_status)}
                         </Badge>
                         {view.public_share_enabled && (
                           <Badge variant="outline" className="bg-primary/15 text-primary border-primary/30">

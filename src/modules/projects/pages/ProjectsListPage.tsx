@@ -449,6 +449,7 @@ export const ProjectsListPage: React.FC = () => {
           onClose={() => setShowCreate(false)}
           onSuccess={(id) => navigate(fromDrawings ? projectSectionPath(id, 'takeoff') : `/projects/${id}`)}
           initialCategoryId={scopedFilterValue(filterValues, 'category')}
+          initialKind={fromDrawings ? 'construction' : undefined}
           initialClient={scopedClient}
           lockClient={false}
         />

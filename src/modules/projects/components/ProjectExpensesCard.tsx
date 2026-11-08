@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, Plus, Link2, Link2Off, Receipt } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { Input } from '@/components/core/ui/input';
 import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { Checkbox } from '@/components/core/ui/checkbox';
@@ -40,12 +41,16 @@ export const ProjectExpensesCard: React.FC<{
   useEffect(() => { void load(); }, [load]);
 
   const totals = useMemo(() => {
-    let approved = 0, pending = 0;
-    for (const i of items) {
-      if (i.approval_status === 'approved') approved += Number(i.amount);
-      else if (i.approval_status === 'pending') pending += Number(i.amount);
-    }
-    return { approved, pending };
+    const sum = (status: string) => {
+      const by = new Map<string, number>();
+      for (const i of items) {
+        if (i.approval_status !== status) continue;
+        const c = i.currency || 'EUR';
+        by.set(c, (by.get(c) ?? 0) + Number(i.amount));
+      }
+      return [...by].map(([c, v]) => money(v, c)).join(' + ');
+    };
+    return { approved: sum('approved'), pending: sum('pending') };
   }, [items]);
 
   const refresh = async () => { await load(); onChanged?.(); };
@@ -64,8 +69,8 @@ export const ProjectExpensesCard: React.FC<{
             <Receipt className="h-4 w-4 text-primary" /> Expenses
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            {money(totals.approved, 'EUR')} approved
-            {totals.pending > 0 && <> · {money(totals.pending, 'EUR')} awaiting approval</>}
+            {totals.approved ? `${totals.approved} approved` : 'Nothing approved yet'}
+            {totals.pending && <> · {totals.pending} awaiting approval</>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -81,9 +86,12 @@ export const ProjectExpensesCard: React.FC<{
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
         ) : items.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            Nothing booked to this project yet.
-          </p>
+          <HubEmptyState
+            icon={Receipt}
+            title="No expenses on this project"
+            description="Add a claim here, or link card spend that has already been imported."
+            action={<Button size="sm" onClick={() => setAdding(true)}><Plus className="h-3.5 w-3.5 mr-1" /> Add expense</Button>}
+          />
         ) : (
           <div className="divide-y divide-hairline">
             {items.map((i) => (
@@ -251,7 +259,7 @@ const LinkExpenseDialog: React.FC<{
             No unassigned expenses. Imported card spend appears here once it lands.
           </p>
         ) : (
-          <div className="max-h-80 overflow-auto rounded-md border border-white/10 divide-y divide-hairline">
+          <div className="max-h-80 overflow-auto rounded-md border border-hairline divide-y divide-hairline">
             {candidates.map((c) => (
               <div key={c.id} className="flex items-center gap-2 p-3">
                 <div className="w-20 shrink-0 text-xs text-muted-foreground">{c.expense_date}</div>

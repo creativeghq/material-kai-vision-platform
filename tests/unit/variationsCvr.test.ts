@@ -19,7 +19,7 @@ const ROOT = process.cwd();
 const SERVICE = readFileSync(
   resolve(ROOT, 'src/modules/projects/services/variationsService.ts'), 'utf8',
 );
-const CVR = readFileSync(resolve(ROOT, 'src/modules/projects/components/CvrCard.tsx'), 'utf8');
+const CVR = readFileSync(resolve(ROOT, 'src/modules/projects/components/CostCodesCard.tsx'), 'utf8');
 const REGISTER = readFileSync(
   resolve(ROOT, 'src/modules/projects/components/VariationsCard.tsx'), 'utf8',
 );
@@ -99,14 +99,14 @@ describe('the CVR card', () => {
     expect(CVR).not.toMatch(/contracted_value\s*\)?\s*\+\s*.*variation_value/);
     expect(CVR).not.toMatch(/actual_cost\s*\)?\s*\+\s*.*committed_cost/);
     // The footer sums the SQL's own per-row totals, which is a different thing from rebuilding one.
-    expect(CVR).toContain('n(r.total_value)');
-    expect(CVR).toContain('n(r.total_cost)');
+    expect(CVR).toContain('n(c.total_value)');
+    expect(CVR).toContain('n(c.margin)');
   });
 
   it('does not recompute the margin percentage', () => {
     // A null margin_pct means "no value to take a percentage of", which is a different fact from
     // 0% — and 0% reads as break-even to somebody deciding whether to carry on.
-    expect(CVR).toContain('r.margin_pct !== null');
+    expect(CVR).toContain('c.margin_pct !== null');
     expect(CVR).not.toMatch(/margin\s*\/\s*.*total_value/);
   });
 

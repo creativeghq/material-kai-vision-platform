@@ -12,8 +12,6 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { humanizeLabel } from '@/utils/humanize';
 import { statusTone } from '@/utils/statusTone';
 import { useToast } from '@/hooks/use-toast';
-import { usePermissions } from '@/hooks/usePermissions';
-import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
 import { projectsService, type ProjectFinanceSummary, type QuoteBillingProgress } from '../../services/projectsService';
 import { goToSectionLabel, projectSectionPath } from '../../projectSections';
@@ -24,11 +22,17 @@ import { AttachFinanceDialog } from '../AttachFinanceDialog';
 
 const money = (n: number | null, c: string | null) => formatMoney(n, c ?? 'EUR');
 
-export const InvoicingTab: React.FC<{ projectId: string; projectName?: string }> = ({ projectId, projectName }) => {
+export const InvoicingTab: React.FC<{
+  projectId: string;
+  projectName?: string;
+  /** The project's own workspace — never the switcher's, which can be a different one. */
+  workspaceId: string | null;
+  canManage: boolean;
+  /** Valuations, certification and retention are main-contractor mechanics. */
+  showApplications?: boolean;
+}> = ({ projectId, projectName, workspaceId, canManage, showApplications = false }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { isWorkspaceManager } = usePermissions();
-  const { activeWorkspaceId } = useWorkspace();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [acceptedQuotes, setAcceptedQuotes] = useState<any[]>([]);
   const [summary, setSummary] = useState<ProjectFinanceSummary | null>(null);
@@ -196,9 +200,9 @@ export const InvoicingTab: React.FC<{ projectId: string; projectName?: string }>
         </CardContent>
       </Card>
 
-      <ApplicationsCard projectId={projectId} workspaceId={activeWorkspaceId} currency={currency} isOwner={isWorkspaceManager} />
+      {showApplications && <ApplicationsCard projectId={projectId} workspaceId={workspaceId} currency={currency} isOwner={canManage} />}
 
-      <OrdersPanel workspaceId={activeWorkspaceId ?? ''} projectId={projectId} projectName={projectName} orderType="sales" />
+      <OrdersPanel workspaceId={workspaceId ?? ''} projectId={projectId} projectName={projectName} orderType="sales" />
 
       {attaching && (
         <AttachFinanceDialog

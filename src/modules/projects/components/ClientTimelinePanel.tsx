@@ -12,7 +12,12 @@ const KIND_LABEL: Record<ClientTimelineItem['kind'], string> = {
   snag: 'Snag',
 };
 
-export const ClientTimelinePanel: React.FC<{ projectId: string }> = ({ projectId }) => {
+/** The client's subset of the project timeline: client-visible requests, inspections and snags. */
+export interface ClientTimelinePanelProps {
+  projectId: string;
+}
+
+export const ClientTimelinePanel: React.FC<ClientTimelinePanelProps> = ({ projectId }) => {
   const [items, setItems] = useState<ClientTimelineItem[] | null>(null);
   const [failed, setFailed] = useState(false);
 

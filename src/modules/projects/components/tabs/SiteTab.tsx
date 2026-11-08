@@ -30,10 +30,16 @@ import {
   siteService, SNAG_STATUSES, SNAG_SEVERITIES, SNAG_CLOSED_STATUSES,
   type ProjectSnag, type ProjectSiteLog, type SnagStatus, type SnagSeverity,
 } from '../../services/siteService';
-import { HubEmptyState } from '@/components/core/hub';
+import { HubEmptyState, HubSegmented, type HubSegment } from '@/components/core/hub';
 import { DictateSiteWalkDialog } from '../DictateSiteWalkDialog';
 
 type View = 'snags' | 'log' | 'inspections';
+
+const VIEWS: readonly HubSegment<View>[] = [
+  { value: 'snags', label: <span className="flex items-center gap-1.5"><ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />Snags</span>, title: 'Snags' },
+  { value: 'inspections', label: <span className="flex items-center gap-1.5"><ClipboardCheck className="h-3.5 w-3.5" aria-hidden="true" />Inspections</span>, title: 'Inspections' },
+  { value: 'log', label: <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" aria-hidden="true" />Site Log</span>, title: 'Site Log' },
+];
 
 /**
  * Site photos live in a PRIVATE bucket now (#358 PQ-9), so a render needs a signed URL rather
@@ -79,18 +85,6 @@ export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ pro
   /** Bumped after a dictation so both views reload — one walk writes into both of them. */
   const [reloadToken, setReloadToken] = useState(0);
 
-  const Toggle: React.FC<{ value: View; icon: React.ReactNode; label: string }> = ({ value, icon, label }) => (
-    <button
-      type="button"
-      onClick={() => setView(value)}
-      className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs transition-colors ${
-        view === value ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
-      }`}
-    >
-      {icon} {label}
-    </button>
-  );
-
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -101,11 +95,7 @@ export const SiteTab: React.FC<{ projectId: string; isOwner: boolean }> = ({ pro
             <Mic className="h-3.5 w-3.5 mr-1" /> Dictate a walk
           </Button>
         )}
-        <div className="flex rounded-md border border-border/60 p-0.5">
-          <Toggle value="snags" icon={<ClipboardList className="h-3.5 w-3.5" />} label="Snags" />
-          <Toggle value="inspections" icon={<ClipboardCheck className="h-3.5 w-3.5" />} label="Inspections" />
-          <Toggle value="log" icon={<CalendarDays className="h-3.5 w-3.5" />} label="Site Log" />
-        </div>
+        <HubSegmented options={VIEWS} value={view} onChange={setView} aria-label="Site view" />
       </div>
       {/* Inspections sit beside snags rather than inside them because the relationship runs one
           way: a failed check BECOMES a snag, and the snag then lives its own life on the defect

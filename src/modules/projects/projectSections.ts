@@ -1,33 +1,52 @@
 /** The project page's sections — their ids, their titles, and the one way to link to them. */
 export const PROJECT_TABS = [
-  'overview', 'rooms', 'products', 'moodboards', 'plan', 'takeoff', 'purchases', 'quotes', 'billing',
-  'finance', 'sheets', 'client-view', 'contracts', 'handover', 'tasks', 'site', 'documents',
-  'requests', 'assessment', 'timeline',
+  'overview', 'timeline', 'assessment', 'rooms', 'moodboards', 'sheets', 'products', 'plan',
+  'quotes', 'changes', 'contracts', 'billing', 'purchases', 'finance', 'tasks', 'site', 'documents',
+  'handover', 'requests',
 ] as const;
 export type ProjectTab = typeof PROJECT_TABS[number];
+
+/**
+ * Ids that were sections and are now a view inside another. Stored notification links and
+ * agent tools still carry them, so they keep resolving: `?tab=takeoff` opens Estimate on drawings.
+ */
+export const PROJECT_TAB_ALIASES = {
+  takeoff: 'plan',
+  'client-view': 'sheets',
+} as const satisfies Record<string, ProjectTab>;
+export type ProjectTabAlias = keyof typeof PROJECT_TAB_ALIASES;
+export type ProjectTabOrAlias = ProjectTab | ProjectTabAlias;
+
+export function resolveProjectTab(raw: string | null): { tab: ProjectTab | null; alias: ProjectTabAlias | null } {
+  if (!raw) return { tab: null, alias: null };
+  if (raw in PROJECT_TAB_ALIASES) {
+    const alias = raw as ProjectTabAlias;
+    return { tab: PROJECT_TAB_ALIASES[alias], alias };
+  }
+  return { tab: (PROJECT_TABS as readonly string[]).includes(raw) ? (raw as ProjectTab) : null, alias: null };
+}
 
 /** The section's title, exactly as its tab reads. */
 export const PROJECT_SECTION_LABELS: Record<ProjectTab, string> = {
   overview: 'Overview',
+  timeline: 'Timeline',
+  assessment: 'Assessment',
   rooms: 'Rooms',
-  products: 'Products',
   moodboards: 'Moodboards',
-  plan: 'Plan',
-  takeoff: 'Takeoff',
-  purchases: 'Purchases',
+  sheets: 'Presentations',
+  products: 'Selections',
+  plan: 'Estimate',
   quotes: 'Quotes',
-  billing: 'Invoicing',
-  finance: 'Cost Report',
-  sheets: 'Sheets',
-  'client-view': 'Client View',
+  changes: 'Changes',
   contracts: 'Contracts',
-  handover: 'Handover',
+  billing: 'Invoicing',
+  purchases: 'Purchases',
+  finance: 'Costs',
   tasks: 'Tasks',
   site: 'Site',
   documents: 'Documents',
+  handover: 'Equipment & Warranties',
   requests: 'Requests',
-  assessment: 'Assessment',
-  timeline: 'Timeline',
 };
 
 /**
@@ -36,7 +55,7 @@ export const PROJECT_SECTION_LABELS: Record<ProjectTab, string> = {
  */
 export function projectSectionPath(
   projectId: string,
-  tab: ProjectTab,
+  tab: ProjectTabOrAlias,
   params?: Record<string, string>,
 ): string {
   const q = new URLSearchParams();

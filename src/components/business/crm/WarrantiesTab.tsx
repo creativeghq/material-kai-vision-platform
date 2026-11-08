@@ -231,7 +231,7 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
         <WorkPanelHeader
           icon={ShieldCheck}
           title="Equipment & warranties"
-          description="Units this customer owns, with their serial, warranty and service history."
+          description={projectId && !companyId && !contactId ? 'Units installed on this project, with their serial, warranty and service history.' : projectId ? 'Units installed on this project for this client, with their serial, warranty and service history.' : 'Units this customer owns, with their serial, warranty and service history.'}
           action={!loading && assets.length > 0 && (
             <Button size="sm" variant="outline" onClick={() => setAddOpen(true)}>
               <Plus className="mr-1 h-3.5 w-3.5" /> Add unit
@@ -245,7 +245,7 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
             <HubEmptyState
               icon={ShieldCheck}
               title="No units registered yet"
-              description="A unit is a specific thing this customer owns — with its serial, its warranty and its service history. Anything sold on a delivered order registers itself once the product is marked serviceable."
+              description={projectId ? "Register what you install here — each unit keeps its serial, its warranty and its service history, and the client's record shows it too. Anything sold on a delivered order registers itself once the product is marked serviceable." : 'A unit is a specific thing this customer owns — with its serial, its warranty and its service history. Anything sold on a delivered order registers itself once the product is marked serviceable.'}
               action={<Button size="sm" onClick={() => setAddOpen(true)}><Plus className="mr-1 h-3.5 w-3.5" /> Add unit</Button>}
             />
           ) : (
@@ -322,7 +322,7 @@ export const WarrantiesTab: React.FC<WarrantiesTabProps> = ({
           <WorkPanelHeader
             icon={History}
             title="Service history"
-            description="Every visit logged against this customer's units, kept even after the schedule that produced them is removed."
+            description={projectId ? 'Every visit logged against units installed on this project, kept even after the schedule that produced them is removed.' : "Every visit logged against this customer's units, kept even after the schedule that produced them is removed."}
           />
           <CardContent className="p-0">
             <Table>

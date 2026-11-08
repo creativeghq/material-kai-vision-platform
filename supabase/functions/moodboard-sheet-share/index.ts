@@ -161,31 +161,47 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       if (budget instanceof Response) return budget;
       const kind = ['comment', 'approval', 'change_request'].includes(feedback.kind) ? feedback.kind : 'comment';
       const status = ['approved', 'changes_requested'].includes(feedback.status) ? feedback.status : null;
-      // Only accept a sheet_id that actually belongs to THIS client view — an anonymous
-      // commenter shouldn't be able to pin feedback to an arbitrary/other-tenant sheet id.
-      const fbSheetId = (typeof feedback.sheet_id === 'string'
-        && Array.isArray(view.sheet_ids)
-        && view.sheet_ids.includes(feedback.sheet_id))
-        ? feedback.sheet_id
-        : null;
-      const { error: fErr } = await supabase.from('client_view_feedback').insert({
-        client_view_id: view.id,
-        sheet_id: fbSheetId,
-        author_name: typeof feedback.author_name === 'string' ? feedback.author_name.slice(0, 120) : null,
-        session_id: typeof session_id === 'string' ? session_id : null,
-        kind,
-        status,
-        body: typeof feedback.body === 'string' ? feedback.body.slice(0, 4000) : null,
-        ip_hash: budget.ipHash,
+      // The RPC re-checks the token and keeps only a sheet_id that belongs to THIS view; it writes
+      // the feedback row and the project request in one transaction and replays an identical retry.
+      const { data: recorded, error: fErr } = await supabase.rpc('record_client_view_feedback', {
+        p_token: token,
+        p_kind: kind,
+        p_status: status,
+        p_body: typeof feedback.body === 'string' ? feedback.body : null,
+        p_author_name: typeof feedback.author_name === 'string' ? feedback.author_name : null,
+        p_session_id: typeof session_id === 'string' ? session_id.slice(0, 200) : null,
+        p_sheet_id: typeof feedback.sheet_id === 'string' && /^[0-9a-f-]{36}$/i.test(feedback.sheet_id) ? feedback.sheet_id : null,
+        p_ip_hash: budget.ipHash,
       });
-      if (fErr) return jsonResponse({ error: 'Could not save feedback' }, 500);
+      if (fErr || !recorded) return jsonResponse({ error: 'Could not save feedback' }, 500);
+      const rec = recorded as { request_id: string | null; request_opened: boolean; replayed: boolean };
+      if (rec.replayed) return jsonResponse({ success: true });
+      const requestUrl = rec.request_id
+        ? `/projects/${view.project_id}?tab=requests&request=${rec.request_id}`
+        : `/projects/${view.project_id}?tab=client-view`;
       // Flows — notify the deliverable owner that a client responded. Resolve the owning
       // workspace via the project so tenant-scoped flows match. Best-effort.
       try {
         const { data: proj } = await supabase
-          .from('projects').select('workspace_id, name').eq('id', view.project_id).maybeSingle();
-        const authorName = typeof feedback.author_name === 'string' ? feedback.author_name.slice(0, 120) : 'A client';
+          .from('projects').select('workspace_id, name, user_id').eq('id', view.project_id).maybeSingle();
+        const authorName = typeof feedback.author_name === 'string' && feedback.author_name.trim()
+          ? feedback.author_name.slice(0, 120) : 'A client';
         const verb = status === 'approved' ? 'approved' : status === 'changes_requested' ? 'requested changes on' : 'commented on';
+        if (rec.request_opened && rec.request_id) {
+          await emitFlowEvent('project_request_raised', {
+            user_id: (proj as any)?.user_id ?? view.created_by,
+            workspace_id: (proj as any)?.workspace_id ?? null,
+            title: `New request on ${(proj as any)?.name || 'a project'}`,
+            body: `${authorName}: Client feedback on "${view.title}"`,
+            type: 'project_request',
+            action_url: requestUrl,
+            request_id: rec.request_id,
+            project_id: view.project_id,
+            project_name: (proj as any)?.name ?? null,
+            kind: status === 'changes_requested' || kind === 'change_request' ? 'change_request' : 'question',
+            raised_by_name: authorName,
+          });
+        }
         await emitFlowEvent('client_view_feedback_received', {
           type: 'client_view_feedback_received',
           workspace_id: (proj as any)?.workspace_id ?? null,
@@ -201,7 +217,8 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           body: typeof feedback.body === 'string' && feedback.body.trim()
             ? `${authorName} ${verb} the deliverable: "${String(feedback.body).slice(0, 200)}"`
             : `${authorName} ${verb} the deliverable "${view.title}".`,
-          action_url: `/projects/${view.project_id}?tab=client-view`,
+          action_url: requestUrl,
+          request_id: rec.request_id,
         });
       } catch { /* best-effort — never fail the public feedback write on a flow emit */ }
       return jsonResponse({ success: true });

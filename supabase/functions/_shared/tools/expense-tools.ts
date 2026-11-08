@@ -411,7 +411,7 @@ async function findInboundDocument(db: any, workspaceId: string, needle: string)
     `${d.series ?? ''} ${d.aa ?? ''} ${d.mark ?? ''} ${d.issuer_name ?? ''}`.toLowerCase().includes(p.toLowerCase())));
 }
 
-export const createAttachExpenseDocumentTool = (userId: string, workspaceId: string, userJwt: string, onChunk?: (c: any) => void) =>
+export const createAttachExpenseDocumentTool = (userId: string, workspaceId: string, userJwt: string | undefined, onChunk?: (c: any) => void) =>
   tool(async ({ action, document, target_id, target_kind, amount, net_amount, confirm }: {
     action: 'show' | 'attach_order' | 'attach_payment' | 'attach_document' | 'detach_order' | 'detach_payment';
     document: string; target_id?: string; target_kind?: 'feed_line' | 'payment'; amount?: number; net_amount?: number; confirm?: boolean;

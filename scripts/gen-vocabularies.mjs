@@ -148,6 +148,10 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/drawingVocabulary.generated.ts',
   ],
   [
+    'src/modules/projects/projectKindVocabulary.ts',
+    'supabase/functions/_shared/projectKindVocabulary.generated.ts',
+  ],
+  [
     // #532 takeoff kinds/sources/element types; the CHECKs on project_drawing_measurements enforce them.
     'src/modules/projects/takeoffVocabulary.ts',
     'supabase/functions/_shared/takeoffVocabulary.generated.ts',

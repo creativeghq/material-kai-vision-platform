@@ -92,6 +92,8 @@ export interface ProjectPlanVersion {
   created_at: string;
 }
 
+export interface ChangeOrderVariation { variation_id: string; reference: string | null; value: number; status: string; }
+
 export interface PlanWithItems { plan: ProjectPlan; items: ProjectPlanItem[]; }
 
 async function callEngine<T>(action: string, payload: Record<string, unknown>): Promise<T> {
@@ -207,10 +209,10 @@ class ProjectPlansService {
     return count;
   }
 
-  /** After approval: spawn a revision quote (change order) from the current plan. */
-  async createChangeOrder(planId: string): Promise<string> {
-    const { quote_id } = await callEngine<{ quote_id: string }>('create-change-order', { plan_id: planId });
-    return quote_id;
+  /** After approval: a revision quote, recorded as a draft client variation worth the delta. */
+  async createChangeOrder(planId: string): Promise<{ quoteId: string; variation: ChangeOrderVariation | null }> {
+    const res = await callEngine<{ quote_id: string; variation?: ChangeOrderVariation }>('create-change-order', { plan_id: planId });
+    return { quoteId: res.quote_id, variation: res.variation ?? null };
   }
 
   /** Direct metadata edit (title/brief). Item edits go through updateItems + reprice. */

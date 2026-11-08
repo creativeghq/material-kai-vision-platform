@@ -3,6 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { Palette, Loader2, ArrowRight, Plus } from 'lucide-react';
 
 import { Card, CardContent } from '@/components/core/ui/card';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/core/ui/dialog';
+import { Input } from '@/components/core/ui/input';
+import { FormField } from '@/components/core/ui/form-layout';
+import { formatDate } from '@/utils/datetime';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +17,8 @@ import { moodboardAPI } from '@/services/moodboardAPI';
 
 interface MoodboardsTabProps {
   projectId: string;
+  /** A collaborator browses the boards; only the team creates them. */
+  canCreate: boolean;
 }
 
 interface MoodboardRow {
@@ -22,21 +30,23 @@ interface MoodboardRow {
   view_count: number | null;
 }
 
-export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
+export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId, canCreate }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const [moodboards, setMoodboards] = useState<MoodboardRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [title, setTitle] = useState('');
 
   // Create a moodboard already linked to THIS project (+ open it) — the project page is the one
   // place project context is known, so it shouldn't send the user to /moodboard to re-pick it.
   const handleCreate = async () => {
-    const title = window.prompt('Name this moodboard')?.trim();
-    if (!title) return;
+    const name = title.trim();
+    if (!name) return;
     setCreating(true);
     try {
-      const mb = await moodboardAPI.createMoodBoard({ title, project_id: projectId });
+      const mb = await moodboardAPI.createMoodBoard({ title: name, project_id: projectId });
       navigate(`/moodboard/${mb.id}`);
     } catch {
       toast({ title: 'Could not create moodboard', variant: 'destructive' });
@@ -57,6 +67,33 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
 
   useEffect(() => { load(); }, [load]);
 
+  const nameDialog = (
+    <Dialog open={naming} onOpenChange={(o) => { if (!creating) { setNaming(o); if (!o) setTitle(''); } }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>New Moodboard</DialogTitle>
+          <DialogDescription>It is attached to this project and opens straight away.</DialogDescription>
+        </DialogHeader>
+        <FormField label="Moodboard Name">
+          <Input
+            value={title}
+            autoFocus
+            disabled={creating}
+            placeholder="e.g., Master Bath Materials"
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') void handleCreate(); }}
+          />
+        </FormField>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setNaming(false)} disabled={creating}>Cancel</Button>
+          <Button onClick={() => void handleCreate()} disabled={creating || !title.trim()}>
+            {creating && <Loader2 className="h-4 w-4 mr-1 animate-spin" />}Create and open
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -72,31 +109,31 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
           icon={Palette}
           title="No moodboards attached to this project yet"
           description="A moodboard collects the materials and references for a room; presentation sheets and the client view are built from it."
-          action={(
+          action={canCreate ? (
             <>
-              <Button onClick={handleCreate} disabled={creating}>
-                {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} New moodboard
-              </Button>
+              <Button onClick={() => setNaming(true)}><Plus className="h-4 w-4 mr-1" /> New moodboard</Button>
               <Button variant="outline" onClick={() => navigate('/moodboard')}>Go to Moodboards</Button>
             </>
-          )}
+          ) : undefined}
         />
+        {nameDialog}
       </Card>
     );
   }
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={handleCreate} disabled={creating}>
-          {creating ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} New moodboard
-        </Button>
-      </div>
+      {canCreate && (
+        <div className="flex justify-end">
+          <Button size="sm" onClick={() => setNaming(true)}><Plus className="h-4 w-4 mr-1" /> New moodboard</Button>
+        </div>
+      )}
+      {nameDialog}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {moodboards.map(mb => (
         <Card
           key={mb.id}
-          className="dashboard-card cursor-pointer hover:border-primary/40 transition-colors"
+          className="dashboard-card panel-interactive cursor-pointer"
           onClick={() => navigate(`/moodboard/${mb.id}`)}
         >
           <CardContent className="p-4">
@@ -109,7 +146,7 @@ export const MoodboardsTab: React.FC<MoodboardsTabProps> = ({ projectId }) => {
               <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{mb.description}</p>
             )}
             <p className="text-xs text-muted-foreground mt-2">
-              Updated {new Date(mb.updated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+              Updated {formatDate(mb.updated_at)}
             </p>
           </CardContent>
         </Card>

@@ -1,4 +1,4 @@
-/** Specification → Takeoff: drop drawing PDFs, read them, confirm what they say, add it to a quote (#532). */
+/** Estimate → From Drawings: drop drawing PDFs, read them, confirm what they say, add it to a quote (#532). */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, Upload, ScanLine, RefreshCw, FilePlus2 } from 'lucide-react';
@@ -101,7 +101,7 @@ export const TakeoffTab: React.FC<{ projectId: string }> = ({ projectId }) => {
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0 border-b border-hairline px-5 py-3">
           <div className="min-w-0">
-            <CardTitle className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-primary" /> Takeoff</CardTitle>
+            <CardTitle className="flex items-center gap-2"><ScanLine className="h-4 w-4 text-primary" /> Drawings</CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               Upload the drawings and the engineer's study as PDF. Printed tables are read, symbols are counted and
               runs are measured on CAD-exported pages; nothing reaches a quote until you confirm it.

@@ -170,11 +170,13 @@ describe('cost code coverage', () => {
    * first. It superseded CostByCodeCard, which showed the cost half with no value beside it.
    */
   it('the CVR card does not re-derive a row total in TypeScript', () => {
-    const card = FILES.find((f) => f.path.endsWith('/components/CvrCard.tsx'));
-    expect(card, 'CvrCard.tsx should exist').toBeTruthy();
+    const card = FILES.find((f) => f.path.endsWith('/components/CostCodesCard.tsx'));
+    expect(card, 'CostCodesCard.tsx should exist').toBeTruthy();
     expect(card!.src).not.toMatch(/actual_cost\s*\+\s*.*committed_cost/);
     expect(card!.src).not.toMatch(/contracted_value\s*\+\s*.*variation_value/);
     // And the superseded card is gone rather than left beside it showing a different number.
-    expect(FILES.find((f) => f.path.endsWith('/components/CostByCodeCard.tsx'))).toBeFalsy();
+    for (const gone of ['CostByCodeCard', 'CvrCard', 'CostControlCard']) {
+      expect(FILES.find((f) => f.path.endsWith(`/components/${gone}.tsx`)), gone).toBeFalsy();
+    }
   });
 });

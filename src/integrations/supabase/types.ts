@@ -22281,135 +22281,6 @@ export type Database = {
           },
         ]
       }
-      project_products: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          custom_description: string | null
-          custom_name: string | null
-          custom_sku: string | null
-          id: string
-          notes: string | null
-          position: number
-          price_currency: string
-          price_source: string | null
-          product_id: string | null
-          project_id: string
-          quantity: number
-          quoted_price: number | null
-          room_id: string | null
-          sold_price: number | null
-          source_quote_item_id: string | null
-          status: Database["public"]["Enums"]["project_product_status"]
-          unit: string | null
-          updated_at: string
-          workspace_id: string | null
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          custom_description?: string | null
-          custom_name?: string | null
-          custom_sku?: string | null
-          id?: string
-          notes?: string | null
-          position?: number
-          price_currency?: string
-          price_source?: string | null
-          product_id?: string | null
-          project_id: string
-          quantity?: number
-          quoted_price?: number | null
-          room_id?: string | null
-          sold_price?: number | null
-          source_quote_item_id?: string | null
-          status?: Database["public"]["Enums"]["project_product_status"]
-          unit?: string | null
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          custom_description?: string | null
-          custom_name?: string | null
-          custom_sku?: string | null
-          id?: string
-          notes?: string | null
-          position?: number
-          price_currency?: string
-          price_source?: string | null
-          product_id?: string | null
-          project_id?: string
-          quantity?: number
-          quoted_price?: number | null
-          room_id?: string | null
-          sold_price?: number | null
-          source_quote_item_id?: string | null
-          status?: Database["public"]["Enums"]["project_product_status"]
-          unit?: string | null
-          updated_at?: string
-          workspace_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "project_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_master_price_drift"
-            referencedColumns: ["operator_product_id"]
-          },
-          {
-            foreignKeyName: "project_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_products_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products_effective_facts"
-            referencedColumns: ["product_id"]
-          },
-          {
-            foreignKeyName: "project_products_project_id_fkey"
-            columns: ["project_id"]
-            isOneToOne: false
-            referencedRelation: "projects"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_products_room_id_fkey"
-            columns: ["room_id"]
-            isOneToOne: false
-            referencedRelation: "project_rooms"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_products_source_quote_item_id_fkey"
-            columns: ["source_quote_item_id"]
-            isOneToOne: false
-            referencedRelation: "quote_items"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_products_source_quote_item_id_fkey"
-            columns: ["source_quote_item_id"]
-            isOneToOne: false
-            referencedRelation: "quote_items_with_room"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_products_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       project_purchase_items: {
         Row: {
           category: string | null
@@ -23315,6 +23186,8 @@ export type Database = {
           cover_image_url: string | null
           created_at: string
           deadline: string | null
+          kind: string
+          sections: string[] | null
           defects_period_months: number
           description: string | null
           id: string
@@ -23343,6 +23216,8 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           deadline?: string | null
+          kind?: string
+          sections?: string[] | null
           defects_period_months?: number
           description?: string | null
           id?: string
@@ -23371,6 +23246,8 @@ export type Database = {
           cover_image_url?: string | null
           created_at?: string
           deadline?: string | null
+          kind?: string
+          sections?: string[] | null
           defects_period_months?: number
           description?: string | null
           id?: string
@@ -41115,12 +40992,6 @@ export type Database = {
         | "sourcing_agent"
         | "consultant"
         | "other"
-      project_product_status:
-        | "selection"
-        | "confirmed"
-        | "ordered"
-        | "shipped"
-        | "delivered"
       role_upgrade_status: "pending" | "approved" | "rejected"
       tech_radar_ring: "adopt" | "trial" | "assess" | "hold"
       tech_radar_status:
@@ -41448,13 +41319,6 @@ export const Constants = {
         "sourcing_agent",
         "consultant",
         "other",
-      ],
-      project_product_status: [
-        "selection",
-        "confirmed",
-        "ordered",
-        "shipped",
-        "delivered",
       ],
       role_upgrade_status: ["pending", "approved", "rejected"],
       tech_radar_ring: ["adopt", "trial", "assess", "hold"],

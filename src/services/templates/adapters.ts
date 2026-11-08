@@ -13,6 +13,7 @@ import { childRows, depositPct, num, oneOf, positiveQty, str } from './coerce';
 import { TEMPLATE_SCHEMAS } from './schema';
 import type { TemplateAdapter, TemplateApplyResult } from './types';
 import { CONTRACT_CONTEXTS } from '@/services/contracts/contractVocabulary';
+import { PROJECT_KINDS } from '@/modules/projects/projectKinds';
 
 /**
  * Native template adapters (issue #322) — the executable half of the registry; the allowlists and
@@ -204,6 +205,7 @@ export const quoteAdapter: TemplateAdapter<QuoteTemplatePayload> = {
  * `fix_starter_project_task_visibility`.)
  */
 const taskVisibility = oneOf(['internal', 'client_visible'] as const);
+const projectKind = oneOf(PROJECT_KINDS);
 /** `project_rooms_room_type_check`. */
 const roomType = oneOf(['bedroom', 'bathroom', 'kitchen', 'living', 'dining', 'office', 'outdoor', 'hallway', 'other'] as const);
 
@@ -212,6 +214,7 @@ export interface ProjectTemplatePayload {
   description?: string | null;
   budget_amount?: number | null;
   budget_currency?: string | null;
+  kind?: string | null;
   project_rooms?: Record<string, unknown>[];
   project_tasks?: Record<string, unknown>[];
 }
@@ -223,13 +226,23 @@ export const projectAdapter: TemplateAdapter<ProjectTemplatePayload> = {
   capture: (sourceId) => captureRecord<ProjectTemplatePayload>(projectAdapter, sourceId),
   async apply(payload, ctx): Promise<TemplateApplyResult> {
     const rooms = childRows(payload as never, 'project_rooms');
+    const o = ctx.project ?? {};
     const project = await projectsService.createProject({
       name: ctx.title ?? str(payload.name) ?? 'Untitled project',
-      description: str(payload.description) ?? undefined,
-      budget_amount: payload.budget_amount != null ? num(payload.budget_amount) : null,
-      budget_currency: str(payload.budget_currency) ?? 'EUR',
+      description: o.description ?? str(payload.description) ?? undefined,
+      kind: projectKind(o.kind ?? payload.kind) ?? undefined,
+      category_id: o.category_id ?? null,
+      client_company_id: ctx.customer?.companyId ?? null,
+      client_contact_id: ctx.customer?.contactId ?? null,
+      client_address_unit_id: o.client_address_unit_id ?? null,
+      deadline: o.deadline ?? null,
+      budget_amount: o.budget_amount ?? (payload.budget_amount != null ? num(payload.budget_amount) : null),
+      budget_currency: o.budget_currency ?? str(payload.budget_currency) ?? 'EUR',
       workspace_id: ctx.workspaceId,
-      rooms: rooms.map((r) => ({ name: str(r.name) ?? 'Room', room_type: roomType(r.room_type) as never })),
+      rooms: [
+        ...rooms.map((r) => ({ name: str(r.name) ?? 'Room', room_type: roomType(r.room_type) as never })),
+        ...(o.rooms ?? []).map((r) => ({ name: r.name, room_type: roomType(r.room_type) as never })),
+      ],
     });
 
     // Tasks go in parent-first so a child can reference the id its parent just got. The payload

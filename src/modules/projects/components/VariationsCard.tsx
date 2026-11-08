@@ -1,6 +1,7 @@
 /** The variation register — every agreed change to the scope, both directions. */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, Plus, Trash2, Check, X, GitPullRequestArrow } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Loader2, Plus, Trash2, Check, X, GitPullRequestArrow, Undo2 } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -17,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { humanizeLabel } from '@/utils/humanize';
 import { formatMoney } from '@/utils/decimal';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
+import { quoteUrl } from '@/modules/quotes/routes';
 import { isApprovalRefusal, raiseProjectApproval } from '../services/projectApprovals';
 import {
   variationsService, VARIATION_DIRECTIONS, VARIATION_ORIGINS, isVariationMoney,
@@ -27,9 +29,7 @@ interface Props {
   projectId: string;
   workspaceId: string | null;
   currency?: string;
-  isOwner: boolean;
-  /** Bumped when a variation changes so the CVR beside it reloads. */
-  onChanged?: () => void;
+  canEdit: boolean;
 }
 
 const statusVariant = (s: VariationStatus) =>
@@ -39,7 +39,7 @@ const statusVariant = (s: VariationStatus) =>
         : s === 'submitted' ? 'info' : 'neutral';
 
 export const VariationsCard: React.FC<Props> = ({
-  projectId, workspaceId, currency = 'EUR', isOwner, onChanged,
+  projectId, workspaceId, currency = 'EUR', canEdit,
 }) => {
   const { toast } = useToast();
   const [rows, setRows] = useState<ProjectVariation[] | null>(null);
@@ -62,7 +62,6 @@ export const VariationsCard: React.FC<Props> = ({
     try {
       await fn();
       await load();
-      onChanged?.();
     } catch (e) {
       if (approval && workspaceId && isApprovalRefusal(e)) {
         try {
@@ -112,7 +111,7 @@ export const VariationsCard: React.FC<Props> = ({
             Changes to the agreed scope. Only approved ones reach the CVR.
           </p>
         </div>
-        {isOwner && workspaceId && (
+        {canEdit && workspaceId && (
           <div className="flex gap-2">
             <Button size="sm" variant="secondary" onClick={() => setCreating('client')} disabled={busy}>
               <Plus className="h-3.5 w-3.5" /> Client
@@ -134,7 +133,7 @@ export const VariationsCard: React.FC<Props> = ({
             icon={GitPullRequestArrow}
             title="No variations yet"
             description="Record a change to the agreed scope — an extra the client asked for, or an uplift a subcontractor is claiming — and it flows into the cost report once approved."
-            action={isOwner && workspaceId
+            action={canEdit && workspaceId
               ? <Button size="sm" onClick={() => setCreating('client')}><Plus className="h-3.5 w-3.5" /> Add a variation</Button>
               : undefined}
           />
@@ -166,6 +165,11 @@ export const VariationsCard: React.FC<Props> = ({
                       {v.description && (
                         <p className="text-xs text-muted-foreground">{v.description}</p>
                       )}
+                      {v.quote_id && (
+                        <Link to={quoteUrl(v.quote_id)} className="text-xs text-primary hover:underline">
+                          Open the revised quote
+                        </Link>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-xs text-muted-foreground">{humanizeLabel(v.origin)}</td>
                     <td className="px-3 py-2 text-right tabular-nums">{money(Number(v.value))}</td>
@@ -181,7 +185,7 @@ export const VariationsCard: React.FC<Props> = ({
                       )}
                     </td>
                     <td className="px-5 py-2">
-                      {isOwner && (
+                      {canEdit && (
                         <div className="flex justify-end gap-1">
                           {(v.status === 'draft' || v.status === 'submitted') && (
                             <>
@@ -195,10 +199,20 @@ export const VariationsCard: React.FC<Props> = ({
                               </Button>
                             </>
                           )}
-                          <Button size="sm" variant="ghost" title="Delete" disabled={busy}
-                            onClick={() => void act('Could not delete', () => variationsService.remove(v.id))}>
-                            <Trash2 className="h-3.5 w-3.5 text-destructive" />
-                          </Button>
+                          {/* Deleting a change order would release its revised quote into the contract value. */}
+                          {v.quote_id ? (
+                            (v.status === 'draft' || v.status === 'submitted') && (
+                              <Button size="sm" variant="ghost" title="Withdraw" aria-label="Withdraw" disabled={busy}
+                                onClick={() => void act('Could not withdraw', () => variationsService.setStatus(v.id, 'withdrawn'))}>
+                                <Undo2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )
+                          ) : (
+                            <Button size="sm" variant="ghost" title="Delete" aria-label="Delete" disabled={busy}
+                              onClick={() => void act('Could not delete', () => variationsService.remove(v.id))}>
+                              <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                            </Button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -233,7 +247,7 @@ export const VariationsCard: React.FC<Props> = ({
           direction={creating}
           currency={currency}
           onClose={() => setCreating(null)}
-          onSaved={() => { setCreating(null); void load(); onChanged?.(); }}
+          onSaved={() => { setCreating(null); void load(); }}
         />
       )}
     </Card>

@@ -31,8 +31,10 @@ import {
 } from '../../services/projectsService';
 import { ProjectCoverPanel } from '../ProjectCoverPanel';
 import { assigneeKey, NO_ASSIGNEE, useProjectTasks } from '../tasks/useProjectTasks';
-import { ProjectCostPanel } from '../ProjectCostPanel';
-import { ProjectCommandCentre } from '../ProjectCommandCentre';
+import { ProjectMoneyCard } from '../ProjectMoneyCard';
+import { GetStartedCard } from '../GetStartedCard';
+import type { ProjectSetup } from '../../services/projectsService';
+import type { ProjectTab } from '../../projectSections';
 import { ProjectVisitsPanel } from '../ProjectVisitsPanel';
 import { ProjectTeamPanel } from '../ProjectTeamPanel';
 
@@ -51,6 +53,9 @@ interface OverviewTabProps {
   canFinance?: boolean;
   canEditProject?: boolean;
   onOpenSection?: (tab: string) => void;
+  /** Present for a manager; drives the Get Started checklist. */
+  setup?: ProjectSetup | null;
+  onInvite?: () => void;
   team?: { members: ProjectMember[]; canManage: boolean; onChanged: () => void };
 }
 
@@ -72,7 +77,7 @@ const daysUntil = (date: string | null) => {
   return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 };
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, coverCandidate = null, onProjectPatched, canFinance = false, canEditProject = isOwner, onOpenSection, team }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = true, coverCandidate = null, onProjectPatched, canFinance = false, canEditProject = isOwner, onOpenSection, setup = null, onInvite, team }) => {
   const { toast } = useToast();
   // Buildings are only a sensible answer where the workspace actually has them. A permanently
   // empty picker reads as a broken control rather than a neutral one.
@@ -195,8 +200,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
         <div className="min-w-0 space-y-4 lg:col-span-2">
-          {canFinance && onOpenSection && <ProjectCommandCentre projectId={project.id} onOpenSection={onOpenSection} />}
-          {canFinance && onOpenSection && <ProjectCostPanel projectId={project.id} onOpenSection={onOpenSection} />}
+          {canEditProject && setup && onOpenSection && onInvite && (
+            <GetStartedCard
+              project={project}
+              setup={setup}
+              onOpenSection={(t: ProjectTab) => onOpenSection(t)}
+              onInvite={onInvite}
+              onClientSet={(patch) => onProjectPatched?.(patch)}
+            />
+          )}
+          {canFinance && onOpenSection && <ProjectMoneyCard projectId={project.id} onOpenSection={onOpenSection} />}
 
           {/* Rooms summary — switches between simple badge list and per-room budget rollup
               based on whether any room actually has budget/spend data to show. */}

@@ -22,6 +22,7 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
 const MODULE_SLUG = 'projects';
 
+import { PROJECT_KINDS, type ProjectKind } from '../projectKindVocabulary.generated.ts';
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { moduleGate } from './module-gate.ts';
 /**
@@ -49,8 +50,9 @@ export const createCreateProjectTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ name, description, deadline, budget_amount, budget_currency, rooms, client_company_id, client_contact_id, client_name, category }: {
+    async ({ name, description, deadline, budget_amount, budget_currency, rooms, client_company_id, client_contact_id, client_name, category, kind }: {
       name: string;
+      kind?: ProjectKind;
       description?: string;
       deadline?: string;
       budget_amount?: number;
@@ -141,6 +143,7 @@ export const createCreateProjectTool = (
           client_company_id: companyId,
           client_contact_id: contactId,
           category_id: categoryId,
+          ...(kind ? { kind } : {}),
         } as any)
         .select()
         .single();
@@ -196,6 +199,7 @@ export const createCreateProjectTool = (
         client_company_id: z.string().optional().describe('CRM company id of the client (drives quotes/invoices/finance). Company XOR contact.'),
         client_contact_id: z.string().optional().describe('CRM contact id of the client, if the client is a person not a company.'),
         client_name: z.string().optional().describe('Client name to resolve to an existing CRM company/contact when you don\'t have the id.'),
+        kind: z.enum(PROJECT_KINDS).optional().describe('What sort of job it is, which decides the sections the project shows: general (trip, stock move, internal job), design_supply (moodboards, selections, quotes, supply), fit_out (renovation: estimate, purchases, site, snags, handover — the default), construction (adds drawing takeoff, tenders, valuations with retention, CVR).'),
         category: z.string().optional().describe('The kind of work, by NAME - e.g. "Renovation", "Trip", "Warehouse", "Real Estate". The list is per workspace; an unknown name is refused with the real options rather than guessed at.'),
       }),
     },

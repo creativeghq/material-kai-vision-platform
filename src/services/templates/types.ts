@@ -102,6 +102,19 @@ export interface TemplateApplyContext {
   customer?: { companyId?: string | null; contactId?: string | null };
   /** The employee an onboarding checklist is applied to. Never captured — a checklist is generic. */
   hrEmployeeId?: string | null;
+  /** What the create form already knows about a new project; wins over the template's own values. */
+  project?: ProjectApplyOverrides;
+}
+
+export interface ProjectApplyOverrides {
+  description?: string | null;
+  kind?: string | null;
+  category_id?: string | null;
+  client_address_unit_id?: string | null;
+  deadline?: string | null;
+  budget_amount?: number | null;
+  budget_currency?: string | null;
+  rooms?: { name: string; room_type: string | null }[];
 }
 
 export interface TemplateAdapter<P = Record<string, unknown>> {

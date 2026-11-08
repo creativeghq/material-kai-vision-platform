@@ -505,6 +505,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'client_company_id', type: 'string', optional: true, description: 'CRM company id of the client (drives quotes/invoices/finance). Company XOR contact.' },
       { name: 'client_contact_id', type: 'string', optional: true, description: 'CRM contact id of the client, if the client is a person not a company.' },
       { name: 'client_name', type: 'string', optional: true, description: 'Client name to resolve to an existing CRM company/contact when you don\'t have the id.' },
+      { name: 'kind', type: 'enum', enum: ['general', 'design_supply', 'fit_out', 'construction'], optional: true, description: 'What sort of job it is, which decides the sections the project shows: general (trip, stock move, internal job), design_supply (moodboards, selections, quotes, supply), fit_out (renovation: estimate, purchases, site, snags, handover — the default), construction (adds drawing takeoff, tenders, valuations with retention, CVR).' },
       { name: 'category', type: 'string', optional: true, description: 'The kind of work, by NAME - e.g. "Renovation", "Trip", "Warehouse", "Real Estate". The list is per workspace; an unknown name is refused with the real options rather than guessed at.' },
     ],
   },

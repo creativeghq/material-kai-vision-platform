@@ -1,25 +1,23 @@
-/**
- * Filter definitions for the project timeline.
- *
- * The chip row only ever offered the five event categories; recency and free text — the two
- * things you actually reach for on a 200-event feed — had no control at all.
- */
 import { CalendarDays, Activity } from 'lucide-react';
 import type { FilterGroupDef } from '@/components/core/filters';
 import type { ProjectEvent } from '../../services/projectsService';
 
-/** Category → the trigger-emitted event_types it covers (Phase 3 migration). */
+/** Category → the event_types it covers: trigger-written `project_events` plus those `get_project_activity` derives. */
 export const EVENT_CATEGORIES: Array<{ label: string; events: string[] }> = [
   { label: 'Project', events: ['project.created', 'project.status_changed', 'project.budget_changed', 'project.deadline_changed'] },
   { label: 'Rooms', events: ['room.added', 'room.removed'] },
   { label: 'Moodboards', events: ['moodboard.attached', 'moodboard.detached'] },
   { label: 'Quotes', events: ['quote.attached', 'quote.detached', 'quote.status_changed', 'quote.revised'] },
   { label: 'Tasks', events: ['task.created', 'task.completed', 'task.deleted', 'subtask.created', 'subtask.completed', 'subtask.deleted'] },
+  { label: 'Requests', events: ['request.raised', 'request.closed', 'request.client_message'] },
+  { label: 'Site', events: ['inspection.created', 'inspection.signed_off', 'snag.raised', 'snag.resolved'] },
 ];
 
 const CATEGORY_OF = new Map<string, string>(
   EVENT_CATEGORIES.flatMap((g) => g.events.map((e) => [e, g.label] as const)),
 );
+
+export const timelineCategoryOf = (eventType: string): string | undefined => CATEGORY_OF.get(eventType);
 
 export function buildTimelineFilters(
   events: ProjectEvent[],
@@ -37,7 +35,7 @@ export function buildTimelineFilters(
         {
           key: 'q', type: 'text', label: 'Search',
           placeholder: 'Search activity…',
-          accessor: (e: ProjectEvent) => [describe(e), e.event_type],
+          accessor: (e: ProjectEvent) => describe(e),
         },
         {
           key: 'category', type: 'multi', label: 'Category',

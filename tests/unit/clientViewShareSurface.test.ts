@@ -37,7 +37,7 @@ describe('client-view share — private files are signed, not linked', () => {
 describe('client-view share — the anonymous write is bounded', () => {
   it('checks a budget before accepting feedback, and before the flow emit', () => {
     const guardAt = src.indexOf('checkFeedbackBudget(supabase, req, view.id)');
-    const insertAt = src.indexOf("from('client_view_feedback').insert(");
+    const insertAt = src.indexOf("rpc('record_client_view_feedback'");
     const emitAt = src.indexOf("emitFlowEvent('client_view_feedback_received'");
     expect(guardAt, 'the budget check must exist').toBeGreaterThan(-1);
     expect(insertAt, 'the insert must exist').toBeGreaterThan(-1);
@@ -59,7 +59,7 @@ describe('client-view share — the anonymous write is bounded', () => {
     expect(src, 'and it must be hashed before it is stored')
       .toMatch(/crypto\.subtle\.digest\('SHA-256'/);
     expect(src, 'the row takes the hash, not the address')
-      .toMatch(/ip_hash: budget\.ipHash/);
+      .toMatch(/p_ip_hash: budget\.ipHash/);
   });
 
   it('both counts fail closed', () => {
@@ -70,5 +70,29 @@ describe('client-view share — the anonymous write is bounded', () => {
     expect(fn, 'and refuse on it').toMatch(/if \(viewErr\)[\s\S]{0,400}429\)/);
     expect(fn, 'the per-caller count must bind its error').toMatch(/count: mine, error: mineErr/);
     expect(fn, 'and refuse on it').toMatch(/if \(mineErr\)[\s\S]{0,400}429\)/);
+  });
+});
+
+describe('client-view share — feedback becomes a project request', () => {
+  it('writes feedback and the request through ONE RPC, never a second insert', () => {
+    expect(src).toContain("rpc('record_client_view_feedback'");
+    expect(src, 'a direct insert would split the pair the RPC holds in one transaction')
+      .not.toMatch(/from\('client_view_feedback'\)\.insert\(/);
+    expect(src, 'the RPC authorises by the token, the only thing an anonymous viewer holds')
+      .toMatch(/p_token: token/);
+  });
+
+  it('a replayed retry notifies nobody', () => {
+    const replayAt = src.indexOf('if (rec.replayed) return');
+    const emitAt = src.indexOf("emitFlowEvent('client_view_feedback_received'");
+    expect(replayAt).toBeGreaterThan(-1);
+    expect(replayAt).toBeLessThan(emitAt);
+  });
+
+  it('a newly opened request emits the request path event, with the workspace', () => {
+    const block = src.slice(src.indexOf('if (rec.request_opened'), src.indexOf("emitFlowEvent('client_view_feedback_received'"));
+    expect(block).toContain("emitFlowEvent('project_request_raised'");
+    expect(block).toMatch(/workspace_id:/);
+    expect(block).toMatch(/request_id: rec\.request_id/);
   });
 });

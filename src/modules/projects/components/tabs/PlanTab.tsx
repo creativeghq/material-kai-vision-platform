@@ -2,13 +2,19 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import {
   Loader2, Plus, ClipboardList, FileText, Save, History, LayoutTemplate, Trash2, Sparkles, RefreshCw, Package,
+  MoreHorizontal,
 } from 'lucide-react';
 
 import { Card } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
 import { Badge } from '@/components/core/ui/badge';
+import { formatMoney } from '@/utils/decimal';
 import { Input } from '@/components/core/ui/input';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
+import { ToastAction } from '@/components/core/ui/toast';
 import { Label } from '@/components/core/ui/label';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
@@ -27,12 +33,12 @@ import { blueprintsService, type DimensionDef } from '@/services/blueprintsServi
 import {
   projectPlansService, type ProjectPlan, type ProjectPlanItem,
 } from '@/services/projectPlansService';
+import { goToSectionLabel, projectSectionPath } from '../../projectSections';
 
 interface PlanTabProps {
   projectId: string;
   workspaceId: string;
   currency: string;
-  isOwner: boolean;
 }
 
 export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
@@ -258,7 +264,15 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
     setBusy(true);
     try {
       const n = await projectPlansService.generateMaterialList(plan.id);
-      toast({ title: `Added ${n} material item${n === 1 ? '' : 's'}`, description: 'Find them under the project Finance / purchase items.' });
+      toast({
+        title: `Added ${n} material item${n === 1 ? '' : 's'}`,
+        description: 'They are listed under Purchases → Made to order.',
+        action: (
+          <ToastAction altText={goToSectionLabel('purchases')} onClick={() => navigate(projectSectionPath(projectId, 'purchases'))}>
+            {goToSectionLabel('purchases')}
+          </ToastAction>
+        ),
+      });
     } catch (e) {
       toast({ title: 'Material list failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
     } finally { setBusy(false); }
@@ -268,8 +282,18 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
     if (!plan) return;
     setBusy(true);
     try {
-      const quoteId = await projectPlansService.createChangeOrder(plan.id);
-      toast({ title: 'Change order created' });
+      const { quoteId, variation } = await projectPlansService.createChangeOrder(plan.id);
+      toast({
+        title: 'Change order created',
+        description: variation
+          ? `Recorded as ${variation.reference ?? 'a variation'} (${formatMoney(variation.value, currency || plan.source_currency || 'EUR')}) under Changes. It reaches the cost report once approved there.`
+          : undefined,
+        action: (
+          <ToastAction altText={goToSectionLabel('changes')} onClick={() => navigate(projectSectionPath(projectId, 'changes'))}>
+            {goToSectionLabel('changes')}
+          </ToastAction>
+        ),
+      });
       navigate(`/quotes/manage/${quoteId}`);
     } catch (e) {
       toast({ title: 'Change order failed', description: String((e as Error)?.message ?? e), variant: 'destructive' });
@@ -355,18 +379,28 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
         <Button variant="outline" size="sm" disabled={busy} onClick={refreshPricing}>
           <RefreshCw className="h-3.5 w-3.5 mr-1" /> Refresh pricing
         </Button>
-        <Button variant="outline" size="sm" disabled={busy} onClick={saveVersion}>
-          <Save className="h-3.5 w-3.5 mr-1" /> Save version
-        </Button>
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => setHistoryOpen(true)}>
-          <History className="h-3.5 w-3.5 mr-1" /> History
-        </Button>
-        <Button variant="outline" size="sm" disabled={busy} onClick={() => { setSaveAsTitle(plan.title); setSaveAsOpen(true); }}>
-          <Sparkles className="h-3.5 w-3.5 mr-1" /> Save as blueprint
-        </Button>
-        <Button variant="outline" size="sm" disabled={busy} onClick={generateMaterialList}>
-          <Package className="h-3.5 w-3.5 mr-1" /> Material list
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" disabled={busy}>
+              <MoreHorizontal className="h-3.5 w-3.5 mr-1" /> More
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onSelect={() => void saveVersion()}>
+              <Save className="h-3.5 w-3.5 mr-2" /> Save version
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => setHistoryOpen(true)}>
+              <History className="h-3.5 w-3.5 mr-2" /> Version history
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => { setSaveAsTitle(plan.title); setSaveAsOpen(true); }}>
+              <Sparkles className="h-3.5 w-3.5 mr-2" /> Save as blueprint
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => void generateMaterialList()}>
+              <Package className="h-3.5 w-3.5 mr-2" /> Generate material list
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         {plan.status === 'approved' ? (
           <Button size="sm" disabled={busy} onClick={createChangeOrder}>
             <FileText className="h-3.5 w-3.5 mr-1" /> Change order
@@ -376,7 +410,7 @@ export function PlanTab({ projectId, workspaceId, currency }: PlanTabProps) {
             <FileText className="h-3.5 w-3.5 mr-1" /> Create quote
           </Button>
         )}
-        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busy} onClick={deletePlan}>
+        <Button variant="ghost" size="icon" className="h-8 w-8" disabled={busy} onClick={deletePlan} aria-label="Delete plan" title="Delete plan">
           <Trash2 className="h-4 w-4 text-muted-foreground" />
         </Button>
       </div>

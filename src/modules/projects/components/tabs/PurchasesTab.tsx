@@ -126,7 +126,9 @@ const SupplierBillsCard: React.FC<{ projectId: string; onChanged: () => void }> 
 
 export const PurchasesTab: React.FC<{
   projectId: string; workspaceId?: string | null; projectName: string; currency?: string | null; canFinance: boolean;
-}> = ({ projectId, workspaceId, projectName, currency, canFinance }) => {
+  /** Tender packages are a main-contractor feature; off unless the project's kind or sections include it. */
+  showTenders?: boolean;
+}> = ({ projectId, workspaceId, projectName, currency, canFinance, showTenders = false }) => {
   const [summary, setSummary] = useState<ProjectPurchaseSummary | null>(null);
   const [failed, setFailed] = useState(false);
   const [ordersVersion, setOrdersVersion] = useState(0);
@@ -161,7 +163,7 @@ export const PurchasesTab: React.FC<{
       <ModuleTabGate moduleSlug="sales-finance" moduleName="Sales & Finance" blurb="Purchase orders, tenders and supplier bills for this project.">
         <div className="space-y-4">
           <OrdersPanel key={ordersVersion} workspaceId={workspaceId ?? ''} projectId={projectId} projectName={projectName} orderType="purchase" onChanged={onOrdersChanged} />
-          <TenderPackagesCard projectId={projectId} workspaceId={workspaceId ?? null} currency={currency ?? 'EUR'} isOwner={canFinance} onChanged={onOrdersCreated} />
+          {showTenders && <TenderPackagesCard projectId={projectId} workspaceId={workspaceId ?? null} currency={currency ?? 'EUR'} isOwner={canFinance} onChanged={onOrdersCreated} />}
           <SupplierBillsCard key={billsVersion} projectId={projectId} onChanged={() => void loadSummary()} />
           <ProjectExpensesCard projectId={projectId} projectName={projectName} workspaceId={workspaceId ?? ''} onChanged={() => void loadSummary()} />
         </div>

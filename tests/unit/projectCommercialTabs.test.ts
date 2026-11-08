@@ -27,18 +27,22 @@ describe('the Bill is gone', () => {
 describe('one question per tab', () => {
   it('names the tabs for what they answer, without moving the links', () => {
     expect(PROJECT_SECTION_LABELS.billing).toBe('Invoicing');
-    expect(PROJECT_SECTION_LABELS.finance).toBe('Cost Report');
-    expect(PAGE).toContain("tabs: ['quotes', 'contracts', 'billing', 'purchases', 'finance']");
+    expect(PROJECT_SECTION_LABELS.finance).toBe('Costs');
+    expect(PAGE).toContain("tabs: ['quotes', 'changes', 'contracts', 'billing', 'purchases', 'finance']");
   });
 
-  it('Quotes holds what changes the price', () => {
-    expect(QUOTES).toContain('<SelectionsPanel');
-    expect(QUOTES).toContain('<VariationsCard');
-    expect(QUOTES).toContain('canFinance && workspaceId');
+  it('Quotes holds quotes; variations live under Changes', () => {
+    expect(QUOTES).not.toContain('<SelectionsPanel');
+    expect(QUOTES).not.toContain('<VariationsCard');
+    expect(QUOTES).toContain('<TakeoffQuoteWarnings');
+    expect(read(`${TABS}/ChangesTab.tsx`)).toContain('<VariationsCard');
   });
 
   it('the Quotes module gates the team, never an invited client', () => {
-    expect(PAGE).toMatch(/value="quotes">\{isTeam \? <ModuleTabGate moduleSlug="quotes"/);
+    expect(PAGE).toMatch(/value="quotes"><ModuleTabGate moduleSlug="quotes"/);
+    const guest = read('src/modules/projects/components/ClientProjectHome.tsx');
+    expect(guest).toContain('<QuotesTab');
+    expect(guest).not.toContain('moduleSlug="quotes"');
     expect(read('src/modules/projects/components/TakeoffReviewer.tsx')).toContain('<ModuleTabGate moduleSlug="quotes"');
   });
 

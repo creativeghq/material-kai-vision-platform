@@ -390,6 +390,12 @@ async function claimPlanQuote(supabase: DbClient, planId: string, expected: stri
   return (data ?? []).length === 1;
 }
 
+async function recordChangeOrderVariation(supabase: DbClient, quoteId: string, userId: string | null) {
+  const { data, error } = await supabase.rpc('record_plan_change_order_variation', { p_quote_id: quoteId, p_user_id: userId });
+  if (error) throw new HttpError(error.code === '22023' ? 409 : 400, `The change order was not recorded as a variation: ${error.message}`);
+  return data as { variation_id: string; reference: string | null; value: number; status: string };
+}
+
 async function dropUnclaimedQuote(supabase: DbClient, quoteId: string, planId: string): Promise<string> {
   const { error } = await supabase.from('quotes').delete().eq('id', quoteId);
   if (error) throw new HttpError(409, `Another request linked a quote first; could not discard ${quoteId}: ${error.message}`);
@@ -812,8 +818,8 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
     }
 
     case 'create-change-order': {
-      // Plan changed after its quote was approved → spawn a revision quote (delta
-      // captured as a fresh quote in the parent_quote_id chain) for re-approval.
+      // A revision quote for re-approval, recorded in the variation register as a client variation
+      // worth the delta. Keyed on the quote, so a retry or a rebuild updates the same VO row.
       const { plan_id } = body;
       if (!plan_id) throw new HttpError(400, 'plan_id required');
       const plan = await loadPlan(supabase, plan_id);
@@ -827,8 +833,15 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
 
       // A revision still in draft IS the pending change order: rebuild it, never stack another.
       if (prevQuote.status === 'draft' && prevQuote.parent_quote_id) {
+        const { data: decided, error: dErr } = await supabase.from('project_variations')
+          .select('reference, status').eq('quote_id', prevQuote.id)
+          .not('status', 'in', '(draft,submitted)').maybeSingle();
+        if (dErr) throw new HttpError(400, dErr.message);
+        if (decided) {
+          throw new HttpError(409, `Change order ${decided.reference ?? ''} is already ${decided.status}; send or close its quote before raising another.`);
+        }
         await writeQuoteItems(supabase, prevQuote.id, items, true);
-        return json({ quote_id: prevQuote.id });
+        return json({ quote_id: prevQuote.id, variation: await recordChangeOrderVariation(supabase, prevQuote.id, userId) });
       }
 
       const coCust = await projectCustomer(supabase, plan.project_id);
@@ -849,7 +862,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
         return json({ quote_id: await dropUnclaimedQuote(supabase, quote.id, plan_id) });
       }
       await writeQuoteItems(supabase, quote.id, items, false);
-      return json({ quote_id: quote.id });
+      return json({ quote_id: quote.id, variation: await recordChangeOrderVariation(supabase, quote.id, userId) });
     }
 
     default:

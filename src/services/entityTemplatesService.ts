@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import { requireAdapter } from './templates/registry';
-import type { TemplateApplyResult, TemplateEntityType } from './templates/types';
+import type { ProjectApplyOverrides, TemplateApplyResult, TemplateEntityType } from './templates/types';
 
 /**
  * Universal entity templates (issue #322) — CRUD + apply.
@@ -243,6 +243,7 @@ class EntityTemplatesService {
       projectId?: string | null;
       customer?: { companyId?: string | null; contactId?: string | null };
       hrEmployeeId?: string | null;
+      project?: ProjectApplyOverrides;
     },
   ): Promise<TemplateApplyResult> {
     const tpl = await this.get(templateId);
@@ -259,6 +260,7 @@ class EntityTemplatesService {
       projectId: ctx.projectId ?? null,
       customer: ctx.customer,
       hrEmployeeId: ctx.hrEmployeeId ?? null,
+      project: ctx.project,
     });
 
     // Best-effort: a counter must never sink a successful create.
