@@ -57,12 +57,6 @@ export interface ProjectSelection {
   variation_id: string | null;
 }
 
-export interface ClientViewSettings {
-  client_sees_specs: boolean;
-  client_sees_pricing: boolean;
-  client_sees_cost: boolean;
-}
-
 export const SELECTION_STATUS_LABEL: Record<SelectionStatus, string> = {
   proposed: 'Proposed',
   client_approved: 'Approved by the Client',
@@ -99,12 +93,6 @@ export const positionNeedsAttention = (p: SelectionPosition | null): boolean =>
 /** A total built over unpriced lines is a FLOOR, never the figure. */
 export const totalIsAFloor = (p: SelectionPosition | null): boolean =>
   !!p && p.rows.some((r) => r.unpriced > 0);
-
-/**
- * Cost is a separate answer from price. The price is what they pay and the cost is what we paid;
- * one board showing both is a different conversation, so it defaults off.
- */
-export const clientMaySeeCost = (s: ClientViewSettings | null): boolean => !!s && s.client_sees_cost;
 
 export const FROZEN_IS_THE_POINT =
   'An allowance is frozen when the estimate goes out, and its amount cannot move afterwards. That '

@@ -12,7 +12,7 @@ import { join } from 'node:path';
 import { stripComments } from '../helpers/stripComments';
 import {
   SELECTION_STATUS_LABEL, POSITION_LABEL, allowanceIsFrozen, isOverage, isUnderage,
-  overageNeedsBilling, positionNeedsAttention, totalIsAFloor, clientMaySeeCost,
+  overageNeedsBilling, positionNeedsAttention, totalIsAFloor,
   FROZEN_IS_THE_POINT, UNDERAGE_IS_NOT_A_CHANGE_ORDER, COMMITTED_VS_PENDING,
   type AllowanceRow, type SelectionPosition, type SelectionStatus, type SelectionPositionStatus,
 } from '@/modules/projects/selectionRules';
@@ -23,7 +23,7 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 const service = read('src/modules/projects/services/selectionsService.ts');
 const panel = read('src/modules/projects/components/SelectionsPanel.tsx');
 const finance = read('src/modules/projects/components/tabs/QuotesTab.tsx');
-const cvr = read('src/modules/projects/components/CvrCard.tsx');
+const cvr = read('src/modules/projects/components/CostCodesCard.tsx');
 const variations = read('src/modules/projects/services/variationsService.ts');
 
 const row = (over: Partial<AllowanceRow>): AllowanceRow => ({
@@ -96,13 +96,6 @@ describe('an unpriced selection makes the total a floor', () => {
   });
 });
 
-describe('what the client sees is three answers, and cost is the one that defaults off', () => {
-  it('cost is separate from price', () => {
-    expect(clientMaySeeCost({ client_sees_specs: true, client_sees_pricing: true, client_sees_cost: false })).toBe(false);
-    expect(clientMaySeeCost({ client_sees_specs: true, client_sees_pricing: true, client_sees_cost: true })).toBe(true);
-    expect(clientMaySeeCost(null)).toBe(false);
-  });
-});
 
 describe('pending is not committed', () => {
   it('an unapproved purchase order is shown apart and not added into cost', () => {

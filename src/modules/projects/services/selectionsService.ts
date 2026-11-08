@@ -8,16 +8,15 @@
 import { supabase } from '@/integrations/supabase/client';
 
 import type {
-  SelectionPosition, ProjectSelection, ClientViewSettings, SelectionStatus,
+  SelectionPosition, ProjectSelection, SelectionStatus,
 } from '@/modules/projects/selectionRules';
 
 export type {
   SelectionStatus, SelectionPositionStatus, AllowanceRow, SelectionPosition, ProjectSelection,
-  ClientViewSettings,
 } from '@/modules/projects/selectionRules';
 export {
   SELECTION_STATUS_LABEL, POSITION_LABEL, allowanceIsFrozen, isOverage, isUnderage,
-  overageNeedsBilling, positionNeedsAttention, totalIsAFloor, clientMaySeeCost,
+  overageNeedsBilling, positionNeedsAttention, totalIsAFloor,
   FROZEN_IS_THE_POINT, UNDERAGE_IS_NOT_A_CHANGE_ORDER, COMMITTED_VS_PENDING,
 } from '@/modules/projects/selectionRules';
 
@@ -126,22 +125,5 @@ export const selectionsService = {
       ok: boolean; replayed?: boolean; variation_id: string | null; variance?: number;
       reference?: string; reason: string;
     };
-  },
-
-  async clientView(projectId: string): Promise<ClientViewSettings> {
-    const { data, error } = await supabase
-      .from('projects')
-      .select('client_sees_specs, client_sees_pricing, client_sees_cost')
-      .eq('id', projectId)
-      .maybeSingle();
-    if (error) throw error;
-    return (data ?? {
-      client_sees_specs: true, client_sees_pricing: true, client_sees_cost: false,
-    }) as ClientViewSettings;
-  },
-
-  async setClientView(projectId: string, patch: Partial<ClientViewSettings>): Promise<void> {
-    const { error } = await supabase.from('projects').update(patch).eq('id', projectId);
-    if (error) throw error;
   },
 };

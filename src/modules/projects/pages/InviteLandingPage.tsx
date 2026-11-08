@@ -1,6 +1,6 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { FolderKanban, Loader2, Mail, AlertTriangle, CheckCircle2, Send } from 'lucide-react';
+import { FolderKanban, Loader2, Mail, AlertTriangle, CheckCircle2, Send, LogOut } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -31,6 +31,9 @@ export const InviteLandingPage: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [autoAccepting, setAutoAccepting] = useState(false);
+  /** The account auto-accept already tried. A failure resets `autoAccepting`, which re-runs the effect. */
+  const triedFor = useRef<string | null>(null);
+  const [mismatch, setMismatch] = useState(false);
 
   const load = useCallback(async () => {
     if (!token) return;
@@ -52,13 +55,15 @@ export const InviteLandingPage: React.FC = () => {
   useEffect(() => {
     const tryAutoAccept = async () => {
       if (!token || !user || !preview || preview.is_revoked || preview.is_expired || autoAccepting) return;
+      if (triedFor.current === user.id) return;
+      triedFor.current = user.id;
       setAutoAccepting(true);
       try {
         const result = await projectsService.acceptInvitation(token);
         navigate(`/projects/${result.project_id}`, { replace: true });
       } catch (_err) {
-        // Most likely cause: signed-in user's email doesn't match the invite.
-        // Fall through to the email-entry form so they can sign out + retry with the right email.
+        // Most likely cause: the signed-in account's email does not match the invite.
+        setMismatch(true);
         setAutoAccepting(false);
       }
     };
@@ -170,6 +175,22 @@ export const InviteLandingPage: React.FC = () => {
               to view <strong className="text-foreground">{preview.project_name}</strong>
             </p>
           </div>
+
+          {mismatch && user && !sent && (
+            <div className="space-y-2 rounded-sm border border-hairline bg-surface-sunken p-3 text-sm">
+              <p>
+                You are signed in as <strong>{user.email}</strong>, which is not the address this
+                invitation was sent to.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => { await supabase.auth.signOut(); setMismatch(false); }}
+              >
+                <LogOut className="h-4 w-4 mr-2" />Sign out and use another email
+              </Button>
+            </div>
+          )}
 
           {sent ? (
             <div className="space-y-3 text-center pt-2">

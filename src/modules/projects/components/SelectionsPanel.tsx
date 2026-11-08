@@ -24,7 +24,7 @@ import {
   selectionsService, POSITION_LABEL, SELECTION_STATUS_LABEL,
   allowanceIsFrozen, isOverage, isUnderage, overageNeedsBilling, positionNeedsAttention,
   totalIsAFloor, FROZEN_IS_THE_POINT, UNDERAGE_IS_NOT_A_CHANGE_ORDER, COMMITTED_VS_PENDING,
-  type SelectionPosition, type ProjectSelection, type ClientViewSettings, type SelectionStatus,
+  type SelectionPosition, type ProjectSelection, type SelectionStatus,
 } from '@/modules/projects/services/selectionsService';
 
 interface Props {
@@ -37,7 +37,6 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
   const { toast } = useToast();
   const [position, setPosition] = useState<SelectionPosition | null>(null);
   const [selections, setSelections] = useState<ProjectSelection[]>([]);
-  const [clientView, setClientView] = useState<ClientViewSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,12 +47,11 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
     if (!projectId) return;
     setLoading(true);
     try {
-      const [p, s, v] = await Promise.all([
+      const [p, s] = await Promise.all([
         selectionsService.position(projectId),
         selectionsService.selections(projectId),
-        selectionsService.clientView(projectId),
       ]);
-      setPosition(p); setSelections(s); setClientView(v); setFailed(false);
+      setPosition(p); setSelections(s); setFailed(false);
     } catch {
       setPosition(null); setSelections([]); setFailed(true);
     } finally { setLoading(false); }
@@ -321,24 +319,7 @@ export const SelectionsPanel: React.FC<Props> = ({ workspaceId, projectId, rooms
               </Button>
             </div>
 
-            {clientView && (
-              <div className="flex flex-wrap items-center gap-2 rounded-md border border-hairline p-2 text-[11px]">
-                <span className="font-medium">What the client sees</span>
-                {(['client_sees_specs', 'client_sees_pricing', 'client_sees_cost'] as const).map((k) => (
-                  <Button
-                    key={k} size="sm" variant={clientView[k] ? 'secondary' : 'outline'}
-                    className="h-7 px-2 text-[11px]" disabled={busy}
-                    onClick={() => guard(
-                      () => selectionsService.setClientView(projectId, { [k]: !clientView[k] }),
-                      'Could not change the client view',
-                    )}
-                  >
-                    {k === 'client_sees_specs' ? 'Specs' : k === 'client_sees_pricing' ? 'Prices' : 'Cost & margin'}
-                  </Button>
-                ))}
-                <span className="text-muted-foreground">{COMMITTED_VS_PENDING}</span>
-              </div>
-            )}
+            <p className="text-[11px] text-muted-foreground">{COMMITTED_VS_PENDING}</p>
           </>
         )}
       </CardContent>
