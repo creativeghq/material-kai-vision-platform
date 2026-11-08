@@ -23,7 +23,7 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 const service = read('src/modules/projects/services/selectionsService.ts');
 const panel = read('src/modules/projects/components/SelectionsPanel.tsx');
 const finance = read('src/modules/projects/components/tabs/QuotesTab.tsx');
-const cvr = read('src/modules/projects/components/CostCodesCard.tsx');
+const cvr = read('src/modules/projects/components/CvrCard.tsx');
 const variations = read('src/modules/projects/services/variationsService.ts');
 
 const row = (over: Partial<AllowanceRow>): AllowanceRow => ({
