@@ -387,6 +387,132 @@ export const createPayExpenseTool = (userId: string, workspaceId: string, onChun
     }),
   });
 
+// ───────────────────────────── attach_expense_document ─────────────────────────────
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function findInboundDocument(db: any, workspaceId: string, needle: string) {
+  const cols = 'id, mark, series, aa, doc_type, issuer_name, issue_date, total_gross, currency';
+  const base = () => db.from('inbound_documents').select(cols).eq('workspace_id', workspaceId);
+  const text = needle.trim();
+  if (UUID_RE.test(text)) {
+    const { data, error } = await base().eq('id', text).limit(1);
+    if (error) throw error;
+    return (data ?? []) as any[];
+  }
+  const parts = text.replace(/[%,()*"\\]/g, ' ').trim().split(/\s+/).filter(Boolean);
+  const { data, error } = await base()
+    .or(parts.flatMap((p) => [`aa.eq.${p}`, `mark.eq.${p}`, `issuer_name.ilike.%${p}%`]).join(','))
+    .order('issue_date', { ascending: false, nullsFirst: false }).limit(200);
+  if (error) throw error;
+  const rows = (data ?? []) as any[];
+  const exact = rows.filter((d) => `${d.series ?? ''} ${d.aa ?? ''}`.trim().toLowerCase() === text.toLowerCase() || d.mark === text);
+  if (exact.length) return exact;
+  return rows.filter((d) => parts.every((p) =>
+    `${d.series ?? ''} ${d.aa ?? ''} ${d.mark ?? ''} ${d.issuer_name ?? ''}`.toLowerCase().includes(p.toLowerCase())));
+}
+
+export const createAttachExpenseDocumentTool = (userId: string, workspaceId: string, userJwt: string, onChunk?: (c: any) => void) =>
+  tool(async ({ action, document, target_id, target_kind, amount, net_amount, confirm }: {
+    action: 'show' | 'attach_order' | 'attach_payment' | 'attach_document' | 'detach_order' | 'detach_payment';
+    document: string; target_id?: string; target_kind?: 'feed_line' | 'payment'; amount?: number; net_amount?: number; confirm?: boolean;
+  }) => {
+    const denied = await moduleGate(workspaceId, 'sales-finance');
+    if (denied) return denied;
+    try {
+      const db = callerDbClient(userJwt, userId, workspaceId);
+      const found = await findInboundDocument(db, workspaceId, document);
+      if (found.length === 0) return JSON.stringify({ success: false, error: `No received document matches "${document}".` });
+      if (found.length > 1) {
+        return JSON.stringify({
+          success: false, needs_disambiguation: true,
+          message: `More than one received document matches "${document}". Ask which one, and pass its id.`,
+          candidates: found.slice(0, 8).map((d) => ({
+            id: d.id, number: `${d.series ?? ''} ${d.aa ?? ''}`.trim(), mark: d.mark, issuer: d.issuer_name, date: d.issue_date, gross: d.total_gross,
+          })),
+        });
+      }
+      const doc = found[0];
+      const label = `${doc.series ?? ''} ${doc.aa ?? ''}`.trim() || doc.mark;
+
+      if (action === 'show') {
+        const [att, orders, payments] = await Promise.all([
+          db.rpc('get_inbound_doc_attachments', { p_workspace_id: workspaceId }),
+          db.rpc('suggest_orders_for_inbound_doc', { p_doc_id: doc.id }),
+          db.rpc('suggest_payments_for_inbound_doc', { p_doc_id: doc.id, p_query: null }),
+        ]);
+        for (const r of [att, orders, payments]) if (r.error) throw r.error;
+        const attached = ((att.data ?? []) as any[]).find((a) => a.doc_id === doc.id) ?? null;
+        const data = {
+          document: { id: doc.id, number: label, issuer: doc.issuer_name, gross: doc.total_gross, currency: doc.currency },
+          in_expenses: !!attached, due: attached?.bill_due ?? null,
+          attached_orders: attached?.orders ?? [], attached_payments: attached?.payments ?? [],
+          order_candidates: (orders.data ?? []).slice(0, 8), payment_candidates: (payments.data ?? []).slice(0, 8),
+        };
+        onChunk?.({ type: 'expense_document_attachments', data });
+        return JSON.stringify({ success: true, ...data });
+      }
+
+      if (!target_id) return JSON.stringify({ success: false, error: `${action} needs target_id. Call action "show" to see the candidates.` });
+      if (action === 'attach_payment' && !target_kind) {
+        return JSON.stringify({ success: false, error: 'attach_payment needs target_kind, as listed by "show".' });
+      }
+      if (confirm !== true) {
+        const summary = {
+          attach_order: `Attach an order to ${label}. Any payment on the order moves onto the invoice, and the document is added to your expenses if it is not there yet.`,
+          attach_payment: `Attach ${amount == null ? 'a payment' : `${amount} ${doc.currency ?? 'EUR'} of a payment`} to ${label}. This records the payment against the invoice, and adds the document to your expenses if it is not there yet.`,
+          attach_document: `Link another document to ${label}.`,
+          detach_order: `Remove an order from ${label}. Any payment that came from it goes back to the order.`,
+          detach_payment: `Remove a payment from ${label}. The invoice goes back to owing that amount.`,
+        }[action];
+        onChunk?.({
+          type: 'action_confirmation',
+          tool: 'attach_expense_document',
+          input: { action, document: doc.id, target_id, target_kind, amount, net_amount },
+          title: `${action.startsWith('detach') ? 'Remove from' : 'Attach to'} ${label}?`,
+          summary,
+          danger: true,
+          toolkit_id: 'expenses',
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user\'s approval. Do not retry.' });
+      }
+
+      const call = action === 'attach_order'
+        ? db.rpc('attach_order_to_inbound_doc', { p_doc_id: doc.id, p_order_id: target_id, p_net_amount: net_amount ?? null })
+        : action === 'attach_payment'
+          ? db.rpc('attach_payment_to_inbound_doc', {
+            p_doc_id: doc.id,
+            p_payment_id: target_kind === 'payment' ? target_id : null,
+            p_feed_row_id: target_kind === 'feed_line' ? target_id : null,
+            p_amount: amount ?? null,
+          })
+          : action === 'attach_document'
+            ? db.rpc('link_inbound_documents', String(doc.doc_type ?? '').startsWith('9.')
+              ? { p_from_doc_id: target_id, p_to_doc_id: doc.id }
+              : { p_from_doc_id: doc.id, p_to_doc_id: target_id })
+            : action === 'detach_order'
+              ? db.rpc('detach_order_from_inbound_doc', { p_doc_id: doc.id, p_order_id: target_id })
+              : db.rpc('detach_payment_from_inbound_doc', { p_allocation_id: target_id });
+      const { data, error } = await call;
+      if (error) throw error;
+      return JSON.stringify({ success: true, action, document: label, result: data });
+    } catch (e: any) {
+      return JSON.stringify({ success: false, error: e?.message || 'Could not change what this document is attached to' });
+    }
+  }, {
+    name: 'attach_expense_document',
+    description: 'See or change what a received supplier document (myDATA / Expenses inbox) is attached to: purchase orders, payments and other documents. One document can have several of each, one bank transfer can be split across several invoices, and one invoice can cover several orders. A payment already on an order moves onto the invoice when they are attached. Call action "show" first: it returns what is attached and the ranked candidates, with the ids the other actions need. Every change asks the user to Approve first. To record a NEW payment use pay_expense instead.',
+    schema: z.object({
+      action: z.enum(['show', 'attach_order', 'attach_payment', 'attach_document', 'detach_order', 'detach_payment']).describe('What to do. Start with show.'),
+      document: z.string().describe('The received document: its id, MARK, number such as "ΤΙΜ 3588", or issuer name'),
+      target_id: z.string().uuid().optional().describe('The order id, the payment or bank line id, the other document id, or for detach_payment the allocation_id. All come from show.'),
+      target_kind: z.enum(['feed_line', 'payment']).optional().describe('For attach_payment: the kind of that candidate, as listed by show.'),
+      amount: z.number().positive().optional().describe('For attach_payment: how much of the payment goes on this document. Defaults to as much as both sides allow.'),
+      net_amount: z.number().positive().optional().describe('For attach_order when the document already has an order: how much of its net belongs to this one.'),
+      confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
+    }),
+  });
+
 // ───────────────────────────── get_expense_payments ─────────────────────────────
 export const createGetExpensePaymentsTool = (userId: string, workspaceId: string, onChunk?: (c: any) => void) =>
   tool(async ({ expense }: { expense: string }) => {

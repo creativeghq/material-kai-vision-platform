@@ -93,7 +93,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'expenses': {
     capability: ['finance.manage'],
-    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'],
+    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut', 'attach_expense_document'],
   },
   'company-assets': {
     capability: ['workspace.read'],

@@ -29386,6 +29386,36 @@ export type Database = {
         }
         Relationships: []
       }
+      supplier_bill_orders: {
+        Row: {
+            created_at: string
+            created_by: string | null
+            id: string
+            net_amount: number
+            order_id: string
+            supplier_bill_id: string
+            workspace_id: string
+        }
+        Insert: {
+            created_at?: string
+            created_by?: string | null
+            id?: string
+            net_amount: number
+            order_id: string
+            supplier_bill_id: string
+            workspace_id: string
+        }
+        Update: {
+            created_at?: string
+            created_by?: string | null
+            id?: string
+            net_amount?: number
+            order_id?: string
+            supplier_bill_id?: string
+            workspace_id?: string
+        }
+        Relationships: []
+      }
       supplier_bills: {
         Row: {
           amount_credited: number
@@ -37742,6 +37772,7 @@ export type Database = {
           label: string
           options: string[]
           stocked: string[]
+          display: Json
         }[]
       }
       get_line_names: {
@@ -37772,7 +37803,6 @@ export type Database = {
           currency: string
           order_id: string
           order_type: string
-          display: Json
           outstanding: number
           payment_status: string
           settled: number

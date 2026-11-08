@@ -498,6 +498,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   expenses_list: 'Recent Expenses',
   expense_paid: 'Expense Paid',
   expense_payments: 'Payments on this expense',
+  expense_document_attachments: 'What this document is attached to',
   // Company assets (shared Finance + HR register)
   company_assets_list: 'Company Assets',
   company_asset_added: 'Asset Added',

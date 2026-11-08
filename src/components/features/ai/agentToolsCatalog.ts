@@ -2015,7 +2015,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // operator root. None of its four tools has an `AgentToolEntry` either, so the command palette
     // did not list them individually — Expenses was unreachable from both browse surfaces.
     moduleSlug: 'sales-finance',
-    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'],
+    tool_ids: ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut', 'attach_expense_document'],
     quick_starts: [
       {
         label: 'Recent Expenses', description: 'What we have booked', icon: 'ListChecks',
@@ -2048,6 +2048,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         done: 'Here are the suppliers filing against us on myDATA.',
         run: { tool: 'list_mydata_expenses', fixedArgs: { action: 'suppliers' } },
       },
+      { label: 'Attach a document', description: 'Link it to orders and payments', prompt: 'Show me what a received supplier document is attached to, and what it could be attached to. Ask me which document.', icon: 'Inbox' },
       { label: 'Pay an expense', description: 'Settle a supplier bill', prompt: 'I want to pay an expense — show me what is unpaid.', icon: 'Banknote' },
       { label: 'Record an expense', description: 'Log a business cost', prompt: 'Record a business expense — I\'ll give you the details.', icon: 'Plus' },
     ],

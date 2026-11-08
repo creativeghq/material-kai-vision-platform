@@ -61,6 +61,7 @@ const MatchWord: React.FC<{ row: FeedRow }> = ({ row }) => {
   if (row.state !== 'completed') return <span className="text-xs text-muted-foreground">{row.state}</span>;
   switch (row.match_status) {
     case 'matched': return <span className="text-xs text-success">Matched</span>;
+    case 'partial': return <span className="text-xs text-warning" title="Part of this transfer is attached to expenses. The rest can still be matched.">Part matched</span>;
     case 'suggested': return <span className="text-xs text-warning">Needs review</span>;
     case 'ignored': return <span className="text-xs text-muted-foreground">Ignored</span>;
     default: return row.direction === 'in'
@@ -134,7 +135,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       // exchanges, fees) never turn up here asking to be matched to an invoice.
       if (statusF === 'review') {
         query = query
-          .in('match_status', ['suggested', 'unmatched'])
+          .in('match_status', ['suggested', 'unmatched', 'partial'])
           .eq('provider', 'revolut')
           .eq('type', 'transfer');
       }
@@ -194,10 +195,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     toast({ title: 'Invoice settled', description: 'Recorded through the normal payment path; any linked order updates via its invoice.' });
   });
   const settleBill = (row: FeedRow, billId: string) => act('Settle bill', async () => {
-    if (!window.confirm(`Record ${Number(row.amount).toFixed(2)} ${row.currency} against this supplier bill? This books an outgoing payment.`)) return;
-    await callRevolutApi('confirm-bill-match', workspaceId, { transaction_row_id: row.id, bill_id: billId });
+    if (!window.confirm(`Record what is left of this ${Number(row.amount).toFixed(2)} ${row.currency} transfer against this supplier bill? This books an outgoing payment.`)) return;
+    const out = await callRevolutApi<{ payment_unallocated?: number }>('confirm-bill-match', workspaceId, { transaction_row_id: row.id, bill_id: billId });
     setPicking(null);
-    toast({ title: 'Bill settled' });
+    const left = Number(out?.payment_unallocated ?? 0);
+    toast({
+      title: left > 0.005 ? 'Part of the transfer matched' : 'Bill settled',
+      description: left > 0.005 ? `${left.toFixed(2)} ${row.currency} of this transfer is still unassigned. Match it to another bill.` : undefined,
+    });
   });
   const settlePlan = (row: FeedRow, plan: PlanCandidate) => act('Close plan', async () => {
     if (!window.confirm(
@@ -341,6 +346,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
               <SelectItem value="all">Any Status</SelectItem>
               <SelectItem value="review">Needs Review</SelectItem>
               <SelectItem value="matched">Matched</SelectItem>
+              <SelectItem value="partial">Part Matched</SelectItem>
               <SelectItem value="unmatched">Unmatched</SelectItem>
               <SelectItem value="ignored">Ignored</SelectItem>
             </SelectContent>
@@ -432,15 +438,17 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       {revolut && r.direction === 'out' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
                         <>
                           <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'bill' }); setPickQuery(''); }}>Match to supplier bill…</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>Match to a planned payment…</DropdownMenuItem>
+                          {r.match_status !== 'partial' && (
+                            <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>Match to a planned payment…</DropdownMenuItem>
+                          )}
                         </>
                       )}
-                      {bankLine && (r.direction === 'in' || r.direction === 'out') && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
+                      {bankLine && (r.direction === 'in' || r.direction === 'out') && r.match_status !== 'matched' && r.match_status !== 'ignored' && r.match_status !== 'partial' && (
                         <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'party' }); setPickQuery((r.counterparty_name ?? '').split(/\s+/)[0] ?? ''); }}>
                           {r.direction === 'in' ? 'Received from a customer, on account…' : 'Paid to a supplier, on account…'}
                         </DropdownMenuItem>
                       )}
-                      {revolut && r.match_status !== 'matched' && (
+                      {revolut && r.match_status !== 'matched' && r.match_status !== 'partial' && (
                         r.match_status === 'ignored'
                           ? <DropdownMenuItem onClick={() => ignore(r, false)}>Unignore</DropdownMenuItem>
                           : <DropdownMenuItem onClick={() => ignore(r, true)}>Ignore</DropdownMenuItem>

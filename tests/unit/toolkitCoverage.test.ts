@@ -91,7 +91,7 @@ const OPTIONS_EXEMPT = new Set([
   // Needs an id only a PRIOR RESULT can supply — a findings card, a finished crawl, a
   // product row, a sourcing option set. A quick-start would have to ask for a UUID.
   'update_finding', 'seo_onpage_issues', 'track_product_mentions', 'track_product_prices',
-  'create_purchase_order', 'read_document_section',
+  'create_purchase_order', 'read_document_section', 'attach_expense_document',
   // A thread or attachment ref from mail_search / mail_read: the action and mode only mean something on one.
   'mail_update', 'mail_attachment',
   // Driven by an attached image or a guided wizard, not by a field form.

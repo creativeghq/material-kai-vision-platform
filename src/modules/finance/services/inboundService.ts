@@ -382,6 +382,60 @@ export interface InboundOrderSuggestion {
   match_reason: string;
 }
 
+export interface InboundAttachedOrder {
+  order_id: string;
+  order_number: string | null;
+  net_amount: number;
+  is_primary: boolean;
+  payment_status: string | null;
+}
+
+export interface InboundAttachedPayment {
+  allocation_id: string;
+  payment_id: string;
+  amount: number;
+  paid_at: string | null;
+  reference: string | null;
+  via_order_id: string | null;
+}
+
+/** One row of `get_inbound_doc_attachments`: a document that became an expense, and what hangs off it. */
+export interface InboundDocAttachments {
+  doc_id: string;
+  supplier_bill_id: string;
+  bill_status: string;
+  bill_total: number;
+  bill_due: number;
+  orders: InboundAttachedOrder[];
+  payments: InboundAttachedPayment[];
+}
+
+export interface InboundPaymentCandidate {
+  kind: 'feed_line' | 'payment';
+  id: string;
+  paid_at: string | null;
+  amount: number;
+  unallocated: number;
+  currency: string;
+  reference: string | null;
+  party_name: string | null;
+  line_status: string | null;
+  exact_amount: boolean;
+  same_supplier: boolean;
+}
+
+export interface InboundLinkableDocument {
+  id: string;
+  series: string | null;
+  aa: string | null;
+  mark: string;
+  doc_type: string | null;
+  issuer_name: string | null;
+  issue_date: string | null;
+  total_gross: number | null;
+  currency: string | null;
+}
+
 export const inboundService = {
   /**
    * Columns the LIST needs. Deliberately not `*`.
@@ -615,6 +669,78 @@ export const inboundService = {
     if (error) throw error;
     const row = (Array.isArray(data) ? data[0] : data) as { supplier_bill_id: string; note: string };
     return row;
+  },
+
+  async attachments(workspaceId: string): Promise<Record<string, InboundDocAttachments>> {
+    const { data, error } = await supabase.rpc('get_inbound_doc_attachments' as never, {
+      p_workspace_id: workspaceId,
+    } as never);
+    if (error) throw error;
+    const byDoc: Record<string, InboundDocAttachments> = {};
+    for (const row of (data ?? []) as unknown as InboundDocAttachments[]) byDoc[row.doc_id] = row;
+    return byDoc;
+  },
+
+  async suggestPayments(docId: string, query?: string): Promise<InboundPaymentCandidate[]> {
+    const { data, error } = await supabase.rpc('suggest_payments_for_inbound_doc' as never, {
+      p_doc_id: docId, p_query: query?.trim() || null,
+    } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as InboundPaymentCandidate[];
+  },
+
+  /** Books the expense if needed and allocates in ONE transaction; attaching the same pair twice replays. */
+  async attachPayment(docId: string, candidate: Pick<InboundPaymentCandidate, 'kind' | 'id'>, amount?: number) {
+    const { data, error } = await supabase.rpc('attach_payment_to_inbound_doc' as never, {
+      p_doc_id: docId,
+      p_payment_id: candidate.kind === 'payment' ? candidate.id : null,
+      p_feed_row_id: candidate.kind === 'feed_line' ? candidate.id : null,
+      p_amount: amount ?? null,
+    } as never);
+    if (error) throw error;
+    return data as unknown as { applied: number; payment_unallocated: number; bill_due: number; already_attached: boolean };
+  },
+
+  async detachPayment(allocationId: string): Promise<void> {
+    const { error } = await supabase.rpc('detach_payment_from_inbound_doc' as never, {
+      p_allocation_id: allocationId,
+    } as never);
+    if (error) throw error;
+  },
+
+  /** A payment already on the order moves onto the invoice, which is what `carried_from_order` reports. */
+  async attachOrder(docId: string, orderId: string, netAmount?: number) {
+    const { data, error } = await supabase.rpc('attach_order_to_inbound_doc' as never, {
+      p_doc_id: docId, p_order_id: orderId, p_net_amount: netAmount ?? null,
+    } as never);
+    if (error) throw error;
+    return data as unknown as { carried_from_order: number; bill_due: number; bill_status: string; already_attached: boolean };
+  },
+
+  async detachOrder(docId: string, orderId: string): Promise<void> {
+    const { error } = await supabase.rpc('detach_order_from_inbound_doc' as never, {
+      p_doc_id: docId, p_order_id: orderId,
+    } as never);
+    if (error) throw error;
+  },
+
+  /** Other documents to link, the same issuer's first because that is nearly always the answer. */
+  async searchLinkableDocuments(
+    doc: Pick<InboundDocument, 'id' | 'workspace_id' | 'issuer_vat'>,
+    query?: string,
+  ): Promise<InboundLinkableDocument[]> {
+    const term = (query ?? '').replace(/[%,()*"\\]/g, ' ').trim();
+    let q = supabase.from('inbound_documents')
+      .select('id, series, aa, mark, doc_type, issuer_name, issue_date, total_gross, currency')
+      .eq('workspace_id', doc.workspace_id)
+      .neq('id', doc.id)
+      .order('issue_date', { ascending: false, nullsFirst: false })
+      .limit(20);
+    if (term) q = q.or(`aa.ilike.%${term}%,series.ilike.%${term}%,mark.ilike.%${term}%,issuer_name.ilike.%${term}%`);
+    else if (doc.issuer_vat) q = q.eq('issuer_vat', doc.issuer_vat);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as unknown as InboundLinkableDocument[];
   },
 
   /** Manually trigger the myDATA RequestDocs pull (finance-manager).

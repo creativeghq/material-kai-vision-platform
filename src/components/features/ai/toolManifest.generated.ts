@@ -221,6 +221,21 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'attach_expense_document',
+    file: 'supabase/functions/_shared/tools/expense-tools.ts',
+    factory: 'createAttachExpenseDocumentTool',
+    description: 'See or change what a received supplier document (myDATA / Expenses inbox) is attached to: purchase orders, payments and other documents.',
+    params: [
+      { name: 'action', type: 'enum', enum: ['show', 'attach_order', 'attach_payment', 'attach_document', 'detach_order', 'detach_payment'], optional: false, description: 'What to do. Start with show.' },
+      { name: 'document', type: 'string', optional: false, description: 'The received document: its id, MARK, number such as "ΤΙΜ 3588", or issuer name' },
+      { name: 'target_id', type: 'string', optional: true, description: 'The order id, the payment or bank line id, the other document id, or for detach_payment the allocation_id. All come from show.' },
+      { name: 'target_kind', type: 'enum', enum: ['feed_line', 'payment'], optional: true, description: 'For attach_payment: the kind of that candidate, as listed by show.' },
+      { name: 'amount', type: 'number', optional: true, description: 'For attach_payment: how much of the payment goes on this document. Defaults to as much as both sides allow.' },
+      { name: 'net_amount', type: 'number', optional: true, description: 'For attach_order when the document already has an order: how much of its net belongs to this one.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
+    ],
+  },
+  {
     name: 'b2b_company_search',
     file: 'supabase/functions/_shared/tools/b2b-tools.ts',
     factory: 'createB2BCompanySearchTool',

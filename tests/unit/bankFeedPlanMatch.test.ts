@@ -73,8 +73,9 @@ describe('the two ways to settle an outgoing line are one implementation', () =>
     expect(loader.slice(0, 900)).toMatch(/match_status === 'matched'/);
   });
 
-  it('and both write the payment through one helper, not two inserts', () => {
-    expect(BILL_CASE).toMatch(/paymentFromFeedRow\(/);
+  it('the plan writes the payment through one helper, and a bill through the atomic RPC', () => {
+    expect(BILL_CASE).toMatch(/rpc\('attach_payment_to_supplier_bill'/);
+    expect(BILL_CASE, 'a two-step payment and allocation can leave half of it behind').not.toMatch(/from\('payment_allocations'\)/);
     expect(PLAN_CASE).toMatch(/paymentFromFeedRow\(/);
     const inserts = EDGE.match(/from\('payments'\)\s*\.insert\(/g) ?? [];
     expect(inserts.length, 'a second hand-rolled payment insert reappeared in revolut-api')
@@ -88,8 +89,8 @@ describe('the two ways to settle an outgoing line are one implementation', () =>
     expect(helper.slice(0, 1600)).toMatch(/\.eq\('provider_ref', tx\.provider_ref\)/);
   });
 
-  it('and both stamp the feed row through one helper', () => {
-    expect(BILL_CASE).toMatch(/markFeedRowMatched\(service, rowId, payId\)/);
+  it('the plan stamps the feed row through the helper; for a bill SQL decides partial or matched', () => {
+    expect(BILL_CASE).not.toMatch(/markFeedRowMatched/);
     expect(PLAN_CASE).toMatch(/markFeedRowMatched\(service, rowId, payId\)/);
   });
 });

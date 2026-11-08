@@ -1207,7 +1207,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Travel (#398): fares only, never a booking; free allowance or the workspace's own key
       'search_flights', 'add_flight_to_trip_card',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L); 0 cr
-      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'pay_bill_via_revolut',
+      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'pay_bill_via_revolut', 'attach_expense_document',
       // The myDATA/ΑΑΔΕ expenses feed itself — a much larger set than what we have booked.
       'list_mydata_expenses',
       // Company assets register (vehicles/phones/cards/laptops) shared with Finance + HR; 0 cr — DB-only
@@ -1460,7 +1460,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Finance reads + confirm-gated invoice issue (Trinity is the finance agent)
       'manage_finance',
       // Business operating expenses → categorized supplier bill (Payables/AP + P&L)
-      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'pay_bill_via_revolut',
+      'record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'pay_bill_via_revolut', 'attach_expense_document',
       // The myDATA/ΑΑΔΕ expenses feed itself — a much larger set than what we have booked.
       'list_mydata_expenses',
       // Contracts & e-signature (finance/legal domain)
@@ -3106,7 +3106,7 @@ async function executeAgent(
   }
 
   // Business operating expenses → categorized supplier bill (Payables/AP + P&L). 0 cr, DB-only.
-  if (config.tools.some((t: string) => ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut'].includes(t))) {
+  if (config.tools.some((t: string) => ['record_expense', 'list_recent_expenses', 'pay_expense', 'get_expense_payments', 'list_mydata_expenses', 'pay_bill_via_revolut', 'attach_expense_document'].includes(t))) {
     try {
       const expMod = await import('../_shared/tools/expense-tools.ts');
       if (config.tools.includes('record_expense')) tools.push(expMod.createRecordExpenseTool(userId, workspaceId, onChunk));
@@ -3114,6 +3114,7 @@ async function executeAgent(
       if (config.tools.includes('pay_expense')) tools.push(expMod.createPayExpenseTool(userId, workspaceId, onChunk));
       if (config.tools.includes('pay_bill_via_revolut')) tools.push(expMod.createPayBillViaRevolutTool(userId, workspaceId, userJwt, onChunk));
       if (config.tools.includes('get_expense_payments')) tools.push(expMod.createGetExpensePaymentsTool(userId, workspaceId, onChunk));
+      if (config.tools.includes('attach_expense_document')) tools.push(expMod.createAttachExpenseDocumentTool(userId, workspaceId, userJwt, onChunk));
       if (config.tools.includes('list_mydata_expenses')) {
         // The myDATA feed and our own expense ledger both answer to the word "expenses", and they
         // are 1,866 rows and 6 rows in the workspace this was measured in. Which one the turn gets

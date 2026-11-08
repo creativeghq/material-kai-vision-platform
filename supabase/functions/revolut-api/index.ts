@@ -429,44 +429,28 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
     }
 
     case 'confirm-bill-match': {
-      // Human matches an OUTGOING transfer to a supplier bill from the feed's row menu.
+      // Human matches an OUTGOING transfer to a supplier bill; a transfer can pay several bills.
       const rowId = String(body?.transaction_row_id ?? '');
       const billId = String(body?.bill_id ?? '');
       if (!rowId || !billId) throw new HttpError(400, 'transaction_row_id and bill_id are required');
 
-      const tx = await loadOutgoingFeedRow(service, workspaceId, rowId);
+      await loadOutgoingFeedRow(service, workspaceId, rowId);
 
       const { data: bill } = await service
         .from('supplier_bills')
-        .select('id, supplier_bill_number, supplier_company_id, supplier_contact_id, amount_due, currency, category_id')
+        .select('id')
         .eq('id', billId)
         .eq('workspace_id', workspaceId)
         .maybeSingle();
       if (!bill) throw new HttpError(404, 'not found');
-      const txCcy = String(tx.currency ?? 'EUR').toUpperCase();
-      if (String(bill.currency ?? 'EUR').toUpperCase() !== txCcy) {
-        throw new HttpError(400, 'currency mismatch between the transfer and the bill');
-      }
 
-      const payId = await paymentFromFeedRow(
-        service, workspaceId, tx,
-        { companyId: bill.supplier_company_id, contactId: bill.supplier_contact_id },
-        `Manually matched to bill ${bill.supplier_bill_number ?? bill.id}`,
-        bill.category_id ?? null,
-      );
-
-      const applied = Math.min(Number(tx.amount), Number(bill.amount_due));
-      if (!(applied > 0)) throw new HttpError(400, 'the bill has nothing due');
-      const { error: allocErr } = await service.from('payment_allocations').insert({
-        payment_id: payId,
-        supplier_bill_id: bill.id,
-        amount: applied,
-        amount_doc_currency: applied,
-        fx_rate: 1,
+      const { data: attached, error: attachErr } = await auth.supabaseAsUser!.rpc('attach_payment_to_supplier_bill', {
+        p_bill_id: billId,
+        p_feed_row_id: rowId,
+        p_amount: body?.amount == null ? null : Number(body.amount),
       });
-      if (allocErr) throw new HttpError(502, `allocation failed: ${allocErr.message}`);
-      await markFeedRowMatched(service, rowId, payId);
-      return jsonResponse({ ok: true, applied });
+      if (attachErr) throw new HttpError(400, attachErr.message);
+      return jsonResponse({ ok: true, ...(attached as Record<string, unknown>) });
     }
 
     case 'plan-candidates': {
@@ -485,6 +469,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
       if (!rowId || !planId) throw new HttpError(400, 'transaction_row_id and plan_id are required');
 
       const tx = await loadOutgoingFeedRow(service, workspaceId, rowId);
+      if (tx.match_status === 'partial') throw new HttpError(400, 'part of this transfer is attached to expenses, so it cannot also close a plan');
 
       const { data: plan } = await service
         .from('planned_payments')
@@ -571,7 +556,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         .eq('workspace_id', workspaceId)
         .maybeSingle();
       if (!tx) throw new HttpError(404, 'not found');
-      if (tx.match_status === 'matched') throw new HttpError(400, 'a matched line cannot be ignored');
+      if (tx.match_status === 'matched' || tx.match_status === 'partial') throw new HttpError(400, 'a matched line cannot be ignored');
       const { error } = await service
         .from('revolut_bank_transactions')
         .update({

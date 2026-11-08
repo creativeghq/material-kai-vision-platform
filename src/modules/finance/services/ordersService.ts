@@ -757,11 +757,12 @@ export const ordersService = {
   async invoicedOrderIds(orderIds: string[]): Promise<Set<string>> {
     const out = new Set<string>();
     if (orderIds.length === 0) return out;
-    const [inv, bills] = await Promise.all([
+    const [inv, bills, shared] = await Promise.all([
       supabase.from('invoices').select('order_id').in('order_id', orderIds),
       supabase.from('supplier_bills').select('order_id').in('order_id', orderIds),
+      supabase.from('supplier_bill_orders').select('order_id').in('order_id', orderIds),
     ]);
-    for (const r of [...(inv.data ?? []), ...(bills.data ?? [])] as Array<{ order_id: string | null }>) {
+    for (const r of [...(inv.data ?? []), ...(bills.data ?? []), ...(shared.data ?? [])] as Array<{ order_id: string | null }>) {
       if (r.order_id) out.add(r.order_id);
     }
     return out;
@@ -1323,9 +1324,12 @@ export const ordersService = {
      */
     creditBlocks: Array<{ id: string; payment_id: string; amount: number; currency: string; paid_at: string; counterparty_name: string | null }>;
   }> {
+    const { data: sharedBills } = await supabase.from('supplier_bill_orders').select('supplier_bill_id').eq('order_id', orderId);
+    const sharedBillIds = (sharedBills ?? []).map((b) => b.supplier_bill_id);
+    const billsQuery = supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency, supplier_company_id, supplier_name');
     const [inv, bills, pay, alloc, settlement, blocks] = await Promise.all([
       supabase.from('invoices').select('id, internal_number, status, total, amount_due, currency').eq('order_id', orderId),
-      supabase.from('supplier_bills').select('id, supplier_bill_number, status, total, amount_due, currency, supplier_company_id, supplier_name').eq('order_id', orderId),
+      sharedBillIds.length ? billsQuery.or(`order_id.eq.${orderId},id.in.(${sharedBillIds.join(',')})`) : billsQuery.eq('order_id', orderId),
       // The allocations come with the payment: the target is whichever *_id FK is set, and each
       // one is embedded so the row can NAME what it settled without a second lookup.
       supabase.from('payments').select(`id, direction, amount, currency, paid_at, method, reference, notes, bank_account_id, counterparty_company_id, counterparty_contact_id, counterparty_bank_account_id, counterparty_name,

@@ -27,7 +27,7 @@ import { financeService, formatMoney, type Invoice, type CreditNote, type Suppli
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { FINANCE_BASE, FINANCE_TAB, creditNoteDraftUrl, creditNoteUrl, deliveryNoteUrl, financeTabUrl } from '@/modules/finance/routes';
 import { creditNoteDraftsService, invoiceLabel, type CreditNoteDraft } from '@/modules/finance/services/creditNoteDraftsService';
-import { inboundService, type InboundDocument } from '@/modules/finance/services/inboundService';
+import { inboundService, type InboundDocAttachments, type InboundDocument } from '@/modules/finance/services/inboundService';
 import { Layers } from 'lucide-react';
 import { RecordExpenseDocumentDialog } from '@/modules/finance/components/RecordExpenseDocumentDialog';
 import { deliveryNotesService, deliveryNoteRelation, type DeliveryNote } from '@/modules/finance/services/deliveryNotesService';
@@ -60,6 +60,7 @@ import {
 } from '@/modules/finance/utils/inboundProvenance';
 import type { InboundSource, InboundLinkSummary } from '@/modules/finance/services/inboundService';
 import { InboundDetailCell } from '@/modules/finance/components/InboundDetailCell';
+import { InboundAttachCell } from '@/modules/finance/components/InboundAttachCell';
 import { InboundLinkedDetailPanel } from '@/modules/finance/components/InboundLinkedDetailPanel';
 import { hasLinkedDelivery, isInteractiveClick, nestDeliveryNotes } from '@/modules/finance/utils/inboundNesting';
 import { DispatchBoard } from '@/modules/finance/components/DispatchBoard';
@@ -1667,6 +1668,18 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
   // VAT → CRM company id, so a known issuer's name links straight to their record instead of
   // making the operator go and search for them.
   const [crmByVat, setCrmByVat] = React.useState<Record<string, string>>({});
+  const [attachments, setAttachments] = React.useState<Record<string, InboundDocAttachments> | null>({});
+  const [attachTick, setAttachTick] = React.useState(0);
+  const attachmentsChanged = () => { setAttachTick((t) => t + 1); onChanged(); };
+
+  React.useEffect(() => {
+    if (!workspaceId) return;
+    let live = true;
+    inboundService.attachments(workspaceId)
+      .then((a) => { if (live) setAttachments(a); })
+      .catch(() => { if (live) setAttachments(null); });
+    return () => { live = false; };
+  }, [workspaceId, attachTick]);
 
   React.useEffect(() => {
     if (!workspaceId) return;
@@ -1796,6 +1809,13 @@ const InboundTable: React.FC<{ rows: InboundDocument[]; financeBase: string; wor
             </td>
             <td className="px-4 py-2 text-center">
               <InboundDetailCell doc={d} link={links[d.id]} readOnly={readOnly} onChanged={onChanged} />
+              <InboundAttachCell
+                doc={d}
+                attachments={attachments === null ? undefined : attachments[d.id] ?? null}
+                financeBase={financeBase}
+                readOnly={readOnly}
+                onChanged={attachmentsChanged}
+              />
             </td>
             <td className="px-4 py-2 text-center">
               {outcomes.length > 0
