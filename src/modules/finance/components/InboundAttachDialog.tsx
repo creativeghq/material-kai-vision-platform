@@ -8,8 +8,8 @@ import {
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubSegmented, type HubSegment } from '@/components/core/hub/HubSegmented';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/modules/finance/services/financeService';
 import { formatDate } from '@/utils/datetime';
@@ -27,7 +27,14 @@ const docName = (d: { series?: string | null; aa?: string | null; mark?: string 
 
 const isDeliveryNote = (docType: string | null | undefined) => String(docType ?? '').split('.')[0] === '9';
 
-const money = (value: string): number | undefined => {
+type AttachKind = 'payments' | 'orders' | 'documents';
+const ATTACH_KINDS: readonly HubSegment<AttachKind>[] = [
+  { value: 'payments', label: 'Payments' },
+  { value: 'orders', label: 'Orders' },
+  { value: 'documents', label: 'Documents' },
+];
+
+const parseAmount = (value: string): number | undefined => {
   const n = Number(value.replace(',', '.'));
   return Number.isFinite(n) && n > 0 ? n : undefined;
 };
@@ -49,7 +56,7 @@ export const InboundAttachDialog: React.FC<{
   const currency = doc.currency ?? 'EUR';
   const booked = !!attachments;
   const shipping = isDeliveryNote(doc.doc_type);
-  const [tab, setTab] = React.useState(shipping ? 'documents' : 'payments');
+  const [tab, setTab] = React.useState<AttachKind>(shipping ? 'documents' : 'payments');
   const [busy, setBusy] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState('');
   const [orders, setOrders] = React.useState<InboundOrderSuggestion[] | null>(null);
@@ -172,12 +179,13 @@ export const InboundAttachDialog: React.FC<{
           </div>
         )}
 
-        <Tabs value={tab} onValueChange={(v) => { setTab(v); setQuery(''); }}>
-          <TabsList>
-            {!shipping && <TabsTrigger value="payments">Payments</TabsTrigger>}
-            {!shipping && <TabsTrigger value="orders">Orders</TabsTrigger>}
-            <TabsTrigger value="documents">Documents</TabsTrigger>
-          </TabsList>
+        <div>
+          <HubSegmented
+            options={shipping ? ATTACH_KINDS.filter((k) => k.value === 'documents') : ATTACH_KINDS}
+            value={tab}
+            onChange={(v) => { setTab(v); setQuery(''); }}
+            aria-label="Attach to"
+          />
           <Input
             className="mt-3"
             value={query}
@@ -186,7 +194,7 @@ export const InboundAttachDialog: React.FC<{
           />
           {readError && <p className="mt-3 text-sm text-destructive">{readError}</p>}
 
-          <TabsContent value="payments">
+          {tab === 'payments' && (<div className="mt-2">
             {!readError && payments === null && <Loading />}
             {!!payments?.length && (
               <div className="divide-y divide-hairline">
@@ -211,7 +219,7 @@ export const InboundAttachDialog: React.FC<{
                         value={amounts[c.id] ?? suggested.toFixed(2)}
                         onChange={(e) => setAmounts((a) => ({ ...a, [c.id]: e.target.value }))}
                       />
-                      <AttachButton busy={busy === c.id} disabled={!!busy} onClick={() => attachPayment(c, money(amounts[c.id] ?? suggested.toFixed(2)))} />
+                      <AttachButton busy={busy === c.id} disabled={!!busy} onClick={() => attachPayment(c, parseAmount(amounts[c.id] ?? suggested.toFixed(2)))} />
                     </div>
                   );
                 })}
@@ -228,9 +236,9 @@ export const InboundAttachDialog: React.FC<{
                   : <Link to={`${financeBase}?tab=payments`}><Button size="sm" variant="outline">Open payments</Button></Link>}
               />
             )}
-          </TabsContent>
+          </div>)}
 
-          <TabsContent value="orders">
+          {tab === 'orders' && (<div className="mt-2">
             {!readError && orders === null && <Loading />}
             {openOrders.length > 0 && (
               <div className="divide-y divide-hairline">
@@ -258,7 +266,7 @@ export const InboundAttachDialog: React.FC<{
                       )}
                       <AttachButton
                         busy={busy === o.order_id} disabled={!!busy}
-                        onClick={() => attachOrder(o, hasOrder ? money(amounts[o.order_id] ?? unbilled.toFixed(2)) : undefined)}
+                        onClick={() => attachOrder(o, hasOrder ? parseAmount(amounts[o.order_id] ?? unbilled.toFixed(2)) : undefined)}
                       />
                     </div>
                   );
@@ -276,9 +284,9 @@ export const InboundAttachDialog: React.FC<{
                   : <Link to={`${financeBase}?tab=orders`}><Button size="sm" variant="outline">Open orders</Button></Link>}
               />
             )}
-          </TabsContent>
+          </div>)}
 
-          <TabsContent value="documents">
+          {tab === 'documents' && (<div className="mt-2">
             {!readError && documents === null && <Loading />}
             {!!documents?.length && (
               <div className="divide-y divide-hairline">
@@ -304,8 +312,8 @@ export const InboundAttachDialog: React.FC<{
                 action={query ? <Button size="sm" variant="outline" onClick={() => setQuery('')}>Clear search</Button> : undefined}
               />
             )}
-          </TabsContent>
-        </Tabs>
+          </div>)}
+        </div>
       </DialogContent>
     </Dialog>
   );
