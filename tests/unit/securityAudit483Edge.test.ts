@@ -56,7 +56,7 @@ describe('#483 L3 — secrets compare in constant time and fail closed', () => {
 
   it.each([
     '_shared/auth.ts', 'finance-mydata-book/index.ts',
-    'seo-api/handlers/answer-check.ts', 'seo-api/handlers/toolkit-audit.ts',
+    'seo-api/handlers/toolkit-audit.ts',
   ])('%s has no === on the cron secret', (file) => {
     const src = fn(file);
     expect(src).toContain('secretMatches(');

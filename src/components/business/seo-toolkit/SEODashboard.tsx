@@ -459,7 +459,7 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
 
 /** Automatic audits are off unless chosen; the value is the cadence in hours. */
 const AUTO_AUDIT_OPTIONS = [
-  { value: 'off', label: 'Off (on demand)' },
+  { value: 'off', label: 'Off (On Demand)' },
   { value: '24', label: 'Daily' },
   { value: '168', label: 'Weekly' },
   { value: '720', label: 'Monthly' },

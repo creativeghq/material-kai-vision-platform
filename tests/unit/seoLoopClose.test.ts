@@ -39,11 +39,10 @@ describe('#401 W3.2 — a refresh drafts, a person applies', () => {
     expect(auto).toMatch(/auto_apply_meta !== true\) return false;/);
   });
 
-  it('the weekly sweep only refreshes articles that slipped, a few per site, in the background', () => {
+  it('the weekly sweep only notifies; a refresh is drafted when a person asks for one', () => {
     const cron = read('supabase/functions/seo-content-freshness/index.ts');
-    expect(cron).toContain("const REFRESH_REASONS = new Set(['position_drop', 'clicks_drop'])");
-    expect(cron).toContain('REFRESH_PER_SITE');
-    expect(cron).toMatch(/action: 'refresh'[^}]*background: true/);
+    expect(cron).toContain("emitFlowEvent('seo.article_refresh_due'");
+    expect(cron).not.toMatch(/action: 'refresh'/);
   });
 });
 

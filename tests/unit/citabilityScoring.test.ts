@@ -171,10 +171,11 @@ describe('the corpus is a separate sample, not a second opinion', () => {
     expect(code).toContain("status: 'not_collected', note: cov.note");
   });
 
-  it('the weekly run is cron-gated and billed to the site owner through the spend gate', () => {
+  it('the scheduled run is cron-gated, reads only sites whose owner scheduled it, and bills that payer', () => {
     const code = blankComments(src(MENTIONS));
     expect(code).toContain('isCronAuthorized(req)');
-    expect(code).toContain('runFor(db, site, {}, site.user_id)');
+    expect(code).toContain("rpc('website_collectors_due', { p_collector: 'ai_visibility'");
+    expect(code).toContain('runFor(db, site as Site, {}, d.payer_user_id)');
     expect(code).toContain('callDataForSEO(kind, params, attribution)');
   });
 
