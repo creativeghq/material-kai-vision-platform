@@ -30,7 +30,7 @@ const FLAG_TEXT: Record<CommandCentreFlagKey, (v: number, money: Money) => strin
 };
 
 const FLAG_SECTION: Partial<Record<CommandCentreFlagKey, string>> = {
-  pending_variations_exposure: 'quotes',
+  pending_variations_exposure: 'changes',
   certified_unpaid_overdue: 'billing',
   billed_exceeds_contract: 'billing',
   late_deliveries: 'purchases',

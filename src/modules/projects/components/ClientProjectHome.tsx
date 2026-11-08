@@ -36,13 +36,15 @@ export const ClientProjectHome: React.FC<{
   const [sp, setSp] = useSearchParams();
   const [waiting, setWaiting] = useState<ProjectRequestWithMessages[] | null>(null);
 
+  const raw = sp.get('tab');
+  // Re-read on every section change: answering a request in Requests must clear it from "Waiting on You".
   useEffect(() => {
     let cancelled = false;
     projectRequestsService.list(project.id)
       .then((rows) => { if (!cancelled) setWaiting(rows.filter(waitsOnGuest)); })
       .catch(() => { if (!cancelled) setWaiting(null); });
     return () => { cancelled = true; };
-  }, [project.id]);
+  }, [project.id, raw]);
 
   const items = useMemo<HubTabItem[]>(() => [
     { id: 'updates', label: 'Updates' },
@@ -53,7 +55,6 @@ export const ClientProjectHome: React.FC<{
     { id: 'progress', label: 'Progress' },
   ], [collabRole, waiting]);
 
-  const raw = sp.get('tab');
   // Team links (`?tab=requests&request=…`) land on the matching guest section.
   const section: Section = raw === 'requests' || sp.get('request') ? 'requests'
     : items.some((i) => i.id === raw) ? (raw as Section)

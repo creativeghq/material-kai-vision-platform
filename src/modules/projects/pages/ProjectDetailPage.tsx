@@ -160,6 +160,8 @@ export const ProjectDetailPage: React.FC = () => {
   const [sectionsOpen, setSectionsOpen] = useState(false);
   /** Parts holding records — shown whatever the kind says, so hiding a section never hides data. */
   const [setup, setSetup] = useState<ProjectSetup | null>(null);
+  /** Which sections hold records is UNKNOWN after a failed read, so every section stays offered. */
+  const [setupFailed, setSetupFailed] = useState(false);
   const withData = React.useMemo<ReadonlySet<string>>(() => new Set(setup?.sections_with_data ?? []), [setup]);
 
   // Three viewers: the owner, a teammate (project_members), and a client (project_collaborators,
@@ -174,7 +176,7 @@ export const ProjectDetailPage: React.FC = () => {
   const canDeleteProject = isOwner && ['operator', 'dealer', 'architect'].includes(persona);
 
   const parts = project ? projectParts(project) : new Set<ProjectPart>();
-  const offers = (p: ProjectPart) => parts.has(p) || withData.has(p);
+  const offers = (p: ProjectPart) => setupFailed || parts.has(p) || withData.has(p);
   const availableTabs = PROJECT_TABS.filter((t) => {
     if (!isTeam) return false;
     if (t === 'finance' || t === 'billing') return canFinance && offers(t);
@@ -212,7 +214,9 @@ export const ProjectDetailPage: React.FC = () => {
 
   const loadSetup = useCallback(() => {
     if (!id) return;
-    projectsService.getProjectSetup(id).then(setSetup).catch(() => setSetup(null));
+    projectsService.getProjectSetup(id)
+      .then((s) => { setSetup(s); setSetupFailed(false); })
+      .catch(() => { setSetup(null); setSetupFailed(true); });
   }, [id]);
   // Re-read on section change: adding the first room or quote ticks its step and pins its section.
   useEffect(() => { loadSetup(); }, [loadSetup, sp]);

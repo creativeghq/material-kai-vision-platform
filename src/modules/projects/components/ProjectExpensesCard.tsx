@@ -30,12 +30,16 @@ export const ProjectExpensesCard: React.FC<{
   const { toast } = useToast();
   const [items, setItems] = useState<TripExpenseItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
   const [adding, setAdding] = useState(false);
   const [linking, setLinking] = useState(false);
 
   const load = useCallback(async () => {
-    try { setLoading(true); setItems(await tripExpenseService.listByProject(projectId)); }
-    catch (err: any) { toast({ title: 'Failed to load expenses', description: err?.message, variant: 'destructive' }); }
+    try { setLoading(true); setItems(await tripExpenseService.listByProject(projectId)); setFailed(false); }
+    catch (err: any) {
+      setFailed(true);
+      toast({ title: 'Failed to load expenses', description: err?.message, variant: 'destructive' });
+    }
     finally { setLoading(false); }
   }, [projectId, toast]);
   useEffect(() => { void load(); }, [load]);
@@ -69,8 +73,12 @@ export const ProjectExpensesCard: React.FC<{
             <Receipt className="h-4 w-4 text-primary" /> Expenses
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            {totals.approved ? `${totals.approved} approved` : 'Nothing approved yet'}
-            {totals.pending && <> · {totals.pending} awaiting approval</>}
+            {failed ? 'Expenses could not be loaded — totals unknown' : (
+              <>
+                {totals.approved ? `${totals.approved} approved` : 'Nothing approved yet'}
+                {totals.pending && <> · {totals.pending} awaiting approval</>}
+              </>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -85,6 +93,11 @@ export const ProjectExpensesCard: React.FC<{
       <CardContent className="p-0">
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+        ) : failed ? (
+          <div className="space-y-2 p-5 text-sm text-amber-800 dark:text-amber-300">
+            <p>The expenses on this project could not be loaded. They are unknown, not none.</p>
+            <Button size="sm" variant="outline" onClick={() => void load()}>Try again</Button>
+          </div>
         ) : items.length === 0 ? (
           <HubEmptyState
             icon={Receipt}

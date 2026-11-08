@@ -177,7 +177,8 @@ export const CreateProjectModal: React.FC<CreateProjectModalProps> = ({
       client_address_unit_id: addrUnitId,
       deadline: deadline || null,
       budget_amount: budgetAmount ? parseFloat(budgetAmount) : null,
-      budget_currency: budgetCurrency,
+      // Only a typed budget carries its currency; otherwise the template keeps its own pair.
+      budget_currency: budgetAmount ? budgetCurrency : null,
       rooms: rooms.map(r => ({ name: r.name, room_type: r.room_type || null })),
     };
 

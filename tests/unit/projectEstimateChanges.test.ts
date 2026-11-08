@@ -66,22 +66,36 @@ describe('Changes', () => {
 });
 
 describe('a plan change order is recorded as a variation', () => {
-  it('records through the idempotent RPC after the quote lines, on both paths', () => {
-    const body = changeOrderCase();
-    const calls = body.split('recordChangeOrderVariation(').length - 1;
-    expect(calls).toBe(2);
-    const rebuild = body.indexOf('writeQuoteItems(supabase, prevQuote.id');
-    expect(body.indexOf('recordChangeOrderVariation(', rebuild)).toBeGreaterThan(rebuild);
-    const fresh = body.indexOf('writeQuoteItems(supabase, quote.id');
-    expect(body.indexOf('recordChangeOrderVariation(', fresh)).toBeGreaterThan(fresh);
+  const helper = () => {
+    const start = ENGINE.indexOf('async function rebuildDraftRevision(');
+    expect(start, 'rebuildDraftRevision is the one place a draft revision is rebuilt').toBeGreaterThan(-1);
+    return ENGINE.slice(start, ENGINE.indexOf('\n}\n', start));
+  };
+  const quoteCase = () => {
+    const start = ENGINE.indexOf("case 'create-quote-from-plan'");
+    return ENGINE.slice(start, ENGINE.indexOf('    case ', start + 10));
+  };
+
+  it('a draft revision is refused once decided, then rebuilt, then recorded — in that order', () => {
+    const h = helper();
+    const check = h.indexOf(".not('status', 'in', '(draft,submitted)')");
+    const write = h.indexOf('writeQuoteItems(supabase, quoteId');
+    const record = h.indexOf('recordChangeOrderVariation(');
+    expect(check).toBeGreaterThan(-1);
+    expect(write).toBeGreaterThan(check);
+    expect(record).toBeGreaterThan(write);
     expect(ENGINE).toContain("supabase.rpc('record_plan_change_order_variation'");
   });
 
-  it('refuses to rebuild a quote whose change order was already decided, BEFORE touching its lines', () => {
+  it('BOTH plan actions route a draft revision through it — Create quote cannot bypass the guard', () => {
+    expect(changeOrderCase()).toContain('rebuildDraftRevision(supabase, prevQuote.id');
+    expect(quoteCase()).toMatch(/existing\.parent_quote_id\)\s*\{\s*return json\(\{ quote_id: existing\.id, variation: await rebuildDraftRevision\(/);
+  });
+
+  it('a fresh change order records its variation after its lines', () => {
     const body = changeOrderCase();
-    const check = body.indexOf(".not('status', 'in', '(draft,submitted)')");
-    expect(check).toBeGreaterThan(-1);
-    expect(check).toBeLessThan(body.indexOf('writeQuoteItems(supabase, prevQuote.id'));
+    const fresh = body.indexOf('writeQuoteItems(supabase, quote.id');
+    expect(body.indexOf('recordChangeOrderVariation(', fresh)).toBeGreaterThan(fresh);
   });
 
   it('the plan tab points the operator at the register', () => {

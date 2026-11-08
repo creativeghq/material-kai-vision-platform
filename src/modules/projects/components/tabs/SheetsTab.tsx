@@ -9,6 +9,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { SheetWizardModal } from '@/components/features/sheets/SheetWizardModal';
+import { formatDate } from '@/utils/datetime';
 import { SheetCanvasCard } from '@/components/features/sheets/SheetCanvasCard';
 import {
   moodboardSheetsService,
@@ -39,10 +40,11 @@ const SheetRow: React.FC<{
   s: Sheet;
   busy: boolean;
   onOpenPdf: (s: Sheet) => void;
-  onOpenCanvas: (id: string) => void;
+  /** Null for a collaborator: the canvas edits and renders, which only the team may do. */
+  onOpenCanvas: ((id: string) => void) | null;
 }> = ({ s, busy, onOpenPdf, onOpenCanvas }) => {
   const hasPdf = !!s.pdf_storage_path;
-  const primary = hasPdf ? () => onOpenPdf(s) : isInteractive(s) ? () => onOpenCanvas(s.id) : null;
+  const primary = hasPdf ? () => onOpenPdf(s) : isInteractive(s) && onOpenCanvas ? () => onOpenCanvas(s.id) : null;
   return (
     <li
       className={`p-3 flex items-center gap-3 transition-colors ${primary ? 'hover:bg-muted/40 cursor-pointer' : ''}`}
@@ -58,11 +60,11 @@ const SheetRow: React.FC<{
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium truncate">{s.title || typeLabel(s.sheet_type)}</p>
         <p className="text-xs text-muted-foreground">
-          {typeLabel(s.sheet_type)} · Created {new Date(s.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+          {typeLabel(s.sheet_type)} · Created {formatDate(s.created_at)}
         </p>
       </div>
       <span className={`text-xs ${statusTone(s.status)}`}>{humanizeLabel(s.status)}</span>
-      {hasPdf && isInteractive(s) && (
+      {hasPdf && isInteractive(s) && onOpenCanvas && (
         <Button
           size="sm"
           variant="ghost"
@@ -142,7 +144,10 @@ export const SheetsTab: React.FC<SheetsTabProps> = ({ projectId, isOwner = true 
     }
   }, [toast]);
 
-  const rowProps = { onOpenPdf: (s: Sheet) => void openPdf(s), onOpenCanvas: (id: string) => void openCanvas(id) };
+  const rowProps = {
+    onOpenPdf: (s: Sheet) => void openPdf(s),
+    onOpenCanvas: isOwner ? (id: string) => void openCanvas(id) : null,
+  };
 
   const newPlanButton = isOwner ? (
     <Button size="sm" className="gap-2" onClick={() => setWizardOpen(true)}>

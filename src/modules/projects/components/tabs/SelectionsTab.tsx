@@ -473,6 +473,11 @@ const AddSelectionDialog: React.FC<{
     setRoomId(''); setAllowanceId(''); setQty('1'); setUnit(''); setPrice(''); setPriceCurrency(currency);
   };
   const close = () => { reset(); onClose(); };
+  /** A fetched price belongs to the product it was fetched for — changing product drops it. */
+  const choose = (next: Picked | null) => {
+    if (next?.id !== picked?.id) { setPrice(''); setPriceCurrency(currency); }
+    setPicked(next);
+  };
 
   const search = (val: string) => {
     setQuery(val);
@@ -544,7 +549,7 @@ const AddSelectionDialog: React.FC<{
           <FormSection title="What They Picked">
             <div className="flex gap-2">
               <Button size="sm" variant={mode === 'catalog' ? 'secondary' : 'outline'} className="flex-1" onClick={() => setMode('catalog')}>From catalogue</Button>
-              <Button size="sm" variant={mode === 'custom' ? 'secondary' : 'outline'} className="flex-1" onClick={() => { setMode('custom'); setPicked(null); }}>Custom item</Button>
+              <Button size="sm" variant={mode === 'custom' ? 'secondary' : 'outline'} className="flex-1" onClick={() => { setMode('custom'); choose(null); }}>Custom item</Button>
             </div>
             {mode === 'catalog' && (picked ? (
               <div className="flex items-center justify-between rounded-sm border border-hairline p-2">
@@ -552,7 +557,7 @@ const AddSelectionDialog: React.FC<{
                   <p className="truncate font-medium">{picked.name}</p>
                   {picked.sku && <p className="text-xs text-muted-foreground">{picked.sku}</p>}
                 </div>
-                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Clear product" onClick={() => setPicked(null)}><X className="h-4 w-4" /></Button>
+                <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Clear product" onClick={() => choose(null)}><X className="h-4 w-4" /></Button>
               </div>
             ) : (
               <div className="space-y-1">
@@ -564,7 +569,7 @@ const AddSelectionDialog: React.FC<{
                 {results.length > 0 && (
                   <div className="max-h-48 divide-y divide-hairline overflow-auto rounded-sm border border-hairline">
                     {results.map((p) => (
-                      <button key={p.id} type="button" className="w-full p-2 text-left hover:bg-muted/40" onClick={() => { setPicked(p); setResults([]); setQuery(''); }}>
+                      <button key={p.id} type="button" className="w-full p-2 text-left hover:bg-muted/40" onClick={() => { choose(p); setResults([]); setQuery(''); }}>
                         <p className="truncate text-sm font-medium">{p.name}</p>
                         {p.sku && <p className="text-xs text-muted-foreground">{p.sku}</p>}
                       </button>
@@ -638,15 +643,22 @@ const LinkOrderDialog: React.FC<{
   const { toast } = useToast();
   const [candidates, setCandidates] = useState<SelectionOrderCandidate[]>([]);
   const [loading, setLoading] = useState(false);
+  const [readFailed, setReadFailed] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!line) return;
     let live = true;
     setLoading(true);
+    setCandidates([]);
+    setReadFailed(false);
     selectionsService.orderCandidates(line.id)
       .then((c) => { if (live) setCandidates(c); })
-      .catch((err) => { if (live) toast({ title: 'Could not read the project orders', description: errText(err), variant: 'destructive' }); })
+      .catch((err) => {
+        if (!live) return;
+        setReadFailed(true);
+        toast({ title: 'Could not read the project orders', description: errText(err), variant: 'destructive' });
+      })
       .finally(() => { if (live) setLoading(false); });
     return () => { live = false; };
   }, [line, toast]);
@@ -673,6 +685,10 @@ const LinkOrderDialog: React.FC<{
         </DialogHeader>
         {loading ? (
           <div className="flex justify-center py-6"><Loader2 className="h-5 w-5 animate-spin text-primary" /></div>
+        ) : readFailed ? (
+          <p className="py-6 text-center text-sm text-amber-800 dark:text-amber-300">
+            The project's orders could not be read, so nothing can be linked right now.
+          </p>
         ) : candidates.length === 0 ? (
           <HubEmptyState
             title="No orders on this project"

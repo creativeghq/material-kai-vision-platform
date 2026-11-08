@@ -90,6 +90,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const [quotes, setQuotes] = useState<ProjectQuote[]>([]);
   const [vrWorlds, setVrWorlds] = useState<VrWorld[]>([]);
   const [roomLayouts, setRoomLayouts] = useState<Array<{ id: string; name: string }>>([]);
+  const [layoutsFailed, setLayoutsFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -109,7 +110,9 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
         // Room plans are workspace-scoped, not project-scoped — `room_layouts` has no project_id —
         // so this offers the workspace's plans rather than pretending there is a narrower set.
         activeWorkspaceId
-          ? roomPlannerService.listLayouts(activeWorkspaceId).catch(() => [])
+          ? roomPlannerService.listLayouts(activeWorkspaceId)
+            .then((l) => { setLayoutsFailed(false); return l; })
+            .catch(() => { setLayoutsFailed(true); return []; })
           : Promise.resolve([]),
       ]);
       setViews(v);
@@ -473,6 +476,11 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
               {form.embedRoomPlan && (
                 <div className="space-y-1.5">
                   <Label>Plan</Label>
+                  {layoutsFailed && (
+                    <p className="text-xs text-amber-800 dark:text-amber-300">
+                      Your room plans could not be loaded, so this list may be missing some. Reopen to retry.
+                    </p>
+                  )}
                   <Select
                     value={form.roomLayoutId || '__none__'}
                     onValueChange={(v) => setForm({ ...form, roomLayoutId: v === '__none__' ? '' : v })}

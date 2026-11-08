@@ -390,6 +390,21 @@ async function claimPlanQuote(supabase: DbClient, planId: string, expected: stri
   return (data ?? []).length === 1;
 }
 
+/** A draft revision IS a pending change order: refuse once its variation is decided, else rebuild and re-record. */
+async function rebuildDraftRevision(
+  supabase: DbClient, quoteId: string, items: ItemRow[], userId: string | null,
+) {
+  const { data: decided, error: dErr } = await supabase.from('project_variations')
+    .select('reference, status').eq('quote_id', quoteId)
+    .not('status', 'in', '(draft,submitted)').maybeSingle();
+  if (dErr) throw new HttpError(400, dErr.message);
+  if (decided) {
+    throw new HttpError(409, `Change order ${decided.reference ?? ''} is already ${decided.status}; send or close its quote before raising another.`);
+  }
+  await writeQuoteItems(supabase, quoteId, items, true);
+  return recordChangeOrderVariation(supabase, quoteId, userId);
+}
+
 async function recordChangeOrderVariation(supabase: DbClient, quoteId: string, userId: string | null) {
   const { data, error } = await supabase.rpc('record_plan_change_order_variation', { p_quote_id: quoteId, p_user_id: userId });
   if (error) throw new HttpError(error.code === '22023' ? 409 : 400, `The change order was not recorded as a variation: ${error.message}`);
@@ -711,8 +726,11 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
       // A plan's DRAFT quote is rebuilt in place; a sent/accepted one is left alone and a fresh draft
       // minted. The plan is claimed before the lines are written, so a retry reuses the quote.
       if (plan.quote_id) {
-        const { data: existing, error: exErr } = await supabase.from('quotes').select('id, status').eq('id', plan.quote_id).maybeSingle();
+        const { data: existing, error: exErr } = await supabase.from('quotes').select('id, status, parent_quote_id').eq('id', plan.quote_id).maybeSingle();
         if (exErr) throw new HttpError(400, exErr.message);
+        if (existing && existing.status === 'draft' && existing.parent_quote_id) {
+          return json({ quote_id: existing.id, variation: await rebuildDraftRevision(supabase, existing.id, items, userId) });
+        }
         if (existing && existing.status === 'draft') {
           const { error: nErr } = await supabase.from('quotes').update({ name: plan.title }).eq('id', existing.id);
           if (nErr) throw new HttpError(400, `Failed to update quote: ${nErr.message}`);
@@ -833,15 +851,7 @@ const handler = withApiLogging('project-plan-engine', async (req: Request): Prom
 
       // A revision still in draft IS the pending change order: rebuild it, never stack another.
       if (prevQuote.status === 'draft' && prevQuote.parent_quote_id) {
-        const { data: decided, error: dErr } = await supabase.from('project_variations')
-          .select('reference, status').eq('quote_id', prevQuote.id)
-          .not('status', 'in', '(draft,submitted)').maybeSingle();
-        if (dErr) throw new HttpError(400, dErr.message);
-        if (decided) {
-          throw new HttpError(409, `Change order ${decided.reference ?? ''} is already ${decided.status}; send or close its quote before raising another.`);
-        }
-        await writeQuoteItems(supabase, prevQuote.id, items, true);
-        return json({ quote_id: prevQuote.id, variation: await recordChangeOrderVariation(supabase, prevQuote.id, userId) });
+        return json({ quote_id: prevQuote.id, variation: await rebuildDraftRevision(supabase, prevQuote.id, items, userId) });
       }
 
       const coCust = await projectCustomer(supabase, plan.project_id);

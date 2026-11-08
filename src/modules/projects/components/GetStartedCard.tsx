@@ -40,7 +40,8 @@ export const GetStartedCard: React.FC<{
   const parts = projectParts(project);
   const [pickingClient, setPickingClient] = useState(false);
 
-  const design = DESIGN_STEP[kind];
+  const designStep = DESIGN_STEP[kind];
+  const design = designStep && parts.has(designStep.tab) ? designStep : null;
   const steps: Step[] = [
     { id: 'client', label: 'Add the client', done: setup.has_client, action: 'Add client', run: () => setPickingClient(true) },
     ...(parts.has('rooms') ? [{ id: 'rooms', label: 'Add the rooms', done: setup.rooms > 0, action: 'Open Rooms', run: () => onOpenSection('rooms') }] : []),
@@ -52,7 +53,7 @@ export const GetStartedCard: React.FC<{
       run: () => onOpenSection(design.tab),
     }] : []),
     ...(parts.has('quotes') ? [{ id: 'quote', label: 'Send the client a quote', done: setup.quotes > 0, action: 'Open Quotes', run: () => onOpenSection('quotes') }] : []),
-    { id: 'tasks', label: 'Plan the work', done: setup.tasks > 0, action: 'Open Tasks', run: () => onOpenSection('tasks') },
+    ...(parts.has('tasks') ? [{ id: 'tasks', label: 'Plan the work', done: setup.tasks > 0, action: 'Open Tasks', run: () => onOpenSection('tasks') }] : []),
     { id: 'invite', label: 'Invite the client to follow along', done: setup.collaborators > 0, action: 'Invite', run: onInvite },
   ];
   const done = steps.filter((s) => s.done).length;
