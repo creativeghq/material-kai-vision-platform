@@ -37,12 +37,12 @@ export async function handleToolkitAudit(req: Request, body: any): Promise<Respo
 
     // ── Branch A: cron-mode batch ──
     if (isCron) {
-      // A website's own domain is collected by seo-domain-tracker on the owner's schedule; this
-      // cron keeps only the ad-hoc domains the agent was asked to watch.
+      // Only domains whose owner switched automatic audits on; a website's own domain belongs to seo-domain-tracker.
       const { data: due, error } = await sb
         .from('seo_tracked_domains')
         .select('*')
         .eq('is_active', true)
+        .eq('auto_refresh', true)
         .is('website_id', null)
         .or(`next_audit_at.is.null,next_audit_at.lte.${new Date().toISOString()}`)
         .limit(20);

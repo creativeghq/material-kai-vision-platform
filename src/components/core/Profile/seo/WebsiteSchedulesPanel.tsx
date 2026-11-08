@@ -20,6 +20,7 @@ const LABEL: Record<CollectorKind, { name: string; what: string }> = {
   domain_tracking: { name: 'Domain tracking', what: 'Rank, keywords, traffic and backlinks of the domain and its competitors' },
   site_audit: { name: 'Homepage audit', what: 'On-page checks of the homepage' },
   page_crawl: { name: 'Page crawl', what: 'Reads the pages Google shows and the ones not read yet' },
+  ai_visibility: { name: 'AI Visibility', what: 'How often AI assistants mention and cite the site' },
 };
 const CADENCE_LABEL: Record<CollectorCadence, string> = { off: 'Off', daily: 'Daily', weekly: 'Weekly', monthly: 'Monthly' };
 

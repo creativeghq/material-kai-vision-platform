@@ -23,7 +23,7 @@ import { Play, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { FilterBar, useFilters } from '@/components/core/filters';
-import { refreshProduct, untrackProduct, trackProduct } from '@/services/priceMonitoringApi';
+import { refreshProduct, untrackProduct, trackProduct, setPriceAutoRefresh } from '@/services/priceMonitoringApi';
 import type { TrackedQuery } from '@/services/priceMonitoringApi';
 import { statusTone } from '@/utils/statusTone';
 import { buildMonitoredProductFilters } from './monitoredProductFilters';
@@ -104,6 +104,19 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
     }
   };
 
+  const handleAutoRefresh = async (tq: TrackedQuery, on: boolean) => {
+    setBusy((prev) => ({ ...prev, [tq.id]: true }));
+    try {
+      await setPriceAutoRefresh(tq.id, on);
+      toast({ title: on ? 'Daily check on' : 'Daily check off', description: on ? 'Prices refresh daily, charged per run.' : 'Prices refresh only when you press Check now.' });
+      onRefresh();
+    } catch (error) {
+      toast({ title: 'Not saved', description: error instanceof Error ? error.message : 'Unknown error', variant: 'destructive' });
+    } finally {
+      setBusy((prev) => ({ ...prev, [tq.id]: false }));
+    }
+  };
+
   const handleCheckNow = async (tq: TrackedQuery) => {
     const productId = tq.product_id;
     if (!productId) return;
@@ -161,6 +174,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                 <TableHead>Cheapest Verified</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Last Check</TableHead>
+                <TableHead>Daily Check</TableHead>
                 <TableHead className="hidden md:table-cell">Next Check</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -168,7 +182,7 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
             <TableBody>
               {filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                     No monitored products match the current filters.
                   </TableCell>
                 </TableRow>
@@ -203,10 +217,17 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                         ? formatDate(tq.last_refreshed_at, { withTime: true })
                         : 'Never'}
                     </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={!!tq.auto_refresh}
+                        onCheckedChange={(on) => void handleAutoRefresh(tq, on)}
+                        disabled={!tq.is_active || isBusy}
+                        aria-label="Daily automatic check"
+                      />
+                    </TableCell>
                     <TableCell className="hidden text-sm text-muted-foreground md:table-cell">
-                      {tq.next_check_at
-                        ? formatDate(tq.next_check_at, { withTime: true })
-                        : '—'}
+                      {!tq.auto_refresh ? 'On demand'
+                        : tq.next_check_at ? formatDate(tq.next_check_at, { withTime: true }) : '—'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
@@ -214,12 +235,14 @@ export const MonitoredProductsList: React.FC<MonitoredProductsListProps> = ({
                           checked={tq.is_active}
                           onCheckedChange={() => handleToggleMonitoring(tq)}
                           disabled={isBusy}
+                          aria-label="Monitoring"
                         />
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => handleCheckNow(tq)}
                           disabled={!tq.is_active || isBusy}
+                          title="Check now"
                         >
                           {isBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
                         </Button>

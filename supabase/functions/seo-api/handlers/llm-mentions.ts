@@ -414,28 +414,37 @@ export async function handleLlmMentions(req: Request, body: Loose): Promise<Resp
   }
 }
 
-/** Weekly: every active website, billed to its owner through the same spend gate as the button. */
+/** The DataForSEO calls one run makes for a site, so a schedule can be priced before it is switched on. */
+export async function aiVisibilityRunCalls(db: Loose, siteId: string): Promise<{ kind: string }[]> {
+  const market = await resolveMarket(db, siteId, {});
+  const covered = (await coverageFor(db, market)).filter((c) => c.covered).length;
+  const topics = (await topicsFor(db, siteId)).length;
+  const perPlatform = ['ai_llm_mentions_aggregated_metrics', 'ai_llm_mentions_historical', 'ai_llm_mentions_top_domains',
+    'ai_llm_mentions_top_brands', 'ai_llm_mentions_top_pages', 'ai_llm_mentions_search'];
+  return Array.from({ length: covered }, () => [...perPlatform, ...Array(topics).fill('ai_llm_mentions_search')])
+    .flat().map((kind) => ({ kind }));
+}
+
+/** Only sites whose owner scheduled AI visibility, billed to whoever switched the schedule on. */
 async function handleLlmMentionsCron(req: Request): Promise<Response> {
   if (!isCronAuthorized(req)) return json({ success: false, error: 'Unauthorized' }, 401);
   const db = createClient(supabaseUrl(), supabaseServiceKey());
-  const { data: sites, error } = await db
-    .from('user_websites')
-    .select('id, workspace_id, user_id, url, display_name')
-    .eq('is_active', true);
+  const { data: due, error } = await db.rpc('website_collectors_due', { p_collector: 'ai_visibility', p_limit: 50 });
   if (error) return json({ success: false, error: error.message }, 500);
 
   const results: Record<string, unknown>[] = [];
-  for (const site of (sites ?? []) as Site[]) {
-    if (!site.user_id) {
-      results.push({ website_id: site.id, skipped: 'no_owner_to_bill' });
-      continue;
-    }
+  for (const d of (due ?? []) as { website_id: string; payer_user_id: string | null }[]) {
+    const { data: site } = await db.from('user_websites')
+      .select('id, workspace_id, user_id, url, display_name').eq('id', d.website_id).maybeSingle();
+    if (!site) continue;
     if (!(await isWorkspaceEntitled(db, site.workspace_id, SEO_MODULE))) {
       results.push({ website_id: site.id, skipped: 'not_entitled' });
       continue;
     }
     try {
-      const out = await runFor(db, site, {}, site.user_id);
+      const out = await runFor(db, site as Site, {}, d.payer_user_id);
+      const { error: markErr } = await db.rpc('mark_collector_run', { p_website_id: site.id, p_collector: 'ai_visibility' });
+      if (markErr) console.error('[llm-mentions] could not record the run:', markErr.message);
       results.push({ website_id: site.id, market: out.market, platforms: out.platforms });
     } catch (e) {
       results.push({ website_id: site.id, error: e instanceof Error ? e.message : 'failed' });

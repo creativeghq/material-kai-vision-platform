@@ -8,6 +8,7 @@ import { ceilingCreditsFor } from '../../_shared/tools/dataforseo-spend-gate.ts'
 import { COLLECTOR_CADENCES, RANK_SERP_CALLS_PER_KEYWORD_MAX } from '../../_shared/seo/collectorSchedules.generated.ts';
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { RANK_SERP_DEPTH } from '../../_shared/seo/serp-price.ts';
+import { aiVisibilityRunCalls } from './llm-mentions.ts';
 
 /** Pages one scheduled crawl reads at most; mirrors MAX_BACKFILL_PER_RUN in crawl-user-website. */
 export const CRAWL_PAGES_PER_RUN = 50;
@@ -72,6 +73,15 @@ export async function handleCollectorEstimates(req: Request, body: any): Promise
       basis: `up to ${CRAWL_PAGES_PER_RUN} pages a run, ${perPage} credit each; while unread pages are queued it also reads them hourly, and pages not reached are refunded`,
     };
 
+  const ai = await aiVisibilityRunCalls(supabase, websiteId)
+    .then(async (calls) => {
+      if (calls.length === 0) return unknown('No AI platform covers this market yet, so a run collects nothing.');
+      const credits = await ceilingCreditsFor(supabase, calls);
+      return credits == null ? unknown('DataForSEO has no price row, so a run cannot be priced.')
+        : { per_run_max_credits: credits, backlog_max_credits: null, basis: `${calls.length} AI-answer corpus queries across the covered platforms` };
+    })
+    .catch((e) => unknown(`The run could not be priced: ${e instanceof Error ? e.message : String(e)}`));
+
   return jsonResponse({
     success: true,
     data: {
@@ -80,6 +90,7 @@ export async function handleCollectorEstimates(req: Request, body: any): Promise
         { collector: 'domain_tracking', cadences: COLLECTOR_CADENCES.domain_tracking, ...domain },
         { collector: 'site_audit', cadences: COLLECTOR_CADENCES.site_audit, ...audit },
         { collector: 'page_crawl', cadences: COLLECTOR_CADENCES.page_crawl, ...crawl },
+        { collector: 'ai_visibility', cadences: COLLECTOR_CADENCES.ai_visibility, ...ai },
       ],
     },
   });

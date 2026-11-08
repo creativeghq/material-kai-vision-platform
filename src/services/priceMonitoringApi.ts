@@ -83,6 +83,8 @@ export interface TrackedQuery {
   manufacturer: string | null;
   dimensions: string | null;
   country_code: string | null;
+  /** The daily scheduled refresh runs only when on; otherwise prices are checked on demand. */
+  auto_refresh?: boolean;
   is_active: boolean;
   mode: 'discovery' | 'url-only';
   pinned_url: string | null;
@@ -443,4 +445,10 @@ export async function marketCheck(params: MarketCheckParams): Promise<MarketChec
       verify_prices: params.verifyPrices ?? true,
     }),
   });
+}
+
+/** Switch the daily automatic price check for one monitored row on or off. */
+export async function setPriceAutoRefresh(trackedQueryId: string, on: boolean): Promise<void> {
+  const { error } = await (supabase as any).from('tracked_queries').update({ auto_refresh: on }).eq('id', trackedQueryId).is('api_key_id', null);
+  if (error) throw new Error(error.message);
 }

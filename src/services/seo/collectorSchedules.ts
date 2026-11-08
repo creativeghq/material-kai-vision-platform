@@ -1,4 +1,4 @@
-export const COLLECTORS = ['rank_tracking', 'domain_tracking', 'site_audit', 'page_crawl'] as const;
+export const COLLECTORS = ['rank_tracking', 'domain_tracking', 'site_audit', 'page_crawl', 'ai_visibility'] as const;
 export type CollectorKind = typeof COLLECTORS[number];
 
 export const CADENCES = ['off', 'daily', 'weekly', 'monthly'] as const;
@@ -10,6 +10,7 @@ export const COLLECTOR_CADENCES: Record<CollectorKind, readonly CollectorCadence
   domain_tracking: ['off', 'weekly', 'monthly'],
   site_audit: ['off', 'weekly', 'monthly'],
   page_crawl: ['off', 'daily', 'weekly'],
+  ai_visibility: ['off', 'weekly', 'monthly'],
 };
 
 export const RUNS_PER_MONTH: Record<CollectorCadence, number> = { off: 0, daily: 30, weekly: 4.3, monthly: 1 };

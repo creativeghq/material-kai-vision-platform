@@ -2,10 +2,8 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { jsonResponse } from '../../_shared/http.ts';
-import { runInBackground } from '../../_shared/background.ts';
 import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate } from '../../_shared/auth.ts';
-import { secretMatches } from '../../_shared/timing-safe.ts';
 import { resolveSecret } from '../../_shared/secrets.ts';
 import { DataForSEOClient } from '../../_shared/dataforseo-client.ts';
 import { DATAFORSEO_SERVICE } from '../../_shared/tools/dataforseo-spend-gate.ts';
@@ -20,10 +18,7 @@ import { reserveStage, serviceCredits, settleStage, type StageWallet } from './s
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const CRON_SECRET = () => Deno.env.get('CRON_SECRET') || '';
 
-export const ANSWER_CHECK_INTERVAL_DAYS = 7;
-const ARTICLES_PER_CRON_RUN = 3;
 const COVERAGE_ANSWER_CHARS = 3400;
 
 export type AnswerEngine = 'google_ai_mode' | 'chatgpt' | 'perplexity';
@@ -201,41 +196,15 @@ export async function checkArticle(supabase: DbClient, a: CheckableArticle) {
 
 export const ARTICLE_COLUMNS = 'id, user_id, workspace_id, website_id, slug, published_url, target_keyword, markdown_content, stages_data';
 
+/** On demand only: a person presses "Check AI answers" on one article. There is no scheduled sweep. */
 export async function handleAnswerCheck(req: Request, body: any): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
-  const isCron = secretMatches(req.headers.get('x-cron-secret'), CRON_SECRET());
-
-  if (!isCron) {
-    const auth = await authenticate(req);
-    if (!auth.success || !auth.userId) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
-    if (typeof body.article_id !== 'string') return jsonResponse({ success: false, error: 'article_id is required' }, 400);
-    const owned = await loadOwnedArticle(supabase, auth.userId, body.article_id);
-    if ('response' in owned) return owned.response;
-    const { data } = await supabase.from('seo_articles').select(ARTICLE_COLUMNS).eq('id', body.article_id).single();
-    return jsonResponse({ success: true, data: await checkArticle(supabase, data as CheckableArticle) });
-  }
-
-  const since = new Date(Date.now() - ANSWER_CHECK_INTERVAL_DAYS * 86_400_000).toISOString();
-  const { data: recent } = await supabase.from('seo_article_answer_checks').select('article_id').gte('checked_at', since);
-  const fresh = new Set((recent ?? []).map((r: { article_id: string }) => r.article_id));
-  const { data: candidates, error } = await supabase
-    .from('seo_articles')
-    .select(ARTICLE_COLUMNS)
-    .eq('status', 'completed')
-    .not('website_id', 'is', null)
-    .or('slug.not.is.null,published_url.not.is.null')
-    .order('created_at', { ascending: true })
-    .limit(500);
-  if (error) return jsonResponse({ success: false, error: error.message }, 500);
-  const due = ((candidates ?? []) as CheckableArticle[]).filter((a) => !fresh.has(a.id));
-  runInBackground((async () => {
-    let checked = 0;
-    for (const a of due) {
-      if (checked >= ARTICLES_PER_CRON_RUN) break;
-      const r = await checkArticle(supabase, a).catch((e: Error) => ({ article_id: a.id, status: 'failed', error: e.message }));
-      if (!('skipped' in r)) checked += 1;
-    }
-  })(), 'seo-answer-check');
-  return jsonResponse({ success: true, data: { due: due.length, checking_up_to: ARTICLES_PER_CRON_RUN } });
+  const auth = await authenticate(req);
+  if (!auth.success || !auth.userId) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+  if (typeof body.article_id !== 'string') return jsonResponse({ success: false, error: 'article_id is required' }, 400);
+  const owned = await loadOwnedArticle(supabase, auth.userId, body.article_id);
+  if ('response' in owned) return owned.response;
+  const { data } = await supabase.from('seo_articles').select(ARTICLE_COLUMNS).eq('id', body.article_id).single();
+  return jsonResponse({ success: true, data: await checkArticle(supabase, data as CheckableArticle) });
 }

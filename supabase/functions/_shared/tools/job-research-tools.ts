@@ -89,7 +89,7 @@ export const createTrackJobSearchTool = (
       remote_only, seniority, employment_type, salary_min, salary_currency,
       excluded_companies, preferred_companies, sources_enabled, careers_page_urls,
       digest_hour_utc, digest_day_of_week, alert_channels, refresh_interval_hours,
-      tracked_job_id, pause_scope,
+      tracked_job_id, pause_scope, auto_refresh,
     }) => {
       const denied = await moduleGate(workspaceId, MODULE_SLUG);
       if (denied) return denied;
@@ -131,6 +131,15 @@ export const createTrackJobSearchTool = (
         return JSON.stringify({ success: true, scope: pause_scope || 'all', tracked_job: r.data?.tracked_job });
       }
 
+      // refresh now — the on-demand run; billed per run by the backend
+      if (action === 'refresh') {
+        if (!targetId) return JSON.stringify({ success: false, error: 'tracked_job not found by label or id' });
+        const r = await callMivaa(`/api/v1/job-research/track/${targetId}/refresh`, { method: 'POST', jwt, actor: { userId, workspaceId } });
+        if (!r.ok) return JSON.stringify({ success: false, error: r.error || `backend ${r.status}` });
+        onChunk?.({ type: 'job_search_updated', tracked_job_id: targetId, action: 'refreshed', timestamp: Date.now() });
+        return JSON.stringify({ success: true, refreshed: r.data });
+      }
+
       // delete
       if (action === 'delete') {
         if (!targetId) return JSON.stringify({ success: false, error: 'tracked_job not found by label or id' });
@@ -165,6 +174,7 @@ export const createTrackJobSearchTool = (
       if (digest_day_of_week !== undefined && digest_day_of_week !== null) body.digest_day_of_week = digest_day_of_week;
       if (alert_channels?.length) body.alert_channels = alert_channels;
       if (refresh_interval_hours !== undefined) body.refresh_interval_hours = refresh_interval_hours;
+      if (auto_refresh !== undefined) body.auto_refresh = auto_refresh;
       // v0.2: thread the current chat conversation id through so the daily digest
       // posts back into THIS conversation as an assistant message.
       if (conversationId && action === 'start') body.source_conversation_id = conversationId;
@@ -206,7 +216,8 @@ export const createTrackJobSearchTool = (
         '  1. JOBS / KEYWORDS — ask "Which roles? (list as many as you like, separated by commas)". Split their comma-separated answer into the `keywords` array and pass EVERY term — there is no limit, do not trim the list.',
         '  2. LOCATION — ask for a location, or "remote". Set `location` and/or `remote_only=true`.',
         '  3. DAILY EMAIL — ALWAYS ask "Do you want a daily email when new jobs are found?" If yes → alert_channels=["bell","email"]; if no → alert_channels=["bell"].',
-        'Confirm the collected keywords + location + email choice back to the user before creating.',
+        '  4. AUTOMATIC SEARCH — ALWAYS ask "Should I search automatically every day (charged per run), or only when you ask?" Daily → auto_refresh=true; on request → auto_refresh=false (then use action=refresh whenever they ask for new jobs). Never assume daily.',
+        'Confirm the collected keywords + location + email choice + automatic-or-on-demand back to the user before creating.',
         '',
         'When the user says things like:',
         '  • "find me jobs daily"           → digest_hour_utc=7 (or the hour they specify), digest_day_of_week=null, refresh_interval_hours=24',
@@ -235,10 +246,10 @@ export const createTrackJobSearchTool = (
         'history of findings.',
         '',
         'To find an existing search, pass either tracked_job_id or its label. The label is matched',
-        'case-insensitively. To pause: action="pause". To resume: action="resume".',
+        'case-insensitively. To pause: action="pause". To resume: action="resume". To search now: action="refresh".',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['start', 'update', 'pause', 'resume', 'delete']).default('start'),
+        action: z.enum(['start', 'update', 'pause', 'resume', 'delete', 'refresh']).default('start'),
         label: z.string().optional().describe('Human-readable name like "Senior React jobs in Athens". REQUIRED for action=start.'),
         tracked_job_id: z.string().optional().describe('UUID of an existing tracked job search; pass instead of label for update/pause/resume/delete'),
         keywords: z.array(z.string()).optional().describe('Search terms. Ask the user for their roles as a COMMA-SEPARATED list and pass EVERY term they give — no cap, do not trim. Split "Product Manager, Vibe Coder, Product Builder" into ["Product Manager","Vibe Coder","Product Builder"]. Each keyword is searched independently across Google Jobs + Perplexity. Required for action=start.'),
@@ -258,6 +269,7 @@ export const createTrackJobSearchTool = (
         digest_day_of_week: z.number().int().min(0).max(6).nullable().optional().describe('0=Sunday..6=Saturday. NULL/omit = daily. Set when the user wants a weekly digest on a specific day ("every Monday morning" → 1, "every Friday" → 5).'),
         alert_channels: z.array(z.string()).optional().describe('Subset of ["bell","email","webhook"] (default ["bell","email"])'),
         refresh_interval_hours: z.number().int().min(24).max(168).optional().describe('Base cadence between background refreshes, in hours. DAILY FLOOR: minimum 24 — sub-daily is not allowed (anything <24 is raised to 24). Default 24. Cron auto-stretches up to 168h on quiet searches.'),
+        auto_refresh: z.boolean().optional().describe('Background daily search on (true) or on demand only (false, the default). Ask the user; never assume.'),
         pause_scope: z.enum(['all', 'digests_only']).optional()
           .describe('For action=pause/resume. "all" (default) stops both refresh and digest. "digests_only" keeps refresh running silently — useful when the user wants to "stop emailing me but keep collecting findings I can ask for on demand". Maps to: all → is_active flag; digests_only → digest_enabled flag.'),
       }),

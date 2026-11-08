@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Check, Lightbulb, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { Bot, Check, Lightbulb, Loader2, Plus, Sparkles, X } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
@@ -127,28 +127,47 @@ export function ArticleSuggestionsPanel({ articleId, extra, onChanged }: {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [checks, setChecks] = useState<AnswerCheck[]>([]);
+  const [checkingAnswers, setCheckingAnswers] = useState(false);
 
   const all = Array.isArray(extra?.suggestions) ? (extra.suggestions as ArticleSuggestion[]) : [];
   const pending = all.filter((s) => s.status === 'pending');
   const coverage = (extra?.coverage ?? null) as CoverageReport | null;
 
+  const loadChecks = useCallback(async () => {
+    const { data, error: readErr } = await supabase
+      .from('seo_article_answer_checks')
+      .select('engine, checked_at, status, our_domain_cited, missing')
+      .eq('article_id', articleId)
+      .order('checked_at', { ascending: false })
+      .limit(12);
+    if (readErr) console.warn('[ArticleSuggestions] answer checks unreadable:', readErr.message);
+    const latest = new Map<string, AnswerCheck>();
+    for (const row of (data ?? []) as AnswerCheck[]) if (!latest.has(row.engine)) latest.set(row.engine, row);
+    return [...latest.values()];
+  }, [articleId]);
+
   useEffect(() => {
     let live = true;
-    (async () => {
-      const { data, error: readErr } = await supabase
-        .from('seo_article_answer_checks')
-        .select('engine, checked_at, status, our_domain_cited, missing')
-        .eq('article_id', articleId)
-        .order('checked_at', { ascending: false })
-        .limit(12);
-      if (!live) return;
-      if (readErr) console.warn('[ArticleSuggestions] answer checks unreadable:', readErr.message);
-      const latest = new Map<string, AnswerCheck>();
-      for (const row of (data ?? []) as AnswerCheck[]) if (!latest.has(row.engine)) latest.set(row.engine, row);
-      setChecks([...latest.values()]);
-    })();
+    void loadChecks().then((c) => { if (live) setChecks(c); });
     return () => { live = false; };
-  }, [articleId]);
+  }, [loadChecks]);
+
+  const checkAnswers = useCallback(async () => {
+    setCheckingAnswers(true);
+    setError(null);
+    try {
+      const res = await invokeSeo({ action: 'answer_check', article_id: articleId });
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      setChecks(await loadChecks());
+      toast({ title: 'AI answers checked', description: "Google AI Mode, ChatGPT and Perplexity were asked this article's keyword." });
+      await onChanged();
+    } finally {
+      setCheckingAnswers(false);
+    }
+  }, [articleId, loadChecks, onChanged, toast]);
 
   const generate = useCallback(async () => {
     setGenerating(true);
@@ -208,14 +227,18 @@ export function ArticleSuggestionsPanel({ articleId, extra, onChanged }: {
           <p className="text-xs font-semibold">Article Suggestions</p>
           <p className="text-[11px] text-muted-foreground">
             Proposed edits for what readers expect and what the analysis found. Preview each, then add or dismiss it.
-            Suggesting uses credits; adding and dismissing are free.
+            Suggesting and checking AI answers use credits; adding and dismissing are free.
           </p>
         </div>
         {pending.length > 0 && suggestButton}
       </div>
 
-      <div className="border-b border-hairline px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-hairline px-3 py-2">
         <ReaderExpectations coverage={coverage} checks={checks} />
+        <Button size="sm" variant="outline" onClick={checkAnswers} disabled={checkingAnswers} className="gap-1.5">
+          {checkingAnswers ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Bot className="h-3.5 w-3.5" />}
+          {checkingAnswers ? 'Checking' : 'Check AI answers'}
+        </Button>
       </div>
 
       {error && (

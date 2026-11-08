@@ -2730,7 +2730,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createTrackJobSearchTool',
     description: 'Create, update, pause, resume, or delete a background job search.',
     params: [
-      { name: 'action', type: 'enum', enum: ['start', 'update', 'pause', 'resume', 'delete'], optional: true },
+      { name: 'action', type: 'enum', enum: ['start', 'update', 'pause', 'resume', 'delete', 'refresh'], optional: true },
       { name: 'label', type: 'string', optional: true, description: 'Human-readable name like "Senior React jobs in Athens". REQUIRED for action=start.' },
       { name: 'tracked_job_id', type: 'string', optional: true, description: 'UUID of an existing tracked job search; pass instead of label for update/pause/resume/delete' },
       { name: 'keywords', type: 'array', optional: true, description: 'Search terms. Ask the user for their roles as a COMMA-SEPARATED list and pass EVERY term they give — no cap, do not trim. Split "Product Manager, Vibe Coder, Product Builder" into ["Product Manager","Vibe Coder","Product Builder"]. Each keyword is searched independently across Google Jobs + Perplexity. Required for action=start.' },
@@ -2750,6 +2750,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'digest_day_of_week', type: 'number', optional: true, description: '0=Sunday..6=Saturday. NULL/omit = daily. Set when the user wants a weekly digest on a specific day ("every Monday morning" → 1, "every Friday" → 5).' },
       { name: 'alert_channels', type: 'array', optional: true, description: 'Subset of ["bell","email","webhook"] (default ["bell","email"])' },
       { name: 'refresh_interval_hours', type: 'number', optional: true, description: 'Base cadence between background refreshes, in hours. DAILY FLOOR: minimum 24 — sub-daily is not allowed (anything <24 is raised to 24). Default 24. Cron auto-stretches up to 168h on quiet searches.' },
+      { name: 'auto_refresh', type: 'boolean', optional: true, description: 'Background daily search on (true) or on demand only (false, the default). Ask the user; never assume.' },
       { name: 'pause_scope', type: 'enum', enum: ['all', 'digests_only'], optional: true, description: 'For action=pause/resume. "all" (default) stops both refresh and digest. "digests_only" keeps refresh running silently — useful when the user wants to "stop emailing me but keep collecting findings I can ask for on demand". Maps to: all → is_active flag; digests_only → digest_enabled flag.' },
     ],
   },

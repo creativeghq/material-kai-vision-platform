@@ -6,13 +6,14 @@ const CRONS: Array<[string, string]> = [
   ['supabase/functions/seo-domain-tracker/index.ts', 'domain_tracking'],
   ['supabase/functions/seo-site-audit/index.ts', 'site_audit'],
   ['supabase/functions/crawl-user-website/index.ts', 'page_crawl'],
+  ['supabase/functions/seo-api/handlers/llm-mentions.ts', 'ai_visibility'],
 ];
 
 describe('paid collectors run on the customer schedule (#475)', () => {
   it('each collector cron reads its due sites from the schedule and records the run', () => {
     for (const [file, collector] of CRONS) {
       const src = strippedSource(file);
-      if (collector !== 'page_crawl') {
+      if (collector !== 'page_crawl' && collector !== 'ai_visibility') {
         expect(src, file).toContain(`rpc('website_collectors_due', { p_collector: '${collector}'`);
         expect(src, file).not.toMatch(/from\('user_websites'\)\s*\.select\('id, workspace_id, url'\)\.eq\('is_active', true\)/);
       }
@@ -52,5 +53,18 @@ describe('paid collectors run on the customer schedule (#475)', () => {
     const gap = strippedSource('src/components/core/Profile/seo/CompetitorGapPanel.tsx');
     expect(gap).toContain("'get_competitor_keyword_gap'");
     expect(gap).toContain('<KeywordActions');
+  });
+
+  it('nothing paid runs on a schedule nobody chose: subjects opt in, articles are checked on demand', () => {
+    expect(strippedSource('supabase/functions/seo-api/handlers/llm-mentions.ts')).toContain("rpc('website_collectors_due', { p_collector: 'ai_visibility'");
+    expect(strippedSource('supabase/functions/seo-api/handlers/llm-mentions.ts')).not.toMatch(/from\('user_websites'\)[\s\S]{0,120}\.eq\('is_active', true\);/);
+    expect(strippedSource('supabase/functions/seo-api/handlers/toolkit-audit.ts')).toMatch(/\.eq\('auto_refresh', true\)/);
+    const answer = strippedSource('supabase/functions/seo-api/handlers/answer-check.ts');
+    expect(answer).not.toContain('x-cron-secret');
+    expect(answer).not.toContain('runInBackground');
+    expect(strippedSource('supabase/functions/seo-content-freshness/index.ts')).not.toContain("action: 'refresh'");
+    expect(strippedSource('src/components/features/ai/ArticleSuggestionsPanel.tsx')).toContain("action: 'answer_check'");
+    expect(strippedSource('src/components/business/mention-monitoring/MentionMonitorTab.tsx')).toContain('auto_refresh: on');
+    expect(strippedSource('src/components/business/price-monitoring/MonitoredProductsList.tsx')).toContain('setPriceAutoRefresh(');
   });
 });

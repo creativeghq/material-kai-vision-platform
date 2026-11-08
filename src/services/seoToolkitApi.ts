@@ -49,6 +49,7 @@ export interface SeoTrackedDomain {
   country_code: string | null;
   language_code: string;
   audit_cadence_hours: number;
+  auto_refresh: boolean;
   next_audit_at: string | null;
   last_audited_at: string | null;
   last_audit_id: string | null;
@@ -165,6 +166,7 @@ export async function createTrackedDomain(input: {
   country_code?: string | null;
   language_code?: string;
   audit_cadence_hours?: number;
+  auto_refresh?: boolean;
   notes?: string | null;
 }): Promise<SeoTrackedDomain> {
   const { data: userData } = await supabase.auth.getUser();
@@ -176,6 +178,7 @@ export async function createTrackedDomain(input: {
     country_code: input.country_code || null,
     language_code: (input.language_code || 'en').toLowerCase(),
     audit_cadence_hours: input.audit_cadence_hours ?? 168,
+    auto_refresh: input.auto_refresh === true,
     notes: input.notes || null,
   };
   const { data, error } = await (supabase as any)
@@ -190,7 +193,7 @@ export async function createTrackedDomain(input: {
 export async function updateTrackedDomain(
   id: string,
   patch: Partial<Pick<SeoTrackedDomain,
-    'display_label' | 'audit_cadence_hours' | 'is_active' | 'notes'
+    'display_label' | 'audit_cadence_hours' | 'auto_refresh' | 'is_active' | 'notes'
   >>,
 ): Promise<void> {
   const { error } = await (supabase as any)

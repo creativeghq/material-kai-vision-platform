@@ -90,8 +90,7 @@ const OUTLET_ICON: Record<string, React.ReactNode> = {
 
 export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => {
   const { toast } = useToast();
-  // admin-only diagnostic actions (force-refresh, classifier correction, promote) are
-  // operator-level platform controls. Resolved from the unified capability layer.
+  // Admin-only diagnostics (classifier correction, promote, exclusions) are operator controls.
   const { can } = usePermissions();
   const admin = can('platform.admin');
   const [tracked, setTracked] = useState<TrackedMention | null>(null);
@@ -234,6 +233,22 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
     }
   }, [subject, tracked?.id, toast]);
 
+  const handleAutoRefresh = useCallback(async (on: boolean) => {
+    if (!tracked?.id) return;
+    try {
+      const updated = await updateTrackedMention(tracked.id, { auto_refresh: on });
+      if (updated) setTracked(updated);
+      toast({
+        title: on ? 'Automatic checks on' : 'Automatic checks off',
+        description: on
+          ? `Mentions refresh every ${tracked.refresh_interval_hours || 24}h and AI answers are probed weekly, charged per run.`
+          : 'Nothing runs until you press Refresh or Run probe.',
+      });
+    } catch (e: any) {
+      toast({ title: 'Not saved', description: String(e?.message || e), variant: 'destructive' });
+    }
+  }, [tracked?.id, tracked?.refresh_interval_hours, toast]);
+
   /**
    * Synchronous latches on the two PAID actions (#360 CB-20).
    *
@@ -249,7 +264,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
     refreshingNow.current = true;
     setRefreshing(true);
     try {
-      const o = await refreshSubject(subject, { force: admin });
+      const o = await refreshSubject(subject, { force: true });
       toast({
         title: o.status === 'refreshed' ? `Refresh complete: ${o.hits_count || 0} mentions` : `Refresh ${o.status}`,
         description: o.errors && Object.keys(o.errors).length ? `Errors: ${Object.keys(o.errors).join(', ')}` : undefined,
@@ -261,7 +276,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
       refreshingNow.current = false;
       setRefreshing(false);
     }
-  }, [subject, admin, toast, load]);
+  }, [subject, toast, load]);
 
   const handleProbeLlm = useCallback(async () => {
     if (probingNow.current) return;
@@ -460,12 +475,16 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:justify-end">
             <span className="text-xs text-muted-foreground">{enabled ? 'Active' : 'Off'}</span>
-            <Switch checked={enabled} onCheckedChange={handleToggle} />
-            {admin && enabled && (
-              <Button onClick={handleRefresh} disabled={refreshing} size="sm" variant="outline">
-                <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
+            <Switch checked={enabled} onCheckedChange={handleToggle} aria-label="Monitoring" />
+            {enabled && (
+              <>
+                <span className="text-xs text-muted-foreground">Automatic checks</span>
+                <Switch checked={!!tracked?.auto_refresh} onCheckedChange={handleAutoRefresh} aria-label="Automatic checks" />
+                <Button onClick={handleRefresh} disabled={refreshing} size="sm" variant="outline">
+                  <RefreshCw className={`h-3 w-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </>
             )}
           </div>
         </CardHeader>
@@ -563,7 +582,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                 <CardContent className="p-0">
                   {filteredFeed.length === 0 ? (
                     <div className="p-6 text-center text-sm text-muted-foreground">
-                      No mentions yet. {enabled && admin ? 'Click "Refresh" to discover.' : ''}
+                      No mentions yet. {enabled ? 'Click "Refresh" to discover.' : ''}
                     </div>
                   ) : (
                     <ul className="divide-y divide-border">
@@ -745,7 +764,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
                     which sources those answers cite.
                   </p>
                 </div>
-                {admin && (
+                {enabled && (
                   <div className="flex items-center gap-2">
                     <Select
                       value={tracked?.probe_tier || 'cheap'}
@@ -1116,7 +1135,7 @@ export const MentionMonitorTab: React.FC<Props> = ({ subject, subjectName }) => 
 
           {/* Footer */}
           <div className="text-xs text-muted-foreground flex items-center gap-2">
-            Cadence: every {tracked.refresh_interval_hours || 24}h ·
+            {tracked.auto_refresh ? `Automatic checks: every ${tracked.refresh_interval_hours || 24}h` : 'On demand only'} ·
             {tracked.last_refreshed_at ? ` last refreshed ${formatDate(tracked.last_refreshed_at, { withTime: true })}` : ' never refreshed'}
           </div>
         </>

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -15,6 +16,7 @@ import {
   listAuditHistory,
   createTrackedDomain,
   deleteTrackedDomain,
+  updateTrackedDomain,
   setResearchRunStarred,
   deleteResearchRun,
   triggerAuditNow,
@@ -310,6 +312,18 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
     }
   };
 
+  const handleAutoAudit = async (d: SeoTrackedDomain, v: string) => {
+    try {
+      await updateTrackedDomain(d.id, v === 'off'
+        ? { auto_refresh: false }
+        : { auto_refresh: true, audit_cadence_hours: Number(v) });
+      toast({ title: v === 'off' ? `Automatic audits off for ${d.domain}` : `${d.domain}: automatic audits on` });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'Not saved', description: String(e?.message || e), variant: 'destructive' });
+    }
+  };
+
   const handleDelete = async (d: SeoTrackedDomain) => {
     if (!confirm(`Stop tracking "${d.domain}"?`)) return;
     try {
@@ -372,6 +386,12 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
                       </div>
                     </div>
                     <div className="flex items-center gap-1">
+                      <Select value={autoAuditValue(d)} onValueChange={(v) => void handleAutoAudit(d, v)}>
+                        <SelectTrigger className="h-8 w-36 text-xs" aria-label="Automatic audits"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {AUTO_AUDIT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
                       <Button
                         size="sm" variant="outline"
                         onClick={() => handleAuditNow(d)}
@@ -437,6 +457,16 @@ const DomainAuditTab: React.FC<{ onChange?: () => void }> = ({ onChange }) => {
   );
 };
 
+/** Automatic audits are off unless chosen; the value is the cadence in hours. */
+const AUTO_AUDIT_OPTIONS = [
+  { value: 'off', label: 'Off (on demand)' },
+  { value: '24', label: 'Daily' },
+  { value: '168', label: 'Weekly' },
+  { value: '720', label: 'Monthly' },
+] as const;
+const autoAuditValue = (d: { auto_refresh?: boolean; audit_cadence_hours: number }) =>
+  (d.auto_refresh ? (AUTO_AUDIT_OPTIONS.find((o) => o.value === String(d.audit_cadence_hours))?.value ?? '168') : 'off');
+
 // ───────────────────────────────────────────────────────────────────
 // Add domain dialog
 // ───────────────────────────────────────────────────────────────────
@@ -447,7 +477,7 @@ const AddDomainDialog: React.FC<{ open: boolean; onClose: () => void; onAdded: (
   const [label, setLabel] = useState('');
   const [country, setCountry] = useState('US');
   const [language, setLanguage] = useState('en');
-  const [cadence, setCadence] = useState(168);
+  const [autoAudit, setAutoAudit] = useState<string>('off');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
@@ -462,10 +492,11 @@ const AddDomainDialog: React.FC<{ open: boolean; onClose: () => void; onAdded: (
         display_label: label || null,
         country_code: country || null,
         language_code: language,
-        audit_cadence_hours: cadence,
+        audit_cadence_hours: autoAudit === 'off' ? 168 : Number(autoAudit),
+        auto_refresh: autoAudit !== 'off',
       });
       toast({ title: 'Domain added', description: `${domain} now tracked.` });
-      setDomain(''); setLabel(''); setCountry('US'); setLanguage('en'); setCadence(168);
+      setDomain(''); setLabel(''); setCountry('US'); setLanguage('en'); setAutoAudit('off');
       onAdded();
       onClose();
     } catch (e: any) {
@@ -500,8 +531,13 @@ const AddDomainDialog: React.FC<{ open: boolean; onClose: () => void; onAdded: (
               <Input id="seodashboard-language" placeholder="en" maxLength={5} value={language} onChange={(e) => setLanguage(e.target.value.toLowerCase())} />
             </div>
             <div>
-              <label htmlFor="seodashboard-cadence-hrs" className="text-xs text-muted-foreground">Cadence (hrs)</label>
-              <Input id="seodashboard-cadence-hrs" type="number" value={cadence} onChange={(e) => setCadence(parseInt(e.target.value, 10) || 168)} />
+              <label htmlFor="seodashboard-auto-audit" className="text-xs text-muted-foreground">Automatic Audits</label>
+              <Select value={autoAudit} onValueChange={setAutoAudit}>
+                <SelectTrigger id="seodashboard-auto-audit"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {AUTO_AUDIT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>

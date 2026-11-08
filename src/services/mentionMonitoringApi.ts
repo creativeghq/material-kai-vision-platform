@@ -95,6 +95,8 @@ export type HomepageDomain = string | null;
 
 export interface TrackedMention {
   id: string;
+  /** Scheduled refresh + weekly AI probe run only when on; otherwise everything is on demand. */
+  auto_refresh?: boolean;
   api_key_id: string | null;
   product_id: string | null;
   brand_name: string | null;
@@ -566,7 +568,7 @@ export async function createTrackedMention(
 
 export async function updateTrackedMention(
   id: string,
-  patch: Partial<CreateTrackedMentionInput & { is_active: boolean }>,
+  patch: Partial<CreateTrackedMentionInput & { is_active: boolean; auto_refresh: boolean }>,
 ): Promise<TrackedMention | null> {
   const res = await api<{ success: boolean; data: TrackedMention | null }>(
     `/api/v1/mention-monitoring/track/${id}`,
