@@ -343,7 +343,7 @@ export interface CostLine {
 export type CommandCentreFlagKey =
   | 'negative_forecast_margin' | 'over_budget' | 'billed_exceeds_contract'
   | 'pending_variations_exposure' | 'certified_unpaid_overdue' | 'late_deliveries'
-  | 'critical_snags_open' | 'overdue_requests' | 'mixed_currencies';
+  | 'critical_snags_open' | 'overdue_requests' | 'mixed_currencies' | 'revision_order_short';
 
 /** `get_project_command_centre` — every figure and every verdict is derived in SQL. */
 export interface ProjectCommandCentre {

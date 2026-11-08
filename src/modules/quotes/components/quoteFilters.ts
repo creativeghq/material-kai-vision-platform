@@ -11,7 +11,7 @@ import { NONE_VALUE, optionsFromRows, type FilterGroupDef, type FilterOption } f
 import { humanizeLabel } from '@/utils/humanize';
 import type { QuoteWithItems, StatusTag } from '../services/QuotesService';
 
-const QUOTE_STATUSES = ['draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired'] as const;
+const QUOTE_STATUSES = ['draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired', 'superseded'] as const;
 
 const statusOptions = (rows: QuoteWithItems[]): FilterOption[] => {
   const counts = new Map<string, number>();

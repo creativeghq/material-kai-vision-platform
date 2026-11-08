@@ -7,7 +7,7 @@ import React from 'react';
 import { Clock, FileText, CheckCircle, XCircle, Package } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 
-export type QuoteStatus = 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
+export type QuoteStatus = 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired' | 'superseded';
 
 interface StatusConfig {
   icon: React.ElementType;
@@ -22,6 +22,7 @@ const STATUS_CONFIG: Record<string, StatusConfig> = {
   accepted:  { icon: CheckCircle,  className: 'bg-green-100 text-green-800 hover:bg-green-100',  label: 'Accepted' },
   rejected:  { icon: XCircle,      className: 'bg-red-100 text-red-800 hover:bg-red-100',        label: 'Rejected' },
   expired:   { icon: XCircle,      className: 'bg-gray-100 text-gray-500 hover:bg-gray-100',     label: 'Expired' },
+  superseded: { icon: FileText,    className: 'bg-gray-100 text-gray-500 hover:bg-gray-100',     label: 'Superseded' },
 };
 
 const DEFAULT_CONFIG: StatusConfig = {
@@ -54,6 +55,7 @@ const QUOTE_STATUS_WORD_TONE: Record<string, string> = {
   accepted: 'text-emerald-600 dark:text-emerald-400',
   rejected: 'text-red-500 dark:text-red-400',
   expired: 'text-muted-foreground',
+  superseded: 'text-muted-foreground',
 };
 
 export function QuoteStatusWord({ status }: { status: string }) {

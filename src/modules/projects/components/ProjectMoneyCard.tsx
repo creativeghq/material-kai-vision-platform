@@ -27,10 +27,12 @@ const FLAG_TEXT: Record<CommandCentreFlagKey, (v: number, money: Money) => strin
   critical_snags_open: (v) => `${v} critical snag${v === 1 ? ' is' : 's are'} still open.`,
   overdue_requests: (v) => `${v} RFI/request${v === 1 ? ' is' : 's are'} past the due date.`,
   mixed_currencies: (v) => `Figures add amounts across ${v} currencies.`,
+  revision_order_short: (v, m) => `A revised quote was accepted after its order was already in progress — amend the order: it is ${m(v)} short of the revision.`,
 };
 
 const FLAG_SECTION: Partial<Record<CommandCentreFlagKey, string>> = {
   pending_variations_exposure: 'changes',
+  revision_order_short: 'billing',
   certified_unpaid_overdue: 'billing',
   billed_exceeds_contract: 'billing',
   late_deliveries: 'purchases',

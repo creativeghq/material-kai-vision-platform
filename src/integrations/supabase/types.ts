@@ -26357,6 +26357,8 @@ export type Database = {
           revision_number: number
           source_quote_id: string | null
           status: string
+          superseded_at: string | null
+          superseded_by_quote_id: string | null
           status_tag_id: string | null
           submitted_at: string | null
           subtotal: number | null
@@ -26405,6 +26407,8 @@ export type Database = {
           revision_number?: number
           source_quote_id?: string | null
           status?: string
+          superseded_at?: string | null
+          superseded_by_quote_id?: string | null
           status_tag_id?: string | null
           submitted_at?: string | null
           subtotal?: number | null
@@ -26453,6 +26457,8 @@ export type Database = {
           revision_number?: number
           source_quote_id?: string | null
           status?: string
+          superseded_at?: string | null
+          superseded_by_quote_id?: string | null
           status_tag_id?: string | null
           submitted_at?: string | null
           subtotal?: number | null

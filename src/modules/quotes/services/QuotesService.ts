@@ -18,7 +18,7 @@ export interface Quote {
   parent_quote_id?: string | null;
   revision_number?: number;
   name?: string;
-  status: 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired';
+  status: 'draft' | 'submitted' | 'quoted' | 'accepted' | 'rejected' | 'expired' | 'superseded';
   status_tag_id?: string;
   total_items: number;
   notes?: string;
