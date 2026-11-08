@@ -32,4 +32,15 @@ describe('packagingByFormat', () => {
     expect(packagingByFormat(null)).toEqual([]);
     expect(packagingByFormat({ boxes_per_pallet: 30 })).toEqual([]);
   });
+
+  it('keeps an https source link and drops anything else', () => {
+    const [ok, bad] = packagingByFormat({
+      per_variant: [
+        { format: '30x90', m2_per_box: 1.35, source: { url: 'https://azulrec.com/x/Keros-TEBAS.pdf' } },
+        { format: '30x90', m2_per_box: 1.35, source: { url: 'javascript:alert(1)' } },
+      ],
+    });
+    expect(ok.sourceUrl).toBe('https://azulrec.com/x/Keros-TEBAS.pdf');
+    expect(bad.sourceUrl).toBeNull();
+  });
 });

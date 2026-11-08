@@ -9,11 +9,17 @@ const COLUMNS: Array<{ key: keyof PackagingFormatRow['values']; label: string; u
   { key: 'weight_per_pallet_kg', label: 'Pallet Weight', unit: 'kg' },
 ];
 
+function fileName(url: string): string {
+  const last = url.split('/').pop() || 'sheet';
+  try { return decodeURIComponent(last); } catch { return last; }
+}
+
 export function PackagingByFormatTable({ packaging }: { packaging: unknown }) {
   const rows = packagingByFormat(packaging);
   if (rows.length === 0) return null;
   const showPallet = rows.some(r => r.pallet);
   const anyEstimated = rows.some(r => r.estimated.size > 0);
+  const sources = [...new Set(rows.map(r => r.sourceUrl).filter((u): u is string => !!u))];
   return (
     <div className="space-y-1.5">
       <Table>
@@ -43,9 +49,19 @@ export function PackagingByFormatTable({ packaging }: { packaging: unknown }) {
           ))}
         </TableBody>
       </Table>
+      {sources.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">
+          From the maker&apos;s packing sheet:{' '}
+          {sources.map((u, i) => (
+            <a key={u} href={u} target="_blank" rel="noopener noreferrer" className="underline">
+              {i > 0 ? ', ' : ''}{fileName(u)}
+            </a>
+          ))}
+        </p>
+      )}
       {anyEstimated && (
         <p className="text-[11px] text-muted-foreground">
-          est. = not published by the supplier; taken from the same brand&apos;s identical size. Hover a value for its basis.
+          est. = not published by the supplier; derived from the tile size or the same size in this or other brands. Hover a value for its basis.
         </p>
       )}
     </div>

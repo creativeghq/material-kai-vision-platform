@@ -44,6 +44,7 @@ export interface PackagingFormatRow {
   values: Record<(typeof FORMAT_KEYS)[number], number | null>;
   estimated: Set<string>;
   basis: string | null;
+  sourceUrl: string | null;
 }
 
 /** `packaging.per_variant` as rows; `estimated.fields` marks values the supplier did not publish. */
@@ -59,12 +60,14 @@ export function packagingByFormat(packaging: unknown): PackagingFormatRow[] {
     ) as PackagingFormatRow['values'];
     if (FORMAT_KEYS.every(k => values[k] === null)) continue;
     const est = (r.estimated ?? null) as { fields?: unknown; basis?: unknown } | null;
+    const src = (r.source ?? null) as { url?: unknown } | null;
     rows.push({
       format: typeof r.format === 'string' && r.format ? r.format : null,
       pallet: typeof r.pallet === 'string' && r.pallet ? r.pallet : null,
       values,
       estimated: new Set(Array.isArray(est?.fields) ? est.fields.filter((f): f is string => typeof f === 'string') : []),
       basis: typeof est?.basis === 'string' ? est.basis : null,
+      sourceUrl: typeof src?.url === 'string' && /^https:\/\//.test(src.url) ? src.url : null,
     });
   }
   return rows;

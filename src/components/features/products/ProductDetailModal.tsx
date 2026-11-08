@@ -1194,6 +1194,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       seen.add(norm);
       out.push(cert);
     }
+    for (const r of recordedCerts) {
+      if (r.standard && !out.some(c => certMatches(c, r.standard))) out.push(r.standard);
+    }
     return out;
   })();
   const certSource = extractValue(complianceData?.certifications_source);
