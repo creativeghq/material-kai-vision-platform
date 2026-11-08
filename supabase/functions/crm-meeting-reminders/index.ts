@@ -46,7 +46,7 @@ serve(withApiLogging('crm-meeting-reminders', async (req) => {
 
       let party = '';
       if (m.target_kind && m.target_id) {
-        const tbl = m.target_kind === 'company' ? 'crm_companies' : 'crm_contacts';
+        const tbl = m.target_kind === 'company' ? 'crm_companies' : m.target_kind === 'lead' ? 'crm_leads' : 'crm_contacts';
         const { data: p } = await supabase.from(tbl).select('name').eq('id', m.target_id).maybeSingle();
         party = (p as { name?: string } | null)?.name || '';
       }

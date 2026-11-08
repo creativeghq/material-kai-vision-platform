@@ -25,6 +25,8 @@ import {
   EDITABLE_LEAD_STATUSES, LeadFormFields, formToLeadInput, leadToForm, type EditableLeadStatus, type LeadFormState,
 } from '../components/LeadFormFields';
 import { ConvertLeadDialog } from '../components/ConvertLeadDialog';
+import { CrmRecordActivity } from '@/components/business/crm/CrmRecordActivity';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 
 const quoteLabel = (q: LeadQuote) => [q.quote_number, q.name].filter(Boolean).join(' · ') || 'Quote';
 
@@ -74,6 +76,7 @@ export const LeadDetailPage: React.FC = () => {
   }
 
   const converted = lead.status === 'converted';
+  const emailInInbox = lead.email ? () => navigate(inboxComposeEmailUrl({ to: lead.email!, leadId: lead.id })) : undefined;
   const overdue = !!lead.follow_up_on && !converted && lead.status !== 'lost' && lead.follow_up_on < todayLocalISO();
 
   const run = async (fn: () => Promise<unknown>, failTitle: string) => {
@@ -212,8 +215,8 @@ export const LeadDetailPage: React.FC = () => {
             }
             actions={
               <>
-                {lead.email && (
-                  <Button asChild size="sm" variant="outline"><a href={`mailto:${lead.email}`}><Mail className="mr-1 h-3.5 w-3.5" />Email</a></Button>
+                {emailInInbox && (
+                  <Button size="sm" variant="outline" onClick={emailInInbox}><Mail className="mr-1 h-3.5 w-3.5" />Email</Button>
                 )}
                 {lead.phone && (
                   <Button asChild size="sm" variant="outline"><a href={`tel:${lead.phone}`}><Phone className="mr-1 h-3.5 w-3.5" />Call</a></Button>
@@ -305,14 +308,22 @@ export const LeadDetailPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader><CardTitle>Notes</CardTitle></CardHeader>
-        <CardContent>
-          {lead.notes
-            ? <p className="whitespace-pre-wrap text-sm leading-relaxed">{lead.notes}</p>
-            : <HubEmptyState icon={FileText} title="No notes yet" description="Keep the conversation history here." action={!converted ? <Button size="sm" variant="outline" onClick={() => setEditForm(leadToForm(lead))}>Edit lead</Button> : undefined} />}
-        </CardContent>
-      </Card>
+      {lead.notes && (
+        <Card>
+          <CardHeader><CardTitle>Earlier Notes</CardTitle></CardHeader>
+          <CardContent>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{lead.notes}</p>
+          </CardContent>
+        </Card>
+      )}
+
+      <CrmRecordActivity
+        target={{ kind: 'lead', id: lead.id }}
+        workspaceId={lead.workspace_id}
+        people={[{ id: lead.id, name: lead.name, email: lead.email, kind: 'lead' }]}
+        recordLabel={lead.name}
+        onComposeEmail={emailInInbox}
+      />
     </HubRecordPage>
   );
 };

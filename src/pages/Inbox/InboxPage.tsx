@@ -44,6 +44,8 @@ const InboxPage: React.FC = () => {
     context,
     showNew,
     setShowNew,
+    composeSeed,
+    setComposeSeed,
     showAdd,
     setShowAdd,
     showDetails,
@@ -122,7 +124,7 @@ const InboxPage: React.FC = () => {
         <NewThreadDialog
           workspaceId={activeWorkspaceId}
           initialMode={
-            scopedFilterValue(filterValues, 'source') === 'email'
+            composeSeed || scopedFilterValue(filterValues, 'source') === 'email'
               ? 'email'
               : scopedFilterValue(filterValues, 'source') === 'whatsapp' || mode === 'whatsapp'
                 ? 'whatsapp'
@@ -131,8 +133,9 @@ const InboxPage: React.FC = () => {
                 : 'team'
           }
           scopedLabelId={labelFilter}
-          onClose={() => setShowNew(false)}
-          onCreated={(id) => { setShowNew(false); loadThreads(); openThread(id); }}
+          emailSeed={composeSeed}
+          onClose={() => { setShowNew(false); setComposeSeed(null); }}
+          onCreated={(id) => { setShowNew(false); setComposeSeed(null); loadThreads(); openThread(id); }}
         />
       )}
       <ForwardDialog

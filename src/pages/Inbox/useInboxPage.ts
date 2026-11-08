@@ -25,6 +25,7 @@ import { formatDate, formatTime } from '@/utils/datetime';
 import { useTrackOpens, type MailOpens } from './components/OpenTracking';
 import { encodeAttachments } from './composerAttachments';
 import { useComposerSettings } from './useComposerSettings';
+import { takeComposeEmailSeed, type ComposeEmailSeed } from './composeLink';
 
 
 
@@ -266,6 +267,7 @@ export function useInboxPage() {
   const draftSnapshot = useRef('');
 
   const [showNew, setShowNew] = useState(false);
+  const [composeSeed, setComposeSeed] = useState<ComposeEmailSeed | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   /** Mobile: the mailbox (views, sources, labels) as a drawer — the desktop sidebar has no room there. */
@@ -279,6 +281,15 @@ export function useInboxPage() {
       p.delete('new');
       setSearchParams(p, { replace: true });
     }
+  }, [activeWorkspaceId, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (!activeWorkspaceId) return;
+    const taken = takeComposeEmailSeed(searchParams);
+    if (!taken) return;
+    setComposeSeed(taken.seed);
+    setShowNew(true);
+    setSearchParams(taken.rest, { replace: true });
   }, [activeWorkspaceId, searchParams, setSearchParams]);
 
   /**
@@ -1385,6 +1396,8 @@ export function useInboxPage() {
     sendToken,
     showNew,
     setShowNew,
+    composeSeed,
+    setComposeSeed,
     showAdd,
     setShowAdd,
     showDetails,

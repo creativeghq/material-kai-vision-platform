@@ -42,7 +42,7 @@ export interface CrmMeeting {
   id: string;
   workspace_id: string | null;
   owner_user_id: string;
-  target_kind: 'contact' | 'company' | null;
+  target_kind: 'contact' | 'company' | 'lead' | null;
   target_id: string | null;
   subject: string;
   notes: string | null;
@@ -269,10 +269,11 @@ class CrmMeetingsService {
     if (error) throw error;
   }
 
-  /** Fill party_name from crm_contacts / crm_companies in two batched reads. */
+  /** Fill party_name from crm_contacts / crm_companies / crm_leads in batched reads. */
   private async resolvePartyNames(rows: CrmMeeting[]): Promise<void> {
     const contactIds = [...new Set(rows.filter((r) => r.target_kind === 'contact' && r.target_id).map((r) => r.target_id as string))];
     const companyIds = [...new Set(rows.filter((r) => r.target_kind === 'company' && r.target_id).map((r) => r.target_id as string))];
+    const leadIds = [...new Set(rows.filter((r) => r.target_kind === 'lead' && r.target_id).map((r) => r.target_id as string))];
     const names = new Map<string, string>();
     await Promise.all([
       contactIds.length
@@ -282,6 +283,10 @@ class CrmMeetingsService {
       companyIds.length
         ? supabase.from('crm_companies').select('id, name').in('id', companyIds)
             .then(({ data }) => (data || []).forEach((c: any) => names.set(`company:${c.id}`, c.name)))
+        : Promise.resolve(),
+      leadIds.length
+        ? supabase.from('crm_leads').select('id, name').in('id', leadIds)
+            .then(({ data }) => (data || []).forEach((l) => names.set(`lead:${l.id}`, l.name)))
         : Promise.resolve(),
     ]);
     for (const r of rows) r.party_name = r.target_kind && r.target_id ? (names.get(`${r.target_kind}:${r.target_id}`) ?? null) : null;

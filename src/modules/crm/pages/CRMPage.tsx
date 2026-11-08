@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import { Users, Building2, Trash2, Mail, CreditCard, Key, Tags, Plus, Kanban, UserPlus } from 'lucide-react';
 
 import {
@@ -908,7 +909,7 @@ export const CRMManagement: React.FC = () => {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell className="hidden max-w-[18rem] break-all md:table-cell">{contact.email ? <a href={`mailto:${contact.email}`} className="text-primary hover:underline">{contact.email}</a> : <HubCellEmpty />}</TableCell>
+                          <TableCell className="hidden max-w-[18rem] break-all md:table-cell">{contact.email ? <HubCellLink to={inboxComposeEmailUrl({ to: contact.email, contactId: contact.id })}>{contact.email}</HubCellLink> : <HubCellEmpty />}</TableCell>
                           <TableCell className="hidden whitespace-nowrap lg:table-cell">{contact.phone ? <a href={`tel:${contact.phone}`} className="text-primary hover:underline">{contact.phone}</a> : <HubCellEmpty />}</TableCell>
                           <TableCell className="hidden max-w-[16rem] break-words sm:table-cell">{contactCompanyName(contact) || <HubCellEmpty />}</TableCell>
                           <TableCell className="hidden text-sm text-muted-foreground xl:table-cell">{professionalTypeLabel(contact.profession) || contact.profession || <HubCellEmpty />}</TableCell>

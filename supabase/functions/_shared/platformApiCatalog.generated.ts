@@ -2655,6 +2655,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "description": "Label to update (string (uuid))"
       },
+      "lead_id": {
+        "type": "string",
+        "description": "CRM lead the email is to; logs the send on the lead and never creates a contact for it (string (uuid))"
+      },
       "email_cc": {
         "type": "array",
         "description": "Cc addresses (at most 20 with Bcc)"

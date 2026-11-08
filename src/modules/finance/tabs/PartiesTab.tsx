@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import {
   Loader2, FileText, Receipt, Printer, BookOpen, Coins, Users, Banknote,
   ChevronDown, Mail, Download, Copy, RotateCcw, ExternalLink, RefreshCw, ShoppingCart, ArrowLeft,
@@ -806,7 +807,7 @@ const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statements
                 {party?.is_supplier && <span className="text-sky-600 dark:text-sky-400">Supplier</span>}
                 {(party?.is_customer || party?.is_supplier) && <span>·</span>}
                 {party?.email
-                  ? <a href={`mailto:${party.email}`} className="text-primary hover:underline">{party.email}</a>
+                  ? <Link to={inboxComposeEmailUrl({ to: party.email })} className="text-primary hover:underline" title="Write from the Inbox">{party.email}</Link>
                   : <span>No email on file</span>}
                 {party?.contact_group && <><span>·</span><span>{SEGMENT_LABELS[party.contact_group] ?? party.contact_group}</span></>}
               </p>

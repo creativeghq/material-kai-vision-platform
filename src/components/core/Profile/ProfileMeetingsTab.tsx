@@ -15,6 +15,7 @@ import { crmMeetingsService, type CrmMeeting } from '@/services/crmMeetingsServi
 import { SubjectLinkField, type SubjectValue } from '@/components/business/crm/SubjectLinkField';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { getErrorMessage } from '@/core/errors/utils';
+import { leadUrl } from '@/modules/crm/routes';
 
 const fmt = (iso: string) => new Date(iso).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
 
@@ -65,7 +66,7 @@ export const ProfileMeetingsTab: React.FC = () => {
 
   const openParty = (m: CrmMeeting) => {
     if (!m.target_kind || !m.target_id) return;
-    navigate(`/crm/${m.target_kind === 'contact' ? 'contacts' : 'companies'}/${m.target_id}`);
+    navigate(m.target_kind === 'lead' ? leadUrl(m.target_id) : `/crm/${m.target_kind === 'contact' ? 'contacts' : 'companies'}/${m.target_id}`);
   };
 
   const Row: React.FC<{ m: CrmMeeting; done?: boolean }> = ({ m, done }) => (

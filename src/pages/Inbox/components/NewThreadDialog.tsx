@@ -16,6 +16,7 @@ import { avatarTint, initials } from '../inboxFormat';
 import { WorkspaceMemberOption } from './InboxPrimitives';
 import { ComposeEmailForm } from './ComposeEmailForm';
 import { ComposeWhatsAppForm } from './ComposeWhatsAppForm';
+import type { ComposeEmailSeed } from '../composeLink';
 
 export interface ContactOption { id: string; label: string; email: string | null; hasAccount: boolean; }
 
@@ -23,9 +24,10 @@ export const NewThreadDialog: React.FC<{
   workspaceId: string;
   initialMode: 'team' | 'customer' | 'email' | 'whatsapp';
   scopedLabelId: string | null;
+  emailSeed?: ComposeEmailSeed | null;
   onClose: () => void;
   onCreated: (id: string) => void;
-}> = ({ workspaceId, initialMode, scopedLabelId, onClose, onCreated }) => {
+}> = ({ workspaceId, initialMode, scopedLabelId, emailSeed, onClose, onCreated }) => {
   const { toast } = useToast();
   const [mode, setMode] = useState<'team' | 'customer' | 'email' | 'whatsapp'>(initialMode);
   const [busy, setBusy] = useState(false);
@@ -175,7 +177,7 @@ export const NewThreadDialog: React.FC<{
             {mode === 'whatsapp' ? (
               <ComposeWhatsAppForm workspaceId={workspaceId} onCancel={onClose} onOpened={async (id) => { await applyScopedLabel(id); onCreated(id); }} />
             ) : mode === 'email' ? (
-              <ComposeEmailForm workspaceId={workspaceId} onCancel={onClose} onSent={async (id) => { await applyScopedLabel(id); onCreated(id); }} />
+              <ComposeEmailForm workspaceId={workspaceId} seed={emailSeed} onCancel={onClose} onSent={async (id) => { await applyScopedLabel(id); onCreated(id); }} />
             ) : mode === 'team' ? (
               <>
                 <div className="space-y-1.5">

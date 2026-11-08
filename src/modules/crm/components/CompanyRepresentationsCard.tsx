@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import { HubCellLink } from '@/components/core/hub';
 import { Factory, Handshake, Loader2, Mail, Phone, Plus, Trash2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -116,7 +118,7 @@ function PersonCell({ person }: { person: PersonRef | null }) {
       <div className="font-medium"><HubCellLink to={`/crm/contacts/${person.id}`}>{person.name}</HubCellLink>{person.position ? <span className="font-normal text-muted-foreground"> · {person.position}</span> : null}</div>
       <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
         {phone && <a href={telHref(phone)} className="inline-flex items-center gap-1 hover:underline"><Phone className="h-3 w-3" />{phone}</a>}
-        {person.email && <a href={`mailto:${person.email}`} className="inline-flex items-center gap-1 hover:underline"><Mail className="h-3 w-3" />{person.email}</a>}
+        {person.email && <Link to={inboxComposeEmailUrl({ to: person.email, contactId: person.id })} className="inline-flex items-center gap-1 hover:underline"><Mail className="h-3 w-3" />{person.email}</Link>}
       </div>
     </div>
   );

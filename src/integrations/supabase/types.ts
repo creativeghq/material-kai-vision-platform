@@ -40871,7 +40871,7 @@ export type Database = {
         | "lead_source"
         | "employment"
       crm_category_member_kind: "platform_user" | "crm_contact" | "crm_company"
-      crm_note_target_kind: "contact" | "company"
+      crm_note_target_kind: "contact" | "company" | "lead"
       detection_method:
         | "visual"
         | "spectral"
@@ -41191,7 +41191,7 @@ export const Constants = {
         "employment",
       ],
       crm_category_member_kind: ["platform_user", "crm_contact", "crm_company"],
-      crm_note_target_kind: ["contact", "company"],
+      crm_note_target_kind: ["contact", "company", "lead"],
       detection_method: [
         "visual",
         "spectral",

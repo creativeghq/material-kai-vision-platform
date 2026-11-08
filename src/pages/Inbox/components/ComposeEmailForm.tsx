@@ -17,6 +17,7 @@ import { useFileDrop } from '../useFileDrop';
 import { TrackOpensToggle, useTrackOpens } from './OpenTracking';
 import { FollowUpOnSend, applyPlatformPlan, describePlan, type SendFollowUpPlan } from './FollowUpOnSend';
 import { WritingScore } from './WritingScore';
+import type { ComposeEmailSeed } from '../composeLink';
 
 type Suggestion = { id: string; label: string; email: string };
 
@@ -29,13 +30,15 @@ async function toAttachment(file: File): Promise<AttachmentInput> {
 
 export const ComposeEmailForm: React.FC<{
   workspaceId: string;
+  seed?: ComposeEmailSeed | null;
   onCancel: () => void;
   onSent: (threadId: string) => void;
-}> = ({ workspaceId, onCancel, onSent }) => {
+}> = ({ workspaceId, seed, onCancel, onSent }) => {
   const { toast } = useToast();
   const [from, setFrom] = useState<string | null | undefined>(undefined);
-  const [to, setTo] = useState('');
-  const [contactId, setContactId] = useState<string | null>(null);
+  const [to, setTo] = useState(seed?.to ?? '');
+  const [contactId, setContactId] = useState<string | null>(seed?.contactId ?? null);
+  const [leadId, setLeadId] = useState<string | null>(seed?.leadId ?? null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [cc, setCc] = useState('');
   const [bcc, setBcc] = useState('');
@@ -58,7 +61,7 @@ export const ComposeEmailForm: React.FC<{
 
   useEffect(() => {
     const term = to.trim();
-    if (contactId || term.length < 2) { setSuggestions([]); return; }
+    if (contactId || leadId || term.length < 2) { setSuggestions([]); return; }
     let cancelled = false;
     const t = setTimeout(async () => {
       const { data } = await supabase.from('crm_contacts')
@@ -75,7 +78,7 @@ export const ComposeEmailForm: React.FC<{
       })));
     }, 200);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [to, contactId, workspaceId]);
+  }, [to, contactId, leadId, workspaceId]);
 
   const [followUp, setFollowUp] = useState<SendFollowUpPlan | null>(null);
   const canSend = !!from && to.trim().includes('@') && subject.trim() && (body.trim() || files.length > 0);
@@ -89,6 +92,7 @@ export const ComposeEmailForm: React.FC<{
         workspace_id: workspaceId,
         to: to.trim(),
         contact_id: contactId ?? undefined,
+        lead_id: leadId ?? undefined,
         subject: subject.trim(),
         body: body.trim() || undefined,
         email_cc: splitAddresses(cc),
@@ -124,7 +128,8 @@ export const ComposeEmailForm: React.FC<{
             <Label htmlFor="compose-to" className="text-xs text-muted-foreground">To</Label>
             {!copiesOpen && <Button variant="ghost" size="sm" className="h-6 px-2 text-xs" onClick={() => setCopiesOpen(true)}>Cc / Bcc</Button>}
           </div>
-          <Input id="compose-to" placeholder="name@company.com or search contacts" value={to} onChange={(e) => { setTo(e.target.value); setContactId(null); }} />
+          <Input id="compose-to" placeholder="name@company.com or search contacts" value={to} onChange={(e) => { setTo(e.target.value); setContactId(null); setLeadId(null); }} />
+          {leadId && <p className="text-[11px] text-muted-foreground">Sent from here, it is logged on the lead&apos;s activity.</p>}
           {suggestions.length > 0 && (
             <div className="absolute z-20 left-0 right-0 top-full mt-1 rounded-sm border border-hairline bg-popover shadow-overlay p-1">
               {suggestions.map((s) => (

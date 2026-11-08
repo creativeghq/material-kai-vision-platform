@@ -18082,6 +18082,10 @@
                         "type": "string",
                         "description": "CRM contact the email is to; matched by address when omitted (string (uuid))"
                       },
+                      "lead_id": {
+                        "type": "string",
+                        "description": "CRM lead the email is to; logs the send on the lead and never creates a contact for it (string (uuid))"
+                      },
                       "email_cc": {
                         "type": "array",
                         "items": {

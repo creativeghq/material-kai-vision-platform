@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import { formatDate as formatDateValue } from '@/utils/datetime';
 import {
   Building2,
@@ -318,9 +320,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ project, isOwner = tru
                   <>
                     <p className="text-sm font-medium">{clientName}</p>
                     {clientEmail && (
-                      <a href={`mailto:${clientEmail}`} className="flex items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-foreground">
+                      <Link
+                        to={inboxComposeEmailUrl({ to: clientEmail, contactId: project.client_company ? null : project.client_contact_id })}
+                        className="flex items-center gap-1.5 truncate text-xs text-muted-foreground hover:text-foreground"
+                        title="Write from the Inbox"
+                      >
                         <Mail className="h-3.5 w-3.5 shrink-0" />{clientEmail}
-                      </a>
+                      </Link>
                     )}
                     {clientPhone && (
                       <a href={`tel:${clientPhone}`} className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">

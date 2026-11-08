@@ -9504,6 +9504,12 @@
             "desc": "CRM contact the email is to; matched by address when omitted"
           },
           {
+            "name": "lead_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "CRM lead the email is to; logs the send on the lead and never creates a contact for it"
+          },
+          {
             "name": "email_cc",
             "type": "string[]",
             "required": false,

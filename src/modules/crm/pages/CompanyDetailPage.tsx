@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { CompanySignalsPanel } from '@/components/signals/CompanySignalsPanel';
 import { ArrowLeft, Building2, MapPin, Globe, Save, Users, Trash2, Plus, Receipt, Percent, Package, Tag, Tags, Send, ShieldCheck, Loader2, Wallet, MessageSquare, Phone, ChevronDown, Clock, TrendingUp, RefreshCw, FolderKanban, Layers , Wrench, Kanban, PackageOpen, Radar } from 'lucide-react';
@@ -734,6 +735,8 @@ export const CompanyDetailPage: React.FC = () => {
   const initials = (company.name || '?').trim().split(/\s+/).map((w) => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '?';
   // People the Activity composer can email / add as meeting attendees: the company's own
   // inbox (emailable only) + each attached contact.
+  // A company's email goes to a real person in the Inbox, so the thread lands on a contact.
+  const emailRep = (company.contacts ?? []).find((c: any) => (c.contact_email ?? '').trim());
   const timelinePeople: TimelinePerson[] = [
     ...(company.email ? [{ id: company.id || 'company', name: company.name || 'Company', email: company.email, kind: 'company' as const }] : []),
     ...((company.contacts ?? []).map((c: any) => ({ id: c.contact_id, name: c.contact_name, email: c.contact_email, kind: 'contact' as const }))),
@@ -1284,9 +1287,9 @@ export const CompanyDetailPage: React.FC = () => {
                           </TableCell>
                           <TableCell className="hidden max-w-[18rem] break-all sm:table-cell">
                             {contact.contact_email ? (
-                              <a href={`mailto:${contact.contact_email}`} className="text-primary hover:underline">
+                              <HubCellLink to={inboxComposeEmailUrl({ to: contact.contact_email, contactId: contact.contact_id })}>
                                 {contact.contact_email}
-                              </a>
+                              </HubCellLink>
                             ) : (
                               <HubCellEmpty />
                             )}
@@ -1351,6 +1354,9 @@ export const CompanyDetailPage: React.FC = () => {
                 people={timelinePeople}
                 recordLabel={company.name}
                 refreshKey={activityRefresh}
+                onComposeEmail={emailRep
+                  ? () => navigate(inboxComposeEmailUrl({ to: emailRep.contact_email, contactId: emailRep.contact_id }))
+                  : undefined}
               />
             ) : (
               <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Create this company to start logging activity.</CardContent></Card>

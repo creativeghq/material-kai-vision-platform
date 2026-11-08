@@ -63,8 +63,8 @@ export interface TimelinePerson {
   id: string;
   name: string;
   email?: string | null;
-  /** 'company' entries are emailable but never offered as meeting attendees. */
-  kind?: 'contact' | 'company';
+  /** Only 'contact' entries are offered as attendees — attendee ids are crm_contacts ids. */
+  kind?: 'contact' | 'company' | 'lead';
 }
 
 interface Props {
@@ -212,7 +212,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
   // Person picker. Email can go to any person with an address; only real contacts
   // (not the company inbox) are offered as meeting/call attendees.
   const emailRecipients = (people ?? []).filter((p) => (p.email ?? '').trim());
-  const attendeeCandidates = (people ?? []).filter((p) => (p.kind ?? 'contact') !== 'company');
+  const attendeeCandidates = (people ?? []).filter((p) => (p.kind ?? 'contact') === 'contact');
   const hasPeople = Array.isArray(people);
   // Email action shows when there's someone to write to: an emailable person (company)
   // or the party's own address (contact, via canEmail).
@@ -288,7 +288,7 @@ export const CrmActivityTimeline: React.FC<Props> = ({ target, refreshKey = 0, o
       setRemindEmail(false);
       setRemindWhatsapp(false);
       setAttendeeIds([]);
-      setSendInvites(true);
+      setSendInvites(false);
       await load(); // instant refresh
     } catch (err) {
       toast({ title: 'Could not save', description: getErrorMessage(err), variant: 'destructive' });

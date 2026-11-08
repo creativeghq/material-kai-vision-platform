@@ -244,7 +244,7 @@ describe('the deal pipeline has one object and data-driven stages', () => {
       declared,
       'This union must equal the CHECK on crm_activities.target_kind. Widening it needs the ' +
       'migration in the same change.',
-    ).toEqual(['company', 'contact', 'deal', 'user']);
+    ).toEqual(['company', 'contact', 'deal', 'lead', 'user']);
   });
   it('a deal trigger config can only filter on keys the emitter actually sends', () => {
     // flow-engine matches trigger_config by EQUALITY against the event payload. A config key the

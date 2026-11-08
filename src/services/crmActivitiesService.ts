@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
  * other throws a CHECK violation at runtime while typechecking clean — the four-places
  * shape. Guarded by tests/unit/dealPipelineDerivation.test.ts.
  */
-export type CrmActivityTargetKind = 'contact' | 'company' | 'user' | 'deal';
+export type CrmActivityTargetKind = 'contact' | 'company' | 'user' | 'deal' | 'lead';
 export interface CrmActivityTarget { kind: CrmActivityTargetKind; id: string }
 
 /** A note written from a deal. It still belongs to the contact/company it targets. */

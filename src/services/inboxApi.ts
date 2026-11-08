@@ -641,7 +641,7 @@ export const inboxApi = {
     return call<{ text: string; mode: string }>('assist', { thread_id, mode, ...(extra ?? {}) });
   },
   composeEmail(input: {
-    workspace_id: string; to: string; subject: string; body?: string; contact_id?: string;
+    workspace_id: string; to: string; subject: string; body?: string; contact_id?: string; lead_id?: string;
     email_cc?: string[]; email_bcc?: string[]; attachments?: AttachmentInput[]; track_opens?: boolean; include_signature?: boolean;
   }) {
     return call<{ thread_id: string; delivery_error: string | null }>('compose_email', input);

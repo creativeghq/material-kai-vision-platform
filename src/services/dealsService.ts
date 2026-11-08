@@ -43,7 +43,7 @@ export interface Deal {
   owner_user_id: string | null;
   created_at: string;
   updated_at: string;
-  contact?: { id: string; name: string | null } | null;
+  contact?: { id: string; name: string | null; email?: string | null } | null;
   company?: { id: string; name: string | null } | null;
   property?: { id: string; title: string | null; reference_code: string | null; town: string | null } | null;
   task_total?: number;
@@ -81,7 +81,7 @@ const DEAL_SELECT =
   'id, workspace_id, deal_type_id, title, stage, status, value, currency, probability, ' +
   'expected_close_date, lost_reason, notes, contact_id, company_id, property_id, project_id, ' +
   'owner_user_id, created_at, updated_at, ' +
-  'contact:crm_contacts!crm_deals_contact_id_fkey ( id, name ), ' +
+  'contact:crm_contacts!crm_deals_contact_id_fkey ( id, name, email ), ' +
   'company:crm_companies ( id, name ), ' +
   'property:properties ( id, title, reference_code, town ), ' +
   'tasks:crm_deal_tasks ( id, done )';

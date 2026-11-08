@@ -25,10 +25,12 @@ interface Props {
   recordLabel?: string | null;
   /** Bumped by the page to force a reload after IT logs an activity (company attach, lead change…). */
   refreshKey?: number;
+  /** Replaces the Send-email dialog: a lead has no contact to send as, so it opens the Inbox. */
+  onComposeEmail?: () => void;
 }
 
 export const CrmRecordActivity = forwardRef<CrmRecordActivityHandle, Props>(
-  ({ target, workspaceId, people, recordLabel, refreshKey = 0 }, ref) => {
+  ({ target, workspaceId, people, recordLabel, refreshKey = 0, onComposeEmail }, ref) => {
     const emailableRecipients = useMemo(() => people.filter((p) => (p.email ?? '').trim()), [people]);
     const [internalBump, setInternalBump] = useState(0);
     const [emailOpen, setEmailOpen] = useState(false);
@@ -46,7 +48,7 @@ export const CrmRecordActivity = forwardRef<CrmRecordActivityHandle, Props>(
       setEmailOpen(true);
     };
 
-    useImperativeHandle(ref, () => ({ composeEmail: openEmail }), [emailableRecipients]);
+    useImperativeHandle(ref, () => ({ composeEmail: onComposeEmail ?? openEmail }), [emailableRecipients, onComposeEmail]);
 
     return (
       <>
@@ -55,12 +57,12 @@ export const CrmRecordActivity = forwardRef<CrmRecordActivityHandle, Props>(
           refreshKey={refreshKey + internalBump}
           people={people}
           canEmail={emailableRecipients.length > 0}
-          onComposeEmail={() => openEmail()}
+          onComposeEmail={onComposeEmail ?? (() => openEmail())}
         />
-        <SendEmailDialog
+        {!onComposeEmail && <SendEmailDialog
           open={emailOpen}
           onClose={() => setEmailOpen(false)}
-          recipients={emailableRecipients.map((p) => ({ email: p.email!.trim(), name: p.name, kind: p.kind }))}
+          recipients={emailableRecipients.map((p) => ({ email: p.email!.trim(), name: p.name, kind: p.kind === 'lead' ? undefined : p.kind }))}
           initialSelected={emailInitialSelected}
           recipientLabel={recordLabel}
           workspaceId={workspaceId}
@@ -75,7 +77,7 @@ export const CrmRecordActivity = forwardRef<CrmRecordActivityHandle, Props>(
               })
               .then(() => setInternalBump((n) => n + 1));
           }}
-        />
+        />}
       </>
     );
   },

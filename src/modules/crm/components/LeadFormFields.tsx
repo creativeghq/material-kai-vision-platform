@@ -86,10 +86,6 @@ export const LeadFormFields: React.FC<Props> = ({ form, onChange, disabled }) =>
         <Label htmlFor="lead-request">Request</Label>
         <Textarea id="lead-request" rows={3} disabled={disabled} value={form.request} onChange={(e) => set('request', e.target.value)} />
       </div>
-      <div className="space-y-1 sm:col-span-2">
-        <Label htmlFor="lead-notes">Notes</Label>
-        <Textarea id="lead-notes" rows={5} disabled={disabled} value={form.notes} onChange={(e) => set('notes', e.target.value)} />
-      </div>
       <div className="space-y-1">
         <Label>Status</Label>
         <Select disabled={disabled} value={form.status} onValueChange={(v) => set('status', v as EditableLeadStatus)}>

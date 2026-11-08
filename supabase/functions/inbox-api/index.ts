@@ -5099,6 +5099,14 @@ async function handleJwtAction(
         throw new HttpError(409, 'You have no active Inbox address to send from. Set one up in Inbox settings first.');
       }
 
+      let leadId: string | null = null;
+      if (payload.lead_id) {
+        const { data: l } = await db.from('crm_leads').select('id, workspace_id')
+          .eq('id', String(payload.lead_id)).maybeSingle();
+        if (!l || (l as { workspace_id: string }).workspace_id !== workspaceId) throw new HttpError(404, 'Lead not found in this workspace');
+        leadId = (l as { id: string }).id;
+      }
+
       let contactId: string | null = null;
       if (payload.contact_id) {
         const { data: c } = await db.from('crm_contacts').select('id, workspace_id')
@@ -5106,13 +5114,14 @@ async function handleJwtAction(
         if (!c || (c as { workspace_id: string }).workspace_id !== workspaceId) throw new HttpError(404, 'Contact not found in this workspace');
         contactId = (c as { id: string }).id;
       } else {
-        contactId = (await resolveCustomer(db, workspaceId, to, null, userId)).contactId;
+        // A lead is not a contact: match an existing one, never create one for it.
+        contactId = (await resolveCustomer(db, workspaceId, to, null, leadId ? null : userId)).contactId;
       }
 
       const { data: thread, error } = await db.from('inbox_threads').insert({
         workspace_id: workspaceId, thread_type: 'customer', channel: 'email',
         subject, status: 'open', created_by: userId, last_message_at: new Date().toISOString(),
-        metadata: { email_to: box.full_address.toLowerCase(), email_from: to, email_address_id: box.id },
+        metadata: { email_to: box.full_address.toLowerCase(), email_from: to, email_address_id: box.id, ...(leadId ? { lead_id: leadId } : {}) },
       }).select('*').single();
       if (error) throw new HttpError(500, `Failed to create conversation: ${error.message}`);
       const threadId = (thread as { id: string }).id;
@@ -5149,6 +5158,14 @@ async function handleJwtAction(
       } catch (e) {
         if (e instanceof HttpError && e.status === 502) return json({ thread_id: threadId, delivery_error: e.message });
         throw e;
+      }
+      if (leadId) {
+        const { error: actErr } = await db.from('crm_activities').insert({
+          target_kind: 'lead', target_id: leadId, workspace_id: workspaceId, actor_user_id: userId,
+          activity_type: 'email_sent', title: `Email sent to ${to}`, description: subject,
+          metadata: { recipients: [to], inbox_thread_id: threadId },
+        });
+        if (actErr) console.error('[inbox-api] compose_email: lead activity not logged', leadId, actErr);
       }
       return json({ thread_id: threadId, delivery_error: null });
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import { ArrowLeft, Mail, Phone, Building2, MapPin, Calendar, User, FileText, Save, Link as LinkIcon, Unlink, UserPlus, Receipt, Percent, Tag, Tags, Send, Wallet, Clock, MessageSquare, MessageCircle, X, ChevronDown, Sparkles, Loader2, RefreshCw, FolderKanban , Wrench, Home, Package } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/core/ui/collapsible';
 import { PartyAccountTabs } from '@/modules/finance/components/PartyAccountTabs';
@@ -838,6 +839,9 @@ export const ContactDetailPage: React.FC = () => {
                     people={timelinePeople}
                     recordLabel={contact.name}
                     refreshKey={activityRefresh}
+                    onComposeEmail={contact.email
+                      ? () => navigate(inboxComposeEmailUrl({ to: contact.email!, contactId: contact.id }))
+                      : undefined}
                   />
                 ) : null}
                 {contact.id ? <FollowUpsCard contactId={contact.id} /> : (

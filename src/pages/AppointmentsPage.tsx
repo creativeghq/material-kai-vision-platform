@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import {
   Calendar, Clock, Loader2, User, Mail, MessageSquare, CheckCircle2,
   XCircle, ChevronRight, Inbox, StickyNote, Link2 as LinkIcon,
@@ -239,9 +240,9 @@ function AppointmentDetailDrawer({
             </div>
             <div className="flex items-center gap-2 text-sm">
               <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
-              <a href={`mailto:${appt.client_email}`} className="text-primary hover:underline">
+              <Link to={inboxComposeEmailUrl({ to: appt.client_email })} className="text-primary hover:underline" title="Write from the Inbox">
                 {appt.client_email}
-              </a>
+              </Link>
             </div>
             {appt.client_message && (
               <div className="flex gap-2 text-sm mt-1">
