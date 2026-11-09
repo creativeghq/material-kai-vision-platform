@@ -20,8 +20,7 @@ export default async function globalSetup(_config: FullConfig) {
   }
 
   const browser = await chromium.launch();
-  // This launches its own context, so it does NOT inherit `use.extraHTTPHeaders` from the
-  // config — the bypass has to be applied here too, or the login would hit the SSO wall.
+  // Its own context: without the bypass header here the login hits the SSO wall.
   const page = await browser.newPage({
     ignoreHTTPSErrors: true,
     extraHTTPHeaders: bypassHeaders(baseURL),

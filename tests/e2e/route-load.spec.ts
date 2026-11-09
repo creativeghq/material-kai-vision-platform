@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 
 /**
  * Route-load smoke. For each top route: navigate, and FAIL if the page white-screens, throws

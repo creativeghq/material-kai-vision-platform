@@ -1,11 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
-import { bypassHeaders } from './tests/e2e/vercelBypass';
+import { SMOKE_BASE_URL } from './tests/e2e/fixtures';
 
-// Route-load smoke: drives the REAL deployed app in a headless browser and asserts each
-// route renders (no white-screen / chunk-load failure / error-boundary). Catches the class
-// of bug that took down /quotes /finance /discover after a deploy.
-const baseURL = process.env.SMOKE_BASE_URL || 'https://app.materialshub.gr';
-
+// Route-load smoke against the REAL deployed app. Context options (auth state, protection
+// bypass, timeouts) live in tests/e2e/fixtures.ts, which shares one context per worker.
 export default defineConfig({
   testDir: './tests/e2e',
   globalSetup: './tests/e2e/global-setup.ts',
@@ -15,17 +12,6 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['list']] : 'list',
   timeout: 45_000,
   expect: { timeout: 15_000 },
-  use: {
-    baseURL,
-    // Empty for the custom domain; the protection bypass when the target is a *.vercel.app
-    // candidate. Throws rather than returning empty if that target is protected and the secret
-    // is missing — see vercelBypass.ts.
-    extraHTTPHeaders: bypassHeaders(baseURL),
-    storageState: 'tests/e2e/.auth/state.json',
-    headless: true,
-    ignoreHTTPSErrors: true,
-    navigationTimeout: 30_000,
-    actionTimeout: 15_000,
-  },
+  use: { baseURL: SMOKE_BASE_URL, headless: true },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 });

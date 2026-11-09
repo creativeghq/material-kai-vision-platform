@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
 import { ROUTES } from './routes';
 import { AUDIT_FN, HARD_KINDS, type AuditResult } from './contentAudit';
