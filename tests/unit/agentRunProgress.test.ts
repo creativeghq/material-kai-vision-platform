@@ -291,13 +291,26 @@ describe('the run is wired to the stream and to the canvas', () => {
   it('a turn that only produced PROSE puts nothing in the chat and opens nothing', () => {
     // The whole point of the rebuild. A run with no steps is a turn that answered in words;
     // announcing "Ran 0 tools" under every reply is what the canvas pane did with a whole tab.
-    expect(hub).toMatch(/run\.status === 'running' \|\| run\.step_order\.length === 0\) return null/);
+    expect(hub).toMatch(/run\.status !== 'running' && run\.step_order\.length === 0\) return null/);
   });
 
-  it('a finished run’s line sits with its own turn, not on a pile above the stream', () => {
-    // Keyed on the user message that started it, so it lands where the work happened. Left on
-    // the pinned strip it would detach from its turn and grow by one every message.
+  it('a run’s line sits with its own turn — live or finished — not on a pile above the stream', () => {
     expect(hub).toMatch(/runsByUserMessage\.get\(message\.id\)/);
+    // A live workflow renders its tracker IN the turn, never only in a block above every message.
+    expect(hub).toMatch(/if \(wf && isLiveWorkflow\(wf\)\)/);
+    expect(hub).toMatch(/orphanWorkflows = Object\.values\(workflows\)[\s\S]{0,120}!turnBoundRunIds\.has\(wf\.run_id\)/);
+  });
+
+  it('a generation turn is ONE message: the reply replaces the instant bubble', () => {
+    const created = hub.slice(hub.indexOf("chunk.type === 'generation_job_created'"), hub.indexOf("chunk.type === 'gemini_image_ready'"));
+    expect(created).not.toMatch(/saveAndLinkMessage\(/);
+    expect(hub).toMatch(/prev\.filter\(\(m\) => m\.id !== generationMessageId\)/);
+  });
+
+  it('no workflow is left running after its turn ends, and new work starts blank', () => {
+    expect(hub).toMatch(/endRun\('done'\);\s*settleWorkflowsAtTurnEnd\(\);/);
+    expect(hub).toMatch(/const handleNewConversation = useCallback\(\(\) => \{[\s\S]{0,120}clearLiveWork\(\)/);
+    expect(hub).toMatch(/isAgentSwitch && !adoptedForConversation\)[\s\S]{0,200}clearLiveWork\(/);
   });
 
   it('an aborted workflow does not take its turn page down with it', () => {
@@ -365,7 +378,8 @@ describe('the run is wired to the stream and to the canvas', () => {
   it('both workflow continue paths bind their send to the workflow', () => {
     // Unbound, the send opens a run of its own and the turn draws two cards: the pipeline,
     // and the tools executing it.
-    expect(hub.split('pendingWorkflowRunIdRef.current = ').length - 1).toBe(3);
+    const binds = hub.match(/pendingWorkflowRunIdRef\.current = (?!null)\S+/g) ?? [];
+    expect(binds.sort()).toEqual(['pendingWorkflowRunIdRef.current = args.runId;', 'pendingWorkflowRunIdRef.current = wf.run_id;']);
   });
 
   it('offers the wizard slot only when the wizard has something to put in it', () => {

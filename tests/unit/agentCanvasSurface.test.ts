@@ -298,11 +298,9 @@ describe('the chat still says what is happening', () => {
     expect(hub).toContain('<RunChip');
   });
 
-  it('only a RUNNING run is pinned above the stream', () => {
-    // Left pinned after it finishes, the strip grows by one every turn and a long conversation
-    // opens on a stack of finished checklists detached from the turns that made them.
-    expect(hub).toMatch(/displayRuns\.some\(\(r\) => r\.status === 'running'\)/);
-    expect(hub).toMatch(/displayRuns\.filter\(\(r\) => r\.status === 'running'\)/);
+  it('only a running run with NO turn on screen is pinned above the stream', () => {
+    // A run with a turn renders under it; pinned above, B2B progress sat over the whole chat.
+    expect(hub).toMatch(/displayRuns\.filter\(\(r\) => r\.status === 'running' && !turnBoundRunIds\.has\(r\.run_id\)/);
   });
 
   it('one workflow ask on screen, not two', () => {

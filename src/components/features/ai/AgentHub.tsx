@@ -1230,6 +1230,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const activeRunIdRef = useRef<string | null>(null);
   /** Set by the wizard immediately before it sends: this turn belongs to that workflow run. */
   const pendingWorkflowRunIdRef = useRef<string | null>(null);
+  /** The conversation a first send just created, so the reset effect leaves its live run alone. */
+  const adoptedConversationIdRef = useRef<string | null>(null);
 
   /**
    * Fold one stream chunk into the active run.
@@ -1262,6 +1264,68 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       if (!run || run.status !== 'running') return prev;
       return { ...prev, [runId]: finishRun(run, status, errorMessage) };
     });
+  }, []);
+
+  /**
+   * No workflow stays "running" once its turn has ended. A step still open is FAILED (it never
+   * reported), only a step waiting on the user keeps the run live, and a later step chunk
+   * re-opens a settled run because the overall status is re-derived from its steps.
+   */
+  const settleWorkflowsAtTurnEnd = useCallback(() => {
+    setWorkflows((prev) => {
+      let changed = false;
+      const next: Record<string, WorkflowRuntimeState> = {};
+      for (const [id, wf] of Object.entries(prev)) {
+        const terminal = wf.status === 'done' || wf.status === 'failed' || wf.status === 'aborted';
+        if (terminal || wf.awaiting_input_step_id) { next[id] = wf; continue; }
+        const steps = { ...wf.steps };
+        for (const [sid, s] of Object.entries(steps)) {
+          if (s.status === 'running') {
+            steps[sid] = { ...s, status: 'failed', error_message: s.error_message || 'The turn ended before this step reported a result.', completed_at: new Date().toISOString() };
+          }
+        }
+        const statuses = Object.values(steps).map((s) => s.status);
+        // A wizard whose next step takes a form is WAITING ON THE USER, not finished.
+        const nextId = wf.step_order.find((sid) => (steps[sid]?.status ?? 'pending') === 'pending');
+        const nextSchema = nextId
+          ? getWorkflowDefinition(wf.definition_id)?.steps.find((s) => s.id === nextId)?.input_schema
+          : undefined;
+        if (nextId && nextSchema?.length && !statuses.includes('failed')) {
+          next[id] = {
+            ...wf,
+            steps: { ...steps, [nextId]: { ...(steps[nextId] || { step_id: nextId }), status: 'awaiting_input' } },
+            status: 'running',
+            awaiting_input_step_id: nextId,
+            awaiting_input_schema: nextSchema,
+            collapsed: false,
+          };
+          changed = true;
+          continue;
+        }
+        const status: WorkflowRuntimeState['status'] = statuses.includes('failed') ? 'failed'
+          : statuses.includes('done') ? 'done'
+          : 'failed';
+        next[id] = { ...wf, steps, status, collapsed: status === 'done' };
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  /**
+   * Drop all live work: a different agent or a new chat must start blank. `keepFreshWizards`
+   * spares a wizard booted locally that has not run a step — booting one can itself switch agent.
+   */
+  const clearLiveWork = useCallback((opts?: { keepFreshWizards?: boolean }) => {
+    setRuns({});
+    setWorkflows((prev) => {
+      if (!opts?.keepFreshWizards) return Object.keys(prev).length ? {} : prev;
+      const kept = Object.fromEntries(Object.entries(prev).filter(([, wf]) =>
+        wf.metadata?.booted_locally && !Object.values(wf.steps).some((s) => s.status === 'done' || s.status === 'failed')));
+      return Object.keys(kept).length === Object.keys(prev).length ? prev : kept;
+    });
+    activeRunIdRef.current = null;
+    if (!opts?.keepFreshWizards) pendingWorkflowRunIdRef.current = null;
   }, []);
 
   /**
@@ -1934,6 +1998,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       if (isAgentSwitch && !adoptedForConversation) {
         setCurrentConversationId(null);
         setMessages([]);
+        // The id may already be null, in which case the conversation-reset effect never fires.
+        clearLiveWork({ keepFreshWizards: true });
       }
     };
 
@@ -2614,6 +2680,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           // freshly-added user bubble from local state. Result: user's message
           // appears to "disappear" until the page is refreshed.
           loadedConversationParamRef.current = conversationId;
+          adoptedConversationIdRef.current = conversationId;
           setCurrentConversationId(conversationId);
           onConversationChange?.(conversationId);
           newConversation = conversation;
@@ -2684,6 +2751,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // conversation). A live-data agent MUST run every time.
       let data: any = null;
       let pendingGeminiData: Message['geminiImageData'] | null = null;
+      // The instant "Generating…" bubble: shown at once, replaced by the turn's reply, saved ONCE.
+      let generationMessageId: string | null = null;
+      let generationJobLocal: Message['generation_job'] | null = null;
       // The server's id for this turn, carried on every chunk. Several card paths below build
       // their own `final_result` object locally, so reading it off `data` alone would miss it —
       // and an unstamped save is one the server cannot tell from no save at all.
@@ -2952,20 +3022,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
 
                 setMessages((prev) => [...prev, generationMessage]);
-
-                // Save generation message to database immediately
-                if (conversationId) {
-                  await saveAndLinkMessage(generationMessage.id, {
-                    conversationId,
-                    role: 'assistant',
-                    content: generationMessage.content,
-                    metadata: {
-                      agentId: selectedAgent,
-                      model: selectedModel,
-                      generation_job: generationMessage.generation_job,
-                    },
-                  });
-                }
+                // Not saved here: the reply replaces this bubble and is saved with the job.
+                generationMessageId = generationMessage.id;
+                generationJobLocal = generationMessage.generation_job ?? null;
 
                 finalResult = {
                   type: 'final_result',
@@ -3842,6 +3901,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   const stepStatuses = Object.values(nextSteps).map((s: any) => s.status);
                   let overall: WorkflowRuntimeState['status'] = wf.status;
                   if (stepStatuses.some((s) => s === 'running' || s === 'awaiting_input')) overall = 'running';
+                  else if (stepStatuses.some((s) => s === 'failed')) overall = 'failed';
                   else if (stepStatuses.every((s) => s === 'done' || s === 'skipped')) overall = 'done';
                   return { ...prev, [chunk.run_id]: { ...wf, steps: nextSteps, status: overall } };
                 });
@@ -4109,7 +4169,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         model: data.model || selectedModel,
         demoData,
         materialData,
-        generation_job: data.generation_job, // Async 3D generation job info
+        generation_job: data.generation_job ?? generationJobLocal ?? undefined,
         geminiImageData: pendingGeminiData ?? undefined,
         searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec from material_search
         followUps: directRun?.toolkitId && !directRun.resumeAfter
@@ -4122,11 +4182,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       };
 
       // Track active generation job if present
-      if (data.generation_job) {
+      if (assistantMessage.generation_job) {
+        const job = assistantMessage.generation_job;
         setActiveGenerationJobs((prev) => {
           const updated = new Map(prev);
-          updated.set(data.generation_job.job_id, {
-            ...data.generation_job,
+          updated.set(job.job_id, {
+            ...job,
             messageId: assistantMessage.id,
             startTime: Date.now(),
           });
@@ -4134,7 +4195,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         });
       }
 
-      setMessages((prev) => [...prev, assistantMessage]);
+      setMessages((prev) => [
+        ...(generationMessageId ? prev.filter((m) => m.id !== generationMessageId) : prev),
+        assistantMessage,
+      ]);
 
       // Save assistant message to database with response metrics
       if (conversationId) {
@@ -4160,7 +4224,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             cachedResponse: false,
             demoData, // Save demo data for DemoAgent
             materialData, // Save material data for Search Agent
-            generation_job: data.generation_job, // Save generation job info for async 3D generation
+            generation_job: assistantMessage.generation_job,
             geminiImageData: pendingGeminiData ?? undefined, // Gemini single-image result merged into this message
             searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec
             followUps: assistantMessage.followUps, // fallback chips, re-derived from the catalog on reload
@@ -4204,6 +4268,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     } finally {
       setIsLoading(false);
       endRun('done');
+      settleWorkflowsAtTurnEnd();
       activeRunIdRef.current = null;
       // The finished message renders from `messages`; leaving the buffer set would flash the
       // previous answer under the next turn's working panel.
@@ -4582,6 +4647,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const handleNewConversation = useCallback(() => {
     setCurrentConversationId(null);
     setMessages([]);
+    clearLiveWork();
     setHiddenArtifactIds([]);
     // Nothing is open, so nothing has been honoured: clicking the notification for the
     // conversation just left must reopen it rather than read as "already there".
@@ -4908,15 +4974,19 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
   // Reset the canvas when switching conversations.
   useEffect(() => {
+    // The first send of a new chat ADOPTS the id it just created: same thread, and wiping here
+    // would drop the run that send is feeding mid-stream.
+    if (currentConversationId && adoptedConversationIdRef.current === currentConversationId) {
+      adoptedConversationIdRef.current = null;
+      return;
+    }
     setActiveCanvasId(null);
     setHiddenArtifactIds([]);
-    // Runs are live state for THIS thread's turns — a reloaded conversation replays its
-    // messages, not its streams, so carrying them across would show the previous thread's
-    // work under the new one's tabs.
-    setRuns({});
-    activeRunIdRef.current = null;
+    // Runs and workflows are live state for THIS thread's turns; a reloaded conversation
+    // replays its messages, not its streams.
+    clearLiveWork();
     yieldedRunsRef.current = new Set();
-  }, [currentConversationId]);
+  }, [currentConversationId, clearLiveWork]);
 
   /** PRODUCING something opens it. Starting a turn does not. */
   const yieldedRunsRef = useRef<Set<string>>(new Set());
@@ -5977,6 +6047,67 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     ? canvasGroups.find((g) => g.members.some((m) => m.id === activeCanvasId)) ?? null
     : null;
 
+  // Suppressed for a run the modal is holding: the same plan twice on one screen.
+  const renderWorkflowTracker = (wf: WorkflowRuntimeState) => {
+    const awaitingId = wf.awaiting_input_step_id;
+    const showForm = awaitingId && wf.awaiting_input_schema && wf.awaiting_input_schema.length > 0;
+    return (
+      <WorkflowTracker
+        key={wf.run_id}
+        runtime={wf}
+        onToggleCollapse={() => setWorkflows((prev) => ({
+          ...prev,
+          [wf.run_id]: { ...prev[wf.run_id], collapsed: !prev[wf.run_id].collapsed },
+        }))}
+        onStepAction={(stepId, action) => handleWorkflowStepAction(wf.run_id, stepId, action)}
+        bottomSlot={showForm && (
+          <WorkflowInlineForm
+            prompt={wf.awaiting_input_prompt || `Step "${awaitingId}" needs input.`}
+            schema={wf.awaiting_input_schema!}
+            initialValues={wf.steps[awaitingId!]?.input}
+            onSubmit={async (values) => {
+              // Structured continuation so the agent prompt addendum parses it deterministically.
+              const continuation = `[workflow:${wf.definition_id}/${awaitingId}] continue with input: ${JSON.stringify(values)}`;
+              setWorkflows((prev) => ({
+                ...prev,
+                [wf.run_id]: {
+                  ...prev[wf.run_id],
+                  awaiting_input_step_id: null,
+                  awaiting_input_schema: undefined,
+                  awaiting_input_prompt: undefined,
+                  steps: { ...prev[wf.run_id].steps, [awaitingId!]: { ...(prev[wf.run_id].steps[awaitingId!] || { step_id: awaitingId!, status: 'pending' }), input: values, status: 'running' } },
+                },
+              }));
+              // Same binding the wizard sets: this send is a step of THIS workflow.
+              pendingWorkflowRunIdRef.current = wf.run_id;
+              setInput(continuation);
+              setTimeout(() => handleSendMessage(), 0);
+            }}
+            onCancel={() => setWorkflows((prev) => ({
+              ...prev,
+              [wf.run_id]: {
+                ...prev[wf.run_id],
+                awaiting_input_step_id: null,
+                awaiting_input_schema: undefined,
+                awaiting_input_prompt: undefined,
+              },
+            }))}
+            submitLabel={`Continue → ${wf.steps[awaitingId!]?.status === 'awaiting_input' ? 'Run step' : 'Save'}`}
+          />
+        )}
+      />
+    );
+  };
+  const isLiveWorkflow = (wf: WorkflowRuntimeState) =>
+    wf.status === 'planning' || wf.status === 'running' || !!wf.awaiting_input_step_id;
+  const visibleMessageIds = new Set(visibleMessages.map((m) => m.id));
+  const turnBoundRunIds = new Set(
+    displayRuns.filter((r) => r.user_message_id && visibleMessageIds.has(r.user_message_id)).map((r) => r.run_id),
+  );
+  const orphanWorkflows = Object.values(workflows)
+    .filter((wf) => isLiveWorkflow(wf) && !turnBoundRunIds.has(wf.run_id))
+    .filter((wf) => activeCanvasId !== `run:${wf.run_id}`);
+
   return (
     <ActiveMoodboardProvider value={activeMoodboard} onChange={setActiveMoodboard}>
     <div className="flex flex-1 min-h-0">
@@ -6150,16 +6281,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               Without this rendered above the empty/non-empty branch, booting
               a workflow locally would update state but show nothing because
               the empty state still wins until the first message arrives. */}
-          {/* The run LINE while work is HAPPENING — "the other line that shows details of
-              generations". Pinned above the stream because it is about right now.
-
-              A FINISHED run's line renders with its own turn instead (below, under the user
-              message that started it): left here it would detach from its turn and the strip
-              would grow by one every message, so a long conversation opens on a stack of
-              finished checklists. */}
-          {displayRuns.some((r) => r.status === 'running') && (
+          {/* A running run with no turn on screen (e.g. booted before the first message). Every
+              other run, live or finished, renders under the user message that started it. */}
+          {displayRuns.some((r) => r.status === 'running' && !turnBoundRunIds.has(r.run_id) && !workflows[r.run_id]) && (
             <div className="max-w-md space-y-2 pl-11">
-              {displayRuns.filter((r) => r.status === 'running').map((run) => (
+              {displayRuns.filter((r) => r.status === 'running' && !turnBoundRunIds.has(r.run_id) && !workflows[r.run_id]).map((run) => (
                 <RunChip
                   key={`chip-${run.run_id}`}
                   run={run}
@@ -6176,7 +6302,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             * wizard would otherwise update state and show nothing.
             */}
           {visibleMessages.length === 0 && Object.values(workflows)
-            .filter((wf) => wf.status !== 'aborted' && wf.status !== 'done')
+            .filter(isLiveWorkflow)
             .filter((wf) => activeCanvasId !== `run:${wf.run_id}`)
             .map((wf) => (
               <WorkflowWizardCard
@@ -6232,7 +6358,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             );
           })()}
 
-          {visibleMessages.length === 0 && Object.values(workflows).filter((wf) => wf.status !== 'aborted' && wf.status !== 'done').length === 0 ? (
+          {visibleMessages.length === 0 && !Object.values(workflows).some(isLiveWorkflow) ? (
             // A fresh conversation opens on the welcome + starters, full width. This used to be
             // conditional on the canvas pane being unmounted, because an open-and-empty canvas
             // hosted the same block; the modal is never open with nothing in it, so this is the
@@ -6243,97 +6369,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             null
           ) : (
             <>
-              {/* Workflow trackers — pinned above messages, one per active run. Suppressed for
-                  a run the modal is currently holding, which says all of this at full size. */}
-              {Object.values(workflows).some((wf) => activeCanvasId !== `run:${wf.run_id}`) && (
-                <div className="space-y-2">
-                  {Object.values(workflows)
-                    .filter((wf) => wf.status !== 'aborted')
-                    // The modal is drawing this one at full size; a tracker under it would be
-                    // the same plan twice on one screen.
-                    .filter((wf) => activeCanvasId !== `run:${wf.run_id}`)
-                    .map((wf) => {
-                      const awaitingId = wf.awaiting_input_step_id;
-                      const showForm = awaitingId && wf.awaiting_input_schema && wf.awaiting_input_schema.length > 0;
-                      return (
-                        <WorkflowTracker
-                          key={wf.run_id}
-                          runtime={wf}
-                          onToggleCollapse={() => setWorkflows((prev) => ({
-                            ...prev,
-                            [wf.run_id]: { ...prev[wf.run_id], collapsed: !prev[wf.run_id].collapsed },
-                          }))}
-                          onStepAction={(stepId, action) => handleWorkflowStepAction(wf.run_id, stepId, action)}
-                          bottomSlot={showForm && (
-                            <WorkflowInlineForm
-                              prompt={wf.awaiting_input_prompt || `Step "${awaitingId}" needs input.`}
-                              schema={wf.awaiting_input_schema!}
-                              initialValues={wf.steps[awaitingId!]?.input}
-                              onSubmit={async (values) => {
-                                // The agent picks up the next message and resumes the workflow.
-                                // We package the form values as a structured continuation hint
-                                // so the agent prompt addendum can parse it deterministically.
-                                const continuation = `[workflow:${wf.definition_id}/${awaitingId}] continue with input: ${JSON.stringify(values)}`;
-                                setWorkflows((prev) => ({
-                                  ...prev,
-                                  [wf.run_id]: {
-                                    ...prev[wf.run_id],
-                                    awaiting_input_step_id: null,
-                                    awaiting_input_schema: undefined,
-                                    awaiting_input_prompt: undefined,
-                                    steps: { ...prev[wf.run_id].steps, [awaitingId!]: { ...(prev[wf.run_id].steps[awaitingId!] || { step_id: awaitingId!, status: 'pending' }), input: values, status: 'running' } },
-                                  },
-                                }));
-                                // Same binding the wizard sets: this send is a step of THIS
-                                // workflow, not a run of its own.
-                                pendingWorkflowRunIdRef.current = wf.run_id;
-                                setInput(continuation);
-                                // Auto-send so the user doesn't have to click again
-                                setTimeout(() => handleSendMessage(), 0);
-                              }}
-                              onCancel={() => setWorkflows((prev) => ({
-                                ...prev,
-                                [wf.run_id]: {
-                                  ...prev[wf.run_id],
-                                  awaiting_input_step_id: null,
-                                  awaiting_input_schema: undefined,
-                                  awaiting_input_prompt: undefined,
-                                },
-                              }))}
-                              submitLabel={`Continue → ${wf.steps[awaitingId!]?.status === 'awaiting_input' ? 'Run step' : 'Save'}`}
-                            />
-                          )}
-                        />
-                      );
-                    })}
-                </div>
+              {/* Only a workflow bound to no visible turn renders here; every other one renders
+                  under the user message that started it (see the end of each turn below). */}
+              {orphanWorkflows.length > 0 && (
+                <div className="space-y-2">{orphanWorkflows.map(renderWorkflowTracker)}</div>
               )}
               {visibleMessages.filter((m) => !turnLayout.absorbed.has(m.id)).map((message) => (
                 <React.Fragment key={message.id}>
-                {/* The FINISHED run's line, under the turn it belongs to.
-                    Pinning it above the stream with the live one would detach it from its turn
-                    and grow the strip by one every message, so a long conversation would open on
-                    a stack of finished checklists. A run with no steps draws nothing: that turn
-                    answered in words, and "Ran 0 tools" under every reply is exactly what this
-                    rebuild set out to remove. */}
-                {(() => {
-                  const run = runsByUserMessage.get(message.id);
-                  if (!run || run.status === 'running' || run.step_order.length === 0) return null;
-                  // Same shape as the artifact card below: indented past the avatar column, and
-                  // sized to its content. At the bubble's 75% it was a 1400px bar holding one
-                  // line of text.
-                  return (
-                    <div className="flex justify-start pl-11">
-                      <div className="w-full max-w-md">
-                        <RunChip
-                          run={run}
-                          active={activeCanvasId === `run:${run.run_id}`}
-                          onOpen={() => focusCanvas(`run:${run.run_id}`)}
-                        />
-                      </div>
-                    </div>
-                  );
-                })()}
                 {/*
                   * A bubble that would only repeat the card under it is not drawn.
                   * Three payloads carry no prose of their own — a pending question, an approval
@@ -6520,6 +6562,29 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 {turnLayout.attached.get(message.id)?.map((cardMsg) => (
                   <div key={cardMsg.id} className="flex justify-start pl-11">{renderArtifactCard(cardMsg)}</div>
                 ))}
+                {/* The turn's run, under the user message that started it — live or finished.
+                    A finished run with no steps draws nothing: that turn answered in words. */}
+                {(() => {
+                  const run = runsByUserMessage.get(message.id);
+                  if (!run) return null;
+                  const wf = workflows[run.run_id];
+                  if (wf && isLiveWorkflow(wf)) {
+                    if (activeCanvasId === `run:${wf.run_id}`) return null;
+                    return <div className="pl-11">{renderWorkflowTracker(wf)}</div>;
+                  }
+                  if (run.status !== 'running' && run.step_order.length === 0) return null;
+                  return (
+                    <div className="flex justify-start pl-11">
+                      <div className="w-full max-w-md">
+                        <RunChip
+                          run={run}
+                          active={activeCanvasId === `run:${run.run_id}`}
+                          onOpen={() => focusCanvas(`run:${run.run_id}`)}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
                 </React.Fragment>
               ))}
 
