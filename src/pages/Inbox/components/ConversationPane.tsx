@@ -360,6 +360,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
                     m={shown} info={info} collapsed={false} onToggle={() => undefined}
                     ours={activeThread.thread_type !== 'internal' ? (info?.kind === 'member' || info?.kind === 'agent') : (info?.userId != null && info.userId === myUserId)}
                     workspaceId={activeThread.workspace_id}
+                    onAddToNote={isMember ? addToNote : undefined}
                   />
                 );
               })() : undefined}
