@@ -1,6 +1,7 @@
 /** Brand profile — the positioning and voice every content producer reads at runtime, a website's own or the workspace default. */
 import React, { useCallback, useEffect, useState } from 'react';
 import { Check, Loader2, Save, ShieldCheck, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -11,6 +12,7 @@ import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { userWebsitesService, type CompetitorRow } from '@/services/userWebsitesService';
+import { platformLabel } from '@/components/core/icons/PlatformIcon';
 import {
   BRAND_FIELD_LABELS, BRAND_SOURCE_LABELS, type BrandProposableField, type BrandProposalOp, type BrandProposalSource,
 } from '@/config/brandProfileFields';
@@ -82,6 +84,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
   const [glossary, setGlossary] = useState<GlossaryLesson[]>([]);
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [competitors, setCompetitors] = useState<CompetitorRow[] | null>(null);
+  const [accounts, setAccounts] = useState<{ id: string; platform: string; handle: string | null }[] | null>(null);
   const [deciding, setDeciding] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -90,7 +93,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }
     setLoading(true);
-    const [{ data, error }, { data: lessons }, { data: pending }, comps] = await Promise.all([
+    const [{ data, error }, { data: lessons }, { data: pending }, comps, linked] = await Promise.all([
       supabase.from('workspace_brand_profile').select('*').eq('workspace_id', activeWorkspaceId),
       supabase.from('seo_writer_lessons').select('id, from_text, to_text')
         .eq('workspace_id', activeWorkspaceId).eq('kind', 'glossary').eq('status', 'approved').order('created_at'),
@@ -98,6 +101,8 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
         .select('id, website_id, field, op, value, rationale, source, evidence, agent_id, created_at')
         .eq('workspace_id', activeWorkspaceId).eq('status', 'proposed').order('created_at'),
       userWebsitesService.listCompetitors(websiteId).catch(() => null),
+      supabase.from('social_accounts').select('id, platform, handle')
+        .eq('workspace_id', activeWorkspaceId).eq('website_id', websiteId).order('platform'),
     ]);
     if (error) {
       // Leave the form unloaded: showing EMPTY would let Save write blanks over the real profile.
@@ -116,6 +121,7 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
     setGlossary((lessons ?? []) as GlossaryLesson[]);
     setProposals((pending ?? []) as unknown as Proposal[]);
     setCompetitors(comps ? comps.filter((c) => c.is_active) : null);
+    setAccounts(linked.error ? null : (linked.data ?? []));
     setLoading(false);
   }, [activeWorkspaceId, websiteId, toast]);
 
@@ -331,6 +337,18 @@ export const WebsiteBrandProfilePanel: React.FC<{ websiteId: string; onOpenCompe
               )}
             </FormField>
             {area('Writing Style', 'writing_style', 'Short paragraphs, concrete numbers, no marketing adjectives.')}
+            {list('Example Content', 'example_content_urls', 'https://…/our-best-article',
+              'Comma-separated links to pieces that sound right. Article briefs read them as the voice to match.')}
+            <FormField label="Social Accounts in This Voice" hint="Each connected account picks the website whose voice it writes in.">
+              <div className="flex flex-wrap items-center gap-2">
+                {accounts?.length
+                  ? accounts.map((a) => <Badge key={a.id} variant="neutral">{platformLabel(a.platform)}{a.handle ? ` · ${a.handle}` : ''}</Badge>)
+                  : <span className="text-xs text-muted-foreground">{accounts ? 'No social account writes as this website yet; they use the workspace default.' : 'Could not read the social accounts.'}</span>}
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/profile?tab=social-accounts">Manage social accounts</Link>
+                </Button>
+              </div>
+            </FormField>
           </FormSection>
 
           <FormSection title="Who is writing">

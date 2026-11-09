@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
 import { marketingService, summarizeAudienceConsent, type CampaignAudience, type CrmCategory, type MarketingTemplate, type AudienceRecipient } from '../services/marketingService';
+import { EmailCopyAssist } from './EmailCopyAssist';
 import { AudienceConsentNotice } from './AudienceConsentNotice';
 
 interface Props {
@@ -183,6 +184,12 @@ export const CreateMarketingCampaignModal: React.FC<Props> = ({ workspaceId, byo
             <FormField label="Preview Text" htmlFor="c-prev" optional>
               <Input id="c-prev" value={form.preview_text} onChange={(e) => setForm({ ...form, preview_text: e.target.value })} />
             </FormField>
+
+            <EmailCopyAssist
+              workspaceId={workspaceId}
+              subject={form.subject_line}
+              onPick={(subject, preview) => setForm((f) => ({ ...f, subject_line: subject, ...(preview != null ? { preview_text: preview } : {}) }))}
+            />
           </TabsContent>
 
           {/* Audience */}

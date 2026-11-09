@@ -6,6 +6,7 @@ import { corsHeaders } from '../../_shared/cors.ts';
 import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts';
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { zernioApi, ensureZernioSecrets } from '../zernio.ts';
+import { checkCopy, composePublishedText, loadCopyRules } from '../../_shared/copy-check.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -65,7 +66,13 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
 
   try {
     // Build Zernio createPost payload (POST /v1/posts).
-    const text = [post.caption, ...(post.hashtags || [])].filter(Boolean).join('\n\n');
+    const text = composePublishedText(post.caption ?? '', post.hashtags);
+    const rules = await loadCopyRules(supabase, account.platform);
+    const hard = checkCopy({ text: post.caption ?? '', hashtags: post.hashtags, rules }).warnings
+      .filter((w) => w.code === 'over_limit' || w.code === 'too_many_hashtags');
+    if (hard.length) {
+      return jsonResponse({ success: false, error: hard.map((w) => w.message).join(' ') }, 422);
+    }
 
     // MEDIA. A post can be drafted today and published next month, so a URL stored on the row is
     // the one thing that cannot be trusted at this moment: anything on a PRIVATE bucket has an

@@ -4,6 +4,15 @@ import type { ConsentBasis } from '../consentBasis';
 import type { Json } from '@/integrations/supabase/types';
 import { edgeError } from '@/utils/edgeError';
 
+export interface EmailCopyWarning { code: string; message: string }
+export interface EmailCopyDraft {
+  subjects: { angle: string; text: string; char_count: number; warnings: EmailCopyWarning[] }[];
+  preview_text: { text: string; char_count: number; warnings: EmailCopyWarning[] };
+  body: { headline: string; opening: string; points: string[]; cta_text: string; ps: string };
+  body_warnings: EmailCopyWarning[];
+  avoid_hits: string[];
+}
+
 export type CampaignStatus =
   | 'draft' | 'scheduled' | 'sending' | 'sent' | 'partial_failure' | 'paused' | 'cancelled';
 
@@ -281,6 +290,16 @@ class MarketingService {
     // when they did the campaign sent to whatever the page happened to be holding.
     await this.ensureRecipients(campaignId);
     return campaignId;
+  }
+
+  /** Subject options, preview text and a body outline in the chosen website's voice. Spends credits. */
+  async writeCopy(workspaceId: string, input: { brief: string; audience?: string; website_id?: string | null }): Promise<EmailCopyDraft> {
+    const { data, error } = await supabase.functions.invoke('generate-email-copy', {
+      body: { workspace_id: workspaceId, brief: input.brief, audience: input.audience || undefined, website_id: input.website_id || undefined },
+    });
+    if (error) throw await edgeError(error);
+    if (!data?.success) throw new Error(data?.error || 'Could not write the copy');
+    return data as EmailCopyDraft;
   }
 
   async setStatus(campaignId: string, next: CampaignStatus, fromStatuses: CampaignStatus[]): Promise<void> {

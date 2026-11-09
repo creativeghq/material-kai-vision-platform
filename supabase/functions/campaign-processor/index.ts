@@ -13,6 +13,8 @@ import { chargeCronWorkspace } from '../_shared/cron-billing.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 // One answer to "may this workspace send" (#357 AE-1).
 import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
+import { campaignPreflight } from '../_shared/email/campaign-preflight.ts';
+import { loadBrandContext } from '../_shared/brand-context.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
@@ -140,6 +142,26 @@ serve(withApiLogging('campaign-processor', async (req) => {
       if (template.workspace_id && template.workspace_id !== campaign.workspace_id) {
         await blockCampaign(supabase, campaign, 'template_missing', 'The campaign template does not belong to this workspace.');
         continue;
+      }
+
+      // Runs once, before the first send, for every path that flips a campaign to 'sending'.
+      if (!campaign.metadata?.credit_charged && !campaign.metadata?.preflight_passed_at) {
+        const brand = await loadBrandContext(supabase, campaign.workspace_id, null);
+        const check = await campaignPreflight(
+          supabase, campaign.workspace_id, campaign, brand.status === 'ok' ? brand.profile?.avoid_list ?? [] : [],
+        );
+        if (!check.ok) {
+          const blocks = check.issues.filter((i) => i.severity === 'block').map((i) => i.message);
+          await blockCampaign(supabase, campaign, 'preflight_failed', `Not sent: ${blocks.join(' ')}`);
+          continue;
+        }
+        campaign.metadata = {
+          ...(campaign.metadata || {}),
+          preflight_passed_at: new Date().toISOString(),
+          preflight_warnings: [...check.issues.map((i) => i.message), ...check.copy_warnings.map((w) => w.message)],
+        };
+        const { error: pfErr } = await supabase.from('campaigns').update({ metadata: campaign.metadata }).eq('id', campaign.id);
+        if (pfErr) { console.error(`Campaign ${campaign.id}: could not record the pre-send check:`, pfErr); continue; }
       }
 
       // Credit metering: charge the workspace owner ONCE per campaign (one unit of work), guarded so

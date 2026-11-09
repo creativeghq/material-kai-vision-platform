@@ -17,12 +17,12 @@ import { safeHref } from '@/utils/safeUrl';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
 
-/** The per-platform caption ceilings the generator writes to. Shown, so the limit is visible
- *  BEFORE the platform rejects the send rather than after. */
-const MAX_CHARS: Record<string, number> = {
-  instagram: 2200, facebook: 63206, linkedin: 3000, tiktok: 2200,
-  pinterest: 500, youtube: 5000, twitter: 280, threads: 500,
-};
+interface ChannelRule {
+  max_chars: number | null;
+  visible_chars: number | null;
+  hashtag_limit: number | null;
+  links_clickable: boolean | null;
+}
 
 export interface EditableAccount {
   id: string;
@@ -105,7 +105,17 @@ export const SocialPostEditorDialog: React.FC<{
     () => accounts.filter((a) => !post || a.platform === post.platform),
     [accounts, post],
   );
-  const limit = post ? MAX_CHARS[post.platform] : undefined;
+  const [rule, setRule] = useState<ChannelRule | null>(null);
+  useEffect(() => {
+    if (!post) { setRule(null); return; }
+    let cancelled = false;
+    void supabase.from('channel_writing_rules')
+      .select('max_chars, visible_chars, hashtag_limit, links_clickable')
+      .eq('channel', post.platform).eq('is_active', true).maybeSingle()
+      .then(({ data }) => { if (!cancelled) setRule((data as ChannelRule | null) ?? null); });
+    return () => { cancelled = true; };
+  }, [post]);
+  const limit = rule?.max_chars ?? undefined;
   // Hashtags ride along in the caption on every platform we post to, so the count has to include
   // them or the editor says 190/280 for a tweet the platform then refuses.
   const composed = [caption.trim(), hashtags.trim()].filter(Boolean).join('\n\n');
@@ -115,6 +125,10 @@ export const SocialPostEditorDialog: React.FC<{
     () => hashtags.split(/[\s,]+/).map((t) => t.trim().replace(/^#/, '')).filter(Boolean),
     [hashtags],
   );
+  const tooManyTags = rule?.hashtag_limit != null && parsedTags.length > rule.hashtag_limit;
+  const firstLine = caption.trim().split('\n')[0] ?? '';
+  const cutAt = rule?.visible_chars ?? null;
+  const hasLink = rule?.links_clickable === false && /https?:\/\/\S+/i.test(caption);
 
   const save = useCallback(async (): Promise<boolean> => {
     if (!post) return false;
@@ -224,6 +238,16 @@ export const SocialPostEditorDialog: React.FC<{
                 {composed.length}{limit ? ` / ${limit}` : ''} characters
                 {overLimit ? ` — ${platformLabel(post.platform)} will reject this.` : ''}
               </p>
+              {cutAt != null && firstLine.length > cutAt && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  Readers see «{firstLine.slice(0, cutAt)}…» before “more”. Put the point in the first {cutAt} characters.
+                </p>
+              )}
+              {hasLink && (
+                <p className="mt-1 text-[11px] text-[hsl(var(--warning))]">
+                  Links in a {platformLabel(post.platform)} caption are not clickable. Point to the link in your bio instead.
+                </p>
+              )}
             </div>
 
             <div>
@@ -238,6 +262,11 @@ export const SocialPostEditorDialog: React.FC<{
               />
               <p className="mt-1 text-[11px] text-muted-foreground">
                 Space or comma separated. The leading # is added for you.
+                {rule?.hashtag_limit != null && (
+                  <span className={tooManyTags ? 'text-[hsl(var(--error))]' : ''}>
+                    {' '}{parsedTags.length} / {rule.hashtag_limit}{tooManyTags ? ` — ${platformLabel(post.platform)} allows ${rule.hashtag_limit}; publishing will be refused.` : ''}
+                  </span>
+                )}
               </p>
             </div>
 

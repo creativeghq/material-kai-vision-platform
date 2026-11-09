@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Building2, Phone, ClipboardList,
+  Share2, BarChart3, Settings, FileText, Send, MessageCircle, Users, Building2, Phone, ClipboardList, CalendarRange,
 } from 'lucide-react';
 import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
 import { useEntitlements } from '@/hooks/useEntitlements';
@@ -10,6 +10,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { SocialAccountsTab } from './SocialAccountsTab';
 import { SocialAnalyticsPanel } from './SocialAnalyticsPanel';
 import { WorkspaceSocialAccounts } from './WorkspaceSocialAccounts';
+import { SocialPostMixPanel } from './SocialPostMixPanel';
 import { MessagingChannelsTab } from '@/modules/messaging/components/MessagingChannelsTab';
 import { PhoneNumbersTab } from '@/modules/messaging/components/PhoneNumbersTab';
 import { MessagingTemplatesTab } from '@/modules/messaging/components/MessagingTemplatesTab';
@@ -20,7 +21,7 @@ import { MessagingAnalyticsTab } from '@/modules/messaging/components/MessagingA
 import { MessagingOptoutsTab } from '@/modules/messaging/components/MessagingOptoutsTab';
 
 type SectionId =
-  | 'accounts' | 'workspace-accounts' | 'analytics'
+  | 'accounts' | 'workspace-accounts' | 'analytics' | 'post-mix'
   | 'whatsapp' | 'wa-numbers' | 'wa-templates' | 'wa-forms' | 'wa-campaigns' | 'wa-logs' | 'wa-analytics'
   | 'wa-optouts';
 
@@ -34,6 +35,7 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
   'accounts': SocialAccountsTab,
   'workspace-accounts': WorkspaceSocialAccounts,
   'analytics': SocialAnalyticsPanel,
+  'post-mix': SocialPostMixPanel,
   'whatsapp': MessagingChannelsTab,
   'wa-numbers': PhoneNumbersTab,
   'wa-templates': MessagingTemplatesTab,
@@ -60,6 +62,7 @@ export const SocialHubPanel: React.FC = () => {
       // connected handles is a disclosure, not a convenience.
       ...(isWorkspaceManager ? [{ id: 'workspace-accounts', label: 'Workspace Accounts', icon: Building2 }] : []),
       { id: 'analytics', label: 'Post Analytics', icon: BarChart3 },
+      ...(isWorkspaceManager ? [{ id: 'post-mix', label: 'Post Mix', icon: CalendarRange }] : []),
     ];
     if (hasMessaging && isWorkspaceManager) {
       out.push(
