@@ -184,9 +184,11 @@ const KAI_TOOLS: AgentToolEntry[] = [
   {
     id: 'manage_email_campaign', name: 'Email Campaigns', category: 'Email Marketing',
     moduleSlug: 'email-marketing',
-    desc: 'List email campaigns/templates and compose a DRAFT campaign (name + template + audience). The agent drafts; you review + send from Marketing → Email.',
+    desc: 'List email campaigns/templates, compose a DRAFT campaign, write its subject, preview text and body outline, and check it before sending. Sending asks for your approval.',
     examples: [
       'Draft a campaign to my architects category using the spring promo template',
+      'Write the subject and preview text for my spring campaign',
+      'Is my spring campaign ready to send?',
       'List my email campaigns',
     ],
   },
@@ -2299,7 +2301,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'email-marketing',
     capability: 'marketing.email',
     name: 'Email Marketing',
-    description: 'Compose draft email campaigns (name + template + audience) the agent drafts and you send from the Email page.',
+    description: 'Compose draft email campaigns, write their subject, preview text and body, and check them before sending.',
     icon: 'Mail',
     moduleSlug: 'email-marketing',
     tool_ids: ['manage_email_campaign'],
@@ -2307,6 +2309,20 @@ export const TOOLKITS: ToolkitDefinition[] = [
       // Drafting needs a template_id + category_ids that only `list_templates` and the
       // CRM categories can supply, so it stays a prompt.
       { label: 'Draft a campaign', description: 'Compose a draft campaign to a CRM audience', prompt: 'Draft an email campaign — show me my templates and audience categories first.', icon: 'Plus' },
+      {
+        label: 'Write campaign copy', description: 'Subject options, preview text and a body outline', icon: 'Pencil',
+        prompt: 'Write the copy for an email campaign.',
+        done: 'I\'ve drafted three subject lines, the preview text and a body outline, each checked against the email writing rules.',
+        run: { tool: 'manage_email_campaign', fixedArgs: { action: 'write_copy' } },
+        form: [
+          { key: 'brief', label: 'What Is the Email About?', kind: 'text', required: true, placeholder: 'Our new 120x120 porcelain range is in the showroom; invite architects to see it' },
+          { key: 'audience', label: 'Who Receives It', kind: 'text', placeholder: 'Architects and interior designers in Athens' },
+        ],
+      },
+      {
+        label: 'Check before sending', description: 'Template, links, subject, sender and reply-to',
+        prompt: 'Check my draft email campaign before I send it — list my campaigns first so I can pick one.', icon: 'BadgeCheck',
+      },
       {
         label: 'My Campaigns', description: 'List recent email campaigns', icon: 'ListChecks',
         prompt: 'List my recent email campaigns and their status.',

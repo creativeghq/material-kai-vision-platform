@@ -8,7 +8,8 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { formatBrandContextForPrompt, loadBrandContext } from '../_shared/brand-context.ts';
+import { brandDraftCheck, formatBrandContextForPrompt, loadBrandContext } from '../_shared/brand-context.ts';
+import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import { checkCopy, loadCopyRules } from '../_shared/copy-check.ts';
 import { SOCIAL_POST_FORMATS, type SocialPostFormat } from '../_shared/social-post-formats.ts';
 
@@ -75,9 +76,10 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
 
   let websiteId: string | null = null;
   if (socialAccountId) {
-    const { data: acct } = await supabase.from('social_accounts').select('workspace_id, website_id').eq('id', socialAccountId).maybeSingle();
-    if (!acct || acct.workspace_id !== ws) return jsonResponse({ success: false, error: 'Not found' }, 404);
-    websiteId = acct.website_id ?? null;
+    if (!ws) return jsonResponse({ success: false, error: 'workspace_id is required with social_account_id' }, 400);
+    await assertSameWorkspace(supabase, 'social_accounts', socialAccountId, ws, 'social account');
+    const { data: acct } = await supabase.from('social_accounts').select('website_id').eq('id', socialAccountId).eq('workspace_id', ws).maybeSingle();
+    websiteId = acct?.website_id ?? null;
   }
 
   const rules = await loadCopyRules(supabase, platform);
@@ -140,18 +142,19 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
         char_count: check.length,
         visible_before_cut: check.visible,
         warnings: check.warnings,
-        avoid_hits: check.warnings.find((w) => w.code === 'avoid_list')?.hits ?? [],
+        avoid_hits: brand ? brandDraftCheck(brand, `${c.caption} ${hashtags.join(' ')}`).avoid_hits : [],
       };
     });
     const brandCheck = {
       checked: !!brand && brand.status !== 'unavailable',
       avoid_hits: [...new Set(captions.flatMap((c) => c.avoid_hits))],
     };
+    let saveError: string | null = null;
     const generation = { topic, tone, format, platform, all_captions: captions, search_phrases: parsed.search_phrases, brand_check: brandCheck, copy_rules_checked: rules.status === 'ok' };
 
     let savedPostId = postId;
     if (!savedPostId && ws) {
-      const { data: newPost } = await supabase.from('social_posts').insert({
+      const { data: newPost, error: insertErr } = await supabase.from('social_posts').insert({
         workspace_id: ws,
         user_id: userId,
         social_account_id: socialAccountId,
@@ -165,19 +168,23 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
         generation_model: 'claude-haiku-5-5',
         metadata: generation,
       }).select('id').single();
-      savedPostId = newPost?.id;
+      if (insertErr) saveError = `The captions were written but the draft could not be saved: ${insertErr.message}`;
+      savedPostId = newPost?.id ?? null;
     } else if (postId && existingPost) {
-      await supabase.from('social_posts').update({
+      const { error: updateErr } = await supabase.from('social_posts').update({
         credits_used: (existingPost.credits_used || 0) + debitResult.credits_debited,
         credits_breakdown: { ...(existingPost.credits_breakdown || {}), caption: debitResult.credits_debited },
         caption: captions[0]?.caption,
         hashtags,
         metadata: { ...(existingPost.metadata || {}), ...generation },
       }).eq('id', postId);
+      if (updateErr) saveError = `The captions were written but the draft could not be updated: ${updateErr.message}`;
     }
 
     return jsonResponse({
       success: true,
+      saved: !saveError,
+      ...(saveError ? { save_error: saveError } : {}),
       post_id: savedPostId,
       captions,
       hashtags,

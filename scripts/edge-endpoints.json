@@ -3973,6 +3973,105 @@
     }
   },
   {
+    "name": "generate-email-copy",
+    "tag": "Email Marketing",
+    "summary": "Draft a marketing email's subject, preview text and body outline",
+    "description": "Writes 3 subject options (each a different angle), the preview text and a body outline for one marketing email, under the email_subject and email_preheader rows of channel_writing_rules, and returns the shared copy check's warnings for each. With campaign_id (a draft in the caller's workspace) it saves the first subject and the preview text onto that campaign. Needs the marketing.email capability and the Email Marketing module.",
+    "security": [
+      "supabaseJwt",
+      "apiKeyPartner"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "request": {
+      "content_type": "application/json",
+      "fields": {
+        "workspace_id": {
+          "type": "string",
+          "description": "Required. The workspace the email is for."
+        },
+        "brief": {
+          "type": "string",
+          "description": "What the email is about and what the reader should do. Required unless source_text is given."
+        },
+        "audience": {
+          "type": "string",
+          "description": "Who receives it."
+        },
+        "source_text": {
+          "type": "string",
+          "description": "Material to write from (an article, a product sheet). Treated as data, not instructions."
+        },
+        "campaign_id": {
+          "type": "string",
+          "description": "Optional draft campaign to save the subject and preview text onto."
+        },
+        "website_id": {
+          "type": "string",
+          "description": "Optional website whose brand profile to write in."
+        }
+      },
+      "required": [
+        "workspace_id"
+      ]
+    },
+    "response": {
+      "content_type": "application/json",
+      "fields": {
+        "success": {
+          "type": "boolean"
+        },
+        "campaign_id": {
+          "type": "string",
+          "nullable": true
+        },
+        "saved_to_campaign": {
+          "type": "boolean"
+        },
+        "subjects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "angle": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "char_count": {
+                "type": "integer"
+              },
+              "warnings": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        },
+        "preview_text": {
+          "type": "object"
+        },
+        "body": {
+          "type": "object"
+        },
+        "body_warnings": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "credits_used": {
+          "type": "number"
+        }
+      }
+    }
+  },
+  {
     "name": "generate-social-image",
     "tag": "Social",
     "summary": "Generate a social media image via Aurora, Gemini, or FLUX based on content type",

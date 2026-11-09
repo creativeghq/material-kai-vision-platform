@@ -35,6 +35,7 @@ export const API_KEY_ENDPOINTS: ReadonlySet<string> = new Set([
   'flow-engine',
   'generate-catalog-pdf',
   'generate-contract-pdf',
+  'generate-email-copy',
   'generate-interior-gemini',
   'generate-interior-video-v2',
   'generate-moodboard-sheet-pdf',

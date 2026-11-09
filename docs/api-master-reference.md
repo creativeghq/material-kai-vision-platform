@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (181)
+## 1. Supabase Edge Functions (182)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -354,6 +354,12 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `workspace-pulse` _(GET + POST)_ | JWT / kai_* | Glanceable per-section summary for the desktop widget |
+
+**Email Marketing**
+
+| Function | Auth | Summary |
+|---|---|---|
+| `generate-email-copy` | JWT / kai_* | Draft a marketing email's subject, preview text and body outline |
 
 **HR**
 

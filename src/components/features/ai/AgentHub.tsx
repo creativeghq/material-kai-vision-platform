@@ -417,6 +417,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   email_campaign_created: 'Draft Campaign Created',
   brand_change_proposed: 'Brand Change Proposed',
   email_campaign_sent: 'Campaign Sending',
+  email_copy_drafted: 'Email Copy Drafted',
+  email_campaign_preflight: 'Pre-Send Check',
   // CRM
   crm_company_created: 'Company Added to CRM',
   crm_contact_created: 'Contact Added to CRM',

@@ -148,6 +148,10 @@
       "description": "Dashboard functions."
     },
     {
+      "name": "Email Marketing",
+      "description": "Email Marketing functions."
+    },
+    {
       "name": "HR",
       "description": "HR functions."
     },
@@ -8139,6 +8143,115 @@
                 },
                 "required": [
                   "platform"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/generate-email-copy": {
+      "post": {
+        "tags": [
+          "Email Marketing"
+        ],
+        "summary": "Draft a marketing email's subject, preview text and body outline",
+        "operationId": "post_generate_email_copy",
+        "description": "Writes 3 subject options (each a different angle), the preview text and a body outline for one marketing email, under the email_subject and email_preheader rows of channel_writing_rules, and returns the shared copy check's warnings for each. With campaign_id (a draft in the caller's workspace) it saves the first subject and the preview text onto that campaign. Needs the marketing.email capability and the Email Marketing module.\n\n**Response:** (`application/json`)",
+        "security": [
+          {
+            "supabaseJwt": []
+          },
+          {
+            "apiKeyPartner": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "Required. The workspace the email is for."
+                  },
+                  "brief": {
+                    "type": "string",
+                    "description": "What the email is about and what the reader should do. Required unless source_text is given."
+                  },
+                  "audience": {
+                    "type": "string",
+                    "description": "Who receives it."
+                  },
+                  "source_text": {
+                    "type": "string",
+                    "description": "Material to write from (an article, a product sheet). Treated as data, not instructions."
+                  },
+                  "campaign_id": {
+                    "type": "string",
+                    "description": "Optional draft campaign to save the subject and preview text onto."
+                  },
+                  "website_id": {
+                    "type": "string",
+                    "description": "Optional website whose brand profile to write in."
+                  }
+                },
+                "required": [
+                  "workspace_id"
                 ]
               }
             }

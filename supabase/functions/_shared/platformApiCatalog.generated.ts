@@ -1345,6 +1345,41 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "generate-email-copy",
+    "tag": "Email Marketing",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Draft a marketing email's subject, preview text and body outline",
+    "description": "Writes 3 subject options (each a different angle), the preview text and a body outline for one marketing email, under the email_subject and email_preheader rows of channel_writing_rules, and returns the shared copy check's warnings for each. With campaign_id (a draft in the caller's workspace) it saves the first subject and the preview text onto that campaign. Needs the marketing.email capability ",
+    "fields": {
+      "workspace_id": {
+        "type": "string",
+        "description": "Required. The workspace the email is for."
+      },
+      "brief": {
+        "type": "string",
+        "description": "What the email is about and what the reader should do. Required unless source_text is given."
+      },
+      "audience": {
+        "type": "string",
+        "description": "Who receives it."
+      },
+      "source_text": {
+        "type": "string",
+        "description": "Material to write from (an article, a product sheet). Treated as data, not instructions."
+      },
+      "campaign_id": {
+        "type": "string",
+        "description": "Optional draft campaign to save the subject and preview text onto."
+      },
+      "website_id": {
+        "type": "string",
+        "description": "Optional website whose brand profile to write in."
+      }
+    }
+  },
+  {
     "name": "generate-interior-gemini",
     "tag": "AI Generation",
     "methods": [

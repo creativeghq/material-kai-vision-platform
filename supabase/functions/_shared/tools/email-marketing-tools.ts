@@ -21,6 +21,27 @@ const MODULE_SLUG = 'email-marketing';
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { callerDbClient } from '../caller-client.ts';
 import { brandDraftCheck, loadBrandContext } from '../brand-context.ts';
+import { campaignPreflight } from '../email/campaign-preflight.ts';
+
+const SUPABASE_URL = () => Deno.env.get('SUPABASE_URL') ?? '';
+const SUPABASE_ANON_KEY = () => Deno.env.get('SUPABASE_ANON_KEY') ?? '';
+
+/** Call an edge function AS the user, so its own auth and workspace checks apply. */
+async function callEdge(jwt: string, path: string, payload: Record<string, unknown>): Promise<{ ok: boolean; data?: any; error?: string }> {
+  try {
+    const resp = await fetch(`${SUPABASE_URL()}/functions/v1/${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${jwt}`, apikey: SUPABASE_ANON_KEY(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const text = await resp.text();
+    let parsed: any = {};
+    try { parsed = text ? JSON.parse(text) : {}; } catch { parsed = { error: text }; }
+    return resp.ok ? { ok: true, data: parsed } : { ok: false, data: parsed, error: parsed?.error || `${path} failed (${resp.status})` };
+  } catch (e) {
+    return { ok: false, error: `${path} call failed: ${(e as Error).message}` };
+  }
+}
 
 async function moduleReady(workspaceId: string): Promise<{ ok: boolean; error?: string }> {
   try {
@@ -47,7 +68,7 @@ export const createManageEmailCampaignTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, name, template_id, subject_line, description, category_ids, campaign_id, confirm }) => {
+    async ({ action, name, template_id, subject_line, preview_text, description, category_ids, campaign_id, brief, audience, source_text, confirm }) => {
       const gate = await moduleReady(workspaceId);
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const sb = svcClient();
@@ -100,6 +121,7 @@ export const createManageEmailCampaignTool = (
             description: description?.trim() || null,
             template_id,
             subject_line: subject_line?.trim() || null,
+            preview_text: preview_text?.trim() || null,
             audience_filter: { category_ids: Array.isArray(category_ids) ? category_ids : [], manual_emails: [] },
             status: 'draft',
             recipient_count: 0,   // resolved on the page when the user reviews + sends
@@ -131,17 +153,54 @@ export const createManageEmailCampaignTool = (
         });
       }
 
+      if (action === 'write_copy') {
+        if (!brief && !source_text) return JSON.stringify({ success: false, error: 'write_copy needs a brief or source_text.' });
+        if (!jwt) return JSON.stringify({ success: false, error: 'Writing copy needs an authenticated user session.' });
+        const res = await callEdge(jwt, 'generate-email-copy', { workspace_id: workspaceId, campaign_id, brief, audience, source_text });
+        if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
+        onChunk?.({ type: 'email_copy_drafted', campaign_id: res.data?.campaign_id ?? null, copy: res.data, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true,
+          ...res.data,
+          message: res.data?.saved_to_campaign
+            ? 'Subject and preview text saved on the draft campaign; the body outline is for the template editor. Show the user every subject option and its warnings.'
+            : 'Copy drafted. Show the user every subject option and its warnings; pass campaign_id to save it onto a draft.',
+        });
+      }
+
+      if (action === 'preflight') {
+        if (!campaign_id) return JSON.stringify({ success: false, error: 'preflight needs a campaign_id.' });
+        const { data: camp } = await sb.from('campaigns').select('id, name, template_id, subject_line, preview_text')
+          .eq('id', campaign_id).eq('workspace_id', workspaceId).eq('channel_type', 'email').maybeSingle();
+        if (!camp) return JSON.stringify({ success: false, error: 'campaign not found in this workspace' });
+        const brand = await loadBrandContext(sb, workspaceId);
+        const preflight = await campaignPreflight(sb, workspaceId, camp, brand.status === 'ok' ? brand.profile?.avoid_list ?? [] : []);
+        onChunk?.({ type: 'email_campaign_preflight', campaign_id, name: camp.name, preflight, timestamp: Date.now() });
+        return JSON.stringify({ success: true, preflight });
+      }
+
       if (action === 'send') {
         if (!campaign_id) return JSON.stringify({ success: false, error: 'send needs a campaign_id (a draft campaign).' });
         // Load + validate the draft campaign in-workspace.
         const { data: camp } = await sb
           .from('campaigns')
-          .select('id, name, status, audience_filter')
+          .select('id, name, status, audience_filter, template_id, subject_line, preview_text')
           .eq('id', campaign_id).eq('workspace_id', workspaceId).eq('channel_type', 'email').maybeSingle();
         if (!camp) return JSON.stringify({ success: false, error: 'campaign not found in this workspace' });
         if (camp.status !== 'draft' && camp.status !== 'paused') {
           return JSON.stringify({ success: false, error: `only draft/paused campaigns can be sent (this one is "${camp.status}")` });
         }
+        const brand = await loadBrandContext(sb, workspaceId);
+        const preflight = await campaignPreflight(sb, workspaceId, camp, brand.status === 'ok' ? brand.profile?.avoid_list ?? [] : []);
+        onChunk?.({ type: 'email_campaign_preflight', campaign_id, name: camp.name, preflight, timestamp: Date.now() });
+        if (!preflight.ok) {
+          return JSON.stringify({
+            success: false,
+            error: `This campaign cannot be sent yet: ${preflight.issues.filter((i) => i.severity === 'block').map((i) => i.message).join(' ')}`,
+            preflight,
+          });
+        }
+        const cautions = [...preflight.issues.filter((i) => i.severity === 'warn').map((i) => i.message), ...preflight.copy_warnings.map((w) => w.message)];
 
         // Resolve the audience through the ONE derivation the pages use — every source, deduped by
         // address, unsubscribes dropped. Membership-guarded, so it needs the user client. This tool
@@ -177,7 +236,10 @@ export const createManageEmailCampaignTool = (
             title: 'Send this email campaign?',
             summary: `Send campaign "${camp.name}" to ${recipients.length} recipient${recipients.length === 1 ? '' : 's'} from your CRM`
               + (withheld > 0 ? ` (${withheld} more held back — no marketing consent on file)` : '')
-              + `. Emails go out via the workspace's own Resend sender and cannot be recalled.`,
+              + `, subject "${preflight.subject}", from ${preflight.sender?.from_name} <${preflight.sender?.from_email}>`
+              + `. Emails go out via the workspace's own Resend sender and cannot be recalled.`
+              + (cautions.length ? ` Check: ${cautions.join(' ')}` : ''),
+            preflight,
             danger: true,
             toolkit_id: 'email-marketing',
             timestamp: Date.now(),
@@ -202,14 +264,21 @@ export const createManageEmailCampaignTool = (
       name: 'manage_email_campaign',
       description:
         'Email marketing: list campaigns/templates, compose a DRAFT campaign (name + template + audience), ' +
-        'and send a draft (action="send"). SENDING is a mass-comms action — it ALWAYS asks the user to ' +
-        'Approve/Decline first (never set confirm:true yourself; the UI sets it on approval). ' +
-        'Call list_templates first to get a template_id for create_draft.',
+        'write its copy (write_copy: 3 subject options, preview text and a body outline, checked against the ' +
+        'email writing rules; with campaign_id it saves the first subject and the preview onto that draft), ' +
+        'check a draft before sending (preflight: template, links, subject, sender, reply-to), ' +
+        'and send a draft (action="send", which runs the same check and refuses on a blocking issue). ' +
+        'SENDING is a mass-comms action — it ALWAYS asks the user to Approve/Decline first (never set ' +
+        'confirm:true yourself; the UI sets it on approval). Call list_templates first to get a template_id for create_draft.',
       schema: z.object({
-        action: z.enum(['list', 'list_templates', 'create_draft', 'send']).default('list'),
+        action: z.enum(['list', 'list_templates', 'create_draft', 'write_copy', 'preflight', 'send']).default('list'),
         name: z.string().optional().describe('Campaign name (required for create_draft).'),
         template_id: z.string().optional().describe('Marketing template id from list_templates (required for create_draft).'),
         subject_line: z.string().optional(),
+        preview_text: z.string().optional().describe('create_draft: the line inboxes show after the subject.'),
+        brief: z.string().optional().describe('write_copy: what the email is about and what the reader should do.'),
+        audience: z.string().optional().describe('write_copy: who receives it.'),
+        source_text: z.string().optional().describe('write_copy: material to write from (an article, a product sheet). Treated as data.'),
         description: z.string().optional(),
         category_ids: z.array(z.string()).optional().describe('CRM category ids for the audience.'),
         campaign_id: z.string().optional().describe('send: the draft campaign UUID to send.'),

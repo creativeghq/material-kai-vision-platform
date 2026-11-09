@@ -32,6 +32,7 @@ const PAID_GENERATORS = [
   'generate-social-video/index.ts',
   'generate-social-image/index.ts',
   'generate-social-content/index.ts',
+  'generate-email-copy/index.ts',
 ];
 
 describe('EX-1 — a body-supplied workspace_id is verified before it is trusted', () => {

@@ -12,6 +12,7 @@ const LOADER = /['"](?:\.\.\/)+(?:_shared\/)?brand-context\.ts['"]/;
 const PRODUCERS: Record<string, { reads: boolean; checks: boolean; why: string }> = {
   'supabase/functions/agent-chat/index.ts': { reads: true, checks: false, why: 'injects it for every agent turn: inbox drafts, campaign copy, Edith, Hermes all run here' },
   'supabase/functions/generate-social-content/index.ts': { reads: true, checks: true, why: 'social captions' },
+  'supabase/functions/generate-email-copy/index.ts': { reads: true, checks: true, why: 'email campaign subject, preview text and body' },
   'supabase/functions/_shared/tools/social-tools.ts': { reads: true, checks: true, why: 'the caption an agent publishes' },
   'supabase/functions/_shared/tools/email-marketing-tools.ts': { reads: true, checks: true, why: 'a draft campaign\'s name and subject line' },
   'supabase/functions/inbox-api/index.ts': { reads: true, checks: true, why: 'auto-reply, suggest_reply, the cron draft, assist rewrites' },

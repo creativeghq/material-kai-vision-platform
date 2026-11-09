@@ -97,6 +97,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'generate-quote-pdf', label: 'generate-quote-pdf', sublabel: 'Generate or return cached PDF for a quote' },
   { id: 'generate-region-edit', label: 'generate-region-edit', sublabel: 'Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora' },
   { id: 'generate-social-content', label: 'generate-social-content', sublabel: 'Generate platform-optimised social media captions and hashtags via Claude' },
+  { id: 'generate-email-copy', label: 'generate-email-copy', sublabel: "Draft a marketing email's subject, preview text and body outline" },
   { id: 'generate-social-image', label: 'generate-social-image', sublabel: 'Generate a social media image via Aurora, Gemini, or FLUX based on content type' },
   { id: 'generate-social-video', label: 'generate-social-video', sublabel: 'Generate a short-form social video (MiniMax H3 by default; Kling, Gemini Omni, Wan3.0, Seedance 2.5 and Ray3.2 selectable)' },
   { id: 'generate-virtual-staging', label: 'generate-virtual-staging', sublabel: 'AI virtual staging of an empty room via Replicate proplabs/virtual-staging' },

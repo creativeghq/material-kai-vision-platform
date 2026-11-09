@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
 import { checkCopy, type ChannelWritingRule, type CopyRules, type WritingTell } from '../../supabase/functions/_shared/copy-check.ts';
+import { templateLinkIssues } from '../../supabase/functions/_shared/email/campaign-preflight.ts';
 import { strippedSource } from '../helpers/sourceIndex';
 
 const ROOT = process.cwd();
@@ -71,6 +72,19 @@ describe('checkCopy', () => {
   });
 });
 
+describe('templateLinkIssues (email pre-send check)', () => {
+  const codesOf = (html: string) => templateLinkIssues(html).map((i) => `${i.severity}:${i.code}`);
+  it('blocks links that go nowhere or to a placeholder', () => {
+    expect(codesOf('<a href="#">x</a><a href="">y</a><a href="javascript:void(0)">z</a>')).toEqual(['block:empty_link', 'block:empty_link', 'block:empty_link']);
+    expect(codesOf('<a href="https://example.com/offer">x</a>')).toEqual(['block:placeholder_link']);
+    expect(codesOf('<a href="/relative">x</a>')).toEqual(['block:invalid_link']);
+  });
+  it('warns on http, and passes https, mailto, tel and merge tags', () => {
+    expect(codesOf('<a href="http://materialshub.gr">x</a>')).toEqual(['warn:insecure_link']);
+    expect(codesOf('<a href="https://materialshub.gr">a</a><a href="mailto:a@b.gr">b</a><a href="tel:+30210">c</a><a href="{{unsubscribe_url}}">d</a>')).toEqual([]);
+  });
+});
+
 describe('writers read the rules instead of holding them', () => {
   const caption = strippedSource(join(ROOT, 'supabase/functions/generate-social-content/index.ts'));
   const social = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/social-tools.ts'));
@@ -81,9 +95,21 @@ describe('writers read the rules instead of holding them', () => {
     expect(caption).toContain('checkCopy(');
   });
 
+  it('an email send runs the pre-send check BEFORE the approval card, and refuses on a block', () => {
+    const email = strippedSource(join(ROOT, 'supabase/functions/_shared/tools/email-marketing-tools.ts'));
+    const sendAt = email.indexOf("action === 'send'");
+    const check = email.indexOf('campaignPreflight(', sendAt);
+    const refuse = email.indexOf('!preflight.ok', sendAt);
+    const gate = email.indexOf('confirm !== true', sendAt);
+    expect(check).toBeGreaterThan(sendAt);
+    expect(refuse).toBeGreaterThan(check);
+    expect(gate).toBeGreaterThan(refuse);
+  });
+
   it('manage_social checks the copy and publishes the draft it was given', () => {
     expect(social).toContain('loadCopyRules(');
-    expect(social).toMatch(/if \(post_id\)[\s\S]{0,200}from\('social_posts'\)/);
+    expect(social).toMatch(/if \(post_id\)[\s\S]{0,120}readDraftPost\(/);
+    expect(social).toMatch(/async function readDraftPost[\s\S]{0,200}from\('social_posts'\)/);
     const gate = social.indexOf('confirm !== true');
     const write = social.indexOf("from('social_posts').update({", gate);
     expect(gate).toBeGreaterThan(-1);

@@ -138,15 +138,9 @@ export const createManageSocialTool = (
         // A draft carries what was generated onto it (image, video, caption); publishing it means sending THAT row.
         let draft: any = null;
         if (post_id) {
-          const { data, error } = await svc.from('social_posts')
-            .select('id, status, caption, hashtags, image_urls, video_url, social_account_id')
-            .eq('id', post_id).eq('workspace_id', ws).maybeSingle();
-          if (error) return JSON.stringify({ success: false, error: `Could not read the draft: ${error.message}` });
-          if (!data) return JSON.stringify({ success: false, error: 'No draft with that post_id in this workspace.' });
-          if (data.status !== 'draft' && data.status !== 'failed') {
-            return JSON.stringify({ success: false, error: `That post is already ${data.status}.` });
-          }
-          draft = data;
+          const loaded = await readDraftPost(svc, ws, String(post_id));
+          if ('error' in loaded) return JSON.stringify({ success: false, error: loaded.error });
+          draft = loaded.draft;
         }
         const finalCaption = String(caption ?? draft?.caption ?? '').trim();
         if (!finalCaption) return JSON.stringify({ success: false, error: 'caption is required to publish or schedule a post.' });
@@ -539,3 +533,14 @@ export const createManageSocialTool = (
     },
   );
 };
+
+/** A draft (or failed) post in this workspace, as publish/schedule will send it. */
+async function readDraftPost(svc: any, ws: string, postId: string): Promise<{ draft: any } | { error: string }> {
+  const { data, error } = await svc.from('social_posts')
+    .select('id, status, caption, hashtags, image_urls, video_url, social_account_id')
+    .eq('id', postId).eq('workspace_id', ws).maybeSingle();
+  if (error) return { error: `Could not read the draft: ${error.message}` };
+  if (!data) return { error: 'No draft with that post_id in this workspace.' };
+  if (data.status !== 'draft' && data.status !== 'failed') return { error: `That post is already ${data.status}.` };
+  return { draft: data };
+}
