@@ -284,10 +284,13 @@ async function executeCondition(
     case 'delay': {
       const { duration, unit } = config as { duration: number; unit: string };
       const ms = duration * ({ seconds: 1000, minutes: 60000, hours: 3600000, days: 86400000 }[unit] || 60000);
-      // Cap at 25s to stay within edge function timeout budget
-      const cappedMs = Math.min(ms, 25000);
-      await new Promise((resolve) => setTimeout(resolve, cappedMs));
-      return { output: { delayed: true, requested_ms: ms, actual_ms: cappedMs }, branch: 'output' };
+      // A run lives inside one edge invocation, so a wait longer than this would silently become this.
+      const maxInlineMs = 25000;
+      if (ms > maxInlineMs) {
+        throw new Error(`A ${duration} ${unit} delay is longer than a flow can wait inside one run (${maxInlineMs / 1000} seconds). Delays that resume later are not built yet (#552).`);
+      }
+      await new Promise((resolve) => setTimeout(resolve, ms));
+      return { output: { delayed: true, requested_ms: ms, actual_ms: ms }, branch: 'output' };
     }
 
     case 'stop': {

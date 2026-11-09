@@ -81,6 +81,7 @@
     "get_related_products",
     "get_rent_charge_settlements",
     "get_sale_commission_splits",
+    "get_social_audit",
     "get_sourcing_board",
     "get_supplier_inbound_orders",
     "get_tender_bid_analysis",

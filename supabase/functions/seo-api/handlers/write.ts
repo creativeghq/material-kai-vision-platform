@@ -375,7 +375,7 @@ async function buildWritingUserPrompt(
 
   return renderPromptTemplate(await getGenerationPrompt(supabase, 'seo_writer_user'), { outline: outline, featured_snippet_target: (plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description)
   ? `\nFEATURED SNIPPET TARGET: The TL;DR block's lead sentence MUST answer: "${serpValue(plan.featuredSnippetTarget || research?.serpSignals?.featuredSnippetTarget?.description, 600)}"\n`
-  : '', faq_list: faqList, primary_keyword: plan.primaryKeyword, secondary_keywords: plan.secondaryKeywords.join(', '), lsi_keywords: plan.lsiKeywords.join(', '), target_word_count: plan.targetWordCount });
+  : '', reader_job: plan.readerJob?.trim() || 'Not stated in the plan; infer it from the keyword and outline.', faq_list: faqList, primary_keyword: plan.primaryKeyword, secondary_keywords: plan.secondaryKeywords.join(', '), lsi_keywords: plan.lsiKeywords.join(', '), target_word_count: plan.targetWordCount });
 }
 
 function buildOutlineText(sections: ArticlePlan['sections'], depth: number): string {

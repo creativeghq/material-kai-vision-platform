@@ -586,6 +586,11 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   social_insights: 'Social Insights',
   social_post_analytics: 'Post Analytics',
   social_content_generated: 'Caption Drafted',
+  social_repurposed: 'Posts Drafted From Article',
+  social_audit: 'What Is Working',
+  social_week_inputs: 'Planning the Week',
+  social_week_planned: 'Week Planned',
+  social_repurpose_sources: 'Articles to Repurpose',
   social_image_generated: 'Image Generated',
   social_video_generated: 'Video Generated',
   // Quotes

@@ -2785,6 +2785,38 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'manage_social', fixedArgs: { action: 'list_accounts' } },
       },
       {
+        label: 'Write a post', description: 'Three drafts in your voice, checked against the channel rules', icon: 'Pencil',
+        prompt: 'Write a social post for my connected accounts.',
+        promptTemplate: 'Write a {{format}} post about: {{topic}}. List my connected accounts first, draft it for the right one, and show every variant with its warnings. Do not publish.',
+        form: [
+          { key: 'topic', label: 'What Is It About?', kind: 'text', required: true, placeholder: 'The Kifisia bathroom we finished in 120x120 porcelain' },
+          { key: 'format', label: 'Format', kind: 'select', default: 'photo', options: [
+            { value: 'photo', label: 'Photo' },
+            { value: 'carousel', label: 'Carousel' },
+            { value: 'reel', label: 'Reel' },
+            { value: 'video', label: 'Video' },
+            { value: 'text', label: 'Text Only' },
+            { value: 'story', label: 'Story' },
+          ] },
+        ],
+      },
+      {
+        label: 'Plan my week', description: 'A week of post angles from your mix, articles and proof', icon: 'CalendarPlus',
+        prompt: 'Plan my social posts for next week. Get the planning inputs first, propose the week, and save it only when I agree.',
+      },
+      {
+        label: 'What is working', description: 'Each post against your own median, by hook type', icon: 'Gauge',
+        prompt: 'What is working on my social accounts?',
+        done: 'Here is how each post did against your own usual, and which hook types are pulling their weight.',
+        run: { tool: 'manage_social', fixedArgs: { action: 'audit' } },
+      },
+      {
+        label: 'Article to Posts', description: 'Turn a finished article into one draft per account', icon: 'Newspaper',
+        prompt: 'Turn one of my articles into social posts.',
+        done: 'Here are your recent finished articles. Pick one and I will write a draft for each connected account.',
+        run: { tool: 'manage_social', fixedArgs: { action: 'repurpose' } },
+      },
+      {
         label: 'Publish a post', description: 'Post now to a connected account', icon: 'Megaphone',
         prompt: 'Publish a social post.',
         done: 'I\'ve published that post.',

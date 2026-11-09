@@ -31,6 +31,7 @@ import { serviceClient as svcClient } from '../supabase-client.ts';
 import { brandDraftCheck, loadBrandContext } from '../brand-context.ts';
 import { checkCopy, composePublishedText, loadCopyRules } from '../copy-check.ts';
 import { SOCIAL_POST_FORMATS } from '../social-post-formats.ts';
+import { callerDbClient } from '../caller-client.ts';
 /** Call any edge function AS the user (so its authenticate() + workspace checks apply). */
 async function callEdge(jwt: string, path: string, payload: Record<string, unknown>): Promise<any> {
   try {
@@ -115,7 +116,7 @@ export const createManageSocialTool = (
   }
 
   return tool(
-    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, format, source_text, prompt, post_id, source_image_url, video_model, duration_seconds, aspect_ratio, job_id, confirm }: any) => {
+    async ({ action, account_id, account_ids, article_id, slots, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, format, source_text, prompt, post_id, source_image_url, video_model, duration_seconds, aspect_ratio, job_id, confirm }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -193,12 +194,15 @@ export const createManageSocialTool = (
 
         let post: { id: string } | null = null;
         if (draft) {
+          const variants: any[] = Array.isArray(draft.metadata?.all_captions) ? draft.metadata.all_captions : [];
+          const sent = variants.find((v) => String(v?.caption ?? '').trim() === finalCaption);
           const { error: upErr } = await svc.from('social_posts').update({
             social_account_id: acct.id,
             platform: acct.platform,
             caption: finalCaption,
             hashtags: finalTags,
             image_urls: finalImages,
+            metadata: { ...(draft.metadata ?? {}), hook_type: sent?.hook_type ?? (variants.length ? 'edited' : null) },
             updated_at: new Date().toISOString(),
           }).eq('id', draft.id).eq('workspace_id', ws);
           if (upErr) return JSON.stringify({ success: false, error: `Could not update the draft: ${upErr.message}` });
@@ -351,17 +355,27 @@ export const createManageSocialTool = (
       }
 
       if (action === 'generate_content') {
-        if ((!topic && !source_text) || (!platform && !account_id)) {
+        let accountRef = account_id ?? null;
+        let topicText = topic ?? null;
+        let postFormat = format ?? null;
+        if (post_id && !platform && !accountRef) {
+          const loaded = await readDraftPost(svc, ws, String(post_id));
+          if ('error' in loaded) return JSON.stringify({ success: false, error: loaded.error });
+          accountRef = loaded.draft.social_account_id ?? null;
+          topicText ??= loaded.draft.metadata?.plan?.angle ?? null;
+          postFormat ??= loaded.draft.metadata?.format ?? null;
+        }
+        if ((!topicText && !source_text) || (!platform && !accountRef)) {
           return JSON.stringify({ success: false, error: 'generate_content needs a topic (or source_text) and a platform or account_id.' });
         }
         let target = platform ? String(platform).toLowerCase() : null;
-        if (account_id) {
-          const resolved = await resolveAccount(ws, account_id, undefined);
+        if (accountRef) {
+          const resolved = await resolveAccount(ws, accountRef, undefined);
           if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error });
           target = String(resolved.account.platform).toLowerCase();
         }
         const res = await callEdge(jwt!, 'generate-social-content', {
-          topic, platform: target, tone, format, source_text, workspace_id: ws, post_id, social_account_id: account_id,
+          topic: topicText, platform: target, tone, format: postFormat, source_text, workspace_id: ws, post_id, social_account_id: accountRef,
         });
         if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
         onChunk?.({ type: 'social_content_generated', platform: target, post_id: res.data?.post_id ?? null, data: res.data, timestamp: Date.now() });
@@ -371,6 +385,155 @@ export const createManageSocialTool = (
           message: res.data?.post_id
             ? `Draft caption + hashtags saved to post ${res.data.post_id}. Pass that post_id to generate_image so the picture lands on THIS draft, then publish/schedule.`
             : 'Draft caption + hashtags generated. Review, then use publish/schedule.',
+        });
+      }
+
+      if (action === 'plan_week') {
+        const { data: kindRows, error: kindErr } = await svc.from('social_post_kinds')
+          .select('workspace_id, key, label, purpose, per_week, formats, sort_order, is_active')
+          .or(`workspace_id.is.null,workspace_id.eq.${ws}`);
+        if (kindErr) return JSON.stringify({ success: false, error: `Could not read the post mix: ${kindErr.message}` });
+        const byKey = new Map<string, any>();
+        for (const k of (kindRows ?? []).filter((r: any) => r.workspace_id === null)) byKey.set(k.key, k);
+        for (const k of (kindRows ?? []).filter((r: any) => r.workspace_id === ws)) byKey.set(k.key, k);
+        const mix = [...byKey.values()].filter((k) => k.is_active && Number(k.per_week) > 0)
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((k) => ({ key: k.key, label: k.label, purpose: k.purpose, per_week: Number(k.per_week), formats: k.formats }));
+        const { data: accts, error: acctErr } = await svc.from('social_accounts')
+          .select('id, platform, handle').eq('workspace_id', ws).eq('is_active', true);
+        if (acctErr) return JSON.stringify({ success: false, error: `Could not read the connected accounts: ${acctErr.message}` });
+
+        if (!Array.isArray(slots) || slots.length === 0) {
+          const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+          const [articles, recent, brand] = await Promise.all([
+            svc.from('seo_articles').select('id, title, published_url, completed_at').eq('workspace_id', ws).eq('status', 'completed')
+              .gte('completed_at', since).order('completed_at', { ascending: false }).limit(10),
+            svc.from('social_posts').select('id, platform, status, caption, metadata, published_at, created_at').eq('workspace_id', ws)
+              .gte('created_at', since).order('created_at', { ascending: false }).limit(40),
+            loadBrandContext(svc, ws),
+          ]);
+          const inputs = {
+            mix,
+            accounts: accts ?? [],
+            recent_articles: articles.data ?? [],
+            recent_posts: (recent.data ?? []).map((p: any) => ({
+              id: p.id, platform: p.platform, status: p.status, caption: typeof p.caption === 'string' ? p.caption.slice(0, 100) : null,
+              kind: p.metadata?.plan?.kind ?? null, planned_for: p.metadata?.plan?.planned_for ?? null,
+            })),
+            proof: brand.status === 'ok' ? { proof: brand.profile?.proprietary_data ?? [], work: brand.profile?.owned_examples ?? [] } : null,
+          };
+          onChunk?.({ type: 'social_week_inputs', inputs, timestamp: Date.now() });
+          return JSON.stringify({
+            success: true,
+            inputs,
+            message: 'Plan the week from the mix (per_week is the target count per kind, spread across days, never two of one kind in a row), '
+              + 'the accounts, recent articles and proof. Avoid angles already in recent_posts. Every slot needs a concrete ANGLE, not a topic. '
+              + 'Show the plan to the user; when they agree, call plan_week again with slots to save them as drafts. Nothing is scheduled.',
+          });
+        }
+
+        const accountById = new Map((accts ?? []).map((a: any) => [a.id, a]));
+        const problems: string[] = [];
+        const rows = slots.map((s: any, i: number) => {
+          const acct = accountById.get(s.account_id);
+          if (!acct) problems.push(`slot ${i + 1}: account is not connected in this workspace`);
+          if (!byKey.has(s.kind)) problems.push(`slot ${i + 1}: "${s.kind}" is not a post kind in the mix`);
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(String(s.planned_for ?? ''))) problems.push(`slot ${i + 1}: planned_for must be YYYY-MM-DD`);
+          if (!String(s.angle ?? '').trim()) problems.push(`slot ${i + 1}: angle is required`);
+          return {
+            workspace_id: ws,
+            user_id: userId,
+            social_account_id: acct?.id ?? null,
+            platform: acct?.platform ?? 'unknown',
+            post_type: s.format === 'reel' || s.format === 'video' ? 'video' : s.format === 'text' ? 'text' : 'image',
+            caption: null,
+            status: 'draft',
+            metadata: {
+              format: s.format,
+              plan: { planned_for: s.planned_for, kind: s.kind, angle: String(s.angle).trim(), source: s.source ? String(s.source) : null, planned_at: new Date().toISOString() },
+            },
+          };
+        });
+        if (problems.length) return JSON.stringify({ success: false, error: `Nothing was saved: ${problems.join('; ')}` });
+        const { data: saved, error: saveErr } = await svc.from('social_posts').insert(rows).select('id, platform, metadata');
+        if (saveErr) return JSON.stringify({ success: false, error: `Could not save the plan: ${saveErr.message}` });
+        const planned = (saved ?? []).map((p: any) => ({ post_id: p.id, platform: p.platform, ...p.metadata?.plan, format: p.metadata?.format }));
+        onChunk?.({ type: 'social_week_planned', planned, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true,
+          planned,
+          message: `${planned.length} slot(s) saved as drafts with no caption yet. To write one, call generate_content with its post_id, `
+            + 'the angle as topic and its format. Nothing is scheduled until the user approves each post.',
+        });
+      }
+
+      if (action === 'audit') {
+        if (account_id) {
+          const resolved = await resolveAccount(ws, account_id, undefined);
+          if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error });
+        }
+        const { data, error } = await callerDbClient(jwt!, userId, ws).rpc('get_social_audit', {
+          p_workspace_id: ws, p_account_id: account_id ?? null,
+        });
+        if (error) return JSON.stringify({ success: false, error: `Could not run the audit: ${error.message}` });
+        onChunk?.({ type: 'social_audit', audit: data, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true,
+          audit: data,
+          message: 'The numbers and their status are derived in SQL. Report the status and note first; state a pattern only when status is "ok", '
+            + 'name the posts behind it, and never call an unsynced post zero.',
+        });
+      }
+
+      if (action === 'repurpose') {
+        if (!article_id && !source_text) {
+          const { data: recent, error } = await svc.from('seo_articles')
+            .select('id, title, target_keyword, published_url, completed_at')
+            .eq('workspace_id', ws).eq('status', 'completed')
+            .order('completed_at', { ascending: false, nullsFirst: false }).limit(10);
+          if (error) return JSON.stringify({ success: false, error: `Could not list articles: ${error.message}` });
+          onChunk?.({ type: 'social_repurpose_sources', articles: recent ?? [], timestamp: Date.now() });
+          return JSON.stringify({ success: true, articles: recent ?? [], message: 'Ask the user which article to turn into posts, then call repurpose with its article_id.' });
+        }
+        let material = source_text ? String(source_text) : '';
+        let title = topic ? String(topic) : '';
+        let link: string | null = null;
+        if (article_id) {
+          const { data: art, error } = await svc.from('seo_articles')
+            .select('id, title, target_keyword, markdown_content, published_url, status')
+            .eq('id', article_id).eq('workspace_id', ws).maybeSingle();
+          if (error) return JSON.stringify({ success: false, error: `Could not read the article: ${error.message}` });
+          if (!art) return JSON.stringify({ success: false, error: 'No article with that id in this workspace.' });
+          if (!art.markdown_content) return JSON.stringify({ success: false, error: 'That article has no content yet.' });
+          material = art.markdown_content;
+          title = title || art.title || art.target_keyword || '';
+          link = art.published_url ?? null;
+        }
+        const { data: accts, error: acctErr } = await svc.from('social_accounts')
+          .select('id, platform, handle').eq('workspace_id', ws).eq('is_active', true);
+        if (acctErr) return JSON.stringify({ success: false, error: `Could not read the connected accounts: ${acctErr.message}` });
+        const wanted = Array.isArray(account_ids) && account_ids.length ? new Set(account_ids.map(String)) : null;
+        const targets = (accts ?? []).filter((a: any) => !wanted || wanted.has(a.id));
+        if (!targets.length) {
+          return JSON.stringify({ success: false, error: wanted ? 'None of those accounts is connected in this workspace.' : 'No social accounts are connected. Connect one in Profile → Social Accounts first.' });
+        }
+        const drafts: any[] = [];
+        for (const a of targets) {
+          const res = await callEdge(jwt!, 'generate-social-content', {
+            topic: `${title}${link ? ` (article: ${link})` : ''}`,
+            platform: String(a.platform).toLowerCase(), format, tone, source_text: material,
+            workspace_id: ws, social_account_id: a.id,
+          });
+          drafts.push(res.ok && res.data?.success !== false
+            ? { account_id: a.id, platform: a.platform, handle: a.handle, post_id: res.data?.post_id ?? null, captions: res.data?.captions ?? [], saved: res.data?.saved !== false }
+            : { account_id: a.id, platform: a.platform, handle: a.handle, error: res.data?.error || res.error });
+        }
+        onChunk?.({ type: 'social_repurposed', title, article_id: article_id ?? null, drafts, timestamp: Date.now() });
+        const failed = drafts.filter((d) => d.error).length;
+        return JSON.stringify({
+          success: failed < drafts.length,
+          drafts,
+          message: `${drafts.length - failed} draft(s) written${failed ? `, ${failed} failed` : ''}. Nothing is published: show each draft and its warnings, then publish or schedule the ones the user approves by post_id.`,
         });
       }
 
@@ -476,9 +639,18 @@ export const createManageSocialTool = (
         '  account_insights → follower/engagement insights for an account (or the whole workspace if none given).',
         '  post_analytics   → sync + return analytics for the 15 latest published posts. Narrow with post_id,',
         '                     account_id or platform.',
+        '  plan_week        → without slots: the post mix, connected accounts, recent articles, recent posts and',
+        '                     proof to plan from. With slots (after the user agrees): saves each as a draft with',
+        '                     no caption yet. Never schedules.',
+        '  audit            → what is working: each published post against its account\'s own median, shares',
+        '                     and saves per reach, and a breakdown by hook type, with a status (no_data,',
+        '                     not_collected, too_few, ok). Optional account_id.',
         '  generate_content → AI-draft 3 caption variants + hashtags (topic or source_text, and account_id or',
         '                     platform). Follows that channel\'s writing rules and returns warnings per variant;',
         '                     show the warnings with the draft. Saves a DRAFT post and returns its post_id.',
+        '  repurpose        → turn one SEO article (article_id) or source_text into ONE draft per connected',
+        '                     account (or per account_ids), each in its channel\'s rules and voice. Without',
+        '                     article_id/source_text it lists recent finished articles to choose from. Drafts only.',
         '  generate_image   → AI-generate an image from a prompt. Pass the post_id from generate_content',
         '                     and the image is attached to that draft; omit it and you get a second,',
         '                     separate draft holding only the picture.',
@@ -496,7 +668,17 @@ export const createManageSocialTool = (
         'yourself; the UI sets it on approval.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image', 'generate_video', 'video_status']),
+        slots: z.array(z.object({
+          planned_for: z.string().describe('YYYY-MM-DD'),
+          account_id: z.string().uuid(),
+          kind: z.string().describe('A key from the mix plan_week returned.'),
+          format: z.enum(SOCIAL_POST_FORMATS),
+          angle: z.string().describe('The specific angle, not a topic: "the Kifisia bathroom laid in two days", not "bathrooms".'),
+          source: z.string().optional().describe('What it is drawn from: an article id, a project, a proof line.'),
+        })).optional().describe('plan_week: the agreed slots to save as drafts. Omit to get the planning inputs.'),
+        action: z.enum(['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'plan_week', 'audit', 'generate_content', 'repurpose', 'generate_image', 'generate_video', 'video_status']),
+        article_id: z.string().uuid().optional().describe('repurpose: the SEO article to turn into posts. Omit to list recent finished articles.'),
+        account_ids: z.array(z.string().uuid()).optional().describe('repurpose: which connected accounts to write for. Omit for every connected account.'),
         confirm: z.boolean().optional().describe('Do NOT set — the Approve/Decline card sets confirm:true on approval.'),
         account_id: z.string().uuid().optional().describe('Target connected account id.'),
         platform: z.string().optional().describe("Platform name (e.g. 'instagram', 'facebook', 'linkedin') to resolve the account, or the target platform for generate_content/generate_image."),
@@ -537,7 +719,7 @@ export const createManageSocialTool = (
 /** A draft (or failed) post in this workspace, as publish/schedule will send it. */
 async function readDraftPost(svc: any, ws: string, postId: string): Promise<{ draft: any } | { error: string }> {
   const { data, error } = await svc.from('social_posts')
-    .select('id, status, caption, hashtags, image_urls, video_url, social_account_id')
+    .select('id, status, caption, hashtags, image_urls, video_url, social_account_id, metadata')
     .eq('id', postId).eq('workspace_id', ws).maybeSingle();
   if (error) return { error: `Could not read the draft: ${error.message}` };
   if (!data) return { error: 'No draft with that post_id in this workspace.' };

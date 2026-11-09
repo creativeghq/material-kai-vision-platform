@@ -1600,7 +1600,10 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageSocialTool',
     description: 'Publish/schedule social posts and read analytics over the workspace\'s ALREADY-CONNECTED social accounts.',
     params: [
-      { name: 'action', type: 'enum', enum: ['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'generate_content', 'generate_image', 'generate_video', 'video_status'], optional: false },
+      { name: 'slots', type: 'array', optional: true, description: 'plan_week: the agreed slots to save as drafts. Omit to get the planning inputs.' },
+      { name: 'action', type: 'enum', enum: ['list_accounts', 'publish', 'schedule', 'best_time', 'account_insights', 'post_analytics', 'plan_week', 'audit', 'generate_content', 'repurpose', 'generate_image', 'generate_video', 'video_status'], optional: false },
+      { name: 'article_id', type: 'string', optional: true, description: 'repurpose: the SEO article to turn into posts. Omit to list recent finished articles.' },
+      { name: 'account_ids', type: 'array', optional: true, description: 'repurpose: which connected accounts to write for. Omit for every connected account.' },
       { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set — the Approve/Decline card sets confirm:true on approval.' },
       { name: 'account_id', type: 'string', optional: true, description: 'Target connected account id.' },
       { name: 'platform', type: 'string', optional: true, description: 'Platform name (e.g. \'instagram\', \'facebook\', \'linkedin\') to resolve the account, or the target platform for generate_content/generate_image.' },

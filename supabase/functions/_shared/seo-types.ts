@@ -323,6 +323,8 @@ export interface ArticlePlan {
     | 'navigational'
     | 'commercial'
     | 'transactional';
+  /** "When …, I want …, so I can …" — absent on plans made before it existed. */
+  readerJob?: string;
   recommendedSchema: SchemaType[];
   featuredSnippetTarget: string | null;
   faqQuestions: string[];

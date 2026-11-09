@@ -75,6 +75,7 @@ const ArticlePlanSchema = z.object({
   sections: z.array(ArticleSectionSchema),
   targetWordCount: z.number(),
   searchIntent: z.enum(['informational', 'navigational', 'commercial', 'transactional']),
+  readerJob: z.string().describe('One sentence in the article language: "When [situation], I want [what they look for], so I can [outcome]". The opening must let this reader recognise their situation.'),
   recommendedSchema: z.array(z.enum(['Article', 'FAQPage', 'HowTo', 'Review', 'Product', 'ItemList'])),
   featuredSnippetTarget: z.string().nullable(),
   faqQuestions: z.array(z.string()),

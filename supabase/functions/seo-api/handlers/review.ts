@@ -15,7 +15,7 @@ const CONSISTENCY_MODEL = 'claude-sonnet-5-5';
 const CONSISTENCY_MAX_INPUT_TOKENS = 20000;
 const KINDS = [
   'unsupported_claim', 'wrong_fact', 'arithmetic', 'relationship_claim', 'language', 'loanword',
-  'photo_description', 'link', 'meta', 'contradiction',
+  'photo_description', 'link', 'meta', 'contradiction', 'repetition',
 ];
 const META_PART = '## META';
 
