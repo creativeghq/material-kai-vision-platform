@@ -28,6 +28,7 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     labels,
     activeThread,
     loadingThread,
+    replyTo,
     setReplyTo,
     setShowDetails,
     backToList,
@@ -346,7 +347,24 @@ export const ConversationPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
           </div>
 
           {/* Composer */}
-          {composerModel && <InboxComposer m={composerModel} />}
+          {composerModel && (
+            <InboxComposer
+              m={composerModel}
+              context={isEmail ? (() => {
+                const shown = (replyTo && mailIds.includes(replyTo.id) ? replyTo : null)
+                  ?? messages.find((x) => x.id === lastMailId);
+                if (!shown) return null;
+                const info = shown.sender_participant_id ? labels.get(shown.sender_participant_id) : undefined;
+                return (
+                  <EmailMessageCard
+                    m={shown} info={info} collapsed={false} onToggle={() => undefined}
+                    ours={activeThread.thread_type !== 'internal' ? (info?.kind === 'member' || info?.kind === 'agent') : (info?.userId != null && info.userId === myUserId)}
+                    workspaceId={activeThread.workspace_id}
+                  />
+                );
+              })() : undefined}
+            />
+          )}
         </>
       )}
     </MobileFullScreen>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Loader2, Paperclip, StickyNote, X, MessagesSquare, Reply, ReplyAll, Forward, Sparkles, ShoppingCart, AlertTriangle,
   Package, Wrench, ChevronDown, Type, Trash2, FileText, Image as ImageIcon, Plus,
@@ -8,6 +8,7 @@ import { Textarea } from '@/components/core/ui/textarea';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
 import { Label } from '@/components/core/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { slashCommandMatches, slashTokenAtCaret } from '../inboxSlashCommands';
 import { formatDate, formatTime } from '@/utils/datetime';
@@ -43,7 +44,7 @@ function readFormatPref(): boolean {
   return stored !== '0';
 }
 
-export const InboxComposer: React.FC<{ m: MailComposerModel }> = ({ m }) => {
+export const InboxComposer: React.FC<{ m: MailComposerModel; context?: React.ReactNode }> = ({ m, context }) => {
   const {
     threadId, workspaceId, channel, threadMeta: meta, recipientName, agent, waWindow, waBlocked, isMember, isMobile,
     draft, setDraft, composerRef, sending, isNote, setIsNote, attachments, setAttachments, replyQuote, clearReplyQuote,
@@ -93,6 +94,18 @@ export const InboxComposer: React.FC<{ m: MailComposerModel }> = ({ m }) => {
   const canSend = !sending && !waBlocked && !leadBlocked && hasContent && !missingRecipient && !missingSubject;
   const dirty = hasContent || !!replyQuote;
 
+  const focusMode = channel === 'email' && !isMobile;
+  const [focusOpen, setFocusOpen] = useState(false);
+  useEffect(() => { setFocusOpen(false); }, [threadId]);
+  const quoteKey = replyQuote ? `${replyQuote.label}|${replyQuote.text}` : '';
+  useEffect(() => { if (focusMode && quoteKey) setFocusOpen(true); }, [focusMode, quoteKey]);
+  useEffect(() => { if (focusMode && forwarding) setFocusOpen(true); }, [focusMode, forwarding]);
+  const wasSending = useRef(false);
+  useEffect(() => {
+    if (wasSending.current && !sending && !hasContent) setFocusOpen(false);
+    wasSending.current = sending;
+  }, [sending, hasContent]);
+
   const toggleFormat = () => {
     if (formatOpen) email?.setPreview(false);
     setFormatOpen((v) => {
@@ -127,7 +140,7 @@ export const InboxComposer: React.FC<{ m: MailComposerModel }> = ({ m }) => {
           </span>
         );
 
-  return (
+  const composerBody = (
     <div {...dropProps} className="border-t border-hairline bg-card md:bg-surface-sunken p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] md:p-3 space-y-2 shrink-0">
       {isPublicComment && !isNote && (
         <div className="text-xs bg-pink-500/10 dark:bg-pink-500/15 border border-pink-500/25 dark:border-pink-500/30 text-pink-700 dark:text-pink-300 rounded-sm px-3 py-2 flex items-start gap-1.5">
@@ -376,7 +389,7 @@ export const InboxComposer: React.FC<{ m: MailComposerModel }> = ({ m }) => {
                         : isMember ? 'Write a reply…'
                           : 'Type a message…'
               }
-              className="min-h-[44px] md:min-h-[76px] max-h-[30vh] md:max-h-[40vh] [field-sizing:content] border-0 bg-transparent px-3 py-2.5 max-md:text-base hover:border-0 focus-visible:ring-0 focus-visible:border-0"
+              className={`${focusOpen ? 'min-h-[140px] max-h-[32vh]' : 'min-h-[44px] md:min-h-[76px] max-h-[30vh] md:max-h-[40vh]'} [field-sizing:content] border-0 bg-transparent px-3 py-2.5 max-md:text-base hover:border-0 focus-visible:ring-0 focus-visible:border-0`}
               disabled={waBlocked}
             />
             </div>
@@ -548,5 +561,85 @@ export const InboxComposer: React.FC<{ m: MailComposerModel }> = ({ m }) => {
         </div>
       </div>
     </div>
+  );
+
+  if (!focusMode) return composerBody;
+
+  if (!focusOpen) {
+    const open = () => setFocusOpen(true);
+    const firstLine = draft.trim().split(/\r?\n/)[0] ?? '';
+    return (
+      <div className="border-t border-hairline bg-surface-sunken px-3 py-2 shrink-0">
+        <div className={`flex items-center gap-1 rounded-sm border bg-card pl-2 pr-1 ${isNote ? 'border-warning/40' : 'border-hairline hover:border-primary/60'}`}>
+          {isNote ? <StickyNote className="w-4 h-4 shrink-0 text-warning" /> : <Reply className="w-4 h-4 shrink-0 text-muted-foreground" />}
+          <textarea
+            ref={composerRef}
+            readOnly
+            rows={1}
+            value={firstLine}
+            onFocus={open}
+            onClick={open}
+            aria-label={isNote ? 'Write a private note' : `Reply to ${recipientName}`}
+            placeholder={isNote ? 'Write a private note…' : `Reply to ${recipientName}…`}
+            className="h-9 min-w-0 flex-1 resize-none overflow-hidden whitespace-nowrap bg-transparent py-2 text-sm leading-5 outline-none cursor-text placeholder:text-muted-foreground"
+          />
+          {ai.draftShown && !isNote && (
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs text-primary"><Sparkles className="w-3.5 h-3.5" /> AI draft ready</span>
+          )}
+          {isMember && !isNote && !ai.draftShown && (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1 text-primary" disabled={ai.drafting}
+              onClick={() => { open(); ai.setSteerOpen(true); }}>
+              {ai.drafting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} Suggest reply
+            </Button>
+          )}
+          {email && email.replyAllCount > 0 && (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => { pickMode('all'); open(); }}>
+              <ReplyAll className="w-3.5 h-3.5" /> Reply all
+            </Button>
+          )}
+          {email?.setSubject && (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => { pickMode('forward'); open(); }}>
+              <Forward className="w-3.5 h-3.5" /> Forward
+            </Button>
+          )}
+          {isMember && setIsNote && !isNote && (
+            <Button variant="ghost" size="sm" className="h-7 px-2 text-xs gap-1" onClick={() => { toNote(); open(); }}>
+              <StickyNote className="w-3.5 h-3.5" /> Note
+            </Button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Dialog open onOpenChange={setFocusOpen}>
+      <DialogContent
+        className="flex h-[calc(100dvh-3rem)] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:rounded-sm"
+        onOpenAutoFocus={(e) => {
+          e.preventDefault();
+          if (forwarding) return;
+          requestAnimationFrame(() => {
+            const t = composerRef.current;
+            if (!t) return;
+            t.focus();
+            t.setSelectionRange(t.value.length, t.value.length);
+          });
+        }}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => { if (slashMenu || suggestion) e.preventDefault(); }}
+      >
+        <div className="shrink-0 border-b border-hairline px-4 py-3 pr-12">
+          <DialogTitle className="truncate text-sm">
+            {isNote ? 'Private note' : forwarding ? 'Forward' : `Reply to ${recipientName}`}
+          </DialogTitle>
+          <DialogDescription className="sr-only">The message you are answering is above, your reply below. Closing keeps the draft.</DialogDescription>
+        </div>
+        <div className="min-h-[120px] flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+          {context ?? <p className="text-sm text-muted-foreground">No message to show.</p>}
+        </div>
+        {composerBody}
+      </DialogContent>
+    </Dialog>
   );
 };

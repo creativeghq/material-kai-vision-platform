@@ -437,7 +437,12 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
       </div>
       </AttachmentActionsProvider>
 
-      {model && <InboxComposer m={model} />}
+      {model && (
+        <InboxComposer
+          m={model}
+          context={(() => { const shown = target ?? last; return shown ? card(shown, false) : null; })()}
+        />
+      )}
     </div>
   );
 };
