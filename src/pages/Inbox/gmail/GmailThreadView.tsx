@@ -347,10 +347,13 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
         </button>
         <MailAvatar name={counterpart?.name} email={counterpart?.address} photoUrl={counterpart?.photo_url} className="h-9 w-9 md:h-10 md:w-10 shrink-0" />
         <div className="flex-1 min-w-0">
-          <div className="text-[15px] font-semibold truncate">{counterpart ? who(counterpart) : threadSubject}</div>
-          <div className="text-xs text-muted-foreground truncate">{counterpart?.address ?? account?.email ?? ''} · Gmail</div>
+          <div className="text-[15px] font-semibold leading-snug line-clamp-2 break-words" title={threadSubject}>{threadSubject}</div>
+          <div className="text-xs text-muted-foreground truncate">
+            {counterpart ? `${who(counterpart)}${counterpart.address && who(counterpart) !== counterpart.address ? ` · ${counterpart.address}` : ''}` : account?.email ?? ''} · Gmail
+          </div>
         </div>
         <div className="flex items-center gap-0.5 overflow-x-auto max-w-[55%] md:max-w-none">
+          {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={threadSubject} sender={lastIncoming?.from ?? null} />}
           <IconAction icon={Star} label={row?.starred ? 'Unstar' : 'Star'} active={row?.starred} onClick={() => { void toggleStar(); }} />
           {userLabels.length > 0 && (
             <DropdownMenu>
@@ -403,8 +406,6 @@ export const GmailThreadView: React.FC<{ g: GmailMailboxState }> = ({ g }) => {
               ))}
             </div>
           )}
-          <h1 className="font-sans text-xl sm:text-2xl font-semibold leading-tight break-words pb-1">{threadSubject}</h1>
-          {openMessages && <GmailThreadFacts g={g} threadId={openId} subject={threadSubject} sender={lastIncoming?.from ?? null} />}
           {copilotFor === openId && account && (
             <div className="rounded-sm border border-hairline p-3">
               <CopilotPanel run={async (mode, question) => (await gmailApi.assist(account.id, openId, mode, question)).text} />

@@ -1,16 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ImageOff } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { sanitizeEmailHtml } from '@/utils/sanitizeEmailHtml';
-
-const TRUSTED_KEY = 'inbox.images.trustedSenders';
-
-function readTrusted(): string[] {
-  try { return JSON.parse(localStorage.getItem(TRUSTED_KEY) ?? '[]') as string[]; } catch { return []; }
-}
-function writeTrusted(list: string[]) {
-  try { localStorage.setItem(TRUSTED_KEY, JSON.stringify(list.slice(-500))); } catch { return; }
-}
 
 const FRAME_CSS = `
   html,body{margin:0;padding:0;background:#fff;color:#1d2321;}
@@ -25,12 +15,8 @@ const FRAME_CSS = `
 export const EmailHtmlView: React.FC<{
   html: string; sender?: string | null; onShowText?: () => void;
   inlineImages?: Readonly<Record<string, string>>;
-}> = ({ html, sender, onShowText, inlineImages }) => {
-  const senderKey = (sender ?? '').trim().toLowerCase();
-  const [allowOnce, setAllowOnce] = useState(false);
-  const [trusted, setTrusted] = useState(() => !!senderKey && readTrusted().includes(senderKey));
-  const allow = allowOnce || trusted;
-  const { html: clean, blockedImages } = useMemo(() => sanitizeEmailHtml(html, allow, inlineImages), [html, allow, inlineImages]);
+}> = ({ html, onShowText, inlineImages }) => {
+  const { html: clean } = useMemo(() => sanitizeEmailHtml(html, true, inlineImages), [html, inlineImages]);
   const frameRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(120);
 
@@ -73,26 +59,13 @@ export const EmailHtmlView: React.FC<{
     return () => { frame.removeEventListener('load', onLoad); observer?.disconnect(); };
   }, [clean, measure]);
 
-  const trustSender = () => {
-    if (!senderKey) return;
-    writeTrusted([...readTrusted().filter((s) => s !== senderKey), senderKey]);
-    setTrusted(true);
-  };
-
   const srcDoc = `<!doctype html><html><head><meta charset="utf-8"><style>${FRAME_CSS}</style></head><body>${clean}</body></html>`;
 
   return (
     <div className="space-y-1.5">
-      {(blockedImages > 0 || onShowText) && (
+      {onShowText && (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-          {blockedImages > 0 && !allow && (
-            <>
-              <span className="inline-flex items-center gap-1"><ImageOff className="h-3.5 w-3.5" />Images hidden</span>
-              <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={() => setAllowOnce(true)}>Show images</Button>
-              {senderKey && <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={trustSender}>Always for {senderKey}</Button>}
-            </>
-          )}
-          {onShowText && <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onShowText}>Plain text</Button>}
+          <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={onShowText}>Plain text</Button>
         </div>
       )}
       <iframe
