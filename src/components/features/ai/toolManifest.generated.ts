@@ -830,6 +830,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'referenceImageUrl', type: 'string', optional: true, description: 'Public HTTP URL of a reference image — only needed if NOT using the user uploaded image. Leave empty to use the uploaded image automatically.' },
       { name: 'baseImageIndex', type: 'number', optional: true, description: '1-based index of the attached image that is the ROOM to work from. Default with two attachments is image 2 ("Your Room" in the composer); pass it when the user attached the room first and a material/inspiration second.' },
       { name: 'models', type: 'array', optional: true, description: 'Specific model IDs to restrict generation to. Omit to use all models for the selected mode.' },
+      { name: 'cabinetHardware', type: 'enum', enum: ['gola', 'push_to_open', 'edge_pull', 'bar_handles', 'knobs', 'cup_pulls'], optional: true, description: 'How every cabinet front opens, applied identically to all doors and drawers: gola (handleless recessed channel), push_to_open (flat handleless fronts), edge_pull, bar_handles, knobs, cup_pulls. Set it for any design with cabinets.' },
     ],
   },
   {

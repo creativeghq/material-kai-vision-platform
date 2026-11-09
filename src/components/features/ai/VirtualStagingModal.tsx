@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/core/ui/button';
 import { Sofa, Bed, UtensilsCrossed, Droplets, Monitor, Wind, Trees, Waves, ChevronLeft, ChevronRight, Check, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS, type CabinetHardware } from '@/config/cabinetHardware';
 import { TOOL_MANIFEST_BY_NAME } from './toolManifest.generated';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -74,6 +75,8 @@ export interface VirtualStagingParams {
   room: string;
   style: string;
   furnitureItems: string;
+  /** design variant only: one hardware system for every cabinet front; null = the AI picks one. */
+  cabinetHardware?: CabinetHardware | null;
 }
 
 interface VirtualStagingModalProps {
@@ -106,11 +109,13 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
   const [selectedRoom, setSelectedRoom] = useState<string>(defaultRoom || '');
   const [selectedStyle, setSelectedStyle] = useState<string>('');
   const [furnitureItems, setFurnitureItems] = useState<string>('');
+  const [cabinetHardware, setCabinetHardware] = useState<CabinetHardware | null>(null);
 
   // Reset when reopened — auto-skip step 1 if defaultRoom is provided
   useEffect(() => {
     if (isOpen) {
       setSelectedStyle('');
+      setCabinetHardware(null);
       // design seeds step 3 from the user's typed input; staging starts empty
       setFurnitureItems(isDesign ? (initialDetails?.trim() || '') : '');
       if (defaultRoom) {
@@ -136,7 +141,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
   };
 
   const handleGenerate = () => {
-    onGenerate({ room: selectedRoom, style: selectedStyle, furnitureItems });
+    onGenerate({ room: selectedRoom, style: selectedStyle, furnitureItems, cabinetHardware: isDesign ? cabinetHardware : null });
     onClose();
   };
 
@@ -272,6 +277,34 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
                     : 'This is sent as the furniture specification to the AI model. Add or remove items as needed.'}
                 </p>
               </div>
+              {isDesign && (
+                <div className="space-y-1.5">
+                  <p id="cabinet-hardware-label" className="text-xs font-medium text-muted-foreground">Cabinet Hardware (optional)</p>
+                  <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="cabinet-hardware-label">
+                    {[null, ...CABINET_HARDWARE].map((value) => (
+                      <button
+                        key={value ?? 'auto'}
+                        type="button"
+                        role="radio"
+                        aria-checked={cabinetHardware === value}
+                        onClick={() => setCabinetHardware(value)}
+                        className={cn(
+                          'flex items-center justify-between rounded-sm border px-3 py-2 text-left text-sm transition-colors',
+                          cabinetHardware === value
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border hover:border-primary/40 hover:bg-muted/50',
+                        )}
+                      >
+                        {value ? CABINET_HARDWARE_OPTIONS[value].label : 'Let the AI Choose'}
+                        {cabinetHardware === value && <Check className="ml-1 h-3.5 w-3.5 flex-shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[11px] text-muted-foreground">
+                    The same system is used on every door and drawer, so the design never mixes handles.
+                  </p>
+                </div>
+              )}
               <div className="flex justify-end">
                 <Button
                   onClick={handleGenerate}

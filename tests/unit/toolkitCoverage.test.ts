@@ -101,6 +101,9 @@ const OPTIONS_EXEMPT = new Set([
   // (STAGING_ROOMS / STAGING_STYLES), so it cannot drift from the schema even though
   // this file cannot see inside it.
   'virtual_staging',
+  // `cabinetHardware` is the "Design a room" modal's picker (same VirtualStagingModal); a derived
+  // form would also ask for referenceImageUrl / baseImageIndex / models. Pinned by cabinetHardware.test.ts.
+  'generate_3d',
   // 20+ params including arrays and per-source object toggles — collected
   // conversationally by their agent, not by one modal.
   'track_job_search', 'add_purchase_item',

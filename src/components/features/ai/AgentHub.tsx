@@ -111,6 +111,7 @@ import { WorkflowTracker } from './workflows/WorkflowTracker';
 import { WorkflowInlineForm } from './workflows/WorkflowInlineForm';
 import { CommandPalette } from './workflows/CommandPalette';
 import { getWorkflow as getWorkflowDefinition, toolkitForWorkflow } from './workflows/workflowRegistry';
+import { CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
 import type { WorkflowRuntimeState } from './workflows/types';
 import { RunCanvas, RunChip } from './runs/RunCanvas';
 import { applyRunChunk, createRun, finishRun, runFromWorkflow, runTabTitle } from './runs/runDerivation';
@@ -7395,7 +7396,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           variant="design"
           initialDetails={input}
           hasReferenceImage={attachedImages.length > 0}
-          onGenerate={({ room, style, furnitureItems }) => {
+          onGenerate={({ room, style, furnitureItems, cabinetHardware }) => {
             setShowNewDesignModal(false);
             setSelectedGenerationMode(null);
             const base = `Generate a ${style.toLowerCase()} ${room.toLowerCase()} interior design.`;
@@ -7403,7 +7404,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             const refNote = attachedImages.length > 0
               ? ' Use my uploaded image as the reference room to redesign.'
               : '';
-            const composedPrompt = extra ? `${base} Include: ${extra}.${refNote}` : `${base}${refNote}`;
+            const hardwareNote = cabinetHardware
+              ? ` Cabinet hardware: ${CABINET_HARDWARE_OPTIONS[cabinetHardware].label} (cabinetHardware=${cabinetHardware}) on every door and drawer.`
+              : '';
+            const composedPrompt = (extra ? `${base} Include: ${extra}.` : base) + hardwareNote + refNote;
             setInput(composedPrompt);
             setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
           }}

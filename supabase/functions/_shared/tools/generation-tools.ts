@@ -6,6 +6,8 @@
 
 import { resolveImageSlots } from './image-slots.ts';
 import { PATTERNS as SURFACE_PATTERNS } from '../surfacePatterns.generated.ts';
+import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS, type CabinetHardware } from '../cabinetHardware.generated.ts';
+import { loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -76,6 +78,16 @@ const CANNOT_SEE_NOTE =
   + 'result are your only evidence about what it ran on — report those, and never describe or '
   + 'vouch for what the picture looks like.';
 
+/** The spec plus the one hardware decision, so no model is left to pick per door. */
+export async function withCabinetHardware(prompt: string, hardware?: CabinetHardware | null): Promise<string> {
+  if (!hardware) return prompt;
+  const clause = renderPromptTemplate(
+    await loadPrompt(supabase, 'tool', 'interior_hardware_clause'),
+    { hardware: CABINET_HARDWARE_OPTIONS[hardware].render },
+  );
+  return `${prompt.trim().replace(/\.?$/, '.')} ${clause}`;
+}
+
 /**
  * LangChain Tool: Interior Design Generation
  *
@@ -90,8 +102,9 @@ export const create3DGenerationTool = (
   conversationImages: string[] = [], // Previously generated image URLs (for edit intent detection)
 ) => {
   return tool(
-    async ({ prompt, roomType, style, referenceImageUrl, baseImageIndex, models }) => {
+    async ({ prompt: rawPrompt, roomType, style, referenceImageUrl, baseImageIndex, models, cabinetHardware }) => {
       try {
+        const prompt = await withCabinetHardware(rawPrompt, cabinetHardware);
 
         // Resolve the reference image:
         // 1. Agent-provided URL takes priority (public HTTP URL)
@@ -187,8 +200,6 @@ export const create3DGenerationTool = (
               models: models || undefined,
               user_id: userId,
               workspace_id: workspaceId,
-              width: 768,
-              height: 768,
             }),
             signal: controller.signal,
           });
@@ -267,7 +278,9 @@ Do NOT call this tool when:
 - A chip mode was explicitly selected (floor-plan-render, image-edit, floor-plan-text) — those are Gemini-only precise operations. This is enforced server-side; do not call generate_3d in those cases.
 - Iterative edits on a previously generated image — use generate_gemini alone.
 - Floor plan requests — use generate_gemini alone with mode=floor-plan-text.
-- Materials selection board — use generate_gemini alone with mode=materials-selection-board.`,
+- Materials selection board — use generate_gemini alone with mode=materials-selection-board.
+
+Write the prompt as DECISIONS, never alternatives: "X or Y" lets each model pick per detail, which is how one render ends up with knobs, bar handles and handleless doors side by side. Keep every stated dimension, module width and left-to-right order verbatim. For any design with cabinets (kitchen, outdoor kitchen, bathroom vanity, wardrobe) set cabinetHardware — the user's choice if they stated one, otherwise the one that best fits the style — and do not describe handles in the prompt yourself.`,
       schema: z.object({
         prompt: z.string().describe('Detailed design description (e.g., "Modern minimalist bedroom with oak flooring and white walls")'),
         roomType: z.string().optional().describe('Room type (bedroom, living_room, kitchen, bathroom, office, etc.)'),
@@ -275,6 +288,7 @@ Do NOT call this tool when:
         referenceImageUrl: z.string().optional().describe('Public HTTP URL of a reference image — only needed if NOT using the user uploaded image. Leave empty to use the uploaded image automatically.'),
         baseImageIndex: z.number().int().optional().describe('1-based index of the attached image that is the ROOM to work from. Default with two attachments is image 2 ("Your Room" in the composer); pass it when the user attached the room first and a material/inspiration second.'),
         models: z.array(z.string()).optional().describe('Specific model IDs to restrict generation to. Omit to use all models for the selected mode.'),
+        cabinetHardware: z.enum(CABINET_HARDWARE).optional().describe('How every cabinet front opens, applied identically to all doors and drawers: gola (handleless recessed channel), push_to_open (flat handleless fronts), edge_pull, bar_handles, knobs, cup_pulls. Set it for any design with cabinets.'),
       }),
     }
   );
