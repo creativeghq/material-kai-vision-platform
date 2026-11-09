@@ -336,7 +336,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'calculate_kitchen_cost',
     file: 'supabase/functions/_shared/tools/calculator-tools.ts',
     factory: 'createKitchenCostTool',
-    description: 'Price a fitted kitchen from its running metres and finishes, using the live price list.',
+    description: 'Price an INDOOR fitted kitchen from its running metres and finishes, using the live price list.',
     params: [
       { name: 'run_length_m', type: 'number', optional: false, description: 'Total length of the base cabinet run, in metres — add up the walls the kitchen runs along.' },
       { name: 'wall_run_length_m', type: 'number', optional: true, description: 'Length of the wall/hanging unit run, in metres. Defaults to the price list default.' },
