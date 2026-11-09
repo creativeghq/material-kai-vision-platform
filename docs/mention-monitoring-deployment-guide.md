@@ -74,7 +74,7 @@ Both are **optional**. Without them, the pipeline still runs on News (DataForSEO
 7. Copy the key. That's `YOUTUBE_DATA_API_KEY`.
 8. Click **Restrict key** (recommended):
    - **API restrictions** → "Restrict key" → select only **YouTube Data API v3**.
-   - **Application restrictions** → leave "None" or set IP allowlist to your MIVAA server IP (157.245.166.19).
+   - **Application restrictions** → leave "None" or set IP allowlist to your MIVAA server IP (46.62.199.103).
 
 **Quota**: 10,000 units/day, free. A search costs ~100 units. So ~100 subjects/day fit comfortably.
 
@@ -125,7 +125,7 @@ The `mivaa-pdf-extractor/.github/workflows/deploy.yml` workflow will rsync the c
 After it finishes, SSH to the server and verify:
 
 ```bash
-ssh root@157.245.166.19
+ssh root@46.62.199.103
 systemctl show mivaa-pdf-extractor --property=Environment | tr ' ' '\n' | grep -E 'YOUTUBE|GEMINI'
 ```
 
