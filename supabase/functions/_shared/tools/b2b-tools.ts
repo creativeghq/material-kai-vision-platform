@@ -341,7 +341,7 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
     const searchBudget = Math.min(20, Math.max(6, Math.ceil(limit * 1.5)));
     onProgress?.(`Searching for ${category} ${typesLabel}${where}...`);
 
-    const response = await postAnthropicWithRetry({
+    const postSearch = (locationCode: string | null) => postAnthropicWithRetry({
       method: 'POST',
       headers: {
         'x-api-key': anthropicKey,
@@ -361,13 +361,26 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
             name: 'web_search',
             max_uses: searchBudget,
             ...(blockedDomains.length ? { blocked_domains: blockedDomains } : {}),
-            ...(countryCode ? { user_location: { type: 'approximate', country: countryCode } } : {}),
+            ...(locationCode ? { user_location: { type: 'approximate', country: locationCode } } : {}),
           },
           RECORD_COMPANIES_TOOL,
         ],
         messages: [{ role: 'user', content: rendered.query }],
       })),
     });
+
+    let effectiveCountryCode = countryCode;
+    let response = await postSearch(countryCode);
+    // The provider supports user_location for a subset of countries only (GR is refused with a 400).
+    // The country is already in the query text, so the hint is optional: drop it rather than fail.
+    if (!response.ok && response.status === 400 && countryCode) {
+      const errText = await response.clone().text();
+      if (/country code .* not supported/i.test(errText)) {
+        console.warn(`[${operation}] web_search refused user_location=${countryCode}; retrying without it`);
+        effectiveCountryCode = null;
+        response = await postSearch(null);
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -445,7 +458,7 @@ async function runCompanySearch(ctx: CompanySearchContext, args: CompanySearchAr
             sub_feature: 'web_search',
             ...queryParams,
             blocked_domains: blockedDomains.length,
-            user_location: countryCode,
+            user_location: effectiveCountryCode,
             web_search_surcharge_usd: webSearchSurcharge,
           },
           created_at: new Date().toISOString(),

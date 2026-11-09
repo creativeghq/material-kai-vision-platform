@@ -62,7 +62,7 @@ let debitAgentChatTurn: any, refundAgentChatTurn: any, getAgentTurnCost: any;
 let isPartnerApiKeyAccess: any, isEndpointAllowed: any;
 let getToolPrompt: any;
 let extractTextContent: any;
-let authenticate: any, isAdminAccess: any, isPlatformOperator: any;
+let authenticate: any, isAdminAccess: any, isPlatformOperator: any, authFailureStatus: any;
 let getSkillsForAgent: any, getSkillContent: any, formatSkillsForSystemPrompt: any;
 let emitFlowEvent: any;
 let aiCallLogger: any;
@@ -119,6 +119,7 @@ async function initRuntime() {
   renderPromptTemplate = promptMod.renderPromptTemplate;
   extractTextContent = lgCoreMod.extractTextContent;
   authenticate = authMod.authenticate;
+  authFailureStatus = authMod.authFailureStatus;
   isAdminAccess = authMod.isAdminAccess;
   isPlatformOperator = authMod.isPlatformOperator;
   isPartnerApiKeyAccess = authMod.isPartnerApiKeyAccess;
@@ -973,7 +974,7 @@ function getModelNameForAgent(agentId: string, modelOverride?: string | null): s
 // are routable (sandbox agents developer/qa-reviewer are not chat-executable here).
 const ORCHESTRATOR_IDS = new Set(['orchestrator', 'jarvis', 'auto']);
 const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
-  { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, room redesign, image or 3D generation, virtual staging, lighting, VR worlds, moodboards, presentation sheets' },
+  { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, designing a kitchen, bathroom or outdoor space from a written spec (dimensions, module layout, finishes) — even when it also asks for suppliers, room redesign, image or 3D generation, virtual staging, lighting, VR worlds, moodboards, presentation sheets' },
   // The knowledge-base clause is not padding: nearly every published kb_doc is product-as-
   // PRACTICE (discovery, roadmaps, JTBD) while every other blurb here says product-as-GOODS, so
   // without it "what is product discovery?" matches no specialist and is answered unsearched.
@@ -4159,7 +4160,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     if (!auth.success) {
       return new Response(
         JSON.stringify({ error: auth.error || 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+        { status: authFailureStatus(auth), headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 

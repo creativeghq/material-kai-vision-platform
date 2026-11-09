@@ -56,6 +56,15 @@ export interface AuthResult {
   /** The same connection with RLS ENFORCED as the calling user (#197 item 4). */
   supabaseAsUser?: DbClient | null;
   apiKey?: ApiKeyContext | null;
+  /** The token could not be CHECKED (Auth 5xx / unreachable) — not that it was refused. */
+  unavailable?: boolean;
+}
+
+const AUTH_UNAVAILABLE = 'Sign-in check is temporarily unavailable. Please try again in a moment.';
+
+/** 503 when the auth service could not answer, 401 when it refused the caller. */
+export function authFailureStatus(auth: Pick<AuthResult, 'unavailable'>): 401 | 503 {
+  return auth.unavailable ? 503 : 401;
 }
 
 /** Unified authentication handler for Supabase Edge Functions */
@@ -251,6 +260,22 @@ async function validateUserToken(
   try {
     const { data: { user }, error } = await adminClient.auth.getUser(token);
 
+    // A 5xx (or no status: network failure) means Auth could not answer — e.g. Postgres out of
+    // connection slots on 2026-11-09. Reporting that as an expired token sends users to re-login.
+    const errStatus = (error as { status?: number } | null)?.status;
+    if (error && (errStatus === undefined || errStatus >= 500)) {
+      console.error(`[auth] getUser could not be answered (status ${errStatus ?? 'none'}): ${error.message}`);
+      return {
+        success: false,
+        level: 'none',
+        user: null,
+        userId: null,
+        error: AUTH_UNAVAILABLE,
+        unavailable: true,
+        supabase: adminClient,
+      };
+    }
+
     if (error || !user) {
       return {
         success: false,
@@ -290,7 +315,8 @@ async function validateUserToken(
       level: 'none',
       user: null,
       userId: null,
-      error: err instanceof Error ? err.message : 'Authentication failed',
+      error: AUTH_UNAVAILABLE,
+      unavailable: true,
       supabase: adminClient,
     };
   }

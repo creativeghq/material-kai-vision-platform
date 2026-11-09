@@ -195,14 +195,25 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
       const schema = (bp.dimensions_schema ?? []) as { key: string; label?: string; unit?: string; default?: number }[];
       const dims: Record<string, number> = {};
       for (const d of schema) dims[d.key] = Number(d.default ?? 0);
-      const supplied: Record<string, number | undefined> = {
-        run_length: input.run_length_m,
-        wall_run_length: input.wall_run_length_m,
-        worktop_length: input.worktop_length_m,
+      // Lengths are FORMULA variables, not schema dims — the schema stopped declaring them when zones
+      // arrived, and gating on `k in dims` dropped every supplied length, so each line silently fell
+      // back to its default_quantity (a 2.5 m run priced as 6 m). An unstated length is 0, and said.
+      const num = (v: unknown) => (v != null && Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : null);
+      const run = num(input.run_length_m) ?? 0;
+      const lengths: Record<string, { value: number; assumed: string | null }> = {
+        run_length: { value: run, assumed: null },
+        wall_run_length: num(input.wall_run_length_m) != null
+          ? { value: num(input.wall_run_length_m)!, assumed: null }
+          : { value: 0, assumed: 'No wall units priced (none stated).' },
+        worktop_length: num(input.worktop_length_m) != null
+          ? { value: num(input.worktop_length_m)!, assumed: null }
+          : { value: run, assumed: `Worktop priced at the base run length (${run} m).` },
+        tall_run_length: { value: 0, assumed: null },
+        island_length: { value: 0, assumed: null },
+        highboard_length: { value: 0, assumed: null },
       };
-      for (const [k, v] of Object.entries(supplied)) {
-        if (v != null && Number.isFinite(Number(v)) && Number(v) >= 0 && k in dims) dims[k] = Number(v);
-      }
+      for (const [k, v] of Object.entries(lengths)) dims[k] = v.value;
+      const assumptions = Object.values(lengths).map((v) => v.assumed).filter(Boolean) as string[];
 
       const extraLines = rows.filter((r) => r.kind === 'task' && !r.option_group);
       const { selected, unmatched } = resolveSelection(rows, { options: input.options, extras: input.extras });
@@ -257,6 +268,8 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
           })),
         available: { options, extras: availableExtras },
         unmatched,
+        assumptions,
+        price_basis: 'Platform starter price list for INDOOR fitted kitchens (per running metre). Appliances, sink, tap and delivery are not included.',
       };
 
       try {
@@ -270,8 +283,10 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
     {
       name: 'calculate_kitchen_cost',
       description:
-        'Price a fitted kitchen from its running metres and finishes, using the live price list. Deterministic, free, instant — no external API. '
+        'Price an INDOOR fitted kitchen from its running metres and finishes, using the live price list. Deterministic, free, instant — no external API. '
         + 'Use when someone asks what a new kitchen costs, or to compare finishes and worktops. '
+        + 'NEVER use it for an outdoor kitchen, an aluminium/stainless carcass, or a package that includes appliances: the list holds none of those, so the total would describe a different kitchen. Say there is no price list for it instead. '
+        + 'Report every entry in `assumptions` alongside the figure. '
         + 'Call it FIRST with only run_length_m: the result lists every available model, worktop and add-on with what each would cost for that kitchen. Then call again with the ones the user picked — never guess a model name. '
         + 'ALWAYS check `unmatched` in the result: anything listed there was NOT applied and the standard default was priced instead, so correct the user rather than presenting the total as the spec they asked for. '
         + 'Present the figure as a ballpark excluding VAT, with appliances and sink not included, subject to a survey.',
