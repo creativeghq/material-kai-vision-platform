@@ -1620,26 +1620,16 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "Generate platform-optimised social media captions and hashtags via Claude",
-    "description": "Uses Claude Haiku to generate 3 caption variants and hashtags tailored to the target platform's character limits and tone conventions. Costs 2 credits (non-refundable). Platforms: instagram, facebook, linkedin, tiktok, pinterest, youtube, twitter, threads.",
+    "summary": "Draft social post captions under the channel's writing rules",
+    "description": "Drafts 3 caption variants (each with a different hook type) plus hashtags for one channel. Limits, hashtag caps and structure come from channel_writing_rules at run time; a channel with no rules row is refused. Every variant is run through the shared copy check and returned with its warnings. Uses the brand profile of the website the account writes for.",
     "fields": {
       "topic": {
         "type": "string",
-        "description": "Required. Content topic or product/scene description"
+        "description": "What the post is about. Required unless source_text is given."
       },
       "platform": {
         "type": "string",
-        "enum": [
-          "instagram",
-          "facebook",
-          "linkedin",
-          "tiktok",
-          "pinterest",
-          "youtube",
-          "twitter",
-          "threads"
-        ],
-        "description": "Required. Target social platform"
+        "description": "Required. A channel with an active row in channel_writing_rules (e.g. instagram, linkedin)."
       },
       "tone": {
         "type": "string",
@@ -1653,7 +1643,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "boolean"
       },
       "hashtag_count": {
-        "type": "integer"
+        "type": "integer",
+        "description": "Defaults to the channel's recommended count; never more than the channel's limit."
       },
       "workspace_id": {
         "type": "string"
@@ -1661,6 +1652,26 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "post_id": {
         "type": "string",
         "description": "Optional social_posts row ID to associate with"
+      },
+      "format": {
+        "type": "string",
+        "enum": [
+          "photo",
+          "carousel",
+          "reel",
+          "video",
+          "text",
+          "story"
+        ],
+        "description": "What the post is. A reel or video carries its own hook, so the caption does a different job."
+      },
+      "source_text": {
+        "type": "string",
+        "description": "Material to write from (an article, a product sheet, notes). Treated as data, not instructions."
+      },
+      "social_account_id": {
+        "type": "string",
+        "description": "The account the post is for; picks the brand profile of the website it writes for."
       }
     }
   },

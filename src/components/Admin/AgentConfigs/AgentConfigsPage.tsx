@@ -16,14 +16,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { AIModelPricingTab } from './AIModelPricingTab';
 import { ChatStartersTab } from './ChatStartersTab';
-// Relocated here from their own orphaned /admin routes so all AI-dev
-// surfaces live under one page. Old routes redirect into these tabs via ?tab=.
+import { WritingRulesTab } from './WritingRulesTab';
 import { ExtractionPromptsPage } from '@/components/Admin/ExtractionPrompts/ExtractionPromptsPage';
 import { PromptTemplatesPage } from '@/components/Admin/PromptTemplates/PromptTemplatesPage';
 import { AITestingPanel } from '@/components/Admin/AITestingPanel';
-// Relocated here so every AI ops/monitoring surface lives under one page.
-// Old standalone routes (/admin/api-gateway, /admin/ai-data, /admin/background-agents,
-// /admin/3d-model-debugging) + the Operations "AI Performance" tab redirect into these.
 import { AIPerformanceTab } from '@/components/Admin/AIPerformanceTab';
 import AIDataPage from '@/pages/Admin/AIDataPage';
 import { ApiGatewayAdmin } from '@/components/Admin/ApiGatewayAdmin';
@@ -32,7 +28,7 @@ import ModelDebuggingPanel from '@/components/Admin/ModelDebuggingPanel';
 import { formatNumber } from '@/utils/decimal';
 
 const TAB_VALUES = [
-  'prompts', 'extraction', 'templates', 'sandbox', 'starters', 'pricing',
+  'prompts', 'extraction', 'templates', 'writing-rules', 'sandbox', 'starters', 'pricing',
   'performance', 'ai-data', 'background-agents', 'api-gateway', '3d-debug',
 ] as const;
 
@@ -337,6 +333,10 @@ export const AgentConfigsPage: React.FC = () => {
             <TabsTrigger value="templates" className="flex items-center gap-2">
               <Layers className="h-4 w-4" />
               Prompt Templates
+            </TabsTrigger>
+            <TabsTrigger value="writing-rules" className="flex items-center gap-2">
+              <ListChecks className="h-4 w-4" />
+              Writing Rules
             </TabsTrigger>
             <TabsTrigger value="sandbox" className="flex items-center gap-2">
               <Cpu className="h-4 w-4" />
@@ -786,6 +786,10 @@ export const AgentConfigsPage: React.FC = () => {
           </TabsContent>
 
           {/* AI sandbox/testing — relocated from /admin/material-analysis */}
+          <TabsContent value="writing-rules">
+            <WritingRulesTab />
+          </TabsContent>
+
           <TabsContent value="sandbox">
             <AITestingPanel embedded />
           </TabsContent>

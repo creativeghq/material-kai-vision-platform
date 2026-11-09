@@ -29,6 +29,8 @@ const MODULE_SLUG = 'social-media';
 
 import { serviceClient as svcClient } from '../supabase-client.ts';
 import { brandDraftCheck, loadBrandContext } from '../brand-context.ts';
+import { checkCopy, composePublishedText, loadCopyRules } from '../copy-check.ts';
+import { SOCIAL_POST_FORMATS } from '../social-post-formats.ts';
 /** Call any edge function AS the user (so its authenticate() + workspace checks apply). */
 async function callEdge(jwt: string, path: string, payload: Record<string, unknown>): Promise<any> {
   try {
@@ -91,7 +93,7 @@ export const createManageSocialTool = (
     const svc = svcClient();
     const { data: accounts } = await svc
       .from('social_accounts')
-      .select('id, platform, handle, is_active, zernio_account_id')
+      .select('id, platform, handle, is_active, zernio_account_id, website_id')
       .eq('workspace_id', ws)
       .eq('is_active', true);
     const list = accounts ?? [];
@@ -113,7 +115,7 @@ export const createManageSocialTool = (
   }
 
   return tool(
-    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, prompt, post_id, source_image_url, video_model, duration_seconds, aspect_ratio, job_id, confirm }: any) => {
+    async ({ action, account_id, platform, caption, hashtags, image_urls, scheduled_at, topic, tone, format, source_text, prompt, post_id, source_image_url, video_model, duration_seconds, aspect_ratio, job_id, confirm }: any) => {
       const gate = await moduleReady();
       if (!gate.ok) return JSON.stringify({ success: false, error: gate.error });
       const ws = workspaceId!;
@@ -133,36 +135,52 @@ export const createManageSocialTool = (
         if (action === 'schedule' && !scheduled_at) {
           return JSON.stringify({ success: false, error: 'scheduled_at (ISO datetime) is required to schedule.' });
         }
-        if (!caption || !String(caption).trim()) {
-          return JSON.stringify({ success: false, error: 'caption is required to publish or schedule a post.' });
+        // A draft carries what was generated onto it (image, video, caption); publishing it means sending THAT row.
+        let draft: any = null;
+        if (post_id) {
+          const { data, error } = await svc.from('social_posts')
+            .select('id, status, caption, hashtags, image_urls, video_url, social_account_id')
+            .eq('id', post_id).eq('workspace_id', ws).maybeSingle();
+          if (error) return JSON.stringify({ success: false, error: `Could not read the draft: ${error.message}` });
+          if (!data) return JSON.stringify({ success: false, error: 'No draft with that post_id in this workspace.' });
+          if (data.status !== 'draft' && data.status !== 'failed') {
+            return JSON.stringify({ success: false, error: `That post is already ${data.status}.` });
+          }
+          draft = data;
         }
-        const resolved = await resolveAccount(ws, account_id, platform);
+        const finalCaption = String(caption ?? draft?.caption ?? '').trim();
+        if (!finalCaption) return JSON.stringify({ success: false, error: 'caption is required to publish or schedule a post.' });
+        const finalTags: string[] | null = Array.isArray(hashtags) ? hashtags.map(String) : draft?.hashtags ?? null;
+        const finalImages: string[] | null = Array.isArray(image_urls) ? image_urls.map(String) : draft?.image_urls ?? null;
+
+        const resolved = await resolveAccount(ws, account_id ?? (platform ? undefined : draft?.social_account_id ?? undefined), platform);
         if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error, candidates: (resolved as any).candidates });
         const acct = resolved.account;
-        const brandCheck = brandDraftCheck(await loadBrandContext(svc, ws),
-          `${caption} ${Array.isArray(hashtags) ? hashtags.map(String).join(' ') : ''}`);
+        const brand = await loadBrandContext(svc, ws, acct.website_id ?? null);
+        const rules = await loadCopyRules(svc, String(acct.platform).toLowerCase());
+        const copy = checkCopy({ text: finalCaption, hashtags: finalTags, rules, avoidList: brand.status === 'ok' ? brand.profile?.avoid_list : [] });
+        const brandCheck = brandDraftCheck(brand, composePublishedText(finalCaption, finalTags));
+        const blocking = copy.warnings.filter((w) => w.code === 'over_limit' || w.code === 'too_many_hashtags');
 
-        // SECURITY INVARIANT 9 (#352 A3). Publishing had NO gate of any kind — no `confirm` in
-        // the schema, no `action_confirmation` chunk. The only "confirm" in this file was the
-        // word in the tool description, which is a request to the model rather than a gate.
-        // @materialshub" is a decision someone can make, "post to platform instagram" is not.
-        // It is still before the draft row and before any call to Zernio.
+        // Invariant 9: the human gate sits before any write and before Zernio.
         if (confirm !== true) {
-          const preview = String(caption).trim().slice(0, 180);
-          const tags = Array.isArray(hashtags) && hashtags.length ? ` ${hashtags.map(String).join(' ')}` : '';
-          const imgs = Array.isArray(image_urls) && image_urls.length ? ` with ${image_urls.length} image(s)` : '';
+          const preview = finalCaption.slice(0, 180);
+          const tags = finalTags?.length ? ` ${finalTags.join(' ')}` : '';
+          const media = [finalImages?.length ? `${finalImages.length} image(s)` : '', draft?.video_url ? 'a video' : ''].filter(Boolean).join(' and ');
           onChunk?.({
             type: 'action_confirmation',
             tool: 'manage_social',
-            input: { action, account_id: acct.id, caption, hashtags, image_urls, scheduled_at },
+            input: { action, account_id: acct.id, post_id: draft?.id, caption: finalCaption, hashtags: finalTags, image_urls: finalImages, scheduled_at },
             title: action === 'publish' ? 'Publish this post now?' : 'Schedule this post?',
-            summary: `"${preview}${tags}"${imgs} → ${acct.platform}${acct.handle ? ` (${acct.handle})` : ''}`
+            summary: `"${preview}${tags}"${media ? ` with ${media}` : ''} → ${acct.platform}${acct.handle ? ` (${acct.handle})` : ''}`
               + (action === 'publish'
                 ? '. It goes out immediately and cannot be recalled.'
                 : ` at ${scheduled_at}. It will go out automatically.`)
-              + (brandCheck.avoid_hits.length ? ` Uses words on your avoid list: ${brandCheck.avoid_hits.join(', ')}.` : '')
+              + (copy.warnings.length ? ` Check: ${copy.warnings.map((w) => w.message).join(' ')}` : '')
+              + (copy.checked ? '' : ' The writing rules could not be checked.')
               + (brandCheck.checked ? '' : ' The avoid list could not be checked.'),
             avoid_hits: brandCheck.avoid_hits,
+            copy_warnings: copy.warnings,
             danger: true,
             toolkit_id: 'social',
             timestamp: Date.now(),
@@ -171,27 +189,45 @@ export const createManageSocialTool = (
             success: true,
             awaiting_confirmation: true,
             avoid_hits: brandCheck.avoid_hits,
+            copy_warnings: copy.warnings,
             message: "Awaiting the user's approval to post. Do not retry.",
           });
         }
+        if (blocking.length) {
+          return JSON.stringify({ success: false, error: `${acct.platform} would refuse this post: ${blocking.map((w) => w.message).join(' ')}`, copy_warnings: copy.warnings });
+        }
 
-        // Draft the post row (server-derived identity). Allowlisted payload — never spread input.
-        const { data: post, error: postErr } = await svc
-          .from('social_posts')
-          .insert({
-            workspace_id: ws,
-            user_id: userId,
+        let post: { id: string } | null = null;
+        if (draft) {
+          const { error: upErr } = await svc.from('social_posts').update({
             social_account_id: acct.id,
             platform: acct.platform,
-            post_type: (Array.isArray(image_urls) && image_urls.length) ? 'image' : 'text',
-            caption: String(caption),
-            hashtags: Array.isArray(hashtags) ? hashtags.map(String) : null,
-            image_urls: Array.isArray(image_urls) ? image_urls.map(String) : null,
-            status: 'draft',
-          })
-          .select('id')
-          .single();
-        if (postErr || !post) return JSON.stringify({ success: false, error: `Could not draft the post: ${postErr?.message || 'unknown'}` });
+            caption: finalCaption,
+            hashtags: finalTags,
+            image_urls: finalImages,
+            updated_at: new Date().toISOString(),
+          }).eq('id', draft.id).eq('workspace_id', ws);
+          if (upErr) return JSON.stringify({ success: false, error: `Could not update the draft: ${upErr.message}` });
+          post = { id: draft.id };
+        } else {
+          const { data, error: postErr } = await svc
+            .from('social_posts')
+            .insert({
+              workspace_id: ws,
+              user_id: userId,
+              social_account_id: acct.id,
+              platform: acct.platform,
+              post_type: finalImages?.length ? 'image' : 'text',
+              caption: finalCaption,
+              hashtags: finalTags,
+              image_urls: finalImages,
+              status: 'draft',
+            })
+            .select('id')
+            .single();
+          if (postErr || !data) return JSON.stringify({ success: false, error: `Could not draft the post: ${postErr?.message || 'unknown'}` });
+          post = data;
+        }
 
         const res = await callZernio(jwt!, {
           action: action === 'publish' ? 'publish_now' : 'schedule',
@@ -321,13 +357,20 @@ export const createManageSocialTool = (
       }
 
       if (action === 'generate_content') {
-        if (!topic || !platform) return JSON.stringify({ success: false, error: 'generate_content needs a topic and a platform.' });
-        const res = await callEdge(jwt!, 'generate-social-content', { topic, platform, tone, workspace_id: ws, post_id });
+        if ((!topic && !source_text) || (!platform && !account_id)) {
+          return JSON.stringify({ success: false, error: 'generate_content needs a topic (or source_text) and a platform or account_id.' });
+        }
+        let target = platform ? String(platform).toLowerCase() : null;
+        if (account_id) {
+          const resolved = await resolveAccount(ws, account_id, undefined);
+          if (!resolved.ok) return JSON.stringify({ success: false, error: resolved.error });
+          target = String(resolved.account.platform).toLowerCase();
+        }
+        const res = await callEdge(jwt!, 'generate-social-content', {
+          topic, platform: target, tone, format, source_text, workspace_id: ws, post_id, social_account_id: account_id,
+        });
         if (!res.ok || res.data?.success === false) return JSON.stringify({ success: false, error: res.data?.error || res.error });
-        // `post_id` is on the chunk so the card can hand off to the draft it just wrote, and it is
-        // named in the message so the NEXT call in the flow attaches to that draft instead of
-        // starting a new one.
-        onChunk?.({ type: 'social_content_generated', platform, post_id: res.data?.post_id ?? null, data: res.data, timestamp: Date.now() });
+        onChunk?.({ type: 'social_content_generated', platform: target, post_id: res.data?.post_id ?? null, data: res.data, timestamp: Date.now() });
         return JSON.stringify({
           success: true,
           ...res.data,
@@ -431,14 +474,17 @@ export const createManageSocialTool = (
         '',
         'Actions:',
         '  list_accounts    → list connected accounts (id, platform, handle). Start here if unsure which account.',
-        '  publish          → post NOW. Needs caption + (account_id OR platform); optional hashtags[], image_urls[].',
+        '  publish          → post NOW. Pass post_id to send a draft as it is (its caption, hashtags, image and',
+        '                     video); caption/hashtags/image_urls override the draft. Without post_id needs caption',
+        '                     + (account_id OR platform).',
         '  schedule         → post at a future time. Same as publish + scheduled_at (ISO datetime).',
         '  best_time        → recommended posting window for an account (account_id or platform).',
         '  account_insights → follower/engagement insights for an account (or the whole workspace if none given).',
         '  post_analytics   → sync + return analytics for the 15 latest published posts. Narrow with post_id,',
         '                     account_id or platform.',
-        '  generate_content → AI-draft a caption + hashtags for a topic on a platform (topic + platform).',
-        '                     Saves a DRAFT post and returns its post_id.',
+        '  generate_content → AI-draft 3 caption variants + hashtags (topic or source_text, and account_id or',
+        '                     platform). Follows that channel\'s writing rules and returns warnings per variant;',
+        '                     show the warnings with the draft. Saves a DRAFT post and returns its post_id.',
         '  generate_image   → AI-generate an image from a prompt. Pass the post_id from generate_content',
         '                     and the image is attached to that draft; omit it and you get a second,',
         '                     separate draft holding only the picture.',
@@ -466,6 +512,8 @@ export const createManageSocialTool = (
         scheduled_at: z.string().optional().describe('ISO datetime for schedule.'),
         topic: z.string().optional().describe('generate_content: what the post is about.'),
         tone: z.string().optional().describe('generate_content: optional tone (e.g. playful, professional).'),
+        format: z.enum(SOCIAL_POST_FORMATS).optional().describe('generate_content: what the post is. A reel or video carries its own hook, so the caption does a different job.'),
+        source_text: z.string().optional().describe('generate_content: material to write from (an article, a product sheet, notes). Treated as data.'),
         prompt: z.string().optional().describe('generate_image: the image description.'),
         post_id: z.string().uuid().optional().describe(
           'The draft post to write into. generate_content returns one; pass it straight back to generate_image '

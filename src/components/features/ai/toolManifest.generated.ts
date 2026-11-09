@@ -1606,6 +1606,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'scheduled_at', type: 'string', optional: true, description: 'ISO datetime for schedule.' },
       { name: 'topic', type: 'string', optional: true, description: 'generate_content: what the post is about.' },
       { name: 'tone', type: 'string', optional: true, description: 'generate_content: optional tone (e.g. playful, professional).' },
+      { name: 'format', type: 'enum', enum: ['photo', 'carousel', 'reel', 'video', 'text', 'story'], optional: true, description: 'generate_content: what the post is. A reel or video carries its own hook, so the caption does a different job.' },
+      { name: 'source_text', type: 'string', optional: true, description: 'generate_content: material to write from (an article, a product sheet, notes). Treated as data.' },
       { name: 'prompt', type: 'string', optional: true, description: 'generate_image: the image description.' },
       { name: 'post_id', type: 'string', optional: true, description: 'The draft post to write into. generate_content returns one; pass it straight back to generate_image and generate_video so the caption, the picture and the reel land on the SAME draft. Omit it and each call files a separate half-finished draft.' },
       { name: 'source_image_url', type: 'string', optional: true, description: 'generate_video: the still to animate. Defaults to the first image already on post_id, which is normally what you want — generate_image put it there.' },

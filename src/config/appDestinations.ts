@@ -124,6 +124,7 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   },
   { id: 'admin-flows', breadcrumb: 'Admin → Flows', route: '/flows' },
   { id: 'admin-knowledge-base', breadcrumb: 'Admin → Knowledge Base', route: '/admin/knowledge-base' },
+  { id: 'admin-writing-rules', breadcrumb: 'Admin → Writing Rules', route: '/admin/ai-configs?tab=writing-rules' },
 ];
 
 const BY_ID = new Map(APP_DESTINATIONS.map((d) => [d.id, d]));

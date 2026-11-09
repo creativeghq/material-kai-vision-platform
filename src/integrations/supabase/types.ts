@@ -28634,6 +28634,7 @@ export type Database = {
           metadata: Json | null
           platform: string
           user_id: string
+          website_id: string | null
           workspace_id: string
           zernio_account_id: string
         }
@@ -28651,6 +28652,7 @@ export type Database = {
           metadata?: Json | null
           platform: string
           user_id: string
+          website_id?: string | null
           workspace_id: string
           zernio_account_id: string
         }
@@ -28668,6 +28670,7 @@ export type Database = {
           metadata?: Json | null
           platform?: string
           user_id?: string
+          website_id?: string | null
           workspace_id?: string
           zernio_account_id?: string
         }
@@ -28820,6 +28823,108 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      channel_writing_rules: {
+        Row: {
+          ask_max: number | null
+          channel: string
+          hashtag_limit: number | null
+          hashtag_recommended: number | null
+          hashtag_style: string | null
+          is_active: boolean
+          label: string
+          links_clickable: boolean
+          max_chars: number | null
+          source_note: string | null
+          structure_notes: string | null
+          surface: string
+          target_max_chars: number | null
+          target_min_chars: number | null
+          tone_notes: string | null
+          updated_at: string
+          updated_by: string | null
+          verified_on: string | null
+          visible_chars: number | null
+        }
+        Insert: {
+          ask_max?: number | null
+          channel: string
+          hashtag_limit?: number | null
+          hashtag_recommended?: number | null
+          hashtag_style?: string | null
+          is_active?: boolean
+          label: string
+          links_clickable?: boolean
+          max_chars?: number | null
+          source_note?: string | null
+          structure_notes?: string | null
+          surface: string
+          target_max_chars?: number | null
+          target_min_chars?: number | null
+          tone_notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_on?: string | null
+          visible_chars?: number | null
+        }
+        Update: {
+          ask_max?: number | null
+          channel?: string
+          hashtag_limit?: number | null
+          hashtag_recommended?: number | null
+          hashtag_style?: string | null
+          is_active?: boolean
+          label?: string
+          links_clickable?: boolean
+          max_chars?: number | null
+          source_note?: string | null
+          structure_notes?: string | null
+          surface?: string
+          target_max_chars?: number | null
+          target_min_chars?: number | null
+          tone_notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_on?: string | null
+          visible_chars?: number | null
+        }
+        Relationships: []
+      }
+      writing_tells: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: string
+          language_code: string
+          note: string | null
+          phrase: string
+          surfaces: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind: string
+          language_code?: string
+          note?: string | null
+          phrase: string
+          surfaces?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: string
+          language_code?: string
+          note?: string | null
+          phrase?: string
+          surfaces?: string[] | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       social_zernio_profiles: {
         Row: {

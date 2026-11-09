@@ -17,6 +17,7 @@ const PLATFORM_OWNED_VOCABULARY: ReadonlyArray<readonly [table: string, column: 
   ['modules', 'name'],
   ['flow_area_registry', 'title'],
   ['subscription_plans', 'display_name'],
+  ['channel_writing_rules', 'label'],
 ];
 
 const suite = hasCreds ? describe : describe.skip;

@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { supabaseConfig } from '@/config/apis/supabaseConfig';
 import { PlatformIcon, SOCIAL_PLATFORMS, platformLabel } from '@/components/core/icons/PlatformIcon';
 import { Switch } from '@/components/core/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { platformHasReviews } from '@/config/socialPlatforms';
 
 const SUPABASE_FUNCTIONS_URL = `${supabaseConfig.projectUrl}/functions/v1`;
@@ -25,7 +26,10 @@ interface SocialAccount {
   is_active: boolean;
   last_synced_at: string | null;
   connected_at: string;
+  website_id: string | null;
 }
+
+const DEFAULT_VOICE = '__workspace_default__';
 
 function formatFollowers(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
@@ -45,23 +49,18 @@ function timeAgo(iso: string | null): string {
 
 export const SocialAccountsTab: React.FC = () => {
   const { user } = useAuth();
-  // The account connects into the workspace the user is CURRENTLY looking at. This used to
-  // read `workspace_members` directly with `.maybeSingle()` and no `.limit(1)`: for anyone in
-  // two workspaces PostgREST returns an error rather than a row, so `workspaceId` stayed null
-  // and Connect silently did nothing — the multi-workspace case, i.e. the whole point.
   const { activeWorkspaceId: workspaceId } = useWorkspace();
   const { toast } = useToast();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [websites, setWebsites] = useState<Array<{ id: string; url: string }>>([]);
+  const [savingVoice, setSavingVoice] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState<string | null>(null);
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
-  // null = not asked yet. Connecting is impossible without the operator's Zernio key, and the only
-  // signal used to be a 503 toast AFTER the click, on a page showing eight inviting Connect
-  // buttons. Ask up front and say so instead.
+  // null = not asked yet; connecting needs the operator's Zernio key, so ask before offering Connect.
   const [configured, setConfigured] = useState<boolean | null>(null);
   const { isOperator } = usePermissions();
-  // Which connected location (if any) this user publishes on their public profile. NULL is the
-  // default and publishes nothing — see `user_profiles.public_google_review_account_id`.
+  // NULL publishes nothing — see `user_profiles.public_google_review_account_id`.
   const [publishedAccountId, setPublishedAccountId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
 
@@ -83,8 +82,6 @@ export const SocialAccountsTab: React.FC = () => {
           body: JSON.stringify({ action: 'config_status' }),
         });
         const json = await res.json();
-        // Unreachable/failed probe must not claim "configured" — that is the banner switching
-        // itself off exactly when something is wrong.
         setConfigured(res.ok && json?.success ? Boolean(json.configured) : false);
       } catch {
         setConfigured(false);
@@ -101,10 +98,7 @@ export const SocialAccountsTab: React.FC = () => {
     const connected = params.get('connected');
     const accountId = params.get('accountId');
 
-    // Zernio can come back having FAILED the selection step rather than with an account — no
-    // locations on the Google account, a cancelled picker, a revoked grant. Bailing on a missing
-    // accountId alone left those redirects silent: no toast, and the error sitting in the URL
-    // bar. Google Business has more of these failure modes than any other platform.
+    // Zernio can come back with a failed selection step instead of an account; say so.
     const failure = params.get('error') || params.get('error_description');
     if (failure && !accountId) {
       toast({
@@ -124,12 +118,6 @@ export const SocialAccountsTab: React.FC = () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        // `fetch` only rejects on a NETWORK failure — every HTTP error status resolves
-        // normally. The response was never read and res.ok never checked, so the success
-        // toast fired on 403 ('Not a member of this workspace'), 500 (upsert failure) and 503
-        // (ZERNIO_API_KEY missing). The user was told the account connected, loadAccounts()
-        // then showed nothing, and no error existed anywhere to explain it. The same file
-        // does this correctly 70 lines down.
         const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/zernio-api`, {
           method: 'POST',
           headers: {
@@ -162,9 +150,7 @@ export const SocialAccountsTab: React.FC = () => {
 
   const loadAccounts = async () => {
     setLoading(true);
-    // Scoped to the ACTIVE workspace, not just the user: an account belongs to the workspace it
-    // was connected into, and listing every workspace's accounts here would offer a Disconnect
-    // for a tenant the user is not currently in.
+    // Scoped to the ACTIVE workspace: an account belongs to the workspace it was connected into.
     let q = supabase
       .from('social_accounts')
       .select('*')
@@ -179,9 +165,12 @@ export const SocialAccountsTab: React.FC = () => {
       setAccounts(data || []);
     }
 
-    // Read the opt-in rather than assume it off: the toggle must show what is actually published,
-    // and a failed read leaves it at its last known value rather than silently reading as "off"
-    // next to a profile that is showing the reviews.
+    if (workspaceId) {
+      const { data: sites } = await supabase.from('user_websites').select('id, url').eq('workspace_id', workspaceId).order('url');
+      setWebsites(sites ?? []);
+    }
+
+    // A failed read keeps the last known value rather than reading as "off".
     const { data: prof, error: profErr } = await supabase
       .from('user_profiles')
       .select('public_google_review_account_id')
@@ -190,6 +179,19 @@ export const SocialAccountsTab: React.FC = () => {
     if (!profErr) setPublishedAccountId(prof?.public_google_review_account_id ?? null);
 
     setLoading(false);
+  };
+
+  const setVoice = async (accountId: string, value: string) => {
+    const websiteId = value === DEFAULT_VOICE ? null : value;
+    setSavingVoice(accountId);
+    const { error } = await supabase.from('social_accounts').update({ website_id: websiteId }).eq('id', accountId);
+    setSavingVoice(null);
+    if (error) {
+      toast({ title: 'Could not change the voice', description: error.message, variant: 'destructive' });
+      return;
+    }
+    setAccounts((prev) => prev.map((a) => (a.id === accountId ? { ...a, website_id: websiteId } : a)));
+    toast({ title: 'Voice updated', description: 'Drafts for this account now use that brand profile.' });
   };
 
   /** Publish (or stop publishing) one location's reviews on the user's public profile. */
@@ -238,10 +240,7 @@ export const SocialAccountsTab: React.FC = () => {
           action: 'connect',
           platform,
           workspace_id: workspaceId,
-          // Zernio redirects back here after OAuth; this tab finishes the connection.
-          // MUST point at the social-accounts tab (not bare /profile) — otherwise the user
-          // lands on the default Profile tab, this component never mounts, and the
-          // ?connected=&accountId= callback that persists the account is never processed.
+          // MUST land on this tab: it is what processes the ?connected=&accountId= callback.
           redirect_url: `${window.location.origin}${window.location.pathname}?tab=social-accounts`,
         }),
       });
@@ -306,13 +305,7 @@ export const SocialAccountsTab: React.FC = () => {
   return (
     <div className="space-y-6">
 
-      {/*
-        The one place a person lands after connecting an account, and until now it offered no way
-        to USE one. Composing is the agent's job (Hermes owns `manage_social`), so this hands off
-        rather than growing a second composer: `?capability=` resolves the owning agent and
-        `?quickstart=` opens the Publish form already primed. Both are checked against the catalog
-        by toolkitCoverage.test.ts, so a renamed quick-start breaks the build instead of the link.
-      */}
+      {/* Composing is Hermes's job; the link is checked against the catalog by toolkitCoverage.test.ts. */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold">Social accounts</h3>
@@ -391,6 +384,26 @@ export const SocialAccountsTab: React.FC = () => {
                     : <Trash2 className="h-3 w-3" />}
                 </Button>
               </div>
+
+              {websites.length > 0 && (
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-hairline pt-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Writes in the voice of</p>
+                    <p className="text-xs text-muted-foreground">The brand profile drafts for this account use.</p>
+                  </div>
+                  <Select
+                    value={account.website_id ?? DEFAULT_VOICE}
+                    onValueChange={(v) => setVoice(account.id, v)}
+                    disabled={savingVoice === account.id}
+                  >
+                    <SelectTrigger className="w-64" aria-label={`Voice for ${label}`}><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={DEFAULT_VOICE}>Workspace Default</SelectItem>
+                      {websites.map((w) => <SelectItem key={w.id} value={w.id}>{w.url.replace(/^https?:\/\//, '')}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Publishing a place's reviews on a personal profile is a disclosure, so it is an
                   explicit choice that defaults to off — never something connecting an account

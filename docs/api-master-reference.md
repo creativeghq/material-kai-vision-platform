@@ -68,7 +68,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Auth | Summary |
 |---|---|---|
-| `generate-social-content` | JWT / kai_* | Generate platform-optimised social media captions and hashtags via Claude |
+| `generate-social-content` | JWT / kai_* | Draft social post captions under the channel's writing rules |
 | `generate-social-image` | JWT / kai_* | Generate a social media image via Aurora, Gemini, or FLUX based on content type |
 | `generate-social-video` | JWT / kai_* | Generate a short-form social video (MiniMax H3 by default; Kling, Gemini Omni, Wan3.0, Seedance 2.5 and Ray3.2 selectable) |
 | `zernio-api` _(GET + POST)_ | JWT / kai_* | Social media publishing, OAuth account management, and analytics via Zernio. |

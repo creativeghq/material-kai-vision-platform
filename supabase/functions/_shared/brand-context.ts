@@ -1,6 +1,7 @@
 /** The workspace's positioning and voice, read at the moment an agent writes. The ONE loader. */
 import type { DbClient } from './supabase-client.ts';
 import { loadPrompt, renderPromptTemplate } from './prompt-utils.ts';
+import { containsPhrase } from './phrase-match.ts';
 
 export interface BrandProfileRow {
   id: string;
@@ -67,6 +68,12 @@ export function brandContextLines(ctx: BrandContext, audience: BrandAudience): s
     pushList('Active Hypotheses', list(p?.active_hypotheses));
   }
   if (audience === 'strategy') return lines;
+  if (audience === 'internal') {
+    pushList('Proof we can state (the only figures and cases a draft may claim)', list(p?.proprietary_data));
+    pushList('Work we can point to', list(p?.owned_examples));
+    push('How we work', text(p?.methodology));
+    push('Credentials', text(p?.credentials));
+  }
   pushList('Tone', list(p?.tone_attributes));
   pushList('Personality', list(p?.personality_traits));
   push('Writing Style', text(p?.writing_style));
@@ -82,20 +89,10 @@ export async function formatBrandContextForPrompt(db: DbClient, ctx: BrandContex
   return `\n\n${renderPromptTemplate(frame, { brand_context: lines.join('\n') })}`;
 }
 
-const fold = (s: string): string =>
-  s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/ς/g, 'σ');
-
-const escapeRe = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
 /** Accent-, case- and final-sigma-insensitive whole-word match. Returns each avoid term the text uses, as the operator wrote it. */
 export function avoidListHits(draft: string, avoidList: string[] | null | undefined): string[] {
-  const body = fold(draft ?? '');
-  if (!body) return [];
-  return list(avoidList).filter((term) => {
-    const words = fold(term).split(/\s+/).filter(Boolean).map(escapeRe);
-    if (!words.length) return false;
-    return new RegExp(`(?<![\\p{L}\\p{N}])${words.join('\\s+')}(?![\\p{L}\\p{N}])`, 'u').test(body);
-  });
+  if (!draft?.trim()) return [];
+  return list(avoidList).filter((term) => containsPhrase(draft, term));
 }
 
 export interface BrandDraftCheck {
