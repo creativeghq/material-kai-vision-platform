@@ -165,7 +165,11 @@ export const createManageSocialTool = (
           onChunk?.({
             type: 'action_confirmation',
             tool: 'manage_social',
-            input: { action, account_id: acct.id, post_id: draft?.id, caption: finalCaption, hashtags: finalTags, image_urls: finalImages, scheduled_at },
+            input: {
+              action, account_id: acct.id, post_id: draft?.id, caption: finalCaption, scheduled_at,
+              ...(finalTags ? { hashtags: finalTags } : {}),
+              ...(finalImages ? { image_urls: finalImages } : {}),
+            },
             title: action === 'publish' ? 'Publish this post now?' : 'Schedule this post?',
             summary: `"${preview}${tags}"${media ? ` with ${media}` : ''} → ${acct.platform}${acct.handle ? ` (${acct.handle})` : ''}`
               + (action === 'publish'
@@ -382,7 +386,9 @@ export const createManageSocialTool = (
         return JSON.stringify({
           success: true,
           ...res.data,
-          message: res.data?.post_id
+          message: res.data?.saved === false
+            ? `The caption was written but NOT saved to post ${res.data?.post_id ?? ''}: ${res.data?.save_error ?? 'unknown error'}. Tell the user; publishing that post would send its old caption.`
+            : res.data?.post_id
             ? `Draft caption + hashtags saved to post ${res.data.post_id}. Pass that post_id to generate_image so the picture lands on THIS draft, then publish/schedule.`
             : 'Draft caption + hashtags generated. Review, then use publish/schedule.',
         });
@@ -455,9 +461,21 @@ export const createManageSocialTool = (
           };
         });
         if (problems.length) return JSON.stringify({ success: false, error: `Nothing was saved: ${problems.join('; ')}` });
-        const { data: saved, error: saveErr } = await svc.from('social_posts').insert(rows).select('id, platform, metadata');
+        const slotKey = (acct: unknown, plan: any) => `${acct ?? ''}|${plan?.planned_for}|${plan?.kind}|${String(plan?.angle ?? '').trim().toLowerCase()}`;
+        const dates = [...new Set(rows.map((r: any) => r.metadata.plan.planned_for))];
+        const { data: existing, error: exErr } = await svc.from('social_posts')
+          .select('id, platform, social_account_id, metadata').eq('workspace_id', ws).eq('status', 'draft')
+          .in('metadata->plan->>planned_for', dates);
+        if (exErr) return JSON.stringify({ success: false, error: `Could not check for an existing plan: ${exErr.message}` });
+        const already = new Map((existing ?? []).map((p: any) => [slotKey(p.social_account_id, p.metadata?.plan), p]));
+        const fresh = rows.filter((r: any) => !already.has(slotKey(r.social_account_id, r.metadata.plan)));
+        const reused = rows.map((r: any) => already.get(slotKey(r.social_account_id, r.metadata.plan))).filter(Boolean);
+        const { data: inserted, error: saveErr } = fresh.length
+          ? await svc.from('social_posts').insert(fresh).select('id, platform, metadata')
+          : { data: [], error: null };
         if (saveErr) return JSON.stringify({ success: false, error: `Could not save the plan: ${saveErr.message}` });
-        const planned = (saved ?? []).map((p: any) => ({ post_id: p.id, platform: p.platform, ...p.metadata?.plan, format: p.metadata?.format }));
+        const saved = [...reused, ...(inserted ?? [])];
+        const planned = saved.map((p: any) => ({ post_id: p.id, platform: p.platform, ...p.metadata?.plan, format: p.metadata?.format }));
         onChunk?.({ type: 'social_week_planned', planned, timestamp: Date.now() });
         return JSON.stringify({
           success: true,
@@ -518,7 +536,19 @@ export const createManageSocialTool = (
           return JSON.stringify({ success: false, error: wanted ? 'None of those accounts is connected in this workspace.' : 'No social accounts are connected. Connect one in Profile → Social Accounts first.' });
         }
         const drafts: any[] = [];
+        const done = new Map<string, string>();
+        if (article_id) {
+          const { data: prior, error: priorErr } = await svc.from('social_posts')
+            .select('id, social_account_id').eq('workspace_id', ws).eq('status', 'draft')
+            .eq('metadata->>repurposed_from', String(article_id));
+          if (priorErr) return JSON.stringify({ success: false, error: `Could not check earlier drafts: ${priorErr.message}` });
+          for (const p of prior ?? []) if (p.social_account_id) done.set(p.social_account_id, p.id);
+        }
         for (const a of targets) {
+          if (done.has(a.id)) {
+            drafts.push({ account_id: a.id, platform: a.platform, handle: a.handle, post_id: done.get(a.id), already_drafted: true });
+            continue;
+          }
           const res = await callEdge(jwt!, 'generate-social-content', {
             topic: `${title}${link ? ` (article: ${link})` : ''}`,
             platform: String(a.platform).toLowerCase(), format, tone, source_text: material,
@@ -527,13 +557,21 @@ export const createManageSocialTool = (
           drafts.push(res.ok && res.data?.success !== false
             ? { account_id: a.id, platform: a.platform, handle: a.handle, post_id: res.data?.post_id ?? null, captions: res.data?.captions ?? [], saved: res.data?.saved !== false }
             : { account_id: a.id, platform: a.platform, handle: a.handle, error: res.data?.error || res.error });
+          const newId = res.ok ? res.data?.post_id : null;
+          if (article_id && newId) {
+            const { data: row } = await svc.from('social_posts').select('metadata').eq('id', newId).eq('workspace_id', ws).maybeSingle();
+            const { error: tagErr } = await svc.from('social_posts')
+              .update({ metadata: { ...(row?.metadata ?? {}), repurposed_from: String(article_id) } })
+              .eq('id', newId).eq('workspace_id', ws);
+            if (tagErr) console.error('[manage_social] could not tag repurposed draft', newId, tagErr.message);
+          }
         }
         onChunk?.({ type: 'social_repurposed', title, article_id: article_id ?? null, drafts, timestamp: Date.now() });
         const failed = drafts.filter((d) => d.error).length;
         return JSON.stringify({
           success: failed < drafts.length,
           drafts,
-          message: `${drafts.length - failed} draft(s) written${failed ? `, ${failed} failed` : ''}. Nothing is published: show each draft and its warnings, then publish or schedule the ones the user approves by post_id.`,
+          message: `${drafts.length - failed} draft(s) ready${done.size ? ` (${drafts.filter((d) => d.already_drafted).length} from an earlier run, not rewritten)` : ''}${failed ? `, ${failed} failed` : ''}. Nothing is published: show each draft and its warnings, then publish or schedule the ones the user approves by post_id.`,
         });
       }
 

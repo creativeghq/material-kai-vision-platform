@@ -68,6 +68,9 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
     // Build Zernio createPost payload (POST /v1/posts).
     const text = composePublishedText(post.caption ?? '', post.hashtags);
     const rules = await loadCopyRules(supabase, account.platform);
+    if (rules.status === 'unavailable') {
+      return jsonResponse({ success: false, error: 'The writing rules could not be read, so the post was not checked or sent. Try again shortly.' }, 503);
+    }
     const hard = checkCopy({ text: post.caption ?? '', hashtags: post.hashtags, rules }).warnings
       .filter((w) => w.code === 'over_limit' || w.code === 'too_many_hashtags');
     if (hard.length) {

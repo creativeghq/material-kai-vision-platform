@@ -11,6 +11,7 @@ import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { brandDraftCheck, formatBrandContextForPrompt, loadBrandContext } from '../_shared/brand-context.ts';
 import { checkCopy, loadCopyRules } from '../_shared/copy-check.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -119,7 +120,7 @@ Deno.serve(withApiLogging('generate-email-copy', async (req) => {
     });
     const preview = checkCopy({ text: output.preview_text, rules: preheaderRules, avoidList });
     const bodyText = [output.body.headline, output.body.opening, ...output.body.points, output.body.cta_text, output.body.ps].join('\n');
-    const bodyCheck = checkCopy({ text: bodyText, rules: { status: 'ok', rule: null, tells: subjectRules.tells }, avoidList });
+    const bodyCheck = checkCopy({ text: bodyText, rules: { status: 'ok', rule: null, tells: subjectRules.tells }, avoidList, surface: 'email' });
     const avoidHits = brandDraftCheck(brand, [...subjects.map((x) => x.text), output.preview_text, bodyText].join('\n')).avoid_hits;
     const result = {
       avoid_hits: avoidHits,
@@ -131,14 +132,15 @@ Deno.serve(withApiLogging('generate-email-copy', async (req) => {
 
     let saveError: string | null = null;
     if (campaign) {
-      const { error: upErr } = await supabase.from('campaigns').update({
+      const { data: saved, error: upErr } = await supabase.from('campaigns').update({
         subject_line: subjects[0]?.text ?? null,
         preview_text: output.preview_text,
         metadata: { ...(campaign.metadata ?? {}), copy_draft: { ...result, generated_at: new Date().toISOString(), model: MODEL } },
         updated_at: new Date().toISOString(),
         updated_by: userId,
-      }).eq('id', campaign.id).eq('workspace_id', workspaceId);
+      }).eq('id', campaign.id).eq('workspace_id', workspaceId).in('status', ['draft', 'paused']).select('id');
       if (upErr) saveError = `The copy was written but could not be saved onto the campaign: ${upErr.message}`;
+      else if (!saved?.length) saveError = 'The copy was written but not saved: the campaign started sending while it was being written.';
     }
 
     return jsonResponse({
@@ -152,10 +154,14 @@ Deno.serve(withApiLogging('generate-email-copy', async (req) => {
   } catch (err) {
     console.error('[generate-email-copy] Error:', err);
     try {
-      await supabase.rpc('refund_credits', {
+      const { error: refundRpcErr } = await supabase.rpc('refund_credits', {
         p_user_id: userId, p_amount: debit.credits_debited, p_operation_type: 'email_copy_generation_refund',
         p_description: 'Refund: email copy generation failed', p_metadata: { workspace_id: workspaceId }, p_workspace_id: workspaceId,
       });
+      if (refundRpcErr) {
+        console.error('[generate-email-copy] Refund failed:', refundRpcErr);
+        await captureException(new Error(`email-copy refund failed for user ${userId}: ${refundRpcErr.message}`));
+      }
     } catch (refundErr) {
       console.error('[generate-email-copy] Refund failed:', refundErr);
     }

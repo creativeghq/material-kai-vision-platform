@@ -12,6 +12,7 @@ import { brandDraftCheck, formatBrandContextForPrompt, loadBrandContext } from '
 import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import { checkCopy, loadCopyRules } from '../_shared/copy-check.ts';
 import { SOCIAL_POST_FORMATS, type SocialPostFormat } from '../_shared/social-post-formats.ts';
+import { captureException } from '../_shared/sentry.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -205,7 +206,7 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
 async function refundCredits(supabase: any, userId: string, amount: number, workspace_id?: string): Promise<void> {
   if (!amount || amount <= 0) return;
   try {
-    await supabase.rpc('refund_credits', {
+    const { error } = await supabase.rpc('refund_credits', {
       p_user_id: userId,
       p_amount: amount,
       p_operation_type: 'social_content_generation_refund',
@@ -213,6 +214,10 @@ async function refundCredits(supabase: any, userId: string, amount: number, work
       p_metadata: { workspace_id },
       p_workspace_id: workspace_id ?? null,
     });
+    if (error) {
+      console.error('[generate-social-content] Refund failed:', error);
+      await captureException(new Error(`social-content refund failed for user ${userId}: ${error.message}`));
+    }
   } catch (refundErr) {
     console.error('[generate-social-content] Refund failed:', refundErr);
   }

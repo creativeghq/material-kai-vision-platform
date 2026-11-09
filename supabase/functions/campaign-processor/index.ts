@@ -144,8 +144,8 @@ serve(withApiLogging('campaign-processor', async (req) => {
         continue;
       }
 
-      // Runs once, before the first send, for every path that flips a campaign to 'sending'.
-      if (!campaign.metadata?.credit_charged && !campaign.metadata?.preflight_passed_at) {
+      // Every tick, before any batch: the template can change between ticks, and every path that flips a campaign to 'sending' lands here.
+      {
         const brand = await loadBrandContext(supabase, campaign.workspace_id, null);
         const check = await campaignPreflight(
           supabase, campaign.workspace_id, campaign, brand.status === 'ok' ? brand.profile?.avoid_list ?? [] : [],
@@ -155,13 +155,16 @@ serve(withApiLogging('campaign-processor', async (req) => {
           await blockCampaign(supabase, campaign, 'preflight_failed', `Not sent: ${blocks.join(' ')}`);
           continue;
         }
-        campaign.metadata = {
-          ...(campaign.metadata || {}),
-          preflight_passed_at: new Date().toISOString(),
-          preflight_warnings: [...check.issues.map((i) => i.message), ...check.copy_warnings.map((w) => w.message)],
-        };
-        const { error: pfErr } = await supabase.from('campaigns').update({ metadata: campaign.metadata }).eq('id', campaign.id);
-        if (pfErr) { console.error(`Campaign ${campaign.id}: could not record the pre-send check:`, pfErr); continue; }
+        if (!campaign.metadata?.preflight_passed_at) {
+          campaign.metadata = {
+            ...(campaign.metadata || {}),
+            preflight_passed_at: new Date().toISOString(),
+            preflight_warnings: [...check.issues.map((i) => i.message), ...check.copy_warnings.map((w) => w.message)],
+          };
+          const { error: pfErr } = await supabase.from('campaigns').update({ metadata: campaign.metadata }).eq('id', campaign.id);
+          if (pfErr) { console.error(`Campaign ${campaign.id}: could not record the pre-send check:`, pfErr); continue; }
+        }
+        campaign.preview_text = check.preview_text;
       }
 
       // Credit metering: charge the workspace owner ONCE per campaign (one unit of work), guarded so

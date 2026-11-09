@@ -179,6 +179,7 @@ export const SocialPostMixPanel: React.FC = () => {
                   </TableCell>
                   <TableCell className="text-right">
                     <Input
+                      key={`${e.own?.id ?? 'base'}:${e.row.per_week}`}
                       type="number" min={0} step={0.5} className="ml-auto h-8 w-20 text-right tabular-nums"
                       defaultValue={e.row.per_week}
                       disabled={busy === e.key}

@@ -60,6 +60,13 @@ describe('checkCopy', () => {
     expect(codes(checkCopy({ text: 'Subscribe now and comment', rules: rules() }))).not.toContain('too_many_asks');
   });
 
+  it('applies a surface given explicitly when there is no channel rule (an email body)', () => {
+    const r = checkCopy({ text: 'Subscribe now', rules: rules(null), surface: 'email' });
+    expect(r.warnings.find((w) => w.code === 'too_many_asks')).toBeUndefined();
+    expect(tells.filter((t) => t.surfaces?.includes('email')).length).toBeGreaterThan(0);
+    expect(checkCopy({ text: 'Have you ever tried it?', rules: rules(null), surface: 'email' }).warnings.map((w) => w.code)).toContain('banned_opener');
+  });
+
   it('reports an unreadable rule set as unchecked, never as clean', () => {
     const r = checkCopy({ text: 'anything', rules: rules(null, 'unavailable') });
     expect(r.checked).toBe(false);
@@ -104,6 +111,24 @@ describe('writers read the rules instead of holding them', () => {
     expect(check).toBeGreaterThan(sendAt);
     expect(refuse).toBeGreaterThan(check);
     expect(gate).toBeGreaterThan(refuse);
+  });
+
+  it('every send path runs the pre-send check: the processor checks before it sends a batch', () => {
+    const proc = strippedSource(join(ROOT, 'supabase/functions/campaign-processor/index.ts'));
+    const check = proc.indexOf('campaignPreflight(');
+    const block = proc.indexOf("'preflight_failed'", check);
+    const send = proc.indexOf("functions/v1/email-api", check);
+    expect(check).toBeGreaterThan(-1);
+    expect(block).toBeGreaterThan(check);
+    expect(send).toBeGreaterThan(block);
+    expect(proc).not.toMatch(/!campaign\.metadata\?\.preflight_passed_at\)\s*\{\s*const brand/);
+  });
+
+  it('the publish handler composes the text it checks and refuses when the rules cannot be read', () => {
+    const pub = strippedSource(join(ROOT, 'supabase/functions/zernio-api/handlers/publish.ts'));
+    expect(pub).toContain('composePublishedText(');
+    expect(pub).toMatch(/rules\.status === 'unavailable'[\s\S]{0,200}503/);
+    expect(pub.indexOf('checkCopy(')).toBeLessThan(pub.indexOf('zernioApi('));
   });
 
   it('manage_social checks the copy and publishes the draft it was given', () => {

@@ -83,6 +83,8 @@ export function checkCopy(input: {
   hashtags?: string[] | null;
   rules: CopyRules;
   avoidList?: string[] | null;
+  /** Which surface's tells apply when there is no channel rule (an email body has none). */
+  surface?: string;
 }): CopyCheckResult {
   const { rules } = input;
   const full = composePublishedText(input.text, input.hashtags);
@@ -91,7 +93,8 @@ export function checkCopy(input: {
   const add = (code: CopyWarningCode, message: string, hits?: string[]) =>
     warnings.push(hits ? { code, message, hits } : { code, message });
 
-  const tells = rules.tells.filter((t) => !t.surfaces?.length || (rule && t.surfaces.includes(rule.surface)));
+  const surface = rule?.surface ?? input.surface ?? null;
+  const tells = rules.tells.filter((t) => !t.surfaces?.length || (surface != null && t.surfaces.includes(surface)));
   const hitsOf = (kind: WritingTellKind) => tells.filter((t) => t.kind === kind && containsPhrase(full, t.phrase)).map((t) => t.phrase);
 
   const length = [...full].length;
