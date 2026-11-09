@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import { readFileSync } from 'node:fs';
-import { ROUTES } from './routes';
+import { ROUTES_TO_RUN, recordRouteAssets } from './routes';
 import { AUDIT_FN, HARD_KINDS, type AuditResult } from './contentAudit';
 
 /**
@@ -11,7 +11,7 @@ const BASELINE: Record<string, Record<string, number>> = JSON.parse(
   readFileSync('.github/content-audit-baseline.json', 'utf8'),
 );
 
-for (const route of ROUTES) {
+for (const route of ROUTES_TO_RUN) {
   test(`content audit: ${route}`, async ({ page }) => {
     await page.goto(route, { waitUntil: 'domcontentloaded' });
     await page.waitForLoadState('networkidle').catch(() => {});
@@ -20,6 +20,7 @@ for (const route of ROUTES) {
       .catch(() => {});
 
     const audit: AuditResult = JSON.parse(await page.evaluate(AUDIT_FN));
+    await recordRouteAssets(page, route);
     const allowed = BASELINE[route] ?? {};
 
     const counted: Record<string, number> = {};

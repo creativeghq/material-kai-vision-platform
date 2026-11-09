@@ -11,6 +11,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dist-meta
+.smoke
 *.local
 
 # Environment variables - NEVER COMMIT THESE!

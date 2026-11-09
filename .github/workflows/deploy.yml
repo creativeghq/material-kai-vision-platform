@@ -96,6 +96,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       frontend: ${{ steps.areas.outputs.frontend }}
+      frontend_base: ${{ steps.base.outputs.frontend_base }}
       # Both function verdicts are DERIVED in `changed-functions`, from one diff taken against
       # the FUNCTIONS marker. They used to come from paths-filter, which takes a single base and
       # it is the frontend's — see the comment on that step for why that is not a detail.
@@ -563,6 +564,13 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chunk-modules-${{ github.sha }}
+          path: dist-meta/chunk-modules.json
+          retention-days: 1
+          if-no-files-found: error
+
   # ────────────────────────────────────────────────────────────────────
   # deploy-frontend: prebuilt Vercel upload (no double build).
   # ────────────────────────────────────────────────────────────────────
@@ -964,12 +972,14 @@ jobs:
   # If that secret ever goes missing the suite would smoke a login page and pass on anything,
   # so tests/e2e/vercelBypass.ts FAILS LOUDLY when the target is protected and the secret isn't set.
   fe-smoke:
-    needs: [deploy-frontend]
+    needs: [deploy-frontend, changes]
     if: ${{ always() && needs.deploy-frontend.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -1005,8 +1015,27 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install chromium
 
+      # Scoping: only routes whose loaded source files changed since the deployed build run.
+      # The route→module record is keyed by the deployed SHA; a miss runs every route.
+      - uses: actions/download-artifact@v4
+        with:
+          name: chunk-modules-${{ github.sha }}
+          path: .smoke/build
+      - name: Restore the deployed build's route→module record
+        if: needs.changes.outputs.frontend_base != ''
+        uses: actions/cache/restore@v4
+        with:
+          path: .smoke/record/route-modules.json
+          key: fe-route-modules-${{ needs.changes.outputs.frontend_base }}
+      - name: 🎯 Select affected routes
+        env:
+          FE_SMOKE_ALL: ${{ github.event_name == 'workflow_dispatch' && '1' || '0' }}
+        run: node scripts/smoke/select-routes.mjs "${{ needs.changes.outputs.frontend_base }}" .smoke/record/route-modules.json .smoke/selection.json
+
       - name: 🖥️ Front-end route-load smoke
         env:
+          SMOKE_ROUTES_FILE: .smoke/selection.json
+          SMOKE_RECORD_DIR: .smoke/route-assets
           # The unaliased production candidate, NOT the live domain — this has to fail before
           # users can reach it. It is a *.vercel.app URL and therefore behind SSO, which is what
           # the bypass secret is for; without the secret Playwright would smoke the login page
@@ -1016,6 +1045,13 @@ jobs:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
         run: npx playwright test --reporter=line
+
+      - name: Record this build's route→module map
+        run: node scripts/smoke/record-route-modules.mjs .smoke/build/chunk-modules.json .smoke/route-assets .smoke/record/route-modules.json .smoke/record/route-modules.json
+      - uses: actions/cache/save@v4
+        with:
+          path: .smoke/record/route-modules.json
+          key: fe-route-modules-${{ github.sha }}
 
   # ────────────────────────────────────────────────────────────────────────────
   # integration-tests — live-system Vitest suites: cross-workspace RLS isolation

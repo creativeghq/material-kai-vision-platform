@@ -1,14 +1,37 @@
+import fs from 'fs';
 import path from 'path';
 
-import { defineConfig, loadEnv } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
+
+/** dist-meta/chunk-modules.json: chunk file → repo source files in it (fe-smoke route scoping). */
+function chunkModulesManifest(): Plugin {
+  return {
+    name: 'chunk-modules-manifest',
+    apply: 'build',
+    generateBundle(_options, bundle) {
+      const root = process.cwd();
+      const map: Record<string, string[]> = {};
+      for (const out of Object.values(bundle)) {
+        if (out.type !== 'chunk') continue;
+        const files = Object.keys(out.modules)
+          .filter((id) => !id.startsWith('\0') && !id.includes('node_modules'))
+          .map((id) => path.relative(root, id.split('?')[0]).replace(/\\/g, '/'))
+          .filter((rel) => !rel.startsWith('..'));
+        map[path.basename(out.fileName)] = [...new Set(files)].sort();
+      }
+      fs.mkdirSync(path.join(root, 'dist-meta'), { recursive: true });
+      fs.writeFileSync(path.join(root, 'dist-meta', 'chunk-modules.json'), JSON.stringify(map));
+    },
+  };
+}
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, process.cwd(), '');
 
   return {
-    plugins: [react()],
+    plugins: [react(), chunkModulesManifest()],
     optimizeDeps: {
       // Excluding @sparkjsdev/spark from pre-bundling fixes the "(void 0) is not a constructor"
       // error in dev mode. When Vite pre-bundles spark with esbuild, it externalises `three`

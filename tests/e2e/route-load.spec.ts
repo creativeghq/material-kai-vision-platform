@@ -10,7 +10,7 @@ import { test, expect } from './fixtures';
  * page's chunk and a broken page would be missed).
  */
 // The list lives in ./routes so this spec and content-audit cannot drift apart.
-import { ROUTES } from './routes';
+import { ROUTES_TO_RUN } from './routes';
 
 // A failed dynamic import / runtime crash — the white-screen signatures.
 const FATAL = /failed to fetch dynamically imported module|error loading dynamically imported module|ChunkLoadError|Loading chunk \d+ failed|Importing a module script failed|is not a function|is not defined|Cannot read propert|undefined is not an object/i;
@@ -42,7 +42,7 @@ const DATA_REQUEST_PROBE = () => {
   } as typeof XMLHttpRequest.prototype.open;
 };
 
-for (const route of ROUTES) {
+for (const route of ROUTES_TO_RUN) {
   test(`route loads: ${route}`, async ({ page }) => {
     const fatal: string[] = [];
     page.on('pageerror', (e) => { if (FATAL.test(e.message)) fatal.push(`pageerror: ${e.message}`); });
