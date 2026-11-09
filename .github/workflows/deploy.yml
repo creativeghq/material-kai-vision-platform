@@ -173,8 +173,11 @@ jobs:
               - 'tsconfig.json'
               - 'index.html'
               - 'vercel.json'
+            # Only what the live integration tier reads; unit and e2e files have their own jobs.
             tests:
-              - 'tests/**'
+              - 'tests/integration/**'
+              - 'tests/helpers/**'
+              - 'vitest.config.ts'
             # Frontend file, backend effect: sync-capability-matrix rewrites live SQL from it.
             capabilities:
               - 'src/auth/roleCapabilities.ts'
