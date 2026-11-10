@@ -4,15 +4,9 @@ import {
   Users,
   TrendingUp,
   Activity,
-  Clock,
   FileText,
-  MessageSquare,
   RefreshCw,
   Database,
-  Bot,
-  ThumbsUp,
-  ThumbsDown,
-  Zap,
   Gauge,
   Search,
   CreditCard,
@@ -24,7 +18,7 @@ import {
   KeyRound,
   Bell,
 } from 'lucide-react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import {
   PieChart,
@@ -51,14 +45,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/core/ui/table';
-import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Progress } from '@/components/core/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { UnifiedProcessingMonitor } from '../UnifiedProcessingMonitor';
-import { PriceLookupsCard } from './PriceLookupsCard';
 import { PipelineStrategyMetricsPanel } from './PipelineStrategyMetricsPanel';
 import { CatalogOperationsTab } from './CatalogOperationsTab';
 import { SystemHealthMonitor } from '../SystemHealthMonitor';
@@ -80,42 +72,19 @@ import { PushBroadcastPanel } from './PushBroadcastPanel';
 import { InboxAIPanel } from './InboxAIPanel';
 import { CapabilityLedgerPanel } from './CapabilityLedgerPanel';
 import { ChannelsCostPanel } from './ChannelsCostPanel';
-import { AgentUnmetRequestsPanel } from './AgentUnmetRequestsPanel';
 import { ChannelsBillingDetail } from './ChannelsBillingDetail';
 
 import type {
-  UsageAnalytics,
-  AgentChatMessage,
-  ApiUsageLog,
   DataProcessingStats,
   ExternalServiceUsageData,
   ResendEmailStats,
   NotificationChannelStats,
 } from './types';
 import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from './constants';
-import { estimateTokens, calculateCost } from './utils';
-import { StatCard } from './components/StatCard';
-import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 
-// Shape of `admin_agent_chat_stats()` — one all-time aggregate row replacing what used to be a
-// 100-row client-side sample. Token counts are returned per model rather than pre-costed so the
-// price table stays in constants.ts instead of being forked into SQL.
-interface AgentChatStats {
-  total_responses: number;
-  total_analytics_events: number;
-  total_api_calls: number;
-  active_users: number;
-  avg_response_time_ms: number;
-  rating_up: number;
-  rating_down: number;
-  rated_total: number;
-  by_model: Array<{ model: string; responses: number; est_tokens: number }>;
-  by_feature: Array<{ feature: string; responses: number; avg_response_time_ms: number | null }>;
-}
-
 const VALID_OPERATIONS_TABS = new Set([
-  'system-health', 'data-processing', 'performance', 'agent-chat',
+  'system-health', 'data-processing', 'performance',
   'search-analytics', 'services-billing', 'platform-overview', 'catalogs',
   'seo-toolkit', 'factory-onboarding', 'keys', 'modules', 'push',
 ]);
@@ -139,21 +108,6 @@ const OperationsDashboardInner: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const [analytics, setAnalytics] = useState<UsageAnalytics>({
-    total_searches: 0,
-    total_api_calls: 0,
-    active_users: 0,
-    avg_response_time: 0,
-  });
-  // `apiUsage` / `agentChatRows` each hold ONE page of rows fetched with an exact count.
-  const [apiUsage, setApiUsage] = useState<ApiUsageLog[]>([]);
-  const [apiUsagePage, setApiUsagePage] = useState(1);
-  const [apiUsageTotal, setApiUsageTotal] = useState(0);
-  const [agentChatRows, setAgentChatRows] = useState<AgentChatMessage[]>([]);
-  const [agentChatPage, setAgentChatPage] = useState(1);
-  const [agentChatTotal, setAgentChatTotal] = useState(0);
-  // Single all-time aggregate row feeding the summary tiles.
-  const [agentStats, setAgentStats] = useState<AgentChatStats | null>(null);
   // Which data-processing sources failed to load this pass. Non-empty means the tiles below are
   // not measurements. (#365 AD-7)
   const [processingSourcesUnavailable, setProcessingSourcesUnavailable] = useState<string[]>([]);
@@ -169,115 +123,7 @@ const OperationsDashboardInner: React.FC = () => {
   const [resendEmailStats, setResendEmailStats] = useState<ResendEmailStats | null>(null);
   const [resendEmailLoading, setResendEmailLoading] = useState(false);
   const [notifChannelStats, setNotifChannelStats] = useState<NotificationChannelStats[]>([]);
-  const [toolCallStats, setToolCallStats] = useState<Array<{
-    tool_name: string;
-    total_calls: number;
-    successful_calls: number;
-    failed_calls: number;
-    zero_result_calls: number;
-    success_rate: number;
-    zero_result_rate: number;
-    avg_duration_ms: number;
-    p95_duration_ms: number;
-  }>>([]);
   const { toast } = useToast();
-
-  // Detect feature type from agent chat metadata
-  const getFeatureType = (metadata: AgentChatMessage['metadata']): string => {
-    if (!metadata) return 'Text Chat';
-    if (metadata.worldData) return 'VR World';
-    if (metadata.videoData) return 'Video Walkthrough';
-    if (metadata.materialsBoardData) return 'Materials Board';
-    if (metadata.geminiImageData) return 'AI Image';
-    if (metadata.generation_job) return 'Interior Design';
-    return 'Text Chat';
-  };
-
-  const FEATURE_COLORS: Record<string, string> = {
-    'VR World':       'bg-purple-100 text-purple-700 border-purple-200',
-    'Video Walkthrough': 'bg-blue-100 text-blue-700 border-blue-200',
-    'Interior Design': 'bg-amber-100 text-amber-700 border-amber-200',
-    'Materials Board': 'bg-green-100 text-green-700 border-green-200',
-    'AI Image':       'bg-pink-100 text-pink-700 border-pink-200',
-    'Text Chat':      'bg-gray-100 text-gray-600 border-gray-200',
-  };
-
-  // Text-only tone per feature — plain colored word for the table row (no pill).
-  const FEATURE_TONE: Record<string, string> = {
-    'VR World':          'text-purple-600 dark:text-purple-400',
-    'Video Walkthrough': 'text-blue-500 dark:text-blue-400',
-    'Interior Design':   'text-amber-600 dark:text-amber-400',
-    'Materials Board':   'text-emerald-600 dark:text-emerald-400',
-    'AI Image':          'text-pink-600 dark:text-pink-400',
-    'Text Chat':         'text-muted-foreground',
-  };
-
-
-  // Server-paged table loaders. They report the exact row count so the footer readout describes the
-  // whole table instead of whatever slice happened to be fetched for the tiles.
-  const loadAgentChatPage = useCallback(async (page: number) => {
-    const from = (page - 1) * TABLE_PAGE_SIZE;
-    const { data, count, error } = await supabase
-      .from('agent_chat_messages')
-      .select(
-        `
-          id,
-          conversation_id,
-          role,
-          content,
-          metadata,
-          created_at,
-          agent_chat_conversations!inner (
-            user_id
-          )
-        `,
-        { count: 'exact' },
-      )
-      .eq('role', 'assistant')
-      .order('created_at', { ascending: false })
-      .range(from, from + TABLE_PAGE_SIZE - 1);
-
-    if (error) {
-      console.error('❌ Error fetching agent chat page:', error);
-      return;
-    }
-
-    setAgentChatRows(
-      (data || []).map((msg: any) => ({
-        id: msg.id,
-        conversation_id: msg.conversation_id,
-        role: msg.role,
-        content: msg.content,
-        metadata: msg.metadata,
-        created_at: msg.created_at,
-        user_id: msg.agent_chat_conversations?.user_id,
-      })),
-    );
-    setAgentChatTotal(count ?? 0);
-    setAgentChatPage(page);
-  }, []);
-
-  const loadApiUsagePage = useCallback(async (page: number): Promise<{ count: number; rows: ApiUsageLog[] }> => {
-    const from = (page - 1) * TABLE_PAGE_SIZE;
-    const { data, count, error } = await supabase
-      .from('api_usage_logs')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(from, from + TABLE_PAGE_SIZE - 1);
-
-    if (error) {
-      console.error('❌ Error fetching api_usage_logs page:', error);
-      return { count: 0, rows: [] };
-    }
-
-    // No client-side row filtering here — dropping rows after the range would leave short pages
-    // that disagree with the exact count. The cells already render null status / timestamp.
-    const rows = (data || []) as ApiUsageLog[];
-    setApiUsage(rows);
-    setApiUsageTotal(count ?? 0);
-    setApiUsagePage(page);
-    return { count: count ?? 0, rows };
-  }, []);
 
   const fetchAnalyticsData = useCallback(async () => {
     try {
@@ -300,38 +146,6 @@ const OperationsDashboardInner: React.FC = () => {
       }
 
       console.log('✅ User authenticated:', session.user.email);
-
-      // API Request Logs table — first page only; the "API Calls" total comes from the aggregate.
-      await loadApiUsagePage(1);
-      // Agent Chat table is paged independently of the tiles.
-      await loadAgentChatPage(1);
-
-      // One aggregate row over the FULL agent_chat_messages / analytics_events / api_usage_logs
-      // tables — never a fetch-N-rows-and-reduce-in-the-browser sample. Operator-gated
-      // server-side (is_platform_operator), so it can safely expose platform-wide usage + cost.
-      const { data: statsRow, error: statsError } = await supabase.rpc('admin_agent_chat_stats');
-
-      if (statsError) {
-        console.error('❌ Error fetching agent chat stats:', statsError);
-        if (statsError.message?.includes('JWT') || statsError.message?.includes('401')) {
-          toast({
-            title: 'Session Expired',
-            description: 'Your session has expired. Please refresh the page and log in again.',
-            variant: 'destructive',
-          });
-          return;
-        }
-      } else if (statsRow) {
-        const stats = statsRow as unknown as AgentChatStats;
-        setAgentStats(stats);
-        setAnalytics({
-          total_searches: (stats.total_analytics_events || 0) + (stats.total_responses || 0),
-          total_api_calls: stats.total_api_calls || 0,
-          active_users: stats.active_users || 0,
-          avg_response_time: Math.round(stats.avg_response_time_ms || 0),
-        });
-      }
-
 
       // Fetch Data Processing Stats (PDF, XML, Scraping)
       console.log('🔄 Fetching data processing stats...');
@@ -435,17 +249,6 @@ const OperationsDashboardInner: React.FC = () => {
         })).sort((a, b) => b.total - a.total),
       );
 
-      // ── Tool call analytics (per-tool success/zero-result/latency) ──
-      try {
-        const { data: toolData } = await supabase.rpc('get_tool_call_stats', {
-          time_interval: '7 days',
-        });
-        if (toolData && Array.isArray(toolData)) {
-          setToolCallStats(toolData);
-        }
-      } catch (toolErr) {
-        console.warn('Failed to load tool call stats:', toolErr);
-      }
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast({
@@ -456,7 +259,7 @@ const OperationsDashboardInner: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [toast, loadAgentChatPage, loadApiUsagePage]);
+  }, [toast]);
 
   useEffect(() => {
     fetchAnalyticsData();
@@ -555,13 +358,6 @@ const OperationsDashboardInner: React.FC = () => {
       });
   }, []);
 
-  const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return 'text-green-600';
-    if (status >= 400 && status < 500) return 'text-yellow-600';
-    if (status >= 500) return 'text-red-600';
-    return 'text-gray-600';
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen">
@@ -598,10 +394,6 @@ const OperationsDashboardInner: React.FC = () => {
             <TabsTrigger value="performance">
               <Gauge className="h-4 w-4 mr-2" />
               Performance
-            </TabsTrigger>
-            <TabsTrigger value="agent-chat">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              Agent Chat
             </TabsTrigger>
             <TabsTrigger value="search-analytics">
               <Search className="h-4 w-4 mr-2" />
@@ -684,414 +476,6 @@ const OperationsDashboardInner: React.FC = () => {
               <TabsContent value="resellers"><ResellerApplicationsTab /></TabsContent>
               <TabsContent value="marketplace"><MarketplaceApprovalsTab /></TabsContent>
             </Tabs>
-          </TabsContent>
-
-          {/* Agent Chat Analytics Tab */}
-          <TabsContent value="agent-chat" className="space-y-4">
-            {/* First on the tab, because the per-tool table below answers "did the tools work"
-                and can never answer "was there a tool at all" — which is the question that sends
-                a user away empty-handed. */}
-            <AgentUnmetRequestsPanel />
-
-            {/* Platform Overview Stats */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              <StatCard
-                title="Searches & Responses"
-                value={analytics.total_searches}
-                icon={Search}
-                description="Analytics events + agent responses, all time"
-                trend={12}
-              />
-              <StatCard
-                title="API Calls"
-                value={analytics.total_api_calls}
-                icon={BarChart3}
-                description="Total API requests, all time"
-                trend={8}
-              />
-              <StatCard
-                title="Active Users"
-                value={analytics.active_users}
-                icon={Users}
-                description="Unique users across all logged activity"
-                trend={15}
-              />
-              <StatCard
-                title="Avg Response Time"
-                value={`${analytics.avg_response_time}ms`}
-                icon={Clock}
-                description="Across all agent responses"
-                trend={-5}
-              />
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bot className="h-4 w-4" />
-                  Agent Chat Analytics
-                </CardTitle>
-                <CardDescription>
-                  Response times, quality ratings and cost estimates are aggregated in SQL over every
-                  assistant response. The table below pages through them.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {/* Summary Stats */}
-                {(() => {
-                  const ratedCount = agentStats?.rated_total ?? 0;
-                  const upCount = agentStats?.rating_up ?? 0;
-                  const downCount = agentStats?.rating_down ?? 0;
-                  const approvalPct = ratedCount > 0 ? Math.round((upCount / ratedCount) * 100) : null;
-                  const avgResponseMs = Math.round(agentStats?.avg_response_time_ms ?? 0);
-                  const totalResponses = agentStats?.total_responses ?? 0;
-                  // Pricing stays client-side (constants.ts); SQL only returns the per-model token
-                  // estimate, so the two never drift out of sync.
-                  const estCost = (agentStats?.by_model ?? []).reduce(
-                    (sum, m) => sum + calculateCost(m.model, m.est_tokens, m.est_tokens).total,
-                    0,
-                  );
-                  const features = [...(agentStats?.by_feature ?? [])].sort((a, b) => b.responses - a.responses);
-                  return (
-                    <>
-                      {/* Row 1: core metrics */}
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
-                          <div className="text-sm text-slate-600">Total Chats</div>
-                          <div className="text-2xl font-bold text-slate-900">{agentChatTotal}</div>
-                          <div className="text-xs text-muted-foreground mt-1">all assistant responses</div>
-                        </div>
-                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-slate-200 shadow-sm">
-                          <div className="text-sm text-slate-600">Avg Response Time</div>
-                          <div className="text-2xl font-bold text-slate-900">{avgResponseMs > 0 ? `${(avgResponseMs / 1000).toFixed(1)}s` : '—'}</div>
-                          <div className="text-xs text-muted-foreground mt-1">all responses</div>
-                        </div>
-                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-green-200 shadow-sm">
-                          <div className="text-sm text-green-700 flex items-center gap-1">
-                            <ThumbsUp className="h-3.5 w-3.5" /> Positive Ratings
-                          </div>
-                          <div className="text-2xl font-bold text-green-600">{upCount}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {approvalPct !== null ? `${approvalPct}% approval rate` : 'No ratings yet'}
-                          </div>
-                        </div>
-                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-red-200 shadow-sm">
-                          <div className="text-sm text-red-700 flex items-center gap-1">
-                            <ThumbsDown className="h-3.5 w-3.5" /> Negative Ratings
-                          </div>
-                          <div className="text-2xl font-bold text-red-600">{downCount}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {ratedCount > 0 ? `${ratedCount} rated of ${totalResponses}` : 'No ratings yet'}
-                          </div>
-                        </div>
-                        <div className="bg-white/80 backdrop-blur-sm rounded-lg p-4 border border-blue-200 shadow-sm">
-                          <div className="text-sm text-blue-700">Est. Cost</div>
-                          <div className="text-2xl font-bold text-blue-600">
-                            ${estCost.toFixed(4)}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">all responses</div>
-                        </div>
-                      </div>
-
-                      {/* Row 2: Ratings approval bar */}
-                      {ratedCount > 0 && (
-                        <div className="mb-4 bg-white/80 rounded-lg border border-slate-200 p-4 shadow-sm">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-sm font-medium text-slate-700">Rating Breakdown</span>
-                            <span className="text-xs text-muted-foreground">{ratedCount} / {totalResponses} responses rated</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <ThumbsUp className="h-4 w-4 text-green-600 shrink-0" />
-                            <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-                              <div
-                                className="h-full bg-green-500 rounded-full transition-all"
-                                style={{ width: `${approvalPct ?? 0}%` }}
-                              />
-                            </div>
-                            <ThumbsDown className="h-4 w-4 text-red-500 shrink-0" />
-                          </div>
-                          <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                            <span className="text-green-600 font-medium">{upCount} positive</span>
-                            <span className="font-semibold">{approvalPct}% approval</span>
-                            <span className="text-red-500 font-medium">{downCount} negative</span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Row 3: Feature type breakdown */}
-                      {features.length > 0 && (
-                        <div className="mb-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                          {features.map((f) => {
-                            const avgMs = f.avg_response_time_ms;
-                            return (
-                              <div key={f.feature} className={`rounded-lg border px-3 py-2.5 text-center ${FEATURE_COLORS[f.feature] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                                <div className="text-xs font-medium truncate">{f.feature}</div>
-                                <div className="text-xl font-bold mt-0.5">{f.responses}</div>
-                                {avgMs !== null && avgMs > 0 && (
-                                  <div className="text-xs opacity-70 mt-0.5">{(avgMs / 1000).toFixed(1)}s avg</div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </>
-                  );
-                })()}
-
-                {/* Agent Chat Table */}
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-[240px]">Response Preview</TableHead>
-                      <TableHead>Feature</TableHead>
-                      <TableHead>Agent</TableHead>
-                      <TableHead>Model</TableHead>
-                      <TableHead>Response Time</TableHead>
-                      <TableHead>Rating</TableHead>
-                      <TableHead>Products</TableHead>
-                      <TableHead>Cost (Est.)</TableHead>
-                      <TableHead>Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {agentChatRows.map((chat) => {
-                      const model = chat.metadata?.model || 'claude-opus-5-5';
-                      const inputTokens = estimateTokens(chat.content);
-                      const outputTokens = estimateTokens(chat.content);
-                      const cost = calculateCost(model, inputTokens, outputTokens);
-                      const featureType = getFeatureType(chat.metadata);
-                      const featureTone = FEATURE_TONE[featureType] || 'text-muted-foreground';
-                      // Extra detail for specific features
-                      const genStatus = chat.metadata?.worldData?.status || chat.metadata?.videoData?.status;
-                      const boardMode = chat.metadata?.materialsBoardData?.board_mode;
-
-                      return (
-                        <TableRow key={chat.id}>
-                          <TableCell className="font-medium max-w-[240px]">
-                            <div className="truncate text-sm" title={chat.content}>
-                              {chat.content.slice(0, 70)}…
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-col gap-1">
-                              <span className={`text-xs ${featureTone}`}>
-                                {featureType}
-                              </span>
-                              {(genStatus || boardMode) && (
-                                <span className="text-xs text-muted-foreground">
-                                  {boardMode ? boardMode.replace(/-/g, ' ') : genStatus}
-                                </span>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-xs text-muted-foreground capitalize">
-                              {chat.metadata?.agentId || 'kai'}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded border border-border">
-                              {model.includes('haiku') ? 'Haiku' : model.includes('opus') ? 'Opus' : model.slice(0, 12)}
-                            </code>
-                          </TableCell>
-                          <TableCell>
-                            {chat.metadata?.responseTimeMs && chat.metadata.responseTimeMs > 0 ? (
-                              <span className={chat.metadata.responseTimeMs > 30000 ? 'text-red-600 font-medium' : chat.metadata.responseTimeMs > 10000 ? 'text-amber-600' : ''}>
-                                {(chat.metadata.responseTimeMs / 1000).toFixed(1)}s
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {chat.metadata?.rating === 'up' ? (
-                              <div className="flex items-center gap-1">
-                                <ThumbsUp className="h-4 w-4 text-green-600" />
-                                <span className="text-xs text-green-600">Good</span>
-                              </div>
-                            ) : chat.metadata?.rating === 'down' ? (
-                              <div className="flex items-center gap-1">
-                                <ThumbsDown className="h-4 w-4 text-red-600" />
-                                <span className="text-xs text-red-600">Poor</span>
-                              </div>
-                            ) : (
-                              <span className="text-gray-300 text-xs">—</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {chat.metadata?.productsCount || 0}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="text-xs">
-                              <div className="text-green-600">In: ${cost.input.toFixed(5)}</div>
-                              <div className="text-blue-600">Out: ${cost.output.toFixed(5)}</div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-sm text-gray-500">
-                            {formatDate(chat.created_at, { withTime: true })}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-                <TablePagination
-                  page={agentChatPage}
-                  total={agentChatTotal}
-                  onPageChange={loadAgentChatPage}
-                  label="responses"
-                />
-                {agentChatTotal === 0 && (
-                  <div className="text-center py-8 text-gray-500">
-                    No agent chat data available yet. Start chatting with the agent to see analytics.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Tool Call Analytics — per-tool success/zero-result/latency rates */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  Tool Call Analytics
-                </CardTitle>
-                <CardDescription>
-                  How often each agent tool is called, succeeds, returns zero results, and how fast it is. Last 7 days.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {toolCallStats.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Tool</TableHead>
-                        <TableHead className="text-right">Calls</TableHead>
-                        <TableHead className="text-right">Success Rate</TableHead>
-                        <TableHead className="text-right">Zero-Result Rate</TableHead>
-                        <TableHead className="text-right">Avg ms</TableHead>
-                        <TableHead className="text-right">p95 ms</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {toolCallStats.map((tool) => (
-                        <TableRow key={tool.tool_name}>
-                          <TableCell className="font-mono text-sm">{tool.tool_name}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {formatNumber(Number(tool.total_calls))}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge
-                              className={
-                                tool.success_rate >= 95
-                                  ? 'bg-green-100 text-green-700 border-green-200'
-                                  : tool.success_rate >= 80
-                                  ? 'bg-amber-100 text-amber-700 border-amber-200'
-                                  : 'bg-red-100 text-red-700 border-red-200'
-                              }
-                            >
-                              {Number(tool.success_rate || 0).toFixed(1)}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Badge
-                              className={
-                                tool.zero_result_rate >= 30
-                                  ? 'bg-red-100 text-red-700 border-red-200'
-                                  : tool.zero_result_rate >= 10
-                                  ? 'bg-amber-100 text-amber-700 border-amber-200'
-                                  : 'bg-gray-100 text-gray-700 border-gray-200'
-                              }
-                            >
-                              {Number(tool.zero_result_rate || 0).toFixed(1)}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {Number(tool.avg_duration_ms || 0).toFixed(0)}
-                          </TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {Number(tool.p95_duration_ms || 0).toFixed(0)}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    No tool call data yet. Trigger some agent chats to populate.
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* API Request Logs (merged from API Usage tab) */}
-            {apiUsageTotal > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Zap className="h-4 w-4" />
-                    API Request Logs
-                  </CardTitle>
-                  <CardDescription>Raw API endpoint requests and response codes, newest first</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Path</TableHead>
-                        <TableHead>Method</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Response Time</TableHead>
-                        <TableHead>Source</TableHead>
-                        <TableHead>Time</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {apiUsage.map((log) => (
-                        <TableRow key={log.id}>
-                          <TableCell className="font-mono text-sm max-w-xs truncate">
-                            {log.request_path}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono text-xs">
-                              {log.request_method}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <span className={getStatusColor(log.response_status ?? 0)}>
-                              {log.response_status ?? '—'}
-                            </span>
-                          </TableCell>
-                          <TableCell>{log.response_time_ms || 0}ms</TableCell>
-                          <TableCell>
-                            <code className="text-xs bg-muted text-foreground px-1.5 py-0.5 rounded border border-border">
-                              {log.is_internal_request ? 'Internal' : 'External'}
-                            </code>
-                          </TableCell>
-                          <TableCell>
-                            {log.created_at
-                              ? formatDate(log.created_at, { withTime: true })
-                              : 'N/A'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <TablePagination
-                    page={apiUsagePage}
-                    total={apiUsageTotal}
-                    onPageChange={loadApiUsagePage}
-                    label="requests"
-                  />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Price Lookups — admin-triggered KB pricing tool usage */}
-            <PriceLookupsCard />
           </TabsContent>
 
           {/* Search Analytics Tab — query performance, cache, and observability */}
@@ -1778,4 +1162,9 @@ const OperationsDashboardInner: React.FC = () => {
     </div>
   );
 };
-export const OperationsDashboard = React.memo(OperationsDashboardInner);
+const OperationsDashboardRoute: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  if (searchParams.get('tab') === 'agent-chat') return <Navigate to="/admin" replace />;
+  return <OperationsDashboardInner />;
+};
+export const OperationsDashboard = React.memo(OperationsDashboardRoute);

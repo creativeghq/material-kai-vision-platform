@@ -470,10 +470,7 @@ resolves, the tool returns `status:'category_missing'` naming where an admin cre
    - Removed old MaterialKnowledgeBase import
    - Added AuthGuard and AdminGuard protection
 
-2. **AdminDashboard.tsx** - Navigation link
-   - Updated "PDF Knowledge Base" to "Knowledge Base & Documentation"
-   - Updated description to reflect new features
-   - Badge shows "NEW v2.3.0"
+2. **Navigation** - reached from `/admin` → Admin menu → Knowledge Base
 
 3. **MIVAA Gateway** - API routing
    - 13 Knowledge Base endpoints registered

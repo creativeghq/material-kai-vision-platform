@@ -7,16 +7,13 @@ export interface ModuleNavItem {
   icon: LucideIcon;
   /**
    * Where this nav item surfaces:
-   * - `'admin-dashboard'` → a card on `/admin` (operator surface).
    * - `'workspace'` → the tenant **App Launcher**. Shown only when the
    *   module is globally enabled AND entitled to the active workspace. This is how optional
    *   modules (HR, Docs, Real Estate, …) appear WITHOUT cluttering the top nav.
    * - `'sidebar'` → legacy/unused; kept for back-compat.
    */
-  location: 'sidebar' | 'admin-dashboard' | 'workspace';
-  adminCategory?: string;
+  location: 'sidebar' | 'workspace';
   adminDescription?: string;
-  adminCount?: string;
 }
 
 export interface ModuleRoute {

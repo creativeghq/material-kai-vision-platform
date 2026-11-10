@@ -1,6 +1,6 @@
 import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { Mail, AtSign, LayoutTemplate } from 'lucide-react';
+import { AtSign, LayoutTemplate } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -27,18 +27,7 @@ const definition: ModuleDefinition = {
     { path: '/admin/emails', component: legacyAdminRedirect('/emails') },
     { path: '/admin/email-templates/:id/edit', component: legacyAdminRedirect('/emails/templates/:id/edit') },
   ],
-  navItems: [
-    {
-      label: 'Email Management',
-      path: '/emails',
-      icon: Mail,
-      location: 'admin-dashboard',
-      adminCategory: 'Communications',
-      adminDescription:
-        'Manage email domains, templates, and monitor delivery analytics with Resend.',
-      adminCount: 'Resend',
-    },
-  ],
+  navItems: [],
   // Default sender settings (`email_settings` table). Was previously hidden
   // behind a modal triggered from the email management page — now also
   // surfaced on the generic Module Settings page so admins find it.

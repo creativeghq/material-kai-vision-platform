@@ -4,7 +4,7 @@
  * Modules whose `headerActions[]` is non-empty get their components
  * mounted in the platform Header (right-aligned action row next to
  * the avatar) and the shared PageHeader. Disabled modules disappear
- * automatically — same pattern as `useAdminDashboardCards()`.
+ * automatically.
  */
 
 import React, { Suspense, useMemo } from 'react';

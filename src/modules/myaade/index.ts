@@ -6,7 +6,6 @@
 //   - /admin/modules/myaade/settings is auto-mounted by ModuleSettingsPage
 
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { Building2 } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -21,17 +20,7 @@ const definition: ModuleDefinition = {
       requireAdmin: true,
     },
   ],
-  navItems: [
-    {
-      label: manifest.name,
-      path: '/admin/modules/myaade',
-      icon: Building2,
-      location: 'admin-dashboard',
-      adminCategory: 'Modules',
-      adminDescription: manifest.description,
-      adminCount: manifest.priceTier.toUpperCase(),
-    },
-  ],
+  navItems: [],
 };
 
 export default definition;

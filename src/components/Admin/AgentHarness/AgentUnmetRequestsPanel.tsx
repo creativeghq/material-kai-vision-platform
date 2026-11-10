@@ -64,7 +64,7 @@ const VERDICT: Record<number, { label: string; variant: 'error' | 'warning' | 'i
   5: { label: 'Served', variant: 'neutral', hint: 'Tools ran and the reply did not hedge.' },
 };
 
-export const AgentUnmetRequestsPanel: React.FC = () => {
+export const AgentUnmetRequestsPanel: React.FC<{ onOpenConversation?: (id: string) => void }> = ({ onOpenConversation }) => {
   const [days, setDays] = useState<number>(30);
   const [rows, setRows] = useState<AuditRow[] | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,8 +73,7 @@ export const AgentUnmetRequestsPanel: React.FC = () => {
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    // Operator-gated inside the function (is_platform_admin), so this is safe to call straight
-    // from the client — the same shape as admin_agent_chat_stats on this page.
+    // Operator-gated inside the function (is_platform_admin).
     const { data, error: rpcError } = await supabase.rpc('agent_conversation_audit' as never, { p_days: days } as never);
     if (rpcError) {
       setError(rpcError.message || 'Could not load the conversation audit.');
@@ -239,7 +238,15 @@ export const AgentUnmetRequestsPanel: React.FC = () => {
                           {formatDate(r.started_at)}
                         </td>
                         <td className="p-2">
-                          {/* The conversation itself is the context a count can never carry. */}
+                          {onOpenConversation && (
+                            <button
+                              type="button"
+                              className="mr-2 text-xs underline"
+                              onClick={() => onOpenConversation(r.conversation_id)}
+                            >
+                              Trace
+                            </button>
+                          )}
                           <a
                             className="inline-flex items-center gap-1 text-xs underline"
                             href={`/agent-hub?conversation=${r.conversation_id}`}

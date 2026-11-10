@@ -1,6 +1,6 @@
 import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { MessageSquare, Webhook } from 'lucide-react';
+import { Webhook } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -23,17 +23,7 @@ const definition: ModuleDefinition = {
     { path: '/messaging', component: MessagingManagementPage, requireWorkspaceAdmin: true },
     { path: '/admin/messaging', component: legacyAdminRedirect('/messaging') },
   ],
-  navItems: [
-    {
-      label: 'Messaging (WhatsApp)',
-      path: '/messaging',
-      icon: MessageSquare,
-      location: 'admin-dashboard',
-      adminCategory: 'Communications',
-      adminDescription: 'Send WhatsApp campaigns and capture replies via Zernio.',
-      adminCount: 'Zernio',
-    },
-  ],
+  navItems: [],
   // Operator-side setup for the shared Zernio account. The register-webhook button also exists on
   // the Channels tab of /messaging, but that is a TENANT page behind a workspace-admin guard and
   // is not reachable from the app menu — the operator pasting the secret is here, on the Keys tab.

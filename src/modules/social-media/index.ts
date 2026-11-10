@@ -1,6 +1,6 @@
 import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { Share2, Webhook, Star } from 'lucide-react';
+import { Webhook } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -28,28 +28,7 @@ const definition: ModuleDefinition = {
     { path: '/social-media/reviews', component: ReviewsPage },
     { path: '/admin/social-media/accounts', component: legacyAdminRedirect('/social-media/accounts') },
   ],
-  navItems: [
-    {
-      label: 'Social Media Accounts',
-      path: '/social-media/accounts',
-      icon: Share2,
-      location: 'admin-dashboard',
-      adminCategory: 'Communications',
-      adminDescription:
-        'View all workspace social accounts connected via Zernio. Users connect their own accounts from their profile.',
-      adminCount: 'Zernio',
-    },
-    {
-      label: 'Reviews',
-      path: '/social-media/reviews',
-      icon: Star,
-      location: 'admin-dashboard',
-      adminCategory: 'Communications',
-      adminDescription:
-        'Reviews left on your connected Google Business profile. Reply straight to the platform.',
-      adminCount: 'Google',
-    },
-  ],
+  navItems: [],
   // The Keys tab is auto-mounted by ModuleSettingsPage (ZERNIO_* are scoped here via
   // primary_module_slug). This adds the half that pasting a key does not do: telling Zernio
   // where to deliver events, and showing whether the plan still has a profile left for the

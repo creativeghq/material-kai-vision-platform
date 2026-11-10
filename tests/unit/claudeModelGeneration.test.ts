@@ -18,7 +18,6 @@ const ALLOWED = new Set<string>([
   // What each model accepts — it names the one model that still takes sampling parameters.
   'supabase/functions/_shared/claude-models.ts',
   // Price tables keep the superseded rates so rows logged on those models still price.
-  'src/components/Admin/OperationsDashboard/constants.ts',
   'src/services/credits.service.ts',
 ]);
 

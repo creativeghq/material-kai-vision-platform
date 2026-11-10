@@ -1,5 +1,5 @@
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { Landmark, Sliders } from 'lucide-react';
+import { Sliders } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -14,18 +14,7 @@ const definition: ModuleDefinition = {
     // OAuth consent return — the URI registered in the Revolut dashboard.
     { path: '/revolut/callback', component: RevolutCallbackPage },
   ],
-  navItems: [
-    {
-      label: 'Revolut Business',
-      path: '/admin/modules/banking-revolut/settings',
-      icon: Landmark,
-      location: 'admin-dashboard',
-      adminCategory: 'Finance & Billing',
-      adminDescription:
-        'Bank feed + reconciliation from the workspace\'s own Revolut Business account. Per-workspace BYOK keys and OAuth.',
-      adminCount: 'Banking',
-    },
-  ],
+  navItems: [],
   // BYOK like payments-viva: nothing platform-level to configure; every credential is
   // per-workspace and lives on this panel (and Profile → Keys).
   settingsPanels: [

@@ -1,6 +1,6 @@
 import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { FileText, Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -57,17 +57,7 @@ const definition: ModuleDefinition = {
     { path: '/admin/timeline-steps', component: legacyAdminRedirect('/quotes/settings/timeline-steps') },
     { path: '/admin/quote-settings', component: legacyAdminRedirect('/quotes/settings') },
   ],
-  navItems: [
-    {
-      label: 'Quote Requests',
-      path: '/quotes/requests/manage',
-      icon: FileText,
-      location: 'admin-dashboard',
-      adminCategory: 'CRM & User Management',
-      adminDescription: 'View and manage customer quote requests with pricing.',
-      adminCount: 'Quote System',
-    },
-  ],
+  navItems: [],
   // Module Settings page (/admin/modules/quotes/settings) auto-mounts these
   // alongside the "Keys" tab. PDF template uploads + company info + default
   // VAT now live there instead of being hidden at /admin/quote-settings

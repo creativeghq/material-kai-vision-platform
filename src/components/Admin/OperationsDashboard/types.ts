@@ -1,65 +1,3 @@
-export interface ModelConfig {
-  id: string;
-  name: string;
-  provider: 'anthropic' | 'meta' | 'google';
-  model: string;
-  inputCostPer1M: number;
-  outputCostPer1M: number;
-  speed: 'fast' | 'medium' | 'slow';
-  usedFor: string[];
-  totalInputTokens: number;
-  totalOutputTokens: number;
-}
-
-export interface UsageAnalytics {
-  total_searches: number;
-  total_api_calls: number;
-  active_users: number;
-  avg_response_time: number;
-}
-
-export interface AgentChatMessage {
-  id: string;
-  conversation_id: string;
-  role: string;
-  content: string;
-  metadata: {
-    agentId?: string;
-    model?: string;
-    responseTimeMs?: number;
-    productsCount?: number;
-    cachedResponse?: boolean;
-    rating?: 'up' | 'down' | null;
-    ratedAt?: string;
-    worldData?: {
-      vrWorldId?: string;
-      status?: string;
-      splatUrl100k?: string;
-      splatUrl500k?: string;
-      splatUrlFull?: string;
-      sourceImageUrl?: string;
-      caption?: string;
-      prompt?: string;
-    };
-    videoData?: {
-      job_id?: string;
-      status?: string;
-      video_url?: string;
-    };
-    materialsBoardData?: {
-      job_id?: string;
-      image_url?: string;
-      board_mode?: string;
-      credits_used?: number;
-    };
-    geminiImageData?: Record<string, unknown>;
-    generation_job?: Record<string, unknown>;
-  } | null;
-  created_at: string;
-  user_email?: string;
-  user_id?: string;
-}
-
 export interface NotificationChannelStats {
   channel: string;
   label: string;
@@ -80,21 +18,6 @@ export interface SearchAnalytic {
 }
 
 // Mirrors the real public.api_usage_logs columns (request-shaped).
-export interface ApiUsageLog {
-  id: string;
-  user_id: string | null;
-  endpoint_id: string | null;
-  request_path: string;
-  request_method: string;
-  response_status: number | null;
-  response_time_ms: number | null;
-  ip_address: string | null;
-  user_agent: string | null;
-  is_internal_request: boolean;
-  rate_limit_exceeded: boolean;
-  created_at: string | null;
-}
-
 export interface SubscriptionStats {
   totalUsers: number;
   freeUsers: number;

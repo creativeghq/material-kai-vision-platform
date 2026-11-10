@@ -35643,7 +35643,11 @@ export type Database = {
         Args: { p_layout_id: string; p_quote_id: string }
         Returns: Json
       }
-      admin_agent_chat_stats: { Args: never; Returns: Json }
+      admin_agent_conversation_trace: {
+        Args: { p_conversation_id: string }
+        Returns: Json
+      }
+      admin_agent_harness_overview: { Args: { p_days?: number }; Returns: Json }
       admin_ai_usage_summary: { Args: { p_since: string }; Returns: Json }
       admin_approve_factory_registration: {
         Args: { p_request_id: string; p_reviewer_id: string }
@@ -38108,20 +38112,6 @@ export type Database = {
       get_supplier_inbound_orders_svc: {
         Args: { p_workspace_id: string }
         Returns: Json
-      }
-      get_tool_call_stats: {
-        Args: { time_interval?: string }
-        Returns: {
-          avg_duration_ms: number
-          failed_calls: number
-          p95_duration_ms: number
-          success_rate: number
-          successful_calls: number
-          tool_name: string
-          total_calls: number
-          zero_result_calls: number
-          zero_result_rate: number
-        }[]
       }
       get_top_cached_queries: {
         Args: { max_results?: number }

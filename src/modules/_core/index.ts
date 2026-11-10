@@ -30,11 +30,6 @@ export {
 
 export type { ModuleSubscriber, ModuleHeaderAction, ModuleSettingsPanel } from './ModuleDefinition';
 
-export {
-  useAdminDashboardCards,
-  type AdminDashboardCard,
-} from './useAdminDashboardCards';
-
 export { ModuleHeaderActions } from './ModuleHeaderActions';
 
 export {

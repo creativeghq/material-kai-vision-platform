@@ -103,7 +103,7 @@ const CreditPackagesPage = lazy(() => import('./components/business/billing/Cred
 // CRM pages live in `src/modules/crm/` — registered through buildModuleRoutes().
 
 // ── Admin pages (only loaded for admin users) ───────────────────────
-const AdminDashboard = lazy(() => import('./components/Admin/AdminDashboard'));
+const AgentHarnessDashboard = lazy(() => import('./components/Admin/AgentHarness/AgentHarnessDashboard'));
 const KnowledgeBaseManagement = lazy(() => import('./components/Admin/KnowledgeBase').then(m => ({ default: m.KnowledgeBaseManagement })));
 const MaterialsDataPage = lazy(() => import('./components/Admin/MaterialsData').then(m => ({ default: m.MaterialsDataPage })));
 const LogViewer = lazy(() => import('./components/Admin/LogViewer').then(m => ({ default: m.LogViewer })));
@@ -680,7 +680,7 @@ const App = () => (
                     <AuthGuard>
                       <AdminGuard>
                         <Layout>
-                          <AdminDashboard />
+                          <AgentHarnessDashboard />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>

@@ -16,18 +16,7 @@ const InvoicingPanel = lazy(() =>
 const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [],
-  navItems: [
-    {
-      label: 'Payments',
-      path: '/admin/modules/payments/settings',
-      icon: CreditCard,
-      location: 'admin-dashboard',
-      adminCategory: 'Finance & Billing',
-      adminDescription:
-        'Payment processing parent module. Owns business identity + invoice routing. Specific providers (Stripe, future PayPal/Adyen) live as sibling modules and appear on the Providers tab.',
-      adminCount: 'Multi-provider',
-    },
-  ],
+  navItems: [],
   // The Module Settings page auto-mounts a Keys tab (SecretsManagerCard for
   // any secret linked to this module via platform_secret_module_links — Stripe
   // keys appear here as informational; the primary location is payments-stripe).

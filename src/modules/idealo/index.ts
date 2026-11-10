@@ -1,5 +1,4 @@
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { ShoppingCart } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -14,17 +13,7 @@ const definition: ModuleDefinition = {
       requireAdmin: true,
     },
   ],
-  navItems: [
-    {
-      label: manifest.name,
-      path: '/admin/modules/idealo',
-      icon: ShoppingCart,
-      location: 'admin-dashboard',
-      adminCategory: 'Modules',
-      adminDescription: manifest.description,
-      adminCount: manifest.priceTier.toUpperCase(),
-    },
-  ],
+  navItems: [],
 };
 
 export default definition;

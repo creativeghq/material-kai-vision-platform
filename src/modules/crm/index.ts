@@ -26,7 +26,6 @@ const definition: ModuleDefinition = {
     // work, so it keeps its /admin address and its AdminGuard.
     { path: '/admin/crm/users/:id',     component: UserDetailPage, requireAdmin: true },
   ],
-  // No admin-dashboard tile: CRM is a top-nav surface (/crm, capability-gated crm.view).
   navItems: [],
 };
 

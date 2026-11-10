@@ -1,6 +1,5 @@
 import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
-import { Megaphone } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
@@ -19,17 +18,7 @@ const definition: ModuleDefinition = {
     },
     { path: '/admin/mention-monitoring', component: legacyAdminRedirect('/mention-monitoring') },
   ],
-  navItems: [
-    {
-      label: manifest.name,
-      path: '/mention-monitoring',
-      icon: Megaphone,
-      location: 'admin-dashboard',
-      adminCategory: 'Modules',
-      adminDescription: manifest.description,
-      adminCount: manifest.priceTier.toUpperCase(),
-    },
-  ],
+  navItems: [],
 };
 
 export default definition;
