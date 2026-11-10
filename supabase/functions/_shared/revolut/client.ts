@@ -316,6 +316,8 @@ export interface RevolutAccount {
   balance: number;
   currency: string;
   state: string;
+  /** `current`, or `merchant`: the acquiring settlement account, never a transfer IBAN for customers. */
+  account_type?: string;
   public?: boolean;
   created_at?: string;
   updated_at?: string;

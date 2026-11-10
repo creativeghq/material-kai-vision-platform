@@ -16752,9 +16752,22 @@
     "actions": [
       {
         "name": "accounts",
-        "summary": "LIVE Revolut accounts with the balance the bank reports, plus how each maps to a finance_bank_accounts row.",
+        "summary": "LIVE active Revolut accounts (current and merchant) with the balance the bank reports, their IBAN and display label, plus how each maps to a finance_bank_accounts row.",
         "params": [],
-        "response": "{ok, accounts: [{id, name, balance, currency, state, public, created_at, updated_at}], bank_accounts: [{id, name, currency, revolut_account_id}]} — `balance` is Revolut's figure for that currency pocket right now; the platform's book balance is GET /rest/v1/vw_bank_account_balances"
+        "response": "{ok, accounts: [{id, name, account_type, balance, currency, state, iban, label, public, created_at, updated_at}], bank_accounts: [{id, name, currency, revolut_account_id, show_on_invoice}]} — `balance` is Revolut's figure for that currency pocket right now; the platform's book balance is GET /rest/v1/vw_bank_account_balances"
+      },
+      {
+        "name": "add-account",
+        "summary": "Add ONE Revolut account as a finance_bank_accounts row, named from Revolut (name, type, currency, IBAN tail). Never printed on invoices until switched on in Settings → Bank accounts. Returns the existing row when already added.",
+        "params": [
+          {
+            "name": "revolut_account_id",
+            "type": "string",
+            "required": true,
+            "desc": "Revolut account id from `accounts`"
+          }
+        ],
+        "response": "{ok, bank_account_id}"
       },
       {
         "name": "map-account",
@@ -16862,7 +16875,7 @@
       },
       {
         "name": "oauth-complete",
-        "summary": "Exchange the consent code for tokens and create finance_bank_accounts rows for each pocket. Idempotent against a double-fired callback.",
+        "summary": "Exchange the consent code for tokens. Creates no bank-account rows — the owner adds accounts from `accounts` with `add-account`. Idempotent against a double-fired callback.",
         "params": [
           {
             "name": "code",

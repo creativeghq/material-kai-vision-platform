@@ -207,17 +207,7 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
         if (fresh?.refresh_token) return jsonResponse({ ok: true, already: true });
         throw err;
       }
-      // Provision the pocket bank-account rows right away — the user should see their
-      // Revolut accounts under Finance → Banks the moment the connection lands.
-      try {
-        const fresh = await resolveRevolutConfig(service, workspaceId);
-        if (fresh) {
-          const { ensureRevolutBankAccounts } = await import('../_shared/revolut/sync-core.ts');
-          await ensureRevolutBankAccounts(service, fresh);
-        }
-      } catch (err) {
-        console.warn('[revolut-api] pocket provisioning after connect failed:', err instanceof Error ? err.message : err);
-      }
+      // No account rows are created here: the owner adds the ones they want from the list.
       return jsonResponse({ ok: true });
     }
 
@@ -267,12 +257,26 @@ Deno.serve(withApiLogging('revolut-api', async (req) => {
     case 'accounts': {
       const cfg = await requireConfig(service, workspaceId);
       const issuer = issuerDomainFrom(cfg.oauth_redirect_uri ?? '');
-      const accounts = await listAccounts(service, cfg, issuer);
+      const { revolutBankDetails, revolutAccountLabel } = await import('../_shared/revolut/sync-core.ts');
+      const raw = (await listAccounts(service, cfg, issuer)).filter((a) => a.state === 'active');
+      const accounts = await Promise.all(raw.map(async (a) => {
+        const { iban } = await revolutBankDetails(service, cfg, issuer, a.id);
+        return { ...a, iban, label: revolutAccountLabel(a, iban) };
+      }));
       const { data: mapped } = await service
         .from('finance_bank_accounts')
-        .select('id, name, currency, revolut_account_id')
+        .select('id, name, currency, revolut_account_id, show_on_invoice')
         .eq('workspace_id', workspaceId);
       return jsonResponse({ ok: true, accounts, bank_accounts: mapped ?? [] });
+    }
+
+    case 'add-account': {
+      const revolutAccountId = String(body?.revolut_account_id ?? '');
+      if (!revolutAccountId) throw new HttpError(400, 'revolut_account_id is required');
+      const cfg = await requireConfig(service, workspaceId);
+      const { addRevolutBankAccount } = await import('../_shared/revolut/sync-core.ts');
+      const id = await addRevolutBankAccount(service, cfg, revolutAccountId);
+      return jsonResponse({ ok: true, bank_account_id: id });
     }
 
     case 'map-account': {

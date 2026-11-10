@@ -160,7 +160,14 @@ recorded as `unmatched_person` — never invented. Offboarding freezes cards; un
 ## Sandbox validation — what has and hasn't been exercised
 
 Verified live: connection + OAuth, sync (transactions fetched and upserted, watermark advancing),
-webhook registration, pocket auto-provisioning with real IBANs auto-filled onto invoices.
+webhook registration.
+
+**Accounts are added by the owner, never by the sync.** Settings → Revolut → Accounts lists what
+Revolut returns — including the `merchant` (card-acquiring settlement) account, which has its own
+IBAN and is not a transfer IBAN for customers — and each one is added with *Add* or linked to an
+existing row. An added row is never printed on invoices until it is switched on in Bank accounts.
+Auto-provisioning on connect/sync did both on its own, and on 2026-11-10 it printed the merchant
+IBAN on an invoice whose owner had every account switched off.
 
 **Not yet exercised against the API:** invoice → simulated transfer → auto-match; VoP →
 counterparty → bill run → approval → outgoing settlement; Merchant checkout; card + expense with

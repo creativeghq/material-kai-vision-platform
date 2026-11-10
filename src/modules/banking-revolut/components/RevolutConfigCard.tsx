@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Switch } from '@/components/core/ui/switch';
+import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
@@ -101,7 +102,6 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
   const authorize = () =>
     run('Authorise', async () => {
       const out = await callRevolutApi<{ url: string }>('authorize-url', workspaceId);
-      // Full-page redirect: the callback route completes the exchange and returns here.
       window.location.href = out.url;
     });
 
@@ -114,6 +114,18 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
       setAccounts(out.accounts);
       setBankAccounts(out.bank_accounts);
     });
+
+  const addAccount = (a: RevolutAccountInfo) =>
+    run('Add account', async () => {
+      await callRevolutApi('add-account', workspaceId, { revolut_account_id: a.id });
+      await loadAccounts();
+      toast({ title: 'Account added', description: `${a.label ?? a.currency} is in Bank accounts. It is not printed on invoices until you switch it on there.` });
+    });
+
+  useEffect(() => {
+    if (status?.connected && accounts === null) void loadAccounts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status?.connected]);
 
   const mapAccount = (revolutAccountId: string, bankAccountId: string | null) =>
     run('Map account', async () => {
@@ -291,31 +303,54 @@ export const RevolutConfigCard: React.FC<Props> = ({ workspaceId }) => {
           )}
         </div>
 
-        {/* Step 4 — account mapping */}
         {status.connected && (
           <div className="space-y-2">
-            <div className="text-sm font-medium">4. Account mapping</div>
-            {accounts === null ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <div className="text-sm font-medium">4. Accounts</div>
+                <p className="text-xs text-muted-foreground">
+                  What Revolut reports for this business. Add the ones you want in Bank accounts; an added account goes on invoices only when you switch it on there.
+                </p>
+              </div>
               <Button size="sm" variant="outline" onClick={loadAccounts} disabled={busy !== null}>
-                {busy === 'Load accounts' ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
-                Load Revolut accounts
+                {busy === 'Load accounts' ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <RefreshCw className="mr-1 h-3 w-3" />}
+                Resync accounts
               </Button>
+            </div>
+            {accounts === null ? (
+              <p className="text-sm text-muted-foreground">Loading accounts from Revolut…</p>
             ) : accounts.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No accounts returned.</p>
+              <p className="text-sm text-muted-foreground">Revolut returned no active accounts.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="divide-y divide-hairline rounded-sm border border-hairline">
                 {accounts.map((a) => {
-                  const mappedTo = bankAccounts.find((b) => b.revolut_account_id === a.id)?.id ?? '';
+                  const row = bankAccounts.find((b) => b.revolut_account_id === a.id);
                   return (
-                    <div key={a.id} className="flex flex-wrap items-center gap-2 text-sm">
-                      <span className="min-w-32 font-medium">{a.name || a.currency}</span>
-                      <span className="text-muted-foreground">{a.balance.toFixed(2)} {a.currency}</span>
-                      <Select value={mappedTo || 'none'} onValueChange={(v) => mapAccount(a.id, v === 'none' ? null : v)}>
-                        <SelectTrigger aria-label={`Map ${a.name || a.currency} to a bank account`} className="h-9 w-48 text-xs">
+                    <div key={a.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2 font-medium">
+                          {a.label ?? a.name ?? a.currency}
+                          {a.account_type === 'merchant' && (
+                            <Badge variant="warning" title="Revolut's card-acquiring settlement account. Card and Revolut Pay sales settle here; it is not an IBAN to give customers.">Merchant</Badge>
+                          )}
+                        </div>
+                        <div className="text-xs text-muted-foreground tabular-nums">
+                          {a.iban ? `IBAN ${a.iban}` : 'No IBAN'} · {a.balance.toFixed(2)} {a.currency}
+                          {row && <> · {row.show_on_invoice ? 'Printed on invoices' : 'Not on invoices'}</>}
+                        </div>
+                      </div>
+                      {!row && (
+                        <Button size="sm" variant="outline" onClick={() => addAccount(a)} disabled={busy !== null}>
+                          {busy === 'Add account' ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : null}
+                          Add
+                        </Button>
+                      )}
+                      <Select value={row?.id ?? 'none'} onValueChange={(v) => mapAccount(a.id, v === 'none' ? null : v)}>
+                        <SelectTrigger aria-label={`Link ${a.label ?? a.currency} to a bank account`} className="h-9 w-56 text-xs">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">— not mapped —</SelectItem>
+                          <SelectItem value="none">{row ? 'Unlink' : 'Or link an existing account…'}</SelectItem>
                           {bankAccounts.map((b) => (
                             <SelectItem key={b.id} value={b.id}>{b.name}{b.currency ? ` (${b.currency})` : ''}</SelectItem>
                           ))}

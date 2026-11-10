@@ -74,9 +74,12 @@ export async function saveRevolutConfig(workspaceId: string, input: RevolutConfi
 export interface RevolutAccountInfo {
   id: string;
   name?: string;
+  account_type?: string;
   balance: number;
   currency: string;
   state: string;
+  iban?: string | null;
+  label?: string;
 }
 
 export interface RevolutBankAccountRow {
@@ -84,6 +87,7 @@ export interface RevolutBankAccountRow {
   name: string;
   currency: string | null;
   revolut_account_id: string | null;
+  show_on_invoice?: boolean;
 }
 
 /** One call surface for every `revolut-api` action; throws with the server's message. */
