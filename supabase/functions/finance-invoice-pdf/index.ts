@@ -918,14 +918,17 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     let leftBottom = topY;
     if (logoImg) { page.drawImage(logoImg, { x: M, y: topY - logoH, width: logoW, height: logoH }); leftBottom = topY - logoH; }
     textR(title, right, topY - 11, 12, bold, colors.accent);
-    let qrBottom = topY - 18;
+    const docNumber = String(inv.internal_number ?? inv.legal_number ?? '');
+    let titleBottom = topY - 18;
+    if (docNumber) { textR(`${L.number}: ${docNumber}`, right, topY - 25, 9, bold, INK); titleBottom = topY - 31; }
+    let qrBottom = titleBottom;
     if (fiscalQr && inv.print_online_code !== false) {
       const qs = 68;
-      drawQr(page, fiscalQr, right - qs, topY - 22 - qs, qs);
-      textR(L.verify, right, topY - 22 - qs - 9, 6.5, font, MUTED);
-      qrBottom = topY - 22 - qs - 12;
+      drawQr(page, fiscalQr, right - qs, titleBottom - 4 - qs, qs);
+      textR(L.verify, right, titleBottom - 4 - qs - 9, 6.5, font, MUTED);
+      qrBottom = titleBottom - 4 - qs - 12;
     }
-    const iy = Math.min(logoImg ? leftBottom - 16 : topY - 20, topY - 20);
+    const iy = logoImg ? Math.min(leftBottom - 16, topY - 20) : topY + 1;
     drawBadge(page, 'home', M + 9, iy - 9, 9, colors.accent);
     text(issuerName, M + 26, iy - 12, 15, bold, INK);
     let jy = iy - 26;

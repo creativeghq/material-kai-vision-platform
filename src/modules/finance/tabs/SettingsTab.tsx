@@ -68,8 +68,8 @@ const SETTINGS_SECTIONS = [
   { value: 'costcodes', label: 'Cost Codes', icon: Ruler },
   { value: 'services', label: 'Services', icon: Wrench },
   { value: 'team', label: 'Team', icon: Users },
-  { value: 'storefront', label: 'Online Store', icon: Store },
-  { value: 'banks', label: 'Accounts & Payments', icon: Landmark },
+  { value: 'storefront', label: 'Store', icon: Store },
+  { value: 'banks', label: 'Accounts', icon: Landmark },
 ] as const;
 
 const MONEY_PANES = [
@@ -81,7 +81,7 @@ const MONEY_PANES = [
 ] as const;
 type MoneyPane = (typeof MONEY_PANES)[number]['id'];
 
-/** Sections that were folded into Accounts & Payments; old links land on their pane. */
+/** Sections that were folded into Accounts; old links land on their pane. */
 const LEGACY_SECTION_PANE: Record<string, MoneyPane> = { digest: 'statements', payments: 'providers' };
 
 /** Provider keys (Resend sender, ΑΑΔΕ codes, myDATA Inbox) now live in Profile → Keys. */

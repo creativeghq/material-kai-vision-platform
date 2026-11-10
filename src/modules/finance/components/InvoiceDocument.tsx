@@ -603,31 +603,32 @@ export function InvoiceDocument({
         lines: data.delivery?.lines ?? data.shipping?.rows ?? data.customer.lines,
       },
     ];
+    const docNumber = data.meta.find((m) => m.label === L.number)?.value;
     return (
       <div lang={data.lang} style={sheet} data-invoice-template={spec.id}>
-        {/* Header: logo left, title + QR right */}
+        {/* Header: logo + issuer left, title + number + QR right */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-          <div>
+          <div style={{ minWidth: 0 }}>
             {data.issuer.logoUrl && (
-              <img src={data.issuer.logoUrl} alt="" style={{ maxHeight: 54, maxWidth: 180, objectFit: 'contain', display: 'block' }} />
+              <img src={data.issuer.logoUrl} alt="" style={{ maxHeight: 54, maxWidth: 180, objectFit: 'contain', display: 'block', marginBottom: 10 }} />
             )}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              {badge(<Home size={13} color={colors.accent} />)}
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{data.issuer.name}</div>
+                <div style={{ fontSize: 9, ...muted }}>{data.issuer.lines.map((l, i) => <div key={i}>{l}</div>)}</div>
+              </div>
+            </div>
           </div>
-          <div style={{ textAlign: 'right' }}>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 800, color: colors.accent }}>{data.title}</div>
+            {docNumber && <div style={{ fontSize: 10, fontWeight: 700, marginTop: 3 }}>{L.number}: {docNumber}</div>}
             {data.fiscal?.qrUrl && (
               <div style={{ marginTop: 6, display: 'inline-block' }}>
                 <QRCodeSVG value={data.fiscal.qrUrl} size={72} level="M" />
                 <div style={{ fontSize: 7, ...muted }}>{L.verify}</div>
               </div>
             )}
-          </div>
-        </div>
-        {/* Issuer identity with home badge */}
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 10 }}>
-          {badge(<Home size={13} color={colors.accent} />)}
-          <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 700 }}>{data.issuer.name}</div>
-            <div style={{ fontSize: 9, ...muted }}>{data.issuer.lines.map((l, i) => <div key={i}>{l}</div>)}</div>
           </div>
         </div>
         <div style={{ borderTop: `0.8px solid ${colors.line}`, margin: '10px 0 14px' }} />
