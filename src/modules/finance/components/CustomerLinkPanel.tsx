@@ -13,7 +13,9 @@ export const CustomerLinkPanel: React.FC<{
   workspaceId: string;
   label: string;
   title?: string;
-}> = ({ kind, id, workspaceId, label, title = 'Customer link' }) => {
+  /** Extra actions for the button row, such as opening the customer's Inbox thread. */
+  extra?: React.ReactNode;
+}> = ({ kind, id, workspaceId, label, title = 'Customer link', extra }) => {
   const { toast } = useToast();
   const { handleEmailSendError, connectEmailGate } = useConnectEmailGate();
   const [busy, setBusy] = useState<'rotate' | 'email' | null>(null);
@@ -62,6 +64,7 @@ export const CustomerLinkPanel: React.FC<{
         <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => void rotate()} disabled={!!busy}>
           {busy === 'rotate' ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />} New link
         </Button>
+        {extra}
       </div>
       {connectEmailGate}
     </HubPanel>

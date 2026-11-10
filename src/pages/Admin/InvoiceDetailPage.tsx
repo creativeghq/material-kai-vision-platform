@@ -36,6 +36,8 @@ import { PaymentReceiptActions } from '@/modules/finance/components/PaymentRecei
 import { PaymentProofsCard } from '@/modules/finance/components/PaymentProofsCard';
 import { FiscalRecordPanel, useFiscalAuthCode } from '@/modules/finance/components/FiscalRecordPanel';
 import { CustomerLinkPanel } from '@/modules/finance/components/CustomerLinkPanel';
+import { mintCustomerLink } from '@/modules/finance/services/customerLinks';
+import { SendOnWhatsAppButton } from '@/modules/messaging/components/SendOnWhatsAppButton';
 import { resolvePrintedCounterparty } from '@/modules/finance/invoice-templates/counterparty';
 import { formatDate } from '@/utils/datetime';
 
@@ -341,7 +343,7 @@ const InvoiceDetailPage: React.FC = () => {
             <HubProperty label="Source">
               <span className="flex flex-wrap gap-3">
                 {inv.order_id && <Link to={`${financeBase}/orders/${inv.order_id}`} className="text-primary hover:underline">View order</Link>}
-                {inv.quote_id && <Link to={`/quotes/manage/${inv.quote_id}`} className="text-primary hover:underline">View quote</Link>}
+                {(invoice as any).quote_id && <Link to={`/quotes/manage/${(invoice as any).quote_id}`} className="text-primary hover:underline">View quote</Link>}
               </span>
             </HubProperty>
           )}
@@ -363,7 +365,19 @@ const InvoiceDetailPage: React.FC = () => {
         onSend={canSendFiscal ? () => void handleSubmitFiscal() : undefined}
       />
       {isActionable && (
-        <CustomerLinkPanel kind="invoice" id={invoice.id} workspaceId={invoice.workspace_id} label={`Invoice ${invoice.internal_number ?? ''}`.trim()} />
+        <CustomerLinkPanel
+          kind="invoice" id={invoice.id} workspaceId={invoice.workspace_id} label={`Invoice ${invoice.internal_number ?? ''}`.trim()}
+          extra={
+            <SendOnWhatsAppButton
+              contactId={invoice.customer_contact_id ?? null}
+              companyId={invoice.customer_company_id ?? null}
+              message={`Invoice ${invoice.internal_number ?? ''}`}
+              resolveMessage={async () => `Invoice ${invoice.internal_number ?? ''}: ${await mintCustomerLink('invoice', invoice.id)}`}
+              label="Inbox"
+              variant="outline"
+            />
+          }
+        />
       )}
     </>
   );

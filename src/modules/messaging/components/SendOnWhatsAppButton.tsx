@@ -20,6 +20,8 @@ interface Props {
   companyId?: string | null;
   /** What to put in the composer. Usually a sentence plus a link. */
   message: string;
+  /** Builds the text at click time, e.g. after minting a link the page has not created yet. */
+  resolveMessage?: () => Promise<string>;
   label?: string;
   size?: 'sm' | 'default';
   variant?: 'secondary' | 'outline' | 'ghost';
@@ -44,7 +46,7 @@ async function resolvePhone(contactId?: string | null, companyId?: string | null
 }
 
 export const SendOnWhatsAppButton: React.FC<Props> = ({
-  contactId, companyId, message, label = 'Send on WhatsApp', size = 'sm', variant = 'secondary',
+  contactId, companyId, message, resolveMessage, label = 'Send on WhatsApp', size = 'sm', variant = 'secondary',
 }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -67,10 +69,11 @@ export const SendOnWhatsAppButton: React.FC<Props> = ({
   const go = async () => {
     try {
       setBusy(true);
+      const text = resolveMessage ? await resolveMessage() : message;
       const r = await messagingService.openWhatsAppThread({
         phone: party.phone, name: party.name || undefined,
       });
-      navigate(`/inbox?thread=${r.thread_id}&say=${encodeURIComponent(message)}`);
+      navigate(`/inbox?thread=${r.thread_id}&say=${encodeURIComponent(text)}`);
     } catch (e) {
       toast({ title: 'Could not open WhatsApp', description: (e as Error).message, variant: 'destructive' });
     } finally {
