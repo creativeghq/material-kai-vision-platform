@@ -2642,7 +2642,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
         {/* Full styled-template preview overlay (Oxygen-style "Προεπισκόπηση") */}
         {showPreview && (
-          <div className="absolute inset-0 z-50 flex flex-col bg-muted/40">
+          <div className="absolute inset-0 z-50 flex flex-col bg-surface-sunken">
             <div className="flex items-center justify-between border-b border-border/60 bg-background px-4 h-14 shrink-0">
               <span className="text-sm font-medium">Invoice preview</span>
               <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setShowPreview(false)}><ChevronLeft className="h-4 w-4" /> Back to edit</Button>

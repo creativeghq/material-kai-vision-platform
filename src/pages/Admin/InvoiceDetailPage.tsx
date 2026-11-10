@@ -1,42 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link, useSearchParams } from 'react-router-dom';
-import { FINANCE_BASE, FINANCE_TAB } from '@/modules/finance/routes';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  AlertCircle, CheckCircle2, Download, Eye, FileMinus, FileText, FolderOpen, Loader2, MoreHorizontal,
+  Pencil, Plus, Send, Truck,
+} from 'lucide-react';
+
+import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { supabase } from '@/integrations/supabase/client';
 import { humanizeLabel } from '@/utils/humanize';
-import {
-  Loader2,
-  FileText,
-  CheckCircle2,
-  Plus,
-  ExternalLink,
-  AlertCircle,
-  ArrowLeft,
-  CreditCard,
-  Copy,
-  ShieldCheck,
-  Truck,
-  FolderOpen,
-  Pencil,
-} from 'lucide-react';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { useToast } from '@/hooks/use-toast';
 import {
-  financeService,
-  formatMoney,
-  type InvoiceWithItems,
-} from '@/modules/finance/services/financeService';
-import { SendOnWhatsAppButton } from '@/modules/messaging/components/SendOnWhatsAppButton';
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
+import {
+  HubEmptyState, HubPanel, HubProperty, HubPropertyList, HubRecordPage, HubStatTile, LinkedRecordsPanel,
+} from '@/components/core/hub';
+import { useToast } from '@/hooks/use-toast';
+import { financeService, formatMoney, type InvoiceWithItems } from '@/modules/finance/services/financeService';
 import { ReceiveReturnDialog } from '@/modules/finance/components/ReceiveReturnDialog';
 import { fiscalConnectorService } from '@/services/fiscalConnectorService';
 import { mydataPaymentLabel } from '@/modules/finance/paymentVocabulary';
 import { movePurposeLabel } from '@/services/fiscal/fiscalVocabulary';
 import { usePermissions } from '@/hooks/usePermissions';
 import { ProjectLinkField } from '@/modules/finance/components/ProjectLinkField';
-import { LinkedRecordsPanel } from '@/components/core/hub';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 import { WholesaleCardNotice } from '@/modules/finance/components/WholesaleCardNotice';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
@@ -44,12 +34,25 @@ import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog'
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { PaymentProofsCard } from '@/modules/finance/components/PaymentProofsCard';
+import { FiscalRecordPanel, useFiscalAuthCode } from '@/modules/finance/components/FiscalRecordPanel';
+import { CustomerLinkPanel } from '@/modules/finance/components/CustomerLinkPanel';
+import { resolvePrintedCounterparty } from '@/modules/finance/invoice-templates/counterparty';
 import { formatDate } from '@/utils/datetime';
-import { mintCustomerLink } from '@/modules/finance/services/customerLinks';
 
+const STATUS_VARIANT: Record<string, 'success' | 'info' | 'warning' | 'error' | 'neutral'> = {
+  paid: 'success', issued: 'info', sent: 'info', partially_paid: 'warning', overdue: 'error',
+  draft: 'neutral', void: 'neutral', credit_noted: 'neutral',
+};
+
+const crumbs = (title: string) => [
+  { label: 'Finance', to: FINANCE_BASE },
+  { label: 'Invoices', to: financeTabUrl(FINANCE_TAB.invoices) },
+  { label: title },
+];
 
 const InvoiceDetailPage: React.FC = () => {
   const { invoiceId } = useParams<{ invoiceId: string }>();
+  const navigate = useNavigate();
   const financeBase = FINANCE_BASE;
   const { toast } = useToast();
   const [invoice, setInvoice] = useState<InvoiceWithItems | null>(null);
@@ -59,8 +62,6 @@ const InvoiceDetailPage: React.FC = () => {
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false);
   const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
   const [returnFor, setReturnFor] = useState<{ id: string; number: string | null } | null>(null);
-  const [payLink, setPayLink] = useState<string | null>(null);
-  const [payLinkBusy, setPayLinkBusy] = useState(false);
   const [fiscalBusy, setFiscalBusy] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -69,16 +70,12 @@ const InvoiceDetailPage: React.FC = () => {
   /** Derived in SQL (`get_invoice_edit_verdict`): editable until myDATA returns a MARK. */
   const [editVerdict, setEditVerdict] = useState<{ editable: boolean; reason: string | null } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
-  // Attributing revenue to a job is a finance decision, gated the same way the project's own
-  // Finance tab is. Everyone else sees the invoice without the control.
+  /** Drafts carry no counterparty snapshot yet, so their customer is read live. */
+  const [liveParty, setLiveParty] = useState<Record<string, unknown> | null>(null);
   const { can, isWorkspaceManager } = usePermissions();
   const canEditProject = can('finance.manage');
+  const authCode = useFiscalAuthCode('invoices', invoiceId ?? '', (invoice as any)?.fiscal_mark ?? null);
 
-  /**
-   * Re-point this invoice at a job (#378 L2). Saved on pick rather than behind a Save button:
-   * it is one attribute of the document, the same treatment the order header gives it, and a
-   * link that needs confirming is a link people abandon half-set.
-   */
   const handleProjectChange = async (projectId: string | null) => {
     if (!invoiceId) return;
     setProjectSaving(true);
@@ -149,6 +146,12 @@ const InvoiceDetailPage: React.FC = () => {
       ]);
       setInvoice(inv);
       setEditVerdict((verdict.data as any) ?? null);
+      if (!(inv as any).counterparty_snapshot?.row && (inv.customer_company_id || inv.customer_contact_id)) {
+        const { data: live } = inv.customer_company_id
+          ? await supabase.from('crm_companies').select('*').eq('id', inv.customer_company_id).maybeSingle()
+          : await supabase.from('crm_contacts').select('*').eq('id', inv.customer_contact_id!).maybeSingle();
+        setLiveParty((live as Record<string, unknown> | null) ?? null);
+      }
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load invoice');
     } finally {
@@ -180,7 +183,6 @@ const InvoiceDetailPage: React.FC = () => {
       if (!f) {
         toast({ title: 'No Fiscal Response', variant: 'destructive' });
       } else if (f.ok === false) {
-        // not_configured / no_binding / build error — surfaced verbatim
         toast({ title: 'Not Submitted', description: f.error, variant: 'destructive' });
       } else if (f.skipped) {
         toast({ title: 'Already Transmitted', description: 'This invoice has a myDATA MARK already.' });
@@ -201,7 +203,7 @@ const InvoiceDetailPage: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading && !invoice) {
     return (
       <div className="flex h-[calc(100vh-200px)] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -211,258 +213,256 @@ const InvoiceDetailPage: React.FC = () => {
 
   if (error || !invoice) {
     return (
-      <div className="px-3 sm:px-6 py-10">
-        <Card className="border-destructive/50">
-          <CardContent className="flex gap-2 p-6 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 mt-0.5" />
-            {error ?? 'Invoice not found'}
-          </CardContent>
-        </Card>
+      <div className="p-6">
+        <HubEmptyState
+          icon={FileText}
+          title="Invoice not found"
+          description={error ?? 'It may have been removed, or it belongs to another workspace.'}
+          action={<Button variant="outline" onClick={() => navigate(financeTabUrl(FINANCE_TAB.invoices))}>Back to Invoices</Button>}
+        />
       </div>
     );
   }
 
-  /**
-   * Can this document be acted on at all?
-   *
-   * A draft is not yet a document: it has no legal number, the payment picker and the credit-note
-   * picker both exclude it, and a public pay link for one would be a link to something that does
-   * not legally exist. Void and credit_noted are closed. Everything else is actionable.
-   */
+  const inv = invoice as any;
+  const cur = invoice.currency;
+  /** A draft has no legal number; void and credit_noted are closed. Only "Mark Issued" applies to a draft. */
   const isActionable = invoice.status !== 'void'
     && invoice.status !== 'credit_noted'
     && invoice.status !== 'draft';
+  const transmitted = inv.fiscal_status === 'accepted' || inv.fiscal_status === 'offline';
+  const canSendFiscal = invoice.status !== 'draft' && !transmitted;
 
   const totalMargin = invoice.items.reduce((acc, it) => acc + (it.line_margin ?? 0), 0);
   const totalCogs = invoice.items.reduce((acc, it) => acc + (it.line_cost ?? 0), 0);
   const costKnown = invoice.items.some((it) => it.line_cost != null);
   const marginPct =
     costKnown && invoice.subtotal_net > 0 ? (totalMargin / invoice.subtotal_net) * 100 : null;
+  const party = resolvePrintedCounterparty(inv.counterparty_snapshot?.row ?? null, liveParty as any);
+  const customerTo = invoice.customer_company_id
+    ? `/crm/companies/${invoice.customer_company_id}`
+    : invoice.customer_contact_id ? `/crm/contacts/${invoice.customer_contact_id}` : null;
+  const credited = Number(invoice.amount_credited ?? 0);
+  const withheld = Number(inv.total_withheld_amount ?? 0);
+  const fiscalStale = inv.fiscal_status === 'offline'
+    && Date.now() - new Date(inv.fiscal_submitted_at ?? inv.updated_at ?? Date.now()).getTime() >= 24 * 3600 * 1000;
+
+  const subtitle = [
+    party?.name,
+    invoice.issued_at ? `Issued ${formatDate(invoice.issued_at)}` : 'Not issued yet',
+    invoice.due_at ? `Due ${formatDate(invoice.due_at)}` : null,
+  ].filter(Boolean).join(' · ');
+
+  const actions = (
+    <>
+      <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
+        <Eye className="mr-1.5 h-4 w-4" /> Preview
+      </Button>
+      {invoice.status === 'draft' && (
+        <Button size="sm" onClick={handleIssue}>
+          <CheckCircle2 className="mr-1.5 h-4 w-4" /> Mark Issued
+        </Button>
+      )}
+      {isActionable && (
+        <Button size="sm" onClick={() => setPaymentDialogOpen(true)}>
+          <Plus className="mr-1.5 h-4 w-4" /> Record payment
+        </Button>
+      )}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" aria-label="More actions">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-52">
+          {editVerdict?.editable && (
+            <DropdownMenuItem onSelect={() => setEditOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Edit invoice</DropdownMenuItem>
+          )}
+          <DropdownMenuItem disabled={pdfBusy} onSelect={() => void handleDownloadPdf()}>
+            {pdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
+          </DropdownMenuItem>
+          {canSendFiscal && (
+            <DropdownMenuItem disabled={fiscalBusy} onSelect={() => void handleSubmitFiscal()}>
+              <Send className="mr-2 h-4 w-4" /> Send to AADE
+            </DropdownMenuItem>
+          )}
+          {canEditProject && (
+            <DropdownMenuItem onSelect={() => setProjectOpen(true)}>
+              <FolderOpen className="mr-2 h-4 w-4" /> {inv.project_id ? 'Change project' : 'Link to project'}
+            </DropdownMenuItem>
+          )}
+          {isActionable && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => setCreditNoteDialogOpen(true)}>
+                <FileMinus className="mr-2 h-4 w-4" /> Issue credit note
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
+
+  const detailRows: [string, React.ReactNode][] = [
+    ['Payment Method', inv.payment_method_code ? mydataPaymentLabel(inv.payment_method_code) : null],
+    ['Payment Note', inv.payment_method_info],
+    ['Related Document', inv.related_document],
+    ['Digital Transaction Fee', Number(inv.digital_transaction_fee) > 0 ? formatMoney(inv.digital_transaction_fee, cur) : null],
+    ['Prices Include VAT', inv.prices_include_vat ? 'Yes' : null],
+    ['VAT Payment Suspension', inv.vat_payment_suspension ? 'Yes' : null],
+  ];
+
+  const left = (
+    <>
+      <HubPanel title="Details">
+        <HubPropertyList>
+          <HubProperty label="Status">
+            <span className="flex flex-wrap gap-1.5">
+              <Badge variant={STATUS_VARIANT[invoice.status] ?? 'neutral'}>{humanizeLabel(invoice.status)}</Badge>
+              {inv.has_shipping && <Badge variant="neutral" className="gap-1"><Truck className="h-3 w-3" /> With shipping</Badge>}
+            </span>
+          </HubProperty>
+          <HubProperty label="Customer">
+            {party?.name
+              ? (customerTo ? <Link className="text-primary hover:underline" to={customerTo}>{party.name}</Link> : party.name)
+              : null}
+            {party?.vatNumber && <span className="block text-xs text-muted-foreground">VAT {party.vatNumber}</span>}
+          </HubProperty>
+          <HubProperty label="Document Type">{inv.document_type ?? null}</HubProperty>
+          {inv.series && <HubProperty label="Series">{inv.series}</HubProperty>}
+          <HubProperty label="Issued">{invoice.issued_at ? formatDate(invoice.issued_at) : 'Not issued yet'}</HubProperty>
+          <HubProperty label="Due">{invoice.due_at ? formatDate(invoice.due_at) : null}</HubProperty>
+          {Number(inv.branch_code ?? 0) > 0 && <HubProperty label="Establishment">#{inv.branch_code}</HubProperty>}
+          {detailRows.filter(([, v]) => v).map(([label, value]) => (
+            <HubProperty key={label} label={label}>{value}</HubProperty>
+          ))}
+          {(inv.order_id || inv.quote_id) && (
+            <HubProperty label="Source">
+              <span className="flex flex-wrap gap-3">
+                {inv.order_id && <Link to={`${financeBase}/orders/${inv.order_id}`} className="text-primary hover:underline">View order</Link>}
+                {inv.quote_id && <Link to={`/quotes/manage/${inv.quote_id}`} className="text-primary hover:underline">View quote</Link>}
+              </span>
+            </HubProperty>
+          )}
+          <HubProperty label="P&L">
+            <label htmlFor="invoice-exclude-pnl" className={`flex items-start gap-2 ${canEditProject && !pnlSaving ? 'cursor-pointer' : 'opacity-70'}`}>
+              <Checkbox id="invoice-exclude-pnl" className="mt-0.5 h-4 w-4 rounded" checked={inv.exclude_from_pnl === true} disabled={!canEditProject || pnlSaving} onCheckedChange={() => void togglePnlExclusion()} />
+              <span>
+                Exclude from P&amp;L
+                <span className="block text-xs text-muted-foreground">Still counts for VAT, myDATA and what the customer owes</span>
+              </span>
+            </label>
+          </HubProperty>
+        </HubPropertyList>
+      </HubPanel>
+      <FiscalRecordPanel
+        record={inv}
+        authenticationCode={authCode}
+        sending={fiscalBusy}
+        onSend={canSendFiscal ? () => void handleSubmitFiscal() : undefined}
+      />
+      {isActionable && (
+        <CustomerLinkPanel kind="invoice" id={invoice.id} workspaceId={invoice.workspace_id} label={`Invoice ${invoice.internal_number ?? ''}`.trim()} />
+      )}
+    </>
+  );
 
   return (
-    <div className="px-3 sm:px-6 space-y-6 py-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
-          <Link to={`${financeBase}?tab=${FINANCE_TAB.invoices}`} aria-label="Back to Invoices">
-            <Button variant="ghost" size="sm" className="-ml-2" aria-label="Back to Invoices">
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </Link>
-          <div>
-            <div className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-muted-foreground" />
-              <h1 className="text-xl font-semibold">{invoice.internal_number}</h1>
-              <Badge variant={invoice.status === 'overdue' ? 'destructive' : invoice.status === 'paid' ? 'default' : 'outline'}>
-                {humanizeLabel(invoice.status)}
-              </Badge>
-              {(invoice as any).has_shipping && (
-                <Badge variant="secondary" className="gap-1"><Truck className="h-3 w-3" /> With shipping</Badge>
-              )}
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {invoice.issued_at
-                ? `Issued ${formatDate(invoice.issued_at)}`
-                : 'Not Issued Yet'}
-              {invoice.due_at && ` · Due ${formatDate(invoice.due_at)}`}
-              {Number((invoice as any).branch_code ?? 0) > 0 && ` · Establishment #${(invoice as any).branch_code}`}
-              {(invoice as any).series && ` · Series ${(invoice as any).series}`}
-              {(invoice as any).order_id && (
-                <> · <Link to={`${financeBase}/orders/${(invoice as any).order_id}`} className="text-primary hover:underline">View order</Link></>
-              )}
-              {/* The quote this document came from. Invoice → order was linked and invoice → quote
-                  was not, so the offer the customer actually agreed to — the prices, the options,
-                  the expiry — was unreachable from the invoice arguing about it. */}
-              {(invoice as any).quote_id && (
-                <> · <Link to={`/quotes/manage/${(invoice as any).quote_id}`} className="text-primary hover:underline">View quote</Link></>
-              )}
-            </p>
-            <label htmlFor="invoice-exclude-pnl" className={`mt-2 inline-flex items-center gap-2 text-sm ${canEditProject && !pnlSaving ? 'cursor-pointer' : 'opacity-70'}`}>
-              <Checkbox id="invoice-exclude-pnl" className="h-4 w-4 rounded" checked={(invoice as any).exclude_from_pnl === true} disabled={!canEditProject || pnlSaving} onCheckedChange={() => void togglePnlExclusion()} />
-              <span>Exclude from P&amp;L</span>
-              <span className="text-xs text-muted-foreground">— still counts for VAT, myDATA and what the customer owes</span>
-            </label>
-            {/* Which job this invoice is revenue for (#378 L2). `get_project_pnl` reads billed
-                revenue off this column, so an invoice without one leaves the job showing cost and
-                no income — and until now it could only be set from inside the project, which is
-                the direction someone looking at an invoice does not have. Editable after issue:
-                the job is internal reporting, not a fiscal field. */}
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canEditProject && (
-            <Button onClick={() => setProjectOpen(true)} variant="outline">
-              <FolderOpen className="mr-2 h-4 w-4" />
-              {(invoice as any).project_id ? 'Project' : 'Link to Project'}
-            </Button>
-          )}
-          {editVerdict?.editable && (
-            <Button onClick={() => setEditOpen(true)} variant="outline">
-              <Pencil className="mr-2 h-4 w-4" /> Edit
-            </Button>
-          )}
-          {invoice.status === 'draft' && (
-            <Button onClick={handleIssue}>
-              <CheckCircle2 className="mr-2 h-4 w-4" /> Mark Issued
-            </Button>
-          )}
-          <Button onClick={() => setPreviewOpen(true)} variant="outline">
-            <FileText className="mr-2 h-4 w-4" />
-            Preview
-          </Button>
-          <Button onClick={handleDownloadPdf} variant="outline" disabled={pdfBusy}>
-            {pdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
-            Download PDF
-          </Button>
-          {invoice.status !== 'draft' && (
-            (invoice as any).fiscal_status === 'accepted' ? (
-              <Button variant="outline" disabled title="This invoice already has its myDATA MARK">
-                <ShieldCheck className="mr-2 h-4 w-4" /> Sent to AADE
-              </Button>
-            ) : (
-              <Button onClick={handleSubmitFiscal} variant="outline" disabled={fiscalBusy}>
-                {fiscalBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ShieldCheck className="mr-2 h-4 w-4" />}
-                Send to AADE
-              </Button>
-            )
-          )}
-          {/* `isActionable` adds status !== 'draft'. Gating only on void/credit_noted let a
-              PUBLIC card-pay link be minted for an unissued document, let "Record payment"
-              open against a draft (whose row the payment dialog's picker excludes, so the
-              money booked as unallocated credit), and let "Credit Note" open a dialog whose
-              picker excludes drafts — empty, with no explanation. The only action a draft
-              offers is "Mark Issued". */}
-          {isActionable && (
-            <Button
-              onClick={async () => {
-                if (!invoice) return;
-                try {
-                  setPayLinkBusy(true);
-                  const link = await mintCustomerLink('invoice', invoice.id);
-                  setPayLink(link);
-                  try {
-                    await navigator.clipboard.writeText(link);
-                    toast({ title: 'Customer link copied', description: 'The customer sees the invoice online, and can pay it while money is owed.' });
-                  } catch {
-                    toast({ title: 'Customer link ready', description: link });
-                  }
-                } catch (err: any) {
-                  toast({ title: 'Failed', description: err?.message ?? 'Error', variant: 'destructive' });
-                } finally {
-                  setPayLinkBusy(false);
-                }
-              }}
-              disabled={payLinkBusy}
-              variant="outline"
-            >
-              {payLinkBusy ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CreditCard className="mr-2 h-4 w-4" />}
-              Customer link
-            </Button>
-          )}
-          {isActionable && (
-            <Button onClick={() => setPaymentDialogOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" /> Record payment
-            </Button>
-          )}
-          {isActionable && (
-            <Button onClick={() => setCreditNoteDialogOpen(true)} variant="outline">
-              Credit Note
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* #448 -- wholesale settled on a terminal is collected by a 355 -> 8.4 receipt correlated
-          to this invoice, NOT by the A.1098 retail-receipt-then-credit-note workaround. Running
-          both files two documents for one sale. */}
-      <WholesaleCardNotice invoiceId={invoiceId ?? null} />
-
-      <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Link to Project</DialogTitle>
-          </DialogHeader>
-          <ProjectLinkField
-            workspaceId={(invoice as any).workspace_id}
-            projectId={(invoice as any).project_id ?? null}
-            onChange={async (id) => { await handleProjectChange(id); setProjectOpen(false); }}
-            disabled={projectSaving}
-          />
-        </DialogContent>
-      </Dialog>
-
-      {payLink && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="flex items-center justify-between gap-3 p-3 text-sm">
-            <div className="min-w-0">
-              <div className="font-medium">Customer link: the invoice online, with payment while money is owed</div>
-              <code className="block truncate text-xs text-muted-foreground">{payLink}</code>
-            </div>
-            <div className="flex gap-2 shrink-0">
-              <Button size="sm" variant="outline" onClick={async () => { await navigator.clipboard.writeText(payLink); toast({ title: 'Copied' }); }}>
-                <Copy className="h-3 w-3 mr-1" /> Copy
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => window.open(payLink, '_blank')}>
-                <ExternalLink className="h-3 w-3 mr-1" /> Open
-              </Button>
-              {/* Onto the channel the customer answers on. Copy-to-clipboard was the only route
-                  for a pay link, which makes the paste into WhatsApp a step outside the system on
-                  every invoice. */}
-              <SendOnWhatsAppButton
-                contactId={(invoice as any).customer_contact_id ?? null}
-                companyId={(invoice as any).customer_company_id ?? null}
-                message={`Invoice ${invoice.internal_number ?? ''}: ${payLink}`}
-                label="WhatsApp"
-                variant="ghost"
+    <HubRecordPage
+      icon={FileText}
+      title={invoice.internal_number ?? 'Draft invoice'}
+      subtitle={subtitle}
+      breadcrumbs={crumbs(invoice.internal_number ?? 'Draft invoice')}
+      actions={actions}
+      left={left}
+      overlays={
+        <>
+          <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
+            <DialogContent className="max-w-md">
+              <DialogHeader><DialogTitle>Link to Project</DialogTitle></DialogHeader>
+              <ProjectLinkField
+                workspaceId={inv.workspace_id}
+                projectId={inv.project_id ?? null}
+                onChange={async (id) => { await handleProjectChange(id); setProjectOpen(false); }}
+                disabled={projectSaving}
               />
-              <Button size="sm" variant="ghost" onClick={() => setPayLink(null)}>Hide</Button>
+            </DialogContent>
+          </Dialog>
+          <RecordPaymentDialog
+            workspaceId={invoice.workspace_id}
+            presetInvoiceId={invoice.id}
+            defaultAmount={Number(invoice.amount_due) || undefined}
+            initialCounterparty={{ companyId: invoice.customer_company_id ?? null, contactId: invoice.customer_contact_id ?? null }}
+            open={paymentDialogOpen}
+            onOpenChange={setPaymentDialogOpen}
+            onSaved={async () => { setPaymentDialogOpen(false); await load(); }}
+          />
+          <NewInvoiceDialog
+            workspaceId={inv.workspace_id}
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            editInvoiceId={editOpen ? invoice.id : null}
+            onCreated={async () => { setEditOpen(false); await load(); }}
+          />
+          <NewCreditNoteDialog
+            workspaceId={invoice.workspace_id}
+            presetInvoiceId={invoice.id}
+            open={creditNoteDialogOpen}
+            onOpenChange={setCreditNoteDialogOpen}
+            onCreated={async () => { setCreditNoteDialogOpen(false); await load(); }}
+          />
+          {returnFor && (
+            <ReceiveReturnDialog
+              creditNoteId={returnFor.id}
+              creditNoteNumber={returnFor.number}
+              open={!!returnFor}
+              onOpenChange={(v) => { if (!v) setReturnFor(null); }}
+              onDone={() => { setReturnFor(null); void load(); }}
+            />
+          )}
+          <InvoicePreviewModal
+            invoiceId={invoice.id}
+            workspaceId={invoice.workspace_id}
+            open={previewOpen}
+            onOpenChange={setPreviewOpen}
+          />
+        </>
+      }
+    >
+      {inv.fiscal_status === 'rejected' && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm">
+          <div className="flex min-w-0 items-start gap-2">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+            <div className="min-w-0">
+              <p className="font-medium text-destructive">AADE refused this invoice</p>
+              <p className="text-xs text-muted-foreground break-words">
+                {inv.fiscal_error ?? 'No reason returned.'} It has no MARK, so fix the cause and send it again under the same number.
+              </p>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+          {editVerdict?.editable && (
+            <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit invoice</Button>
+          )}
+        </div>
+      )}
+      {fiscalStale && (
+        <div className="rounded-md border border-[hsl(var(--warning)/0.4)] bg-[hsl(var(--warning-bg))] px-4 py-3 text-sm text-[hsl(var(--warning))]">
+          Awaiting transmission for over 24 hours. It holds a legal number but has no MARK — check the provider portal before re-issuing.
+        </div>
       )}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="dashboard-card border-0">
-          <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Total</div>
-            <div className="mt-1 text-xl font-semibold">{formatMoney(invoice.total, invoice.currency)}</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Net {formatMoney(invoice.subtotal_net, invoice.currency)} · VAT {formatMoney(invoice.vat_amount, invoice.currency)}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="dashboard-card border-0">
-          <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Paid / Due</div>
-            <div className="mt-1 text-xl font-semibold">
-              {formatMoney(invoice.amount_paid, invoice.currency)} / <span className="text-base text-muted-foreground">{formatMoney(invoice.amount_due, invoice.currency)}</span>
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {(invoice.payments ?? []).length} payment(s) recorded
-              {/* Cash and credit settle an invoice differently and must not read the same.
-                  `_recompute_invoice_status_after_allocation` deliberately keeps amount_paid
-                  CASH-ONLY and books credit-note allocations into amount_credited — and until
-                  now nothing in the app read the second half, so "the customer paid €500" and
-                  "we credited them €500" rendered identically while the ledger knew better. */}
-              {Number(invoice.amount_credited ?? 0) > 0.005 && (
-                <> · <span className="text-amber-600 dark:text-amber-400">
-                  {formatMoney(Number(invoice.amount_credited), invoice.currency)} credited
-                </span></>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-        <Card className="dashboard-card border-0">
-          <CardContent className="p-4">
-            <div className="text-xs text-muted-foreground">Margin (admin)</div>
-            <div className="mt-1 text-xl font-semibold">
-              {costKnown ? formatMoney(totalMargin, invoice.currency) : '—'}{' '}
-              {marginPct != null && <span className="text-sm text-muted-foreground">({marginPct.toFixed(1)}%)</span>}
-            </div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              {costKnown ? `COGS ${formatMoney(totalCogs, invoice.currency)}` : 'No cost recorded on any line'}
-            </div>
-          </CardContent>
-        </Card>
+      <WholesaleCardNotice invoiceId={invoiceId ?? null} />
+
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <HubStatTile label="Total" value={formatMoney(invoice.total, cur)} />
+        <HubStatTile label="Paid" value={formatMoney(invoice.amount_paid, cur)} />
+        <HubStatTile label="Due" value={formatMoney(invoice.amount_due, cur)} />
+        <HubStatTile
+          label="Margin"
+          value={costKnown ? formatMoney(totalMargin, cur) : '—'}
+          help={costKnown ? `COGS ${formatMoney(totalCogs, cur)}${marginPct != null ? ` · ${marginPct.toFixed(1)}% of net` : ''}` : 'No cost recorded on any line'}
+        />
       </div>
 
       <Card>
@@ -472,14 +472,14 @@ const InvoiceDetailPage: React.FC = () => {
         <CardContent className="p-0">
           <div className="table-scroll">
           <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
+            <thead className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
               <tr className="border-b border-border/60">
                 <th className="px-4 py-2 text-left">Description</th>
                 <th className="px-4 py-2 text-left">SKU</th>
                 <th className="px-4 py-2 text-right">Qty</th>
                 <th className="px-4 py-2 text-right">Unit Price</th>
                 <th className="px-4 py-2 text-right">Line Total</th>
-                <th className="px-4 py-2 text-right">Cost (Snap)</th>
+                <th className="px-4 py-2 text-right">Cost</th>
                 <th className="px-4 py-2 text-right">Margin</th>
               </tr>
             </thead>
@@ -488,95 +488,46 @@ const InvoiceDetailPage: React.FC = () => {
                 <tr><td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">No line items.</td></tr>
               )}
               {invoice.items.map((it) => (
-                <tr key={it.id} className="border-b border-border/30 hover:bg-muted/30">
+                <tr key={it.id} className="border-b border-border/30">
                   <td className="px-4 py-2">{it.description ?? '(no description)'}</td>
                   <td className="px-4 py-2 font-mono text-xs">{it.sku ?? '—'}</td>
-                  <td className="px-4 py-2 text-right">{it.quantity}</td>
-                  <td className="px-4 py-2 text-right">{formatMoney(it.unit_price, invoice.currency)}</td>
-                  <td className="px-4 py-2 text-right font-medium">{formatMoney(it.line_total, invoice.currency)}</td>
-                  <td className="px-4 py-2 text-right">{formatMoney(it.line_cost, invoice.currency)}</td>
-                  <td className={`px-4 py-2 text-right font-medium ${it.line_margin < 0 ? 'text-destructive' : ''}`}>
-                    {formatMoney(it.line_margin, invoice.currency)}
+                  <td className="px-4 py-2 text-right tabular-nums">{it.quantity}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{formatMoney(it.unit_price, cur)}</td>
+                  <td className="px-4 py-2 text-right font-medium tabular-nums">{formatMoney(it.line_total, cur)}</td>
+                  <td className="px-4 py-2 text-right tabular-nums">{it.line_cost == null ? '—' : formatMoney(it.line_cost, cur)}</td>
+                  <td className={`px-4 py-2 text-right font-medium tabular-nums ${it.line_margin < 0 ? 'text-destructive' : ''}`}>
+                    {it.line_cost == null ? '—' : formatMoney(it.line_margin, cur)}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
           </div>
+          <dl className="ml-auto w-full max-w-xs space-y-1 px-5 py-4 text-sm">
+            <div className="flex justify-between"><dt className="text-muted-foreground">Net</dt><dd className="tabular-nums">{formatMoney(invoice.subtotal_net, cur)}</dd></div>
+            <div className="flex justify-between"><dt className="text-muted-foreground">VAT</dt><dd className="tabular-nums">{formatMoney(invoice.vat_amount, cur)}</dd></div>
+            {withheld > 0 && (
+              <div className="flex justify-between"><dt className="text-muted-foreground">Withholding</dt><dd className="tabular-nums">− {formatMoney(withheld, cur)}</dd></div>
+            )}
+            <div className="flex justify-between border-t border-hairline pt-2 font-semibold"><dt>Total</dt><dd className="tabular-nums">{formatMoney(invoice.total, cur)}</dd></div>
+            {credited > 0.005 && (
+              <div className="flex justify-between text-xs"><dt className="text-muted-foreground">Credited</dt><dd className="tabular-nums">{formatMoney(credited, cur)}</dd></div>
+            )}
+          </dl>
         </CardContent>
       </Card>
 
-      {(invoice as any).has_shipping && (
-        <Card>
-          <CardHeader className="border-b border-border/60 px-5 py-3">
-            <CardTitle className="flex items-center gap-2">
-              <Truck className="h-4 w-4" /> Shipping &amp; transport
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
-            {[
-              ['Loading Place', (invoice as any).ship_from],
-              ['Delivery Place', (invoice as any).ship_to],
-              ['Transport Date', (invoice as any).transport_date],
-              ['Time', (invoice as any).transport_time],
-              ['Vehicle no.', (invoice as any).vehicle_number],
-              ['Responsible', (invoice as any).responsible],
-              ['Purpose', (invoice as any).move_purpose ? `${(invoice as any).move_purpose} — ${movePurposeLabel((invoice as any).move_purpose)}` : null],
-            ].map(([label, value]) => (
-              <div key={label as string} className="flex justify-between gap-3">
-                <span className="text-muted-foreground">{label}</span>
-                <span className="text-right font-medium">{value ? String(value) : '—'}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-
-      {(() => {
-        const inv = invoice as any;
-        const rows: [string, any][] = [
-          // AADE 8.12 via the one table — the literal that used to sit here was that list
-          // rotated by two, so code 7 (POS / e-POS) read as "Domestic account".
-          ['Payment Method', inv.payment_method_code ? mydataPaymentLabel(inv.payment_method_code) : null],
-          ['Payment Note', inv.payment_method_info],
-          ['Related Document', inv.related_document],
-          ['Digital Transaction Fee', Number(inv.digital_transaction_fee) > 0 ? formatMoney(inv.digital_transaction_fee, inv.currency) : null],
-          ['Withholding', Number(inv.total_withheld_amount) > 0 ? formatMoney(inv.total_withheld_amount, inv.currency) : null],
-          ['Prices include VAT', inv.prices_include_vat ? 'Yes' : null],
-          ['VAT payment suspension', inv.vat_payment_suspension ? 'Yes' : null],
-        ].filter((r) => r[1]) as [string, any][];
-        return rows.length > 0 ? (
-          <Card>
-            <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Payment &amp; Document Details</CardTitle></CardHeader>
-            <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
-              {rows.map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-3">
-                  <span className="text-muted-foreground">{label}</span>
-                  <span className="text-right font-medium">{String(value)}</span>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        ) : null;
-      })()}
-
-      <PaymentProofsCard
-        invoiceId={invoice.id}
-        workspaceId={invoice.workspace_id}
-        currency={invoice.currency}
-        canManage={isWorkspaceManager}
-        outstanding={Number(invoice.amount_due) || 0}
-        onChanged={() => void load()}
-      />
-
       <Card>
-        <CardHeader className="border-b border-border/60 px-5 py-3">
+        <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 border-b border-border/60 px-5 py-3">
           <CardTitle>Payments</CardTitle>
+          {isActionable && Number(invoice.amount_due) > 0.005 && (
+            <Button size="sm" variant="outline" onClick={() => setPaymentDialogOpen(true)}><Plus className="mr-1.5 h-3.5 w-3.5" /> Record payment</Button>
+          )}
         </CardHeader>
         <CardContent className="p-0">
           <div className="table-scroll">
           <table className="w-full text-sm">
-            <thead className="text-xs text-muted-foreground">
+            <thead className="bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
               <tr className="border-b border-border/60">
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Account</th>
@@ -596,14 +547,10 @@ const InvoiceDetailPage: React.FC = () => {
                 return (
                   <tr key={p.id} className="border-b border-border/30">
                     <td className="px-4 py-2">{formatDate(p.paid_at)}</td>
-                    {/* Account, not method — the method is derived from the account. */}
                     <td className="px-4 py-2">{p.bank_account_name ?? '—'}</td>
                     <td className="px-4 py-2">{p.reference ?? '—'}</td>
-                    {/* allocAmount is summed from `a.amount`, which is denominated in the
-                        INVOICE's currency (RecordPaymentDialog sets amount = amt x fx and
-                        amount_doc = amt). Stamping it with the PAYMENT's currency showed a euro
-                        figure labelled USD on any cross-currency settlement. */}
-                    <td className="px-4 py-2 text-right font-medium">{formatMoney(allocAmount, invoice.currency)}</td>
+                    {/* `a.amount` is in the INVOICE's currency, so it is labelled with it, not the payment's. */}
+                    <td className="px-4 py-2 text-right font-medium tabular-nums">{formatMoney(allocAmount, cur)}</td>
                     <td className="px-4 py-2 text-right"><PaymentReceiptActions paymentId={p.id} direction={(p as any).direction ?? 'in'} /></td>
                   </tr>
                 );
@@ -614,6 +561,15 @@ const InvoiceDetailPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      <PaymentProofsCard
+        invoiceId={invoice.id}
+        workspaceId={invoice.workspace_id}
+        currency={cur}
+        canManage={isWorkspaceManager}
+        outstanding={Number(invoice.amount_due) || 0}
+        onChanged={() => void load()}
+      />
+
       {(invoice.credit_notes ?? []).length > 0 && (
         <Card>
           <CardHeader className="border-b border-border/60 px-5 py-3">
@@ -622,7 +578,7 @@ const InvoiceDetailPage: React.FC = () => {
           <CardContent className="p-0">
             <div className="table-scroll">
             <table className="w-full text-sm">
-              <thead className="border-b border-border/60 text-xs text-muted-foreground">
+              <thead className="border-b border-border/60 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
                 <tr>
                   <th className="px-4 py-2 text-left">Number</th>
                   <th className="px-4 py-2 text-left">Date</th>
@@ -644,9 +600,7 @@ const InvoiceDetailPage: React.FC = () => {
                         : <span className="text-[11px] text-muted-foreground italic">{cn.fiscal_status ?? 'not sent'}</span>}
                     </td>
                     <td className="px-4 py-2 text-muted-foreground">{cn.reason ?? '—'}</td>
-                    <td className="px-4 py-2 text-right font-medium">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
-                    {/* The credit note moves money and nothing else. Whether the goods came back
-                        is a separate, physical fact — stated here rather than assumed either way. */}
+                    <td className="px-4 py-2 text-right font-medium tabular-nums">{formatMoney(cn.total ?? cn.amount, cn.currency)}</td>
                     <td className="px-4 py-2 text-right whitespace-nowrap">
                       {cn.goods_returned_at ? (
                         <span className="text-[11px] text-muted-foreground">
@@ -668,141 +622,35 @@ const InvoiceDetailPage: React.FC = () => {
         </Card>
       )}
 
-      {(() => {
-        const f = invoice as any;
-        if (!f.fiscal_status) return null;
-        const tone =
-          f.fiscal_status === 'accepted' ? 'default'
-          : f.fiscal_status === 'offline' ? 'secondary'
-          : f.fiscal_status === 'rejected' || f.fiscal_status === 'error' ? 'destructive'
-          : 'outline';
-        return (
-          <Card>
-            <CardHeader className="border-b border-border/60 px-5 py-3">
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4" /> myDATA / e-Invoicing
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 p-5 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <Badge variant={tone as any}>{f.fiscal_status}{f.fiscal_connector_slug ? ` · ${f.fiscal_connector_slug}` : ''}</Badge>
+      {inv.has_shipping && (
+        <Card>
+          <CardHeader className="border-b border-border/60 px-5 py-3">
+            <CardTitle className="flex items-center gap-2">
+              <Truck className="h-4 w-4" /> Shipping &amp; Transport
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-x-8 gap-y-3 p-5 text-sm sm:grid-cols-2">
+            {[
+              ['Loading Place', inv.ship_from],
+              ['Delivery Place', inv.ship_to],
+              ['Transport Date', inv.transport_date],
+              ['Time', inv.transport_time],
+              ['Vehicle No.', inv.vehicle_number],
+              ['Responsible', inv.responsible],
+              ['Purpose', inv.move_purpose ? `${inv.move_purpose} — ${movePurposeLabel(inv.move_purpose)}` : null],
+            ].map(([label, value]) => (
+              <div key={label as string} className="flex justify-between gap-3">
+                <span className="text-muted-foreground">{label}</span>
+                <span className="text-right font-medium">{value ? String(value) : '—'}</span>
               </div>
-              {f.fiscal_mark && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">MARK</span>
-                  <span className="font-mono text-xs">{f.fiscal_mark}</span>
-                </div>
-              )}
-              {f.fiscal_uid && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">UID</span>
-                  <span className="font-mono text-xs break-all">{f.fiscal_uid}</span>
-                </div>
-              )}
-              {f.fiscal_submitted_at && (
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Submitted</span>
-                  <span className="text-xs">{formatDate(f.fiscal_submitted_at, { withTime: true })}</span>
-                </div>
-              )}
-              {/* AADE's URL, which is what the button has always claimed. It opened
-                  `fiscal_qr_url` — the PROVIDER's rendering of the document — so the label was
-                  wrong and it showed the one copy we never surface. */}
-              {f.fiscal_aade_qr_url && (
-                <Button size="sm" variant="outline" onClick={() => window.open(f.fiscal_aade_qr_url, '_blank')}>
-                  <ExternalLink className="h-3 w-3 mr-1" /> View on AADE
-                </Button>
-              )}
-              {/* Why it did not land. Kept above the status prose because on a rejected or
-                  stalled document this is the only actionable thing on the card. */}
-              {f.fiscal_error && f.fiscal_status !== 'accepted' && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 p-3">
-                  <p className="text-xs font-medium text-destructive">Provider Response</p>
-                  <p className="mt-1 text-xs text-muted-foreground break-words">{f.fiscal_error}</p>
-                </div>
-              )}
-              {f.fiscal_status === 'offline' && (
-                // Only promise the MARK while the wait is still normal. Past the point where the
-                // recovery cron starts alerting, saying "shortly" is what kept a stalled document
-                // looking healthy for as long as it sat there (#193 / M6).
-                Date.now() - new Date(f.fiscal_submitted_at ?? f.updated_at ?? Date.now()).getTime() < 24 * 3600 * 1000 ? (
-                  <p className="text-xs text-muted-foreground">
-                    AADE was offline at submission. The provider will transmit automatically and the final MARK will appear shortly.
-                  </p>
-                ) : (
-                  <p className="text-xs text-amber-500">
-                    This document has been awaiting transmission for over 24 hours. It holds a legal number but has no MARK —
-                    check the provider portal before re-issuing.
-                  </p>
-                )
-              )}
-              {f.fiscal_status === 'rejected' && (
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="text-xs text-destructive">
-                    AADE refused this document. It has no MARK, so it can still be edited — fix the cause, then send it
-                    again under the same number.
-                  </p>
-                  {editVerdict?.editable && (
-                    <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
-                      <Pencil className="h-3 w-3 mr-1" /> Edit invoice
-                    </Button>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        );
-      })()}
-
-      <LinkedRecordsPanel kind="invoice" id={invoice.id} refreshKey={(invoice as { project_id?: string | null }).project_id} />
-
-      {/* The platform's one Record Payment form, preset to this invoice. Foreign-currency
-          settlement lives in it now, so this page no longer needs a copy of the form to have it. */}
-      <RecordPaymentDialog
-        workspaceId={invoice.workspace_id}
-        presetInvoiceId={invoice.id}
-        defaultAmount={Number(invoice.amount_due) || undefined}
-        initialCounterparty={{ companyId: invoice.customer_company_id ?? null, contactId: invoice.customer_contact_id ?? null }}
-        open={paymentDialogOpen}
-        onOpenChange={setPaymentDialogOpen}
-        onSaved={async () => { setPaymentDialogOpen(false); await load(); }}
-      />
-      {/* The platform's one credit-note form, preset to this invoice — it credits per LINE with
-          exact VAT, which the bespoke copy that used to live here could not do at all. */}
-      <NewInvoiceDialog
-        workspaceId={(invoice as any).workspace_id}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        editInvoiceId={editOpen ? invoice.id : null}
-        onCreated={async () => { setEditOpen(false); await load(); }}
-      />
-      <NewCreditNoteDialog
-        workspaceId={invoice.workspace_id}
-        presetInvoiceId={invoice.id}
-        open={creditNoteDialogOpen}
-        onOpenChange={setCreditNoteDialogOpen}
-        onCreated={async () => { setCreditNoteDialogOpen(false); await load(); }}
-      />
-      {returnFor && (
-        <ReceiveReturnDialog
-          creditNoteId={returnFor.id}
-          creditNoteNumber={returnFor.number}
-          open={!!returnFor}
-          onOpenChange={(v) => { if (!v) setReturnFor(null); }}
-          onDone={() => { setReturnFor(null); void load(); }}
-        />
+            ))}
+          </CardContent>
+        </Card>
       )}
-      <InvoicePreviewModal
-        invoiceId={invoice.id}
-        workspaceId={invoice.workspace_id}
-        open={previewOpen}
-        onOpenChange={setPreviewOpen}
-      />
-    </div>
+
+      <LinkedRecordsPanel kind="invoice" id={invoice.id} refreshKey={inv.project_id} />
+    </HubRecordPage>
   );
 };
-
-
 
 export default InvoiceDetailPage;

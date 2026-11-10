@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, Download, X } from 'lucide-react';
 
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
@@ -19,15 +19,18 @@ import { financeService } from '../services/financeService';
 import { InvoiceDocument } from './InvoiceDocument';
 
 interface Resolved {
+  number: string | null;
   spec: InvoiceTemplateSpec;
   colors: InvoiceColors;
   data: InvoiceRenderData;
 }
 
+/** A4 width in CSS px (210mm at 96dpi); the sheet is scaled down to fit narrower viewports. */
+const SHEET_PX = 794;
+
 /**
- * Full-screen invoice preview. Loads the invoice + items + finance settings + customer
- * exactly like the PDF function does, then renders the themed HTML document so the
- * on-screen preview matches the generated PDF. Offers Download (calls the PDF function).
+ * Invoice preview, sized to the paper. Loads the invoice + items + finance settings + customer
+ * exactly like the PDF function does, so the on-screen preview matches the generated PDF.
  */
 export function InvoicePreviewModal({
   invoiceId,
@@ -44,6 +47,19 @@ export function InvoicePreviewModal({
   const [loading, setLoading] = useState(false);
   const [resolved, setResolved] = useState<Resolved | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [paperArea, setPaperArea] = useState<HTMLDivElement | null>(null);
+  const observer = useRef<ResizeObserver | null>(null);
+
+  useEffect(() => {
+    observer.current?.disconnect();
+    if (!paperArea) return;
+    const fit = () => setScale(Math.min(1, (paperArea.clientWidth - 32) / SHEET_PX));
+    fit();
+    observer.current = new ResizeObserver(fit);
+    observer.current.observe(paperArea);
+    return () => observer.current?.disconnect();
+  }, [paperArea]);
 
   useEffect(() => {
     if (!open || !invoiceId) return;
@@ -206,7 +222,7 @@ export function InvoicePreviewModal({
           documentTaxes: documentTaxes ?? null,
         });
 
-        if (!cancelled) setResolved({ spec, colors, data });
+        if (!cancelled) setResolved({ number: invoice.internal_number ?? null, spec, colors, data });
       } catch (err: any) {
         if (!cancelled) toast({ title: 'Could not load invoice preview', description: err?.message, variant: 'destructive' });
       } finally {
@@ -234,36 +250,36 @@ export function InvoicePreviewModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         hideClose
-        className="no-card-hover w-[100vw] h-[100vh] max-w-none p-0 gap-0 rounded-none border-0 flex flex-col bg-muted/40"
+        className="no-card-hover flex h-[calc(100dvh-1.5rem)] w-[calc(100vw-1.5rem)] max-w-[calc(210mm+3rem)] flex-col gap-0 overflow-hidden rounded-md border border-hairline bg-surface-sunken p-0"
       >
-        {/* Radix requires a title + description on every dialog for screen readers; the toolbar
-            shows a visible label, so these are visually hidden but announced. */}
         <DialogTitle className="sr-only">Invoice Preview</DialogTitle>
-        <DialogDescription className="sr-only">Full-page preview of the invoice document with a download action.</DialogDescription>
-        {/* Toolbar */}
-        <div className="flex items-center justify-between gap-3 px-4 h-14 shrink-0 border-b border-border/40 bg-background">
-          <span className="text-sm font-medium">Invoice preview</span>
-          <div className="flex items-center gap-2">
+        <DialogDescription className="sr-only">Preview of the invoice document with a download action.</DialogDescription>
+        <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-hairline bg-card px-4">
+          <span className="min-w-0 truncate font-sans text-sm font-semibold">
+            Invoice preview{resolved?.number ? <span className="font-normal text-muted-foreground"> · {resolved.number}</span> : null}
+          </span>
+          <div className="flex shrink-0 items-center gap-2">
             <Button size="sm" className="gap-2" onClick={handleDownload} disabled={downloading || !resolved}>
               {downloading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
               Download PDF
             </Button>
-            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onOpenChange(false)}>
-              <X className="h-4 w-4" /> Close
+            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label="Close preview" onClick={() => onOpenChange(false)}>
+              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
 
-        {/* Scrollable paper area */}
-        <div className="flex-1 overflow-auto py-8 px-4">
+        <div ref={setPaperArea} className="flex-1 overflow-auto py-4">
           {loading ? (
-            <div className="flex items-center justify-center h-full">
+            <div className="flex h-full items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
             </div>
           ) : resolved ? (
-            <InvoiceDocument spec={resolved.spec} colors={resolved.colors} data={resolved.data} />
+            <div className="mx-auto w-fit shadow-overlay" style={{ zoom: scale }}>
+              <InvoiceDocument spec={resolved.spec} colors={resolved.colors} data={resolved.data} />
+            </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+            <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               No preview available.
             </div>
           )}
