@@ -287,7 +287,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
   const [busy, setBusy] = useState(false);
   /** Edit mode: the stored invoice's status and number once hydrated. Issued keeps its type, series and date. */
-  const [editing, setEditing] = useState<{ status: string; number: string; total: number } | null>(null);
+  const [editing, setEditing] = useState<{ status: string; number: string; total: number; settled: number } | null>(null);
   const [catalogsReady, setCatalogsReady] = useState(false);
   /** Values the open-time effects would otherwise reset while an edit is hydrating. */
   const pendingEdit = useRef<{ addrUnitId: string | null; seriesId: string | null } | null>(null);
@@ -319,6 +319,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // order-level paid-upfront (cash) discount
   const [paidUpfront, setPaidUpfront] = useState(false);
   const [cashPct, setCashPct] = useState(0);
+  const termsBeforeUpfront = useRef<string | null>(null);
+  const togglePaidUpfront = (on: boolean) => {
+    setPaidUpfront(on);
+    if (on) { termsBeforeUpfront.current = paymentTermsDays; setPaymentTermsDays('0'); }
+    else if (termsBeforeUpfront.current != null) { setPaymentTermsDays(termsBeforeUpfront.current); termsBeforeUpfront.current = null; }
+  };
   useEffect(() => {
     if (!workspaceId) return;
     financeService.getActiveCashDiscountPct(workspaceId).then(setCashPct).catch(() => {});
@@ -396,6 +402,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [relatedDocument, setRelatedDocument] = useState('');
   const [printTerms, setPrintTerms] = useState(true);
   const [includeInMyf, setIncludeInMyf] = useState(true);
+  const [excludeFromPnl, setExcludeFromPnl] = useState(false);
   const [printOnlineCode, setPrintOnlineCode] = useState(true);
   const [infoBox, setInfoBox] = useState('');
   const [logoMode, setLogoMode] = useState<'auto' | 'none'>('auto');
@@ -485,7 +492,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setIssueDate(todayLocalISO()); setNotes(initialNotes ?? '');
     setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
     setPaymentMethodCode(String(MYDATA_PAYMENT_CODE.on_credit)); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
-    setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
+    setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setExcludeFromPnl(false); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(true); setSendEmail(false); setAutoNext(null); setChosenSeriesId('auto');
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat(''); setDocTaxes([]);
     setLines(initialItems && initialItems.length ? initialItems.map((it) => emptyLine(it)) : [emptyLine()]);
@@ -665,10 +672,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       const bal = await financeService.getCustomerBalance(workspaceId, {
         companyId: customer.type === 'company' ? customer.id : null,
         contactId: customer.type === 'contact' ? customer.id : null,
+        excludeInvoiceId: editInvoiceId ?? null,
       }).catch(() => null);
       setBuyerOutstanding(Number(bal?.net_balance ?? 0));
     })();
-  }, [customer, workspaceId]);
+  }, [customer, workspaceId, editInvoiceId]);
 
   // Reset the chosen sub-unit when the customer changes (the picker re-adopts the new
   // party's default unit, if any).
@@ -714,7 +722,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       }
       if (cancelled) return;
       pendingEdit.current = { addrUnitId: v.customer_address_unit_id ?? null, seriesId: v.chosen_series_id ?? null };
-      setEditing({ status: v.status, number: v.legal_number || v.internal_number || '', total: Number(v.total ?? 0) });
+      setEditing({ status: v.status, number: v.legal_number || v.internal_number || '', total: Number(v.total ?? 0), settled: Math.max(0, Number(v.total ?? 0) - Number(v.amount_due ?? v.total ?? 0)) });
       setCustomer(cust);
       setDocumentType(v.document_type || '1.1'); setDocTypePinned(true);
       setActivityCode(v.activity_kad?.code ?? ''); setCurrency(v.currency || 'EUR'); setVatRate(str(v.vat_rate ?? 24));
@@ -727,7 +735,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setSelfPricing(!!v.self_billed_supplier_company_id); setSelfBillSupplierId(v.self_billed_supplier_company_id ?? '');
       setExchangeRate(str(v.exchange_rate)); setPricesIncludeVat(!!v.prices_include_vat);
       setPaidUpfront(!!v.paid_upfront); setDigitalFee(Number(v.digital_transaction_fee) ? str(v.digital_transaction_fee) : '');
-      setRelatedDocument(v.related_document ?? ''); setPrintTerms(v.print_terms !== false); setIncludeInMyf(v.include_in_myf !== false);
+      setRelatedDocument(v.related_document ?? ''); setPrintTerms(v.print_terms !== false); setIncludeInMyf(v.include_in_myf !== false); setExcludeFromPnl(v.exclude_from_pnl === true);
       setPrintOnlineCode(v.print_online_code !== false); setInfoBox(v.info_box ?? ''); setLogoMode(v.logo_mode === 'none' ? 'none' : 'auto');
       setMoveStock(v.move_stock !== false); setSendEmail(false);
       setExpenseType(v.expense_classification_type ?? ''); setExpenseCategory(v.expense_classification_category ?? '');
@@ -1113,7 +1121,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const inactiveVat = hasVat && a?.vat_validated === false;
     const unvalidatedVat = hasVat && (a?.vat_validated === null || a?.vat_validated === undefined);
     const creditLimit = a?.credit_limit != null ? Number(a.credit_limit) : null;
-    const projected = buyerOutstanding + (totals.total || 0);
+    const projected = buyerOutstanding + (totals.total || 0) - (editing?.settled ?? 0);
     const overCreditLimit = creditLimit != null && creditLimit > 0 && projected > creditLimit;
     const blocks: string[] = [];
     if (riskRules.block_inactive && inactiveVat) blocks.push('the buyer VAT number is inactive / not recognised');
@@ -1127,7 +1135,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       warns.push('Buyer VAT has not been validated against AADE/VIES.');
     }
     return { inactiveVat, unvalidatedVat, overCreditLimit, creditLimit, projected, blocks, warns, hardBlocked: blocks.length > 0 };
-  }, [customerAddr, buyerOutstanding, totals.total, riskRules, currency]);
+  }, [customerAddr, buyerOutstanding, totals.total, riskRules, currency, editing?.settled]);
 
   // Fiscal class of the (already rolled-up) buyer. Greek myDATA: businesses get
   // invoices (1.x/2.x); a private individual with no VAT gets a retail receipt
@@ -1299,7 +1307,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         cash_discount_pct: paidUpfront ? cashPct : 0,
         digital_transaction_fee: parseDecimalOr(digitalFee, 0),
         related_document: relatedDocument || null,
-        print_terms: printTerms, include_in_myf: includeInMyf, print_online_code: printOnlineCode, move_stock: moveStock,
+        print_terms: printTerms, include_in_myf: includeInMyf, exclude_from_pnl: excludeFromPnl, print_online_code: printOnlineCode, move_stock: moveStock,
         info_box: infoBox || null, logo_mode: logoMode,
         payment_terms_days: parseInt(paymentTermsDays, 10) || 30, notes: notes || null,
         document_type: documentType, category_id: categoryId || null, branch_code: parseInt(branchCode, 10) || 0,
@@ -1683,7 +1691,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         <span className="text-muted-foreground">
                           → total after this invoice{' '}
                           <span className="tabular-nums font-medium text-foreground">
-                            {formatMoney(Math.max(0, buyerOutstanding + (totals.total || 0)), currency)}
+                            {formatMoney(Math.max(0, buyerRisk.projected), currency)}
                           </span>
                         </span>
                       </span>
@@ -1922,6 +1930,25 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 </Select>
               </FormField>
             </FormGrid>
+            {cashPct > 0 || paidUpfront ? (
+              <label htmlFor="ni-paid-upfront" className="mt-3 flex cursor-pointer items-start gap-2 text-sm">
+                <Checkbox id="ni-paid-upfront" className="mt-0.5 h-4 w-4 rounded" checked={paidUpfront} onCheckedChange={(v) => togglePaidUpfront(v === true)} />
+                <span>Paid upfront{cashPct > 0 ? ` (−${cashPct}% cash discount)` : ''}
+                  <span className="block text-xs text-muted-foreground">Takes the discount off every line and sets the payment terms to 0 days.</span>
+                </span>
+              </label>
+            ) : (
+              <div className="mt-3 flex items-start gap-2 rounded-sm border border-dashed border-hairline bg-surface-sunken p-3 text-sm">
+                <Checkbox className="mt-0.5 h-4 w-4 rounded" checked={false} disabled aria-label="Paid upfront (not set up)" />
+                <span>
+                  <span className="text-muted-foreground">Paid upfront — not set up</span>
+                  <span className="block text-xs text-muted-foreground">
+                    To offer a discount for paying upfront, add a <span className="font-medium">Paid Upfront (Cash)</span> rule in{' '}
+                    <Link to="/finance?tab=settings&section=pricing" className="text-primary underline underline-offset-2">Settings → Pricing</Link>.
+                  </span>
+                </span>
+              </div>
+            )}
             </FormSection>
 
             {/* Shipping — combined invoice + delivery note (document-level, kept high near the doc type) */}
@@ -1974,11 +2001,6 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer">
                     <Checkbox className="h-3.5 w-3.5 rounded" checked={pricesIncludeVat} onCheckedChange={(v) => setPricesIncludeVat(v === true)} />
                     Prices include VAT
-                  </label>
-                  {/* paid-upfront (cash) discount; disabled until a cash rule exists */}
-                  <label className="flex items-center gap-1.5 text-[11px] text-muted-foreground cursor-pointer" title={cashPct === 0 ? 'Set a Paid-upfront rule in Finance → Settings → Pricing' : `${cashPct}% off when paid upfront`}>
-                    <Checkbox className="h-3.5 w-3.5 rounded" checked={paidUpfront} disabled={cashPct === 0} onCheckedChange={(v) => setPaidUpfront(v === true)} />
-                    Paid upfront{cashPct > 0 ? ` (−${cashPct}%)` : ''}
                   </label>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -2548,6 +2570,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <OptionCheck id="newinvoice-send-email" label="Send by Email on Create" checked={sendEmail} onChange={setSendEmail} />
                 <OptionCheck id="newinvoice-include-myf" label="Include in MYF Report" checked={includeInMyf} onChange={setIncludeInMyf} />
                 <OptionCheck id="newinvoice-move-stock" label="Move Stock on Issue" checked={moveStock} onChange={setMoveStock} />
+                <OptionCheck id="newinvoice-exclude-pnl" label="Exclude from P&L" checked={excludeFromPnl} onChange={setExcludeFromPnl} />
               </div>
             </FormSection>
 

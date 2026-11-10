@@ -1643,13 +1643,14 @@ const _financeServiceCore = {
   },
 
   /** Customer open balance: sum of open-invoice amount_due − sum of unallocated inbound payments. */
-  async getCustomerBalance(workspaceId: string, party: { companyId?: string | null; contactId?: string | null }): Promise<{
+  async getCustomerBalance(workspaceId: string, party: { companyId?: string | null; contactId?: string | null; excludeInvoiceId?: string | null }): Promise<{
     open_invoices_due: number; customer_credit: number; net_balance: number; currency: string;
   }> {
     const { data, error } = await supabase.rpc('get_customer_open_balance', {
       p_workspace_id: workspaceId,
       p_company_id: party.companyId ?? null,
       p_contact_id: party.contactId ?? null,
+      p_exclude_invoice_id: party.excludeInvoiceId ?? null,
     });
     if (error) throw error;
     return data as any;
@@ -2213,6 +2214,7 @@ const _financeServiceCore = {
     tripReportId?: string | null;
     /** The building this cost is for. Independent of `projectId`. */
     propertyId?: string | null;
+    excludeFromPnl?: boolean;
   }): Promise<SupplierBill> {
     const { data, error } = await supabase
       .from('supplier_bills')
@@ -2235,11 +2237,17 @@ const _financeServiceCore = {
         covers_order_id: input.coversOrderId ?? null,
         trip_report_id: input.tripReportId ?? null,
         property_id: input.propertyId ?? null,
+        exclude_from_pnl: input.excludeFromPnl === true,
       })
       .select()
       .single();
     if (error) throw error;
     return data as SupplierBill;
+  },
+
+  async setDocumentPnlExclusion(kind: 'invoice' | 'supplier_bill' | 'supplier_credit_note' | 'inbound_document', id: string, exclude: boolean): Promise<void> {
+    const { error } = await supabase.rpc('set_document_pnl_exclusion', { p_kind: kind, p_id: id, p_exclude: exclude });
+    if (error) throw error;
   },
 
   /**
@@ -2267,6 +2275,7 @@ const _financeServiceCore = {
      */
     costCodeId?: string | null;
     notes?: string | null;
+    excludeFromPnl?: boolean;
     /**
      * "What is this cost for?" — re-answered after the fact (#378 L1). Until this existed the
      * link could only be written at the moment the expense was born, so a transport invoice that
@@ -2283,7 +2292,7 @@ const _financeServiceCore = {
       propertyId: string | null;
     };
   }): Promise<void> {
-    const row: Record<string, string | null> = {};
+    const row: Record<string, string | boolean | null> = {};
     if ('supplierBillNumber' in patch) row.supplier_bill_number = patch.supplierBillNumber?.trim() || null;
     if ('issuedAt' in patch) row.issued_at = patch.issuedAt || null;
     if ('dueAt' in patch) row.due_at = patch.dueAt || null;
@@ -2291,6 +2300,7 @@ const _financeServiceCore = {
     if ('categoryId' in patch) row.category_id = patch.categoryId || null;
     if ('costCodeId' in patch) row.cost_code_id = patch.costCodeId || null;
     if ('notes' in patch) row.notes = patch.notes?.trim() || null;
+    if (patch.excludeFromPnl !== undefined) row.exclude_from_pnl = patch.excludeFromPnl;
     if (patch.link) {
       row.project_id = patch.link.projectId;
       row.order_id = patch.link.orderId;
@@ -2341,6 +2351,7 @@ const _financeServiceCore = {
     /** …or an expense card, or a building. Filing links: neither changes a single figure. */
     tripReportId?: string | null;
     propertyId?: string | null;
+    excludeFromPnl?: boolean;
   }): Promise<{ billId: string; paymentId: string | null; paymentError: string | null }> {
     // A supplier bill needs a payee — a saved CRM supplier OR a one-off free-text name.
     if (!input.supplierCompanyId && !input.supplierContactId && !input.supplierName?.trim()) {
@@ -2374,6 +2385,7 @@ const _financeServiceCore = {
       coversOrderId: input.coversOrderId ?? null,
       tripReportId: input.tripReportId ?? null,
       propertyId: input.propertyId ?? null,
+      excludeFromPnl: input.excludeFromPnl,
     });
 
     /** The bill above is COMMITTED (#351 C3). */

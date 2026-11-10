@@ -3640,6 +3640,7 @@ export type Database = {
       }
       credit_notes: {
         Row: {
+          exclude_from_pnl: boolean
           tax_payable_delta: number
           amount: number
           branch_code: number
@@ -3677,6 +3678,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           tax_payable_delta?: number
           amount: number
           branch_code?: number
@@ -3714,6 +3716,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           tax_payable_delta?: number
           amount?: number
           branch_code?: number
@@ -11819,6 +11822,7 @@ export type Database = {
       }
       inbound_documents: {
         Row: {
+          exclude_from_pnl: boolean
           aa: string | null
           authentication_code: string | null
           category_id: string | null
@@ -11863,6 +11867,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           aa?: string | null
           authentication_code?: string | null
           category_id?: string | null
@@ -11907,6 +11912,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           aa?: string | null
           authentication_code?: string | null
           category_id?: string | null
@@ -13106,6 +13112,7 @@ export type Database = {
       }
       invoices: {
         Row: {
+          exclude_from_pnl: boolean
           invoice_variation_type: number | null
           is_delivery_note: boolean
           non_obligated_recipient: boolean
@@ -13222,6 +13229,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           invoice_variation_type?: number | null
           is_delivery_note?: boolean
           non_obligated_recipient?: boolean
@@ -13338,6 +13346,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           invoice_variation_type?: number | null
           is_delivery_note?: boolean
           non_obligated_recipient?: boolean
@@ -29359,6 +29368,7 @@ export type Database = {
       }
       supplier_bills: {
         Row: {
+          exclude_from_pnl: boolean
           amount_credited: number
           amount_due: number | null
           amount_paid: number
@@ -29389,6 +29399,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
@@ -29419,6 +29430,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           amount_credited?: number
           amount_due?: number | null
           amount_paid?: number
@@ -29655,6 +29667,7 @@ export type Database = {
       }
       supplier_credit_notes: {
         Row: {
+          exclude_from_pnl: boolean
           category_id: string | null
           created_at: string
           created_by: string | null
@@ -29678,6 +29691,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           category_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -29701,6 +29715,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           category_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -35412,6 +35427,10 @@ export type Database = {
       }
     }
     Functions: {
+      set_document_pnl_exclusion: {
+        Args: { p_exclude: boolean; p_id: string; p_kind: string }
+        Returns: boolean
+      }
       whatsapp_audience_preview: {
         Args: { p_workspace_id: string; p_filter: Json }
         Returns: Json
@@ -37351,6 +37370,7 @@ export type Database = {
         Args: {
           p_company_id?: string
           p_contact_id?: string
+          p_exclude_invoice_id?: string
           p_workspace_id: string
         }
         Returns: Json
