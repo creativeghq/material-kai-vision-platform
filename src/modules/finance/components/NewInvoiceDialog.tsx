@@ -1707,7 +1707,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <FormField label="Date Issued" htmlFor="ni-issue-date">
                 <Input id="ni-issue-date" type="date" className="h-9" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
               </FormField>
-              <FormField label="Related Document" htmlFor="ni-related" optional>
+              <FormField label="Related Document" htmlFor="ni-related" optional className="sm:col-span-2">
                 <Input id="ni-related" className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="Invoice no. or MARK" />
               </FormField>
               {/* Document language selector deferred until translations launch — invoices are English-only for now. */}
