@@ -11,6 +11,7 @@ import { Switch } from '@/components/core/ui/switch';
 import { Badge } from '@/components/core/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { mydataIncomeTypeAllowed } from '@/services/fiscal/fiscalVocabulary';
 import { invoicingSetupService, type RefRow, type DocTypeSetting, type DocSeries, type FinanceBranch } from '@/services/invoicingSetupService';
 import { SALES_CHANNELS, SALES_CHANNEL_LABEL, type SalesChannel } from '@/modules/commerce/commerceVocabulary';
 
@@ -146,7 +147,7 @@ export const DocumentSetupCard: React.FC<{ workspaceId: string }> = ({ workspace
                         <span className="text-xs text-muted-foreground w-44 shrink-0">Default income classification</span>
                         <Select value={st?.default_income_classification_type ?? ''} onValueChange={(v) => setDefaultClass(t.code, v)}>
                           <SelectTrigger className="h-8 max-w-md"><SelectValue placeholder="Select…" /></SelectTrigger>
-                          <SelectContent>{incTypes.map((ic) => <SelectItem key={ic.code} value={ic.code}>{ic.code} — {ic.description}</SelectItem>)}</SelectContent>
+                          <SelectContent>{incTypes.filter((ic) => mydataIncomeTypeAllowed(t.code, ic.code) || ic.code === st?.default_income_classification_type).map((ic) => <SelectItem key={ic.code} value={ic.code}>{ic.code} — {ic.description}</SelectItem>)}</SelectContent>
                         </Select>
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">

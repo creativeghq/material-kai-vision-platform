@@ -2245,10 +2245,6 @@ const _financeServiceCore = {
     return data as SupplierBill;
   },
 
-  async setDocumentPnlExclusion(kind: 'invoice' | 'supplier_bill' | 'supplier_credit_note' | 'inbound_document', id: string, exclude: boolean): Promise<void> {
-    const { error } = await supabase.rpc('set_document_pnl_exclusion', { p_kind: kind, p_id: id, p_exclude: exclude });
-    if (error) throw error;
-  },
 
   /**
    * Edit a bill's DOCUMENT metadata after creation — the fields the supplier's paper/PDF

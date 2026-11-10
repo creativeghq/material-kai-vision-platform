@@ -54,7 +54,7 @@ import {
 } from '@/modules/finance/mydataTaxPayable';
 import {
   SELECTABLE_MOVE_PURPOSES, MYDATA_INFORMATIONAL_INCOME_TYPES,
-  mydataIncomeClassificationType, mydataIncomeClassificationCategory,
+  mydataIncomeClassificationType, mydataIncomeClassificationCategory, mydataIncomeTypeAllowed,
 } from '@/services/fiscal/fiscalVocabulary';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
@@ -1207,7 +1207,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   const applyDocDefault = (code: string) => {
     const def = docDefaults[code];
-    if (def?.type) {
+    if (def?.type && mydataIncomeTypeAllowed(code, def.type)) {
       setGIncType(def.type); setGIncCat(def.category ?? '');
       setLines((ls) => ls.map((l) => l.income_classification_type ? l : { ...l, income_classification_type: def.type!, income_classification_category: def.category ?? l.income_classification_category }));
     }
@@ -1230,11 +1230,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const retail = documentType.startsWith('11.');
     const pi = l.product_income;
     const def = docDefaults[documentType];
-    const type = (retail ? pi?.typeRetail : pi?.type) || def?.type || mydataIncomeClassificationType(documentType);
+    const ok = (t: string | null | undefined) => (t && mydataIncomeTypeAllowed(documentType, t) ? t : null);
+    const type = ok(retail ? pi?.typeRetail : pi?.type) || ok(def?.type) || mydataIncomeClassificationType(documentType);
     let category = (retail ? pi?.categoryRetail : pi?.category) || def?.category || mydataIncomeClassificationCategory(documentType);
     if (l.item_type === 'service' && category === 'category1_1') category = 'category1_3';
     return { type, category, auto: true };
   };
+
+  const allowedIncTypes = useMemo(() => incTypes.filter((t) => mydataIncomeTypeAllowed(documentType, t.code)), [incTypes, documentType]);
 
   const handleSave = async (draftOnly = false) => {
     const issuing = !draftOnly;
@@ -2020,7 +2023,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       </Select>
                       <Select value={gIncType || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncType(val); applyGlobal('income_classification_type', val); }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income type" /></SelectTrigger>
-                        <SelectContent><SelectItem value="none">Income type…</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                        <SelectContent><SelectItem value="none">Income type…</SelectItem>{allowedIncTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
                       </Select>
                       <Select value={gIncCat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGIncCat(val); applyGlobal('income_classification_category', val); }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Income Category" /></SelectTrigger>
@@ -2184,7 +2187,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                                   <div className="grid grid-cols-2 gap-2">
                                     <Select value={inc.type || 'none'} onValueChange={(v) => pin({ income_classification_type: v === 'none' ? '' : v })}>
                                       <SelectTrigger className="h-7 text-xs" title="Income type (E3 code)"><SelectValue placeholder="Type" /></SelectTrigger>
-                                      <SelectContent><SelectItem value="none">—</SelectItem>{incTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
+                                      <SelectContent><SelectItem value="none">—</SelectItem>{allowedIncTypes.map((t) => <SelectItem key={t.code} value={t.code}>{t.code} — {t.description}</SelectItem>)}</SelectContent>
                                     </Select>
                                     <Select value={inc.category || 'none'} onValueChange={(v) => pin({ income_classification_category: v === 'none' ? '' : v })}>
                                       <SelectTrigger className="h-7 text-xs" title="Income category"><SelectValue placeholder="Category" /></SelectTrigger>

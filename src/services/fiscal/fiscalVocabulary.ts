@@ -88,6 +88,12 @@ export function mydataIncomeClassificationType(documentType: string | null | und
   return t.startsWith('11.') ? 'E3_561_003' : 'E3_561_001';
 }
 
+/** False for a pair AADE refuses: E3_561_003 (retail, private customers) on a wholesale 1.x/2.x/5.x document (error 313). */
+export function mydataIncomeTypeAllowed(documentType: string | null | undefined, incomeType: string): boolean {
+  const family = String(documentType ?? '').split('.')[0];
+  return !(incomeType === 'E3_561_003' && ['1', '2', '5'].includes(family));
+}
+
 export function mydataIncomeClassificationCategory(documentType: string | null | undefined): string {
   const t = String(documentType ?? '');
   if (t.startsWith('6.')) return 'category1_6';
