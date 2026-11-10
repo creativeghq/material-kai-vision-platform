@@ -17,6 +17,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
+import { SourceDocumentLink } from './SourceDocumentLink';
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,7 @@ const SELECT_COLUMNS = `
   source_type,
   embedding_model,
   embedding_dimension,
-  documents!inner(workspace_id)
+  documents!inner(workspace_id, filename)
 `;
 
 interface EmbeddingsTabProps {
@@ -207,6 +208,7 @@ export const EmbeddingsTab: React.FC<EmbeddingsTabProps> = ({ workspaceId, jobId
                     </TableCell>
                     <TableCell>
                       {getSourceBadge(emb.source_type)}
+                      <SourceDocumentLink documentId={emb.document_id} filename={emb.documents?.filename} />
                     </TableCell>
                     <TableCell>
                       <Badge variant="outline">{emb.embedding_dimension || 0}</Badge>

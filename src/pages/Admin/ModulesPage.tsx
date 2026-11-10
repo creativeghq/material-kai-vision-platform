@@ -1,18 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Home, Package, ArrowRight, AlertCircle, KeyRound, Layers, CreditCard } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Package, ArrowRight, AlertCircle, KeyRound, Key, Layers, CreditCard, Users } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Switch } from '@/components/core/ui/switch';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import { registeredModules, useEnabledModules, refreshModuleRegistry, groupByParent } from '@/modules/_core';
 import { invalidateInvoiceProviderCache } from '@/modules/payments/services/invoiceProviderService';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { ModuleBillingDialog } from './ModuleBillingDialog';
+import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
+import { ModuleSubscribersPanel } from '@/components/Admin/OperationsDashboard/ModuleSubscribersPanel';
+import { PlansPanel } from '@/components/Admin/Platform/PlansPanel';
+import { SecretsManagerCard } from '@/components/Admin/Secrets/SecretsManagerCard';
+import { ApiGatewayAdmin } from '@/components/Admin/ApiGatewayAdmin';
 import { formatAddonPrice } from '@/services/moduleActivationService';
 
 interface BillingInfo {
@@ -43,7 +49,7 @@ const TIER_VARIANT: Record<string, 'default' | 'secondary' | 'outline'> = {
   enterprise: 'outline',
 };
 
-const ModulesPage: React.FC = () => {
+const ModulesCatalogPanel: React.FC = () => {
   const { toast } = useToast();
   const { rows, isLoading } = useEnabledModules();
   const [updating, setUpdating] = useState<string | null>(null);
@@ -114,29 +120,10 @@ const ModulesPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader
-        icon={Package}
-        title="Modules"
-        subtitle="Enabling a module publishes it to the catalog — every workspace owner can then activate or purchase it from Profile → Modules. Toggles take effect immediately."
-        actions={
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" className="gap-2">
-              <Link to="/admin/plans">
-                <Layers className="h-4 w-4" />
-                Plans &amp; Pricing
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" size="sm" className="gap-2">
-              <Link to="/admin">
-                <Home className="h-4 w-4" />
-                Back to Admin
-              </Link>
-            </Button>
-          </div>
-        }
-      />
-
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className="space-y-6">
+        <p className="text-sm text-muted-foreground">
+          Enabling a module publishes it to the catalog — every workspace owner can then activate or purchase it from Profile → Modules. Toggles take effect immediately.
+        </p>
         {orphanedRows.length > 0 && (
           <Card className="border-yellow-500/30 bg-yellow-500/5">
             <CardHeader>
@@ -296,6 +283,55 @@ const ModulesPage: React.FC = () => {
           onSaved={() => { void loadBilling(); }}
         />
       )}
+    </div>
+  );
+};
+
+const PLATFORM_TABS: HubTabItem[] = [
+  { id: 'modules', label: 'Modules', icon: Package },
+  { id: 'subscribers', label: 'Subscribers', icon: Users },
+  { id: 'plans', label: 'Plans', icon: Layers },
+  { id: 'platform-keys', label: 'Platform Keys', icon: KeyRound },
+  { id: 'api-keys', label: 'API Keys', icon: Key },
+];
+const PLATFORM_TAB_IDS = new Set(PLATFORM_TABS.map((t) => t.id));
+
+const ModulesPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get('tab') ?? '';
+  const active = PLATFORM_TAB_IDS.has(requested) ? requested : 'modules';
+
+  const select = (id: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (id === 'modules') next.delete('tab');
+    else next.set('tab', id);
+    setSearchParams(next, { replace: true });
+  };
+
+  return (
+    <div>
+      <PageHeader
+        icon={Package}
+        title="Platform"
+        subtitle="What the platform sells and how it is reached: modules and who subscribes to them, plan tiers and limits, platform secrets, and partner API keys."
+        breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Platform' }]}
+      >
+        <HubTabNav items={PLATFORM_TABS} activeId={active} onSelect={select} aria-label="Platform sections" />
+      </PageHeader>
+
+      <Tabs value={active} onValueChange={select} className="p-3 sm:p-6">
+        <TabsContent value="modules" className="mt-0"><ModulesCatalogPanel /></TabsContent>
+        <TabsContent value="subscribers" className="mt-0"><ModuleSubscribersPanel /></TabsContent>
+        <TabsContent value="plans" className="mt-0"><PlansPanel /></TabsContent>
+        <TabsContent value="platform-keys" className="mt-0">
+          <SecretsManagerCard
+            scope={{ mode: 'platform' }}
+            title="Platform Secret Keys"
+            description="Secrets not tied to a single module: AI providers, payments, push and cron. An environment variable always wins; a value here is used only when it is unset. Module-specific keys live in each module's own Settings."
+          />
+        </TabsContent>
+        <TabsContent value="api-keys" className="mt-0"><ApiGatewayAdmin embedded /></TabsContent>
+      </Tabs>
     </div>
   );
 };

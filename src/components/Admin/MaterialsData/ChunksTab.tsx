@@ -16,6 +16,7 @@ import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination } from '@/components/core/ui/table-pagination';
+import { SourceDocumentLink } from './SourceDocumentLink';
 import {
   Dialog,
   DialogContent,
@@ -53,7 +54,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter})
   const buildQuery = useCallback((values: FilterValues, head: boolean) => {
     const query: any = supabase
       .from('document_chunks')
-      .select(head ? 'id' : '*', { count: 'exact', head })
+      .select(head ? 'id' : '*, documents(filename)', { count: 'exact', head })
       .eq('workspace_id', workspaceId);
     return applyFiltersToQuery(query, groups, values);
   }, [workspaceId, groups]);
@@ -159,6 +160,7 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter})
                   <TableRow>
                     <TableHead>Content Preview</TableHead>
                     <TableHead>Source</TableHead>
+                    <TableHead>Document</TableHead>
                     <TableHead>Has Embedding</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
@@ -170,6 +172,11 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter})
                         {chunk.content?.substring(0, 100)}...
                       </TableCell>
                       <TableCell>{getSourceBadge(chunk.source_type)}</TableCell>
+                      <TableCell>
+                        {chunk.document_id
+                          ? <SourceDocumentLink documentId={chunk.document_id} filename={chunk.documents?.filename} />
+                          : <span className="text-xs text-muted-foreground">—</span>}
+                      </TableCell>
                       <TableCell>
                         {chunk.text_embedding ? (
                           <span className="text-xs text-emerald-600 dark:text-emerald-400">Yes</span>
@@ -215,6 +222,12 @@ export const ChunksTab: React.FC<ChunksTabProps> = ({ workspaceId, jobIdFilter})
                   {selectedChunk.content}
                 </p>
               </div>
+              {selectedChunk.document_id && (
+                <div>
+                  <h4 className="font-semibold mb-2">Source Document</h4>
+                  <SourceDocumentLink documentId={selectedChunk.document_id} filename={selectedChunk.documents?.filename} />
+                </div>
+              )}
               <div>
                 <h4 className="font-semibold mb-2">Page Number</h4>
                 <Badge>{selectedChunk.page_number || 'N/A'}</Badge>

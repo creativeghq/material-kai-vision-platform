@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { TablePagination } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
+import { SourceDocumentLink } from './SourceDocumentLink';
 import {
   Table,
   TableBody,
@@ -70,7 +71,9 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
           caption,
           source_type,
           created_at,
-          workspace_id
+          workspace_id,
+          document_id,
+          documents(filename)
         `)
         .eq('workspace_id', workspaceId);
 
@@ -165,6 +168,7 @@ export const RelationsTab: React.FC<RelationsTabProps> = ({ workspaceId, jobIdFi
                     </TableCell>
                     <TableCell>
                       {getSourceBadge(relation.source_type)}
+                      <SourceDocumentLink documentId={relation.document_id} filename={relation.documents?.filename} />
                     </TableCell>
                     <TableCell className="max-w-md">
                       <div className="line-clamp-2 text-sm">

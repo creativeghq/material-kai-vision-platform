@@ -153,8 +153,6 @@ export interface JobTypeMetrics {
 }
 
 export interface QueueMetrics {
-  pdf_processing: JobTypeMetrics;
-  web_scraping: JobTypeMetrics;
   xml_import: JobTypeMetrics;
   all_jobs: JobTypeMetrics;
   total_documents: number;

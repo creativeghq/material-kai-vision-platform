@@ -7,7 +7,6 @@ import {
   Activity,
   Download,
   CheckCircle,
-  Terminal,
   Image as ImageIcon,
   Flame,
   Cpu,
@@ -45,28 +44,11 @@ export const XML_IMPORT_PIPELINE_FLOW = [
   { id: 'completed', name: 'Completed', icon: CheckCircle, checkpoint: 'completed' },
 ];
 
-// Web Scraping Pipeline Stages
-export const WEB_SCRAPING_PIPELINE_FLOW = [
-  { id: 'initialized', name: 'Job Initialized', icon: Clock, checkpoint: 'initialized' },
-  { id: 'pages_scraped', name: 'Pages Scraped', icon: Terminal, checkpoint: 'pages_scraped' },
-  { id: 'products_discovered', name: 'Products Discovered', icon: Package, checkpoint: 'products_discovered' },
-  { id: 'images_extracted', name: 'Images Extracted', icon: ImageIcon, checkpoint: 'images_extracted' },
-  { id: 'images_downloaded', name: 'Images Downloaded', icon: Download, checkpoint: 'images_downloaded' },
-  { id: 'images_classified', name: 'Images Classified', icon: ImageIcon, checkpoint: 'images_classified' },
-  { id: 'clips_generated', name: 'SLIG Embeddings', icon: Zap, checkpoint: 'clips_generated' },
-  { id: 'chunks_created', name: 'Chunks Created', icon: FileText, checkpoint: 'chunks_created' },
-  { id: 'embeddings_queued', name: 'Embeddings Queued', icon: Activity, checkpoint: 'embeddings_queued' },
-  { id: 'completed', name: 'Completed', icon: CheckCircle, checkpoint: 'completed' },
-];
-
 // Helper function to get pipeline stages based on job type
 export const getPipelineForJobType = (jobType: string) => {
   switch (jobType) {
     case 'xml_import':
       return XML_IMPORT_PIPELINE_FLOW;
-    case 'web_scraping':
-      return WEB_SCRAPING_PIPELINE_FLOW;
-    case 'pdf_processing':
     case 'product_discovery_upload':
     default:
       return GLOBAL_PIPELINE_FLOW;

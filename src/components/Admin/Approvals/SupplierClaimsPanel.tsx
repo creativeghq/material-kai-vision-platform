@@ -3,6 +3,7 @@ import { Loader2, ShieldCheck, Check, X, RefreshCw, UserCheck, AlertTriangle } f
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { SectionHeader } from '@/components/shared/SectionHeader';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { supplierClaimsService, type SupplierClaimQueueRow } from '@/services/supplierClaimsService';
 import { formatDate } from '@/utils/datetime';
@@ -15,7 +16,7 @@ import { formatDate } from '@/utils/datetime';
  * what later grants the right to publish catalog data platform-wide, so the row has to show who
  * is asking — a workspace id cannot be vouched for.
  */
-export default function SupplierClaimsPage() {
+export function SupplierClaimsPanel() {
   const { toast } = useToast();
   const [claims, setClaims] = useState<SupplierClaimQueueRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,7 @@ export default function SupplierClaimsPage() {
   };
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="space-y-4">
       <SectionHeader
         icon={ShieldCheck}
         title="Supplier Identity Claims"
@@ -73,7 +74,7 @@ export default function SupplierClaimsPage() {
           {loading ? (
             <div className="flex items-center gap-2 justify-center py-12 text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>
           ) : claims.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-10 text-center">No pending claims.</p>
+            <HubEmptyState icon={ShieldCheck} title="No pending claims" description="A supplier identity claim lands here when someone asks to speak for a factory." />
           ) : claims.map((c) => (
             <div key={c.id} className="dashboard-card p-3 space-y-2.5">
               <div className="flex items-start justify-between gap-3">

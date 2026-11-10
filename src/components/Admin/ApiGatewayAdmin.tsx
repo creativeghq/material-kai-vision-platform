@@ -264,7 +264,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
 
   if (loading) {
     return (
-      <div className="min-h-screen">
+      <div className={embedded ? '' : 'min-h-screen'}>
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Activity className="h-8 w-8 animate-spin mx-auto mb-4" />

@@ -1,0 +1,9 @@
+{
+  "slug": "price-monitoring",
+  "name": "Price Monitoring",
+  "description": "Track retailer prices for catalog products and external queries (Perplexity + DataForSEO discovery, Firecrawl verification), with alerts on price drops / new retailers / promos.",
+  "category": "pricing",
+  "priceTier": "pro",
+  "icon": "TrendingUp",
+  "version": "0.1.0"
+}

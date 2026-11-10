@@ -18,6 +18,7 @@ import {
   DialogTitle,
 } from '@/components/core/ui/dialog';
 import { ImageEmbeddingsInspector } from './ImageEmbeddingsInspector';
+import { SourceDocumentLink } from './SourceDocumentLink';
 
 import { onEnterOrSpace } from '@/utils/a11y';
 
@@ -53,7 +54,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
   const buildQuery = useCallback((values: FilterValues, head: boolean) => {
     const query: any = supabase
       .from('document_images')
-      .select(head ? 'id' : '*', { count: 'exact', head })
+      .select(head ? 'id' : '*, documents(filename)', { count: 'exact', head })
       .eq('workspace_id', workspaceId);
     return applyFiltersToQuery(query, groups, values);
   }, [workspaceId, groups]);
@@ -184,7 +185,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
       .from('document_images')
       .select(`
         *,
-        documents(id, filename, title)
+        documents(filename)
       `)
       .eq('id', image.id)
       .single();
@@ -361,6 +362,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
                     </Badge>
                     {getSourceBadge(image.source_type)}
                   </div>
+                  <SourceDocumentLink documentId={image.document_id} filename={image.documents?.filename} />
 
                   {/* Title */}
                   <h4 className="font-medium truncate" style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-xs)' }}>
@@ -406,6 +408,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
               <DialogTitle className="break-words">
                 {selectedImage.metadata?.filename || selectedImage.caption || `Page ${selectedImage.page_number}`}
               </DialogTitle>
+              <SourceDocumentLink documentId={selectedImage.document_id} filename={selectedImage.documents?.filename} />
             </DialogHeader>
             <div className="flex gap-6 overflow-hidden flex-1">
               {/* Left Side - Image */}

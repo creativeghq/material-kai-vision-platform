@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2 } from 'lucide-react';
+import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
 import { AdminStatCard } from '../AdminStatCard';
@@ -13,8 +13,13 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { EmbeddingsTab } from './EmbeddingsTab';
 import { RelationsTab } from './RelationsTab';
 import { supabase } from '@/integrations/supabase/client';
+import AIDataPage from '@/pages/Admin/AIDataPage';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const TAB_VALUES = ['products', 'chunks', 'images', 'embeddings', 'relations', 'ai-review'] as const;
+type TabValue = typeof TAB_VALUES[number];
+const isTab = (v: string | null): v is TabValue => (TAB_VALUES as readonly string[]).includes(v ?? '');
 
 export const MaterialsDataPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -30,6 +35,25 @@ export const MaterialsDataPage: React.FC = () => {
   const jobIdTyped = jobIdFilter.trim();
   const jobIdInvalid = jobIdTyped !== '' && !UUID_RE.test(jobIdTyped);
   const appliedJobId = jobIdInvalid ? '' : jobIdTyped;
+  const tabParam = searchParams.get('tab');
+  const activeTab: TabValue = isTab(tabParam) ? tabParam : 'products';
+  const handleTabChange = (val: string) => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (val === 'products') params.delete('tab');
+      else params.set('tab', val);
+      if (val !== 'ai-review') params.delete('view');
+      return params;
+    }, { replace: true });
+  };
+  const clearRecordFilters = () => {
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      params.delete('jobId');
+      params.delete('productId');
+      return params;
+    });
+  };
   const [stats, setStats] = useState({
     products: 0,
     chunks: 0,
@@ -110,7 +134,7 @@ export const MaterialsDataPage: React.FC = () => {
     <div className="min-h-screen">
       <GlobalAdminHeader
         title="Materials Data"
-        description="View all products, chunks, images, and embeddings from PDF, XML, and Web Scraping sources"
+        description="Products, chunks, images and embeddings from every ingestion source, and the AI review of them"
         badge="All Sources"
         breadcrumbs={[
           { label: 'Admin', path: '/admin' },
@@ -147,12 +171,12 @@ export const MaterialsDataPage: React.FC = () => {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Filter className="h-4 w-4" />
             Showing one ingestion job
-            <Button variant="ghost" size="sm" onClick={() => setSearchParams({})}>Show all</Button>
+            <Button variant="ghost" size="sm" onClick={clearRecordFilters}>Show all</Button>
           </div>
         )}
 
         {/* Main Content */}
-        <Tabs defaultValue="products" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="products">
               <Package className="h-4 w-4 mr-2" />
@@ -174,6 +198,10 @@ export const MaterialsDataPage: React.FC = () => {
               <Link2 className="h-4 w-4 mr-2" />
               Relations
             </TabsTrigger>
+            <TabsTrigger value="ai-review">
+              <Sparkles className="h-4 w-4 mr-2" />
+              AI Review
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="products" className="mt-6">
@@ -194,6 +222,10 @@ export const MaterialsDataPage: React.FC = () => {
 
           <TabsContent value="relations" className="mt-6">
             <RelationsTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
+          </TabsContent>
+
+          <TabsContent value="ai-review" className="mt-6">
+            <AIDataPage embedded tabParam="view" />
           </TabsContent>
         </Tabs>
       </div>

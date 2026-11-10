@@ -65,8 +65,8 @@ describe('B18 — job controls do what they say', () => {
     expect(s).toMatch(/prev\.failure_summary/);
   });
 
-  it('the active-jobs banner includes product_discovery_upload', () => {
-    expect(src('src/components/Admin/DataImportHub.tsx')).toMatch(/\.in\('job_type', \['pdf_processing', 'product_discovery_upload'\]\)/);
+  it('the active-jobs banner watches product_discovery_upload, the job type a PDF upload creates', () => {
+    expect(src('src/components/Admin/DataImportHub.tsx')).toMatch(/\.eq\('job_type', 'product_discovery_upload'\)/);
   });
 
   it('a failed stage is not a completed one, and a partial job is not a clean success', () => {
@@ -226,7 +226,6 @@ describe('writers', () => {
   it('admin product counts select only the id', () => {
     for (const f of [
       'src/components/Admin/MaterialsData/MaterialsDataPage.tsx',
-      'src/components/Admin/UnifiedProcessingMonitor.tsx',
       'src/components/Admin/MetadataManagement.tsx',
       'src/pages/Admin/BatchCategorizationPage.tsx',
     ]) {

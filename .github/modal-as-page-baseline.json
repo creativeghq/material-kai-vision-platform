@@ -1,9 +1,8 @@
 {
   "_comment": "Modals whose body carries its own tabs or a table — a page wearing a modal. Score: 3 for section nav, 2 for a table, 2 for size. Only ever goes DOWN; lower it with npm run modals:audit -- --write.",
-  "total": 23,
+  "total": 20,
   "files": {
     "src/components/Admin/AsyncJobQueueMonitor/AsyncJobQueueMonitor.tsx": 5,
-    "src/components/Admin/ExtractionPrompts/ExtractionPromptsPage.tsx": 3,
     "src/components/Admin/KnowledgeBase/DocumentEditor.tsx": 7,
     "src/components/Admin/MaterialsData/ImagesTab.tsx": 5,
     "src/components/business/crm/SendEmailDialog.tsx": 5,

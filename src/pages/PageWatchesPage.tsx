@@ -601,8 +601,8 @@ export default function PageWatchesPage() {
                       What retailers charge for{' '}
                       <span className="text-foreground">your products</span> — a resolved product and
                       a number to compare, not a diff to read.{' '}
-                      <Link to="/admin/monitoring?tab=price" className="text-primary hover:underline">
-                        Monitoring → Price
+                      <Link to="/price-monitoring" className="text-primary hover:underline">
+                        Price Monitoring
                       </Link>
                     </dd>
                   </div>

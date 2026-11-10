@@ -14,34 +14,39 @@ import { RelevancyManagement } from '@/components/Admin/RelevancyManagement';
 import { DuplicateDetectionPage } from './DuplicateDetectionPage';
 import { BatchCategorizationPage } from './BatchCategorizationPage';
 
-const TAB_VALUES = ['metadata', 'relevancy', 'duplicates', 'categorization'] as const;
+const TAB_VALUES = ['metadata', 'relevancy', 'duplicates', 'categorization', 'field-roles'] as const;
 type TabValue = typeof TAB_VALUES[number];
 
 interface AIDataPageProps {
-  /** When embedded (e.g. as a tab inside AI Configurations), hide the page
-   *  header and use local tab state so the ?tab query param doesn't collide
-   *  with the parent page's tab routing. */
+  /** Hide the page header when mounted inside another page's tab. */
   embedded?: boolean;
+  /** Query param the sub-tab syncs to; embedded without one keeps local state. */
+  tabParam?: string;
 }
 
-const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false }) => {
-  const [searchParams, setSearchParams] = useSearchParams();
+const isTab = (v: string | null): v is TabValue => (TAB_VALUES as readonly string[]).includes(v ?? '');
 
-  const initialTab: TabValue = (() => {
-    const t = searchParams.get('tab');
-    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : 'metadata';
-  })();
-  const [activeTab, setActiveTab] = useState<TabValue>(embedded ? 'metadata' : initialTab);
+const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false, tabParam }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const param = tabParam ?? (embedded ? null : 'tab');
+
+  const [localTab, setLocalTab] = useState<TabValue>('metadata');
+  const fromUrl = param ? searchParams.get(param) : null;
+  const activeTab: TabValue = param ? (isTab(fromUrl) ? fromUrl : 'metadata') : localTab;
 
   const handleTabChange = useCallback((val: string) => {
-    const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : 'metadata';
-    setActiveTab(next);
-    if (embedded) return; // don't touch the URL when embedded
-    const params = new URLSearchParams(searchParams);
-    if (next === 'metadata') params.delete('tab');
-    else params.set('tab', next);
-    setSearchParams(params, { replace: true });
-  }, [embedded, searchParams, setSearchParams]);
+    const next: TabValue = isTab(val) ? val : 'metadata';
+    if (!param) {
+      setLocalTab(next);
+      return;
+    }
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev);
+      if (next === 'metadata') params.delete(param);
+      else params.set(param, next);
+      return params;
+    }, { replace: true });
+  }, [param, setSearchParams]);
 
   return (
     <div className={embedded ? '' : 'min-h-screen'}>
@@ -69,7 +74,7 @@ const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false }) => {
               <Tags className="h-4 w-4" /> Categorization
             </TabsTrigger>
             <TabsTrigger value="field-roles" className="flex items-center gap-2">
-              <Database className="h-4 w-4" /> Field roles
+              <Database className="h-4 w-4" /> Field Roles
             </TabsTrigger>
           </TabsList>
 

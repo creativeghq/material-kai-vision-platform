@@ -122,7 +122,6 @@ describe('generation model registry', () => {
       'src/config/apis/replicateConfig.ts',
       'src/components/features/ai/ProgressiveImageGrid.tsx',
       'src/components/features/ai/agentToolsCatalog.ts',
-      'src/components/Admin/ModelDebuggingPanel.tsx',
     ];
     const offenders: string[] = [];
     for (const file of surfaces) {

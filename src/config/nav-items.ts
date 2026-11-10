@@ -181,7 +181,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'Contacts, companies, and leads.' },
   // Price Monitoring — agent-driven capability, exposed in the launcher like Interior/Social/SEO:
   // the tile opens the studio primed on the price-monitoring toolkit (track a product, pull prices).
-  // All-users via agent.use + module gate; the full admin dashboard stays at /admin/monitoring.
+  // All-users via agent.use + module gate; the tracked-products page is /price-monitoring.
   // Appointments — agent-driven scheduling over CRM Meetings (self-reminders); page is the Calendar tab.
   { id: 'appointments', label: 'Appointments', path: '/agent-hub?capability=appointments', icon: CalendarClock, requireCapability: 'agent.use', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'List & schedule appointments with reminders — in the AI studio.' },
   // Deals & Pipeline. Lives on /crm?tab=pipeline (one deal object across CRM and Real Estate,

@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { formatDate as formatDateValue } from '@/utils/datetime';
-import { useSearchParams } from 'react-router-dom';
-import { Bot, Edit, Save, X, History, Clock, Sparkles, FileText, Search as SearchIcon, Cpu, Layers, Wrench, ChevronRight, Info, Trash2, AlertTriangle, DollarSign, ListChecks, Activity, Database, Boxes, Network, Box } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Bot, Save, X, History, FileText, Trash2, AlertTriangle, DollarSign, ListChecks, Boxes, RefreshCw, MessageSquare } from 'lucide-react';
 import { GlobalAdminHeader } from '../GlobalAdminHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -12,25 +12,37 @@ import { Input } from '@/components/core/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/core/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import {
+  HubEmptyState,
+  HubFilterSelect,
+  HubResetFilters,
+  HubSortButton,
+  HubToolbar,
+  HUB_FILTER_ALL,
+  useHubTable,
+  type HubSort,
+  type HubTableField,
+} from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { humanizeLabel } from '@/utils/humanize';
+import { formatNumber } from '@/utils/decimal';
 import { AIModelPricingTab } from './AIModelPricingTab';
 import { ChatStartersTab } from './ChatStartersTab';
 import { WritingRulesTab } from './WritingRulesTab';
-import { ExtractionPromptsPage } from '@/components/Admin/ExtractionPrompts/ExtractionPromptsPage';
-import { PromptTemplatesPage } from '@/components/Admin/PromptTemplates/PromptTemplatesPage';
-import { AITestingPanel } from '@/components/Admin/AITestingPanel';
-import { AIPerformanceTab } from '@/components/Admin/AIPerformanceTab';
-import AIDataPage from '@/pages/Admin/AIDataPage';
-import { ApiGatewayAdmin } from '@/components/Admin/ApiGatewayAdmin';
 import { BackgroundAgentsPage } from '@/components/Admin/BackgroundAgents/BackgroundAgentsPage';
-import ModelDebuggingPanel from '@/components/Admin/ModelDebuggingPanel';
-import { formatNumber } from '@/utils/decimal';
 
-const TAB_VALUES = [
-  'prompts', 'extraction', 'templates', 'writing-rules', 'sandbox', 'starters', 'pricing',
-  'performance', 'ai-data', 'background-agents', 'api-gateway', '3d-debug',
-] as const;
+const TAB_VALUES = ['prompts', 'starters', 'writing-rules', 'pricing', 'background-agents'] as const;
+
+const MOVED_TABS: Record<string, string> = {
+  'ai-data': '/admin/materials-data?tab=ai-review',
+  'api-gateway': '/admin/modules?tab=api-keys',
+};
+
+/** Mirrors `update_prompt_with_history`: these types are written to `system_prompt`, every other to `prompt_text`. */
+const SYSTEM_PROMPT_TYPES = new Set(['agent', 'system']);
 
 interface Prompt {
   id: string;
@@ -42,7 +54,9 @@ interface Prompt {
   prompt_text: string;
   system_prompt: string | null;
   stage: string | null;
-  configuration: any;
+  industry: string | null;
+  configuration: Record<string, unknown> | null;
+  used_in: string[] | null;
   version: number;
   status: string;
   is_active: boolean;
@@ -55,41 +69,59 @@ interface PromptHistory {
   prompt_id: string;
   old_prompt_text: string;
   new_prompt_text: string;
+  old_system_prompt: string | null;
+  new_system_prompt: string | null;
   change_reason: string | null;
   changed_by: string | null;
   changed_at: string;
 }
 
-// Type-specific icons
-const TYPE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  agent: Bot,
-  extraction: FileText,
-  template: Layers,
-  search: SearchIcon,
-  classification: Cpu,
-  tool: Wrench,
-  generation: Layers,
+const writesSystemPrompt = (p: Prompt) => SYSTEM_PROMPT_TYPES.has(p.prompt_type);
+
+const editableText = (p: Prompt) =>
+  writesSystemPrompt(p) ? (p.system_prompt || p.prompt_text) : (p.prompt_text || p.system_prompt || '');
+
+/** A non-agent row that also carries a system prompt the RPC does not write. */
+const secondarySystemPrompt = (p: Prompt) =>
+  !writesSystemPrompt(p) && p.prompt_text?.trim() && p.system_prompt?.trim() ? p.system_prompt : null;
+
+const isUnreadableAtRuntime = (p: Prompt) => writesSystemPrompt(p) && !p.system_prompt?.trim();
+
+const PROMPT_FIELDS: HubTableField<Prompt>[] = [
+  {
+    id: 'name',
+    sortValue: (p) => p.name,
+    searchText: (p) => `${p.name} ${p.description ?? ''} ${p.category} ${(p.used_in ?? []).join(' ')}`,
+  },
+  { id: 'type', sortValue: (p) => p.prompt_type, filterValue: (p) => p.prompt_type, filterLabel: 'Type', filterOptionLabel: humanizeLabel },
+  { id: 'stage', sortValue: (p) => p.stage, filterValue: (p) => p.stage, filterLabel: 'Stage', filterOptionLabel: humanizeLabel },
+  { id: 'category', sortValue: (p) => p.category, filterValue: (p) => p.category, filterLabel: 'Category', filterOptionLabel: humanizeLabel },
+  { id: 'version', sortValue: (p) => p.version },
+  { id: 'updated', sortValue: (p) => p.updated_at },
+];
+
+const SortHead: React.FC<{
+  id: string;
+  sort?: HubSort;
+  onSort: (id: string) => void;
+  align?: 'left' | 'right';
+  className?: string;
+  children: React.ReactNode;
+}> = ({ id, sort, onSort, align, className, children }) => {
+  const active = sort?.columnId === id ? sort.direction : undefined;
+  return (
+    <TableHead
+      className={cn(align === 'right' && 'text-right', className)}
+      aria-sort={active ? (active === 'asc' ? 'ascending' : 'descending') : undefined}
+    >
+      <HubSortButton active={active} align={align} onClick={() => onSort(id)}>
+        {children}
+      </HubSortButton>
+    </TableHead>
+  );
 };
 
-// Type-specific colors
-const TYPE_COLORS: Record<string, string> = {
-  agent: 'bg-violet-500/10 text-violet-600 border-violet-500/20',
-  extraction: 'bg-blue-500/10 text-blue-600 border-blue-500/20',
-  template: 'bg-amber-500/10 text-amber-600 border-amber-500/20',
-  search: 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20',
-  generation: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
-  classification: 'bg-rose-500/10 text-rose-600 border-rose-500/20',
-  tool: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
-};
-
-// Stage badge colors
-const STAGE_COLORS: Record<string, string> = {
-  discovery: 'bg-cyan-100 text-cyan-700',
-  chunking: 'bg-purple-100 text-purple-700',
-  entity_creation: 'bg-green-100 text-green-700',
-  image_analysis: 'bg-orange-100 text-orange-700',
-  scraping: 'bg-pink-100 text-pink-700',
-};
+type RpcCall = (fn: string, args: Record<string, unknown>) => Promise<{ error: { message: string } | null }>;
 
 export const AgentConfigsPage: React.FC = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -99,21 +131,31 @@ export const AgentConfigsPage: React.FC = () => {
   const [editedDescription, setEditedDescription] = useState('');
   const [changeReason, setChangeReason] = useState('');
   const [saving, setSaving] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
+  const [historyFor, setHistoryFor] = useState<Prompt | null>(null);
   const [historyData, setHistoryData] = useState<PromptHistory[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
-  const [selectedType, setSelectedType] = useState<string>('all');
-  const [expandedPrompt, setExpandedPrompt] = useState<string | null>(null);
   const [deletingPrompt, setDeletingPrompt] = useState<Prompt | null>(null);
   const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const promptTable = useHubTable(prompts, PROMPT_FIELDS, { columnId: 'type', direction: 'asc' });
 
-  // URL-synced active tab so the legacy /admin/{extraction-prompts,prompt-templates,
-  // material-analysis} routes can deep-link here via ?tab=.
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = (TAB_VALUES as readonly string[]).includes(searchParams.get('tab') || '')
-    ? (searchParams.get('tab') as string)
-    : 'prompts';
+  const requestedTab = searchParams.get('tab') || '';
+  const activeTab = (TAB_VALUES as readonly string[]).includes(requestedTab) ? requestedTab : 'prompts';
+
+  useEffect(() => {
+    if (!requestedTab || (TAB_VALUES as readonly string[]).includes(requestedTab)) return;
+    const moved = MOVED_TABS[requestedTab];
+    if (moved) {
+      navigate(moved, { replace: true });
+      return;
+    }
+    const params = new URLSearchParams(searchParams);
+    params.delete('tab');
+    setSearchParams(params, { replace: true });
+  }, [requestedTab, navigate, searchParams, setSearchParams]);
+
   const handleTabChange = (val: string) => {
     const params = new URLSearchParams(searchParams);
     if (val === 'prompts') params.delete('tab');
@@ -121,43 +163,32 @@ export const AgentConfigsPage: React.FC = () => {
     setSearchParams(params, { replace: true });
   };
 
-  useEffect(() => {
-    loadPrompts();
-  }, []);
-
-  const loadPrompts = async () => {
+  const loadPrompts = useCallback(async () => {
     try {
       setLoading(true);
-      // chat_starter prompts have their own dedicated tab (ChatStartersTab) with
-      // a structured editor for the configuration fields — exclude them here to
-      // avoid showing the same rows in two places with two different editors.
+      // chat_starter rows have their own structured editor in the Chat Starters tab.
       const { data, error } = await supabase
         .from('prompts')
         .select('*')
         .eq('is_active', true)
-        .neq('prompt_type', 'chat_starter')
-        .order('prompt_type', { ascending: true })
-        .order('stage', { ascending: true })
-        .order('category', { ascending: true });
-
+        .neq('prompt_type', 'chat_starter');
       if (error) throw error;
-
-      console.log('[AI Configs] Loaded prompts:', data?.length || 0);
-      setPrompts(data || []);
+      setPrompts((data || []) as unknown as Prompt[]);
     } catch (error) {
       console.error('Error loading prompts:', error);
       toast({ title: 'Error', description: 'Failed to load prompts', variant: 'destructive' });
     } finally {
       setLoading(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    void loadPrompts();
+  }, [loadPrompts]);
 
   const handleEdit = (prompt: Prompt) => {
     setEditingPrompt(prompt);
-    const textToEdit = (prompt.prompt_type === 'agent' || prompt.prompt_type === 'tool')
-      ? (prompt.system_prompt || prompt.prompt_text)
-      : (prompt.prompt_text || prompt.system_prompt);
-    setEditedText(textToEdit);
+    setEditedText(editableText(prompt));
     setEditedDescription(prompt.description || '');
     setChangeReason('');
   };
@@ -165,7 +196,7 @@ export const AgentConfigsPage: React.FC = () => {
   const handleViewHistory = async (prompt: Prompt) => {
     try {
       setLoadingHistory(true);
-      setShowHistory(true);
+      setHistoryFor(prompt);
       const { data, error } = await supabase
         .from('prompt_history')
         .select('*')
@@ -173,7 +204,7 @@ export const AgentConfigsPage: React.FC = () => {
         .order('changed_at', { ascending: false })
         .limit(5);
       if (error) throw error;
-      setHistoryData(data || []);
+      setHistoryData((data || []) as unknown as PromptHistory[]);
     } catch (error) {
       console.error('Error loading history:', error);
       setHistoryData([]);
@@ -191,14 +222,7 @@ export const AgentConfigsPage: React.FC = () => {
 
     try {
       setSaving(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
-
-      // ONE atomic RPC — the history row and the prompt update in a single transaction, admin
-      // check inside. (#365 AD-21)
-      const { error: rpcErr } = await (supabase.rpc as unknown as (
-        fn: string, args: Record<string, unknown>,
-      ) => Promise<{ error: { message: string } | null }>)('update_prompt_with_history', {
+      const { error: rpcErr } = await (supabase.rpc as unknown as RpcCall)('update_prompt_with_history', {
         p_prompt_id: editingPrompt.id,
         p_new_text: editedText,
         p_new_description: editedDescription,
@@ -208,10 +232,7 @@ export const AgentConfigsPage: React.FC = () => {
 
       toast({ title: 'Success', description: `${editingPrompt.name} updated successfully` });
       setEditingPrompt(null);
-      setEditedText('');
-      setEditedDescription('');
-      setChangeReason('');
-      loadPrompts();
+      void loadPrompts();
     } catch (error) {
       console.error('Error saving prompt:', error);
       toast({ title: 'Error', description: 'Failed to save prompt', variant: 'destructive' });
@@ -225,25 +246,18 @@ export const AgentConfigsPage: React.FC = () => {
 
     try {
       setDeleting(true);
-
-      // Audited + atomic, and it actually applies. `prompts` has NO DELETE policy, so the direct
-      // `.delete()` this replaced matched 0 rows, raised nothing, and reported "permanently
-      // deleted" — verified live. Deletions also wrote no history at all, so a prompt that drives
-      // agent behaviour could disappear with no record of who removed it or why. (#365 AD-21)
       const reason = window.prompt(
         hardDelete
           ? 'Why is this prompt being permanently deleted? (recorded in prompt_history)'
           : 'Why is this prompt being deactivated? (recorded in prompt_history)',
       );
-      if (reason === null) return;              // cancelled
+      if (reason === null) return;
       if (!reason.trim()) {
         toast({ title: 'A reason is required', description: 'Removing a prompt is recorded, so it needs one.', variant: 'destructive' });
         return;
       }
 
-      const { error } = await (supabase.rpc as unknown as (
-        fn: string, args: Record<string, unknown>,
-      ) => Promise<{ error: { message: string } | null }>)('delete_prompt_with_audit', {
+      const { error } = await (supabase.rpc as unknown as RpcCall)('delete_prompt_with_audit', {
         p_prompt_id: deletingPrompt.id,
         p_hard: hardDelete,
         p_change_reason: reason,
@@ -257,7 +271,7 @@ export const AgentConfigsPage: React.FC = () => {
       });
 
       setDeletingPrompt(null);
-      loadPrompts();
+      void loadPrompts();
     } catch (error) {
       console.error('Error deleting prompt:', error);
       toast({ title: 'Error', description: 'Failed to delete prompt', variant: 'destructive' });
@@ -267,566 +281,387 @@ export const AgentConfigsPage: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => formatDateValue(dateString, { withTime: true });
-
-  const getPromptTypeLabel = (type: string) => {
-    const labels: Record<string, string> = {
-      agent: 'Agent',
-      extraction: 'Extraction',
-      template: 'Template',
-      search: 'Search',
-      classification: 'Classification',
-    };
-    return labels[type] || type;
-  };
-
-  /** An agent prompt this page will happily DISPLAY and the runtime cannot LOAD. */
-  const isUnreadableAtRuntime = (prompt: Prompt) =>
-    prompt.prompt_type === 'agent' && !prompt.system_prompt?.trim();
-
-  const getPromptLength = (prompt: Prompt) => {
-    const text = (prompt.prompt_type === 'agent' || prompt.prompt_type === 'tool')
-      ? (prompt.system_prompt || prompt.prompt_text)
-      : (prompt.prompt_text || prompt.system_prompt);
-    return text?.length || 0;
-  };
-
-  const filteredPrompts = selectedType === 'all'
-    ? prompts
-    : prompts.filter(p => p.prompt_type === selectedType);
-
-  const promptTypes = ['all', ...Array.from(new Set(prompts.map(p => p.prompt_type)))];
-
-  // Group prompts by type and stage for better organization
-  const groupedPrompts = filteredPrompts.reduce((acc, prompt) => {
-    const key = prompt.stage || 'general';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(prompt);
-    return acc;
-  }, {} as Record<string, Prompt[]>);
-
-  const stageOrder = ['discovery', 'chunking', 'entity_creation', 'image_analysis', 'scraping', 'general'];
-  const sortedStages = Object.keys(groupedPrompts).sort((a, b) => {
-    const aIndex = stageOrder.indexOf(a);
-    const bIndex = stageOrder.indexOf(b);
-    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
-  });
+  const editingSecondary = editingPrompt ? secondarySystemPrompt(editingPrompt) : null;
+  const editingConfig = editingPrompt?.configuration && Object.keys(editingPrompt.configuration).length > 0
+    ? editingPrompt.configuration
+    : null;
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen p-6 bg-gradient-to-br from-background via-background to-muted/20">
+      <div className="min-h-screen p-6 bg-background">
         <GlobalAdminHeader
           title="AI Configurations"
-          description="Manage all AI prompts, model pricing, and system configurations. Changes are tracked and versioned."
+          description="Manage AI prompts, chat starters, writing rules, model pricing and background agents. Prompt changes are tracked and versioned."
         />
 
-        {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-6">
             <TabsTrigger value="prompts" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
-              AI Prompts
+              Prompts
             </TabsTrigger>
-            <TabsTrigger value="extraction" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Extraction Prompts
-            </TabsTrigger>
-            <TabsTrigger value="templates" className="flex items-center gap-2">
-              <Layers className="h-4 w-4" />
-              Prompt Templates
+            <TabsTrigger value="starters" className="flex items-center gap-2">
+              <MessageSquare className="h-4 w-4" />
+              Chat Starters
             </TabsTrigger>
             <TabsTrigger value="writing-rules" className="flex items-center gap-2">
               <ListChecks className="h-4 w-4" />
               Writing Rules
             </TabsTrigger>
-            <TabsTrigger value="sandbox" className="flex items-center gap-2">
-              <Cpu className="h-4 w-4" />
-              Sandbox
-            </TabsTrigger>
-            <TabsTrigger value="starters" className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4" />
-              Chat Starters
-            </TabsTrigger>
             <TabsTrigger value="pricing" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Model Pricing
-            </TabsTrigger>
-            <TabsTrigger value="performance" className="flex items-center gap-2">
-              <Activity className="h-4 w-4" />
-              Performance
-            </TabsTrigger>
-            <TabsTrigger value="ai-data" className="flex items-center gap-2">
-              <Database className="h-4 w-4" />
-              AI Data
             </TabsTrigger>
             <TabsTrigger value="background-agents" className="flex items-center gap-2">
               <Boxes className="h-4 w-4" />
               Background Agents
             </TabsTrigger>
-            <TabsTrigger value="api-gateway" className="flex items-center gap-2">
-              <Network className="h-4 w-4" />
-              API Gateway
-            </TabsTrigger>
-            <TabsTrigger value="3d-debug" className="flex items-center gap-2">
-              <Box className="h-4 w-4" />
-              3D Debugging
-            </TabsTrigger>
           </TabsList>
 
-          {/* Prompts Tab Content */}
           <TabsContent value="prompts">
-        {/* Stats Bar */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {promptTypes.filter(t => t !== 'all').map((type) => {
-            const count = prompts.filter(p => p.prompt_type === type).length;
-            const TypeIcon = TYPE_ICONS[type] || Sparkles;
-            return (
-              <button
-                key={type}
-                onClick={() => setSelectedType(type)}
-                className={`p-4 rounded-xl border transition-all duration-200 ${
-                  selectedType === type
-                    ? 'ring-2 ring-primary shadow-lg scale-[1.02]'
-                    : 'hover:shadow-md hover:scale-[1.01]'
-                } ${TYPE_COLORS[type] || 'bg-muted'}`}
-              >
-                <div className="flex items-center gap-3">
-                  <TypeIcon className="h-5 w-5" />
-                  <div className="text-left">
-                    <div className="text-2xl font-bold">{count}</div>
-                    <div className="text-xs opacity-80">{getPromptTypeLabel(type)}</div>
-                  </div>
+            <Card>
+              <CardHeader className="flex flex-row items-start justify-between gap-4">
+                <div>
+                  <CardTitle>Prompts</CardTitle>
+                  <CardDescription>
+                    Every active prompt the agents, the PDF pipeline and the templates load at runtime — {formatNumber(prompts.length)} in total.
+                  </CardDescription>
                 </div>
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setSelectedType('all')}
-            className={`p-4 rounded-xl border transition-all duration-200 ${
-              selectedType === 'all'
-                ? 'ring-2 ring-primary shadow-lg scale-[1.02] bg-primary/10'
-                : 'hover:shadow-md hover:scale-[1.01] bg-muted/50'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <Layers className="h-5 w-5" />
-              <div className="text-left">
-                <div className="text-2xl font-bold">{prompts.length}</div>
-                <div className="text-xs opacity-80">All Prompts</div>
-              </div>
-            </div>
-          </button>
-        </div>
-
-        {/* Main Content */}
-        <div className="mt-8">
-          {loading ? (
-            <div className="text-center py-16">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
-              <p className="mt-4 text-muted-foreground">Loading prompts...</p>
-            </div>
-          ) : filteredPrompts.length === 0 ? (
-            <div className="text-center py-16">
-              <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No prompts found</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {sortedStages.map((stage) => (
-                <div key={stage} className="space-y-4">
-                  {/* Stage Header */}
-                  {selectedType !== 'agent' && stage !== 'general' && (
-                    <div className="flex items-center gap-3">
-                      <Badge className={`${STAGE_COLORS[stage] || 'bg-gray-100 text-gray-700'} px-3 py-1 text-sm font-medium`}>
-                        {stage.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                      </Badge>
-                      <div className="flex-1 h-px bg-border"></div>
-                      <span className="text-sm text-muted-foreground">{groupedPrompts[stage].length} prompts</span>
-                    </div>
-                  )}
-
-                  {/* Prompts Grid */}
-                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {groupedPrompts[stage].map((prompt) => {
-                      const TypeIcon = TYPE_ICONS[prompt.prompt_type] || Sparkles;
-                      const isExpanded = expandedPrompt === prompt.id;
-
-                      return (
-                        <Card
-                          key={prompt.id}
-                          className={`group hover:shadow-lg transition-all duration-200 cursor-pointer border-l-4 ${
-                            TYPE_COLORS[prompt.prompt_type]?.includes('violet') ? 'border-l-violet-500' :
-                            TYPE_COLORS[prompt.prompt_type]?.includes('blue') ? 'border-l-blue-500' :
-                            TYPE_COLORS[prompt.prompt_type]?.includes('amber') ? 'border-l-amber-500' :
-                            TYPE_COLORS[prompt.prompt_type]?.includes('emerald') ? 'border-l-emerald-500' :
-                            TYPE_COLORS[prompt.prompt_type]?.includes('rose') ? 'border-l-rose-500' :
-                            'border-l-gray-500'
-                          }`}
-                          onClick={() => setExpandedPrompt(isExpanded ? null : prompt.id)}
-                        >
-                          <CardHeader className="pb-3">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className={`p-2 rounded-lg ${TYPE_COLORS[prompt.prompt_type] || 'bg-muted'}`}>
-                                  <TypeIcon className="h-4 w-4" />
-                                </div>
-                                <div className="min-w-0">
-                                  <CardTitle className="font-semibold truncate">{prompt.name}</CardTitle>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <Badge variant="outline" className="text-xs">{prompt.category}</Badge>
-                                    <Badge variant="outline" className="text-xs">v{prompt.version}</Badge>
-                                    {isUnreadableAtRuntime(prompt) && (
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <Badge variant="error" className="text-xs">Not live</Badge>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="max-w-xs">
-                                          This agent has no <code>system_prompt</code>. The text below is its{' '}
-                                          <code>prompt_text</code>, which the runtime does not read — every
-                                          conversation with this agent fails before reaching the model. Save an
-                                          edit here to write it to the right column.
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <ChevronRight className={`h-5 w-5 text-muted-foreground transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                            </div>
-                          </CardHeader>
-
-                          <CardContent className="pt-0">
-                            {/* Description */}
-                            {prompt.description ? (
-                              <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
-                                {prompt.description}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-muted-foreground/50 italic mb-3">
-                                No description available
-                              </p>
-                            )}
-
-                            {/* Metadata Row */}
-                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-1">
-                                    <FileText className="h-3 w-3" />
-                                    <span>{formatNumber(getPromptLength(prompt))} chars</span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>Prompt length</TooltipContent>
-                              </Tooltip>
-
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <div className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    <span>{formatDate(prompt.updated_at)}</span>
-                                  </div>
-                                </TooltipTrigger>
-                                <TooltipContent>Last updated</TooltipContent>
-                              </Tooltip>
-
-                              {prompt.stage && (
-                                <Badge className={`text-xs ${STAGE_COLORS[prompt.stage] || 'bg-gray-100 text-gray-700'}`}>
-                                  {prompt.stage.replace('_', ' ')}
-                                </Badge>
+                <Button onClick={() => void loadPrompts()} variant="outline" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Refresh
+                </Button>
+              </CardHeader>
+              <CardContent className="p-0">
+                {loading ? (
+                  <div className="py-12 text-center text-muted-foreground">Loading prompts...</div>
+                ) : prompts.length === 0 ? (
+                  <HubEmptyState
+                    icon={FileText}
+                    title="No active prompts"
+                    description="Prompts are seeded by migration; once a row in prompts is active it appears here to edit."
+                    action={<Button variant="outline" size="sm" onClick={() => void loadPrompts()}>Refresh</Button>}
+                  />
+                ) : (
+                  <>
+                    <HubToolbar
+                      search={promptTable.search}
+                      onSearchChange={promptTable.setSearch}
+                      searchPlaceholder="Search prompts"
+                      filters={
+                        <>
+                          {(['type', 'stage', 'category'] as const).map((id) => (
+                            <HubFilterSelect
+                              key={id}
+                              label={humanizeLabel(id)}
+                              value={promptTable.filters[id] ?? HUB_FILTER_ALL}
+                              options={promptTable.filterOptions[id]}
+                              onChange={(v) => promptTable.setFilter(id, v)}
+                            />
+                          ))}
+                          <HubResetFilters count={promptTable.activeFilterCount} onReset={promptTable.reset} />
+                        </>
+                      }
+                    />
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <SortHead id="name" sort={promptTable.sort} onSort={promptTable.toggleSort}>Name</SortHead>
+                          <SortHead id="type" sort={promptTable.sort} onSort={promptTable.toggleSort}>Type</SortHead>
+                          <SortHead id="stage" sort={promptTable.sort} onSort={promptTable.toggleSort} className="hidden sm:table-cell">Stage</SortHead>
+                          <SortHead id="category" sort={promptTable.sort} onSort={promptTable.toggleSort} className="hidden md:table-cell">Category</SortHead>
+                          <SortHead id="version" sort={promptTable.sort} onSort={promptTable.toggleSort} align="right" className="hidden md:table-cell">Version</SortHead>
+                          <TableHead className="hidden xl:table-cell text-right">Used In</TableHead>
+                          <SortHead id="updated" sort={promptTable.sort} onSort={promptTable.toggleSort} className="hidden lg:table-cell">Updated</SortHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {promptTable.rows.length === 0 && (
+                          <TableRow className="hover:bg-transparent">
+                            <TableCell colSpan={8} className="p-0">
+                              <HubEmptyState
+                                variant="filtered"
+                                title="No prompts match these filters"
+                                action={<Button variant="outline" size="sm" onClick={promptTable.reset}>Clear filters</Button>}
+                              />
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {promptTable.rows.map((prompt) => (
+                          <TableRow key={prompt.id}>
+                            <TableCell>
+                              <button
+                                type="button"
+                                onClick={() => handleEdit(prompt)}
+                                className="block max-w-[20rem] truncate text-left font-semibold text-primary hover:underline"
+                                title={prompt.description || prompt.name}
+                              >
+                                {prompt.name}
+                              </button>
+                              {isUnreadableAtRuntime(prompt) && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Badge variant="error" className="mt-1 text-xs">Not Live</Badge>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    This prompt has no <code>system_prompt</code>, which is the only column its loader
+                                    reads. Save an edit here to write it to the right column.
+                                  </TooltipContent>
+                                </Tooltip>
                               )}
-                            </div>
-
-                            {/* Expanded Actions */}
-                            {isExpanded && (
-                              <div className="mt-4 pt-4 border-t flex gap-2" role="presentation" onClick={(e) => e.stopPropagation()}>
-                                <Button
-                                  onClick={() => handleEdit(prompt)}
-                                  variant="default"
-                                  size="sm"
-                                  className="flex-1"
-                                >
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  Edit prompt
+                            </TableCell>
+                            <TableCell className="text-sm">{humanizeLabel(prompt.prompt_type)}</TableCell>
+                            <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">
+                              {prompt.stage ? humanizeLabel(prompt.stage) : '—'}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                              {humanizeLabel(prompt.category)}
+                            </TableCell>
+                            <TableCell className="hidden md:table-cell text-right tabular-nums text-muted-foreground">v{prompt.version}</TableCell>
+                            <TableCell className="hidden xl:table-cell text-right tabular-nums text-muted-foreground">
+                              {prompt.used_in?.length ? (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span>{formatNumber(prompt.used_in.length)}</span>
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-sm">
+                                    <ul className="space-y-0.5 font-mono text-xs">
+                                      {prompt.used_in.map((loc) => <li key={loc}>{loc}</li>)}
+                                    </ul>
+                                  </TooltipContent>
+                                </Tooltip>
+                              ) : '—'}
+                            </TableCell>
+                            <TableCell className="hidden lg:table-cell whitespace-nowrap text-sm text-muted-foreground">
+                              {formatDate(prompt.updated_at)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button onClick={() => void handleViewHistory(prompt)} variant="ghost" size="sm" aria-label="History">
+                                  <History className="h-4 w-4" />
                                 </Button>
-                                <Button
-                                  onClick={() => handleViewHistory(prompt)}
-                                  variant="outline"
-                                  size="sm"
-                                >
-                                  <History className="h-4 w-4 mr-2" />
-                                  History
-                                </Button>
-                                <Button
-                                  onClick={() => setDeletingPrompt(prompt)}
-                                  variant="destructive"
-                                  size="sm"
-                                >
+                                <Button onClick={() => setDeletingPrompt(prompt)} variant="ghost" size="sm" aria-label="Delete">
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
-                            )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+
+            <Dialog open={!!editingPrompt} onOpenChange={(open) => { if (!open) setEditingPrompt(null); }}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingPrompt?.name}</DialogTitle>
+                  <DialogDescription>
+                    {editingPrompt && [
+                      humanizeLabel(editingPrompt.prompt_type),
+                      humanizeLabel(editingPrompt.category),
+                      editingPrompt.stage ? humanizeLabel(editingPrompt.stage) : null,
+                      editingPrompt.industry ? humanizeLabel(editingPrompt.industry) : null,
+                      `Version ${editingPrompt.version}`,
+                    ].filter(Boolean).join(' · ')}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Input
+                      id="description"
+                      value={editedDescription}
+                      onChange={(e) => setEditedDescription(e.target.value)}
+                      placeholder="Brief description of what this prompt does..."
+                      className="mt-2"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="prompt">
+                      {editingPrompt && writesSystemPrompt(editingPrompt) ? 'System Prompt' : 'Prompt Text'}
+                    </Label>
+                    <Textarea
+                      id="prompt"
+                      value={editedText}
+                      onChange={(e) => setEditedText(e.target.value)}
+                      className="min-h-[360px] font-mono text-sm mt-2"
+                      placeholder="Enter prompt text..."
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">{formatNumber(editedText.length)} characters</p>
+                  </div>
+
+                  {editingSecondary && (
+                    <div>
+                      <Label>System Prompt</Label>
+                      <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-sm border border-hairline bg-surface-sunken p-3 font-mono text-xs">
+                        {editingSecondary}
+                      </pre>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Read-only here: saving writes the Prompt Text only and keeps this system prompt as it is.
+                      </p>
+                    </div>
+                  )}
+
+                  {editingConfig && (
+                    <div>
+                      <Label>Configuration</Label>
+                      <pre className="mt-2 max-h-40 overflow-y-auto rounded-sm border border-hairline bg-surface-sunken p-3 font-mono text-xs">
+                        {JSON.stringify(editingConfig, null, 2)}
+                      </pre>
+                      <p className="text-xs text-muted-foreground mt-1">Read-only here.</p>
+                    </div>
+                  )}
+
+                  {editingPrompt?.used_in?.length ? (
+                    <div>
+                      <Label>Used In</Label>
+                      <ul className="mt-2 space-y-0.5 font-mono text-xs text-muted-foreground">
+                        {editingPrompt.used_in.map((loc) => <li key={loc}>{loc}</li>)}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  <div>
+                    <Label htmlFor="reason">Change Reason</Label>
+                    <Input
+                      id="reason"
+                      value={changeReason}
+                      onChange={(e) => setChangeReason(e.target.value)}
+                      placeholder="e.g., Improved extraction accuracy for product dimensions"
+                      className="mt-2"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Required — recorded in the prompt's change history.</p>
+                  </div>
+                </div>
+
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setEditingPrompt(null)}>
+                    <X className="h-4 w-4 mr-2" />
+                    Cancel
+                  </Button>
+                  <Button onClick={() => void handleSave()} disabled={saving || !changeReason.trim()}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {saving ? 'Saving...' : 'Save changes'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!historyFor} onOpenChange={(open) => { if (!open) setHistoryFor(null); }}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>Change History</DialogTitle>
+                  <DialogDescription>Last 5 changes to {historyFor?.name}</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  {loadingHistory ? (
+                    <div className="py-8 text-center text-muted-foreground">Loading history...</div>
+                  ) : historyData.length === 0 ? (
+                    <HubEmptyState
+                      icon={History}
+                      title="No changes recorded"
+                      description="This prompt has not been edited since it was seeded."
+                      action={historyFor ? (
+                        <Button size="sm" variant="outline" onClick={() => { const p = historyFor; setHistoryFor(null); handleEdit(p); }}>
+                          Edit prompt
+                        </Button>
+                      ) : undefined}
+                    />
+                  ) : (
+                    historyData.map((entry, index) => {
+                      const systemChanged = (entry.old_system_prompt ?? '') !== (entry.new_system_prompt ?? '');
+                      const before = systemChanged ? entry.old_system_prompt : entry.old_prompt_text;
+                      const after = systemChanged ? entry.new_system_prompt : entry.new_prompt_text;
+                      return (
+                        <Card key={entry.id}>
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between gap-2">
+                              <CardTitle className="flex items-center gap-2">
+                                <Badge variant="neutral">#{historyData.length - index}</Badge>
+                                {entry.change_reason || 'No reason provided'}
+                              </CardTitle>
+                              <span className="text-sm text-muted-foreground">{formatDate(entry.changed_at)}</span>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Previous</Label>
+                                <div className="mt-1 p-2 rounded-sm border border-hairline bg-surface-sunken text-xs font-mono line-clamp-4">
+                                  {before || '—'}
+                                </div>
+                              </div>
+                              <div>
+                                <Label className="text-xs text-muted-foreground">Updated</Label>
+                                <div className="mt-1 p-2 rounded-sm border border-hairline bg-surface-sunken text-xs font-mono line-clamp-4">
+                                  {after || '—'}
+                                </div>
+                              </div>
+                            </div>
                           </CardContent>
                         </Card>
                       );
-                    })}
+                    })
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!deletingPrompt} onOpenChange={(open) => { if (!open) setDeletingPrompt(null); }}>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <div className="flex items-center gap-3">
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    <div>
+                      <DialogTitle>Delete Prompt</DialogTitle>
+                      <DialogDescription>
+                        Are you sure you want to delete "{deletingPrompt?.name}"?
+                      </DialogDescription>
+                    </div>
                   </div>
+                </DialogHeader>
+
+                <div className="py-2 space-y-3 text-sm text-muted-foreground">
+                  <p><strong>Deactivate:</strong> hides the prompt but keeps it in the database, so it can be restored later.</p>
+                  <p><strong>Delete permanently:</strong> removes the prompt from the database. This cannot be undone.</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
 
-        {/* Edit Dialog */}
-        <Dialog open={!!editingPrompt} onOpenChange={() => setEditingPrompt(null)}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                {editingPrompt && (
-                  <div className={`p-2 rounded-lg ${TYPE_COLORS[editingPrompt.prompt_type] || 'bg-muted'}`}>
-                    {(() => {
-                      const TypeIcon = TYPE_ICONS[editingPrompt.prompt_type] || Sparkles;
-                      return <TypeIcon className="h-5 w-5" />;
-                    })()}
-                  </div>
-                )}
-                <div>
-                  <DialogTitle>{editingPrompt?.name}</DialogTitle>
-                  <DialogDescription>
-                    {(editingPrompt?.prompt_type === 'agent' || editingPrompt?.prompt_type === 'tool') ? 'System Prompt' : 'Extraction Prompt'} •
-                    Category: {editingPrompt?.category} •
-                    {editingPrompt?.stage && ` Stage: ${editingPrompt.stage} •`}
-                    Version {editingPrompt?.version}
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <div className="space-y-4 py-4">
-              {/* Description Field */}
-              <div>
-                <Label htmlFor="description" className="flex items-center gap-2">
-                  <Info className="h-4 w-4" />
-                  Description
-                </Label>
-                <Input
-                  id="description"
-                  value={editedDescription}
-                  onChange={(e) => setEditedDescription(e.target.value)}
-                  placeholder="Brief description of what this prompt does..."
-                  className="mt-2"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Helps identify the purpose of this prompt in the admin panel
-                </p>
-              </div>
-
-              {/* Prompt Text */}
-              <div>
-                <Label htmlFor="prompt" className="flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  {(editingPrompt?.prompt_type === 'agent' || editingPrompt?.prompt_type === 'tool') ? 'System Prompt' : 'Prompt Text'}
-                </Label>
-                <Textarea
-                  id="prompt"
-                  value={editedText}
-                  onChange={(e) => setEditedText(e.target.value)}
-                  className="min-h-[400px] font-mono text-sm mt-2"
-                  placeholder="Enter prompt text..."
-                />
-                <p className="text-sm text-muted-foreground mt-2">{formatNumber(editedText.length)} characters</p>
-              </div>
-
-              {/* Change Reason */}
-              <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4">
-                <Label htmlFor="reason" className="text-amber-700 dark:text-amber-400 font-medium">
-                  Change Reason (Required)
-                </Label>
-                <Input
-                  id="reason"
-                  value={changeReason}
-                  onChange={(e) => setChangeReason(e.target.value)}
-                  placeholder="e.g., Improved extraction accuracy for product dimensions"
-                  className="mt-2"
-                />
-                <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
-                  This will be recorded in the change history for auditing
-                </p>
-              </div>
-            </div>
-
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setEditingPrompt(null)}>
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button onClick={handleSave} disabled={saving || !changeReason.trim()}>
-                <Save className="h-4 w-4 mr-2" />
-                {saving ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        {/* History Dialog */}
-        <Dialog open={showHistory} onOpenChange={setShowHistory}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Change History</DialogTitle>
-              <DialogDescription>Last 5 changes to this prompt</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              {loadingHistory ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                </div>
-              ) : historyData.length === 0 ? (
-                <div className="text-center py-8">
-                  <History className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-muted-foreground">No history available</p>
-                </div>
-              ) : (
-                historyData.map((entry, index) => (
-                  <Card key={entry.id} className="border-l-4 border-l-blue-500">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-center justify-between">
-                        <CardTitle className="flex items-center gap-2">
-                          <Badge variant="outline">#{historyData.length - index}</Badge>
-                          {entry.change_reason || 'No reason provided'}
-                        </CardTitle>
-                        <span className="text-sm text-muted-foreground">{formatDate(entry.changed_at)}</span>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Previous</Label>
-                          <div className="mt-1 p-2 bg-red-50 dark:bg-red-900/20 rounded text-xs font-mono line-clamp-3 border border-red-200 dark:border-red-800">
-                            {entry.old_prompt_text}
-                          </div>
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Updated</Label>
-                          <div className="mt-1 p-2 bg-green-50 dark:bg-green-900/20 rounded text-xs font-mono line-clamp-3 border border-green-200 dark:border-green-800">
-                            {entry.new_prompt_text}
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={!!deletingPrompt} onOpenChange={() => setDeletingPrompt(null)}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-red-100">
-                  <AlertTriangle className="h-5 w-5 text-red-600" />
-                </div>
-                <div>
-                  <DialogTitle>Delete Prompt</DialogTitle>
-                  <DialogDescription>
-                    Are you sure you want to delete "{deletingPrompt?.name}"?
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-
-            <div className="py-4 space-y-4">
-              <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800">
-                <p className="text-sm text-amber-800 dark:text-amber-200">
-                  <strong>Type:</strong> {deletingPrompt?.prompt_type}<br />
-                  <strong>Category:</strong> {deletingPrompt?.category}<br />
-                  {deletingPrompt?.stage && <><strong>Stage:</strong> {deletingPrompt.stage}<br /></>}
-                  <strong>Version:</strong> {deletingPrompt?.version}
-                </p>
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                <p className="mb-2"><strong>Deactivate (Soft Delete):</strong> Hides the prompt but keeps it in the database. Can be restored later.</p>
-                <p><strong>Permanently Delete:</strong> Removes the prompt from the database completely. This cannot be undone.</p>
-              </div>
-            </div>
-
-            <DialogFooter className="flex gap-2">
-              <Button variant="outline" onClick={() => setDeletingPrompt(null)} disabled={deleting}>
-                Cancel
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => handleDelete(false)}
-                disabled={deleting}
-              >
-                {deleting ? 'Processing...' : 'Deactivate'}
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => handleDelete(true)}
-                disabled={deleting}
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
-                {deleting ? 'Deleting...' : 'Delete Permanently'}
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                <DialogFooter className="flex gap-2">
+                  <Button variant="outline" onClick={() => setDeletingPrompt(null)} disabled={deleting}>
+                    Cancel
+                  </Button>
+                  <Button variant="secondary" onClick={() => void handleDelete(false)} disabled={deleting}>
+                    {deleting ? 'Processing...' : 'Deactivate'}
+                  </Button>
+                  <Button variant="destructive" onClick={() => void handleDelete(true)} disabled={deleting}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {deleting ? 'Deleting...' : 'Delete permanently'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
-          {/* Extraction Prompts (MIVAA pipeline) — relocated from /admin/extraction-prompts */}
-          <TabsContent value="extraction">
-            <ExtractionPromptsPage embedded />
-          </TabsContent>
-
-          {/* Prompt Templates (MIVAA) — relocated from /admin/prompt-templates */}
-          <TabsContent value="templates">
-            <PromptTemplatesPage embedded />
-          </TabsContent>
-
-          {/* AI sandbox/testing — relocated from /admin/material-analysis */}
-          <TabsContent value="writing-rules">
-            <WritingRulesTab />
-          </TabsContent>
-
-          <TabsContent value="sandbox">
-            <AITestingPanel embedded />
-          </TabsContent>
-
-          {/* Chat Starters Tab Content */}
           <TabsContent value="starters">
             <ChatStartersTab />
           </TabsContent>
 
-          {/* Model Pricing Tab Content */}
+          <TabsContent value="writing-rules">
+            <WritingRulesTab />
+          </TabsContent>
+
           <TabsContent value="pricing">
             <AIModelPricingTab />
           </TabsContent>
 
-          {/* AI Performance — relocated from the Operations "AI Performance" tab */}
-          <TabsContent value="performance">
-            <AIPerformanceTab />
-          </TabsContent>
-
-          {/* AI Data — relocated from /admin/ai-data (metadata / relevancy / duplicates / categorization) */}
-          <TabsContent value="ai-data">
-            <AIDataPage embedded />
-          </TabsContent>
-
-          {/* Background Agents — relocated from /admin/background-agents */}
           <TabsContent value="background-agents">
             <BackgroundAgentsPage />
-          </TabsContent>
-
-          {/* API Gateway — relocated from /admin/api-gateway */}
-          <TabsContent value="api-gateway">
-            <ApiGatewayAdmin embedded />
-          </TabsContent>
-
-          {/* 3D Model Debugging — relocated from /admin/3d-model-debugging */}
-          <TabsContent value="3d-debug">
-            <ModelDebuggingPanel embedded />
           </TabsContent>
         </Tabs>
       </div>

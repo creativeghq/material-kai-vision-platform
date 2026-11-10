@@ -1,11 +1,16 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 
-// AI Data moved under AI Configurations. The former per-view routes
-// (/admin/metadata, /admin/relevancy, /admin/duplicate-detection) all land on the
-// AI Data tab; the sub-view is picked inside the tab.
+const VIEW_BY_PATH: Record<string, string> = {
+  '/admin/relevancy': 'relevancy',
+  '/admin/duplicate-detection': 'duplicates',
+};
+
 const AIDataRedirect: React.FC = () => {
-  return <Navigate to="/admin/ai-configs?tab=ai-data" replace />;
+  const { pathname } = useLocation();
+  const view = VIEW_BY_PATH[pathname.replace(/\/+$/, '')];
+  const to = `/admin/materials-data?tab=ai-review${view ? `&view=${view}` : ''}`;
+  return <Navigate to={to} replace />;
 };
 
 export default AIDataRedirect;

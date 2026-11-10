@@ -58,7 +58,7 @@ JARVIS tools in [`sourcing-tools.ts`](../supabase/functions/_shared/tools/sourci
 
 ## Monitoring & market intel
 
-A single **`/admin/monitoring`** shell tabs Price / Mentions / Job Research (each gated by its module flag — Price Monitoring is a registered `public.modules` row as of #244 B0). A **`MarketIntelCard`** on expanded quote lines surfaces the tracked price + 7-day mention snapshot for the product being quoted.
+Price Monitoring is the tenant page **`/price-monitoring`** and Mention Monitoring **`/mention-monitoring`**, each gated by its module entitlement (`/admin/monitoring` redirects). A **`MarketIntelCard`** on expanded quote lines surfaces the tracked price + 7-day mention snapshot for the product being quoted.
 
 ## Marketplace sourcing (A5)
 
@@ -68,7 +68,7 @@ A single **`/admin/monitoring`** shell tabs Price / Mentions / Job Research (eac
 
 The cross-workspace upgrade of the per-workspace supplier model:
 - **Identity** — `platform_suppliers` canonical registry keyed on `(vat_number, country_code)`; per-workspace `crm_companies` link via `platform_supplier_id` (additive; the `_crm_link_platform_supplier` trigger + `resolve_platform_supplier` keep it current). **RLS: service-role only** — no cross-tenant read surface from the registry itself.
-- **Claim flow** — `supplier_claim_requests` + `request_supplier_claim` (any member; computes a low/needs-review risk flag from the workspace's own VAT) + **`decide_supplier_claim` (operator-only** = owner/admin of the root workspace, via `is_platform_operator()`). Operator review queue at `/admin/supplier-claims`. Approval sets `platform_suppliers.claimed_workspace_id` + `status='claimed'` — this is what grants cross-workspace order visibility.
+- **Claim flow** — `supplier_claim_requests` + `request_supplier_claim` (any member; computes a low/needs-review risk flag from the workspace's own VAT) + **`decide_supplier_claim` (operator-only** = owner/admin of the root workspace, via `is_platform_operator()`). Operator review queue at Operations → Approvals → Supplier Claims (`/admin/supplier-claims` redirects). Approval sets `platform_suppliers.claimed_workspace_id` + `status='claimed'` — this is what grants cross-workspace order visibility.
 - **Portal** — a claimed supplier sees the POs sent to their identity across **all** buyer workspaces at `/supplier-portal` (`get_supplier_inbound_orders` — header + lines + buyer name only, the visibility contract) and can acknowledge / set ETA / mark shipped (`supplier_update_inbound_order` → `orders.supplier_status/eta/note`).
 - **ERP outbound** — [`supplier-orders-api`](../supabase/functions/supplier-orders-api/index.ts), a `kai_*` partner API so a supplier's own ERP lists its inbound POs + posts status back (service-role `_svc` RPCs, gated to the workspace's approved claim). See [docs/supplier-orders-api.md](supplier-orders-api.md).
 

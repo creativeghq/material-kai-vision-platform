@@ -39,6 +39,7 @@ const DB_ONLY: Record<string, string> = {
     'trigger-adjacent audit log written by 3 SQL functions; nothing reads it from code',
   job_alert_log: 'written by 2 SQL functions; 14 rows, the job-alert dedupe ledger',
   agent_uploaded_files: 'referenced by 2 SQL functions',
+  uploaded_files: 'read by dic_detect__ops_storage_paths_unregistered; 0 rows since the RAG sandbox was removed',
   product_similarity_cache: 'referenced by 1 SQL function',
   product_usage_stats: 'referenced by 1 SQL function',
   supplier_credit_note_items: 'referenced by 1 SQL function',

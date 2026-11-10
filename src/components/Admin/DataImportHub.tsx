@@ -51,7 +51,7 @@ const DataImportHub: React.FC = () => {
         .from('background_jobs')
         .select('*')
         .eq('workspace_id', activeWorkspaceId)
-        .in('job_type', ['pdf_processing', 'product_discovery_upload'])
+        .eq('job_type', 'product_discovery_upload')
         .in('status', ['pending', 'processing'])
         .order('created_at', { ascending: false });
 

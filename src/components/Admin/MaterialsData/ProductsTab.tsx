@@ -22,6 +22,7 @@ import { buildMaterialsDataFilters } from './materialsDataFilters';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { ProductDetailModal } from './ProductDetailModal';
+import { SourceDocumentLink } from './SourceDocumentLink';
 import { TablePagination } from '@/components/core/ui/table-pagination';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { formatDate } from '@/utils/datetime';
@@ -50,6 +51,7 @@ interface Product {
   source_document_id: string;
   source_type?: 'pdf_processing' | 'xml_import' | 'web_scraping' | null;
   source_job_id?: string | null;
+  documents?: { filename: string | null } | null;
   // Halfvec comes back as a string; null = never embedded
   // (invisible to product-level vector search until backfilled).
   text_embedding_1024?: string | null;
@@ -65,7 +67,7 @@ interface Product {
  */
 const PRODUCTS_TAB_SELECT =
   'id, name, workspace_id, status, metadata, created_at, source_document_id, source_type, '
-  + 'source_job_id, text_embedding_1024';
+  + 'source_job_id, text_embedding_1024, documents(filename)';
 
 interface ProductsTabProps {
   workspaceId: string;
@@ -392,7 +394,10 @@ export const ProductsTab: React.FC<ProductsTabProps> = ({ workspaceId, jobIdFilt
                         return <Badge variant={b.variant}>{b.label}</Badge>;
                       })()}
                     </TableCell>
-                    <TableCell>{getSourceBadge(product.source_type)}</TableCell>
+                    <TableCell>
+                      {getSourceBadge(product.source_type)}
+                      <SourceDocumentLink documentId={product.source_document_id} filename={product.documents?.filename} />
+                    </TableCell>
                     <TableCell>
                       <span className="text-xs text-muted-foreground capitalize">
                         {category}

@@ -95,7 +95,7 @@ const ModuleSettingsPage: React.FC = () => {
             />
             <div className="text-xs text-muted-foreground">
               Platform-wide keys (AI providers, Stripe, VAPID, cron secret) are managed at{' '}
-              <Link to="/admin/operations?tab=keys" className="text-primary underline">/admin/operations → Keys</Link>.
+              <Link to="/admin/modules?tab=platform-keys" className="text-primary underline">Platform → Platform Keys</Link>.
             </div>
           </>
         ) : (
@@ -131,7 +131,7 @@ const ModuleSettingsPage: React.FC = () => {
               />
               <div className="text-xs text-muted-foreground mt-3">
                 Platform-wide keys (AI providers, Stripe, VAPID, cron secret) are managed at{' '}
-                <Link to="/admin/operations?tab=keys" className="text-primary underline">/admin/operations → Keys</Link>.
+                <Link to="/admin/modules?tab=platform-keys" className="text-primary underline">Platform → Platform Keys</Link>.
               </div>
             </TabsContent>
 

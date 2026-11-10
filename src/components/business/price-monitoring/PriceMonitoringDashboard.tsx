@@ -110,8 +110,8 @@ export const PriceMonitoringDashboard: React.FC = () => {
   return (
     <div className="space-y-6 p-6">
       <SectionHeader
-        title="Price Monitoring"
-        subtitle="Track competitor prices and get alerts on price changes"
+        title="Tracked Products"
+        subtitle="Competitor prices for every product you monitor, refreshed on its schedule."
         actions={(
           <>
             <Button onClick={handleRefresh} variant="outline" size="sm" disabled={isLoading}>

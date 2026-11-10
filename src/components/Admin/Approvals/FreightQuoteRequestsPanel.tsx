@@ -7,8 +7,8 @@
 import React, { useEffect, useState } from 'react';
 import { Loader2, Ship, Send, XCircle, Plus, Trash2, Sparkles } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { PageHeader } from '@/components/shared/PageHeader';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -21,7 +21,7 @@ import { formatDate } from '@/utils/datetime';
 type OfferRow = { carrier: string; amount: string; currency: string; transit: string };
 const emptyRow = (): OfferRow => ({ carrier: '', amount: '', currency: 'USD', transit: '' });
 
-export default function FreightQuoteRequestsPage() {
+export function FreightQuoteRequestsPanel() {
   const { toast } = useToast();
   const [rows, setRows] = useState<PendingQuoteRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,16 +48,17 @@ export default function FreightQuoteRequestsPage() {
   };
 
   return (
-    <div className="min-h-screen">
-      <PageHeader icon={Ship} title="Freight Quote Requests" subtitle="Tenant requests without their own SeaRates key — fulfil and send back" />
-      <div className="p-3 sm:p-6">
+    <div>
         <Card>
-          <CardHeader className="border-b border-border/60 px-5 py-3"><CardTitle>Pending Requests</CardTitle></CardHeader>
+          <CardHeader className="border-b border-border/60 px-5 py-3">
+            <CardTitle>Pending Freight Quote Requests</CardTitle>
+            <CardDescription className="text-xs">Tenant requests without their own SeaRates key — fulfil and send back.</CardDescription>
+          </CardHeader>
           <CardContent className="p-0">
             {loading ? (
               <div className="flex justify-center py-12"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
             ) : rows.length === 0 ? (
-              <div className="px-4 py-8 text-center text-sm text-muted-foreground">No pending freight-quote requests.</div>
+              <HubEmptyState icon={Ship} title="No pending freight quote requests" description="A request appears here when a tenant without a SeaRates key asks for a quote." />
             ) : (
               <>
               <div className="table-scroll">
@@ -94,7 +95,6 @@ export default function FreightQuoteRequestsPage() {
             )}
           </CardContent>
         </Card>
-      </div>
       <AnswerDialog request={answer} onOpenChange={(v) => { if (!v) setAnswer(null); }} onAnswered={async () => { setAnswer(null); await load(); }} />
     </div>
   );

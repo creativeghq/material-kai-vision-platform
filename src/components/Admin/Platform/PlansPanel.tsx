@@ -6,19 +6,17 @@
  */
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Home, Layers, AlertTriangle, Loader2, Infinity as InfinityIcon } from 'lucide-react';
-import { Button } from '@/components/core/ui/button';
+import { AlertTriangle, Loader2, Infinity as InfinityIcon } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { useToast } from '@/hooks/use-toast';
 import {
   planAdminService, PLAN_TIERS, QUOTA_KEYS, dependencyViolations, MODULE_DEPENDENCIES,
   type AdminModule, type AdminPlan, type PlanTier,
 } from '@/services/planAdminService';
 
-const PlansPage: React.FC = () => {
+export const PlansPanel: React.FC = () => {
   const { toast } = useToast();
   const [modules, setModules] = useState<AdminModule[]>([]);
   const [plans, setPlans] = useState<AdminPlan[]>([]);
@@ -61,18 +59,7 @@ const PlansPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader
-        icon={Layers}
-        title="Plans &amp; Pricing"
-        subtitle="Assign each module to the lowest plan that unlocks it, and set per-plan usage limits. Changes take effect immediately."
-        actions={
-          <Button asChild variant="ghost" size="sm" className="gap-2">
-            <Link to="/admin"><Home className="h-4 w-4" /> Back to Admin</Link>
-          </Button>
-        }
-      />
-
-      <div className="space-y-6 p-3 sm:p-6">
+      <div className="space-y-6">
         {loading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : (
@@ -195,7 +182,7 @@ const PlansPage: React.FC = () => {
               </CardContent>
             </Card>
             <p className="text-xs text-muted-foreground">
-              Modules are enabled/disabled platform-wide in <Link to="/admin/modules" className="text-primary">Modules</Link>.
+              Modules are enabled/disabled platform-wide in <Link to="/admin/modules" className="text-primary">Platform → Modules</Link>.
               A workspace&apos;s plan = its owner&apos;s active subscription; the operator (root) always has everything.
             </p>
           </>
@@ -205,4 +192,3 @@ const PlansPage: React.FC = () => {
   );
 };
 
-export default PlansPage;

@@ -91,11 +91,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [clearingQueue, setClearingQueue] = useState(false);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'all' | 'pdf_processing' | 'web_scraping' | 'xml_import'>('all');
+  const [selectedTab, setSelectedTab] = useState<'all' | 'xml_import'>('all');
   // Each tab keeps its own page so switching tabs doesn't lose your place in the others.
   const [allPage, setAllPage] = useState(1);
-  const [pdfPage, setPdfPage] = useState(1);
-  const [scrapingPage, setScrapingPage] = useState(1);
   const [xmlPage, setXmlPage] = useState(1);
   const [failedPage, setFailedPage] = useState(1);
   const [showDeleteJobModal, setShowDeleteJobModal] = useState(false);
@@ -286,7 +284,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       let history: Array<Record<string, unknown>> = [];
       let usedFullStatus = false;
 
-      if (job.job_type === 'pdf_processing' || job.job_type === 'product_discovery_upload') {
+      if (job.job_type === 'product_discovery_upload') {
         try {
           const fullStatus = await mivaaApi.getJobFullStatus(job.id);
           if (fullStatus.success && fullStatus.data) {
@@ -363,7 +361,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       });
 
       // Fetch product progress for PDF processing jobs
-      if (job.job_type === 'pdf_processing' || job.job_type === 'product_discovery_upload') {
+      if (job.job_type === 'product_discovery_upload') {
         await fetchProductProgress(job.id);
       }
     } catch (error) {
@@ -416,7 +414,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       // costs the sum of both latencies on every tick of the 10-second `setInterval` below, on a
       // screen admins leave open all day.
       const [bgJobsRes, xmlJobsRes] = await Promise.all([
-        // Fetch background jobs (PDF, Web Scraping, Product Discovery, Image Embedding Regeneration)
         supabase
           .from('background_jobs')
           // `count: 'exact'` is the disclosure, not an optimisation: every headline number on this
@@ -425,7 +422,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           // recent 500 as if it were the whole queue, and a truncated count on an operations
           // dashboard is worse than an error because it looks authoritative. (#365 AD-8)
           .select('*', { count: 'exact' })
-          .in('job_type', ['pdf_processing', 'web_scraping', 'product_discovery_upload', 'image_embedding_regeneration'])
+          .in('job_type', ['product_discovery_upload', 'image_embedding_regeneration'])
           .order('created_at', { ascending: false })
           // Both job sources are merged and filtered per-tab client-side, so server-side paging
           // isn't available here; the cap is raised instead so pagination isn't paging a truncation.
@@ -472,12 +469,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
         if (!jobType) {
           filteredJobs = jobs;
-        } else if (jobType === 'pdf_processing') {
-          // Group product_discovery_upload with pdf_processing
-          filteredJobs = jobs.filter(j =>
-            j.job_type === 'pdf_processing' ||
-            j.job_type === 'product_discovery_upload',
-          );
         } else {
           filteredJobs = jobs.filter(j => j.job_type === jobType);
         }
@@ -525,8 +516,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       // 🆕 Calculate metrics from combined jobs (background_jobs + data_import_jobs)
       const calculateMetrics = (): QueueMetrics => {
         // Calculate metrics for each job type
-        const pdfMetrics = calculateJobTypeMetrics(allJobs, 'pdf_processing');
-        const scrapingMetrics = calculateJobTypeMetrics(allJobs, 'web_scraping');
         const xmlMetrics = calculateJobTypeMetrics(allJobs, 'xml_import');
         const allMetrics = calculateJobTypeMetrics(allJobs); // All jobs combined
 
@@ -553,8 +542,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         const totalDocuments = new Set(allJobs.map((j) => j.document_id).filter(Boolean)).size;
 
         return {
-          pdf_processing: pdfMetrics,
-          web_scraping: scrapingMetrics,
           xml_import: xmlMetrics,
           all_jobs: allMetrics,
           total_documents: totalDocuments,
@@ -581,10 +568,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   /** Rows of one job-type tab, within the modal-narrowed set — also drives the tab badges. */
   const jobsOfType = useCallback((list: BackgroundJob[], type: typeof selectedTab): BackgroundJob[] => {
     if (type === 'all') return list;
-    // product_discovery_upload is a PDF job under a different name.
-    if (type === 'pdf_processing') {
-      return list.filter(job => job.job_type === 'pdf_processing' || job.job_type === 'product_discovery_upload');
-    }
     return list.filter(job => job.job_type === type);
   }, []);
 
@@ -602,14 +585,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   // Realtime refreshes and deletions shrink these lists constantly; clamping at render
   // keeps a now-out-of-range page from showing an empty table with no way back.
   const allPageSafe = clampPage(allPage, filteredJobs.length);
-  const pdfPageSafe = clampPage(pdfPage, filteredJobs.length);
-  const scrapingPageSafe = clampPage(scrapingPage, filteredJobs.length);
   const xmlPageSafe = clampPage(xmlPage, filteredJobs.length);
   const failedPageSafe = clampPage(failedPage, failedJobs.length);
 
   // A narrowed result set is a different list in every tab — restart them all at page 1.
   useEffect(() => {
-    setAllPage(1); setPdfPage(1); setScrapingPage(1); setXmlPage(1); setFailedPage(1);
+    setAllPage(1); setXmlPage(1); setFailedPage(1);
   }, [filterValues]);
 
   useEffect(() => {
@@ -737,8 +718,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         });
 
         // 🚀 PROACTIVE PRODUCT REFRESH
-        const isPdfJob = typedJobData.job_type === 'pdf_processing' ||
-                         typedJobData.job_type === 'product_discovery_upload';
+        const isPdfJob = typedJobData.job_type === 'product_discovery_upload';
 
         const shouldFetchProducts = isPdfJob && (
           (typedJobData.status === 'processing' && (productsDiscoveredCount > 0 || jobCheckpoints.some(cp => cp.stage === 'products_detected'))) ||
@@ -1516,7 +1496,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <p className="text-xs text-muted-foreground">Success Rate</p>
             </div>
             <div className="text-2xl font-bold">
-              {metrics.pdf_processing.success_rate.toFixed(1)}%
+              {metrics.all_jobs.success_rate.toFixed(1)}%
             </div>
           </div>
 
@@ -1526,7 +1506,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <p className="text-xs text-muted-foreground">Avg Time</p>
             </div>
             <div className="text-2xl font-bold">
-              {formatTime(metrics.pdf_processing.avg_processing_time)}
+              {formatTime(metrics.all_jobs.avg_processing_time)}
             </div>
           </div>
 
@@ -1535,7 +1515,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               <p className="text-xs text-muted-foreground">Total Jobs</p>
             </div>
-            <div className="text-2xl font-bold">{metrics.pdf_processing.total}</div>
+            <div className="text-2xl font-bold">{metrics.all_jobs.total}</div>
           </div>
         </div>
 
@@ -1555,8 +1535,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           setSelectedTab(value as any);
           // The tab IS the job-type filter, so the row set changes completely — start at page 1.
           setAllPage(1);
-          setPdfPage(1);
-          setScrapingPage(1);
           setXmlPage(1);
         }}
         className="space-y-4"
@@ -1566,14 +1544,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           <TabsTrigger value="all" className="flex items-center gap-2">
             All Jobs
             <Badge variant="secondary" className="ml-1">{scopedJobs.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="pdf_processing" className="flex items-center gap-2">
-            PDF Processing
-            <Badge variant="secondary" className="ml-1">{jobsOfType(scopedJobs, 'pdf_processing').length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="web_scraping" className="flex items-center gap-2">
-            Web Scraping
-            <Badge variant="secondary" className="ml-1">{jobsOfType(scopedJobs, 'web_scraping').length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="xml_import" className="flex items-center gap-2">
             XML Import
@@ -1840,434 +1810,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   page={allPageSafe}
                   total={getFilteredJobs().length}
                   onPageChange={setAllPage}
-                  label="jobs"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Content - PDF Processing */}
-        <TabsContent value="pdf_processing" className="space-y-4">
-          <Card className="dashboard-card border-white/10">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-primary" />
-                    PDF Processing Jobs
-                  </CardTitle>
-                  <CardDescription>
-                    {metrics.pdf_processing.total} total jobs | Avg processing time:{' '}
-                    {formatTime(metrics.pdf_processing.avg_processing_time)}
-                  </CardDescription>
-                </div>
-
-                {/* Control Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleClearQueue}
-                    disabled={clearingQueue || getFilteredJobs().filter(j => j.status === 'pending' || j.status === 'failed').length === 0}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Cancel all pending and failed jobs"
-                  >
-                    {clearingQueue ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Clearing...
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-3.5 h-3.5 inline mr-1.5" />
-                        Clear Queue
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setAutoRefresh(!autoRefresh)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 shadow-sm ${
-                      autoRefresh
-                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                        : 'bg-white/10 text-foreground hover:bg-white/15 border border-white/10'
-                    }`}
-                  >
-                    {autoRefresh ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Auto-refresh ON
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
-                        Auto-refresh OFF
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={fetchQueueData}
-                    className="px-3 py-1.5 bg-white/10 text-foreground hover:bg-white/15 border border-white/10 rounded-md text-sm font-medium transition-all duration-200"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
-                    Refresh Now
-                  </button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Status Breakdown */}
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-yellow-600" />
-                    <p className="text-xs text-muted-foreground">Pending</p>
-                  </div>
-                  <div className="text-2xl font-bold text-yellow-400">
-                    {metrics.pdf_processing.pending}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                    <p className="text-xs text-muted-foreground">Processing</p>
-                  </div>
-                  <div className="text-2xl font-bold text-blue-400">
-                    {metrics.pdf_processing.processing}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <p className="text-xs text-muted-foreground">Completed</p>
-                  </div>
-                  <div className="text-2xl font-bold text-green-400">
-                    {metrics.pdf_processing.completed}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="h-4 w-4 text-red-600" />
-                    <p className="text-xs text-muted-foreground">Failed</p>
-                  </div>
-                  <div className="text-2xl font-bold text-red-400">
-                    {metrics.pdf_processing.failed}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                    <p className="text-xs text-muted-foreground">Interrupted</p>
-                  </div>
-                  <div className="text-2xl font-bold text-orange-400">
-                    {metrics.pdf_processing.interrupted}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="h-4 w-4 text-gray-600" />
-                    <p className="text-xs text-muted-foreground">Cancelled</p>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-400">
-                    {metrics.pdf_processing.cancelled}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-purple-600" />
-                    <p className="text-xs text-muted-foreground">Retrying</p>
-                  </div>
-                  <div className="text-2xl font-bold text-purple-400">
-                    {metrics.pdf_processing.retrying}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-                    <p className="text-xs text-muted-foreground">Total</p>
-                  </div>
-                  <div className="text-2xl font-bold">
-                    {metrics.pdf_processing.total}
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Jobs List */}
-              <div className="mt-6">
-                <h4 className="font-semibold mb-3 text-foreground">Recent Jobs</h4>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {getFilteredJobs().length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No jobs in queue</p>
-                  ) : (
-                    paginate(getFilteredJobs(), pdfPageSafe).map((job) => (
-                      <div
-                        key={job.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
-                      >
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={onEnterOrSpace(() => fetchJobDetails(job))}
-                          className="flex-1 cursor-pointer"
-                          onClick={() => fetchJobDetails(job)}
-                        >
-                          <div className="text-sm font-medium text-foreground group-hover:text-primary transition">
-                            {job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                            <span>{formatDate(job.created_at)}</span>
-                            <span>•</span>
-                            <span>Progress: {job.progress}%</span>
-                            <span>•</span>
-                            <span className="font-medium">
-                              <LiveTimer job={job} />
-                            </span>
-                          </div>
-                          {job.metadata?.stage && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Stage: {(job.metadata as any)?.sub_stage || job.metadata.stage}
-                              {(job.metadata as any)?.sub_stage && (
-                                <span className="ml-1 text-muted-foreground">({job.metadata.stage})</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(job.status, job)}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleDeleteJob(job.id);
-                            }}
-                            disabled={deletingJob === job.id}
-                            className="p-1 rounded hover:bg-red-500/20 disabled:opacity-50"
-                            title="Delete job"
-                          >
-                            <Trash2 className={`w-4 h-4 text-red-600 hover:text-red-300 transition ${deletingJob === job.id ? 'animate-spin' : ''}`} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <TablePagination
-                  page={pdfPageSafe}
-                  total={getFilteredJobs().length}
-                  onPageChange={setPdfPage}
-                  label="jobs"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Tab Content - Web Scraping */}
-        <TabsContent value="web_scraping" className="space-y-4">
-          <Card className="dashboard-card border-white/10">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-primary" />
-                    Web Scraping Jobs
-                  </CardTitle>
-                  <CardDescription>
-                    {metrics.web_scraping.total} total jobs | Avg processing time:{' '}
-                    {formatTime(metrics.web_scraping.avg_processing_time)}
-                  </CardDescription>
-                </div>
-
-                {/* Control Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleClearQueue}
-                    disabled={clearingQueue || getFilteredJobs().filter(j => j.status === 'pending' || j.status === 'failed').length === 0}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Cancel all pending and failed jobs"
-                  >
-                    {clearingQueue ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Clearing...
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-3.5 h-3.5 inline mr-1.5" />
-                        Clear Queue
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setAutoRefresh(!autoRefresh)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 shadow-sm ${
-                      autoRefresh
-                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                        : 'bg-white/10 text-foreground hover:bg-white/15 border border-white/10'
-                    }`}
-                  >
-                    {autoRefresh ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Auto-refresh ON
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
-                        Auto-refresh OFF
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={fetchQueueData}
-                    className="px-3 py-1.5 bg-white/10 text-foreground hover:bg-white/15 border border-white/10 rounded-md text-sm font-medium transition-all duration-200"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
-                    Refresh Now
-                  </button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Status Breakdown */}
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-yellow-600" />
-                    <p className="text-xs text-muted-foreground">Pending</p>
-                  </div>
-                  <div className="text-2xl font-bold text-yellow-400">
-                    {metrics.web_scraping.pending}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                    <p className="text-xs text-muted-foreground">Processing</p>
-                  </div>
-                  <div className="text-2xl font-bold text-blue-400">
-                    {metrics.web_scraping.processing}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <p className="text-xs text-muted-foreground">Completed</p>
-                  </div>
-                  <div className="text-2xl font-bold text-green-400">
-                    {metrics.web_scraping.completed}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="h-4 w-4 text-red-600" />
-                    <p className="text-xs text-muted-foreground">Failed</p>
-                  </div>
-                  <div className="text-2xl font-bold text-red-400">
-                    {metrics.web_scraping.failed}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                    <p className="text-xs text-muted-foreground">Interrupted</p>
-                  </div>
-                  <div className="text-2xl font-bold text-orange-400">
-                    {metrics.web_scraping.interrupted}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="h-4 w-4 text-gray-600" />
-                    <p className="text-xs text-muted-foreground">Cancelled</p>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-400">
-                    {metrics.web_scraping.cancelled}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-purple-600" />
-                    <p className="text-xs text-muted-foreground">Retrying</p>
-                  </div>
-                  <div className="text-2xl font-bold text-purple-400">
-                    {metrics.web_scraping.retrying}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-                    <p className="text-xs text-muted-foreground">Total</p>
-                  </div>
-                  <div className="text-2xl font-bold">
-                    {metrics.web_scraping.total}
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Jobs List */}
-              <div className="mt-6">
-                <h4 className="font-semibold mb-3 text-foreground">Recent Jobs</h4>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {getFilteredJobs().length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No jobs in queue</p>
-                  ) : (
-                    paginate(getFilteredJobs(), scrapingPageSafe).map((job) => (
-                      <div
-                        key={job.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
-                      >
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={onEnterOrSpace(() => fetchJobDetails(job))}
-                          className="flex-1 cursor-pointer"
-                          onClick={() => fetchJobDetails(job)}
-                        >
-                          <div className="text-sm font-medium text-foreground group-hover:text-primary transition">
-                            {job.metadata?.source_url || job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                            <span>{formatDate(job.created_at)}</span>
-                            <span>•</span>
-                            <span>Progress: {job.progress}%</span>
-                            <span>•</span>
-                            <span className="font-medium">
-                              <LiveTimer job={job} />
-                            </span>
-                          </div>
-                          {job.metadata?.stage && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Stage: {(job.metadata as any)?.sub_stage || job.metadata.stage}
-                              {(job.metadata as any)?.sub_stage && (
-                                <span className="ml-1 text-muted-foreground">({job.metadata.stage})</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(job.status, job)}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleDeleteJob(job.id);
-                            }}
-                            disabled={deletingJob === job.id}
-                            className="p-1 rounded hover:bg-red-500/20 disabled:opacity-50"
-                            title="Delete job"
-                          >
-                            <Trash2 className={`w-4 h-4 text-red-600 hover:text-red-300 transition ${deletingJob === job.id ? 'animate-spin' : ''}`} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <TablePagination
-                  page={scrapingPageSafe}
-                  total={getFilteredJobs().length}
-                  onPageChange={setScrapingPage}
                   label="jobs"
                 />
               </div>
@@ -3223,7 +2765,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 {/* Pipeline Progress Overview */}
                 {(() => {
                   // Get job-type-specific pipeline stages
-                  const jobType = selectedJob?.job_type || 'pdf_processing';
+                  const jobType = selectedJob?.job_type || 'product_discovery_upload';
                   const jobSpecificPipeline = getPipelineForJobType(jobType);
 
                   // Map pipeline to display format with icons as emojis

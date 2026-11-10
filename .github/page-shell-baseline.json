@@ -35,10 +35,7 @@
     "src/pages/Admin/FinancePage.tsx",
     "src/pages/Admin/InvoiceDetailPage.tsx",
     "src/pages/Admin/MasterCatalogPage.tsx",
-    "src/pages/Admin/MonitoringPage.tsx",
     "src/pages/Admin/OrderDetailPage.tsx",
-    "src/pages/Admin/PDFDocumentDetails.tsx",
-    "src/pages/Admin/SupplierClaimsPage.tsx",
     "src/pages/AgentHub.tsx",
     "src/pages/MaterialComparePage.tsx",
     "src/pages/RoomPlannerPage.tsx",
@@ -63,7 +60,6 @@
     "src/modules/real-estate/pages/PropertyWorkbench.tsx",
     "src/pages/Admin/InvoiceDetailPage.tsx",
     "src/pages/Admin/OrderDetailPage.tsx",
-    "src/pages/Admin/PDFDocumentDetails.tsx",
     "src/pages/Blueprints/BlueprintEditorPage.tsx",
     "src/pages/Templates/TemplateEditorPage.tsx",
     "src/pages/WebsiteDetailPage.tsx"

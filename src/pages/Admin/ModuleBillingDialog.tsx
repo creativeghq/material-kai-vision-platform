@@ -1,6 +1,6 @@
 // Operator binds a module 1:1 to a Stripe PRODUCT (not a bare price). The charge uses
 // the product's default_price (resolved at activation), so two modules can never collide on a
-// shared price id. The plan tier that INCLUDES a module for free is set separately on /admin/plans.
+// shared price id. The plan tier that INCLUDES a module for free is set separately on Platform → Plans.
 import React, { useEffect, useState } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';

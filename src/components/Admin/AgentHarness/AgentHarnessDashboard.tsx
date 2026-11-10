@@ -71,42 +71,56 @@ type WindowValue = (typeof WINDOWS)[number]['value'];
 
 const ADMIN_PAGES: Array<{ group: string; items: Array<{ label: string; path: string }> }> = [
   {
-    group: 'Harness Configuration',
+    group: 'Agent Harness',
     items: [
-      { label: 'AI Configs — Prompts, Pricing, Models', path: '/admin/ai-configs' },
+      { label: 'Prompts', path: '/admin/ai-configs?tab=prompts' },
+      { label: 'Chat Starters', path: '/admin/ai-configs?tab=starters' },
+      { label: 'Writing Rules', path: '/admin/ai-configs?tab=writing-rules' },
+      { label: 'Model Pricing', path: '/admin/ai-configs?tab=pricing' },
       { label: 'Background Agents', path: '/admin/ai-configs?tab=background-agents' },
-      { label: 'API Gateway', path: '/admin/ai-configs?tab=api-gateway' },
       { label: 'Flows', path: '/flows' },
     ],
   },
   {
-    group: 'Data & Pipeline',
+    group: 'Pipeline',
     items: [
-      { label: 'Materials Data', path: '/admin/materials-data' },
-      { label: 'AI Data Review — Metadata, Relevancy, Duplicates', path: '/admin/ai-configs?tab=ai-data' },
       { label: 'Data Import', path: '/admin/data-import' },
-      { label: 'Async Job Queue', path: '/admin/async-queue-monitor' },
+      { label: 'Job Queue', path: '/admin/async-queue-monitor' },
+      { label: 'Materials Data', path: '/admin/materials-data' },
+      { label: 'AI Review — Metadata, Relevancy, Duplicates', path: '/admin/materials-data?tab=ai-review' },
       { label: 'Knowledge Base', path: '/admin/knowledge-base' },
-      { label: '3D Model Debugging', path: '/admin/ai-configs?tab=3d-debug' },
+    ],
+  },
+  {
+    group: 'Operations',
+    items: [
+      { label: 'System Health', path: '/admin/operations' },
+      { label: 'Search', path: '/admin/operations?tab=search-analytics' },
+      { label: 'Services & Billing', path: '/admin/operations?tab=services-billing' },
+      { label: 'Platform Overview', path: '/admin/operations?tab=platform-overview' },
+      { label: 'Catalogs', path: '/admin/operations?tab=catalogs' },
+      { label: 'Push Notifications', path: '/admin/operations?tab=push' },
+      { label: 'Data Health', path: '/admin/data-health' },
+      { label: 'Application Logs', path: '/admin/logs' },
     ],
   },
   {
     group: 'Platform',
     items: [
-      { label: 'Operations', path: '/admin/operations' },
-      { label: 'Data Health', path: '/admin/data-health' },
-      { label: 'Application Logs', path: '/admin/logs' },
-      { label: 'Monitoring', path: '/admin/monitoring' },
       { label: 'Modules', path: '/admin/modules' },
-      { label: 'Plans', path: '/admin/plans' },
+      { label: 'Subscribers', path: '/admin/modules?tab=subscribers' },
+      { label: 'Plans', path: '/admin/modules?tab=plans' },
+      { label: 'Platform Keys', path: '/admin/modules?tab=platform-keys' },
+      { label: 'API Keys', path: '/admin/modules?tab=api-keys' },
     ],
   },
   {
-    group: 'Marketplace',
+    group: 'Approvals',
     items: [
-      { label: 'Supplier Claims', path: '/admin/supplier-claims' },
+      { label: 'Brand & Reseller Approvals', path: '/admin/operations?tab=factory-onboarding' },
+      { label: 'Supplier Claims', path: '/admin/operations?tab=factory-onboarding&sub=supplier-claims' },
+      { label: 'Freight Quotes', path: '/admin/operations?tab=factory-onboarding&sub=freight-quotes' },
       { label: 'Master Catalog', path: '/catalog-master' },
-      { label: 'Freight Quotes', path: '/admin/freight-quotes' },
     ],
   },
 ];
