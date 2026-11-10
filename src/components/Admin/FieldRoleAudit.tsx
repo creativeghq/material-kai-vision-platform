@@ -120,12 +120,14 @@ export const FieldRoleAudit: React.FC = () => {
         p_role: role,
         p_signal: 'operator',
         p_confidence: 1,
-        p_reason: 'Set from the field-role audit screen.',
+        p_reason: role === field.role ? 'Confirmed from the field-role audit screen.' : 'Set from the field-role audit screen.',
       });
       if (error) throw error;
-      const res = data as { applied?: boolean; reason?: string } | null;
+      const res = data as { applied?: boolean; confirmed?: boolean; reason?: string } | null;
       if (res && res.applied === false) {
         toast({ title: 'Not applied', description: res.reason ?? 'refused', variant: 'destructive' });
+      } else if (res?.confirmed) {
+        toast({ title: `${field.field_name} confirmed as ${role}` });
       } else {
         toast({ title: `${field.field_name} is now ${role}` });
       }
@@ -152,11 +154,11 @@ export const FieldRoleAudit: React.FC = () => {
     <Card>
       <CardHeader className="border-b border-border/60">
         <CardTitle className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4" /> Field roles
+          <ShieldCheck className="h-4 w-4" /> Field Roles
         </CardTitle>
         <CardDescription>
-          What each field was classified as, which signal decided it, and why. Overriding takes
-          effect immediately — this screen never holds ingest up.
+          Identity fields are the choices a quote or order line offers (size, colour, finish).
+          Confirm a verdict that is right, or flip one that is wrong; both take effect immediately.
         </CardDescription>
         <div className="flex flex-wrap gap-4 pt-2 text-sm">
           <span><span className="font-medium">{counts.identity}</span> identity</span>
@@ -239,17 +241,30 @@ export const FieldRoleAudit: React.FC = () => {
                       {r.classified_reason || '—'}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-7 text-xs"
-                        disabled={saving === r.field_name}
-                        onClick={() => override(r, r.role === 'identity' ? 'descriptive' : 'identity')}
-                      >
-                        {saving === r.field_name
-                          ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          : `make ${r.role === 'identity' ? 'descriptive' : 'identity'}`}
-                      </Button>
+                      <div className="flex flex-wrap gap-1">
+                        {signal !== 'operator' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs"
+                            disabled={saving === r.field_name}
+                            onClick={() => override(r, r.role)}
+                          >
+                            Confirm {r.role}
+                          </Button>
+                        )}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs"
+                          disabled={saving === r.field_name}
+                          onClick={() => override(r, r.role === 'identity' ? 'descriptive' : 'identity')}
+                        >
+                          {saving === r.field_name
+                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            : `Make ${r.role === 'identity' ? 'descriptive' : 'identity'}`}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

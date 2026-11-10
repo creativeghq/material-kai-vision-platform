@@ -127,7 +127,8 @@ export const createCallPlatformRpcTool = (
     const access = platformRpcAccess(name);
     if (access.access === 'withheld') {
       return JSON.stringify({
-        success: false, withheld: true, reader: name, error: access.reason,
+        success: false, withheld: true, reader: name,
+        error: `${name} is withheld from this tool (${access.reason.replace(/\.$/, '')}).`,
         note: 'Cost and margin are not served through the generic reader. Tell the user this figure '
           + 'needs the screen that gates it by role; do not look for another reader that leaks it.',
       });

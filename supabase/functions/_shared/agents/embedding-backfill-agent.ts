@@ -289,6 +289,8 @@ export class EmbeddingBackfillAgent implements AgentRunner {
     // ── stuck count (entities failing every tick) ──
     let stuck = 0;
     try {
+      const { error: settleError } = await supabase.rpc('settle_embedding_backfill_state');
+      if (settleError) await log('warn', 'could not settle backfill state', { error: settleError.message });
       const { count } = await supabase.from('embedding_backfill_state').select('entity_id', { count: 'exact', head: true })
         .is('resolved_at', null).gte('attempts', STUCK_ATTEMPTS);
       stuck = count ?? 0;
