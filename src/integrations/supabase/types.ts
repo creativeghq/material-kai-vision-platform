@@ -13188,6 +13188,14 @@ export type Database = {
           series: string | null
           series_number: number | null
           ship_from: string | null
+          ship_from_city: string | null
+          ship_from_number: string | null
+          ship_from_postal: string | null
+          ship_from_street: string | null
+          ship_to_city: string | null
+          ship_to_number: string | null
+          ship_to_postal: string | null
+          ship_to_street: string | null
           ship_to: string | null
           status: string
           stripe_checkout_session_id: string | null
@@ -13296,6 +13304,14 @@ export type Database = {
           series?: string | null
           series_number?: number | null
           ship_from?: string | null
+          ship_from_city?: string | null
+          ship_from_number?: string | null
+          ship_from_postal?: string | null
+          ship_from_street?: string | null
+          ship_to_city?: string | null
+          ship_to_number?: string | null
+          ship_to_postal?: string | null
+          ship_to_street?: string | null
           ship_to?: string | null
           status?: string
           stripe_checkout_session_id?: string | null
@@ -13402,6 +13418,14 @@ export type Database = {
           series?: string | null
           series_number?: number | null
           ship_from?: string | null
+          ship_from_city?: string | null
+          ship_from_number?: string | null
+          ship_from_postal?: string | null
+          ship_from_street?: string | null
+          ship_to_city?: string | null
+          ship_to_number?: string | null
+          ship_to_postal?: string | null
+          ship_to_street?: string | null
           ship_to?: string | null
           status?: string
           stripe_checkout_session_id?: string | null

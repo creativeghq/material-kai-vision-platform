@@ -507,7 +507,7 @@ describe('what the sandbox taught us that reading the spec did not', () => {
   it('but a ΔΠΠ still names its goods and both parties', () => {
     // 204 wants the issuer and counterpart named on anything about goods, and a quantitative
     // receipt obviously needs the unit — so the LINE facts are wider than the transport block.
-    expect(novus).toMatch(/const statesGoods = isMovementDoc \|\| carriesTransport/);
+    expect(novus).toMatch(/const statesGoods = isMovementDoc \|\| !!header\.isDeliveryNote/);
     expect(novus).toMatch(/const unresolvedUnits = statesGoods/);
     expect(novus).toMatch(/counterpart: \(counterpart\.vatNumber \|\| statesGoods\)/);
   });

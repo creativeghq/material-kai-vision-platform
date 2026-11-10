@@ -28,6 +28,7 @@ import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { invoicingSetupService, type FinanceBranch, type RefRow } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
 import { DeliveryVatNotice } from '@/modules/finance/components/DeliveryVatNotice';
+import { ShipAddressFields, EMPTY_SHIP_ADDRESS, isCompleteShipAddress, formatShipAddress, type ShipAddress } from '@/modules/finance/components/ShipAddressFields';
 import { CreditControlNotice } from '@/modules/finance/components/CreditControlNotice';
 import { formatAddressLine } from '@/services/crm.service';
 import { QuickAddCompanyDialog } from '@/components/business/crm/QuickAddCompanyDialog';
@@ -236,6 +237,11 @@ const taxOptionLabel = (r: TaxRef): string => {
 };
 
 const PRODUCT_SUGGEST_MIN = 3;
+
+const shipColumns = (prefix: 'ship_from' | 'ship_to', a: ShipAddress | null) => ({
+  [`${prefix}_street`]: a?.street.trim() || null, [`${prefix}_number`]: a?.number.trim() || null,
+  [`${prefix}_postal`]: a?.postal.trim() || null, [`${prefix}_city`]: a?.city.trim() || null,
+});
 
 const EDIT_LINE_COLUMNS = 'id, description, sku, quantity, unit_price, unit, measurement_unit_code, discounted_price, '
   + 'selected_attributes, selected_color, selected_size, vat_category, vat_exemption_category, '
@@ -448,8 +454,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   // Shipping
   const [hasShipping, setHasShipping] = useState(false);
-  const [shipFrom, setShipFrom] = useState('');
-  const [shipTo, setShipTo] = useState('');
+  const [fromAddr, setFromAddr] = useState<ShipAddress>(EMPTY_SHIP_ADDRESS);
+  const [toAddr, setToAddr] = useState<ShipAddress>(EMPTY_SHIP_ADDRESS);
   const [transportDate, setTransportDate] = useState('');
   const [transportTime, setTransportTime] = useState('');
   const [vehicleNumber, setVehicleNumber] = useState('');
@@ -483,7 +489,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(true); setSendEmail(false); setAutoNext(null); setChosenSeriesId('auto');
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat(''); setDocTaxes([]);
     setLines(initialItems && initialItems.length ? initialItems.map((it) => emptyLine(it)) : [emptyLine()]);
-    setHasShipping(false); setShipFrom(''); setShipTo(''); setTransportDate(''); setTransportTime('');
+    setHasShipping(false); setFromAddr(EMPTY_SHIP_ADDRESS); setToAddr(EMPTY_SHIP_ADDRESS); setTransportDate(''); setTransportTime('');
     setVehicleNumber(''); setResponsible(''); setMovePurpose('1');
     setIsB2g(false); setB2gContractRef(''); setB2gBuyerRef(''); setB2gBuyerReg('');
     setB2gBuyerIdentifier(''); setB2gBudgetIdentifier(''); setB2gDueDate(''); setB2gCpv(''); setB2gPoRef('');
@@ -725,7 +731,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setPrintOnlineCode(v.print_online_code !== false); setInfoBox(v.info_box ?? ''); setLogoMode(v.logo_mode === 'none' ? 'none' : 'auto');
       setMoveStock(v.move_stock !== false); setSendEmail(false);
       setExpenseType(v.expense_classification_type ?? ''); setExpenseCategory(v.expense_classification_category ?? '');
-      setHasShipping(!!v.has_shipping); setShipFrom(v.ship_from ?? ''); setShipTo(v.ship_to ?? '');
+      setHasShipping(!!v.has_shipping);
+      setFromAddr({ street: v.ship_from_street ?? v.ship_from ?? '', number: v.ship_from_number ?? '', postal: v.ship_from_postal ?? '', city: v.ship_from_city ?? '' });
+      setToAddr({ street: v.ship_to_street ?? v.ship_to ?? '', number: v.ship_to_number ?? '', postal: v.ship_to_postal ?? '', city: v.ship_to_city ?? '' });
       setTransportDate(v.transport_date ? String(v.transport_date).slice(0, 10) : '');
       setTransportTime(v.transport_time ? String(v.transport_time).slice(0, 5) : '');
       setVehicleNumber(v.vehicle_number ?? ''); setResponsible(v.responsible ?? ''); setMovePurpose(str(v.move_purpose || '1'));
@@ -928,9 +936,18 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const matchedServices = (term: string) => term.length < PRODUCT_SUGGEST_MIN ? [] : services.filter((s) => s.name.toLowerCase().includes(term.toLowerCase())).slice(0, 6);
 
   // Shipping prefills
-  const fmtAddr = (a: any) => a ? [a.business_address ?? a.street ?? a.address, a.business_street_number ?? a.street_number, a.business_postal_code ?? a.postal_code, a.business_city ?? a.city].filter(Boolean).join(' ') : '';
-  const useHqAddress = () => setShipFrom(fmtAddr(issuer));
-  const useCustomerDelivery = () => setShipTo(fmtAddr(customerAddr));
+  const addrOf = (a: any): ShipAddress => ({
+    street: a?.business_address ?? a?.street ?? a?.address ?? '', number: a?.business_street_number ?? a?.street_number ?? '',
+    postal: a?.business_postal_code ?? a?.postal_code ?? '', city: a?.business_city ?? a?.city ?? '',
+  });
+  const useHqAddress = () => setFromAddr(addrOf(issuer));
+  const useCustomerDelivery = () => setToAddr(addrOf(customerAddr));
+  const toggleShipping = (on: boolean) => {
+    setHasShipping(on);
+    if (!on) return;
+    if (!isCompleteShipAddress(fromAddr) && issuer) setFromAddr(addrOf(issuer));
+    if (!isCompleteShipAddress(toAddr) && customerAddr) setToAddr(addrOf(customerAddr));
+  };
 
   // Adopt whatever the shared dialog created (or matched). The ' (company)' suffix is load-bearing
   // — the preview strips exactly that to print the buyer's name (see the `customer` memo below).
@@ -1242,6 +1259,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       });
       return;
     }
+    if (hasShipping && (!isCompleteShipAddress(fromAddr) || !isCompleteShipAddress(toAddr))) {
+      setTab('details');
+      toast({ title: 'Complete the loading and delivery addresses', description: 'myDATA needs street, postal code and city for both places on a delivery note.', variant: 'destructive' });
+      return;
+    }
     if (buyerRisk.hardBlocked) {
       setTab('details');
       toast({
@@ -1290,7 +1312,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         chosen_series_id: chosenSeriesId !== 'auto' ? chosenSeriesId : null,
         customer_address_unit_id: addrUnitId,
         has_shipping: hasShipping,
-        ship_from: hasShipping ? (shipFrom || null) : null, ship_to: hasShipping ? (shipTo || null) : null,
+        ship_from: hasShipping ? (formatShipAddress(fromAddr) || null) : null, ship_to: hasShipping ? (formatShipAddress(toAddr) || null) : null,
+        ...shipColumns('ship_from', hasShipping ? fromAddr : null), ...shipColumns('ship_to', hasShipping ? toAddr : null),
         transport_date: hasShipping && transportDate ? transportDate : null, transport_time: hasShipping ? (transportTime || null) : null,
         vehicle_number: hasShipping ? (vehicleNumber || null) : null, responsible: hasShipping ? (responsible || null) : null,
         move_purpose: hasShipping ? movePurpose : null,
@@ -1549,7 +1572,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       total_withheld_amount: totals.withheld, digital_transaction_fee: totals.digital,
       payment_method_code: paymentMethodCode ? parseInt(paymentMethodCode, 10) : null,
       payment_method_info: paymentMethodInfo || null,
-      has_shipping: hasShipping, ship_from: hasShipping ? shipFrom : null, ship_to: hasShipping ? shipTo : null,
+      has_shipping: hasShipping, ship_from: hasShipping ? formatShipAddress(fromAddr) : null, ship_to: hasShipping ? formatShipAddress(toAddr) : null,
       vehicle_number: hasShipping ? vehicleNumber : null, move_purpose: hasShipping ? movePurpose : null,
       print_terms: printTerms, print_online_code: printOnlineCode, info_box: infoBox || null,
       notes: notes || null, logo_mode: logoMode, fiscal_mark: null,
@@ -1589,7 +1612,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         })
         .filter((r) => r.tax_type > 0 && r.tax_amount !== 0)
       : null,
-  }), [chosenKad, issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, shipFrom, shipTo, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr, selfBillSupplierId, selfBillSupplierRow, docTaxes, docTaxAmountOf, refsForTaxType]);
+  }), [chosenKad, issuer, previewBanks, previewColors, currency, documentType, nextNumber, issueDate, dueDatePreview, relatedDocument, vatRate, paidUpfront, cashPct, totals, paymentMethodCode, paymentMethodInfo, hasShipping, fromAddr, toAddr, vehicleNumber, movePurpose, printTerms, printOnlineCode, infoBox, notes, logoMode, lines, customer, customerAddr, selfBillSupplierId, selfBillSupplierRow, docTaxes, docTaxAmountOf, refsForTaxType]);
 
   const itemCount = useMemo(() => lines.filter((l) => l.description.trim()).length, [lines]);
 
@@ -1906,27 +1929,27 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               <div className="flex items-center justify-between">
                 <div>
                   <div className="text-sm font-medium">Invoice with shipping</div>
-                  <p className="text-xs text-muted-foreground">Adds a transport block (combined invoice + delivery note).</p>
+                  <p className="text-xs text-muted-foreground">The invoice is also the delivery note (Τιμολόγιο – Δελτίο Αποστολής) and is filed with myDATA as one.</p>
                 </div>
-                <Switch checked={hasShipping} onCheckedChange={setHasShipping} />
+                <Switch checked={hasShipping} onCheckedChange={toggleShipping} />
               </div>
               {hasShipping && (
                 <FormGrid cols={4}>
                   <FormField
                     label="Loading Place"
-                    htmlFor="ni-ship-from"
+                    htmlFor="ni-ship-from-street"
                     className="sm:col-span-2"
                     hint={<button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline" onClick={useHqAddress}><MapPin className="h-3 w-3" /> Use HQ details</button>}
                   >
-                    <Input id="ni-ship-from" className="h-8 text-xs" value={shipFrom} onChange={(e) => setShipFrom(e.target.value)} placeholder="Loading address" />
+                    <ShipAddressFields idPrefix="ni-ship-from" value={fromAddr} onChange={setFromAddr} />
                   </FormField>
                   <FormField
                     label="Delivery Place"
-                    htmlFor="ni-ship-to"
+                    htmlFor="ni-ship-to-street"
                     className="sm:col-span-2"
                     hint={<button type="button" className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline disabled:opacity-40" disabled={!customerAddr} onClick={useCustomerDelivery}><MapPin className="h-3 w-3" /> Customer delivery address</button>}
                   >
-                    <Input id="ni-ship-to" className="h-8 text-xs" value={shipTo} onChange={(e) => setShipTo(e.target.value)} placeholder="Delivery address" />
+                    <ShipAddressFields idPrefix="ni-ship-to" value={toAddr} onChange={setToAddr} />
                   </FormField>
                   <FormField label="Date" htmlFor="ni-transport-date"><Input id="ni-transport-date" type="date" className="h-8 text-xs" value={transportDate} onChange={(e) => setTransportDate(e.target.value)} /></FormField>
                   <FormField label="Time" htmlFor="ni-transport-time"><Input id="ni-transport-time" type="time" className="h-8 text-xs" value={transportTime} onChange={(e) => setTransportTime(e.target.value)} /></FormField>

@@ -27,6 +27,7 @@ import {
 } from '@/services/fiscal/fiscalVocabulary';
 import { invoicingSetupService, type FinanceBranch } from '@/services/invoicingSetupService';
 import { AddressUnitSelect } from '@/modules/crm/components/AddressUnitSelect';
+import { ShipAddressFields } from '@/modules/finance/components/ShipAddressFields';
 import { issuedToast, transmitAfterIssue } from '@/modules/finance/services/fiscalAutoSend';
 
 export const NewDeliveryNoteDialog: React.FC<{
@@ -447,11 +448,11 @@ export const NewDeliveryNoteDialog: React.FC<{
           <div className="grid gap-3 md:grid-cols-2">
             <div className="space-y-1 rounded-md border border-border/60 p-3">
               <Label className="text-xs font-medium">Loading Place (From)</Label>
-              <AddressFields value={fromAddr} onChange={setFromAddr} />
+              <ShipAddressFields value={fromAddr} onChange={setFromAddr} />
             </div>
             <div className="space-y-1 rounded-md border border-border/60 p-3">
               <Label className="text-xs font-medium">Delivery Place (To)</Label>
-              <AddressFields value={toAddr} onChange={setToAddr} />
+              <ShipAddressFields value={toAddr} onChange={setToAddr} />
             </div>
           </div>
           {toIncomplete && (
@@ -509,12 +510,3 @@ export const NewDeliveryNoteDialog: React.FC<{
   );
 };
 
-type Addr = { street: string; number: string; postal: string; city: string };
-const AddressFields: React.FC<{ value: Addr; onChange: (a: Addr) => void }> = ({ value, onChange }) => (
-  <div className="grid grid-cols-2 gap-2">
-    <Input className="h-8 text-xs col-span-2" value={value.street} onChange={(e) => onChange({ ...value, street: e.target.value })} placeholder="Street" />
-    <Input className="h-8 text-xs" value={value.number} onChange={(e) => onChange({ ...value, number: e.target.value })} placeholder="No." />
-    <Input className="h-8 text-xs" value={value.postal} onChange={(e) => onChange({ ...value, postal: e.target.value })} placeholder="Postal Code" />
-    <Input className="h-8 text-xs col-span-2" value={value.city} onChange={(e) => onChange({ ...value, city: e.target.value })} placeholder="City" />
-  </div>
-);

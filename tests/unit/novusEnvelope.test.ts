@@ -538,3 +538,32 @@ describe('the provider prints the title of the type we send, never a fixed one',
     }
   });
 });
+
+describe('an invoice with shipping is a ΤΔΑ only when it says so (Novus 1.1 delivery-note example)', () => {
+  const shipping = {
+    movePurpose: 1, movePurposeLabel: 'Πώληση', dispatchDate: '2026-11-11', dispatchTime: '10:30:00',
+    loadingAddress: { street: 'ΔΗΜΗΤΡΙΟΥ ΧΑΡΙΣΗ', number: '14', postalCode: '54352', city: 'ΘΕΣΣΑΛΟΝΙΚΗ' },
+    deliveryAddress: { street: 'Κεντρική', number: '1', postalCode: '63077', city: 'Κρυοπηγή' },
+  };
+  const tda = (over: Record<string, unknown>) => doc(invoice({
+    header: { series: 'MK', aa: '1', issueDate: '2026-11-10', invoiceType: '1.1', currency: 'EUR', ...shipping, ...over },
+  } as any));
+
+  it('with isDeliveryNote: flag inside invoiceHeader, itemDescr and unit on the lines, addresses in otherDeliveryNoteHeader', () => {
+    const d = tda({ isDeliveryNote: true });
+    expect(d.invoiceHeader.isDeliveryNote).toBe(true);
+    expect(d.invoiceHeader.otherDeliveryNoteHeader.deliveryAddress.postalCode).toBe('63077');
+    expect(d.invoiceDetails[0].itemDescr).toBe('Πλακίδιο 60x60');
+    expect(d.invoiceDetails[0].measurementUnit).toBe(1);
+    expect(d.paymentMethods).toBeTruthy();
+  });
+
+  it('without it: transport header only — AADE refused itemDescr (247), the names (219/220) and issuer address (205)', () => {
+    const d = tda({});
+    expect(d.invoiceHeader.isDeliveryNote).toBeUndefined();
+    expect(d.invoiceDetails[0].itemDescr).toBeUndefined();
+    expect(d.issuer.name).toBeUndefined();
+    expect(d.issuer.address).toBeUndefined();
+    expect(d.counterpart.name).toBeUndefined();
+  });
+});

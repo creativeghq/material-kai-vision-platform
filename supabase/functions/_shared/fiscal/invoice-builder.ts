@@ -144,6 +144,26 @@ function assertMovePurpose(raw: unknown, subject: string): number {
   return n;
 }
 
+/** The types Novus accepts as an invoice-that-is-the-delivery-note (`isDeliveryNote`). */
+const TDA_INVOICE_TYPES = new Set(['1.1', '11.1']);
+
+type Place = { street: string; number: string; postalCode: string; city: string };
+
+/** The stored four fields, else the party's whole address. Never one line glued onto the party's postcode. */
+function shipPlace(inv: any, prefix: 'ship_from' | 'ship_to', party: Partial<Place> | undefined, invoiceId: string): Place {
+  const s = (k: string) => String(inv[`${prefix}_${k}`] ?? '').trim();
+  if (s('street') || s('postal') || s('city')) {
+    return { street: s('street'), number: s('number'), postalCode: s('postal'), city: s('city') };
+  }
+  if (String(inv[prefix] ?? '').trim()) {
+    throw new Error(
+      `Refusing to transmit invoice ${invoiceId}: its ${prefix === 'ship_from' ? 'loading' : 'delivery'} place is one ` +
+        `line of text ("${inv[prefix]}"). Edit the invoice and enter street, number, postal code and city.`,
+    );
+  }
+  return { street: party?.street ?? '', number: party?.number ?? '', postalCode: party?.postalCode ?? '', city: party?.city ?? '' };
+}
+
 /** myDATA `dispatchTime` is `xs:time`: AADE rejects `22:30`, which is what a time input stores. */
 export function dispatchTimeOf(raw: unknown): string | undefined {
   const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(raw ?? '').trim());
@@ -581,18 +601,11 @@ export async function buildInvoiceInputFromDb(
           // default rather than guessing the issuing branch at both ends.
           loadingBranch: inv.ship_from_branch_code ?? Number(inv.branch_code ?? 0) ?? 0,
           ...(inv.ship_to_branch_code != null ? { deliveryBranch: Number(inv.ship_to_branch_code) } : {}),
-          loadingAddress: {
-            street: inv.ship_from || issuer.address?.street || '',
-            number: issuer.address?.number ?? '', postalCode: issuer.address?.postalCode ?? '', city: issuer.address?.city ?? '',
-          },
-          deliveryAddress: {
-            street: inv.ship_to || counterpart.address?.street || '',
-            number: counterpart.address?.number ?? '', postalCode: counterpart.address?.postalCode ?? '', city: counterpart.address?.city ?? '',
-          },
-          // myDATA v2.0.2 movement facts. `isDeliveryNote` is what makes this ONE document
-          // (ΤΔΑ) rather than an invoice with a separate 9.3 beside it; the connector refuses
-          // it on a type AADE does not accept it on.
-          ...(inv.is_delivery_note ? { isDeliveryNote: true } : {}),
+          loadingAddress: shipPlace(inv, 'ship_from', issuer.address, invoiceId),
+          deliveryAddress: shipPlace(inv, 'ship_to', counterpart.address, invoiceId),
+          // Shipping on a 1.1 / 11.1 IS the ΤΔΑ. Without the flag AADE files a plain invoice and
+          // refuses every movement field on it (247 itemDescr, 219/220 names, 205 address).
+          ...(inv.is_delivery_note || TDA_INVOICE_TYPES.has(String(inv.document_type)) ? { isDeliveryNote: true } : {}),
           ...(inv.to_weigh ? { toWeigh: true } : {}),
           ...(inv.non_obligated_recipient ? { nonObligatedRecipient: true } : {}),
           ...(inv.without_digital_transport_tracking ? { withoutDigitalTransportTracking: true } : {}),

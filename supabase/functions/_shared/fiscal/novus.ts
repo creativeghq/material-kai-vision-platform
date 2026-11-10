@@ -119,14 +119,13 @@ export function buildNovusPayload(input: FiscalInvoiceInput): Record<string, unk
   // payment methods, no income type. `carriesTransport` states HOW goods travelled, which a
   // ΔΠΠ does not: it records what quantity arrived, and AADE refuses dispatchDate,
   // otherDeliveryNoteHeader, packingsDeclarations and nonObligatedRecipient on one (205).
-  // `statesGoods` is either, and governs the line and party facts 204 asks for.
-  // Conflating the first two is why no invoice with shipping could ever be transmitted.
+  // `statesGoods` (movement doc or ΤΔΑ) governs the line and party facts 204 asks for.
   const isMovementDoc = isMovementDocType(header.invoiceType);
   const carriesTransport =
     isDispatchNoteType(header.invoiceType) || header.movePurpose != null || !!header.isDeliveryNote;
-  // Either way the document is ABOUT goods, so its lines name the item and its unit, and both
-  // parties must be named (204).
-  const statesGoods = isMovementDoc || carriesTransport;
+  // A plain invoice with transport details gets none of them: AADE refuses itemDescr (247),
+  // the names (219/220) and the issuer address (205) on it.
+  const statesGoods = isMovementDoc || !!header.isDeliveryNote;
 
   // A ΔΠΠ MUST SAY WHY IT WAS ISSUED — AADE Appendix §8.24, mandatory from myDATA v2.0.2.
   // There is no defensible default: the codes are different tax facts about the same goods.
