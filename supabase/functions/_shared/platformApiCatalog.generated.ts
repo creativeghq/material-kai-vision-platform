@@ -4046,6 +4046,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "enum": [
           "accounts",
+          "add-account",
           "map-account",
           "fx-rate",
           "exchange",
@@ -4089,7 +4090,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       },
       "revolut_account_id": {
         "type": "string",
-        "description": "Revolut account (pocket) id from `accounts`"
+        "description": "Revolut account id from `accounts`"
       },
       "bank_account_id": {
         "type": "string",
