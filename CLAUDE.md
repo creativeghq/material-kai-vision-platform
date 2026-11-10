@@ -556,6 +556,15 @@ memberships from whatever list the CALLER loaded, and the contact Categories tab
 so the second to write deletes what the first just saved from a copy taken before it. Guarded by
 [tests/unit/supplyCategories.test.ts](tests/unit/supplyCategories.test.ts).
 
+## Supplier price rows carry SIZE, GRADE and UNIT as columns — never only inside the text
+`kb_price_rows.size_keys` (cm, `60x120`), `grade` (`standard|second_choice|lower`), `unit_norm` and `unit_status`
+(`printed|section|unconfirmed`) are derived by the `kb_price_rows_facts_trg` BEFORE trigger from `kb_row_sizes` /
+`kb_row_grade` / `kb_unit_norm`, so no loader can skip them. `resolve_purchase_prices` filters on them: a sized query
+never returns another size, a non-standard grade only when the query asks for it, and an unconfirmed unit is a warning,
+never assumed per m2. Never match a price to a product on item text alone, and never read `selection` as a grade (it is a
+collection name). A new loader inserts rows and nothing else; `lint_price_row_facts()` (service_role) must return all
+zeros after a load. Unit is NEVER guessed: a row with no printed or section unit stays `unconfirmed`.
+
 ## Embeddings & VECS — footguns
 **VECS is the single source of truth for image embeddings.** All vectors are halfvec.
 
