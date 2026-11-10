@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Input } from '@/components/core/ui/input';
-import { parseDecimal } from '@/utils/decimal';
+import { formatNumber, parseDecimal } from '@/utils/decimal';
 
 type MoneyInputProps = Omit<
   React.ComponentProps<typeof Input>,
@@ -34,7 +34,7 @@ export function MoneyInput({
       ? ''
       : displayDecimals === null
         ? String(value)
-        : (value as number).toFixed(displayDecimals);
+        : formatNumber(value as number, { decimals: displayDecimals, maxDecimals: displayDecimals });
 
   return (
     <Input

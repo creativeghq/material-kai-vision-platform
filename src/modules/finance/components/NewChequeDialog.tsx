@@ -10,7 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { chequesService } from '@/modules/finance/services/chequesService';
 import { financeService, type Invoice, type SupplierBill } from '@/modules/finance/services/financeService';
-import { parseDecimal } from '@/utils/decimal';
+import { formatMoney, parseDecimal } from '@/utils/decimal';
 
 export const NewChequeDialog: React.FC<{
   workspaceId: string; open: boolean; onOpenChange: (v: boolean) => void; onCreated: () => void;
@@ -112,10 +112,10 @@ export const NewChequeDialog: React.FC<{
                   {direction === 'in'
                     ? (invoices.length === 0
                         ? <div className="px-2 py-1 text-xs text-muted-foreground">No open invoices</div>
-                        : invoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>))
+                        : invoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — Due: {formatMoney(Number(i.amount_due), i.currency)}</SelectItem>))
                     : (bills.length === 0
                         ? <div className="px-2 py-1 text-xs text-muted-foreground">No open bills</div>
-                        : bills.map((b) => <SelectItem key={b.id} value={b.id}>{b.supplier_bill_number ?? 'Bill'} — due {Number(b.amount_due).toFixed(2)}</SelectItem>))}
+                        : bills.map((b) => <SelectItem key={b.id} value={b.id}>{b.supplier_bill_number ?? 'Bill'} — Due: {formatMoney(Number(b.amount_due), b.currency)}</SelectItem>))}
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">When you mark this cheque cleared, a payment is booked{targetId ? ' and this document is settled.' : ' (unallocated cash).'}</p>

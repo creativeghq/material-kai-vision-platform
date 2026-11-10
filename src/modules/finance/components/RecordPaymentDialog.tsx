@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
+import { MoneyInput } from '@/components/core/ui/money-input';
 import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -694,7 +695,7 @@ export const RecordPaymentDialog: React.FC<{
             </FormField>
             <FormField label="Amount">
               <div className="flex gap-2">
-                <Input type="text" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />
+                <MoneyInput value={parseDecimal(amount)} onValueChange={(n) => setAmount(n == null ? '' : String(n))} />
                 {/* Shown for EVERY direction. It used to render only for `received`, so on a
                     refund or a supplier payment the state stayed at its reset value 'EUR' and was
                     passed straight to recordPayment — refunding a USD invoice booked a EUR
@@ -794,7 +795,7 @@ export const RecordPaymentDialog: React.FC<{
                     <SelectGroup>
                       <SelectLabel>Invoices</SelectLabel>
                       {pickableInvoices.map((i) => (
-                        <SelectItem key={i.id} value={`inv:${i.id}`}>{i.internal_number} — due {Number(i.amount_due).toFixed(2)}</SelectItem>
+                        <SelectItem key={i.id} value={`inv:${i.id}`}>{i.internal_number} — Due: {formatMoney(Number(i.amount_due), i.currency)}</SelectItem>
                       ))}
                     </SelectGroup>
                   )}
@@ -894,7 +895,7 @@ export const RecordPaymentDialog: React.FC<{
                   <SelectTrigger><SelectValue placeholder="Pick the invoice being refunded…" /></SelectTrigger>
                   <SelectContent>
                     {pickableInvoices.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">No invoices</div>
-                      : pickableInvoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — {Number((i as any).total ?? 0).toFixed(2)}{(i as any).fiscal_mark ? ' · MARK' : ''}</SelectItem>)}
+                      : pickableInvoices.map((i) => <SelectItem key={i.id} value={i.id}>{i.internal_number} — {formatMoney(Number((i as any).total ?? 0), i.currency)}{(i as any).fiscal_mark ? ' · MARK' : ''}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </FormField>
