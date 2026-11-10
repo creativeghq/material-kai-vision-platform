@@ -6,7 +6,6 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Switch } from '@/components/core/ui/switch';
 import { Textarea } from '@/components/core/ui/textarea';
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/core/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import {
@@ -84,10 +83,17 @@ const toDraft = (c: EvalCaseRow): Draft => ({
   sort_order: String(c.sort_order ?? 0), notes: c.notes ?? '', is_active: c.is_active,
 });
 
+function regexParseError(src: string): string | null {
+  try {
+    new RegExp(src, 'i');
+    return null;
+  } catch (e) {
+    return (e as Error).message;
+  }
+}
+
 function invalidRegexes(list: string[]): string[] {
-  return list.filter((src) => {
-    try { new RegExp(src, 'i'); return false; } catch { return true; }
-  });
+  return list.filter((src) => regexParseError(src) !== null);
 }
 
 function validate(d: Draft): string[] {
@@ -155,7 +161,7 @@ const TagListInput: React.FC<{
   );
 };
 
-export const EvalCasesSheet: React.FC<{
+export const EvalCasesManager: React.FC<{
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onChanged: () => void;
@@ -263,17 +269,21 @@ export const EvalCasesSheet: React.FC<{
     onChanged();
   };
 
+  if (!open) return null;
+
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full space-y-4 sm:max-w-3xl">
-        <SheetHeader>
-          <SheetTitle>{draft ? (draft.id ? 'Edit Eval Case' : 'New Eval Case') : 'Golden Eval Cases'}</SheetTitle>
-          <SheetDescription>
-            {draft
-              ? 'Each expectation is checked deterministically by agent-eval against one real agent turn.'
-              : 'Active cases are what Run all executes. Deactivate a case to keep its history without running it.'}
-          </SheetDescription>
-        </SheetHeader>
+    <section className="mt-4 space-y-4 border-t border-hairline pt-4" aria-label="Manage eval cases">
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold">{draft ? (draft.id ? 'Edit Eval Case' : 'New Eval Case') : 'Manage Eval Cases'}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {draft
+                ? 'Each expectation is checked deterministically by agent-eval against one real agent turn.'
+                : 'Active cases are what Run all executes. Deactivate a case to keep its history without running it.'}
+            </p>
+          </div>
+          <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>Close</Button>
+        </div>
 
         {draft ? (
           <div className="space-y-5">
@@ -445,7 +455,6 @@ export const EvalCasesSheet: React.FC<{
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-      </SheetContent>
-    </Sheet>
+    </section>
   );
 };

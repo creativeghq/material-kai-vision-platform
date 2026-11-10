@@ -60,7 +60,7 @@ import type {
   HarnessToolRow,
 } from './harnessTypes';
 import { failTone, fmtInt, fmtMs, fmtPct, fmtTokens, fmtUsd, ratio, shortId } from './harnessFormat';
-import { EvalCasesSheet } from './EvalCasesSheet';
+import { EvalCasesManager } from './EvalCasesManager';
 
 export const Panel: React.FC<{
   id?: string;
@@ -536,7 +536,7 @@ export const EvalsPanel: React.FC<{
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <EvalCasesSheet open={manageOpen} onOpenChange={setManageOpen} onChanged={onRan} />
+      <EvalCasesManager open={manageOpen} onOpenChange={setManageOpen} onChanged={onRan} />
     </Panel>
   );
 };
