@@ -407,6 +407,20 @@ export const RecordPaymentDialog: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, kind, selectedInvoice?.currency, selectedBill?.currency, selectedOption?.currency]);
 
+  // The payment is filed under the category of the document it settles, until the operator picks one.
+  const categoryTouched = useRef(false);
+  useEffect(() => { if (open) categoryTouched.current = false; }, [open]);
+  const settledCategoryId =
+    kind === 'received' ? selectedTarget?.category_id :
+    kind === 'refund' ? selectedInvoice?.category_id :
+    kind === 'expense' ? selectedOption?.expense.category_id :
+    null;
+  useEffect(() => {
+    if (!open || categoryTouched.current) return;
+    setCategoryId(settledCategoryId ?? initialCategoryId ?? '');
+  }, [open, settledCategoryId, initialCategoryId]);
+  const pickCategory = (v: string) => { categoryTouched.current = true; setCategoryId(v); };
+
   const pickExpense = (value: string) => {
     setExpenseId(value);
     const o = expenseOptions.find((x) => x.value === value);
@@ -958,7 +972,7 @@ export const RecordPaymentDialog: React.FC<{
                 )}
               </FormField>
               <FormField label="Category" optional>
-                <Select value={categoryId} onValueChange={setCategoryId}>
+                <Select value={categoryId} onValueChange={pickCategory}>
                   <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                   <SelectContent>
                     {categories.length === 0 ? <div className="px-2 py-1 text-xs text-muted-foreground">Add categories in Settings</div>

@@ -95,6 +95,7 @@ export interface Invoice {
   due_at: string | null;
   paid_at: string | null;
   payment_terms_days: number | null;
+  category_id: string | null;
   notes: string | null;
   /** Invoice design template snapshot (set at creation; nullable for legacy rows). */
   template_id: string | null;
