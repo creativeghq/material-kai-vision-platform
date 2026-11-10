@@ -3,16 +3,22 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Book,
+  Bot,
+  Brain,
+  CheckCircle2,
   ChevronDown,
   Database as DatabaseIcon,
   ExternalLink,
   FileJson,
   FileText,
+  Gauge,
   LayoutGrid,
   Loader2,
+  MessagesSquare,
   Radio,
   RefreshCw,
   Workflow,
+  Wrench,
 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
@@ -26,6 +32,7 @@ import {
 } from '@/components/core/ui/dropdown-menu';
 import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
+import { HubTabNav } from '@/components/core/hub/HubTabNav';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -36,11 +43,13 @@ import { AgentUnmetRequestsPanel } from './AgentUnmetRequestsPanel';
 import { ConversationTraceSheet } from './ConversationTraceSheet';
 import {
   AgentsTable,
+  AttentionList,
   BackgroundAgentsTable,
   ConversationsTable,
   EvalsPanel,
   FailuresFeed,
   FlowsTable,
+  HarnessSection,
   HarnessTimeline,
   MemoryPanel,
   ModelsTable,
@@ -110,7 +119,17 @@ const EXTERNAL_TOOLS = [
   { label: 'Edge OpenAPI (JSON)', href: '/api/openapi-edge.json', icon: FileJson },
 ];
 
-const scrollTo = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+const SECTIONS = [
+  { id: 'attention', label: 'Needs Attention' },
+  { id: 'health', label: 'Health' },
+  { id: 'agents', label: 'Agents & Models' },
+  { id: 'tools', label: 'Tools' },
+  { id: 'failures', label: 'Failures' },
+  { id: 'quality', label: 'Quality' },
+  { id: 'automation', label: 'Automation' },
+  { id: 'memory', label: 'Memory & Knowledge' },
+  { id: 'conversations', label: 'Conversations' },
+] as const;
 
 const AgentHarnessDashboard: React.FC = () => {
   const [params, setParams] = useSearchParams();
@@ -123,6 +142,12 @@ const AgentHarnessDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadedAt, setLoadedAt] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+  const [activeSection, setActiveSection] = useState<string>('attention');
+
+  const jumpTo = useCallback((id: string) => {
+    setActiveSection(id);
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, []);
   const [openFindings, setOpenFindings] = useState(0);
 
   useEffect(() => {
@@ -153,6 +178,17 @@ const AgentHarnessDashboard: React.FC = () => {
   }, [days]);
 
   useEffect(() => { void load(); }, [load]);
+
+  useEffect(() => {
+    if (!data) return;
+    const nodes = Array.from(document.querySelectorAll<HTMLElement>('[data-harness-section]'));
+    const io = new IntersectionObserver((entries) => {
+      const top = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)[0];
+      if (top) setActiveSection(top.target.id);
+    }, { rootMargin: '-96px 0px -60% 0px' });
+    nodes.forEach((n) => io.observe(n));
+    return () => io.disconnect();
+  }, [data]);
 
   useEffect(() => {
     if (!live) return;
@@ -255,9 +291,21 @@ const AgentHarnessDashboard: React.FC = () => {
             </DropdownMenu>
           </>
         }
-      />
+      >
+        <HubTabNav
+          aria-label="Dashboard sections"
+          className="border-b-0"
+          activeId={activeSection}
+          onSelect={jumpTo}
+          items={SECTIONS.map((s) => ({
+            id: s.id,
+            label: s.label,
+            count: s.id === 'attention' ? data?.attention.length : undefined,
+          }))}
+        />
+      </PageHeader>
 
-      <div className="space-y-4 p-3 sm:p-6">
+      <div className="space-y-8 p-3 sm:p-6">
         {error && (
           <div className="rounded-sm border border-[hsl(var(--error)/0.3)] bg-[hsl(var(--error-bg))] px-4 py-3 text-sm text-[hsl(var(--error))]">
             Could not load the harness overview: {error}
@@ -272,166 +320,226 @@ const AgentHarnessDashboard: React.FC = () => {
 
         {data && k && (
           <>
-            <HubStatGrid>
-              <HubStatTile
-                label="Agent Turns"
-                value={fmtInt(k.turns)}
-                category={`${fmtInt(k.conversations)} conversations · ${fmtInt(k.users)} users · ${fmtInt(k.workspaces)} workspaces`}
-                delta={delta(k.turns, k.turns_prev, true, windowCaption)}
-                help="Main model turns from agent_usage_logs. Memory and next-step calls are counted separately as aux calls."
-                onClick={() => scrollTo('agents')}
-              />
-              <HubStatTile
-                label="Model + Tool Cost"
-                value={fmtUsd(k.cost_usd)}
-                category={`${fmtUsd(k.billed_usd)} billed · ${fmtInt(Math.round(k.credits))} credits`}
-                delta={delta(k.cost_usd, k.cost_usd_prev, false, windowCaption)}
-                help="Raw provider cost (tokens priced by ai_model_pricing) plus tool costs. Billed is after markup."
-                onClick={() => scrollTo('agents')}
-              />
-              <HubStatTile
-                label="Turn Latency p95"
-                value={fmtMs(k.latency_p95_ms)}
-                category={`p50 ${fmtMs(k.latency_p50_ms)}`}
-                delta={delta(k.latency_p95_ms, k.latency_p95_prev_ms, false, windowCaption)}
-                onClick={() => scrollTo('agents')}
-              />
-              <HubStatTile
-                label="Tool Failure Rate"
-                value={fmtPct(ratio(k.tool_failed, k.tool_calls))}
-                category={k.tool_calls ? `${fmtInt(k.tool_failed)} of ${fmtInt(k.tool_calls)} calls` : 'No tool calls in window'}
-                delta={delta(ratio(k.tool_failed, k.tool_calls), ratio(k.tool_failed_prev, k.tool_calls_prev), false, windowCaption)}
-                onClick={() => scrollTo('tools')}
-              />
-              <HubStatTile
-                label="Zero-Result Rate"
-                value={fmtPct(ratio(k.tool_zero, k.tool_calls - k.tool_failed))}
-                category={`${fmtInt(k.tool_zero)} successful calls returned nothing`}
-                help="Measured against calls that SUCCEEDED — a failed call is unknown, not empty."
-                onClick={() => scrollTo('tools')}
-              />
-              <HubStatTile
-                label="Failed Requests"
-                value={fmtPct(ratio(k.requests_failed, k.requests))}
-                category={k.requests
-                  ? Object.entries(k.requests_by_status).sort().map(([s, n]) => `${s}×${n}`).join(' · ')
-                  : 'No agent-chat requests logged'}
-                help={`Non-2xx responses from the agent-chat edge function (api_usage_logs).${data.window.requests_capped ? ' api_usage_logs keeps 15 days, so this covers the last 15 days only.' : ''}`}
-                onClick={() => scrollTo('failures')}
-              />
-              <HubStatTile
-                label="Empty Replies"
-                value={fmtInt(k.no_response)}
-                category={`${fmtInt(k.server_recovered)} recovered by server · ${fmtInt(k.client_cancelled)} cancelled`}
-                help="Assistant turns persisted as 'No response from agent'."
-                onClick={() => scrollTo('failures')}
-              />
-              <HubStatTile
-                label="Prompt Cache Hit"
-                value={fmtPct(ratio(k.cache_read_tokens, k.input_tokens + k.cache_read_tokens + k.cache_write_tokens))}
-                category={`${fmtInt(Math.round(k.cache_read_tokens / 1000))}k read · ${fmtInt(Math.round(k.cache_write_tokens / 1000))}k written`}
-                help="Cache-read tokens as a share of all prompt tokens (uncached input + cache read + cache write)."
-                onClick={() => scrollTo('agents')}
-              />
-              <HubStatTile
-                label="Eval Pass Rate"
-                value={fmtPct(ratio(evalSummary.passed, evalSummary.ran))}
-                category={evalSummary.ran
-                  ? `${evalSummary.passed}/${evalSummary.ran} cases on their latest run${evalSummary.ran < evalSummary.total ? ` · ${evalSummary.total - evalSummary.ran} never run` : ''}`
-                  : 'No case has run yet'}
-                onClick={() => scrollTo('evals')}
-              />
-              <HubStatTile
-                label="User Ratings"
-                value={`${fmtInt(k.rating_up)} / ${fmtInt(k.rating_down)}`}
-                category="Up / down"
-                onClick={() => scrollTo('conversations')}
-              />
-              <HubStatTile
-                label="Background Run Failures"
-                value={fmtPct(ratio(bg.failed, bg.runs))}
-                category={`${fmtInt(bg.failed)} of ${fmtInt(bg.runs)} runs${data.background.stuck.length ? ` · ${data.background.stuck.length} stuck` : ''}`}
-                onClick={() => scrollTo('background')}
-              />
-              <HubStatTile
-                label="Flow Run Failures"
-                value={fmtPct(ratio(flowTotals.failed, flowTotals.total))}
-                category={`${fmtInt(flowTotals.failed)} of ${fmtInt(flowTotals.total)} runs`}
-                onClick={() => scrollTo('background')}
-              />
-            </HubStatGrid>
-
-            <Panel
-              id="activity"
-              title="Activity"
-              description={`Turns, tool calls and failures per ${Number(days) <= 2 ? 'hour' : 'day'} (UTC buckets). Dashed line is cost, right axis.`}
+            <HarnessSection
+              id="attention"
+              icon={AlertTriangle}
+              title="Needs Attention"
+              subtitle="Everything in this window that is failing, stale or unmeasured, worst first. Click an item to jump to its section."
             >
-              <HarnessTimeline series={data.series} hourly={Number(days) <= 2} />
-            </Panel>
+              <AttentionList items={data.attention} onJump={jumpTo} />
+            </HarnessSection>
 
-            <div id="agents" className="grid gap-4 xl:grid-cols-2">
-              <Panel title="Agents" description="Per agent: main turns, aux calls (memory, next steps), latency and spend." flush>
-                <AgentsTable rows={data.agents} />
+            <HarnessSection
+              id="health"
+              icon={Gauge}
+              title="Health"
+              subtitle={`Headline numbers for the last ${WINDOWS.find((w) => w.value === days)?.label}, with the change against the window before it.`}
+            >
+              <StatGroup label="Usage & Cost">
+                <HubStatTile
+                  label="Agent Turns"
+                  value={fmtInt(k.turns)}
+                  category={`${fmtInt(k.conversations)} conversations · ${fmtInt(k.users)} users · ${fmtInt(k.workspaces)} workspaces`}
+                  delta={delta(k.turns, k.turns_prev, true, windowCaption)}
+                  help="Main model turns from agent_usage_logs. Memory and next-step calls are counted separately as aux calls."
+                  onClick={() => jumpTo('agents')}
+                />
+                <HubStatTile
+                  label="Model + Tool Cost"
+                  value={fmtUsd(k.cost_usd)}
+                  category={`${fmtUsd(k.billed_usd)} billed · ${fmtInt(Math.round(k.credits))} credits`}
+                  delta={delta(k.cost_usd, k.cost_usd_prev, false, windowCaption)}
+                  help="Raw provider cost (tokens priced by ai_model_pricing) plus tool costs. Billed is after markup."
+                  onClick={() => jumpTo('agents')}
+                />
+                <HubStatTile
+                  label="Turn Latency p95"
+                  value={fmtMs(k.latency_p95_ms)}
+                  category={`p50 ${fmtMs(k.latency_p50_ms)}`}
+                  delta={delta(k.latency_p95_ms, k.latency_p95_prev_ms, false, windowCaption)}
+                  onClick={() => jumpTo('agents')}
+                />
+                <HubStatTile
+                  label="Prompt Cache Hit"
+                  value={fmtPct(ratio(k.cache_read_tokens, k.input_tokens + k.cache_read_tokens + k.cache_write_tokens))}
+                  category={`${fmtInt(Math.round(k.cache_read_tokens / 1000))}k read · ${fmtInt(Math.round(k.cache_write_tokens / 1000))}k written`}
+                  help="Cache-read tokens as a share of all prompt tokens (uncached input + cache read + cache write)."
+                  onClick={() => jumpTo('agents')}
+                />
+              </StatGroup>
+
+              <StatGroup label="Reliability">
+                <HubStatTile
+                  label="Tool Failure Rate"
+                  value={fmtPct(ratio(k.tool_failed, k.tool_calls))}
+                  category={k.tool_calls ? `${fmtInt(k.tool_failed)} of ${fmtInt(k.tool_calls)} calls` : 'No tool calls in window'}
+                  delta={delta(ratio(k.tool_failed, k.tool_calls), ratio(k.tool_failed_prev, k.tool_calls_prev), false, windowCaption)}
+                  onClick={() => jumpTo('tools')}
+                />
+                <HubStatTile
+                  label="Zero-Result Rate"
+                  value={fmtPct(ratio(k.tool_zero, k.tool_calls - k.tool_failed))}
+                  category={`${fmtInt(k.tool_zero)} successful calls returned nothing`}
+                  help="Measured against calls that SUCCEEDED — a failed call is unknown, not empty."
+                  onClick={() => jumpTo('tools')}
+                />
+                <HubStatTile
+                  label="Failed Requests"
+                  value={fmtPct(ratio(k.requests_failed, k.requests))}
+                  category={k.requests
+                    ? Object.entries(k.requests_by_status).sort().map(([s, n]) => `${s}×${n}`).join(' · ')
+                    : 'No agent-chat requests logged'}
+                  help={`Non-2xx responses from the agent-chat edge function (api_usage_logs).${data.window.requests_capped ? ' api_usage_logs keeps 15 days, so this covers the last 15 days only.' : ''}`}
+                  onClick={() => jumpTo('failures')}
+                />
+                <HubStatTile
+                  label="Empty Replies"
+                  value={fmtInt(k.no_response)}
+                  category={`${fmtInt(k.server_recovered)} recovered by server · ${fmtInt(k.client_cancelled)} cancelled`}
+                  help="Assistant turns persisted as 'No response from agent'."
+                  onClick={() => jumpTo('failures')}
+                />
+              </StatGroup>
+
+              <StatGroup label="Quality & Automation">
+                <HubStatTile
+                  label="Eval Pass Rate"
+                  value={fmtPct(ratio(evalSummary.passed, evalSummary.ran))}
+                  category={evalSummary.ran
+                    ? `${evalSummary.passed}/${evalSummary.ran} cases on their latest run${evalSummary.ran < evalSummary.total ? ` · ${evalSummary.total - evalSummary.ran} never run` : ''}`
+                    : 'No case has run yet'}
+                  onClick={() => jumpTo('quality')}
+                />
+                <HubStatTile
+                  label="User Ratings"
+                  value={`${fmtInt(k.rating_up)} / ${fmtInt(k.rating_down)}`}
+                  category="Up / down"
+                  onClick={() => jumpTo('conversations')}
+                />
+                <HubStatTile
+                  label="Background Run Failures"
+                  value={fmtPct(ratio(bg.failed, bg.runs))}
+                  category={`${fmtInt(bg.failed)} of ${fmtInt(bg.runs)} runs${data.background.stuck.length ? ` · ${data.background.stuck.length} stuck` : ''}`}
+                  onClick={() => jumpTo('automation')}
+                />
+                <HubStatTile
+                  label="Flow Run Failures"
+                  value={fmtPct(ratio(flowTotals.failed, flowTotals.total))}
+                  category={`${fmtInt(flowTotals.failed)} of ${fmtInt(flowTotals.total)} runs`}
+                  onClick={() => jumpTo('automation')}
+                />
+              </StatGroup>
+
+              <Panel
+                title="Activity"
+                description={`Turns, tool calls and failures per ${Number(days) <= 2 ? 'hour' : 'day'} (UTC buckets). Dashed line is cost, right axis.`}
+              >
+                <HarnessTimeline series={data.series} hourly={Number(days) <= 2} />
               </Panel>
-              <Panel title="Models" description="Token use, prompt-cache hit and cost per model." flush>
-                <ModelsTable rows={data.models} />
+            </HarnessSection>
+
+            <HarnessSection
+              id="agents"
+              icon={Bot}
+              title="Agents & Models"
+              subtitle="Who is doing the work, on which model, how fast and at what cost."
+            >
+              <div className="grid gap-4 xl:grid-cols-2">
+                <Panel title="Agents" description="Main turns, aux calls (memory, next steps), latency and spend per agent." flush>
+                  <AgentsTable rows={data.agents} />
+                </Panel>
+                <Panel title="Models" description="Token use, prompt-cache hit and cost per model." flush>
+                  <ModelsTable rows={data.models} />
+                </Panel>
+              </div>
+            </HarnessSection>
+
+            <HarnessSection
+              id="tools"
+              icon={Wrench}
+              title="Tools"
+              subtitle="Every tool the agents called in this window. Failure and zero-result rates are what to fix first."
+            >
+              <Panel title="Tool Calls" flush={false}>
+                <ToolsTable rows={data.tools} />
               </Panel>
-            </div>
+            </HarnessSection>
 
-            <Panel id="tools" title="Tools" description="Every tool the agents called in this window, worst offenders visible by rate.">
-              <ToolsTable rows={data.tools} />
-            </Panel>
-
-            <div className="grid gap-4 xl:grid-cols-5">
-              <Panel id="failures" title="Failures" description="Newest first, across tools, requests, replies, background agents and flows." className="xl:col-span-2">
+            <HarnessSection
+              id="failures"
+              icon={AlertTriangle}
+              title="Failures"
+              subtitle="Every failure the harness recorded, newest first: tools, requests, empty replies, background runs and flows."
+            >
+              <Panel title="Failure Feed">
                 <FailuresFeed rows={data.failures} onOpenConversation={openTrace} />
               </Panel>
-              <div className="xl:col-span-3">
-                <EvalsPanel
-                  latest={data.evals.latest}
-                  batches={data.evals.batches}
-                  workspaceId={activeWorkspaceId}
-                  onOpenConversation={openTrace}
-                  onRan={() => void load()}
-                />
-              </div>
-            </div>
+            </HarnessSection>
 
-            <div id="unmet">
-              <AgentUnmetRequestsPanel onOpenConversation={openTrace} />
-            </div>
-
-            <div id="background" className="grid gap-4 xl:grid-cols-2">
-              <Panel
-                title="Background Agents"
-                description="Scheduled and event-driven agents, runs in this window."
-                actions={<Button asChild size="sm" variant="ghost"><Link to="/admin/ai-configs?tab=background-agents">Configure</Link></Button>}
-              >
-                <BackgroundAgentsTable rows={data.background.agents} stuck={data.background.stuck} />
-              </Panel>
-              <Panel
-                title="Flows"
-                description="Automation runs (test runs excluded), busiest first."
-                actions={<Button asChild size="sm" variant="ghost" className="gap-1.5"><Link to="/flows"><Workflow className="h-3.5 w-3.5" /> Open</Link></Button>}
-              >
-                <FlowsTable byStatus={data.flows.by_status} rows={data.flows.top} />
-              </Panel>
-            </div>
-
-            <div className="grid gap-4 xl:grid-cols-2">
-              <Panel title="Agent Memory" description="Long-term memories the agents write and recall. Counts are all-time; created/recalled are in this window.">
-                <MemoryPanel memory={data.memory} />
-              </Panel>
-              <PriceLookupsCard />
-            </div>
-
-            <Panel
-              id="conversations"
-              title="Conversations"
-              description="Most recent 200 in this window. Click a row for the full trace: messages, model calls, tool arguments and results."
+            <HarnessSection
+              id="quality"
+              icon={CheckCircle2}
+              title="Quality"
+              subtitle="Golden evals say whether the agents still answer correctly; unmet requests say what people asked that we could not do."
             >
-              <ConversationsTable rows={data.conversations} onOpen={openTrace} />
-            </Panel>
+              <EvalsPanel
+                latest={data.evals.latest}
+                batches={data.evals.batches}
+                workspaceId={activeWorkspaceId}
+                onOpenConversation={openTrace}
+                onRan={() => void load()}
+              />
+              <AgentUnmetRequestsPanel onOpenConversation={openTrace} />
+            </HarnessSection>
+
+            <HarnessSection
+              id="automation"
+              icon={Workflow}
+              title="Automation"
+              subtitle="Background agents and flows that run without a person in the loop."
+            >
+              <div className="grid gap-4 xl:grid-cols-2">
+                <Panel
+                  title="Background Agents"
+                  description="Scheduled and event-driven agents, runs in this window."
+                  actions={<Button asChild size="sm" variant="ghost"><Link to="/admin/ai-configs?tab=background-agents">Configure</Link></Button>}
+                >
+                  <BackgroundAgentsTable rows={data.background.agents} stuck={data.background.stuck} />
+                </Panel>
+                <Panel
+                  title="Flows"
+                  description="Automation runs (test runs excluded), busiest first."
+                  actions={<Button asChild size="sm" variant="ghost"><Link to="/flows">Open Flows</Link></Button>}
+                >
+                  <FlowsTable byStatus={data.flows.by_status} rows={data.flows.top} />
+                </Panel>
+              </div>
+            </HarnessSection>
+
+            <HarnessSection
+              id="memory"
+              icon={Brain}
+              title="Memory & Knowledge"
+              subtitle="What the agents remember between conversations, and how they price from the knowledge base."
+            >
+              <div className="grid gap-4 xl:grid-cols-2">
+                <Panel title="Agent Memory" description="Counts are all-time; created and recalled are in this window.">
+                  <MemoryPanel memory={data.memory} />
+                </Panel>
+                <PriceLookupsCard />
+              </div>
+            </HarnessSection>
+
+            <HarnessSection
+              id="conversations"
+              icon={MessagesSquare}
+              title="Conversations"
+              subtitle="The most recent 200 in this window. Open one for its full trace: messages, model calls, tool arguments and results."
+            >
+              <Panel title="Recent Conversations">
+                <ConversationsTable rows={data.conversations} onOpen={openTrace} />
+              </Panel>
+            </HarnessSection>
           </>
         )}
       </div>
@@ -440,5 +548,12 @@ const AgentHarnessDashboard: React.FC = () => {
     </div>
   );
 };
+
+const StatGroup: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div>
+    <p className="mb-2 text-xs font-semibold text-muted-foreground">{label}</p>
+    <HubStatGrid>{children}</HubStatGrid>
+  </div>
+);
 
 export default AgentHarnessDashboard;

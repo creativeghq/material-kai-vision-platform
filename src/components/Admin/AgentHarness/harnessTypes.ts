@@ -191,6 +191,14 @@ export interface HarnessConversationRow {
   is_eval: boolean;
 }
 
+export interface HarnessAttention {
+  severity: 'error' | 'warning';
+  area: string;
+  title: string;
+  detail: string;
+  section: string;
+}
+
 export interface HarnessOverview {
   window: { days: number; since: string; requests_since: string; requests_capped: boolean };
   kpis: HarnessKpis;
@@ -204,6 +212,7 @@ export interface HarnessOverview {
   flows: { by_status: Record<string, number>; top: HarnessFlowRow[] };
   memory: HarnessMemory;
   conversations: HarnessConversationRow[];
+  attention: HarnessAttention[];
 }
 
 export interface TraceMessage {

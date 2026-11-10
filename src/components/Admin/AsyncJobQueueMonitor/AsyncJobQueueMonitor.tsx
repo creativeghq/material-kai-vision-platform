@@ -631,21 +631,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       )
       .subscribe();
 
-    const scrapingSubscription = supabase
-      .channel('scraping_sessions_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'scraping_sessions',
-        },
-        () => {
-          fetchQueueData();
-        },
-      )
-      .subscribe();
-
     const importSubscription = supabase
       .channel('data_import_jobs_changes')
       .on(
@@ -684,7 +669,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     return () => {
       jobsSubscription.unsubscribe();
-      scrapingSubscription.unsubscribe();
       importSubscription.unsubscribe();
       webhookSubscription.unsubscribe();
       if (interval) clearInterval(interval);

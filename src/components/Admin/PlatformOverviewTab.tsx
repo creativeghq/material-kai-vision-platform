@@ -87,8 +87,6 @@ export function PlatformOverviewTab() {
   // the same "no live platform activity found yet" banner, so a failed query told the operator
   // NOTHING HAS HAPPENED when the truth was WE COULD NOT READ ANYTHING — opposite responses.
   // (#365 AD-2)
-  const [isDemoData, setIsDemoData] = useState(false);
-  const [demoReason, setDemoReason] = useState<'empty' | 'load_failed'>('empty');
   const [loadError, setLoadError] = useState<string | null>(null);
 
   // ── Quotes & Users ────────────────────────────────────────────
@@ -210,158 +208,6 @@ export function PlatformOverviewTab() {
   }, [greekModuleEnabled]);
 
 
-  const loadDemoPlatformData = () => {
-    const wks = buildWeeks(12);
-    const b = [4,6,5,8,7,10,9,13,11,16,14,18];
-    const f = [8,9,8,10,9,11,10,12,11,13,12,14];
-    const h = [20,28,24,35,30,42,38,52,46,62,55,70];
-
-    // Quotes & Users
-    setQuoteFunnel([{ status:'pending',count:42},{status:'accepted',count:28},{status:'rejected',count:14},{status:'completed',count:18}]);
-    setWeeklyQuotes(wks.map((week,i) => ({ week, count: b[i]+2 })));
-    setUserTypes([{name:'Interior Designer',value:38},{name:'Architect',value:25},{name:'Manufacturer',value:15},{name:'Brand',value:12},{name:'Other',value:10}]);
-    setWeeklyGrowth(wks.map((week,i) => ({ week, new_users: f[i]+4 })));
-    setTopQuotedProducts([
-      {name:'Porcelanosa Krono 60x60',count:42},{name:'Flos Aim Pendant',count:38},
-      {name:'Boffi Pipe Kitchen',count:31},{name:'Lema Selecta Wardrobe',count:28},
-      {name:'Poliform Mad Chair',count:24},{name:'B&B Italia Tufty-Time',count:21},
-      {name:'Miele H7860BPX Oven',count:18},{name:'Knoll Platner Chair',count:15},
-      {name:'Vitra Eames DSW',count:13},{name:'Cassina LC4 Chaise',count:11},
-    ]);
-    setKpis({ totalQuotes:216, thisMonth:52, acceptRate:'67%', activeProfiles:284, hireTotal:94 });
-
-    // Supply Side
-    setTopFactories([
-      {name:'Porcelanosa',products:142,saves:324,quotes:87},{name:'Flos',products:68,saves:215,quotes:54},
-      {name:'Boffi',products:55,saves:178,quotes:42},{name:'Lema',products:38,saves:142,quotes:35},
-      {name:'Poliform',products:44,saves:125,quotes:28},{name:'B&B Italia',products:31,saves:98,quotes:22},
-      {name:'Miele',products:28,saves:84,quotes:18},{name:'Knoll',products:22,saves:72,quotes:15},
-    ]);
-    setCatalogGrowth(wks.map((week,i) => ({ week, count: [12,18,15,22,28,24,32,38,30,45,40,52][i] })));
-    setFactoryPipeline([{status:'pending',count:8},{status:'approved',count:24},{status:'rejected',count:3}]);
-    setRecentRequests([
-      {name:'Mosa Tiles',type:'manufacturer',status:'pending',date:'2026-03-04'},
-      {name:'Artemide',type:'brand',status:'approved',date:'2026-03-02'},
-      {name:'Vola',type:'manufacturer',status:'pending',date:'2026-03-01'},
-    ]);
-
-    // Credit Economy
-    setCreditStats({ totalConsumed:1840, totalEarned:2400, topType:'vr_world' });
-    setWeeklyCredits(wks.map((week,i) => ({
-      week, debit: h[i]*8, purchase: f[i]*6, refund: b[i], bonus: i%4===0?50:0, monthly_grant: i===0?200:0,
-    })));
-    setAiModelCosts([
-      {model:'Claude Opus 5.5',credits:840,cost:8.40},{model:'Claude Sonnet 5.5',credits:480,cost:4.80},
-      {model:'voyage-4',credits:280,cost:2.80},{model:'SLIG (SigLIP2-base, Modal)',credits:180,cost:1.80},
-      {model:'Claude Haiku 5.5',credits:60,cost:0.60},{model:'PaddleOCR-VL',credits:80,cost:0.80},
-    ]);
-    setAiOperationCosts([
-      {operation:'vision',credits:420},{operation:'chat',credits:380},
-      {operation:'embedding',credits:280},{operation:'scrape',credits:180},{operation:'agent',credits:150},
-    ]);
-    setAiCostTrend(wks.map((week,i) => ({ week, cost: +(b[i]*0.38+0.5).toFixed(2), credits: b[i]*38+50 })));
-    setTopCreditConsumers([
-      {userId:'a3f8e2c1',credits:284,topOp:'vision'},{userId:'b7d4f092',credits:218,topOp:'chat'},
-      {userId:'c8a1b3e4',credits:195,topOp:'embedding'},{userId:'d2e9f031',credits:172,topOp:'vision'},
-      {userId:'e5c3a8b2',credits:148,topOp:'agent'},{userId:'f1d0e7c3',credits:124,topOp:'chat'},
-      {userId:'g4b8f2a1',credits:98,topOp:'scrape'},{userId:'h7a5e3d4',credits:84,topOp:'embedding'},
-      {userId:'i9c1f8b0',credits:72,topOp:'vision'},{userId:'j2e4d7a5',credits:58,topOp:'chat'},
-    ]);
-    setCreditBalanceDist([{range:'0–100',count:48},{range:'101–500',count:35},{range:'501–1k',count:22},{range:'1k–5k',count:14},{range:'5k+',count:5}]);
-    setCreditKpis2({ totalCostUsd:18.40, uniqueUsers:28 });
-
-    // VR Worlds
-    setVrQualitySplit([{name:'mini (50cr)',value:52},{name:'plus (200cr)',value:14}]);
-    setVrStatusTrend(wks.map((week,i) => ({ week, completed: b[i], failed: Math.max(0,Math.floor(b[i]*0.08)) })));
-    setVrTotalCredits(5400);
-    setFeatureKpis({ vrWorldsGenerated:66, agentRuns:216, moodboardsCreated:138 });
-
-    // 3D Generation
-    const jobB=[4,7,6,10,9,13,11,16,14,18,15,20];
-    const segB=[12,22,18,32,28,40,35,50,44,56,48,62];
-    setGen3dTrend(wks.map((week,i) => ({ week, jobs:jobB[i], segments:segB[i] })));
-    setCanvasKpis({ gen3dJobs:152, gen3dSegments:468 });
-    setGen3dRoomTypes([
-      {name:'living room',value:42},{name:'bedroom',value:38},{name:'kitchen',value:32},
-      {name:'bathroom',value:24},{name:'home office',value:16},
-    ]);
-    setGen3dStatusTrend(wks.map((week,i) => ({
-      week, completed:jobB[i], failed:Math.max(0,Math.floor(jobB[i]*0.10)), pending:Math.floor(jobB[i]*0.05),
-    })));
-    setSegmentZones([
-      {zone:'wall',count:420},{zone:'floor',count:380},{zone:'furniture',count:285},
-      {zone:'ceiling',count:245},{zone:'decor',count:182},{zone:'window',count:148},
-    ]);
-    setTopDetectedMaterials([
-      {material:'wood',count:184},{material:'ceramic',count:162},{material:'marble',count:148},
-      {material:'fabric',count:125},{material:'metal',count:98},{material:'glass',count:84},
-      {material:'paint',count:72},{material:'stone',count:58},
-    ]);
-    setAvgConfidenceTrend(wks.map((week,i) => ({ week, confidence: +(0.72+i*0.015).toFixed(2) })));
-
-    // AI Agents
-    const arB=[8,12,10,15,14,18,16,21,19,24,22,27];
-    setAgentsByType(wks.map((week,i) => ({
-      week, kai:Math.floor(arB[i]*0.5), 'product-enrichment':Math.floor(arB[i]*0.3), 'material-tagger':Math.floor(arB[i]*0.2),
-    })));
-    setTopAgentTypes(['kai','product-enrichment','material-tagger']);
-    setAgentOutcomePie([{name:'completed',value:189},{name:'failed',value:18},{name:'timed_out',value:9}]);
-    setAgentSuccessTrend(wks.map((week,i) => ({
-      week, completed:arB[i], failed:Math.max(1,Math.floor(arB[i]*0.08)),
-    })));
-    setAgentAvgTime([{type:'kai',avgMs:2300},{type:'product-enrichment',avgMs:45000},{type:'material-tagger',avgMs:12000}]);
-    setAgentCreditsByType([{type:'kai',credits:580},{type:'product-enrichment',credits:420},{type:'material-tagger',credits:180}]);
-
-    // Community & Social
-    const rB=[8,12,10,15,14,18,16,21,19,24,22,27];
-    const bsB=[5,8,7,10,9,12,11,14,13,16,15,18];
-    const itB=[15,24,20,30,27,35,32,42,38,48,44,52];
-    const fB=[12,18,15,22,20,25,23,28,26,31,29,34];
-    setMoodboardActivity(wks.map((week,i) => ({ week, boards:bsB[i], items:itB[i] })));
-    setReviewVelocity(wks.map((week,i) => ({ week, count:rB[i], avgRating:4.1+(i%3)*0.1 })));
-    setCreatorGrowth(wks.map((week,i) => ({
-      week,
-      suppliers: Math.floor(f[i]*0.37),
-      architects_designers: Math.floor(f[i]*0.63),
-    })));
-    setFollowsGrowth(wks.map((week,i) => ({ week, count:fB[i] })));
-    setTotalFollowers(342);
-    setReviewRatingDist([{rating:'1★',count:4},{rating:'2★',count:8},{rating:'3★',count:18},{rating:'4★',count:52},{rating:'5★',count:45}]);
-    setReviewKpis({ total:127, avgRating:'4.2' });
-    setHireMeServices([
-      {service:'interior design',count:48},{service:'3D visualization',count:35},
-      {service:'product sourcing',count:28},{service:'project management',count:22},{service:'consultation',count:18},
-    ]);
-    setHireMeFunnel([{status:'pending',count:24},{status:'accepted',count:42},{status:'completed',count:28},{status:'rejected',count:6}]);
-
-    // Search
-    const svBase=[24,38,31,45,42,55,49,62,58,70,65,78];
-    setSearchVolume(wks.map((week,i) => ({ week, searches:svBase[i] })));
-    setSearchFunnel([{stage:'Searches',count:580},{stage:'Clicked',count:420},{stage:'Saved',count:185},{stage:'Quoted',count:72}]);
-    setTopSearches([
-      {term:'marble tiles',count:84},{term:'pendant light',count:71},{term:'oak flooring',count:65},
-      {term:'bathroom vanity',count:58},{term:'kitchen cabinet',count:52},
-    ]);
-    setZeroResultTerms([{term:'zellige tile',count:14},{term:'rattan pendant',count:11},{term:'travertine slab',count:8}]);
-    setSearchKpis({ totalSearches:580, searchToSaveRate:'31.9%', avgSatisfaction:'4.1', zeroResultRate:'5.7%' });
-    setSearchStrategyDist([{name:'semantic',value:280},{name:'visual',value:145},{name:'hybrid',value:98},{name:'text',value:57}]);
-    setSearchLatencyTrend(wks.map((week,i) => ({ week, avgMs:480-i*18 })));
-    setSearchCTRTrend(wks.map((week,i) => ({ week, ctr:+(0.42+i*0.02).toFixed(2) })));
-    setSearchAgentDist([{name:'kai',value:380},{name:'interior-designer',value:180},{name:'demo',value:20}]);
-
-    // KB Health
-    setChunkGrowth(wks.map((week,i) => ({ week, count:b[i]*18 })));
-    setKbDocsByCategory([{name:'Materials',value:48},{name:'Products',value:36},{name:'Guides',value:28},{name:'Technical',value:22},{name:'FAQ',value:14}]);
-    setKbKpis({ totalChunks:2847, totalDocs:148, publishedDocs:135, embeddingSuccessRate:'98%' });
-
-    // Pipeline Health
-    setPdfJobTrend(wks.map((week,i) => ({ week, success:f[i]+2, failed:Math.max(0,Math.floor((f[i]+2)*0.09)) })));
-    setImportThroughput(wks.map((week,i) => ({ week, records:b[i]*45 })));
-    setEnrichmentStatus([{name:'completed',value:1284},{name:'pending',value:145},{name:'failed',value:28},{name:'processing',value:12}]);
-    setPipelineKpis({ totalPdfJobs:182, pdfSuccessRate:'91%', totalImports:24 });
-
-    setIsDemoData(true);
-  };
 
 
   const load = async () => {
@@ -410,13 +256,6 @@ export function PlatformOverviewTab() {
       ]);
 
       const total = (quotes ?? []).length;
-      if (!total && !(profiles ?? []).length) {
-        setDemoReason('empty');
-        setLoadError(null);
-        loadDemoPlatformData();
-        setLoading(false);
-        return;
-      }
 
       // Quotes funnel
       const funnelMap = new Map<string, number>();
@@ -852,13 +691,10 @@ export function PlatformOverviewTab() {
       setNotifKpis({ totalSent: nEmail + nSms + nWeb + nInApp, email: nEmail, sms: nSms, webPush: nWeb, inApp: nInApp });
       setNotifTrend(Array.from(nWkMap.entries()).map(([week, d]) => ({ week, ...d })));
 
-      setIsDemoData(false);
       setLoadError(null);
     } catch (err) {
       console.error('PlatformOverviewTab load error:', err);
-      setDemoReason('load_failed');
       setLoadError(err instanceof Error ? err.message : String(err));
-      loadDemoPlatformData();
     } finally {
       setLoading(false);
     }
@@ -958,20 +794,10 @@ export function PlatformOverviewTab() {
 
   return (
     <div className="space-y-4">
-      {isDemoData && (
-        demoReason === 'load_failed' ? (
-          <div className="rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-2 text-xs text-destructive flex flex-wrap items-center gap-2">
-            <span className="font-semibold">Placeholder data — the platform could not be read.</span>
-            <span>
-              Every figure below is a stand-in, not a measurement. This is a read failure, not an
-              empty platform.{loadError ? ` (${loadError})` : ''}
-            </span>
-          </div>
-        ) : (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-2 text-xs text-amber-600 flex items-center gap-2">
-            <span className="font-semibold">Demo data</span> — the queries ran and found no live platform activity yet.
-          </div>
-        )
+      {loadError && (
+        <div className="rounded-sm border border-[hsl(var(--error)/0.3)] bg-[hsl(var(--error-bg))] px-4 py-2 text-xs text-[hsl(var(--error))]">
+          <span className="font-semibold">The platform could not be read.</span> The figures below are incomplete, not zero. ({loadError})
+        </div>
       )}
 
       {/* ─── 1. Quotes & User Activity ──────────────────────────── */}

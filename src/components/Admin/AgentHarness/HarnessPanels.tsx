@@ -11,7 +11,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { ExternalLink, Loader2, Play, Search, Square } from 'lucide-react';
+import { AlertCircle, AlertTriangle, CheckCircle2, ExternalLink, Loader2, Play, Search, Square } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -36,6 +37,7 @@ import {
   AlertDialogTitle,
 } from '@/components/core/ui/alert-dialog';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { SectionHeader } from '@/components/shared/SectionHeader';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { edgeErrorMessage } from '@/utils/edgeError';
@@ -43,6 +45,7 @@ import { formatDate, formatTime, timeAgo } from '@/utils/datetime';
 
 import type {
   HarnessAgentRow,
+  HarnessAttention,
   HarnessBackgroundAgent,
   HarnessConversationRow,
   HarnessEvalBatch,
@@ -70,7 +73,7 @@ export const Panel: React.FC<{
   <Card id={id} className={className}>
     <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
       <div className="min-w-0">
-        <CardTitle className="text-base">{title}</CardTitle>
+        <CardTitle>{title}</CardTitle>
         {description && <CardDescription className="mt-1">{description}</CardDescription>}
       </div>
       {actions && <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>}
@@ -78,6 +81,60 @@ export const Panel: React.FC<{
     <CardContent className={flush ? 'p-0' : undefined}>{children}</CardContent>
   </Card>
 );
+
+export const HarnessSection: React.FC<{
+  id: string;
+  title: string;
+  subtitle?: string;
+  icon?: LucideIcon;
+  actions?: React.ReactNode;
+  children: React.ReactNode;
+}> = ({ id, title, subtitle, icon, actions, children }) => (
+  <section id={id} data-harness-section className="scroll-mt-24 border-t border-hairline pt-6 first:border-t-0 first:pt-0">
+    <SectionHeader icon={icon} title={title} subtitle={subtitle} actions={actions} />
+    <div className="space-y-4">{children}</div>
+  </section>
+);
+
+const AREA_LABEL: Record<string, string> = {
+  tool: 'Tools', eval: 'Evals', reply: 'Replies', request: 'Requests', cost: 'Cost', latency: 'Latency',
+  quality: 'Quality', background: 'Background', flow: 'Flows', memory: 'Memory',
+};
+
+export const AttentionList: React.FC<{ items: HarnessAttention[]; onJump: (section: string) => void }> = ({ items, onJump }) => {
+  if (items.length === 0) {
+    return (
+      <HubEmptyState
+        icon={CheckCircle2}
+        title="Nothing needs attention"
+        description="No failing tools, evals, replies, runs or unpriced models in this window."
+      />
+    );
+  }
+  return (
+    <ul className="divide-y divide-hairline overflow-hidden rounded-md border border-hairline bg-card">
+      {items.map((a, i) => {
+        const Icon = a.severity === 'error' ? AlertCircle : AlertTriangle;
+        return (
+          <li key={`${a.title}-${i}`}>
+            <button
+              type="button"
+              onClick={() => onJump(a.section)}
+              className="flex w-full items-start gap-3 px-3 py-2.5 text-left hover:bg-surface-sunken"
+            >
+              <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${a.severity === 'error' ? 'text-[hsl(var(--error))]' : 'text-[hsl(var(--warning))]'}`} />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">{a.title}</span>
+                <span className="mt-0.5 block line-clamp-2 text-xs text-muted-foreground">{a.detail}</span>
+              </span>
+              <Badge variant="neutral" className="shrink-0">{AREA_LABEL[a.area] ?? a.area}</Badge>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
 
 const RateBadge: React.FC<{ num: number; den: number }> = ({ num, den }) => {
   const r = ratio(num, den);
