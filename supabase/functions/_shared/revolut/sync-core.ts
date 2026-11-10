@@ -85,7 +85,7 @@ export function legToRow(workspaceId: string, tx: RevolutTransaction, leg: Revol
 
 /** How a Revolut account is named here: Revolut's own name, its type, currency and IBAN tail. */
 export function revolutAccountLabel(acc: RevolutAccount, iban: string | null): string {
-  const name = acc.name?.trim() || (acc.account_type === 'merchant' ? 'Merchant' : 'Account');
+  const name = acc.name?.trim() || (acc.account_type === 'merchant' ? 'Merchant Account' : 'Account');
   return ['Revolut', name, acc.currency, iban ? `…${iban.replace(/\s/g, '').slice(-4)}` : ''].filter(Boolean).join(' · ');
 }
 
