@@ -484,7 +484,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     setDocumentType(initialDocType || '1.1'); setDocTypePinned(false); setActivityCode(''); setCurrency('EUR'); setVatRate('24'); setPaymentTermsDays('30');
     setIssueDate(todayLocalISO()); setNotes(initialNotes ?? '');
     setCategoryId(initialCategoryId ?? ''); setBranchCode('0'); setDocLanguage('en'); setWithholdingCode(''); setWithholdingAmount('');
-    setPaymentMethodCode('3'); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
+    setPaymentMethodCode(String(MYDATA_PAYMENT_CODE.on_credit)); setPaymentMethodInfo(''); setVatSuspension(false); setSelfPricing(false); setSelfBillSupplierId(''); setExchangeRate('');
     setPricesIncludeVat(false); setDigitalFee(''); setRelatedDocument(''); setPrintTerms(true); setIncludeInMyf(true); setMoveStock(true);
     setPrintOnlineCode(true); setInfoBox(''); setLogoMode('auto'); setSubmitNow(true); setSendEmail(false); setAutoNext(null); setChosenSeriesId('auto');
     setGUnit(''); setGVat(''); setGIncType(''); setGIncCat(''); setDocTaxes([]);
