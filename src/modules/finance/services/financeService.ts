@@ -14,6 +14,7 @@ import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 import type { BuyerIdentity, SalesDocumentKind } from '@/modules/finance/utils/salesDocumentKind';
 import { salesDocumentKindFor, salesDocumentKindReason } from '@/modules/finance/utils/salesDocumentKind';
 import { toLocalISODate } from '@/utils/datetime';
+import { compareInvoicesNewestFirst } from '@/modules/finance/lib/invoiceOrder';
 
 // ─── Finance flow events (fire-and-forget) ───────────────────────────────────
 // Emitted when a document is issued or a payment is received, so seeded
@@ -853,7 +854,7 @@ const _financeServiceCore = {
     if (opts.limit) q = q.limit(opts.limit);
     const { data, error } = await q;
     if (error) throw error;
-    return (data ?? []) as Invoice[];
+    return ((data ?? []) as Invoice[]).sort(compareInvoicesNewestFirst);
   },
 
   /** "Send email" — email the invoice summary + MARK/QR to the customer. */
@@ -2245,6 +2246,10 @@ const _financeServiceCore = {
     return data as SupplierBill;
   },
 
+  async setDocumentPnlExclusion(kind: 'invoice' | 'supplier_bill' | 'supplier_credit_note' | 'inbound_document', id: string, exclude: boolean): Promise<void> {
+    const { error } = await supabase.rpc('set_document_pnl_exclusion', { p_kind: kind, p_id: id, p_exclude: exclude });
+    if (error) throw error;
+  },
 
   /**
    * Edit a bill's DOCUMENT metadata after creation — the fields the supplier's paper/PDF
