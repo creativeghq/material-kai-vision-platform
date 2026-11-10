@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { financeService, formatMoney, type CreditRelease } from '@/modules/finance/services/financeService';
 import { financeCategoriesService, type FinanceCategory } from '@/modules/finance/services/financeCategoriesService';
 import { formatDate } from '@/utils/datetime';
+import { PnlExclusionToggle } from '@/modules/finance/components/PnlExclusionToggle';
 
 export const CreditReleasesCard: React.FC<{
   workspaceId: string;
@@ -94,6 +95,8 @@ export const CreditReleasesCard: React.FC<{
                 {formatDate(r.released_at)}{r.notes ? ` · ${r.notes}` : ''}
               </span>
             </span>
+            <span className="flex shrink-0 items-center gap-2">
+            <PnlExclusionToggle kind="credit_release" id={r.id} compact checked={(r as any).exclude_from_pnl === true} onChanged={() => void load()} />
             <Button
               size="sm"
               variant="ghost"
@@ -104,6 +107,7 @@ export const CreditReleasesCard: React.FC<{
             >
               {busy === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <><RotateCcw className="h-3 w-3 mr-1" /> Undo</>}
             </Button>
+            </span>
           </div>
         ))}
       </CardContent>

@@ -44,6 +44,7 @@ import { formatMoney, financeService } from '@/modules/finance/services/financeS
 import { Switch } from '@/components/core/ui/switch';
 import { previewTotalsBreakdown } from '@/modules/quotes/utils/quoteTotals';
 import { formatDate } from '@/utils/datetime';
+import { PnlExclusionToggle } from '@/modules/finance/components/PnlExclusionToggle';
 
 const sendQuoteNotification = (userId: string, title: string, quoteId: string) => {
   supabase.from('user_notifications').insert({
@@ -624,6 +625,8 @@ export const QuoteDetailPage: React.FC = () => {
           <div className="flex items-center gap-3">
             {/* Quote Status Badge */}
             <QuoteStatusBadge status={quote.status} />
+            <PnlExclusionToggle kind="quote" id={quote.id} compact checked={(quote as any).exclude_from_pnl === true}
+              onChanged={(next) => setQuote({ ...quote, exclude_from_pnl: next } as typeof quote)} />
 
             {quote.quote_number && (
               <Badge variant="outline" className="font-mono">{quote.quote_number}</Badge>

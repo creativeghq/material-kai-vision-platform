@@ -8501,6 +8501,7 @@ export type Database = {
       }
       finance_credit_releases: {
         Row: {
+          exclude_from_pnl: boolean
           amount: number
           category_id: string | null
           counterparty_company_id: string | null
@@ -8514,6 +8515,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           amount: number
           category_id?: string | null
           counterparty_company_id?: string | null
@@ -8527,6 +8529,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           amount?: number
           category_id?: string | null
           counterparty_company_id?: string | null
@@ -8620,6 +8623,7 @@ export type Database = {
       }
       finance_recurring_expenses: {
         Row: {
+          exclude_from_pnl: boolean
           auto_pay: boolean
           bank_account_id: string | null
           cadence: string
@@ -8647,6 +8651,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           auto_pay?: boolean
           bank_account_id?: string | null
           cadence: string
@@ -8674,6 +8679,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           auto_pay?: boolean
           bank_account_id?: string | null
           cadence?: string
@@ -17522,6 +17528,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          exclude_from_pnl: boolean
           category_id: string | null
           covers_order_id: string | null
           created_at: string
@@ -17557,6 +17564,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           category_id?: string | null
           covers_order_id?: string | null
           created_at?: string
@@ -17592,6 +17600,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           category_id?: string | null
           covers_order_id?: string | null
           created_at?: string
@@ -26282,6 +26291,7 @@ export type Database = {
       }
       quotes: {
         Row: {
+          exclude_from_pnl: boolean
           accepted_at: string | null
           cash_discount_pct: number
           created_at: string
@@ -26332,6 +26342,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           accepted_at?: string | null
           cash_discount_pct?: number
           created_at?: string
@@ -26382,6 +26393,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           accepted_at?: string | null
           cash_discount_pct?: number
           created_at?: string
@@ -30531,6 +30543,7 @@ export type Database = {
       }
       time_entries: {
         Row: {
+          exclude_from_pnl: boolean
           billed_at: string | null
           billed_invoice_id: string | null
           cost_code_id: string | null
@@ -30551,6 +30564,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           billed_at?: string | null
           billed_invoice_id?: string | null
           cost_code_id?: string | null
@@ -30571,6 +30585,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           billed_at?: string | null
           billed_invoice_id?: string | null
           cost_code_id?: string | null
@@ -31384,6 +31399,7 @@ export type Database = {
       }
       trip_expense_items: {
         Row: {
+          exclude_from_pnl: boolean
           amount: number
           approval_status: string
           billable: boolean
@@ -31414,6 +31430,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          exclude_from_pnl?: boolean
           amount?: number
           approval_status?: string
           billable?: boolean
@@ -31444,6 +31461,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          exclude_from_pnl?: boolean
           amount?: number
           approval_status?: string
           billable?: boolean

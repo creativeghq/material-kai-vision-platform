@@ -57,6 +57,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
   const [reason, setReason] = useState('');
   const [externalMark, setExternalMark] = useState('');
   const [markPaid, setMarkPaid] = useState(false);
+  const [excludeFromPnl, setExcludeFromPnl] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Draft persistence — survives navigating away + reopening; cleared on Save / Cancel.
@@ -146,7 +147,7 @@ export const NewSupplierCreditNoteDialog: React.FC<{
           if (comp) effSupplier = { type: 'company', id: comp.id as string, label: (comp.name as string) ?? effSupplier.label };
         }
       }
-      await financeService.issueSupplierCreditNote({
+      const noteId = await financeService.issueSupplierCreditNote({
         workspaceId,
         supplierBillId: billId || null,
         supplier: effSupplier,
@@ -158,7 +159,12 @@ export const NewSupplierCreditNoteDialog: React.FC<{
         externalMark: externalMark.trim() || undefined,
         lines: computed.payloadLines,
       });
-      toast({ title: 'Supplier credit note recorded', description: billId ? 'Payable reduced.' : 'Standalone note recorded.' });
+      let pnlNote = '';
+      if (!billId && excludeFromPnl) {
+        try { await financeService.setDocumentPnlExclusion('supplier_credit_note', noteId, true); }
+        catch { pnlNote = ' It is still in the P&L: tick Exclude from P&L on it again.'; }
+      }
+      toast({ title: 'Supplier credit note recorded', description: (billId ? 'Payable reduced.' : 'Standalone note recorded.') + pnlNote });
       clearDraft();
       onCreated(); onOpenChange(false);
     } catch (err: any) {
@@ -280,6 +286,16 @@ export const NewSupplierCreditNoteDialog: React.FC<{
             </div>
             <Switch checked={markPaid} onCheckedChange={setMarkPaid} />
           </label>
+
+          {!billId && (
+            <label className="flex cursor-pointer items-center justify-between rounded-md border border-border/60 px-3 py-2">
+              <div>
+                <div className="text-sm font-medium">Exclude from P&amp;L</div>
+                <p className="text-xs text-muted-foreground">Left out of P&amp;L and expense totals. A note against a bill follows that bill instead.</p>
+              </div>
+              <Switch checked={excludeFromPnl} onCheckedChange={setExcludeFromPnl} />
+            </label>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => { clearDraft(); onOpenChange(false); }} disabled={busy}>Cancel</Button>

@@ -20,6 +20,7 @@ import { parseDecimal } from '@/utils/decimal';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
 import { todayLocalISO } from '@/utils/datetime';
+import { PnlExclusionToggle } from '@/modules/finance/components/PnlExclusionToggle';
 
 interface Props { workspaceId: string }
 type Customer = { type: 'company' | 'contact'; id: string; label: string };
@@ -346,6 +347,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                   <div className="w-28 truncate text-xs text-muted-foreground">{names[partyKey(e)] || (partyKey(e) ? '—' : 'No customer')}</div>
                   <div className="w-16 text-right text-xs">{hoursOf(e.minutes)}h</div>
                   <div className="w-20 text-right tabular-nums">{formatMoney(hoursOf(e.minutes) * Number(e.hourly_rate))}</div>
+                  <PnlExclusionToggle kind="time_entry" id={e.id} compact checked={(e as any).exclude_from_pnl === true} />
                   <button type="button" className="text-muted-foreground hover:text-destructive" onClick={(ev) => { ev.preventDefault(); removeEntry(e); }}><Trash2 className="h-3.5 w-3.5" /></button>
                 </label>
               ))}
@@ -452,6 +454,7 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
                   <span className="text-[10px] capitalize text-muted-foreground">billed</span>
                   <div className="w-16 text-right text-xs">{hoursOf(e.minutes)}h</div>
                   <div className="w-20 text-right tabular-nums">{formatMoney(hoursOf(e.minutes) * Number(e.hourly_rate))}</div>
+                  <PnlExclusionToggle kind="time_entry" id={e.id} compact checked={(e as any).exclude_from_pnl === true} />
                 </div>
               ))}
             </div>

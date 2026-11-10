@@ -397,6 +397,9 @@ export interface SupplierBill {
  * `inbound_documents.created_supplier_bill_id` — there is deliberately no back-pointer column
  * on the bill, so there is nothing to drift out of sync.
  */
+export type PnlExclusionKind = 'invoice' | 'supplier_bill' | 'supplier_credit_note' | 'inbound_document' | 'order' | 'quote'
+  | 'credit_release' | 'trip_expense_item' | 'time_entry' | 'recurring_expense';
+
 export interface PayableExpense {
   id: string;
   supplier_bill_number: string | null;
@@ -2246,7 +2249,7 @@ const _financeServiceCore = {
     return data as SupplierBill;
   },
 
-  async setDocumentPnlExclusion(kind: 'invoice' | 'supplier_bill' | 'supplier_credit_note' | 'inbound_document', id: string, exclude: boolean): Promise<void> {
+  async setDocumentPnlExclusion(kind: PnlExclusionKind, id: string, exclude: boolean): Promise<void> {
     const { error } = await supabase.rpc('set_document_pnl_exclusion', { p_kind: kind, p_id: id, p_exclude: exclude });
     if (error) throw error;
   },
@@ -2789,6 +2792,7 @@ const _financeServiceCore = {
     propertyId?: string | null;
     creates?: RecurringCreates;
     planCategory?: PlannedPaymentCategory;
+    excludeFromPnl?: boolean;
   }): Promise<RecurringExpense> {
     const creates = input.creates ?? 'plan';
     // A BILL is a document owed to somebody, so it needs a payee. A plan is a note to yourself
@@ -2823,6 +2827,7 @@ const _financeServiceCore = {
       order_id: input.orderId ?? null,
       trip_report_id: input.tripReportId ?? null,
       property_id: input.propertyId ?? null,
+      exclude_from_pnl: input.excludeFromPnl === true,
     } as any).select().single();
     if (error) throw error;
     return data as RecurringExpense;

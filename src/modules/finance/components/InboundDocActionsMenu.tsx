@@ -8,10 +8,12 @@
  */
 import React, { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MoreVertical, Building2, ListPlus, PackagePlus, PackageMinus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2, Send, FileUp, FileText, CheckCircle2 } from 'lucide-react';
+import { MoreVertical, Building2, ListPlus, PackagePlus, PackageMinus, Trash2, Loader2, Eye, Wallet, ShoppingCart, Receipt, Link2, BadgeCheck, Undo2, Send, FileUp, FileText, CheckCircle2, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/utils/decimal';
 import { inboundService } from '@/modules/finance/services/inboundService';
+import { financeService } from '@/modules/finance/services/financeService';
+import { supabase } from '@/integrations/supabase/client';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -143,6 +145,18 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   const [crmOpen, setCrmOpen] = useState(false);
 
   const { toast } = useToast();
+  const togglePnl = async () => {
+    try {
+      const { data, error } = await supabase.from('inbound_documents').select('exclude_from_pnl').eq('id', doc.id).maybeSingle();
+      if (error) throw error;
+      const next = !(data?.exclude_from_pnl === true);
+      await financeService.setDocumentPnlExclusion('inbound_document', doc.id, next);
+      toast({ title: next ? 'Excluded from P&L' : 'Included in P&L', description: doc.created_supplier_bill_id ? 'The expense it was booked as follows.' : undefined });
+      onChanged?.();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
   const fileInput = useRef<HTMLInputElement>(null);
   const [docBusy, setDocBusy] = useState(false);
   const unconfirmed = doc.status === 'unconfirmed';
@@ -209,6 +223,9 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
         >
           <DropdownMenuItem onClick={onPreview}>
             <Eye className="h-4 w-4 mr-2" /> Preview
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => void togglePnl()}>
+            <EyeOff className="h-4 w-4 mr-2" /> Exclude from / include in P&amp;L
           </DropdownMenuItem>
           {doc.document_path && (
             <DropdownMenuItem onClick={() => void viewDocument()}>

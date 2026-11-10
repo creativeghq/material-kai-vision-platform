@@ -21,6 +21,7 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import { formatMoney, parseDecimal } from '@/utils/decimal';
 import { humanizeLabel } from '@/utils/humanize';
+import { PnlExclusionToggle } from '@/modules/finance/components/PnlExclusionToggle';
 import {
   financeService,
   type PlannedPaymentCategory, type RecurringCadence, type RecurringExpense,
@@ -262,6 +263,9 @@ export const RecurringPlansCard: React.FC<{ workspaceId: string }> = ({ workspac
                           {humanizeLabel(r.plan_category)}
                           {!r.is_active && ' · paused'}
                         </div>
+                        {r.creates === 'bill' && canOperateFinance && (
+                          <div className="mt-1"><PnlExclusionToggle kind="recurring_expense" id={r.id} compact checked={(r as any).exclude_from_pnl === true} /></div>
+                        )}
                       </TableCell>
                       <TableCell className="hidden text-xs sm:table-cell">{cadenceLabel(r.cadence, r.interval_count)}</TableCell>
                       <TableCell className="whitespace-nowrap text-right font-medium tabular-nums">

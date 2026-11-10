@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/t
 import { OrderWorklistPanel } from './OrderWorklistPanel';
 import { ReceiveOrderLinesDialog } from './ReceiveOrderLinesDialog';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle , DialogDescription } from '@/components/core/ui/dialog';
+import { PnlExclusionToggle } from '@/modules/finance/components/PnlExclusionToggle';
 import { OrderCustomsCard } from '@/modules/finance/components/OrderCustomsCard';
 import { OrderCbamCard } from '@/modules/finance/components/OrderCbamCard';
 import { OrderEudrCard } from '@/modules/finance/components/OrderEudrCard';
@@ -2985,6 +2986,10 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                     </>
                   ) : null)}
                 </div>
+              )}
+              {order && (
+                <PnlExclusionToggle kind="order" id={order.id} checked={(order as any).exclude_from_pnl === true}
+                  onChanged={() => { void load(order.id); onChanged(); }} />
               )}
             </div>
           </div>

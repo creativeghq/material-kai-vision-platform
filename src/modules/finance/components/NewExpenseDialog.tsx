@@ -525,6 +525,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           orderId: effectiveOrderId ?? null,
           tripReportId: linkTripReportId,
           propertyId: linkPropertyId,
+          excludeFromPnl,
         });
         } catch (recErr: any) {
           recurringError = recErr?.message ?? 'the recurring template could not be created';

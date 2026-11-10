@@ -269,6 +269,7 @@ export const CreditNoteDetailPage: React.FC = () => {
             </HubProperty>
             <PartyLinks invoiceId={cn.invoice_id} invoice={cn.invoice} partyName={cn.party_name} />
             <HubProperty label="Document Type">{cn.document_type}</HubProperty>
+            <HubProperty label="P&L">{(cn as any).exclude_from_pnl ? 'Excluded — follows its invoice' : 'Included — follows its invoice'}</HubProperty>
             <HubProperty label="Issued">{cn.issued_at ? formatDate(cn.issued_at) : null}</HubProperty>
             <HubProperty label="Reason">{cn.reason}</HubProperty>
             <HubProperty label="Correlated MARK">{cn.correlated_mark ? <span className="font-mono text-xs">{cn.correlated_mark}</span> : null}</HubProperty>

@@ -36,6 +36,7 @@ import { formatDate, todayLocalISO } from '@/utils/datetime';
 import { receiptScanService, splitForForm, RECEIPT_ACCEPT, ReceiptTooLargeError } from '@/services/receiptScanService';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { FlightSearchPanel } from '@/modules/travel/components/FlightSearchPanel';
+import { PnlExclusionToggle } from '@/modules/finance/components/PnlExclusionToggle';
 interface Props {
   workspaceId: string;
   /** Finance reviewers see every card and can approve/reject lines. Reps see only their own. */
@@ -629,6 +630,7 @@ const TripCardDetail: React.FC<{
                   </TableCell>
                   <TableCell>
                     <Badge variant={APPROVAL_VARIANT[it.approval_status] ?? 'neutral'}>{capitalize(it.approval_status)}</Badge>
+                    {canReview && <div className="mt-1"><PnlExclusionToggle kind="trip_expense_item" id={it.id} compact checked={(it as any).exclude_from_pnl === true} /></div>}
                   </TableCell>
                   <TableCell className="text-right">
                     {isOwner && it.commitment === 'planned' && it.approval_status === 'approved' ? (
