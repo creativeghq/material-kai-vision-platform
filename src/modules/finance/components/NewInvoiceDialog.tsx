@@ -237,6 +237,12 @@ const taxOptionLabel = (r: TaxRef): string => {
 
 const PRODUCT_SUGGEST_MIN = 3;
 
+const EDIT_LINE_COLUMNS = 'id, description, sku, quantity, unit_price, unit, measurement_unit_code, discounted_price, '
+  + 'selected_attributes, selected_color, selected_size, vat_category, vat_exemption_category, '
+  + 'income_classification_type, income_classification_category, fees_category, fees_amount, '
+  + 'stamp_duty_category, stamp_duty_amount, other_taxes_category, other_taxes_amount, deductions_amount, '
+  + 'withheld_category, line_comments, invoice_detail_type, rec_type, product_id';
+
 const emptyLine = (g?: Partial<LineItem>): LineItem => ({
   description: '', sku: '', quantity: '1', unit_price: '0', unit_cost: '', discount: '', unit: '',
   measurement_unit_code: '', selected_attributes: {}, color: '', size: '',
@@ -672,13 +678,19 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!open || !editInvoiceId || !catalogsReady) return;
     let cancelled = false;
     (async () => {
-      const [{ data: inv, error: invErr }, { data: items }, { data: taxes }] = await Promise.all([
+      // Named columns: the line cost is column-withheld (#358), and `*` refuses the whole read.
+      const [{ data: inv, error: invErr }, { data: items, error: itemsErr }, { data: taxes, error: taxesErr }] = await Promise.all([
         supabase.from('invoices').select('*').eq('id', editInvoiceId).maybeSingle(),
-        supabase.from('invoice_items').select('*').eq('invoice_id', editInvoiceId).order('added_at', { ascending: true }),
+        supabase.from('invoice_items').select(EDIT_LINE_COLUMNS).eq('invoice_id', editInvoiceId).order('added_at', { ascending: true }),
         supabase.from('invoice_taxes').select('*').eq('invoice_id', editInvoiceId).order('sort_order', { ascending: true }),
       ]);
       if (cancelled) return;
-      if (invErr || !inv) { toast({ title: 'Could not load the invoice', description: invErr?.message, variant: 'destructive' }); return; }
+      const loadErr = invErr ?? itemsErr ?? taxesErr;
+      if (loadErr || !inv || !items?.length) {
+        toast({ title: 'Could not load the invoice for editing', description: loadErr?.message ?? 'Its lines could not be read.', variant: 'destructive' });
+        onOpenChange(false);
+        return;
+      }
       const v = inv as any;
       const str = (x: unknown) => (x == null ? '' : String(x));
       let cust: Customer | null = null;
@@ -731,7 +743,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         return emptyLine({
           id: r.id, description: r.description ?? '', sku: r.sku ?? '', quantity: str(r.quantity ?? 1),
           unit_price: str(v.prices_include_vat ? Number((unit * (1 + pct / 100)).toFixed(4)) : unit),
-          unit_cost: str(r.unit_cost_snapshot), discount: Number(r.discounted_price) ? str(r.discounted_price) : '',
+          unit_cost: '', discount: Number(r.discounted_price) ? str(r.discounted_price) : '',
           unit: r.unit ?? '', measurement_unit_code: str(r.measurement_unit_code),
           selected_attributes: r.selected_attributes ?? {}, color: r.selected_color ?? '', size: r.selected_size ?? '',
           vat_category: str(r.vat_category), vat_exemption: str(r.vat_exemption_category),
