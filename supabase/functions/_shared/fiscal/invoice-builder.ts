@@ -144,6 +144,13 @@ function assertMovePurpose(raw: unknown, subject: string): number {
   return n;
 }
 
+/** myDATA `dispatchTime` is `xs:time`: AADE rejects `22:30`, which is what a time input stores. */
+export function dispatchTimeOf(raw: unknown): string | undefined {
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(String(raw ?? '').trim());
+  if (!m) return undefined;
+  return `${m[1].padStart(2, '0')}:${m[2]}:${m[3] ?? '00'}`;
+}
+
 /** Inverse: the VAT percent myDATA expects for each category. 8 = without-VAT/exempt → 0. */
 const VAT_PCT_BY_CATEGORY: Record<number, number> = { 1: 24, 2: 13, 3: 6, 4: 17, 5: 9, 6: 4, 7: 0, 8: 0 };
 
@@ -556,8 +563,7 @@ export async function buildInvoiceInputFromDb(
       - Number(inv.total_withheld_amount ?? 0) - Number(inv.total_deductions_amount ?? 0);
   const grossTotal = round2(totalGross + taxPayableDelta);
 
-  // Combined invoice + delivery note (Τιμολόγιο – Δελτίο Αποστολής): emit the movement
-  // block so myDATA receives the transport details, same shape as a standalone 9.3.
+  // Τιμολόγιο – Δελτίο Αποστολής: the movement block, same shape as a standalone 9.3.
   const movement = inv.has_shipping
     ? (() => {
         // NO DEFAULT. `move_purpose ? ... : 1` filed every movement nobody classified as a
@@ -565,7 +571,7 @@ export async function buildInvoiceInputFromDb(
         const mp = assertMovePurpose(inv.move_purpose, `invoice ${invoiceId}`);
         return {
           dispatchDate: inv.transport_date ? String(inv.transport_date).slice(0, 10) : issueDate,
-          dispatchTime: inv.transport_time || undefined,
+          dispatchTime: dispatchTimeOf(inv.transport_time),
           vehicleNumber: inv.vehicle_number || undefined,
           movePurpose: mp,
           movePurposeLabel: movePurposeLabel(mp),
@@ -1019,7 +1025,7 @@ export async function buildDeliveryNoteInputFromDb(
       invoiceType: mydataType,
       currency: 'EUR',
       dispatchDate: dn.transport_date ? String(dn.transport_date).slice(0, 10) : issueDate,
-      dispatchTime: dn.transport_time || undefined,
+      dispatchTime: dispatchTimeOf(dn.transport_time),
       vehicleNumber: dn.vehicle_number || undefined,
       ...(movePurpose != null
         ? {

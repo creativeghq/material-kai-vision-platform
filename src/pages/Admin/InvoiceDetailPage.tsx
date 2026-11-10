@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Truck,
   FolderOpen,
+  Pencil,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -38,6 +39,7 @@ import { LinkedRecordsPanel } from '@/components/core/hub';
 import { InvoicePreviewModal } from '@/modules/finance/components/InvoicePreviewModal';
 import { WholesaleCardNotice } from '@/modules/finance/components/WholesaleCardNotice';
 import { NewCreditNoteDialog } from '@/modules/finance/components/NewCreditNoteDialog';
+import { NewInvoiceDialog } from '@/modules/finance/components/NewInvoiceDialog';
 import { RecordPaymentDialog } from '@/modules/finance/components/RecordPaymentDialog';
 import { PaymentReceiptActions } from '@/modules/finance/components/PaymentReceiptActions';
 import { PaymentProofsCard } from '@/modules/finance/components/PaymentProofsCard';
@@ -63,6 +65,9 @@ const InvoiceDetailPage: React.FC = () => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [projectSaving, setProjectSaving] = useState(false);
   const [projectOpen, setProjectOpen] = useState(false);
+  /** Derived in SQL (`get_invoice_edit_verdict`): editable until myDATA returns a MARK. */
+  const [editVerdict, setEditVerdict] = useState<{ editable: boolean; reason: string | null } | null>(null);
+  const [editOpen, setEditOpen] = useState(false);
   // Attributing revenue to a job is a finance decision, gated the same way the project's own
   // Finance tab is. Everyone else sees the invoice without the control.
   const { can, isWorkspaceManager } = usePermissions();
@@ -123,8 +128,12 @@ const InvoiceDetailPage: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const inv = await financeService.getInvoice(invoiceId);
+      const [inv, verdict] = await Promise.all([
+        financeService.getInvoice(invoiceId),
+        supabase.rpc('get_invoice_edit_verdict' as any, { p_invoice_id: invoiceId }),
+      ]);
       setInvoice(inv);
+      setEditVerdict((verdict.data as any) ?? null);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load invoice');
     } finally {
@@ -264,6 +273,11 @@ const InvoiceDetailPage: React.FC = () => {
             <Button onClick={() => setProjectOpen(true)} variant="outline">
               <FolderOpen className="mr-2 h-4 w-4" />
               {(invoice as any).project_id ? 'Project' : 'Link to Project'}
+            </Button>
+          )}
+          {editVerdict?.editable && (
+            <Button onClick={() => setEditOpen(true)} variant="outline">
+              <Pencil className="mr-2 h-4 w-4" /> Edit
             </Button>
           )}
           {invoice.status === 'draft' && (
@@ -704,10 +718,17 @@ const InvoiceDetailPage: React.FC = () => {
                 )
               )}
               {f.fiscal_status === 'rejected' && (
-                <p className="text-xs text-destructive">
-                  AADE refused this document, so its legal number is burned. Fix the cause and re-submit, or void it and
-                  issue a credit note.
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs text-destructive">
+                    AADE refused this document. It has no MARK, so it can still be edited — fix the cause, then send it
+                    again under the same number.
+                  </p>
+                  {editVerdict?.editable && (
+                    <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>
+                      <Pencil className="h-3 w-3 mr-1" /> Edit invoice
+                    </Button>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>
@@ -729,6 +750,13 @@ const InvoiceDetailPage: React.FC = () => {
       />
       {/* The platform's one credit-note form, preset to this invoice — it credits per LINE with
           exact VAT, which the bespoke copy that used to live here could not do at all. */}
+      <NewInvoiceDialog
+        workspaceId={(invoice as any).workspace_id}
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        editInvoiceId={editOpen ? invoice.id : null}
+        onCreated={async () => { setEditOpen(false); await load(); }}
+      />
       <NewCreditNoteDialog
         workspaceId={invoice.workspace_id}
         presetInvoiceId={invoice.id}

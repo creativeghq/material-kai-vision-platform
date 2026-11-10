@@ -3,7 +3,7 @@
 // catalog product (price via get_product_price_for_workspace; color/size/unit prefilled
 // from product metadata) and carries full myDATA detail — measurement unit, VAT category,
 // income classification — set per line OR via the GLOBAL defaults bar above the rows.
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, Loader2, ChevronDown, ChevronRight, ChevronLeft, Search, Package, MapPin, Eye, Wrench } from 'lucide-react';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { issuableDocTypeCodes } from '../issuableDocTypes';
@@ -73,6 +73,8 @@ interface Customer {
 }
 
 interface LineItem {
+  /** The stored `invoice_items.id` when editing an existing invoice. */
+  id?: string;
   description: string;
   sku: string;
   quantity: string;
@@ -142,6 +144,8 @@ interface Props {
   /** Pre-fill the invoice notes. */
   initialNotes?: string;
   initialCategoryId?: string;
+  /** Edit this invoice instead of creating one. Allowed until it has a myDATA MARK. */
+  editInvoiceId?: string | null;
 }
 
 function groupDocTypes(types: { code: string; description: string }[]) {
@@ -265,11 +269,17 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
   return { unit: meta.unit, color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
 }
 
-export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes, initialCategoryId }) => {
+export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes, initialCategoryId, editInvoiceId }) => {
   const { toast } = useToast();
   /** Out of credits is an offer, not a wall — see CreditTopUpDialog. */
   const [topUpRequest, setTopUpRequest] = useState<CreditTopUpRequest | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Edit mode: the stored invoice's status and number once hydrated. Issued keeps its type, series and date. */
+  const [editing, setEditing] = useState<{ status: string; number: string; total: number } | null>(null);
+  const [catalogsReady, setCatalogsReady] = useState(false);
+  /** Values the open-time effects would otherwise reset while an edit is hydrating. */
+  const pendingEdit = useRef<{ addrUnitId: string | null; seriesId: string | null } | null>(null);
+  const identityLocked = !!editing && editing.status !== 'draft';
   const [showPreview, setShowPreview] = useState(false);
   // Inner tabs split the dense myDATA form into Details / Items / Taxes / Options.
   const [tab, setTab] = useState<'details' | 'items' | 'taxes' | 'options'>('details');
@@ -454,7 +464,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   // ── Reset on open ──
   useEffect(() => {
     if (!open) return;
-    setTab('details');
+    setTab('details'); setEditing(null); setCatalogsReady(false); pendingEdit.current = null;
     // Pre-select the buyer when opened from a party page; the [customer] effect
     // below loads its address. Otherwise start blank.
     setCustomer(initialCustomer ?? null); setCustomerSearch(''); setCustomerOptions([]); setCustomerAddr(null);
@@ -542,11 +552,11 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setIssuer(fs.data ?? null);
       setSubmitNow((fs.data as any)?.auto_send_to_aade !== false);
       // Prefill the invoice Notes with the workspace default (editable per-invoice).
-      if ((fs.data as any)?.default_invoice_notes) setNotes(String((fs.data as any).default_invoice_notes));
+      if (!editInvoiceId && (fs.data as any)?.default_invoice_notes) setNotes(String((fs.data as any).default_invoice_notes));
       financeCategoriesService.list(workspaceId).then(setCategories).catch(() => setCategories([]));
       servicesService.list(workspaceId).then(setServices).catch(() => setServices([]));
       financeService.listInvoiceBankAccounts(workspaceId).then(setPreviewBanks).catch(() => setPreviewBanks([]));
-      invoicingSetupService.listBranches(workspaceId).then((b) => { setBranches(b); setBranchCode(String(b.find((x) => x.branch_code === 0)?.branch_code ?? 0)); }).catch(() => setBranches([]));
+      invoicingSetupService.listBranches(workspaceId).then((b) => { setBranches(b); if (!editInvoiceId) setBranchCode(String(b.find((x) => x.branch_code === 0)?.branch_code ?? 0)); }).catch(() => setBranches([]));
       const enabledCodes = Object.values(enabled).filter((e) => e.enabled).map((e) => e.code);
       const issuableCodes = issuableDocTypeCodes(enabledCodes, allSeries ?? []);
       const visible = allTypes.filter((t) => issuableCodes.has(t.code));
@@ -556,8 +566,10 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setExpTypes(expT.map((t) => ({ code: t.code, description: t.description })));
       setExpCats(expC.map((t) => ({ code: t.code, description: t.description })));
       setDocDefaults(Object.fromEntries(Object.values(enabled).map((e) => [e.code, { type: e.default_income_classification_type, category: e.default_income_classification_category, wh: e.default_withholding_code }])));
-      if (visible.length && !visible.some((t) => t.code === '1.1')) setDocumentType(visible[0].code);
+      if (!editInvoiceId && visible.length && !visible.some((t) => t.code === '1.1')) setDocumentType(visible[0].code);
+      setCatalogsReady(true);
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, workspaceId]);
 
   // ── Customer search ──
@@ -629,9 +641,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setCustomerAddr(data ?? null);
       // Adopt the party's commercial defaults: ΜΥΦ inclusion preference and
       // (for 0%-VAT lines) the party's default myDATA VAT-exemption category.
-      if (data && (data as any).include_in_myf === false) setIncludeInMyf(false);
+      if (!editInvoiceId && data && (data as any).include_in_myf === false) setIncludeInMyf(false);
       // Public-sector segment → default to B2G issuance + prefill the buyer registration id.
-      if (data && (data as any).contact_group === 'public_sector') {
+      if (!editInvoiceId && data && (data as any).contact_group === 'public_sector') {
         setIsB2g(true);
         if ((data as any).vat_number) setB2gBuyerReg(String((data as any).vat_number));
       }
@@ -648,7 +660,97 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
 
   // Reset the chosen sub-unit when the customer changes (the picker re-adopts the new
   // party's default unit, if any).
-  useEffect(() => { setAddrUnitId(null); }, [customer?.id]);
+  useEffect(() => {
+    const pending = pendingEdit.current;
+    setAddrUnitId(pending?.addrUnitId ?? null);
+    if (pending) pending.addrUnitId = null;
+  }, [customer?.id]);
+
+  // Edit mode: load the stored invoice once the catalogs have set their defaults, so nothing
+  // the open-time effects write lands on top of what the document actually says.
+  useEffect(() => {
+    if (!open || !editInvoiceId || !catalogsReady) return;
+    let cancelled = false;
+    (async () => {
+      const [{ data: inv, error: invErr }, { data: items }, { data: taxes }] = await Promise.all([
+        supabase.from('invoices').select('*').eq('id', editInvoiceId).maybeSingle(),
+        supabase.from('invoice_items').select('*').eq('invoice_id', editInvoiceId).order('added_at', { ascending: true }),
+        supabase.from('invoice_taxes').select('*').eq('invoice_id', editInvoiceId).order('sort_order', { ascending: true }),
+      ]);
+      if (cancelled) return;
+      if (invErr || !inv) { toast({ title: 'Could not load the invoice', description: invErr?.message, variant: 'destructive' }); return; }
+      const v = inv as any;
+      const str = (x: unknown) => (x == null ? '' : String(x));
+      let cust: Customer | null = null;
+      if (v.customer_company_id || v.customer_contact_id) {
+        const isCo = !!v.customer_company_id;
+        const { data: party } = isCo
+          ? await supabase.from('crm_companies').select('id, name, email').eq('id', v.customer_company_id).maybeSingle()
+          : await supabase.from('crm_contacts').select('id, name, first_name, last_name, email').eq('id', v.customer_contact_id).maybeSingle();
+        const p = party as any;
+        cust = {
+          type: isCo ? 'company' : 'contact',
+          id: isCo ? v.customer_company_id : v.customer_contact_id,
+          label: p?.name || [p?.first_name, p?.last_name].filter(Boolean).join(' ') || p?.email || 'Customer',
+        };
+      }
+      if (cancelled) return;
+      pendingEdit.current = { addrUnitId: v.customer_address_unit_id ?? null, seriesId: v.chosen_series_id ?? null };
+      setEditing({ status: v.status, number: v.legal_number || v.internal_number || '', total: Number(v.total ?? 0) });
+      setCustomer(cust);
+      setDocumentType(v.document_type || '1.1'); setDocTypePinned(true);
+      setActivityCode(v.activity_kad?.code ?? ''); setCurrency(v.currency || 'EUR'); setVatRate(str(v.vat_rate ?? 24));
+      setPaymentTermsDays(str(v.payment_terms_days ?? 30));
+      setIssueDate(v.issued_at ? toLocalISODate(new Date(v.issued_at)) : todayLocalISO());
+      setNotes(v.notes ?? ''); setCategoryId(v.category_id ?? ''); setBranchCode(str(v.branch_code ?? 0));
+      setDocLanguage(v.doc_language === 'el' ? 'el' : 'en');
+      setPaymentMethodCode(str(v.payment_method_code)); setPaymentMethodInfo(v.payment_method_info ?? '');
+      setVatSuspension(!!v.vat_payment_suspension);
+      setSelfPricing(!!v.self_billed_supplier_company_id); setSelfBillSupplierId(v.self_billed_supplier_company_id ?? '');
+      setExchangeRate(str(v.exchange_rate)); setPricesIncludeVat(!!v.prices_include_vat);
+      setPaidUpfront(!!v.paid_upfront); setDigitalFee(Number(v.digital_transaction_fee) ? str(v.digital_transaction_fee) : '');
+      setRelatedDocument(v.related_document ?? ''); setPrintTerms(v.print_terms !== false); setIncludeInMyf(v.include_in_myf !== false);
+      setPrintOnlineCode(v.print_online_code !== false); setInfoBox(v.info_box ?? ''); setLogoMode(v.logo_mode === 'none' ? 'none' : 'auto');
+      setMoveStock(v.move_stock !== false); setSendEmail(false);
+      setExpenseType(v.expense_classification_type ?? ''); setExpenseCategory(v.expense_classification_category ?? '');
+      setHasShipping(!!v.has_shipping); setShipFrom(v.ship_from ?? ''); setShipTo(v.ship_to ?? '');
+      setTransportDate(v.transport_date ? String(v.transport_date).slice(0, 10) : '');
+      setTransportTime(v.transport_time ? String(v.transport_time).slice(0, 5) : '');
+      setVehicleNumber(v.vehicle_number ?? ''); setResponsible(v.responsible ?? ''); setMovePurpose(str(v.move_purpose || '1'));
+      const b = v.b2g_details ?? {};
+      setIsB2g(!!v.is_b2g); setB2gContractRef(b.contractReference ?? ''); setB2gBuyerRef(b.buyerReference ?? '');
+      setB2gBuyerReg(b.buyerLegalRegistrationIdentifier ?? ''); setB2gBuyerIdentifier(b.buyerIdentifier ?? '');
+      setB2gBudgetIdentifier(b.budgetIdentifier ?? ''); setB2gDueDate(b.dueDate ?? ''); setB2gCpv(b.cpvCode ?? ''); setB2gPoRef(b.purchaseOrderReference ?? '');
+      const rows = (items ?? []) as any[];
+      const wh = rows.find((r) => r.withheld_category != null);
+      setWithholdingCode(wh ? str(wh.withheld_category) : '');
+      setWithholdingAmount(Number(v.total_withheld_amount) ? str(v.total_withheld_amount) : '');
+      setLines(rows.length ? rows.map((r) => {
+        const pct = vatPctForCat(r.vat_category != null ? String(r.vat_category) : undefined, Number(v.vat_rate ?? 0));
+        const unit = Number(r.unit_price ?? 0);
+        return emptyLine({
+          id: r.id, description: r.description ?? '', sku: r.sku ?? '', quantity: str(r.quantity ?? 1),
+          unit_price: str(v.prices_include_vat ? Number((unit * (1 + pct / 100)).toFixed(4)) : unit),
+          unit_cost: str(r.unit_cost_snapshot), discount: Number(r.discounted_price) ? str(r.discounted_price) : '',
+          unit: r.unit ?? '', measurement_unit_code: str(r.measurement_unit_code),
+          selected_attributes: r.selected_attributes ?? {}, color: r.selected_color ?? '', size: r.selected_size ?? '',
+          vat_category: str(r.vat_category), vat_exemption: str(r.vat_exemption_category),
+          income_classification_type: r.income_classification_type ?? '', income_classification_category: r.income_classification_category ?? '',
+          fees_category: str(r.fees_category), fees: Number(r.fees_amount) ? str(r.fees_amount) : '',
+          stamp_duty_category: str(r.stamp_duty_category), stamp_duty: Number(r.stamp_duty_amount) ? str(r.stamp_duty_amount) : '',
+          other_taxes_category: str(r.other_taxes_category), other_taxes: Number(r.other_taxes_amount) ? str(r.other_taxes_amount) : '',
+          deductions: Number(r.deductions_amount) ? str(r.deductions_amount) : '', line_comments: r.line_comments ?? '',
+          invoice_detail_type: str(r.invoice_detail_type), is_other_taxes_line: r.rec_type === 3, product_id: r.product_id ?? null,
+        });
+      }) : [emptyLine()]);
+      setDocTaxes(((taxes ?? []) as any[]).map((t) => ({
+        tax_type: str(t.tax_type), tax_category: str(t.tax_category), units: '',
+        amount: str(t.tax_amount), label: t.label ?? '', reduces_payable: !!t.reduces_payable,
+      })));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, editInvoiceId, catalogsReady]);
 
   // Preview the series + next number for this doc type + establishment (read-only).
   useEffect(() => {
@@ -666,7 +768,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         ? list[0]
         : (list.find((r: any) => r.branch_id === (br as any)?.id) ?? list.find((r: any) => r.branch_id === null));
       setAutoNext(match ? { series: (match as any).series, number: (match as any).next_number } : null);
-      setChosenSeriesId('auto');
+      setChosenSeriesId(pendingEdit.current?.seriesId ?? 'auto');
+      if (pendingEdit.current) pendingEdit.current.seriesId = null;
       setSeriesOptions(selfBillSupplierId ? [] : list
         .filter((r: any) => r.branch_id === null || r.branch_id === (br as any)?.id)
         .map((r: any) => ({ id: r.id as string, series: r.series as string, next_number: r.next_number as number })));
@@ -1138,32 +1241,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     }
     try {
       setBusy(true);
-      // Use a DERIVED draft number (no counter advance). The gapless myDATA series/aa is
-      // allocated at issue by mark_invoice_issued — never at draft-create — so a deleted or
-      // failed draft can't gap the legal serial sequence.
-      const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
-      if (numErr) throw numErr;
-
-      // Snapshot the workspace's invoice design template + resolved colors onto this invoice,
-      // so changing the workspace template later never restyles an already-created invoice.
-      const { data: tplSettings } = await supabase.from('finance_settings')
-        .select('invoice_template_id, invoice_template_colors').eq('workspace_id', workspaceId).maybeSingle();
-      const snapshotTemplateId = (tplSettings as any)?.invoice_template_id || DEFAULT_TEMPLATE_ID;
-      const snapshotTemplateColors = resolveColors(snapshotTemplateId, (tplSettings as any)?.invoice_template_colors);
-
-      const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
-        workspace_id: workspaceId,
-        internal_number: draftNumber as string, series: null, series_number: null,
+      const headerFields = {
         customer_contact_id: customer?.type === 'contact' ? customer.id : null,
         customer_company_id: customer?.type === 'company' ? customer.id : null,
         // Naming the supplier is what makes this self-billed; the flag follows it so the two can
         // never disagree about who the envelope says is issuing.
         self_billed_supplier_company_id: selfBillSupplierId || null,
-        // Always insert as draft. "Issue now" routes through mark_invoice_issued
-        // below so the legal_number (gapless) + issued_at + due_at are assigned
-        // by the same RPC the quote path uses — inline status:'issued' here was
-        // skipping legal_number assignment entirely.
-        status: 'draft',
         // parseDecimalOr, like the totals and the exemption gate. This was `Number(vatRate)`,
         // which yields NaN for a European decimal ('24,5') — so the STORED rate disagreed with
         // the totals the operator approved (parseDecimalOr gave 24.5) and with the exemption
@@ -1193,7 +1276,6 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         doc_language: docLanguage,
         activity_kad: chosenKad,
         chosen_series_id: chosenSeriesId !== 'auto' ? chosenSeriesId : null,
-        template_id: snapshotTemplateId, template_colors: snapshotTemplateColors,
         customer_address_unit_id: addrUnitId,
         has_shipping: hasShipping,
         ship_from: hasShipping ? (shipFrom || null) : null, ship_to: hasShipping ? (shipTo || null) : null,
@@ -1212,10 +1294,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           cpvCode: b2gCpv || null,
           purchaseOrderReference: b2gPoRef || null,
         } : null,
-        issued_at: null,
-        due_at: null,
-      }).select().single();
-      if (insErr) throw insErr;
+      };
 
       // Distribute the document-level withholding across lines by net share, with the LAST
       // line taking the rounding remainder so Σ(line withheld) == the summary total exactly
@@ -1240,7 +1319,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
        */
       const cashFactorForLines = paidUpfront ? (1 - cashPct / 100) : 1;
 
-      const itemsPayload = clean.map((l, li) => {
+      const linePayload = clean.map((l, li) => {
         const q = parseDecimalOr(l.quantity, 0); const p = parseDecimalOr(l.unit_price, 0);
         const disc = parseDecimalOr(l.discount, 0);
         const pct = vatPctForCat(l.vat_category || undefined, parseDecimalOr(vatRate, 0));
@@ -1248,7 +1327,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         // Store the NET unit price so per-line myDATA VAT stays correct when prices include VAT.
         const unitNet = pricesIncludeVat ? extractNet(p, pct) : p;
         return {
-          invoice_id: invoice.id, description: l.description.trim(), sku: l.sku.trim() || null,
+          ...(l.id ? { id: l.id } : {}), description: l.description.trim(), sku: l.sku.trim() || null,
           quantity: q, unit_price: Number(unitNet.toFixed(4)), unit: l.unit || null,
           measurement_unit_code: l.measurement_unit_code ? parseInt(l.measurement_unit_code, 10) : null,
           discounted_price: disc || null,
@@ -1293,19 +1372,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           product_id: l.product_id || null,
         };
       });
-      const { error: itemsErr } = await supabase.from('invoice_items').insert(itemsPayload);
-      if (itemsErr) throw itemsErr;
-
-      /**
-       * Document-level taxes (myDATA `taxesTotals`).
-       *
-       * Written AFTER the lines and BEFORE the totals are recomputed, because
-       * `recompute_invoice_tax_totals` decides the declaration mode by asking whether any row
-       * exists. It is also the ONE derivation of the five header totals and of
-       * `tax_payable_delta`, which is the number the envelope builder transmits as the gross —
-       * so the amounts stamped on the invoice above are provisional until this returns.
-       */
-      /** ONE call, so the rows and the totals they imply commit together (rule 4). */
+      // Document-level taxes (myDATA `taxesTotals`). Written after the lines: their presence decides
+      // the declaration mode, and `recompute_invoice_tax_totals` re-derives the header totals.
       const taxRows = docTaxes
         .map((r, i) => {
           const taxType = parseInt(r.tax_type, 10);
@@ -1327,6 +1395,61 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
           };
         })
         .filter((r) => r.tax_type > 0 && r.tax_amount !== 0);
+
+      // Edit: header, lines and taxes in one transaction. An issued invoice keeps its number,
+      // type, series and issue date.
+      if (editInvoiceId) {
+        const { error: editErr } = await supabase.rpc('update_unfiled_invoice', {
+          p_invoice_id: editInvoiceId, p_header: headerFields, p_items: linePayload, p_taxes: taxRows,
+        });
+        if (editErr) throw editErr;
+        const wasDraft = editing?.status === 'draft';
+        if (issuing && wasDraft) await financeService.markInvoiceIssued(editInvoiceId, issueDate || null);
+        if (wasDraft ? issuing && submitNow : issuing) {
+          let fr: any;
+          try { fr = (await fiscalConnectorService.submitInvoice(editInvoiceId))?.fiscal; }
+          catch (e: any) { fr = { ok: false, error: e?.message }; }
+          if (fr?.ok === false || fr?.status === 'rejected') {
+            toast({ title: 'Saved — NOT accepted by myDATA', description: fr.error ?? fr.errorMessage ?? 'The transmission failed.', variant: 'destructive' });
+          } else if (fr?.status === 'accepted') {
+            toast({ title: 'Saved and transmitted to myDATA', description: fr.mark ? `MARK ${fr.mark}` : undefined });
+          }
+        }
+        toast({ title: 'Invoice updated', description: editing?.number || undefined });
+        onCreated(editInvoiceId);
+        return;
+      }
+
+      // Use a DERIVED draft number (no counter advance). The gapless myDATA series/aa is
+      // allocated at issue by mark_invoice_issued — never at draft-create — so a deleted or
+      // failed draft can't gap the legal serial sequence.
+      const { data: draftNumber, error: numErr } = await supabase.rpc('next_invoice_number', { p_workspace_id: workspaceId });
+      if (numErr) throw numErr;
+
+      // Snapshot the workspace's invoice design template + resolved colors onto this invoice,
+      // so changing the workspace template later never restyles an already-created invoice.
+      const { data: tplSettings } = await supabase.from('finance_settings')
+        .select('invoice_template_id, invoice_template_colors').eq('workspace_id', workspaceId).maybeSingle();
+      const snapshotTemplateId = (tplSettings as any)?.invoice_template_id || DEFAULT_TEMPLATE_ID;
+      const snapshotTemplateColors = resolveColors(snapshotTemplateId, (tplSettings as any)?.invoice_template_colors);
+
+      const { data: invoice, error: insErr } = await supabase.from('invoices').insert({
+        workspace_id: workspaceId,
+        internal_number: draftNumber as string, series: null, series_number: null,
+        // Always inserted as draft; issuing goes through mark_invoice_issued (gapless number).
+        status: 'draft',
+        ...headerFields,
+        template_id: snapshotTemplateId, template_colors: snapshotTemplateColors,
+        issued_at: null,
+        due_at: null,
+      }).select().single();
+      if (insErr) throw insErr;
+
+      const { error: itemsErr } = await supabase.from('invoice_items').insert(
+        linePayload.map((row) => ({ ...row, invoice_id: invoice.id })),
+      );
+      if (itemsErr) throw itemsErr;
+
       const { error: taxErr } = await supabase.rpc('set_invoice_document_taxes', {
         p_invoice_id: invoice.id,
         p_rows: taxRows,
@@ -1463,7 +1586,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[98vw] max-w-[1500px] h-[96vh] max-h-[96vh] overflow-hidden p-0 gap-0 flex flex-col" onOpenAutoFocus={(e) => { const search = document.getElementById('ni-customer-search'); if (search) { e.preventDefault(); search.focus(); } }}>
         <DialogHeader className="border-b border-border/60 px-5 py-3 shrink-0">
-          <DialogTitle>New Invoice</DialogTitle><DialogDescription className="sr-only">Create a sales invoice or receipt and add its line items.</DialogDescription>
+          <DialogTitle>{editing ? `Edit Invoice ${editing.number}` : 'New Invoice'}</DialogTitle><DialogDescription className="sr-only">{editing ? 'Change this invoice before it is filed with myDATA.' : 'Create a sales invoice or receipt and add its line items.'}</DialogDescription>
         </DialogHeader>
 
         {/* ───────── Editable form (left) + live styled-template preview (right) ───────── */}
@@ -1552,7 +1675,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     workspaceId={workspaceId}
                     companyId={customer.type === 'company' ? customer.id : null}
                     contactId={customer.type === 'contact' ? customer.id : null}
-                    amount={totals.total || 0}
+                    amount={identityLocked ? Math.max(0, (totals.total || 0) - (editing?.total ?? 0)) : (totals.total || 0)}
                     onBlockedChange={setCreditBlocked}
                   />
 
@@ -1626,6 +1749,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     11.2 (ΑΠΥ, service rendered) sits beside 11.1 because a consumer buying a
                     SERVICE gets that one, and leaving it out is how every retail service went out
                     as a sale of goods. */}
+                {identityLocked ? (
+                  <p className="text-sm">
+                    <span className="font-medium">{documentType} — {docTypes.find((t) => t.code === documentType)?.description ?? 'Document'}</span>
+                    <span className="block text-xs text-muted-foreground">Issued as {editing?.number}. Type, series and issue date stay as issued; everything else can change until myDATA returns a MARK.</span>
+                  </p>
+                ) : (
                 <div className="flex flex-wrap items-center gap-2">
                   {(() => {
                     const chips = ((buyerIsConsumer
@@ -1670,6 +1799,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     {nextNumber ? `Next number: ${nextNumber.series ?? ''}${nextNumber.number}` : 'New series, starts at 1'}
                   </span>
                 </div>
+                )}
                 {docTypes.length === 0 && (
                   <p className="text-[11px] text-amber-600 dark:text-amber-400">
                     No document types are available. Enable a type in <Link to="/finance?tab=settings&section=documents" className="underline underline-offset-2">Settings → Documents → Document Types &amp; Series</Link>, and switch its numbering series back on if it was turned off.
@@ -1700,7 +1830,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                       : `The buyer is outside the EU (${customerAddr?.country_code}): an export is ${supplyKind === 'services' ? '2.3' : '1.3'} at 0% VAT, with its exemption cause (art. 29 for goods).`}
                   </p>
                 )}
-                {seriesOptions.length > 1 && (
+                {seriesOptions.length > 1 && !identityLocked && (
                   <Select value={chosenSeriesId} onValueChange={setChosenSeriesId}>
                     <SelectTrigger aria-label="Numbering Series" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -1711,7 +1841,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 )}
               </FormField>
               <FormField label="Date Issued" htmlFor="ni-issue-date">
-                <Input id="ni-issue-date" type="date" className="h-9" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+                <Input id="ni-issue-date" type="date" className="h-9" value={issueDate} disabled={identityLocked} onChange={(e) => setIssueDate(e.target.value)} />
               </FormField>
               <FormField label="Related Document" htmlFor="ni-related" optional className="sm:col-span-2">
                 <Input id="ni-related" className="h-9" value={relatedDocument} onChange={(e) => setRelatedDocument(e.target.value)} placeholder="Invoice no. or MARK" />
@@ -1727,7 +1857,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               )}
               {branches.length > 1 && (
                 <FormField label="Establishment" htmlFor="ni-branch" className="col-span-full">
-                  <Select value={branchCode} onValueChange={setBranchCode}>
+                  <Select value={branchCode} onValueChange={setBranchCode} disabled={identityLocked}>
                     <SelectTrigger id="ni-branch" className="h-9"><SelectValue /></SelectTrigger>
                     <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={String(b.branch_code)}>#{b.branch_code} {b.name}</SelectItem>)}</SelectContent>
                   </Select>
@@ -2286,6 +2416,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                 <label className="flex items-center gap-2 self-end text-xs">
                   <Checkbox
                     className="h-4 w-4 rounded"
+                    disabled={identityLocked}
                     checked={selfPricing}
                     onCheckedChange={(v) => {
                       const on = v === true;
@@ -2431,13 +2562,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         <DialogFooter className="border-t border-border/60 px-5 py-3 shrink-0 sm:justify-start">
           <Button variant="outline" className="mr-auto" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
           <Button variant="outline" onClick={() => setShowPreview(true)} disabled={busy}><Eye className="h-4 w-4 mr-1.5" /> Preview</Button>
-          <Button variant="outline" onClick={() => handleSave(true)} disabled={busy || docTypes.length === 0} title="Save without a legal number — open it later to edit and issue">Save draft</Button>
+          <Button variant="outline" onClick={() => handleSave(true)} disabled={busy || docTypes.length === 0 || (!!editInvoiceId && !editing)} title={identityLocked ? 'Save the changes without sending to AADE' : 'Save without a legal number — open it later to edit and issue'}>{identityLocked ? 'Save changes' : 'Save draft'}</Button>
           {/* #443: an unclassifiable delivery destination blocks the same way a buyer-risk
               hard block does. A wrong VAT rate is a valid percentage — nothing downstream can
               catch it, and it reaches AADE that way. */}
           <Button
             onClick={() => handleSave(false)}
-            disabled={busy || buyerRisk.hardBlocked || vatDestinationBlocked || creditBlocked || docTypes.length === 0}
+            disabled={busy || buyerRisk.hardBlocked || vatDestinationBlocked || creditBlocked || docTypes.length === 0 || (!!editInvoiceId && !editing)}
             title={
               docTypes.length === 0
                 ? 'No active document type — configure one in Settings → Documents'
@@ -2445,7 +2576,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                   ? 'The delivery destination could not be classified for VAT — give it a postcode'
                   : (buyerRisk.hardBlocked ? buyerRisk.blocks.join('; ') : undefined)
             }
-          >{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create invoice'}</Button>
+          >{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : identityLocked ? 'Save & send to AADE' : editing ? 'Save & issue' : 'Create invoice'}</Button>
         </DialogFooter>
 
         {/* Full styled-template preview overlay (Oxygen-style "Προεπισκόπηση") */}
