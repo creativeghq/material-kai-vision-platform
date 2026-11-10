@@ -96,15 +96,6 @@ const ADMIN_PAGES: Array<{ group: string; items: Array<{ label: string; path: st
       { label: 'Supplier Claims', path: '/admin/supplier-claims' },
       { label: 'Master Catalog', path: '/catalog-master' },
       { label: 'Freight Quotes', path: '/admin/freight-quotes' },
-      { label: 'Quote Requests', path: '/quotes/requests/manage' },
-    ],
-  },
-  {
-    group: 'Communications',
-    items: [
-      { label: 'Email Management', path: '/emails' },
-      { label: 'Social Accounts', path: '/social-media/accounts' },
-      { label: 'Social Reviews', path: '/social-media/reviews' },
     ],
   },
 ];

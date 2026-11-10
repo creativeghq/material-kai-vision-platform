@@ -181,7 +181,6 @@ const TABLES_TO_CLEAR = [
   'materials_catalog',             // Materials catalog entries
 
   // ── Processing Results ──────────────────────────────────────────────
-  'processing_results',            // Processing results
 
   // ── Data Import ─────────────────────────────────────────────────────
   'data_import_job_products',      // Imported product staging rows (child, CASCADE)

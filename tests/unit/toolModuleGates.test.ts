@@ -13,13 +13,13 @@ const manifestSrc = read('src/components/features/ai/toolManifest.generated.ts')
 const slugsIn = (src: string) =>
   new Set([...src.matchAll(/moduleSlug: '([a-z0-9-]+)'/g)].map((m) => m[1]));
 
-/** A `src/modules/<slug>` whose definition registers a nav item has a page of its own (e.g. Revolut's settings). */
+/** A `src/modules/<slug>` that registers a nav item or a settings panel has a page of its own (e.g. Revolut's settings). */
 function registryModulesWithAPage(): string[] {
   const dir = join(ROOT, 'src/modules');
   return readdirSync(dir).filter((d) => {
     const idx = join(dir, d, 'index.ts');
     const man = join(dir, d, 'manifest.json');
-    return existsSync(idx) && existsSync(man) && /navItems: \[\s*\{/.test(readFileSync(idx, 'utf8'));
+    return existsSync(idx) && existsSync(man) && /(navItems|settingsPanels): \[\s*\{/.test(readFileSync(idx, 'utf8'));
   }).map((d) => String(JSON.parse(readFileSync(join(dir, d, 'manifest.json'), 'utf8')).slug ?? ''))
     .filter(Boolean);
 }

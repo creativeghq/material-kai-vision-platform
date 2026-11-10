@@ -382,7 +382,7 @@ export const EvalsPanel: React.FC<{
       }
     >
       {batches.length > 1 && (
-        <div className="mb-3 flex flex-wrap items-end gap-1" aria-label="Pass rate by batch">
+        <div className="mb-3 flex flex-wrap gap-1" aria-label="Pass rate by batch">
           {[...batches].reverse().map((b) => {
             const r = ratio(b.passed, b.runs) ?? 0;
             return (
