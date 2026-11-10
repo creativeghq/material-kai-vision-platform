@@ -407,7 +407,6 @@ export const RecordPaymentDialog: React.FC<{
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, kind, selectedInvoice?.currency, selectedBill?.currency, selectedOption?.currency]);
 
-  // The payment is filed under the category of the document it settles, until the operator picks one.
   const categoryTouched = useRef(false);
   useEffect(() => { if (open) categoryTouched.current = false; }, [open]);
   const settledCategoryId =
@@ -710,11 +709,6 @@ export const RecordPaymentDialog: React.FC<{
             <FormField label="Amount">
               <div className="flex gap-2">
                 <MoneyInput value={parseDecimal(amount)} onValueChange={(n) => setAmount(n == null ? '' : String(n))} />
-                {/* Shown for EVERY direction. It used to render only for `received`, so on a
-                    refund or a supplier payment the state stayed at its reset value 'EUR' and was
-                    passed straight to recordPayment — refunding a USD invoice booked a EUR
-                    cash-out, leaving the refund and the invoice it reverses in different
-                    currencies. The effect above defaults it from the selected target. */}
                 <Select value={currency} onValueChange={setCurrency}>
                   <SelectTrigger className="w-24"><SelectValue /></SelectTrigger>
                   <SelectContent>
