@@ -15,12 +15,11 @@ interface FamilyResult {
 
 const msg = (e: unknown): string => (e instanceof Error ? e.message : String(e));
 
-/** Deficient-image OR-filter shared by detection + post-repair re-check. */
-const ASPECT_DEFICIENT_OR =
-  'has_color_slig.is.null,has_color_slig.eq.false,' +
-  'has_texture_slig.is.null,has_texture_slig.eq.false,' +
-  'has_style_slig.is.null,has_style_slig.eq.false,' +
-  'has_material_slig.is.null,has_material_slig.eq.false';
+/** Deficient-image OR-filter shared by detection + post-repair re-check. An aspect MIVAA
+ *  stamped `absent` had no source text — nothing to embed, so it is never a failure. */
+const ASPECT_DEFICIENT_OR = ['color', 'texture', 'style', 'material']
+  .map((a) => `and(has_${a}_slig.not.is.true,or(${a}_aspect_embedding_model.is.null,${a}_aspect_embedding_model.neq.absent))`)
+  .join(',');
 
 /** Mirrors `owes_visual_vector` in MIVAA visual_backfill.py, so a row it skips is never counted failed. */
 const OWES_VISUAL_AND =
