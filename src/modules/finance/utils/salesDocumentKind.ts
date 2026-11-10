@@ -24,6 +24,11 @@ export function buyerIsConsumer(buyer: BuyerIdentity | null | undefined): boolea
   return !String(buyer.vatNumber ?? '').trim();
 }
 
+export function documentRequiresBusinessBuyer(documentType: string): boolean {
+  const family = documentType.split('.')[0];
+  return family === '1' || family === '2' || family === '5';
+}
+
 /** The sales document this buyer should receive. */
 export function salesDocumentKindFor(buyer: BuyerIdentity | null | undefined): SalesDocumentKind {
   return buyerIsConsumer(buyer) ? 'receipt' : 'invoice';

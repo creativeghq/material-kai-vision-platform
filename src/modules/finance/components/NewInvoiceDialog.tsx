@@ -37,7 +37,7 @@ import { financeService, formatMoney, VAT_CATEGORIES, vatPctForCat, extractNet }
 import { vatOfRaw, round2 } from '@/modules/finance/lib/vatMath';
 import {
   buyerIsConsumer as isConsumerBuyer, supplyKindOf, mydataSalesDocumentType,
-  mydataSalesDocumentReason, documentTakesWithholding,
+  mydataSalesDocumentReason, documentTakesWithholding, documentRequiresBusinessBuyer,
 } from '@/modules/finance/utils/salesDocumentKind';
 import { saleRegimeForCountry } from '@/lib/vatCountries';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
@@ -570,11 +570,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       // the email, the website domain, or the VAT number. `search_fold` holds all of them,
       // accent-folded, so a Greek customer is found however their name is typed.
       const like = foldedLike(term);
+      const businessOnly = documentRequiresBusinessBuyer(documentType);
+      let contactQuery = supabase.from('crm_contacts')
+        .select('id, name, first_name, last_name, email, website, vat_number, contact_type')
+        .ilike(CRM_SEARCH_COLUMN, like);
+      if (businessOnly) contactQuery = contactQuery.or('vat_number.not.is.null,contact_type.eq.company');
       const [contacts, companies] = await Promise.all([
-        supabase.from('crm_contacts')
-          .select('id, name, first_name, last_name, email, website, vat_number')
-          .ilike(CRM_SEARCH_COLUMN, like)
-          .limit(8),
+        contactQuery.limit(8),
         supabase.from('crm_companies')
           .select('id, name, email, website, vat_number')
           .ilike(CRM_SEARCH_COLUMN, like)
@@ -590,6 +592,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         });
       }
       for (const c of contacts.data ?? []) {
+        if (businessOnly && isConsumerBuyer({ isCompany: false, vatNumber: c.vat_number, contactType: c.contact_type })) continue;
         opts.push({
           type: 'contact', id: c.id, source: 'person',
           label: c.name || [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email || c.id,
@@ -599,7 +602,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setCustomerOptions(opts);
     }, 200);
     return () => clearTimeout(t);
-  }, [customerSearch, open]);
+  }, [customerSearch, open, documentType]);
 
   // Load the workspace's buyer risk-gate rules once per open.
   useEffect(() => {
@@ -1580,7 +1583,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               ) : (
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                  <Input id="ni-customer-search" className="pl-8" placeholder="Search contacts or companies…" value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
+                  <Input id="ni-customer-search" className="pl-8" placeholder={documentRequiresBusinessBuyer(documentType) ? 'Search businesses (VAT-registered)…' : 'Search contacts or companies…'} value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
                   {customerOptions.length > 0 && (
                     <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-md border border-border/60 bg-popover shadow-md max-h-72 overflow-y-auto">
                       {customerOptions.map((o) => (
@@ -1606,6 +1609,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     >
                       + Add “{customerSearch.trim()}” as a new client
                     </button>
+                  )}
+                  {documentRequiresBusinessBuyer(documentType) && (
+                    <p className="mt-1 text-[11px] text-muted-foreground">An invoice lists only businesses with a VAT number. For a private individual, choose Receipt.</p>
                   )}
                 </div>
               )}
