@@ -768,7 +768,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
                           </td>
                           <td className="px-4 py-2 text-right">{formatMoney(i.total, i.currency)}</td>
                           <td className="px-4 py-2 text-right font-medium">{formatMoney(i.amount_due, i.currency)}</td>
-                          <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(i.status)}`}>{humanizeLabel(i.status)}</span></td>
+                          <td className="px-4 py-2 text-center"><span className={`text-[10px] ${statusTone(i.status)}`}>{humanizeLabel(i.status)}</span>{(i as any).exclude_from_pnl && <span className="mt-0.5 block text-[10px] text-muted-foreground" title="Left out of P&L and profit totals">Not in P&amp;L</span>}</td>
                           <td className="px-4 py-2 text-center"><FiscalCell status={(i as any).fiscal_status} error={(i as any).fiscal_error} /></td>
                           <td className="px-4 py-2 text-center"><DeliveryTrailCell trail={trails[i.id]} /></td>
                           <td className="px-4 py-2 text-right">

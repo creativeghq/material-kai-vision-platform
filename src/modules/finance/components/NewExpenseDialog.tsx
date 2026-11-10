@@ -129,6 +129,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const [notes, setNotes] = useState('');
 
   const [paidNow, setPaidNow] = useState(true);
+  const [excludeFromPnl, setExcludeFromPnl] = useState(false);
   const [bankAccountId, setBankAccountId] = useState<string>('');
   const [method, setMethod] = useState<PaymentMethod>('bank_transfer');
   const [repeat, setRepeat] = useState<'none' | RecurringCadence>('none');
@@ -177,7 +178,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
   const clearDraft = useSessionDraft(
     `fin-expense:${workspaceId}`,
     open && !orderId,
-    { categoryId, description, reference, currency, subtotalNet, vatAmount, issuedAt, dueAt, notes, paidNow, bankAccountId, method, repeat, party },
+    { categoryId, description, reference, currency, subtotalNet, vatAmount, issuedAt, dueAt, notes, paidNow, excludeFromPnl, bankAccountId, method, repeat, party },
     (d) => {
       setCategoryId(d?.categoryId ?? '');
       setDescription(d?.description ?? '');
@@ -189,6 +190,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setDueAt(d?.dueAt ?? '');
       setNotes(d?.notes ?? '');
       setPaidNow(d?.paidNow ?? true);
+      setExcludeFromPnl(d?.excludeFromPnl ?? false);
       setBankAccountId(d?.bankAccountId ?? '');
       setMethod(d?.method ?? 'bank_transfer');
       setRepeat(d?.repeat ?? 'none');
@@ -239,7 +241,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       setVatAmount(prefill?.vatAmount != null ? String(prefill.vatAmount) : '0');
       setDescription(prefill?.description ?? '');
       setReference(''); setNotes(''); setCurrency('EUR'); setRepeat('none');
-      setPaidNow(true); setDueAt('');
+      setPaidNow(true); setDueAt(''); setExcludeFromPnl(false);
       setIssuedAt(todayLocalISO());
       // Supplier: set from the line/order, or CLEAR (so a prior line's supplier never carries over).
       if (prefill?.supplier?.companyId) setParty({ type: 'company', id: prefill.supplier.companyId, label: prefill.supplier.name || 'Supplier' });
@@ -480,6 +482,7 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         dueAt: paidNow ? undefined : (dueAt || undefined),
         notes: notes || undefined,
         paidNow,
+        excludeFromPnl,
         paidFromBankAccountId: paidNow ? (bankAccountId || null) : null,
         paymentMethod: method,
         counterpartyBankAccountId: paidNow && method === 'bank_transfer' ? (counterpartyBankId || null) : null,
@@ -902,6 +905,14 @@ export const NewExpenseDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
               </FormField>
             </FormGrid>
           </FormSection>
+
+          <div className="flex items-center justify-between rounded-md border border-border/60 p-3">
+            <div>
+              <Label htmlFor="newexpense-exclude-pnl" className="text-sm">Exclude from P&amp;L</Label>
+              <p className="text-[11px] text-muted-foreground">Kept on record, but left out of P&amp;L, expense and profit totals. VAT, balances and cash still count it.</p>
+            </div>
+            <Switch id="newexpense-exclude-pnl" checked={excludeFromPnl} onCheckedChange={setExcludeFromPnl} />
+          </div>
 
           <FormSection title="Payment">
           {/* Paid-now toggle: settled cost vs open payable */}

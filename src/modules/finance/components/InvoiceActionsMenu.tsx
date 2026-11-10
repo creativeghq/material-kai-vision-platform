@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { saveTextFile } from '@/utils/saveTextFile';
-import { MoreVertical, Eye, CreditCard, Send, Copy, ExternalLink, MessageCircle, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase } from 'lucide-react';
+import { MoreVertical, Eye, CreditCard, Send, Copy, ExternalLink, MessageCircle, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase, EyeOff } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -224,6 +224,19 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     } finally { setSaving(false); }
   };
 
+  const togglePnlExclusion = async () => {
+    try {
+      const { data, error } = await supabase.from('invoices').select('exclude_from_pnl').eq('id', invoiceId).maybeSingle();
+      if (error) throw error;
+      const next = !(data?.exclude_from_pnl === true);
+      await financeService.setDocumentPnlExclusion('invoice', invoiceId, next);
+      toast({ title: next ? 'Excluded from P&L' : 'Included in P&L', description: next ? 'Still counted for VAT, myDATA and what the customer owes.' : undefined });
+      onChanged?.();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    }
+  };
+
   const saveCat = async () => {
     setSaving(true);
     try {
@@ -303,6 +316,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         {!isAccountant && <DropdownMenuItem onClick={openDesc}><Pencil className="h-4 w-4 mr-2" /> Change description</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openCat}><Tag className="h-4 w-4 mr-2" /> Change category</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openJob}><Briefcase className="h-4 w-4 mr-2" /> Link to a project</DropdownMenuItem>}
+        {!isAccountant && <DropdownMenuItem onClick={() => void togglePnlExclusion()}><EyeOff className="h-4 w-4 mr-2" /> Exclude from / include in P&amp;L</DropdownMenuItem>}
         <DropdownMenuItem onClick={() => void customerLink.copy()}><Copy className="h-4 w-4 mr-2" /> Copy customer link</DropdownMenuItem>
         <DropdownMenuItem onClick={() => void customerLink.open()}><ExternalLink className="h-4 w-4 mr-2" /> Open customer view</DropdownMenuItem>
         <DropdownMenuItem onClick={() => void customerLink.whatsapp()}><MessageCircle className="h-4 w-4 mr-2" /> Send via WhatsApp</DropdownMenuItem>

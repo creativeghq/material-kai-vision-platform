@@ -373,7 +373,7 @@ export function buildInvoiceRenderData(input: BuildRenderInput): InvoiceRenderDa
       // function. Purpose 19 is transmitted WITH `otherMovePurposeTitle`; printing only the
       // generic label made the paper say less than the envelope.
       inv.move_purpose
-        ? `${L.purpose}: ${movePurposeLabel(inv.move_purpose, lang)}${
+        ? `${L.purpose}: ${inv.move_purpose} — ${movePurposeLabel(inv.move_purpose, lang)}${
           Number(inv.move_purpose) === MYDATA_MOVE_PURPOSE_OTHER && String(inv.other_move_purpose_title ?? '').trim()
             ? ` — ${String(inv.other_move_purpose_title).trim()}`
             : ''

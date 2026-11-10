@@ -18,6 +18,7 @@ import {
   FolderOpen,
   Pencil,
 } from 'lucide-react';
+import { Checkbox } from '@/components/core/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -122,6 +123,20 @@ const InvoiceDetailPage: React.FC = () => {
     if (!invoiceId) return;
     void load();
   }, [invoiceId]);
+
+  const [pnlSaving, setPnlSaving] = useState(false);
+  const togglePnlExclusion = async () => {
+    if (!invoice) return;
+    const next = !(invoice as any).exclude_from_pnl;
+    setPnlSaving(true);
+    try {
+      await financeService.setDocumentPnlExclusion('invoice', invoice.id, next);
+      toast({ title: next ? 'Excluded from P&L' : 'Included in P&L', description: next ? 'Still counted for VAT, myDATA and what the customer owes.' : undefined });
+      await load();
+    } catch (err: any) {
+      toast({ title: 'Failed', description: err?.message, variant: 'destructive' });
+    } finally { setPnlSaving(false); }
+  };
 
   const load = async () => {
     if (!invoiceId) return;
@@ -261,6 +276,11 @@ const InvoiceDetailPage: React.FC = () => {
                 <> · <Link to={`/quotes/manage/${(invoice as any).quote_id}`} className="text-primary hover:underline">View quote</Link></>
               )}
             </p>
+            <label htmlFor="invoice-exclude-pnl" className={`mt-2 inline-flex items-center gap-2 text-sm ${canEditProject && !pnlSaving ? 'cursor-pointer' : 'opacity-70'}`}>
+              <Checkbox id="invoice-exclude-pnl" className="h-4 w-4 rounded" checked={(invoice as any).exclude_from_pnl === true} disabled={!canEditProject || pnlSaving} onCheckedChange={() => void togglePnlExclusion()} />
+              <span>Exclude from P&amp;L</span>
+              <span className="text-xs text-muted-foreground">— still counts for VAT, myDATA and what the customer owes</span>
+            </label>
             {/* Which job this invoice is revenue for (#378 L2). `get_project_pnl` reads billed
                 revenue off this column, so an invoice without one leaves the job showing cost and
                 no income — and until now it could only be set from inside the project, which is
@@ -501,7 +521,7 @@ const InvoiceDetailPage: React.FC = () => {
               ['Time', (invoice as any).transport_time],
               ['Vehicle no.', (invoice as any).vehicle_number],
               ['Responsible', (invoice as any).responsible],
-              ['Purpose', movePurposeLabel((invoice as any).move_purpose)],
+              ['Purpose', (invoice as any).move_purpose ? `${(invoice as any).move_purpose} — ${movePurposeLabel((invoice as any).move_purpose)}` : null],
             ].map(([label, value]) => (
               <div key={label as string} className="flex justify-between gap-3">
                 <span className="text-muted-foreground">{label}</span>

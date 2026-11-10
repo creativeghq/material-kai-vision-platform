@@ -739,14 +739,14 @@ async function buildPdf(d: { inv: any; items: any[]; documentTaxes?: any[]; fs: 
     // transmitted, so it is PRINTED (rule 1c) — otherwise the paper says nothing about why
     // the goods were received while the envelope filed to AADE does.
     if (inv.receiving_note_purpose != null) {
-      const label = receivingNotePurposeLabel(inv.receiving_note_purpose, lang);
+      const label = `${inv.receiving_note_purpose} — ${receivingNotePurposeLabel(inv.receiving_note_purpose, lang)}`;
       const other = Number(inv.receiving_note_purpose) === MYDATA_RECEIVING_NOTE_PURPOSE_OTHER
         ? String(inv.other_receiving_note_purpose_title ?? '').trim()
         : '';
       return `${L.purpose}: ${other ? `${label} — ${other}` : label}`;
     }
     if (!inv.move_purpose) return '';
-    const label = movePurposeLabel(inv.move_purpose, lang);
+    const label = `${inv.move_purpose} — ${movePurposeLabel(inv.move_purpose, lang)}`;
     const other = Number(inv.move_purpose) === MYDATA_MOVE_PURPOSE_OTHER
       ? String(inv.other_move_purpose_title ?? '').trim()
       : '';

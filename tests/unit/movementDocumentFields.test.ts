@@ -108,14 +108,14 @@ describe('a movement states its purpose, or is refused', () => {
     expect(builder).toMatch(/19/);
   });
 
-  it('the purpose NAME is printed, not the bare code', () => {
+  it("the purpose prints AADE's code AND its name, never the bare code", () => {
     for (const f of [
       'src/modules/finance/invoice-templates/renderData.ts',
       'supabase/functions/finance-invoice-pdf/index.ts',
     ]) {
       const src = read(f);
-      expect(src, `${f} prints the raw code`).not.toMatch(/\$\{L\.purpose\}: \$\{inv\.move_purpose\}/);
-      expect(src).toMatch(/movePurposeLabel\(inv\.move_purpose/);
+      expect(src, `${f} prints the raw code alone`).not.toMatch(/\$\{L\.purpose\}: \$\{inv\.move_purpose\}`/);
+      expect(src).toMatch(/\$\{inv\.move_purpose\} — \$\{movePurposeLabel\(inv\.move_purpose/);
     }
   });
 });
