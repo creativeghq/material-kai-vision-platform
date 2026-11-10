@@ -37,7 +37,7 @@ import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { dataIntegrityService } from '@/services/dataIntegrityService';
-import { timeAgo } from '@/utils/datetime';
+import { formatDate, timeAgo } from '@/utils/datetime';
 
 import { AgentUnmetRequestsPanel } from './AgentUnmetRequestsPanel';
 import { ConversationTraceSheet } from './ConversationTraceSheet';
@@ -383,6 +383,24 @@ const AgentHarnessDashboard: React.FC = () => {
               </StatGroup>
 
               <StatGroup label="Reliability">
+                <HubStatTile
+                  label="Turns Completed Cleanly"
+                  value={fmtPct(ratio(data.turns.by_status.ok ?? 0, data.turns.total - data.turns.in_flight))}
+                  category={data.turns.total
+                    ? Object.entries(data.turns.by_status).sort((a, b) => b[1] - a[1]).map(([s, n]) => `${s.replace(/_/g, ' ')} ${n}`).join(' · ')
+                    : data.turns.recording_since
+                      ? 'No turns recorded in this window'
+                      : 'Turn recording has not started yet'}
+                  help={`Every agent-chat turn writes a row when it starts and closes it with a status: ok, error, refused, max tokens, empty, invalid tool call or cancelled. A turn still open after 5 minutes is lost: the edge isolate died.${data.turns.recording_since ? ` Recorded since ${formatDate(data.turns.recording_since, { withTime: true })}.` : ''}`}
+                  onClick={() => jumpTo('failures')}
+                />
+                <HubStatTile
+                  label="Time to First Output"
+                  value={fmtMs(data.turns.ttft_p50_ms)}
+                  category={`p95 ${fmtMs(data.turns.ttft_p95_ms)} · p95 ${data.turns.iterations_p95 != null ? Math.round(data.turns.iterations_p95) : '—'} model steps`}
+                  help="From the start of the turn to the first streamed text or tool call. Separates waiting on the model from waiting on tools."
+                  onClick={() => jumpTo('agents')}
+                />
                 <HubStatTile
                   label="Tool Failure Rate"
                   value={fmtPct(ratio(k.tool_failed, k.tool_calls))}

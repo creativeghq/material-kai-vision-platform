@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Copy,
   Cpu,
+  Flag,
   ExternalLink,
   Loader2,
   User,
@@ -20,13 +21,14 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatDate, formatTime } from '@/utils/datetime';
 
-import type { ConversationTrace, TraceMessage, TraceToolCall, TraceTurn } from './harnessTypes';
+import type { ConversationTrace, TraceMessage, TraceToolCall, TraceTurn, TraceTurnRecord } from './harnessTypes';
 import { fmtInt, fmtMs, fmtTokens, fmtUsd, shortId } from './harnessFormat';
 
 type TimelineItem =
   | { kind: 'message'; at: string; data: TraceMessage }
   | { kind: 'turn'; at: string; data: TraceTurn }
-  | { kind: 'tool'; at: string; data: TraceToolCall };
+  | { kind: 'tool'; at: string; data: TraceToolCall }
+  | { kind: 'record'; at: string; data: TraceTurnRecord };
 
 type Filter = 'all' | 'messages' | 'turns' | 'tools' | 'problems';
 
@@ -39,6 +41,7 @@ const FILTERS: Array<{ value: Filter; label: string }> = [
 ];
 
 function isProblem(item: TimelineItem): boolean {
+  if (item.kind === 'record') return item.data.status !== 'ok' && item.data.status !== 'running';
   if (item.kind === 'tool') return !item.data.success || !!item.data.zero_result;
   if (item.kind === 'turn') return !!item.data.error;
   return item.data.content === 'No response from agent' || item.data.rating === 'down';
@@ -65,7 +68,45 @@ const TimelineRow: React.FC<{ item: TimelineItem }> = ({ item }) => {
   let meta: React.ReactNode = null;
   let body: React.ReactNode = null;
 
-  if (item.kind === 'message') {
+  if (item.kind === 'record') {
+    const r = item.data;
+    const tone = r.status === 'ok' ? 'success' : r.status === 'running' || r.status === 'cancelled' ? 'neutral' : 'error';
+    icon = <Flag className="h-3.5 w-3.5" />;
+    title = (
+      <span className="truncate">
+        <span className="font-semibold">Turn</span>
+        <span className="ml-2 text-muted-foreground">
+          {r.agent ?? r.requested_agent}{r.agent && r.agent !== r.requested_agent ? ` (routed from ${r.requested_agent})` : ''}
+        </span>
+      </span>
+    );
+    meta = (
+      <>
+        <Badge variant={tone}>{r.status.replace(/_/g, ' ')}</Badge>
+        {r.total_ms != null && <span className="tabular-nums">{fmtMs(r.total_ms)}</span>}
+      </>
+    );
+    body = (
+      <>
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs sm:grid-cols-4">
+          <div><dt className="text-muted-foreground">Stop Reason</dt><dd className="font-mono">{r.stop_reason ?? '—'}</dd></div>
+          <div><dt className="text-muted-foreground">Model Steps</dt><dd className="tabular-nums">{r.iterations ?? '—'}</dd></div>
+          <div><dt className="text-muted-foreground">First Output</dt><dd className="tabular-nums">{fmtMs(r.ttft_ms)}</dd></div>
+          <div><dt className="text-muted-foreground">Tool Calls</dt><dd className="tabular-nums">{r.tool_calls ?? '—'}{r.invalid_tool_calls ? ` · ${r.invalid_tool_calls} unparseable` : ''}</dd></div>
+          <div><dt className="text-muted-foreground">Model</dt><dd className="font-mono">{r.model ?? '—'}</dd></div>
+          <div><dt className="text-muted-foreground">Tokens</dt><dd className="tabular-nums">{fmtTokens(r.input_tokens)} / {fmtTokens(r.output_tokens)}</dd></div>
+          <div><dt className="text-muted-foreground">Turn Id</dt><dd className="font-mono">{shortId(r.id)}</dd></div>
+          <div><dt className="text-muted-foreground">Failure Code</dt><dd className="font-mono">{r.failure_code ?? '—'}</dd></div>
+        </dl>
+        {(r.toolkits ?? []).length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {(r.toolkits ?? []).map((tk) => <Badge key={tk} variant="neutral">{tk}</Badge>)}
+          </div>
+        )}
+        <JsonBlock label="Error" value={r.error} />
+      </>
+    );
+  } else if (item.kind === 'message') {
     const m = item.data;
     icon = m.role === 'user' ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />;
     title = (
@@ -211,6 +252,7 @@ export const ConversationTraceSheet: React.FC<{
       ...trace.messages.map((m) => ({ kind: 'message' as const, at: m.created_at, data: m })),
       ...trace.turns.map((t) => ({ kind: 'turn' as const, at: t.at, data: t })),
       ...trace.tool_calls.map((c) => ({ kind: 'tool' as const, at: c.at, data: c })),
+      ...(trace.turn_records ?? []).map((r) => ({ kind: 'record' as const, at: r.started_at, data: r })),
     ];
     return items.sort((a, b) => a.at.localeCompare(b.at));
   }, [trace]);
@@ -218,7 +260,7 @@ export const ConversationTraceSheet: React.FC<{
   const visible = timeline.filter((i) =>
     filter === 'all' ? true
       : filter === 'messages' ? i.kind === 'message'
-        : filter === 'turns' ? i.kind === 'turn'
+        : filter === 'turns' ? i.kind === 'turn' || i.kind === 'record'
           : filter === 'tools' ? i.kind === 'tool'
             : isProblem(i));
 

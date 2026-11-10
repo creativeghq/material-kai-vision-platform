@@ -92,6 +92,61 @@ export async function listAgents(): Promise<BackgroundAgent[]> {
   return (data ?? []) as BackgroundAgent[];
 }
 
+export interface BackgroundAgentPatch {
+  enabled: boolean;
+  schedule: string | null;
+  model: string;
+  system_prompt_override: string | null;
+  config: Record<string, unknown>;
+}
+
+export async function updateAgent(id: string, patch: BackgroundAgentPatch): Promise<void> {
+  const { error } = await supabase
+    .from('background_agents')
+    .update({
+      enabled: patch.enabled,
+      schedule: patch.schedule,
+      model: patch.model,
+      system_prompt_override: patch.system_prompt_override,
+      config: patch.config as never,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export async function setAgentEnabled(id: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('background_agents')
+    .update({ enabled, updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+export interface AgentTypeCatalogEntry {
+  agentType: string;
+  name: string;
+  description: string;
+  defaultModel: string;
+}
+
+export async function fetchAgentTypeCatalog(): Promise<AgentTypeCatalogEntry[]> {
+  const { data, error } = await supabase.functions.invoke('background-agent-runner?catalog=1', { method: 'GET' });
+  if (error) throw error;
+  return ((data as { catalog?: AgentTypeCatalogEntry[] } | null)?.catalog ?? []);
+}
+
+export async function listLlmModelIds(): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('ai_model_pricing')
+    .select('model_key')
+    .eq('category', 'llm')
+    .eq('is_active', true)
+    .order('model_key');
+  if (error) throw error;
+  return Array.from(new Set((data ?? []).map((r) => String(r.model_key))));
+}
+
 // ── Run queries ───────────────────────────────────────────────────────────────
 
 export async function listRuns(agentId: string, limit = 20): Promise<AgentRun[]> {

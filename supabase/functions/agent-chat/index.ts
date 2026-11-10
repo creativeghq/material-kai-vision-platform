@@ -24,6 +24,7 @@ import { captureException } from '../_shared/sentry.ts';
 // loaded inside initRuntime() alongside the other lazy modules.
 import type { AgentMemory as AgentMemoryType } from '../_shared/agent-memory.ts';
 import { runInBackground } from '../_shared/background.ts';
+import { AgentTurnObserver, closeAgentTurn, openAgentTurn } from '../_shared/agent-turns.ts';
 import { shapeForModel, shapeToolResult, turnProducedWork } from '../_shared/tool-result-shape.ts';
 // Security invariant 9 — the approval gate is enforced, not requested (#352 A1).
 import { stripModelAuthoredApproval } from '../_shared/tools/approval-gate.ts';
@@ -289,6 +290,7 @@ function createAgentGraph(
     workspaceId?: string;
     conversationId?: string;
     agentId?: string;
+    turnId?: string | null;
     supabase?: any;
   },
   /**
@@ -408,6 +410,8 @@ function createAgentGraph(
         hasToolCalls: !!(response.tool_calls && response.tool_calls.length > 0),
         streamed: true,
         iteration,
+        stopReason: response.response_metadata?.stop_reason ?? null,
+        invalidToolCalls: Array.isArray(response.invalid_tool_calls) ? response.invalid_tool_calls.length : 0,
       });
     } catch (e) { console.warn('[agent-chat] onChunk callback threw:', e); }
 
@@ -717,6 +721,7 @@ function createAgentGraph(
             user_id: observability.userId || null,
             workspace_id: observability.workspaceId || null,
             agent_id: observability.agentId || null,
+            turn_id: observability.turnId || null,
             tool_name: toolCall.name,
             tool_args: toolCall.args || null,
             result_summary: resultSummary,
@@ -1640,6 +1645,7 @@ async function executeAgent(
   clientTimezone?: string | null,
   /** An unattended Inbox auto-reply: binds the handoff tool. Secret-level callers only. */
   inboxAutoReply = false,
+  turnId: string | null = null,
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -3613,7 +3619,7 @@ async function executeAgent(
       // Logged under the real tool name so `knowledge_base_search` does not read as 0 calls on
       // every dashboard while it runs on every turn — that is the silent-zero shape, and
       // authoring one while fixing another would be a poor trade.
-      observability: { supabase, userId, workspaceId, agentId, conversationId: conversation_id ?? null },
+      observability: { supabase, userId, workspaceId, agentId, conversationId: conversation_id ?? null, turnId },
     });
     if (grounding.block) systemPrompt += grounding.block;
     console.log(
@@ -3644,6 +3650,7 @@ async function executeAgent(
     workspaceId,
     conversationId: conversation_id || undefined,
     agentId,
+    turnId,
     supabase, // module-level service-role client
   }, abortSignal);
 
@@ -4407,6 +4414,24 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     const turnId = crypto.randomUUID();
     /** When this turn started, so the recovery can ask "did anything get written since?". */
     const turnStartedAtIso = new Date().toISOString();
+    const turnObserver = new AgentTurnObserver();
+    const turnOpened = openAgentTurn(supabase, {
+      id: turnId,
+      conversationId: conversation_id ?? null,
+      userId: userId ?? null,
+      workspaceId: workspaceId ?? null,
+      requestedAgent: agentId,
+      audience,
+      isEval: isEvalRun,
+      directTool: isDirectTool ? (direct_tool?.name ?? null) : null,
+      toolkits: Array.isArray(selected_toolkits) ? selected_toolkits : null,
+    });
+    let turnClosed = false;
+    const closeTurn = (f: Parameters<typeof closeAgentTurn>[4]) => {
+      if (turnClosed) return;
+      turnClosed = true;
+      void runInBackground(closeAgentTurn(supabase, turnOpened, turnId, turnObserver, f), 'agent-turn-close');
+    };
     /** The last image this turn produced, so a recovered message can still carry it. */
     let lastGeminiImage: Record<string, unknown> | null = null;
     let lastVideo: { video_url: string; job_id: string; status: 'completed'; credits_used?: number } | null = null;
@@ -4497,6 +4522,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
         // Send initial status IMMEDIATELY (synchronously) to keep stream alive
         if (!safeEnqueue({ type: 'status', message: 'Initializing agent...' })) {
           console.error('❌ Failed to send initial chunk, aborting');
+          closeTurn({ status: 'cancelled', agent: agentId, error: 'stream closed before the first chunk' });
           controller.close();
           return;
         }
@@ -4531,6 +4557,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               role as string, // User's workspace role for RBAC tool gating
               // Streaming callback with safe enqueue
               (chunk: any) => {
+                turnObserver.observe(chunk);
                 // Remembered for the recovery write below — an image is the half of a turn that
                 // cost real money, so a message written without the client's help must still
                 // carry it.
@@ -4590,6 +4617,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               abortController.signal, // fires when the client goes away (#352 A16)
               typeof bodyClientContext?.timezone === 'string' ? bodyClientContext.timezone : null,
               audience === 'customer' && bodyInboxAutoReply === true,
+              turnId,
             );
             if (finalResult) {
             }
@@ -4743,6 +4771,18 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           }
 
           const modelUsed = finalResult.usage?.modelName || MAIN_MODEL;
+          closeTurn({
+            status: turnObserver.statusForCompletedTurn(Boolean(finalResult.failed)),
+            agent: ranAsAgentId,
+            model: modelUsed,
+            failureCode: finalResult.failureCode ?? null,
+            error: finalResult.failed ? finalResult.text : null,
+            toolCalls: finalResult.toolResults?.length ?? 0,
+            inputTokens: finalResult.usage?.inputTokens ?? null,
+            outputTokens: finalResult.usage?.outputTokens ?? null,
+            cacheReadTokens: finalResult.usage?.cacheReadTokens ?? null,
+            cacheWriteTokens: finalResult.usage?.cacheWriteTokens ?? null,
+          });
           const finalChunk = {
             type: 'final_result',
             // The agent that answered. The client persists this into message metadata, which
@@ -4847,6 +4887,13 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
             console.error('❌ Streaming error:', error);
             console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack');
           }
+
+          closeTurn({
+            status: wasCancelled ? 'cancelled' : 'error',
+            agent: agentId,
+            model: getModelNameForAgent(agentId, modelOverride),
+            error: wasCancelled ? null : (error instanceof Error ? error.message : String(error)),
+          });
 
           // Refund partner per-turn credit if the agent crashed before
           // producing any real content. (No-op for internal users.)

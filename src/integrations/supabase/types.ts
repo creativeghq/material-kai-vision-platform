@@ -35940,6 +35940,26 @@ export type Database = {
         Args: { p_kind?: string; p_percent: number; p_quote_id: string }
         Returns: string
       }
+      create_prompt_with_history: {
+        Args: {
+          p_category: string
+          p_change_reason?: string
+          p_configuration?: Json
+          p_description?: string
+          p_industry?: string
+          p_is_active?: boolean
+          p_is_default?: boolean
+          p_name: string
+          p_prompt_text: string
+          p_prompt_type: string
+          p_stage?: string
+          p_subcategory?: string
+          p_system_prompt?: string
+          p_used_in?: string[]
+          p_workspace_id?: string
+        }
+        Returns: string
+      }
       create_quote_for_member: {
         Args: {
           p_custom_request_text?: string
@@ -37032,6 +37052,10 @@ export type Database = {
       delete_party_opening_balance: {
         Args: { p_id: string }
         Returns: undefined
+      }
+      delete_prompt_with_audit: {
+        Args: { p_change_reason: string; p_hard: boolean; p_prompt_id: string }
+        Returns: Json
       }
       import_party_opening_balances: {
         Args: { p_commit?: boolean; p_rows: Json; p_side: string; p_workspace_id: string }
@@ -40730,6 +40754,21 @@ export type Database = {
           p_status: string
         }
         Returns: undefined
+      }
+      update_prompt_with_history: {
+        Args: {
+          p_change_reason: string
+          p_new_category?: string
+          p_new_configuration?: Json
+          p_new_description: string
+          p_new_is_active?: boolean
+          p_new_is_default?: boolean
+          p_new_name?: string
+          p_new_system_prompt?: string
+          p_new_text: string
+          p_prompt_id: string
+        }
+        Returns: Json
       }
       update_search_engagement: {
         Args: { p_action: string; p_search_id: string }

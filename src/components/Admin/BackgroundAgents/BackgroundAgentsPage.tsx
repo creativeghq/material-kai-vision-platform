@@ -1,7 +1,7 @@
 /**
  * Background Agents — Monitoring Dashboard
  *
- * Read-only view of all registered agents and their run history.
+ * Registered agents (edit schedule/model/config, enable or disable) and their run history.
  * Admins can inspect run details, stream live logs, and cancel stuck runs.
  */
 
@@ -10,21 +10,27 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Bot, RefreshCw, CheckCircle, XCircle, Clock, Loader2,
   ChevronDown, ChevronRight, XCircle as CancelIcon, Eye,
-  AlertTriangle, Link2, MessageSquare,
+  AlertTriangle, Link2, MessageSquare, Pencil,
 } from 'lucide-react';
 import { Button }  from '@/components/core/ui/button';
 import { Badge }   from '@/components/core/ui/badge';
+import { Switch }  from '@/components/core/ui/switch';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { FilterBar, applyFilters, useFilters } from '@/components/core/filters';
 import { AgentLogsViewer }     from './AgentLogsViewer';
 import { AgentRunHistoryDrawer } from './AgentRunHistoryDrawer';
 import { ChatActivityTab }     from './ChatActivityTab';
+import { EditBackgroundAgentDialog } from './EditBackgroundAgentDialog';
 import { buildAgentRunFilters } from './backgroundAgentFilters';
 import {
   listAgents, listAllRuns, getRun, cancelRun,
   formatDuration, isStuck,
+  setAgentEnabled, fetchAgentTypeCatalog, listLlmModelIds,
 } from '@/services/backgroundAgents';
-import type { AgentRun, BackgroundAgent } from '@/services/backgroundAgents';
+import type { AgentRun, AgentTypeCatalogEntry, BackgroundAgent } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
 import { SectionHeader } from '@/components/shared/SectionHeader';
@@ -62,6 +68,10 @@ export function BackgroundAgentsPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [expanded,     setExpanded]     = useState<string | null>(null);
   const [historyAgent, setHistoryAgent] = useState<BackgroundAgent | null>(null);
+  const [editAgent,    setEditAgent]    = useState<BackgroundAgent | null>(null);
+  const [togglingId,   setTogglingId]   = useState<string | null>(null);
+  const [catalog,      setCatalog]      = useState<AgentTypeCatalogEntry[] | null>(null);
+  const [models,       setModels]       = useState<string[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -80,6 +90,24 @@ export function BackgroundAgentsPage() {
   }, [toast]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    fetchAgentTypeCatalog().then(setCatalog).catch(() => setCatalog(null));
+    listLlmModelIds().then(setModels).catch(() => setModels([]));
+  }, []);
+
+  const handleToggleEnabled = async (agent: BackgroundAgent, enabled: boolean) => {
+    setTogglingId(agent.id);
+    try {
+      await setAgentEnabled(agent.id, enabled);
+      setAgents(prev => prev.map(a => (a.id === agent.id ? { ...a, enabled } : a)));
+      toast({ title: `${agent.name} ${enabled ? 'enabled' : 'disabled'}` });
+    } catch (err: any) {
+      toast({ title: 'Could not update the agent', description: err.message, variant: 'destructive' });
+    } finally {
+      setTogglingId(null);
+    }
+  };
 
   /** `?run=<id>` — the destination of the "task finished" bell notification. */
   const [searchParams, setSearchParams] = useSearchParams();
@@ -262,6 +290,73 @@ export function BackgroundAgentsPage() {
         }
       />
 
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Agents</CardTitle>
+          <CardDescription>Each row is code in background-agent-runner; edit when and how it runs, not what it is.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {agents.length === 0 ? (
+            <HubEmptyState
+              title={loading ? 'Loading agents…' : 'No background agents'}
+              description={loading ? undefined : 'Agents are registered by the features that own them (Tech Radar, Job Research) or seeded with the runner.'}
+              action={loading ? undefined : <Button size="sm" variant="outline" onClick={load}>Refresh</Button>}
+            />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Agent</TableHead>
+                  <TableHead>Trigger</TableHead>
+                  <TableHead>Schedule</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Last Run</TableHead>
+                  <TableHead>Enabled</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {agents.map(a => (
+                  <TableRow key={a.id}>
+                    <TableCell>
+                      <p className="text-sm font-medium">{a.name}</p>
+                      <p className="font-mono text-xs text-muted-foreground">{a.agent_type}</p>
+                    </TableCell>
+                    <TableCell className="text-xs capitalize">{a.trigger_type}</TableCell>
+                    <TableCell className="font-mono text-xs">{a.schedule ?? '—'}</TableCell>
+                    <TableCell className="font-mono text-xs">{a.model || '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {relTime(a.last_run_at)}
+                      {a.last_run_status && (
+                        <span className={`ml-1 capitalize ${statusTone(a.last_run_status)}`}>· {a.last_run_status}</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Switch
+                        checked={a.enabled}
+                        disabled={togglingId === a.id}
+                        aria-label={`${a.enabled ? 'Disable' : 'Enable'} ${a.name}`}
+                        onCheckedChange={(v) => void handleToggleEnabled(a, v)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end gap-1">
+                        <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs" onClick={() => setEditAgent(a)}>
+                          <Pencil className="h-3 w-3" /> Edit
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setHistoryAgent(a)}>
+                          Runs
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Stats bar */}
       <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
@@ -551,6 +646,14 @@ export function BackgroundAgentsPage() {
           })}
         </div>
       )}
+
+      <EditBackgroundAgentDialog
+        agent={editAgent}
+        catalog={catalog}
+        models={models}
+        onClose={() => setEditAgent(null)}
+        onSaved={load}
+      />
 
       <AgentRunHistoryDrawer
         agent={historyAgent}

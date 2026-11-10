@@ -60,6 +60,7 @@ import type {
   HarnessToolRow,
 } from './harnessTypes';
 import { failTone, fmtInt, fmtMs, fmtPct, fmtTokens, fmtUsd, ratio, shortId } from './harnessFormat';
+import { EvalCasesSheet } from './EvalCasesSheet';
 
 export const Panel: React.FC<{
   id?: string;
@@ -383,6 +384,7 @@ export const EvalsPanel: React.FC<{
   const [running, setRunning] = useState<string | null>(null);
   const [queue, setQueue] = useState<{ done: number; total: number } | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const stopRef = useRef(false);
 
   const runCase = async (caseKey: string, batchId: string): Promise<boolean> => {
@@ -427,15 +429,20 @@ export const EvalsPanel: React.FC<{
         ? `Last batch ${timeAgo(last.at)} · ${last.passed}/${last.runs} passed · ${fmtInt(Math.round(last.credits))} credits`
         : 'No eval batch has run yet.'}
       actions={
-        queue ? (
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { stopRef.current = true; }}>
-            <Square className="h-3.5 w-3.5" /> Stop ({queue.done}/{queue.total})
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="ghost" disabled={queue !== null} onClick={() => setManageOpen(true)}>
+            Manage cases
           </Button>
-        ) : (
-          <Button size="sm" variant="outline" className="gap-1.5" disabled={busy || !workspaceId || latest.length === 0} onClick={() => setConfirmAll(true)}>
-            <Play className="h-3.5 w-3.5" /> Run all
-          </Button>
-        )
+          {queue ? (
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { stopRef.current = true; }}>
+              <Square className="h-3.5 w-3.5" /> Stop ({queue.done}/{queue.total})
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" className="gap-1.5" disabled={busy || !workspaceId || latest.length === 0} onClick={() => setConfirmAll(true)}>
+              <Play className="h-3.5 w-3.5" /> Run all
+            </Button>
+          )}
+        </div>
       }
     >
       {batches.length > 1 && (
@@ -454,7 +461,11 @@ export const EvalsPanel: React.FC<{
         </div>
       )}
       {latest.length === 0 ? (
-        <HubEmptyState title="No active eval cases" description="Add rows to agent_eval_cases to give the harness a regression check." />
+        <HubEmptyState
+          title="No active eval cases"
+          description="Add a case to give the harness a regression check."
+          action={<Button size="sm" variant="outline" onClick={() => setManageOpen(true)}>Manage cases</Button>}
+        />
       ) : (
         <Table>
           <TableHeader>
@@ -525,6 +536,7 @@ export const EvalsPanel: React.FC<{
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <EvalCasesSheet open={manageOpen} onOpenChange={setManageOpen} onChanged={onRan} />
     </Panel>
   );
 };

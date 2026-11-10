@@ -64,7 +64,7 @@ export async function groundTurnInWorkspaceKnowledge(opts: {
    * calls stay tellable apart.
    */
   // deno-lint-ignore no-explicit-any
-  observability?: { supabase: any; userId?: string | null; workspaceId?: string | null; agentId?: string | null; conversationId?: string | null };
+  observability?: { supabase: any; userId?: string | null; workspaceId?: string | null; agentId?: string | null; conversationId?: string | null; turnId?: string | null };
 }): Promise<GroundingOutcome> {
   const { tools, userInput, isDirectToolRun, onChunk, observability } = opts;
 
@@ -252,7 +252,7 @@ function escapeAttr(s: string): string {
  */
 function logLookup(
   // deno-lint-ignore no-explicit-any
-  observability: { supabase: any; userId?: string | null; workspaceId?: string | null; agentId?: string | null; conversationId?: string | null } | undefined,
+  observability: { supabase: any; userId?: string | null; workspaceId?: string | null; agentId?: string | null; conversationId?: string | null; turnId?: string | null } | undefined,
   query: string,
   topK: number,
   raw: unknown,
@@ -271,6 +271,7 @@ function logLookup(
       const shape = err ? null : shapeToolResult(raw);
       observability.supabase.from('agent_tool_call_logs').insert({
         conversation_id: observability.conversationId ?? null,
+        turn_id: observability.turnId ?? null,
         user_id: observability.userId ?? null,
         workspace_id: observability.workspaceId ?? null,
         agent_id: observability.agentId ?? null,

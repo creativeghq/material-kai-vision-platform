@@ -28,10 +28,9 @@ import {
 } from '@/components/core/ui/select';
 import { Switch } from '@/components/core/ui/switch';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
-
-const GLOBAL_WORKSPACE = '00000000-0000-0000-0000-000000000000';
 
 interface StarterVariable {
   key:          string;
@@ -105,6 +104,9 @@ export const ChatStartersTab: React.FC = () => {
   const [deleting, setDeleting] = useState<ChatStarterRow | null>(null);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [changeReason, setChangeReason] = useState('');
+  const [deleteReason, setDeleteReason] = useState('');
+  const [removing, setRemoving] = useState(false);
   const [filterAgent, setFilterAgent] = useState<string>('all');
 
   // ── Load ──────────────────────────────────────────────────────────────────
@@ -138,42 +140,42 @@ export const ChatStartersTab: React.FC = () => {
       toast({ title: 'Name and prompt text are required', variant: 'destructive' });
       return;
     }
+    if (editing && !creating && !changeReason.trim()) {
+      toast({ title: 'A change reason is required', description: 'Edits are recorded in the prompt history.', variant: 'destructive' });
+      return;
+    }
 
     setSaving(true);
     try {
       if (creating) {
         const subcategory = source.subcategory.trim() || slugify(source.name);
-        const { error } = await supabase.from('prompts').insert({
-          prompt_type:   'chat_starter',
-          category:      source.category,
-          subcategory,
-          name:          source.name,
-          description:   source.description || null,
-          prompt_text:   source.prompt_text,
-          configuration: source.configuration,
-          workspace_id:  GLOBAL_WORKSPACE,
-          is_active:     source.is_active,
-          is_default:    source.is_default,
-          version:       1,
-          status:        'published',
-          used_in:       ['chat-composer'],
+        const { error } = await supabase.rpc('create_prompt_with_history', {
+          p_prompt_type:   'chat_starter',
+          p_category:      source.category,
+          p_subcategory:   subcategory,
+          p_name:          source.name,
+          p_description:   source.description || undefined,
+          p_prompt_text:   source.prompt_text,
+          p_configuration: source.configuration as Json,
+          p_is_active:     source.is_active,
+          p_is_default:    source.is_default,
+          p_used_in:       ['chat-composer'],
         });
         if (error) throw error;
         toast({ title: 'Starter created' });
         setCreating(null);
       } else if (editing) {
-        const { error } = await supabase
-          .from('prompts')
-          .update({
-            name:          editing.name,
-            description:   editing.description,
-            prompt_text:   editing.prompt_text,
-            configuration: editing.configuration,
-            is_active:     editing.is_active,
-            is_default:    editing.is_default,
-            category:      editing.category,
-          })
-          .eq('id', editing.id);
+        const { error } = await supabase.rpc('update_prompt_with_history', {
+          p_prompt_id:         editing.id,
+          p_new_text:          editing.prompt_text,
+          p_new_description:   editing.description ?? '',
+          p_change_reason:     changeReason.trim(),
+          p_new_configuration: editing.configuration as Json,
+          p_new_name:          editing.name,
+          p_new_category:      editing.category,
+          p_new_is_active:     editing.is_active,
+          p_new_is_default:    editing.is_default,
+        });
         if (error) throw error;
         toast({ title: 'Starter updated' });
         setEditing(null);
@@ -186,17 +188,38 @@ export const ChatStartersTab: React.FC = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (hard: boolean) => {
     if (!deleting) return;
+    if (!deleteReason.trim()) {
+      toast({ title: 'A reason is required', description: 'Removing a starter is recorded in the prompt history.', variant: 'destructive' });
+      return;
+    }
+    setRemoving(true);
     try {
-      const { error } = await supabase.from('prompts').delete().eq('id', deleting.id);
+      const { error } = await supabase.rpc('delete_prompt_with_audit', {
+        p_prompt_id: deleting.id,
+        p_hard: hard,
+        p_change_reason: deleteReason.trim(),
+      });
       if (error) throw error;
-      toast({ title: 'Starter deleted' });
+      toast({ title: hard ? 'Starter deleted' : 'Starter deactivated' });
       setDeleting(null);
-      load();
+      void load();
     } catch (err: any) {
       toast({ title: 'Delete failed', description: err.message, variant: 'destructive' });
+    } finally {
+      setRemoving(false);
     }
+  };
+
+  const openDelete = (r: ChatStarterRow) => {
+    setDeleteReason('');
+    setDeleting(r);
+  };
+
+  const openEdit = (r: ChatStarterRow) => {
+    setChangeReason('');
+    setEditing(r);
   };
 
   // Group by agent → group
@@ -316,10 +339,10 @@ export const ChatStartersTab: React.FC = () => {
                               </p>
                             </div>
                             <div className="flex items-center gap-1">
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setEditing(r)}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEdit(r)}>
                                 <Edit className="h-3.5 w-3.5" />
                               </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setDeleting(r)}>
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openDelete(r)}>
                                 <Trash2 className="h-3.5 w-3.5 text-red-500" />
                               </Button>
                             </div>
@@ -342,6 +365,8 @@ export const ChatStartersTab: React.FC = () => {
           setForm={(next) => creating ? setCreating(next) : setEditing(next as ChatStarterRow)}
           isNew={!!creating}
           saving={saving}
+          changeReason={changeReason}
+          setChangeReason={setChangeReason}
           onSave={handleSave}
           onClose={() => { setCreating(null); setEditing(null); }}
         />
@@ -358,15 +383,21 @@ export const ChatStartersTab: React.FC = () => {
               <div>
                 <DialogTitle>Delete Starter</DialogTitle>
                 <DialogDescription>
-                  Permanently remove "{deleting?.name}"? This cannot be undone.
+                  Remove "{deleting?.name}" from the picker. Deactivating keeps it and its history; deleting permanently cannot be undone.
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
+          <FormField label="Reason" hint="Recorded in the prompt history.">
+            <Input value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} />
+          </FormField>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDeleting(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              <Trash2 className="h-4 w-4 mr-2" />Delete
+            <Button variant="outline" onClick={() => setDeleting(null)} disabled={removing}>Cancel</Button>
+            <Button variant="secondary" onClick={() => void handleDelete(false)} disabled={removing || !deleteReason.trim()}>
+              Deactivate
+            </Button>
+            <Button variant="destructive" onClick={() => void handleDelete(true)} disabled={removing || !deleteReason.trim()}>
+              <Trash2 className="h-4 w-4 mr-2" />Delete permanently
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -382,11 +413,13 @@ interface StarterFormDialogProps {
   setForm: (next: any) => void;
   isNew:   boolean;
   saving:  boolean;
+  changeReason:    string;
+  setChangeReason: (v: string) => void;
   onSave:  () => void;
   onClose: () => void;
 }
 
-function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: StarterFormDialogProps) {
+function StarterFormDialog({ form, setForm, isNew, saving, changeReason, setChangeReason, onSave, onClose }: StarterFormDialogProps) {
   const config = form.configuration ?? {};
   const vars   = config.variables ?? [];
 
@@ -554,11 +587,19 @@ function StarterFormDialog({ form, setForm, isNew, saving, onSave, onClose }: St
               <Plus className="h-3 w-3 mr-1" />Add variable
             </Button>
           </FormSection>
+
+          {!isNew && (
+            <FormSection title="Record">
+              <FormField label="Change Reason" hint="Recorded in the prompt history.">
+                <Input value={changeReason} onChange={(e) => setChangeReason(e.target.value)} />
+              </FormField>
+            </FormSection>
+          )}
         </div>
 
         <DialogFooter>
           <Button variant="outline" onClick={onClose}><X className="h-4 w-4 mr-2" />Cancel</Button>
-          <Button onClick={onSave} disabled={saving}>
+          <Button onClick={onSave} disabled={saving || (!isNew && !changeReason.trim())}>
             <Save className="h-4 w-4 mr-2" />{saving ? 'Saving…' : 'Save'}
           </Button>
         </DialogFooter>

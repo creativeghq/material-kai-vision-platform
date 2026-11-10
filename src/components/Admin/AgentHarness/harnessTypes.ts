@@ -199,6 +199,19 @@ export interface HarnessAttention {
   section: string;
 }
 
+export interface HarnessTurns {
+  recording_since: string | null;
+  total: number;
+  in_flight: number;
+  lost: number;
+  by_status: Record<string, number>;
+  stop_reasons: Record<string, number>;
+  ttft_p50_ms: number | null;
+  ttft_p95_ms: number | null;
+  iterations_p95: number | null;
+  evals: number;
+}
+
 export interface HarnessOverview {
   window: { days: number; since: string; requests_since: string; requests_capped: boolean };
   kpis: HarnessKpis;
@@ -213,6 +226,7 @@ export interface HarnessOverview {
   memory: HarnessMemory;
   conversations: HarnessConversationRow[];
   attention: HarnessAttention[];
+  turns: HarnessTurns;
 }
 
 export interface TraceMessage {
@@ -261,6 +275,29 @@ export interface TraceToolCall {
   success: boolean;
   error: string | null;
   duration_ms: number | null;
+  turn_id: string | null;
+}
+
+export interface TraceTurnRecord {
+  id: string;
+  started_at: string;
+  completed_at: string | null;
+  status: string;
+  requested_agent: string;
+  agent: string | null;
+  model: string | null;
+  stop_reason: string | null;
+  failure_code: string | null;
+  error: string | null;
+  iterations: number | null;
+  tool_calls: number | null;
+  invalid_tool_calls: number | null;
+  ttft_ms: number | null;
+  total_ms: number | null;
+  toolkits: string[] | null;
+  is_eval: boolean;
+  input_tokens: number | null;
+  output_tokens: number | null;
 }
 
 export interface ConversationTrace {
@@ -279,6 +316,7 @@ export interface ConversationTrace {
   messages: TraceMessage[];
   turns: TraceTurn[];
   tool_calls: TraceToolCall[];
+  turn_records: TraceTurnRecord[];
   evals: Array<{ case_key: string; passed: boolean; at: string; failures: unknown; failure_classes: string[] | null; error: string | null }>;
   checkpoint_bytes: number | null;
 }
