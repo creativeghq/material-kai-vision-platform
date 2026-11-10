@@ -13,11 +13,6 @@ const trailingSequence = (n: string | null | undefined): number => {
 
 const time = (iso: string | null | undefined): number => (iso ? Date.parse(iso) : 0);
 
-/**
- * Newest first: drafts on top, then issued documents by issue DAY, then legal number. The raw
- * `issued_at` is not enough — a document given an issue date is stamped at the start of that day,
- * so the next number issued that morning sorted below the one before it.
- */
 export function compareInvoicesNewestFirst(a: OrderableInvoice, b: OrderableInvoice): number {
   if (!a.issued_at || !b.issued_at) {
     if (a.issued_at) return 1;
