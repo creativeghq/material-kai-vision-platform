@@ -3,7 +3,6 @@ import React from 'react';
 import { Sidebar } from './Sidebar';
 import { MobileBottomNav } from './MobileBottomNav';
 import { PageErrorBoundary } from './ErrorBoundary';
-import { AdminNavStrip } from '@/components/Admin/AdminNavStrip';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -38,7 +37,6 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         {/* Localize a page render throw to the content area (nav + chrome stay usable) instead of
             letting it bubble to the top-level CriticalErrorBoundary and blank the whole app — the
             heavy authenticated pages (finance tables, agent canvas, PDF viewer) are the main risk. */}
-        <AdminNavStrip />
         <PageErrorBoundary name="Page">
           {children}
         </PageErrorBoundary>

@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { usePermissions } from '@/hooks/usePermissions';
+import { PageBreadcrumbs, useAdminBreadcrumbs } from '@/components/shared/PageHeader';
 
 interface GlobalAdminHeaderProps {
   title: string;
@@ -16,8 +17,10 @@ interface GlobalAdminHeaderProps {
 export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
   title,
   description,
+  breadcrumbs,
   badge,
 }) => {
+  const trail = useAdminBreadcrumbs(breadcrumbs?.map((c) => ({ label: c.label, to: c.path })), title);
   const navigate = useNavigate();
   // This header is used by 15 TENANT pages as well as the operator consoles — CRM, Finance, POS,
   // Quotes, Email, Messaging. The two jump buttons below are operator chrome: "Main" goes to the
@@ -27,6 +30,7 @@ export const GlobalAdminHeader: React.FC<GlobalAdminHeaderProps> = ({
 
   return (
     <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-hairline">
+      <PageBreadcrumbs crumbs={trail} />
       <div className="flex items-center justify-between gap-4">
         {/* Left: icon + title */}
         <div className="flex items-center gap-3">

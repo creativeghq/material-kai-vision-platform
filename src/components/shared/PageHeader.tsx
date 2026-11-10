@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 
 import {
   Breadcrumb,
@@ -9,6 +9,13 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@/components/core/ui/breadcrumb';
+
+/** Every page under /admin/* is a child of the admin dashboard; give it the way back unless it names its own trail. */
+export function useAdminBreadcrumbs(crumbs: PageHeaderCrumb[] | undefined, title: string): PageHeaderCrumb[] | undefined {
+  const { pathname } = useLocation();
+  if (crumbs && crumbs.length > 0) return crumbs;
+  return pathname.startsWith('/admin/') ? [{ label: 'Admin', to: '/admin' }, { label: title }] : crumbs;
+}
 
 export interface PageHeaderCrumb {
   label: string;
@@ -45,26 +52,15 @@ interface PageHeaderProps {
   children?: React.ReactNode;
 }
 
-/** PAGE HEADER — the identity band at the top of every page. */
-export function PageHeader({
-  icon: Icon,
-  thumbnailUrl,
-  title,
-  recordTitle = false,
-  subtitle,
-  breadcrumbs,
-  actions,
-  children,
-}: PageHeaderProps) {
+/** The shared Breadcrumb primitive: nav[aria-label] > ol > li, aria-current on the leaf. */
+export function PageBreadcrumbs({ crumbs }: { crumbs?: PageHeaderCrumb[] }) {
+  if (!crumbs || crumbs.length === 0) return null;
   return (
-    <section className="border-b border-hairline bg-card px-4 pt-3 sm:px-6">
-      {/* The shared Breadcrumb primitive rather than a hand-rolled row of links: it emits
-          nav[aria-label] > ol > li with aria-current="page" on the leaf, which is what a screen
-          reader needs to announce "breadcrumb, 2 of 3" instead of three unrelated links. */}
-      {breadcrumbs && breadcrumbs.length > 0 && (
+    <>
+      {(
         <Breadcrumb className="mb-1.5">
           <BreadcrumbList className="gap-1 text-xs sm:gap-1.5">
-            {breadcrumbs.map((crumb, i) => (
+            {crumbs.map((crumb, i) => (
               <React.Fragment key={`${crumb.label}-${i}`}>
                 {i > 0 && <BreadcrumbSeparator className="opacity-60" />}
                 <BreadcrumbItem className="min-w-0">
@@ -81,6 +77,25 @@ export function PageHeader({
           </BreadcrumbList>
         </Breadcrumb>
       )}
+    </>
+  );
+}
+
+/** PAGE HEADER — the identity band at the top of every page. */
+export function PageHeader({
+  icon: Icon,
+  thumbnailUrl,
+  title,
+  recordTitle = false,
+  subtitle,
+  breadcrumbs,
+  actions,
+  children,
+}: PageHeaderProps) {
+  const trail = useAdminBreadcrumbs(breadcrumbs, title);
+  return (
+    <section className="border-b border-hairline bg-card px-4 pt-3 sm:px-6">
+      <PageBreadcrumbs crumbs={trail} />
 
       {/* On mobile the actions drop to their own row (and may wrap) so a wide
           primary button is never clipped off the right edge; from sm up it sits

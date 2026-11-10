@@ -8,6 +8,7 @@ import {
   ExternalLink,
   FileJson,
   FileText,
+  LayoutGrid,
   Loader2,
   Radio,
   RefreshCw,
@@ -19,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
@@ -27,6 +29,7 @@ import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
+import { dataIntegrityService } from '@/services/dataIntegrityService';
 import { timeAgo } from '@/utils/datetime';
 
 import { AgentUnmetRequestsPanel } from './AgentUnmetRequestsPanel';
@@ -57,6 +60,48 @@ const WINDOWS = [
 ] as const;
 type WindowValue = (typeof WINDOWS)[number]['value'];
 
+const ADMIN_PAGES: Array<{ group: string; items: Array<{ label: string; path: string }> }> = [
+  {
+    group: 'Harness Configuration',
+    items: [
+      { label: 'AI Configs — Prompts, Pricing, Models', path: '/admin/ai-configs' },
+      { label: 'Background Agents', path: '/admin/ai-configs?tab=background-agents' },
+      { label: 'API Gateway', path: '/admin/ai-configs?tab=api-gateway' },
+      { label: 'Flows', path: '/flows' },
+    ],
+  },
+  {
+    group: 'Data & Pipeline',
+    items: [
+      { label: 'Materials Data', path: '/admin/materials-data' },
+      { label: 'AI Data Review — Metadata, Relevancy, Duplicates', path: '/admin/ai-configs?tab=ai-data' },
+      { label: 'Data Import', path: '/admin/data-import' },
+      { label: 'Async Job Queue', path: '/admin/async-queue-monitor' },
+      { label: 'Knowledge Base', path: '/admin/knowledge-base' },
+      { label: '3D Model Debugging', path: '/admin/ai-configs?tab=3d-debug' },
+    ],
+  },
+  {
+    group: 'Platform',
+    items: [
+      { label: 'Operations', path: '/admin/operations' },
+      { label: 'Data Health', path: '/admin/data-health' },
+      { label: 'Application Logs', path: '/admin/logs' },
+      { label: 'Monitoring', path: '/admin/monitoring' },
+      { label: 'Modules', path: '/admin/modules' },
+      { label: 'Plans', path: '/admin/plans' },
+    ],
+  },
+  {
+    group: 'Marketplace',
+    items: [
+      { label: 'Supplier Claims', path: '/admin/supplier-claims' },
+      { label: 'Master Catalog', path: '/catalog-master' },
+      { label: 'Freight Quotes', path: '/admin/freight-quotes' },
+    ],
+  },
+];
+
 const EXTERNAL_TOOLS = [
   { label: 'Sentry', href: 'https://ethosco.sentry.io/issues/', icon: AlertTriangle },
   { label: 'MIVAA API Docs', href: 'https://v1api.materialshub.gr/docs', icon: Book },
@@ -78,6 +123,13 @@ const AgentHarnessDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadedAt, setLoadedAt] = useState<string | null>(null);
   const [live, setLive] = useState(false);
+  const [openFindings, setOpenFindings] = useState(0);
+
+  useEffect(() => {
+    void dataIntegrityService.listFindings({ status: 'open' })
+      .then((f) => setOpenFindings(f.length))
+      .catch(() => setOpenFindings(0));
+  }, []);
 
   const setParam = useCallback((key: string, value: string | null) => {
     setParams((prev) => {
@@ -155,6 +207,32 @@ const AgentHarnessDashboard: React.FC = () => {
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               Refresh
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <LayoutGrid className="h-3.5 w-3.5" /> Admin
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="max-h-[70vh] w-72 overflow-y-auto">
+                {ADMIN_PAGES.map((g, gi) => (
+                  <React.Fragment key={g.group}>
+                    {gi > 0 && <DropdownMenuSeparator />}
+                    <DropdownMenuLabel className="text-xs text-muted-foreground">{g.group}</DropdownMenuLabel>
+                    {g.items.map((it) => (
+                      <DropdownMenuItem key={it.path} asChild>
+                        <Link to={it.path} className="flex items-center justify-between gap-2">
+                          {it.label}
+                          {it.path === '/admin/data-health' && openFindings > 0 && (
+                            <span className="text-xs font-semibold text-[hsl(var(--error))]">{openFindings} open</span>
+                          )}
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </React.Fragment>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1.5">
