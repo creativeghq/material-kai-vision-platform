@@ -351,6 +351,21 @@ async function stampInvoiceFromSubmission(
       fiscal_error: null,
     })
     .eq('id', invoiceId);
+  await stampProviderChannel(supabase, invoiceId, sub.mark);
+}
+
+/** Record that a provider-accepted invoice was issued through the provider (#444). */
+async function stampProviderChannel(
+  supabase: DbClient,
+  invoiceId: string,
+  mark: string | null | undefined,
+): Promise<void> {
+  const { error } = await supabase.rpc('stamp_invoice_issuance_channel', {
+    p_invoice: invoiceId, p_channel: 'provider', p_outage_id: null,
+  });
+  if (error) {
+    console.error('issuance-channel stamp FAILED after a successful transmission', { invoiceId, mark, error });
+  }
 }
 
 const fiscalToday = (): string => fiscalDate();
@@ -651,6 +666,7 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
             fiscal_uid: filed?.uid ?? null, fiscal_qr_url: filed?.qrUrl ?? null, fiscal_aade_qr_url: filed?.aadeQrUrl ?? null,
             fiscal_connector_slug: resolved.resolved.slug, fiscal_submitted_at: new Date().toISOString(),
           }).eq('id', (sig as any).invoice_id);
+          await stampProviderChannel(supabase, (sig as any).invoice_id, completion.mark);
         }
 
         return json({ ok: true, pos_signature_id: (sig as any).id, invoice_id: (sig as any).invoice_id, credit_note_id: sigCreditNoteId,
@@ -1392,21 +1408,8 @@ Deno.serve(withApiLogging('finance-issue-invoice', async (req) => {
                 })
                 .eq('id', invoiceId);
 
-              // #444 — HOW this document was lawfully issued, recorded where the fact happens.
-              // From 1/10/2026 a B2B invoice issued from our own ERP is legally non-issuance
-              // (Ε.2004/2026 §2) even though the transmission returns a MARK, so the channel
-              // cannot be inferred afterwards from a connector slug that may since have changed.
               // Every document that reaches here went through a certified provider.
-              const { error: channelErr } = await supabase.rpc('stamp_invoice_issuance_channel', {
-                p_invoice: invoiceId, p_channel: 'provider', p_outage_id: null,
-              });
-              if (channelErr) {
-                // Reported, never swallowed: an unstamped document is one nobody can later show
-                // was lawfully issued, which is exactly what the compliance probe looks for.
-                console.error('issuance-channel stamp FAILED after a successful transmission', {
-                  invoiceId, mark: result.mark, channelErr,
-                });
-              }
+              await stampProviderChannel(supabase, invoiceId, result.mark);
               // The document IS transmitted; ΑΑΔΕ holds a MARK for it whatever this row says.
               // Report the stamp failure rather than swallowing it, and say plainly that the
               // document was sent — the submission row above is the durable record, and the

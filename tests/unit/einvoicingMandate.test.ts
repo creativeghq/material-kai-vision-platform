@@ -31,16 +31,24 @@ describe('the issuance channel is recorded where the transmission happens', () =
     // Stamping before the provider accepted would claim a lawful issuance for a document that
     // may never have reached anyone.
     const accepted = issue.indexOf("const accepted = result.status === 'accepted'");
-    const stamp = issue.indexOf('stamp_invoice_issuance_channel');
+    const stamp = issue.indexOf('stampProviderChannel(supabase, invoiceId, result.mark)');
     expect(accepted, 'the accepted check moved — re-read this file').toBeGreaterThan(-1);
     expect(stamp, 'the channel is stamped before the transmission is known to have worked')
       .toBeGreaterThan(accepted);
   });
 
+  it('every path that writes an invoice MARK also records the channel', () => {
+    const repair = issue.slice(issue.indexOf('async function stampInvoiceFromSubmission'));
+    expect(repair.slice(0, 900)).toContain('stampProviderChannel(');
+    const pos = issue.indexOf('fiscal_connector_slug: resolved.resolved.slug, fiscal_submitted_at');
+    expect(pos, 'the POS completion stamp moved — re-read this file').toBeGreaterThan(-1);
+    expect(issue.slice(pos, pos + 300)).toContain('stampProviderChannel(');
+  });
+
   it('a failed stamp is reported, not swallowed', () => {
     // An unstamped document is one nobody can later show was lawfully issued.
     const at = issue.indexOf('stamp_invoice_issuance_channel');
-    expect(issue.slice(at, at + 900)).toMatch(/console\.error/);
+    expect(issue.slice(at, at + 400)).toMatch(/console\.error/);
   });
 
   it('the channel is never inferred from the connector slug', () => {
