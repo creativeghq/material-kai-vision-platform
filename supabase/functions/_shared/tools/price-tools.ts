@@ -174,7 +174,7 @@ export const createPriceLookupTool = (
             const { data: rrows, error: rerr } = await sb.rpc('resolve_purchase_prices', {
               p_workspace_id: workspaceId,
               p_query: [product_name, manufacturer, sku].filter(Boolean).join(' '),
-              p_limit: 8,
+              p_limit: 20,
             });
             if (rerr) resolvedError = rerr.message;
             else resolvedPrices = rrows ?? [];
@@ -191,7 +191,9 @@ export const createPriceLookupTool = (
           ? [
               'RESOLVED PRICES (derived in SQL from the structured price store — use these numbers verbatim, never recompute):',
               '- status purchase_price / discount_applied: final_net and final_gross are what we pay. Quote them as is and name the supplier, list and price_label.',
+              '- status discount_applied: show the printed list price (printed_net), the discount as its text (applied_rules[].quote), and final_net / final_gross.',
               '- status list_price_conditional_rule or list_price_no_rule: the printed price is a LIST price. Do NOT present it as the purchase price. Show conditional_options (each with its own condition and net_if_applied) and say which condition decides it; if the same supplier has a purchase_price row for the same item, that row wins.',
+              '- Every row that answers the question goes IN the table, grouped by list (doc_slug), e.g. import prices and local-stock prices as separate groups. Never only mention another list or its price in prose.',
               '- Always repeat the warnings array to the admin.',
               '- When you call submit_price_proposal, cite resolved_prices[].doc_id in source_doc_ids.',
             ].join('\n')
@@ -201,9 +203,11 @@ export const createPriceLookupTool = (
           onChunk?.({
             type: 'price_resolution',
             workspace_id: workspaceId,
-            rows: resolvedPrices.slice(0, 5).map((r: any) => ({
+            rows: resolvedPrices.map((r: any) => ({
               row_id: r.row_id,
               doc_id: r.doc_id,
+              doc_slug: r.doc_slug,
+              product_line: r.product_line,
               supplier: r.supplier,
               item_text: r.item_text,
               price_label: r.price_label,
@@ -217,6 +221,7 @@ export const createPriceLookupTool = (
               vat_rate: r.vat_rate,
               status: r.status,
               warnings: r.warnings,
+              applied_rules: r.applied_rules,
               conditional_options: r.conditional_options,
             })),
             timestamp: Date.now(),
@@ -324,9 +329,8 @@ export const createPriceLookupTool = (
           timestamp: Date.now(),
         });
 
-        // Emit a lightweight pre-proposal chunk so the UI can show the sources immediately.
-        // The agent will produce the final price_proposal chunk from its reasoning in a follow-up message.
-        if (matches.length > 0 || hasCustomerDiscount) {
+        // Raw KB snippets are only shown when no structured price answered the question.
+        if (!hasResolved && (matches.length > 0 || hasCustomerDiscount)) {
           onChunk?.({
             type: 'price_lookup_matches',
             product_name,

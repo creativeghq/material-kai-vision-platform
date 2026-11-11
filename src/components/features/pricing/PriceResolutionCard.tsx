@@ -22,9 +22,18 @@ export interface ResolutionOption {
   net_if_applied?: number | null;
 }
 
+export interface AppliedRule {
+  rule_id: number;
+  percents: number[];
+  quote?: string | null;
+  email_date?: string | null;
+}
+
 export interface ResolutionRow {
   row_id: number;
   doc_id?: string | null;
+  doc_slug?: string | null;
+  product_line?: string | null;
   supplier: string;
   item_text: string;
   price_label: string;
@@ -38,6 +47,7 @@ export interface ResolutionRow {
   vat_rate?: number | string | null;
   status: string;
   warnings?: string[];
+  applied_rules?: AppliedRule[];
   conditional_options: ResolutionOption[];
 }
 
@@ -150,6 +160,13 @@ const RowCard: React.FC<{
           </div>
           <Badge variant={fixed ? 'success' : 'warning'}>{fixed ? 'Final purchase price' : 'List price'}</Badge>
         </div>
+
+        {row.status === 'discount_applied' && (row.applied_rules ?? []).map((a) => (
+          <div key={a.rule_id} className="text-xs text-muted-foreground">
+            Printed list price {amount(row.printed_net, row.currency)} · {a.percents.map((p) => `−${p}%`).join(' then ')}
+            {a.quote ? ` — ${a.quote}` : ''}
+          </div>
+        ))}
 
         {isList && (
           <div className="space-y-2">

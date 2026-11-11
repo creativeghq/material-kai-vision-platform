@@ -20,6 +20,7 @@ export const ARTIFACT_PLACEHOLDER = /: result rendered above\.$/;
 /** The model's own lookups — reader names, endpoint lists, raw JSON. Never the answer. */
 export const INTERNAL_RESULT_TYPES: ReadonlySet<string> = new Set([
   'platform_api_matches', 'platform_api_result', 'platform_data_matches', 'platform_data_result',
+  'price_resolution', 'price_lookup_matches',
 ]);
 
 const proseOf = (content: unknown): string => (typeof content === 'string' ? content : '').trim();

@@ -64,6 +64,7 @@ import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard, primaryListCount } from './AgentResultCard';
 import { ARTIFACT_PLACEHOLDER, INTERNAL_RESULT_TYPES, isResultCardRow, layoutTurns, type TurnMessage } from './agentTurnShape';
 import { FlightOffersCard } from './FlightOffersCard';
+import { PriceLookupSources, PriceResolutionTable } from '@/components/features/pricing/PriceLookupChatCards';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
 import { ConversationManagerModal } from './ConversationManagerModal';
 import {
@@ -5855,6 +5856,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // from `agentResultData.title` — and the sub-tab renders it a second time. Three copies of
     // "Records found" above three rows of data.
     if (message.agentResultData?.resultType === 'flight_offers_card') return <FlightOffersCard data={message.agentResultData.data} />;
+    if (message.agentResultData?.resultType === 'price_resolution') return <PriceResolutionTable data={message.agentResultData.data} />;
+    if (message.agentResultData?.resultType === 'price_lookup_matches') return <PriceLookupSources data={message.agentResultData.data} />;
     if (message.agentResultData) return <AgentResultCard title={message.agentResultData.title} data={message.agentResultData.data} resultType={message.agentResultData.resultType} onAsk={handleCardAsk} access={recordLinkAccess} hideTitle />;
     return renderDataCardBody(message);
   };
