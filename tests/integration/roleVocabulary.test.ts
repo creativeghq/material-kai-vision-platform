@@ -40,13 +40,14 @@ suite('role vocabulary · TypeScript catalog vs. the live database', () => {
   it('every role in the TS catalog is storable in workspace_members', async () => {
     const rejected: string[] = [];
     for (const role of WORKSPACE_MEMBER_ROLES) {
+      await svc.from('workspace_members').delete().eq('workspace_id', ws).eq('user_id', subject.id);
       const { error } = await svc.from('workspace_members')
         .insert({ workspace_id: ws, user_id: subject.id, role, status: 'active' });
       if (error) rejected.push(`${role} (${error.message})`);
       await svc.from('workspace_members').delete().eq('workspace_id', ws).eq('user_id', subject.id);
     }
     expect(rejected, `catalog roles the DB refuses to store: ${rejected.join(', ')}`).toEqual([]);
-  });
+  }, 120_000);
 
   it('the constraint actually constrains — a role outside the catalog is refused', async () => {
     // Guards against a false PASS above: if the CHECK were dropped, every insert would succeed and
@@ -65,6 +66,7 @@ suite('role vocabulary · TypeScript catalog vs. the live database', () => {
     const accepted: string[] = [];
     for (const role of RETIRED_OR_NEVER_VALID) {
       if ((WORKSPACE_MEMBER_ROLES as readonly string[]).includes(role)) continue;
+      await svc.from('workspace_members').delete().eq('workspace_id', ws).eq('user_id', subject.id);
       const { error } = await svc.from('workspace_members')
         .insert({ workspace_id: ws, user_id: subject.id, role, status: 'active' });
       if (!error) accepted.push(role);
@@ -72,7 +74,7 @@ suite('role vocabulary · TypeScript catalog vs. the live database', () => {
     }
     expect(accepted, `DB accepts roles absent from the catalog (no persona branch → silent 'staff'): ${accepted.join(', ')}`)
       .toEqual([]);
-  });
+  }, 120_000);
 
   // ── create_workspace_invite: the allowlist that diverged from the CHECK ──────
 
