@@ -310,6 +310,9 @@ verify_jwt = false
 [functions.generate-email-copy]
 verify_jwt = false
 
+[functions.quote-buy-prices]
+verify_jwt = false
+
 [functions.generate-social-image]
 verify_jwt = false
 

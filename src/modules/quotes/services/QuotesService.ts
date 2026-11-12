@@ -63,6 +63,30 @@ export interface Quote {
 /** The status moves an operator makes by hand. `quoted` (Send) and `accepted` keep their own paths. */
 export type QuoteManualStatus = 'draft' | 'submitted' | 'rejected';
 
+export interface BuyPriceSuggestion {
+  line_id: string;
+  name: string;
+  unit: string | null;
+  status: 'matched' | 'no_match' | 'not_in_price_lists';
+  confidence: 'high' | 'medium' | 'low' | null;
+  reason: string | null;
+  candidates_checked: number;
+  match: {
+    row_id: number;
+    supplier: string | null;
+    product_line: string | null;
+    item_text: string;
+    price_label: string | null;
+    unit: string | null;
+    currency: string | null;
+    net_price: number;
+    printed_net: number | null;
+    effective_date: string | null;
+    grade: string | null;
+    warnings: string[];
+  } | null;
+}
+
 export interface QuoteItem {
   id: string;
   quote_id: string;
@@ -585,6 +609,40 @@ export class QuotesService {
       if (row.cost_snapshot != null) map.set(row.quote_item_id, Number(row.cost_snapshot));
     }
     return map;
+  }
+
+  /** Record what one line costs us to buy. `null` clears it. Sell-side only, enforced by RLS. */
+  async setItemCost(
+    quoteId: string,
+    workspaceId: string,
+    itemId: string,
+    cost: number | null,
+    source: 'manual' | 'price_list',
+  ): Promise<void> {
+    const table = (supabase as any).from('quote_item_costs');
+    const { error } = cost == null
+      ? await table.delete().eq('quote_item_id', itemId)
+      : await table.upsert({
+          quote_item_id: itemId,
+          quote_id: quoteId,
+          workspace_id: workspaceId,
+          cost_snapshot: cost,
+          cost_snapshot_currency: 'EUR',
+          cost_snapshot_at: new Date().toISOString(),
+          cost_snapshot_source: source,
+        }, { onConflict: 'quote_item_id' });
+    if (error) throw error;
+  }
+
+  /** Suggested buy price per line, matched against the workspace's supplier price lists. Writes nothing. */
+  async findBuyPrices(quoteId: string): Promise<BuyPriceSuggestion[]> {
+    const { data, error } = await supabase.functions.invoke('quote-buy-prices', { body: { quote_id: quoteId } });
+    if (error) {
+      const body = await (error as any)?.context?.json?.().catch(() => null);
+      throw new Error(body?.error || error.message);
+    }
+    if (!data?.success) throw new Error(data?.error || 'Could not search the price lists');
+    return data.lines as BuyPriceSuggestion[];
   }
 
   /**

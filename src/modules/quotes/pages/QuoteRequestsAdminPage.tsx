@@ -67,7 +67,7 @@ const SOURCE_LABELS: Record<string, string> = {
   agent: 'Assistant',
 };
 
-export const QuoteRequestsAdmin: React.FC = () => {
+export const QuoteRequestsAdmin: React.FC<{ embedded?: boolean }> = ({ embedded = false }) => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
   const navigate = useNavigate();
@@ -305,12 +305,14 @@ export const QuoteRequestsAdmin: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen">
-        <GlobalAdminHeader
-          title="Quote Requests"
-          description="Manage customer quote requests and create quotes for users"
-          badge="Admin"
-        />
+      <div className={embedded ? undefined : 'min-h-screen'}>
+        {!embedded && (
+          <GlobalAdminHeader
+            title="Quote Requests"
+            description="Manage customer quote requests and create quotes for users"
+            badge="Admin"
+          />
+        )}
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -322,14 +324,16 @@ export const QuoteRequestsAdmin: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Quote Requests"
-        description="Manage customer quote requests and create quotes for users"
-        badge="Admin"
-      />
+    <div className={embedded ? undefined : 'min-h-screen'}>
+      {!embedded && (
+        <GlobalAdminHeader
+          title="Quote Requests"
+          description="Manage customer quote requests and create quotes for users"
+          badge="Admin"
+        />
+      )}
 
-      <div className="p-3 sm:p-6 space-y-6">
+      <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         {/* Compact Stats Row */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           <div className="dashboard-card">

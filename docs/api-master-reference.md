@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (182)
+## 1. Supabase Edge Functions (183)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -150,6 +150,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-quote-pdf` | JWT / kai_* | Generate or return cached PDF for a quote |
 | `project-plan-engine` | JWT / kai_* / secret | Authoritative compute for the Blueprint estimating engine (plans, pricing, versions, quotes) |
 | `public-project-plan` | public | Public lead-gen Blueprint estimator (/tools/project-plan) |
+| `quote-buy-prices` | JWT | Suggest a buy price for each line of a quote from the supplier price lists |
 | `quote-public-share` | token / public | Public token-based quote share lookup (anonymous-friendly) |
 | `quotes-api` _(GET + POST)_ | JWT / kai_* | REST API for quote requests (customer-facing) |
 | `send-quote-email` | JWT / kai_* | Email a quote to a recipient with a public share link |

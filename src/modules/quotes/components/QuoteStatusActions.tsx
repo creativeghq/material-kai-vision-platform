@@ -33,17 +33,17 @@ interface StatusMove {
 export function quoteStatusMoves(status: Quote['status']): StatusMove[] {
   switch (status) {
     case 'draft':
-      return [{ to: 'submitted', label: 'Mark submitted' }, { to: 'rejected', label: 'Mark declined…' }];
+      return [{ to: 'submitted', label: 'Submitted' }, { to: 'rejected', label: 'Declined…' }];
     case 'submitted':
-      return [{ to: 'draft', label: 'Back to draft' }, { to: 'rejected', label: 'Mark declined…' }];
+      return [{ to: 'draft', label: 'Draft' }, { to: 'rejected', label: 'Declined…' }];
     case 'quoted':
       return [
-        { to: 'draft', label: 'Back to draft' },
-        { to: 'submitted', label: 'Back to submitted' },
-        { to: 'rejected', label: 'Mark declined…' },
+        { to: 'draft', label: 'Draft' },
+        { to: 'submitted', label: 'Submitted' },
+        { to: 'rejected', label: 'Declined…' },
       ];
     case 'expired':
-      return [{ to: 'draft', label: 'Reopen as draft' }, { to: 'rejected', label: 'Mark declined…' }];
+      return [{ to: 'draft', label: 'Reopen as draft' }, { to: 'rejected', label: 'Declined…' }];
     case 'rejected':
       return [{ to: 'draft', label: 'Reopen as draft' }];
     default:
@@ -110,10 +110,26 @@ function useQuoteStatusMove(quote: StatusQuote, onChanged: () => void) {
   return { busy, run, dialog };
 }
 
-/** The status control on a quote's own page. */
-export const QuoteStatusMenu: React.FC<{ quote: StatusQuote; onChanged: () => void }> = ({ quote, onChanged }) => {
-  const { busy, run, dialog } = useQuoteStatusMove(quote, onChanged);
+/**
+ * The status control on a quote's own page: every status the quote can move to.
+ * Sent and Accepted have side effects (customer notified; order + draft invoice), so the page supplies them.
+ */
+export const QuoteStatusMenu: React.FC<{
+  quote: StatusQuote;
+  onChanged: () => void;
+  onMarkSent?: () => void;
+  onAccept?: () => void;
+  blockedReason?: string;
+  working?: boolean;
+}> = ({ quote, onChanged, onMarkSent, onAccept, blockedReason, working = false }) => {
+  const { busy: moving, run, dialog } = useQuoteStatusMove(quote, onChanged);
+  const busy = moving || working;
+  const [acceptOpen, setAcceptOpen] = useState(false);
   const moves = quoteStatusMoves(quote.status);
+  const open = ['draft', 'submitted', 'quoted'].includes(quote.status);
+  const canSend = open && quote.status !== 'quoted' && !!onMarkSent;
+  const canAccept = open && !!onAccept;
+  const empty = moves.length === 0 && !canSend && !canAccept;
   return (
     <>
       <DropdownMenu>
@@ -124,18 +140,60 @@ export const QuoteStatusMenu: React.FC<{ quote: StatusQuote; onChanged: () => vo
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
-          {moves.length === 0 ? (
+          {empty ? (
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
               An accepted quote is changed by issuing a revision.
             </DropdownMenuLabel>
           ) : (
-            moves.map((m) => (
-              <DropdownMenuItem key={m.to} onSelect={() => run(m)}>{m.label}</DropdownMenuItem>
-            ))
+            <>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Move to</DropdownMenuLabel>
+              {moves.filter((m) => m.to !== 'rejected').map((m) => (
+                <DropdownMenuItem key={m.to} onSelect={() => run(m)}>{m.label}</DropdownMenuItem>
+              ))}
+              {canSend && (
+                <DropdownMenuItem disabled={!!blockedReason} onSelect={() => onMarkSent?.()}>
+                  Sent to customer
+                </DropdownMenuItem>
+              )}
+              {canAccept && (
+                <DropdownMenuItem disabled={!!blockedReason} onSelect={() => setAcceptOpen(true)}>
+                  Accepted…
+                </DropdownMenuItem>
+              )}
+              {moves.some((m) => m.to === 'rejected') && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onSelect={() => run({ to: 'rejected', label: 'Declined…' })}
+                  >
+                    Declined…
+                  </DropdownMenuItem>
+                </>
+              )}
+              {blockedReason && (canSend || canAccept) && (
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{blockedReason}</DropdownMenuLabel>
+              )}
+            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
       {dialog}
+      <Dialog open={acceptOpen} onOpenChange={setAcceptOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark quote accepted</DialogTitle>
+            <DialogDescription>
+              Accepting {quote.name || 'this quote'} creates a confirmed sales order and a draft invoice from its lines.
+              After that the quote can only be changed by issuing a revision.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAcceptOpen(false)}>Cancel</Button>
+            <Button onClick={() => { setAcceptOpen(false); onAccept?.(); }}>Mark accepted</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 };
@@ -167,6 +225,9 @@ export const QuoteRowActions: React.FC<{
         <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
           <DropdownMenuItem onSelect={onOpen}>Open</DropdownMenuItem>
           {moves.length > 0 && <DropdownMenuSeparator />}
+          {moves.length > 0 && (
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Move to</DropdownMenuLabel>
+          )}
           {moves.map((m) => (
             <DropdownMenuItem key={m.to} onSelect={() => run(m)}>{m.label}</DropdownMenuItem>
           ))}

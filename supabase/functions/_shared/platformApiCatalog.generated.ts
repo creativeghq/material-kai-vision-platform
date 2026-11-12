@@ -3792,6 +3792,21 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "quote-buy-prices",
+    "tag": "Quotes",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Suggest a buy price for each line of a quote from the supplier price lists",
+    "description": "Searches the workspace's supplier price lists for every line of one quote and asks a model which candidate row, if any, is the same product. The model may only choose among the rows the database found; it never states a price. Returns, per line, the matched row (supplier, list date, net price, unit, warnings) or no match. Writes nothing: the seller applies a price with the quote_item_costs write. ",
+    "fields": {
+      "quote_id": {
+        "type": "string",
+        "description": "Required. The quote whose lines to price."
+      }
+    }
+  },
+  {
     "name": "quotes-api",
     "tag": "Quotes",
     "methods": [

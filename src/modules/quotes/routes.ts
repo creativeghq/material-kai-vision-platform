@@ -9,7 +9,7 @@
 export const QUOTES_BASE = '/quotes';
 
 /** The `?tab=` keys QuotesPage renders panes for. `quotes` is the default and omits the param. */
-export const QUOTES_TAB = { quotes: 'quotes', requests: 'requests', settings: 'settings' } as const;
+export const QUOTES_TAB = { quotes: 'quotes', customerRequests: 'customer-requests', requests: 'requests', settings: 'settings' } as const;
 
 /** `?<key>=` param the quotes list reads its filter bag out of (see `filterUrl`). */
 export const QUOTES_FILTER_KEY = 'qf';

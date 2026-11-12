@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, FileText, Package, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Boxes, Milestone, Activity, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature, Receipt, MoreHorizontal, Download, ScrollText } from 'lucide-react';
+import { ArrowLeft, FileText, Package, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Boxes, Milestone, Activity, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature, Receipt, MoreHorizontal, Download, ScrollText, Sparkles } from 'lucide-react';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 
 import { Button } from '@/components/core/ui/button';
@@ -37,13 +37,15 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
 import { useDisplayProfile } from '@/hooks/useDisplayProfile';
 import { humanizeLabel } from '@/utils/humanize';
 import { QuoteDealLink } from '../components/QuotePipelineDialog';
+import { QuoteLineBuyPrice } from '../components/QuoteLineBuyPrice';
+import { ClientQuoteDialog } from '../components/ClientQuoteDialog';
+import type { BuyPriceSuggestion } from '../services/QuotesService';
 import { quoteUrl, QUOTES_BASE } from '../routes';
 import {
   Select,
@@ -114,6 +116,10 @@ export const QuoteDetailPage: React.FC = () => {
 
   // Add Products Sheet state
   const [isAddProductsOpen, setIsAddProductsOpen] = useState(false);
+  const [buySuggestions, setBuySuggestions] = useState<Record<string, BuyPriceSuggestion>>({});
+  const [findingBuy, setFindingBuy] = useState(false);
+  const [hasParentNode, setHasParentNode] = useState(false);
+  const [clientQuoteOpen, setClientQuoteOpen] = useState(false);
 
   // Pricing state
   const [itemPrices, setItemPrices] = useState<Record<string, string>>({});
@@ -127,6 +133,13 @@ export const QuoteDetailPage: React.FC = () => {
   const [cashPct, setCashPct] = useState(0);
   const [negMarginPolicy, setNegMarginPolicy] = useState<string>('warn');
   const [salesCanSeeCost, setSalesCanSeeCost] = useState(true);
+  useEffect(() => {
+    const ws = quote?.workspace_id;
+    if (!ws) { setHasParentNode(false); return; }
+    void supabase.from('workspaces').select('parent_workspace_id').eq('id', ws).maybeSingle()
+      .then(({ data }) => setHasParentNode(!!(data as any)?.parent_workspace_id));
+  }, [quote?.workspace_id]);
+
   useEffect(() => {
     if (!quote) return;
     setPaidUpfront(!!(quote as any).paid_upfront);
@@ -578,7 +591,6 @@ export const QuoteDetailPage: React.FC = () => {
    */
   const handleAcceptQuote = async () => {
     if (!quote) return;
-    if (!confirm("Mark this quote accepted on the customer's behalf? This creates the order and a draft invoice.")) return;
     try {
       setAcceptingQuote(true);
       const res = await quotesService.acceptQuote(quote.id);
@@ -594,6 +606,24 @@ export const QuoteDetailPage: React.FC = () => {
       toast({ title: 'Could not accept the quote', description: (err as Error).message, variant: 'destructive' });
     } finally {
       setAcceptingQuote(false);
+    }
+  };
+
+  const handleFindBuyPrices = async () => {
+    if (!quote) return;
+    try {
+      setFindingBuy(true);
+      const lines = await quotesService.findBuyPrices(quote.id);
+      setBuySuggestions(Object.fromEntries(lines.map((l) => [l.line_id, l])));
+      const found = lines.filter((l) => l.match).length;
+      toast({
+        title: found > 0 ? `Found a buy price for ${found} of ${lines.length} lines` : 'None of these lines is in your price lists',
+        description: found < lines.length ? 'The rest are not in your supplier price lists. Enter those by hand.' : undefined,
+      });
+    } catch (err) {
+      toast({ title: 'Could not search the price lists', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setFindingBuy(false);
     }
   };
 
@@ -684,7 +714,7 @@ export const QuoteDetailPage: React.FC = () => {
   const extrasTotal = pricingExtrasTotal;
   const editableStatus = ['draft', 'submitted', 'quoted'].includes(quote.status);
   const unpricedReason = allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first';
-  const procurement = (quote as any).quote_role !== 'client';
+  const procurement = hasParentNode && (quote as any).quote_role !== 'client';
   const canRevise = ['submitted', 'quoted', 'accepted', 'rejected', 'expired'].includes(quote.status);
   const title = quote.name || 'Untitled Quote';
   const subtitle = [
@@ -701,23 +731,6 @@ export const QuoteDetailPage: React.FC = () => {
       navigate(quoteUrl(newQuote.id));
     } catch (err) {
       toast({ title: 'Failed to issue revision', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
-    }
-  };
-
-  const generateForEndUser = async () => {
-    const raw = window.prompt('Margin % to add on top for the end user?', '20');
-    if (raw === null) return;
-    const margin = parseDecimal(raw);
-    if (margin === null || margin < 0) {
-      toast({ title: 'Enter a valid margin %', variant: 'destructive' });
-      return;
-    }
-    try {
-      const newId = await quotesService.generateClientQuote(quote.id, margin);
-      toast({ title: 'Client quote created', description: `+${margin}% margin · opening the draft…` });
-      navigate(quoteUrl(newId));
-    } catch (err) {
-      toast({ title: 'Failed to generate', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
     }
   };
 
@@ -738,7 +751,14 @@ export const QuoteDetailPage: React.FC = () => {
 
   const actions = (
     <>
-      <QuoteStatusMenu quote={quote} onChanged={loadQuoteDetails} />
+      <QuoteStatusMenu
+        quote={quote}
+        onChanged={loadQuoteDetails}
+        onMarkSent={() => void handleSendQuote()}
+        onAccept={() => void handleAcceptQuote()}
+        blockedReason={unpricedReason}
+        working={sendingQuote || acceptingQuote}
+      />
       <QuoteEmailButton quoteId={quote.id} onSent={loadQuoteDetails} />
       {editableStatus && !quoteDocs.preInvoice && (
         <Button size="sm" onClick={handleCreateDraftInvoice} disabled={creatingInvoice || !allItemsHavePrices} title={unpricedReason}>
@@ -761,22 +781,6 @@ export const QuoteDetailPage: React.FC = () => {
           <DropdownMenuItem onSelect={() => void downloadPdf()}>
             <Download className="mr-2 h-4 w-4" /> Download PDF
           </DropdownMenuItem>
-          {editableStatus && (
-            <>
-              <DropdownMenuSeparator />
-              {quote.status !== 'quoted' && (
-                <DropdownMenuItem disabled={sendingQuote || !allItemsHavePrices} onSelect={() => void handleSendQuote()}>
-                  <Send className="mr-2 h-4 w-4" /> Mark priced and notify customer
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem disabled={acceptingQuote || !allItemsHavePrices} onSelect={() => void handleAcceptQuote()}>
-                <CheckCircle className="mr-2 h-4 w-4" /> Mark accepted
-              </DropdownMenuItem>
-              {!allItemsHavePrices && (
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{unpricedReason}</DropdownMenuLabel>
-              )}
-            </>
-          )}
           {(canRevise || procurement) && <DropdownMenuSeparator />}
           {canRevise && (
             <DropdownMenuItem onSelect={() => void issueRevision()}>
@@ -785,7 +789,7 @@ export const QuoteDetailPage: React.FC = () => {
           )}
           {procurement && (
             <>
-              <DropdownMenuItem onSelect={() => void generateForEndUser()}>
+              <DropdownMenuItem onSelect={() => setClientQuoteOpen(true)}>
                 <FilePlus2 className="mr-2 h-4 w-4" /> Generate for end user
               </DropdownMenuItem>
               <DropdownMenuItem onSelect={() => void submitToParent()}>
@@ -922,6 +926,13 @@ export const QuoteDetailPage: React.FC = () => {
       actions={actions}
       left={left}
       overlays={id && (
+        <>
+        <ClientQuoteDialog
+          open={clientQuoteOpen}
+          onOpenChange={setClientQuoteOpen}
+          quote={quote}
+          onCreated={(newId) => navigate(quoteUrl(newId))}
+        />
         <AddProductsSheet
           currency={quote?.currency}
           quoteId={id}
@@ -932,6 +943,7 @@ export const QuoteDetailPage: React.FC = () => {
           customerContactId={quote?.customer_contact_id}
           onProductsAdded={loadQuoteDetails}
         />
+        </>
       )}
     >
         {/* Tabs */}
@@ -1056,6 +1068,17 @@ export const QuoteDetailPage: React.FC = () => {
                   <DollarSign className="h-4 w-4" /> Set Item Prices
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">Set a unit price for each item. Line totals and the grand total are calculated automatically.</p>
+                {salesCanSeeCost && (quote.items || []).length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <Button size="sm" variant="outline" onClick={() => void handleFindBuyPrices()} disabled={findingBuy}>
+                      {findingBuy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
+                      Find buy prices
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      Matches each line against your supplier price lists. Nothing is saved until you press Use this price.
+                    </span>
+                  </div>
+                )}
               </div>
               <div>
                 {(quote.items || []).length === 0 ? (
@@ -1070,6 +1093,7 @@ export const QuoteDetailPage: React.FC = () => {
                             <th className="text-left text-xs font-medium text-muted-foreground p-3">Product</th>
                             <th className="text-center text-xs font-medium text-muted-foreground p-3 w-16">Qty</th>
                             <th className="text-left text-xs font-medium text-muted-foreground p-3 w-32">Unit Price</th>
+                            {salesCanSeeCost && <th className="text-left text-xs font-medium text-muted-foreground p-3">Buy Price</th>}
                             <th className="text-left text-xs font-medium text-muted-foreground p-3 w-24">Discount</th>
                             <th className="text-right text-xs font-medium text-muted-foreground p-3 w-28">Final Price</th>
                             <th className="text-right text-xs font-medium text-muted-foreground p-3 w-28">Line Total</th>
@@ -1128,6 +1152,20 @@ export const QuoteDetailPage: React.FC = () => {
                                     )}
                                   </div>
                                 </td>
+                                {salesCanSeeCost && (
+                                  <td className="p-3 align-top">
+                                    <QuoteLineBuyPrice
+                                      cost={(item as any).cost_snapshot != null ? Number((item as any).cost_snapshot) : null}
+                                      sellPrice={effectivePrice}
+                                      suggestion={buySuggestions[item.id]}
+                                      readOnly={quote.status === 'accepted' || quote.status === 'superseded'}
+                                      onSave={async (cost, source) => {
+                                        await quotesService.setItemCost(quote.id, quote.workspace_id!, item.id, cost, source);
+                                        await loadQuoteDetails();
+                                      }}
+                                    />
+                                  </td>
+                                )}
                                 <td className="p-3">
                                   <div className="relative">
                                     <Input

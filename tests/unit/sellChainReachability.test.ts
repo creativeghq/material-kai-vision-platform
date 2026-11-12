@@ -18,6 +18,7 @@ const read = (p: string) => stripComments(readFileSync(join(ROOT, p), 'utf8'));
 const DISPATCH_SVC = read('src/modules/finance/services/deliveryNotesService.ts');
 const BOARD = read('src/modules/finance/components/DispatchBoard.tsx');
 const QUOTE_ADMIN = read('src/modules/quotes/pages/QuoteDetailAdminPage.tsx');
+const QUOTE_STATUS_MENU = read('src/modules/quotes/components/QuoteStatusActions.tsx');
 const ORDERS = read('src/modules/finance/components/OrdersPanel.tsx');
 const INVOICE = read('src/pages/Admin/InvoiceDetailPage.tsx');
 const QUOTE_LINES = read('src/modules/quotes/components/QuoteItemsList.tsx');
@@ -50,7 +51,8 @@ describe('a quote can be closed from the screen an operator uses', () => {
     // two customer-facing routes. Acceptance mints the order AND the draft invoice, so a sale
     // agreed over WhatsApp could not be entered into the system at all.
     expect(QUOTE_ADMIN).toMatch(/quotesService\.acceptQuote\(/);
-    expect(QUOTE_ADMIN).toMatch(/Mark accepted/);
+    expect(QUOTE_ADMIN).toMatch(/onAccept=\{/);
+    expect(QUOTE_STATUS_MENU).toMatch(/Mark accepted/);
   });
 
   it('and reports the service\'s own refusal rather than a generic failure', () => {

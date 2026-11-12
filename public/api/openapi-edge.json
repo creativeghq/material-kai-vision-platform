@@ -8259,6 +8259,92 @@
         }
       }
     },
+    "/quote-buy-prices": {
+      "post": {
+        "tags": [
+          "Quotes"
+        ],
+        "summary": "Suggest a buy price for each line of a quote from the supplier price lists",
+        "operationId": "post_quote_buy_prices",
+        "description": "Searches the workspace's supplier price lists for every line of one quote and asks a model which candidate row, if any, is the same product. The model may only choose among the rows the database found; it never states a price. Returns, per line, the matched row (supplier, list date, net price, unit, warnings) or no match. Writes nothing: the seller applies a price with the quote_item_costs write. Needs quotes.use or finance.operate in the quote's workspace; charged once per run only when at least one line has candidates.\n\n**Response:** (`application/json`)",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quote_id": {
+                    "type": "string",
+                    "description": "Required. The quote whose lines to price."
+                  }
+                },
+                "required": [
+                  "quote_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/generate-social-image": {
       "post": {
         "tags": [

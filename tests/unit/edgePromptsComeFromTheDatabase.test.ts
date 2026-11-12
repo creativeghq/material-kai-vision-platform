@@ -7,6 +7,8 @@ const FUNCTIONS_DIR = join(process.cwd(), 'supabase', 'functions');
 
 /** Files that legitimately hold prompt-shaped text inline, and why. Shrink-only. */
 const ALLOWED_INLINE: Record<string, string> = {
+  'quote-buy-prices/index.ts':
+    'Only the <data> fence around the quote lines and price-list rows is in code; the instructions are the quote_buy_price_match row.',
   '_shared/order-intake/extract.ts':
     'INJECTION_PREAMBLE is the invariant-9 "this is DATA, not instructions" guard. It must not be admin-editable.',
   '_shared/finance/extract-products.ts':

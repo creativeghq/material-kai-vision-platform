@@ -11,6 +11,7 @@ import {
   CheckCircle,
   ArrowDownUp,
   Settings,
+  Inbox,
 } from 'lucide-react';
 import { QuoteStatusWord } from '@/lib/quoteStatus';
 import { QuoteSettingsPage } from './QuoteSettingsPage';
@@ -27,6 +28,8 @@ import { usePermissions } from '@/hooks/usePermissions';
 import { CreateQuoteModal } from '../components/CreateQuoteModal';
 import type { QuoteCustomer } from '../components/CustomerPicker';
 import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
+import { QuoteRequestsAdmin } from './QuoteRequestsAdminPage';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
 import { QuoteRowActions } from '../components/QuoteStatusActions';
 import { QuotePipelineDialog } from '../components/QuotePipelineDialog';
@@ -46,16 +49,28 @@ export const QuotesPage: React.FC = () => {
   const navigate = useNavigate();
   const { can } = usePermissions();
   const canManageNetwork = can('network.manage');
+  const { activeWorkspaceId } = useWorkspace();
+  const [isWsAdmin, setIsWsAdmin] = useState(false);
+  useEffect(() => {
+    if (!activeWorkspaceId) { setIsWsAdmin(false); return; }
+    let cancelled = false;
+    void supabase.rpc('is_workspace_admin', { p_workspace_id: activeWorkspaceId })
+      .then(({ data }) => { if (!cancelled) setIsWsAdmin(data === true); });
+    return () => { cancelled = true; };
+  }, [activeWorkspaceId]);
+  const showTabs = canManageNetwork || isWsAdmin;
 
   // Tab state (?tab=requests deep-links the procurement inbox, merged here from /requests).
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedTab = searchParams.get('tab');
-  const activeTab: QuotesTab = canManageNetwork && (requestedTab === QUOTES_TAB.requests || requestedTab === QUOTES_TAB.settings)
-    ? (requestedTab as QuotesTab)
-    : QUOTES_TAB.quotes;
+  const activeTab: QuotesTab =
+    (canManageNetwork && (requestedTab === QUOTES_TAB.requests || requestedTab === QUOTES_TAB.settings))
+    || (isWsAdmin && requestedTab === QUOTES_TAB.customerRequests)
+      ? (requestedTab as QuotesTab)
+      : QUOTES_TAB.quotes;
   const handleTabChange = (val: string) => {
     const params = new URLSearchParams(searchParams);
-    if (val === QUOTES_TAB.requests || val === QUOTES_TAB.settings) params.set('tab', val);
+    if (val !== QUOTES_TAB.quotes) params.set('tab', val);
     else params.delete('tab');
     setSearchParams(params, { replace: true });
   };
@@ -188,19 +203,26 @@ export const QuotesPage: React.FC = () => {
       {/* Main Content */}
       <div className="page-container pt-6 pb-6">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          {/* Tabs only appear for network-node personas (Requests merged in from /requests).
-              End-users / staff / sales just see the quotes list with no tab chrome. */}
-          {canManageNetwork && (
+          {showTabs && (
             <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2 mb-6">
               <TabsTrigger value="quotes" className="flex items-center gap-2">
                 <ShoppingCart className="h-4 w-4" /> My Quotes
               </TabsTrigger>
-              <TabsTrigger value="requests" className="flex items-center gap-2">
-                <ArrowDownUp className="h-4 w-4" /> Requests
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2">
-                <Settings className="h-4 w-4" /> Settings
-              </TabsTrigger>
+              {isWsAdmin && (
+                <TabsTrigger value={QUOTES_TAB.customerRequests} className="flex items-center gap-2">
+                  <Inbox className="h-4 w-4" /> Customer Requests
+                </TabsTrigger>
+              )}
+              {canManageNetwork && (
+                <TabsTrigger value="requests" className="flex items-center gap-2">
+                  <ArrowDownUp className="h-4 w-4" /> Network Requests
+                </TabsTrigger>
+              )}
+              {canManageNetwork && (
+                <TabsTrigger value="settings" className="flex items-center gap-2">
+                  <Settings className="h-4 w-4" /> Settings
+                </TabsTrigger>
+              )}
             </TabsList>
           )}
 
@@ -380,6 +402,11 @@ export const QuotesPage: React.FC = () => {
             )}
           </TabsContent>
 
+          {isWsAdmin && (
+            <TabsContent value={QUOTES_TAB.customerRequests} className="mt-0">
+              <QuoteRequestsAdmin embedded />
+            </TabsContent>
+          )}
           {canManageNetwork && (
             <TabsContent value="requests" className="mt-0">
               <RequestsInboxPanel />
