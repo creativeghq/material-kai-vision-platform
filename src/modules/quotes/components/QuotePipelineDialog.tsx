@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/core/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { useToast } from '@/hooks/use-toast';
@@ -132,12 +131,16 @@ export const QuotePipelineDialog: React.FC<{
             Track this quote as a deal: open a new one or attach it to a deal you already have.
           </DialogDescription>
         </DialogHeader>
-        <Tabs value={tab} onValueChange={(v) => setTab(v as 'new' | 'existing')}>
-          <TabsList>
-            <TabsTrigger value="new">New Deal</TabsTrigger>
-            <TabsTrigger value="existing">Existing Deal</TabsTrigger>
-          </TabsList>
-          <TabsContent value="new" className="mt-4 space-y-4">
+        <div className="flex gap-2" role="group" aria-label="New or existing deal">
+          <Button size="sm" variant={tab === 'new' ? 'secondary' : 'outline'} aria-pressed={tab === 'new'} onClick={() => setTab('new')}>
+            Create a new deal
+          </Button>
+          <Button size="sm" variant={tab === 'existing' ? 'secondary' : 'outline'} aria-pressed={tab === 'existing'} onClick={() => setTab('existing')}>
+            Attach to an existing deal
+          </Button>
+        </div>
+        {tab === 'new' ? (
+          <div className="mt-2 space-y-4">
             <FormField label="Deal Title">
               <Input value={title} onChange={(e) => setTitle(e.target.value)} />
             </FormField>
@@ -169,8 +172,9 @@ export const QuotePipelineDialog: React.FC<{
                 Create deal
               </Button>
             </DialogFooter>
-          </TabsContent>
-          <TabsContent value="existing" className="mt-4 space-y-3">
+          </div>
+        ) : (
+          <div className="mt-2 space-y-3">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input className="pl-8" placeholder="Search deals by title" value={query} onChange={(e) => setQuery(e.target.value)} />
@@ -203,8 +207,8 @@ export const QuotePipelineDialog: React.FC<{
                 </button>
               ))}
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );
