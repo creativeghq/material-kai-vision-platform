@@ -996,6 +996,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     const gross = Math.max(0, q * p - disc);
     return pricesIncludeVat ? extractNet(gross, pct) : gross;
   };
+  /** A discount larger than qty × price is floored to a €0 line above, so it must be refused, not stored. */
+  const discountExceedsLine = (l: LineItem) =>
+    parseDecimalOr(l.discount, 0) > parseDecimalOr(l.quantity, 0) * parseDecimalOr(l.unit_price, 0) + 0.005;
   /** The reference table a document-tax bucket picks its category from. Deductions has none. */
   const refsForTaxType = useCallback((taxType: string): TaxRef[] => {
     switch (parseInt(taxType, 10)) {
@@ -1255,6 +1258,16 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!customer && !selfBillSupplierId) { setTab('details'); toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
     const clean = lines.filter((l) => l.description.trim() && parseDecimalOr(l.quantity, 0) > 0);
     if (clean.length === 0) { setTab('items'); toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
+    const overDiscounted = clean.find(discountExceedsLine);
+    if (overDiscounted) {
+      setTab('items');
+      toast({
+        title: 'A discount is larger than its line',
+        description: `"${overDiscounted.description.trim()}": the discount (€) is more than quantity × price. Enter the unit price in Price — Discount € is an amount taken off the line.`,
+        variant: 'destructive',
+      });
+      return;
+    }
     /**
      * ONE tax declaration per document. myDATA offers the per-line fields and `taxesTotals` as
      * alternatives; a levy stated in both is transmitted twice, and a doubled tax is a valid
@@ -2142,7 +2155,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                           </Select>
                         </div>
                         <div className="w-20"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
-                        <div className="w-16"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" title="Discount amount (€) taken off this line" /></div>
+                        <div className="w-16"><Input className={`h-8 text-right text-sm ${discountExceedsLine(l) ? 'border-destructive text-destructive' : ''}`} type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" aria-invalid={discountExceedsLine(l)} title={discountExceedsLine(l) ? 'Discount is larger than quantity × price — did you mean to enter it as the Price?' : 'Discount amount (€) taken off this line'} /></div>
                         <div className="w-16">
                           <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
                             <SelectTrigger className="h-8 px-2 text-xs" title="VAT rate for this line"><SelectValue>{linePct}%</SelectValue></SelectTrigger>
