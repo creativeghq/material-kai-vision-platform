@@ -28,6 +28,9 @@ import { CreateQuoteModal } from '../components/CreateQuoteModal';
 import type { QuoteCustomer } from '../components/CustomerPicker';
 import { RequestsInboxPanel } from '../components/RequestsInboxPanel';
 import { quotesService, QuoteWithItems } from '../services/QuotesService';
+import { QuoteRowActions } from '../components/QuoteStatusActions';
+import { QuotePipelineDialog } from '../components/QuotePipelineDialog';
+import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/utils/datetime';
 import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
 import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
@@ -62,6 +65,9 @@ export const QuotesPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [page, setPage] = useState(1);
+  const [pipelineQuote, setPipelineQuote] = useState<QuoteWithItems | null>(null);
+  // Workspaces the viewer administers — their quotes get the seller's row menu.
+  const [operatorWs, setOperatorWs] = useState<Set<string>>(new Set());
 
   // App Launcher deep-link: /quotes?new=quote opens the Create Quote modal.
   useEffect(() => {
@@ -94,6 +100,16 @@ export const QuotesPage: React.FC = () => {
   useEffect(() => {
     loadQuotes();
   }, [loadQuotes]);
+
+  useEffect(() => {
+    const ids = [...new Set(quotes.map((q) => q.workspace_id).filter((w): w is string => !!w))];
+    let cancelled = false;
+    void Promise.all(ids.map(async (ws) => {
+      const { data } = await supabase.rpc('is_workspace_admin', { p_workspace_id: ws });
+      return data === true ? ws : null;
+    })).then((rows) => { if (!cancelled) setOperatorWs(new Set(rows.filter((w): w is string => !!w))); });
+    return () => { cancelled = true; };
+  }, [quotes.map((q) => q.workspace_id).join(',')]);
 
   const filterGroups = useMemo(() => buildQuoteFilters(quotes), [quotes]);
   // Mirrored into `?qf=` so a filtered list is shareable and, more to the point, addressable:
@@ -317,11 +333,23 @@ export const QuotesPage: React.FC = () => {
                       <td className="px-3 py-2.5 text-muted-foreground">{formatDate(quote.expires_at)}</td>
                       <td className="px-3 py-2.5 text-center"><DeliveryTrailCell trail={trails[quote.id]} /></td>
                       <td className="px-6 py-2.5 text-right">
+                        {quote.workspace_id && operatorWs.has(quote.workspace_id) ? (
+                          <div className="flex items-center justify-end">
+                            <QuoteRowActions
+                              quote={quote}
+                              onOpen={() => handleViewQuote(quote.id)}
+                              onPipeline={() => setPipelineQuote(quote)}
+                              onDelete={() => void handleDeleteQuote(quote.id)}
+                              onChanged={loadQuotes}
+                            />
+                          </div>
+                        ) : (
                         <div className="flex items-center justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
+                            aria-label="Open quote"
                             onClick={(e) => { e.stopPropagation(); handleViewQuote(quote.id); }}
                           >
                             <Eye className="h-3.5 w-3.5" />
@@ -330,11 +358,13 @@ export const QuotesPage: React.FC = () => {
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            aria-label="Delete quote"
                             onClick={(e) => { e.stopPropagation(); handleDeleteQuote(quote.id); }}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -362,6 +392,13 @@ export const QuotesPage: React.FC = () => {
           )}
         </Tabs>
       </div>
+
+      <QuotePipelineDialog
+        quote={pipelineQuote}
+        open={pipelineQuote !== null}
+        onOpenChange={(o) => { if (!o) setPipelineQuote(null); }}
+        onLinked={() => { setPipelineQuote(null); void loadQuotes(); }}
+      />
 
       {/* Create Quote Modal */}
       <CreateQuoteModal

@@ -28,7 +28,7 @@ suite('fiscal derivations · quote → invoice → receipt → settlement', () =
     if (c.error) throw new Error(`seed contact: ${c.error.message}`);
     contact = c.data.id;
 
-    // `upsells` is a global catalogue (no workspace_id), so this row is torn down by id below.
+    // Inserted with no workspace_id (platform-wide), so this row is torn down by id below.
     const u = await svc.from('upsells')
       .insert({ name: `E2E upsell ${rid}`, price: 200, is_active: true })
       .select('id').single();

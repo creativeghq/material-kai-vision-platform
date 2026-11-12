@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Ruler, Boxes, Milestone, Activity, Timer, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature } from 'lucide-react';
+import { ArrowLeft, Calendar, FileText, Package, User, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Boxes, Milestone, Activity, Timer, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature, Receipt, XCircle } from 'lucide-react';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 
 import { Button } from '@/components/core/ui/button';
@@ -31,6 +31,10 @@ import { QuoteItemsList } from '../components/QuoteItemsList';
 import { AddProductsSheet } from '../components/AddProductsSheet';
 import { QuoteShippingCard } from '../components/QuoteShippingCard';
 import { QuoteTermsEditor } from '../components/QuoteTermsEditor';
+import { QuoteStatusMenu } from '../components/QuoteStatusActions';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { QuoteDealLink } from '../components/QuotePipelineDialog';
+import { quoteUrl, QUOTES_BASE } from '../routes';
 import {
   Select,
   SelectContent,
@@ -52,7 +56,7 @@ const sendQuoteNotification = (userId: string, title: string, quoteId: string) =
     type: 'quote_updated',
     title,
     body: null,
-    action_url: `/quotes/${quoteId}`,
+    action_url: quoteUrl(quoteId),
     is_read: false,
     metadata: { quote_id: quoteId },
   }).then(() => {});
@@ -89,7 +93,11 @@ export const QuoteDetailPage: React.FC = () => {
   const [upsellPrice, setUpsellPrice] = useState('');
   const [upsellQuantity, setUpsellQuantity] = useState('1');
   const [upsellMeasurement, setUpsellMeasurement] = useState('');
+  const [upsellIncluded, setUpsellIncluded] = useState(true);
+  const [newExtraName, setNewExtraName] = useState('');
+  const [newExtraDescription, setNewExtraDescription] = useState('');
   const [addingUpsell, setAddingUpsell] = useState(false);
+  const [decidingUpsellId, setDecidingUpsellId] = useState<string | null>(null);
 
   // Timeline notes state (for editing notes on existing timeline items)
   const [editingTimelineNotes, setEditingTimelineNotes] = useState<Record<string, string>>({});
@@ -132,16 +140,14 @@ export const QuoteDetailPage: React.FC = () => {
     }
   }, [quote?.id]);
 
-  // PDF progress is owned by QuoteDownloadButtons (its own `generating` flag). This page keeps
-  // no mirror of it — an unread busy flag only looks like protection.
   const [sendingQuote, setSendingQuote] = useState(false);
   const [acceptingQuote, setAcceptingQuote] = useState(false);
+  const [creatingInvoice, setCreatingInvoice] = useState(false);
 
   useEffect(() => {
     if (id) {
       trackQuoteView(id, 'admin');
       loadQuoteDetails();
-      loadUpsells();
       loadQuoteUpsells();
       loadTimelineData();
     }
@@ -197,12 +203,16 @@ export const QuoteDetailPage: React.FC = () => {
 
   const loadUpsells = async () => {
     try {
-      const data = await quotesService.getUpsells();
-      setUpsells(data.filter(u => u.is_active));
+      const data = await quotesService.getUpsells(true, quote?.workspace_id ?? null);
+      setUpsells(data);
     } catch (error) {
       console.error('Error loading upsells:', error);
     }
   };
+
+  useEffect(() => {
+    if (quote?.workspace_id) void loadUpsells();
+  }, [quote?.workspace_id]);
 
   const loadQuoteUpsells = async () => {
     if (!id) return;
@@ -333,37 +343,61 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
+  const NEW_EXTRA = '__new__';
   const handleAddUpsellFromDropdown = async () => {
     if (!id || !selectedUpsellId) return;
+    const isNew = selectedUpsellId === NEW_EXTRA;
+    const price = upsellPrice ? parseDecimal(upsellPrice) : null;
+    if (isNew && (!newExtraName.trim() || price === null || price < 0)) {
+      toast({ title: 'Name the extra and give it a price', variant: 'destructive' });
+      return;
+    }
     try {
       setAddingUpsell(true);
+      // A new extra joins this workspace's extras list, so it can be offered on the next quote too.
+      const upsellId = isNew
+        ? (await quotesService.createUpsell({
+            name: newExtraName.trim(),
+            description: newExtraDescription.trim() || undefined,
+            price: price ?? 0,
+            workspace_id: quote?.workspace_id ?? null,
+          })).id
+        : selectedUpsellId;
       const metadata = {
-        custom_price: upsellPrice ? parseDecimal(upsellPrice) ?? undefined : undefined,
+        custom_price: !isNew && price !== null ? price : undefined,
         quantity: upsellQuantity ? parseDecimalOr(upsellQuantity, 1) : 1,
         measurement: upsellMeasurement || undefined,
       };
-      await quotesService.addUpsellToQuote(id, selectedUpsellId, undefined, metadata);
+      await quotesService.addUpsellToQuote(id, upsellId, undefined, metadata, upsellIncluded ? true : null);
       toast({
-        title: 'Success',
-        description: 'Upsell added to quote',
+        title: 'Extra added',
+        description: upsellIncluded ? 'Included and charged on this quote.' : 'Offered as optional — the customer decides.',
       });
       setSelectedUpsellId('');
       setUpsellPrice('');
       setUpsellQuantity('1');
       setUpsellMeasurement('');
-      await loadQuoteUpsells();
+      setNewExtraName('');
+      setNewExtraDescription('');
+      await Promise.all([loadQuoteUpsells(), isNew ? loadUpsells() : Promise.resolve()]);
     } catch (error) {
-      console.error('Error adding upsell:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add upsell',
-        variant: 'destructive',
-      });
+      toast({ title: 'Could not add the extra', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setAddingUpsell(false);
     }
   };
 
+  const handleSetUpsellInclusion = async (quoteUpsellId: string, included: boolean | null) => {
+    try {
+      setDecidingUpsellId(quoteUpsellId);
+      await quotesService.setUpsellInclusion(quoteUpsellId, included);
+      await loadQuoteUpsells();
+    } catch (error) {
+      toast({ title: 'Could not update the extra', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      setDecidingUpsellId(null);
+    }
+  };
 
   const handleRemoveUpsell = async (quoteUpsellId: string) => {
     try {
@@ -411,7 +445,7 @@ export const QuoteDetailPage: React.FC = () => {
   const pricingExtrasTotal = quoteUpsells.reduce((sum, qu) => {
     if (qu.customer_accepted !== true) return sum;
     const meta = (qu.metadata ?? {}) as { custom_price?: number; quantity?: number };
-    const upsell = upsells.find(u => u.id === qu.upsell_id);
+    const upsell = qu.upsell ?? upsells.find(u => u.id === qu.upsell_id);
     const price = meta.custom_price ?? upsell?.price ?? 0;
     return sum + price * (meta.quantity ?? 1);
   }, 0);
@@ -429,6 +463,13 @@ export const QuoteDetailPage: React.FC = () => {
   const pricingCashDiscount = pricingPreview.discount;
   const pricingVatAmount = pricingPreview.vat;
   const pricingGrandTotal = pricingPreview.final;
+
+  // Typed in the Pricing tab but not saved: accepting now would bill the stored prices instead.
+  const pricesDirty = (quote?.items || []).some((item) => {
+    const saved = item.unit_price ?? null;
+    const typed = parseDecimal(itemPrices[item.id]);
+    return (typed ?? null) !== (saved === null ? null : Number(saved));
+  });
 
   const allItemsHavePrices = (quote?.items || []).length > 0 &&
     (quote?.items || []).every(item => {
@@ -546,6 +587,43 @@ export const QuoteDetailPage: React.FC = () => {
     }
   };
 
+  /**
+   * One click from a priced quote to a draft invoice of its lines. Acceptance is the ONE writer of
+   * the order + draft pre-invoice (`_generate_order_from_quote_core`), so this accepts and opens it.
+   */
+  const handleCreateDraftInvoice = async () => {
+    if (!quote) return;
+    if (quoteDocs.preInvoice) {
+      navigate(`${FINANCE_BASE}/invoices/${quoteDocs.preInvoice.id}`);
+      return;
+    }
+    if (pricesDirty) {
+      toast({ title: 'Save the prices first', description: 'The Pricing tab has changes that are not saved yet.', variant: 'destructive' });
+      return;
+    }
+    if (!confirm('Create a draft invoice from this quote? The quote is marked accepted, which creates the order and a draft invoice with these lines and extras. The invoice stays a draft until you issue it.')) return;
+    try {
+      setCreatingInvoice(true);
+      const res = await quotesService.acceptQuote(quote.id);
+      if (!res.success) {
+        toast({ title: 'Could not create the invoice', description: res.error ?? 'Nothing was changed.', variant: 'destructive' });
+        return;
+      }
+      const docs = await quotesService.getQuoteDocuments(quote.id);
+      if (docs.preInvoice) {
+        toast({ title: 'Draft invoice created', description: docs.preInvoice.internal_number ?? undefined });
+        navigate(`${FINANCE_BASE}/invoices/${docs.preInvoice.id}`);
+      } else {
+        toast({ title: 'Quote accepted', description: 'The order was created but no draft invoice was found — check Finance → Invoices.', variant: 'destructive' });
+        await loadQuoteDetails();
+      }
+    } catch (err) {
+      toast({ title: 'Could not create the invoice', description: (err as Error).message, variant: 'destructive' });
+    } finally {
+      setCreatingInvoice(false);
+    }
+  };
+
   const handleSendQuote = async () => {
     if (!quote) return;
     try {
@@ -583,7 +661,7 @@ export const QuoteDetailPage: React.FC = () => {
       <div className="min-h-screen">
         <GlobalAdminHeader title="Quote Not Found" badge="Admin" />
         <div className="p-3 sm:p-6">
-          <Button onClick={() => navigate('/quotes/requests/manage')}>
+          <Button onClick={() => navigate(QUOTES_BASE)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to quotes
           </Button>
@@ -617,7 +695,7 @@ export const QuoteDetailPage: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-6">
         {/* Back Button & Status Row */}
         <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate('/quotes/requests/manage')}>
+          <Button variant="outline" onClick={() => navigate(QUOTES_BASE)}>
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to quotes
           </Button>
@@ -652,38 +730,54 @@ export const QuoteDetailPage: React.FC = () => {
               />
             )}
 
-            {/* Send Quote to Customer — only when submitted/draft and all items priced */}
-            {(quote.status === 'submitted' || quote.status === 'draft') && allItemsHavePrices && (
+            <QuoteStatusMenu quote={quote} onChanged={loadQuoteDetails} />
+
+            {(quote.status === 'submitted' || quote.status === 'draft') && (
               <Button
                 size="sm"
+                variant="outline"
                 onClick={handleSendQuote}
-                disabled={sendingQuote}
-                className="bg-green-600 hover:bg-green-700 text-white"
+                disabled={sendingQuote || !allItemsHavePrices}
+                title={allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first'}
               >
                 {sendingQuote ? (
                   <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Sending...</>
                 ) : (
-                  <><Send className="h-4 w-4 mr-1" /> Send Quote</>
+                  <><Send className="h-4 w-4 mr-1" /> Send quote</>
                 )}
               </Button>
             )}
 
-            {/* Close the sale from here. A quote agreed on the phone or over WhatsApp was
-                previously only acceptable by the CUSTOMER, through the share link or a
-                customer-facing route — and acceptance is what mints the order and the invoice. */}
-            {quote && (quote.status === 'quoted' || quote.status === 'submitted') && allItemsHavePrices && (
-              <Button size="sm" variant="secondary" onClick={handleAcceptQuote} disabled={acceptingQuote}>
+            {['draft', 'submitted', 'quoted'].includes(quote.status) && (
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={handleAcceptQuote}
+                disabled={acceptingQuote || !allItemsHavePrices}
+                title={allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first'}
+              >
                 {acceptingQuote
                   ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Accepting...</>
                   : <><CheckCircle className="h-4 w-4 mr-1" /> Mark accepted</>}
               </Button>
             )}
 
+            {['draft', 'submitted', 'quoted'].includes(quote.status) && !quoteDocs.preInvoice && (
+              <Button
+                size="sm"
+                onClick={handleCreateDraftInvoice}
+                disabled={creatingInvoice || !allItemsHavePrices}
+                title={allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first'}
+              >
+                {creatingInvoice
+                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Creating...</>
+                  : <><Receipt className="h-4 w-4 mr-1" /> Create draft invoice</>}
+              </Button>
+            )}
+
             {/* Sales/Finance: Issue invoice (creates internal invoice row from accepted quote) */}
             {quote && <IssueInvoiceButton quoteId={quote.id} quoteStatus={quote.status} />}
 
-            {/* Project Workspace: Issue revision — clones quote + items, bumps revision_number, sets parent_quote_id.
-                Available once the quote is no longer a draft (i.e. has been sent / quoted / accepted / rejected). */}
             {quote && (quote.status === 'submitted' || quote.status === 'quoted' || quote.status === 'accepted' || quote.status === 'rejected' || quote.status === 'expired') && (
               <Button
                 size="sm"
@@ -693,7 +787,7 @@ export const QuoteDetailPage: React.FC = () => {
                   try {
                     const newQuote = await quotesService.issueRevision(quote.id);
                     toast({ title: `Revision ${newQuote.revision_number} created`, description: 'Opening the new draft...' });
-                    navigate(`/quotes/manage/${newQuote.id}`);
+                    navigate(quoteUrl(newQuote.id));
                   } catch (err) {
                     toast({ title: 'Failed to issue revision', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
                   }
@@ -720,7 +814,7 @@ export const QuoteDetailPage: React.FC = () => {
                   try {
                     const newId = await quotesService.generateClientQuote(quote.id, margin);
                     toast({ title: 'Client quote created', description: `+${margin}% margin · opening the draft…` });
-                    navigate(`/quotes/manage/${newId}`);
+                    navigate(quoteUrl(newId));
                   } catch (err) {
                     toast({ title: 'Failed to generate', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
                   }
@@ -881,6 +975,26 @@ export const QuoteDetailPage: React.FC = () => {
           contactId={quote.customer_contact_id ?? null}
           onSaved={loadQuoteDetails}
         />
+
+        <QuoteDealLink
+          quote={quote as any}
+          editable={quote.status !== 'superseded'}
+          onChanged={loadQuoteDetails}
+        />
+
+        {quote.status === 'rejected' && (
+          <div className="dashboard-card flex items-start gap-3 p-4">
+            <XCircle className="h-4 w-4 mt-0.5 text-destructive flex-shrink-0" />
+            <div className="text-sm">
+              <p className="font-medium">
+                Declined{quote.rejected_at ? ` on ${formatDate(quote.rejected_at)}` : ''}
+              </p>
+              <p className="text-muted-foreground">
+                {quote.rejection_reason || 'No reason recorded.'} Use Change status → Reopen as draft to work on it again.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* What accepting this quote PRODUCED (#378 C1). The accept trigger raises a confirmed
             sales order from these lines and a draft pre-invoice with a pay token — correctly, and
@@ -1279,160 +1393,170 @@ export const QuoteDetailPage: React.FC = () => {
               onAdded={loadQuoteDetails}
             />
 
-            {/* Add Upsell Dropdown Section */}
+            {quote.status !== 'accepted' && quote.status !== 'rejected' && quote.status !== 'superseded' && (
             <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
               <div className="mb-5">
                 <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
-                  <Gift className="h-4 w-4" /> Add Extra/Upsell
+                  <Gift className="h-4 w-4" /> Add Extra
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">Select an upsell from the dropdown and customize price, quantity, and measurement</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Charge something on top of the lines — installation, delivery, a service. Pick one from your extras list or create a new one.
+                </p>
               </div>
-              <div>
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
-                  {/* Upsell Dropdown */}
-                  <div className="md:col-span-2">
-                    <label htmlFor="quotedetailadminpage-select-upsell" className="text-sm font-medium mb-2 block">Select Upsell</label>
-                    <Select value={selectedUpsellId} onValueChange={setSelectedUpsellId}>
-                      <SelectTrigger id="quotedetailadminpage-select-upsell" className="w-full">
-                        <SelectValue placeholder="Choose an upsell..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {upsells
-                          .filter(u => !quoteUpsells.some(qu => qu.upsell_id === u.id))
-                          .map((upsell) => (
-                            <SelectItem key={upsell.id} value={upsell.id}>
-                              <div className="flex items-center justify-between gap-4">
-                                <span>{upsell.name}</span>
-                                <span className="text-muted-foreground">€{upsell.price.toFixed(2)}</span>
-                              </div>
-                            </SelectItem>
-                          ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Custom Price */}
-                  <div>
-                    <label htmlFor="quotedetailadminpage-price" className="text-sm font-medium mb-2 block">
-                      <DollarSign className="h-3 w-3 inline mr-1" />
-                      Price (€)
-                    </label>
-                    <Input id="quotedetailadminpage-price"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="Custom price"
-                      value={upsellPrice}
-                      onChange={(e) => setUpsellPrice(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Quantity */}
-                  <div>
-                    <label htmlFor="quotedetailadminpage-quantity" className="text-sm font-medium mb-2 block">
-                      <Ruler className="h-3 w-3 inline mr-1" />
-                      Quantity
-                    </label>
-                    <Input id="quotedetailadminpage-quantity"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="1"
-                      value={upsellQuantity}
-                      onChange={(e) => setUpsellQuantity(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Measurement */}
-                  <div>
-                    <label htmlFor="quotedetailadminpage-measurement" className="text-sm font-medium mb-2 block">Measurement</label>
-                    <Input id="quotedetailadminpage-measurement"
-                      placeholder="e.g., m², pcs"
-                      value={upsellMeasurement}
-                      onChange={(e) => setUpsellMeasurement(e.target.value)}
-                    />
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                <div className="md:col-span-2">
+                  <label htmlFor="quotedetailadminpage-select-upsell" className="text-xs font-medium mb-2 block">Extra</label>
+                  <Select value={selectedUpsellId} onValueChange={(v) => {
+                    setSelectedUpsellId(v);
+                    const u = upsells.find((x) => x.id === v);
+                    if (u) setUpsellPrice(String(u.price));
+                  }}>
+                    <SelectTrigger id="quotedetailadminpage-select-upsell" className="w-full">
+                      <SelectValue placeholder="Choose an extra..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NEW_EXTRA}>
+                        <span className="flex items-center gap-2"><Plus className="h-3.5 w-3.5" /> New extra…</span>
+                      </SelectItem>
+                      {upsells
+                        .filter(u => !quoteUpsells.some(qu => qu.upsell_id === u.id))
+                        .map((upsell) => (
+                          <SelectItem key={upsell.id} value={upsell.id}>
+                            <div className="flex items-center justify-between gap-4">
+                              <span>{upsell.name}</span>
+                              <span className="text-muted-foreground tabular-nums">{formatMoney(upsell.price, quote.currency)}</span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-
-                <Button
-                  onClick={handleAddUpsellFromDropdown}
-                  disabled={!selectedUpsellId || addingUpsell}
-                  className="mt-4"
-                >
-                  {addingUpsell ? (
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  ) : (
-                    <Plus className="h-4 w-4 mr-2" />
-                  )}
-                  Add Upsell to Quote
+                <div>
+                  <label htmlFor="quotedetailadminpage-price" className="text-xs font-medium mb-2 block">Unit Price</label>
+                  <Input id="quotedetailadminpage-price" type="text" inputMode="decimal" placeholder="0.00"
+                    value={upsellPrice} onChange={(e) => setUpsellPrice(e.target.value)} />
+                </div>
+                <div>
+                  <label htmlFor="quotedetailadminpage-quantity" className="text-xs font-medium mb-2 block">Quantity</label>
+                  <Input id="quotedetailadminpage-quantity" type="text" inputMode="decimal" placeholder="1"
+                    value={upsellQuantity} onChange={(e) => setUpsellQuantity(e.target.value)} />
+                </div>
+                <div>
+                  <label htmlFor="quotedetailadminpage-measurement" className="text-xs font-medium mb-2 block">Unit (optional)</label>
+                  <Input id="quotedetailadminpage-measurement" placeholder="e.g. m², pcs, hours"
+                    value={upsellMeasurement} onChange={(e) => setUpsellMeasurement(e.target.value)} />
+                </div>
+                {selectedUpsellId === NEW_EXTRA && (
+                  <>
+                    <div className="md:col-span-2">
+                      <label htmlFor="quotedetailadminpage-new-extra-name" className="text-xs font-medium mb-2 block">Extra Name</label>
+                      <Input id="quotedetailadminpage-new-extra-name" placeholder="e.g. Installation"
+                        value={newExtraName} onChange={(e) => setNewExtraName(e.target.value)} />
+                    </div>
+                    <div className="md:col-span-3">
+                      <label htmlFor="quotedetailadminpage-new-extra-desc" className="text-xs font-medium mb-2 block">Description (optional)</label>
+                      <Input id="quotedetailadminpage-new-extra-desc" placeholder="Shown to the customer under the name"
+                        value={newExtraDescription} onChange={(e) => setNewExtraDescription(e.target.value)} />
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-4">
+                <label className="flex items-center gap-2 text-sm">
+                  <Switch checked={upsellIncluded} onCheckedChange={setUpsellIncluded} />
+                  {upsellIncluded ? 'Included — charged on this quote' : 'Optional — the customer accepts or declines it'}
+                </label>
+                <Button onClick={handleAddUpsellFromDropdown} disabled={!selectedUpsellId || addingUpsell}>
+                  {addingUpsell ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
+                  Add extra
                 </Button>
+                {selectedUpsellId === NEW_EXTRA && (
+                  <span className="text-xs text-muted-foreground">It is also saved to your extras list for the next quote.</span>
+                )}
               </div>
             </div>
+            )}
 
-            {/* Attached Upsells */}
             <div className="dashboard-card rounded-2xl border-0 shadow-sm p-6">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-sm font-semibold flex items-center gap-2 text-primary">
-                  <Gift className="h-4 w-4" /> Attached Extras/Upsells
+                  <Gift className="h-4 w-4" /> Extras on This Quote
                 </h3>
-                <Badge variant="secondary">{quoteUpsells.length} items</Badge>
+                <span className="text-sm font-semibold tabular-nums">
+                  Charged: {formatMoney(extrasTotal, quote.currency)}
+                </span>
               </div>
-              <div>
-                {loadingUpsells ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin" />
-                  </div>
-                ) : quoteUpsells.length === 0 ? (
-                  <p className="text-muted-foreground text-center py-8">No upsells attached to this quote yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {quoteUpsells.map((quoteUpsell) => {
-                      const upsell = upsells.find(u => u.id === quoteUpsell.upsell_id);
-                      if (!upsell) return null;
-
-                      const metadata = quoteUpsell.metadata as { custom_price?: number; quantity?: number; measurement?: string } | null;
-                      const displayPrice = metadata?.custom_price ?? upsell.price;
-                      const displayQty = metadata?.quantity ?? 1;
-                      const displayMeasurement = metadata?.measurement ?? '';
-
-                      return (
-                        <div
-                          key={quoteUpsell.id}
-                          className="flex items-center justify-between p-4 border rounded-lg bg-muted/50"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <Gift className="h-4 w-4 text-muted-foreground" />
-                              <h4 className="font-medium">{upsell.name}</h4>
-                              {quoteUpsell.customer_accepted !== null && (
-                                <span className={`text-xs ${quoteUpsell.customer_accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
-                                  {quoteUpsell.customer_accepted ? 'Accepted' : 'Rejected'}
-                                </span>
-                              )}
-                            </div>
-                            {upsell.description && (
-                              <p className="text-sm text-muted-foreground mt-1">{upsell.description}</p>
-                            )}
-                            <div className="flex items-center gap-4 mt-2 text-sm">
-                              <span className="text-green-600 font-semibold">€{displayPrice.toFixed(2)}</span>
-                              <span className="text-muted-foreground">Qty: {displayQty}</span>
-                              {displayMeasurement && (
-                                <span className="text-muted-foreground">({displayMeasurement})</span>
-                              )}
-                            </div>
-                          </div>
+              {loadingUpsells ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+              ) : quoteUpsells.length === 0 ? (
+                <HubEmptyState
+                  icon={Gift}
+                  title="No extras on this quote"
+                  description="Installation, delivery or any service charged on top of the lines."
+                  action={['accepted', 'rejected', 'superseded'].includes(quote.status) ? undefined : (
+                    <Button size="sm" variant="outline" onClick={() => setSelectedUpsellId(NEW_EXTRA)}>New extra</Button>
+                  )}
+                />
+              ) : (
+                <div className="divide-y divide-hairline border border-hairline rounded-sm">
+                  {quoteUpsells.map((quoteUpsell) => {
+                    const upsell = quoteUpsell.upsell ?? upsells.find(u => u.id === quoteUpsell.upsell_id);
+                    const metadata = quoteUpsell.metadata as { custom_price?: number; quantity?: number; measurement?: string } | null;
+                    const unit = metadata?.custom_price ?? upsell?.price ?? 0;
+                    const qty = metadata?.quantity ?? 1;
+                    const state = quoteUpsell.customer_accepted === true ? 'included'
+                      : quoteUpsell.customer_accepted === false ? 'declined' : 'optional';
+                    const locked = quote.status === 'accepted' || quote.status === 'rejected' || quote.status === 'superseded';
+                    return (
+                      <div key={quoteUpsell.id} className="flex flex-wrap items-center gap-3 p-3">
+                        <div className="flex-1 min-w-[12rem]">
+                          <p className="text-sm font-medium">{upsell?.name ?? 'Extra'}</p>
+                          {upsell?.description && <p className="text-xs text-muted-foreground">{upsell.description}</p>}
+                          <p className="text-xs text-muted-foreground tabular-nums mt-0.5">
+                            {formatMoney(unit, quote.currency)} × {qty}{metadata?.measurement ? ` ${metadata.measurement}` : ''} = {formatMoney(unit * qty, quote.currency)}
+                          </p>
+                        </div>
+                        {locked ? (
+                          <Badge variant={state === 'included' ? 'success' : state === 'declined' ? 'error' : 'neutral'}>
+                            {state === 'included' ? 'Included' : state === 'declined' ? 'Declined' : 'Optional'}
+                          </Badge>
+                        ) : (
+                          <Select
+                            value={state}
+                            onValueChange={(v) => void handleSetUpsellInclusion(quoteUpsell.id, v === 'included' ? true : v === 'declined' ? false : null)}
+                            disabled={decidingUpsellId === quoteUpsell.id}
+                          >
+                            <SelectTrigger className="h-8 w-56 text-sm"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="included">Included (Charged)</SelectItem>
+                              <SelectItem value="optional">Optional (Customer Decides)</SelectItem>
+                              <SelectItem value="declined">Declined</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                        {!locked && (
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
+                            aria-label={`Remove ${upsell?.name ?? 'extra'}`}
                             onClick={() => handleRemoveUpsell(quoteUpsell.id)}
-                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
                           >
                             <X className="h-4 w-4" />
                           </Button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {quoteUpsells.some((qu) => qu.customer_accepted === null || qu.customer_accepted === undefined) && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Optional extras must be decided (by the customer, or set here) before the quote can be accepted or invoiced.
+                </p>
+              )}
             </div>
           </TabsContent>
 

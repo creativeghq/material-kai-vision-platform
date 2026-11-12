@@ -5,8 +5,8 @@ import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
 
 const QuotesPage = lazy(() => import('./pages/QuotesPage').then(m => ({ default: m.QuotesPage })));
-const QuoteDetailCustomerPage = lazy(() =>
-  import('./pages/QuoteDetailCustomerPage').then(m => ({ default: m.QuoteDetailCustomerPage })),
+const QuoteDetailRoute = lazy(() =>
+  import('./pages/QuoteDetailRoute').then(m => ({ default: m.QuoteDetailRoute })),
 );
 const QuotePreviewPage = lazy(() =>
   import('./pages/QuotePreviewPage').then(m => ({ default: m.QuotePreviewPage })),
@@ -16,9 +16,6 @@ const QuoteRequestsPage = lazy(() =>
 );
 const QuoteRequestsAdminPage = lazy(() =>
   import('./pages/QuoteRequestsAdminPage').then(m => ({ default: m.QuoteRequestsAdmin })),
-);
-const QuoteDetailAdminPage = lazy(() =>
-  import('./pages/QuoteDetailAdminPage').then(m => ({ default: m.QuoteDetailPage })),
 );
 const StatusTagsManagementPage = lazy(() =>
   import('./pages/StatusTagsManagementPage').then(m => ({ default: m.StatusTagsManagement })),
@@ -37,7 +34,7 @@ const definition: ModuleDefinition = {
   manifest: manifest as ModuleManifest,
   routes: [
     { path: '/quotes', component: QuotesPage },
-    { path: '/quotes/:id', component: QuoteDetailCustomerPage, openToRecipient: true },
+    { path: '/quotes/:id', component: QuoteDetailRoute, openToRecipient: true },
     { path: '/quotes/:id/preview', component: QuotePreviewPage, openToRecipient: true },
     { path: '/quotes/requests', component: QuoteRequestsPage },
     // The BACK-OFFICE half of the same module: the seller's queue and the vocabulary their quotes
@@ -45,13 +42,13 @@ const definition: ModuleDefinition = {
     // own configuration, so it sits beside /quotes rather than in the operator console — behind
     // AdminGuard the workspace that sells the quotes could not edit its own status tags.
     { path: '/quotes/requests/manage', component: QuoteRequestsAdminPage, requireWorkspaceAdmin: true },
-    { path: '/quotes/manage/:id', component: QuoteDetailAdminPage, requireWorkspaceAdmin: true },
+    { path: '/quotes/manage/:id', component: legacyAdminRedirect('/quotes/:id') },
     { path: '/quotes/settings', component: QuoteSettingsPage, requireWorkspaceAdmin: true },
     { path: '/quotes/settings/status-tags', component: StatusTagsManagementPage, requireWorkspaceAdmin: true },
     { path: '/quotes/settings/upsells', component: UpsellsManagementPage, requireWorkspaceAdmin: true },
     { path: '/quotes/settings/timeline-steps', component: TimelineStepsManagementPage, requireWorkspaceAdmin: true },
     { path: '/admin/quote-requests', component: legacyAdminRedirect('/quotes/requests/manage') },
-    { path: '/admin/quotes/:id', component: legacyAdminRedirect('/quotes/manage/:id') },
+    { path: '/admin/quotes/:id', component: legacyAdminRedirect('/quotes/:id') },
     { path: '/admin/status-tags', component: legacyAdminRedirect('/quotes/settings/status-tags') },
     { path: '/admin/upsells', component: legacyAdminRedirect('/quotes/settings/upsells') },
     { path: '/admin/timeline-steps', component: legacyAdminRedirect('/quotes/settings/timeline-steps') },

@@ -54,7 +54,14 @@ export interface Quote {
   public_share_enabled?: boolean;
   public_share_token?: string | null;
   public_share_created_at?: string | null;
+  /** The CRM deal this quote belongs to — the document carries the link (one deal, many quotes). */
+  deal_id?: string | null;
+  rejected_at?: string | null;
+  rejection_reason?: string | null;
 }
+
+/** The status moves an operator makes by hand. `quoted` (Send) and `accepted` keep their own paths. */
+export type QuoteManualStatus = 'draft' | 'submitted' | 'rejected';
 
 export interface QuoteItem {
   id: string;
@@ -189,6 +196,7 @@ export interface StatusTag {
 
 export interface Upsell {
   id: string;
+  workspace_id?: string | null;
   name: string;
   description?: string;
   price: number;
@@ -615,38 +623,64 @@ export class QuotesService {
     if (error) throw error;
 
     if (data.status === 'accepted' || data.status === 'rejected') {
-      // Admin fan-out is delivered by the "Quote Accepted/Rejected → Notify
-      // Admins" flow (Loop over admin_ids → Create Notification). The event
-      // carries the admin recipient list + payload so an admin can pause/edit it.
-      const accepted = data.status === 'accepted';
-      const eventName = accepted ? 'quote_approved' : 'quote_rejected';
-      const quoteRef = quote.quote_number || quote.id.slice(0, 8);
-      const emitQuoteEvent = (adminIds: string[]) =>
-        flowEventService.emit(eventName, {
-          quote_id: quote.id,
-          user_id: quote.user_id,
-          // Without workspace_id the flow-engine can only match GLOBAL flows for a user caller, so a
-          // tenant's own quote_approved/rejected automation would silently never fire.
-          workspace_id: quote.workspace_id,
-          admin_ids: adminIds,
-          type: accepted ? 'quote_accepted' : 'quote_rejected',
-          title: accepted ? `Quote ${quoteRef} accepted` : `Quote ${quoteRef} declined`,
-          body: accepted ? 'A client has accepted the quote.' : 'A client has declined the quote.',
-          action_url: `/quotes/manage/${quote.id}`,
-        });
-      if (quote.workspace_id) {
-        supabase
-          .from('workspace_members')
-          .select('user_id')
-          .eq('workspace_id', quote.workspace_id)
-          .in('role', ADMIN_ROLES)
-          .then(({ data: admins }) => emitQuoteEvent((admins || []).map((m) => m.user_id)));
-      } else {
-        emitQuoteEvent([]);
-      }
+      this.emitDecisionEvent(quote, data.status === 'accepted', 'client');
     }
 
     return quote;
+  }
+
+  /** Fans a decision out to the workspace admins through the seeded "Quote Accepted/Rejected" flow. */
+  private emitDecisionEvent(quote: Quote, accepted: boolean, by: 'client' | 'operator'): void {
+    const eventName = accepted ? 'quote_approved' : 'quote_rejected';
+    const quoteRef = quote.quote_number || quote.id.slice(0, 8);
+    const who = by === 'client' ? 'A client has' : 'The quote was marked as';
+    const emitQuoteEvent = (adminIds: string[]) =>
+      flowEventService.emit(eventName, {
+        quote_id: quote.id,
+        user_id: quote.user_id,
+        // Without workspace_id the flow-engine matches only GLOBAL flows for a user caller.
+        workspace_id: quote.workspace_id,
+        admin_ids: adminIds,
+        type: accepted ? 'quote_accepted' : 'quote_rejected',
+        title: accepted ? `Quote ${quoteRef} accepted` : `Quote ${quoteRef} declined`,
+        body: by === 'client'
+          ? `${who} ${accepted ? 'accepted' : 'declined'} the quote.`
+          : `${who} ${accepted ? 'accepted' : 'declined'}${quote.rejection_reason ? `: ${quote.rejection_reason}` : '.'}`,
+        action_url: `/quotes/${quote.id}`,
+      });
+    if (quote.workspace_id) {
+      supabase
+        .from('workspace_members')
+        .select('user_id')
+        .eq('workspace_id', quote.workspace_id)
+        .in('role', ADMIN_ROLES)
+        .then(({ data: admins }) => emitQuoteEvent((admins || []).map((m) => m.user_id)));
+    } else {
+      emitQuoteEvent([]);
+    }
+  }
+
+  /**
+   * The operator's hand-made status moves — back to draft (also reopens a declined quote),
+   * mark submitted, mark declined with a reason. Transitions are enforced by `set_quote_status`.
+   */
+  async setQuoteStatus(quoteId: string, status: QuoteManualStatus, reason?: string | null): Promise<Quote> {
+    const { error } = await (supabase as any).rpc('set_quote_status', {
+      p_quote_id: quoteId,
+      p_status: status,
+      p_reason: reason ?? null,
+    });
+    if (error) throw error;
+    const { data: quote, error: readErr } = await supabase.from('quotes').select('*').eq('id', quoteId).single();
+    if (readErr) throw readErr;
+    if (status === 'rejected') this.emitDecisionEvent(quote as Quote, false, 'operator');
+    return quote as Quote;
+  }
+
+  async isOperatorView(quoteId: string): Promise<boolean> {
+    const { data, error } = await (supabase as any).rpc('quote_viewer_is_operator', { p_quote_id: quoteId });
+    if (error) return false;
+    return data === true;
   }
 
   /**
@@ -1280,14 +1314,23 @@ export class QuotesService {
 
   // UPSELLS/EXTRAS METHODS
 
+  private async activeWorkspaceId(): Promise<string | null> {
+    const { data } = await supabase.auth.getUser();
+    return getActiveWorkspaceId(data.user?.id);
+  }
+
   /**
    * Get all upsells
    */
-  async getUpsells(activeOnly: boolean = false): Promise<Upsell[]> {
+  async getUpsells(activeOnly: boolean = false, workspaceId?: string | null): Promise<Upsell[]> {
     let query = supabase
       .from('upsells')
       .select('*')
       .order('display_order', { ascending: true });
+
+    // This workspace's own extras plus the platform-wide ones — never another tenant's.
+    const ws = workspaceId ?? (await this.activeWorkspaceId());
+    query = ws ? query.or(`workspace_id.is.null,workspace_id.eq.${ws}`) : query.is('workspace_id', null);
 
     if (activeOnly) {
       query = query.eq('is_active', true);
@@ -1308,10 +1351,12 @@ export class QuotesService {
     price: number;
     display_order?: number;
     is_active?: boolean;
+    workspace_id?: string | null;
   }): Promise<Upsell> {
     const { data: upsell, error } = await supabase
       .from('upsells')
       .insert({
+        workspace_id: data.workspace_id ?? (await this.activeWorkspaceId()),
         name: data.name,
         description: data.description,
         price: data.price,
@@ -1383,6 +1428,8 @@ export class QuotesService {
     upsellId: string,
     adminNotes?: string,
     metadata?: { custom_price?: number; quantity?: number; measurement?: string },
+    /** `true` = included and charged; `null` = optional, the customer decides. */
+    included: boolean | null = null,
   ): Promise<QuoteUpsell> {
     const { data, error } = await supabase
       .from('quote_upsells')
@@ -1391,6 +1438,8 @@ export class QuotesService {
         upsell_id: upsellId,
         admin_notes: adminNotes,
         metadata: metadata || null,
+        customer_accepted: included,
+        decided_at: included === null ? null : new Date().toISOString(),
       })
       .select('*, upsell:upsells(*)')
       .single();
@@ -1405,6 +1454,11 @@ export class QuotesService {
     accepted: boolean,
   ): Promise<QuoteUpsell> {
     return this.setUpsellDecision(quoteUpsellId, accepted);
+  }
+
+  /** The operator's call on one extra: included (true), declined (false) or optional (null). */
+  async setUpsellInclusion(quoteUpsellId: string, included: boolean | null): Promise<QuoteUpsell> {
+    return this.setUpsellDecision(quoteUpsellId, included);
   }
 
   /** Reset an upsell decision (back to undecided). */

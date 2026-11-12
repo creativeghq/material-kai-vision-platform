@@ -48,7 +48,7 @@ describe('one question per tab', () => {
 
   it('a quote sent to someone opens whatever their own plan is', () => {
     const quotes = read('src/modules/quotes/index.ts');
-    expect(quotes).toContain("path: '/quotes/:id', component: QuoteDetailCustomerPage, openToRecipient: true");
+    expect(quotes).toContain("path: '/quotes/:id', component: QuoteDetailRoute, openToRecipient: true");
     expect(read('src/modules/_core/ModuleRoutes.tsx')).toContain('route.openToRecipient');
     expect(quotes.split(/\r?\n/).filter((l) => l.includes('openToRecipient'))).toHaveLength(2);
   });

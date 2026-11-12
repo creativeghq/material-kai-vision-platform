@@ -182,7 +182,7 @@ export const QuoteRequestsAdmin: React.FC = () => {
   };
 
   const handleViewQuote = (quoteId: string) => {
-    navigate(`/quotes/manage/${quoteId}`);
+    navigate(`/quotes/${quoteId}`);
   };
 
   const handleDeleteQuote = async (quoteId: string) => {

@@ -257,6 +257,9 @@ export const QuoteDetailCustomerPage: React.FC = () => {
         subtitle={`Created ${formatDate(quote.created_at)} · Expires ${formatDate(quote.expires_at)}`}
         actions={
           <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <Button variant="ghost" size="sm" onClick={() => navigate('/quotes')}>
+              <ArrowLeft className="h-4 w-4 mr-2" /> All quotes
+            </Button>
             <QuoteStatusBadge status={quote.status} />
             {/* Reuse this quote's shape on the next job (#322). */}
             <Button variant="outline" size="sm" onClick={() => setSaveTemplateOpen(true)}>

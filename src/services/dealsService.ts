@@ -243,6 +243,18 @@ export const dealsService = {
     return (data ?? []).map((r) => ({ id: (r as { id: string }).id, title: (r as { title: string | null }).title ?? 'Deal' }));
   },
 
+  async getDealSummary(dealId: string): Promise<{ id: string; title: string; status: Deal['status']; stage: string } | null> {
+    const { data, error } = await supabase
+      .from('crm_deals')
+      .select('id, title, status, stage')
+      .eq('id', dealId)
+      .maybeSingle();
+    if (error) throw error;
+    if (!data) return null;
+    const row = data as { id: string; title: string | null; status: Deal['status']; stage: string };
+    return { id: row.id, title: row.title ?? 'Deal', status: row.status, stage: row.stage };
+  },
+
   async createDeal(workspaceId: string, input: DealInput): Promise<Deal> {
     const { data: { user } } = await supabase.auth.getUser();
     // Allowlisted payload — never spread caller input into a write (invariant 8).
