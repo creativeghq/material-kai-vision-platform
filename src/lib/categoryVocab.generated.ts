@@ -137,6 +137,12 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
     aliases: ['ergaleia', 'tools'],
   },
   {
+    key: 'vinyl_flooring',
+    displayName: 'Vinyl Flooring',
+    controlledVocab: ['lvt', 'pvc_floor_mat', 'spc_flooring', 'vinyl_plank', 'vinyl_sheet', 'vinyl_tile', 'wpc_flooring'],
+    aliases: ['click_vinyl', 'dry_back_vinyl', 'lvt', 'pvc_flooring', 'resilient_flooring', 'spc', 'vinyl', 'wpc'],
+  },
+  {
     key: 'wellness',
     displayName: 'Sauna, Spa & Wellness',
     controlledVocab: ['hammam_steam_room', 'hydromassage_shower_panel', 'infrared_cabin', 'sauna_accessory', 'sauna_cabin', 'sauna_control_unit', 'sauna_heater', 'spa_hot_tub', 'steam_generator'],
@@ -145,7 +151,7 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
   {
     key: 'wood',
     displayName: 'Wood',
-    controlledVocab: ['carpet', 'engineered_wood', 'hardwood', 'laminate', 'parquet', 'vinyl_flooring', 'wood_flooring'],
+    controlledVocab: ['carpet', 'engineered_wood', 'hardwood', 'laminate', 'parquet', 'wood_flooring'],
     aliases: ['bamboo', 'wood'],
   },
 ];
@@ -156,7 +162,7 @@ export const CATEGORY_VOCAB: CategoryVocabEntry[] = [
  * the union for months, so a door resolved to `general_materials` and rendered under the
  * wrong heading (#368 PD-5).
  */
-export const CATEGORY_KEYS = ['appliances', 'building_materials', 'decor', 'drywall', 'electrical', 'furniture', 'general_materials', 'hardware', 'heating', 'hvac', 'insulation', 'kitchen', 'lighting', 'openings', 'paint_wall_decor', 'panel_boards', 'plumbing', 'sanitary', 'tiles', 'tools', 'wellness', 'wood'] as const;
+export const CATEGORY_KEYS = ['appliances', 'building_materials', 'decor', 'drywall', 'electrical', 'furniture', 'general_materials', 'hardware', 'heating', 'hvac', 'insulation', 'kitchen', 'lighting', 'openings', 'paint_wall_decor', 'panel_boards', 'plumbing', 'sanitary', 'tiles', 'tools', 'vinyl_flooring', 'wellness', 'wood'] as const;
 
 export type CategoryKey = typeof CATEGORY_KEYS[number];
 

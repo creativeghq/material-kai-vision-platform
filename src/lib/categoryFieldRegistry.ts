@@ -55,7 +55,8 @@ export function resolveUploadCategory(materialCategory: unknown): UploadCategory
 
   // Fuzzy fallback for free text that is neither a key nor a registered vocabulary term.
   if (lower.includes('tile') || lower.includes('ceramic') || lower.includes('porcelain')) return 'tiles';
-  if (lower.includes('wood') || lower.includes('parquet') || lower.includes('laminate') || lower.includes('vinyl')) return 'wood';
+  if (lower.includes('vinyl') || lower.includes('lvt') || lower.includes('spc') || lower.includes('wpc')) return 'vinyl_flooring';
+  if (lower.includes('wood') || lower.includes('parquet') || lower.includes('laminate')) return 'wood';
   if (lower.includes('paint') || lower.includes('wallpaper') || lower.includes('coating')) return 'paint_wall_decor';
   if (lower.includes('sofa') || lower.includes('chair') || lower.includes('table') || lower.includes('cabinet') || lower.includes('bed') || lower.includes('desk') || lower.includes('shelf')) return 'furniture';
   if (lower.includes('radiator') || lower.includes('boiler') || lower.includes('heating') || lower.includes('towel_rail') || lower.includes('fireplace')) return 'heating';

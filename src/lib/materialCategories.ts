@@ -52,6 +52,7 @@ export const CAT_COLORS: Record<string, string> = {
   sanitary:          '#06b6d4',
   kitchen:           '#f59e0b',
   lighting:          '#eab308',
+  vinyl_flooring:    '#a16207',
 };
 
 export const PROFESSIONAL_TYPE_LABELS: Record<string, string> = {

@@ -126,6 +126,7 @@ export enum MaterialCategory {
   HARDWARE = 'hardware',
   TOOLS = 'tools',
   APPLIANCES = 'appliances',
+  VINYL_FLOORING = 'vinyl_flooring',
   // Legacy physical-material types (kept for backwards compat)
   METAL = 'metal',
   PLASTIC = 'plastic',
