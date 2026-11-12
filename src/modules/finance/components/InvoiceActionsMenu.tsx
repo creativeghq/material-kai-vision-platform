@@ -11,7 +11,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { edgeErrorMessage } from '@/utils/edgeError';
 import { saveTextFile } from '@/utils/saveTextFile';
-import { MoreVertical, Eye, CreditCard, Send, Copy, ExternalLink, MessageCircle, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase, EyeOff } from 'lucide-react';
+import { MoreVertical, MoreHorizontal, Eye, CreditCard, Send, Copy, ExternalLink, MessageCircle, Hash, Loader2, RefreshCw, Files, Mail, Pencil, Tag, History, Info, Download, Layers, Briefcase, EyeOff } from 'lucide-react';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
   DropdownMenuSeparator, DropdownMenuTrigger,
@@ -44,9 +44,11 @@ interface Props {
   fiscalMark?: string | null;
   status?: string | null;
   onChanged?: () => void;
+  /** Set on the invoice's own page: no "Open", and payment / credit note open there instead of deep-linking. */
+  record?: { leadingItems?: React.ReactNode; onRecordPayment?: () => void; onIssueCreditNote?: () => void };
 }
 
-export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fiscalStatus, fiscalMark, status, onChanged }) => {
+export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fiscalStatus, fiscalMark, status, onChanged, record }) => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { isAccountant, canOperateFinance } = usePermissions();
@@ -281,14 +283,23 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
 
   const accepted = fStatus === 'accepted' || fStatus === 'offline';
   const canSubmit = status !== 'draft' && status !== 'void' && !accepted;
+  const settleable = status !== 'draft' && status !== 'void' && status !== 'credit_noted';
+  const showPayment = canOperateFinance && (record ? !!record.onRecordPayment : settleable);
+  const showCreditNote = !isAccountant && (record ? !!record.onIssueCreditNote : settleable);
 
   return (
     <>
     <DropdownMenu onOpenChange={(o) => { if (o) void hydrate(); }}>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={(e) => e.stopPropagation()}>
-          {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
-        </button>
+        {record ? (
+          <Button variant="outline" size="sm" aria-label="More actions">
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-4 w-4" />}
+          </Button>
+        ) : (
+          <button type="button" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={(e) => e.stopPropagation()}>
+            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
+          </button>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56" onClick={(e) => e.stopPropagation()}>
         {/* "View", "Record payment", "View / print" and "Issue credit note" all ran the identical
@@ -296,8 +307,9 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
             on a page with nothing open. They deep-link now; InvoiceDetailPage reads ?action= and
             opens the matching dialog. "View / print" is gone: it was a third label for the same
             navigation, and printing is what "Download PDF" below does. */}
-        <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> Open</DropdownMenuItem>
-        {canOperateFinance && <DropdownMenuItem onClick={() => go('?action=payment')}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
+        {record?.leadingItems}
+        {!record && <DropdownMenuItem onClick={() => go()}><Eye className="h-4 w-4 mr-2" /> Open</DropdownMenuItem>}
+        {showPayment && <DropdownMenuItem onClick={() => (record?.onRecordPayment ? record.onRecordPayment() : go('?action=payment'))}><CreditCard className="h-4 w-4 mr-2" /> Record payment</DropdownMenuItem>}
         <DropdownMenuItem onClick={downloadPdf}><Download className="h-4 w-4 mr-2" /> Download PDF</DropdownMenuItem>
         <DropdownMenuItem onClick={downloadEn16931}><Download className="h-4 w-4 mr-2" /> Download EN 16931 XML</DropdownMenuItem>
 
@@ -322,7 +334,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         <DropdownMenuItem onClick={() => void customerLink.whatsapp()}><MessageCircle className="h-4 w-4 mr-2" /> Send via WhatsApp</DropdownMenuItem>
 
         <DropdownMenuSeparator />
-        {!isAccountant && <DropdownMenuItem onClick={() => go('?action=credit_note')}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
+        {showCreditNote && <DropdownMenuItem onClick={() => (record?.onIssueCreditNote ? record.onIssueCreditNote() : go('?action=credit_note'))}><RefreshCw className="h-4 w-4 mr-2" /> Issue credit note</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={duplicateAsDraft}><Files className="h-4 w-4 mr-2" /> Duplicate as draft</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={() => setSaveTemplateOpen(true)}><Layers className="h-4 w-4 mr-2" /> Save as template</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={sendEmail}><Mail className="h-4 w-4 mr-2" /> Send email</DropdownMenuItem>}

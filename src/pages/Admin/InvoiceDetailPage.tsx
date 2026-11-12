@@ -1,21 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
-  AlertCircle, CheckCircle2, Download, Eye, FileMinus, FileText, FolderOpen, Loader2, MoreHorizontal,
-  Pencil, Plus, Send, Truck,
+  AlertCircle, CheckCircle2, Eye, FileText, Loader2, Pencil, Plus, Truck,
 } from 'lucide-react';
 
 import { FINANCE_BASE, FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
 import { supabase } from '@/integrations/supabase/client';
 import { humanizeLabel } from '@/utils/humanize';
 import { Checkbox } from '@/components/core/ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
-} from '@/components/core/ui/dropdown-menu';
+import { DropdownMenuItem } from '@/components/core/ui/dropdown-menu';
+import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import {
   HubEmptyState, HubPanel, HubProperty, HubPropertyList, HubRecordPage, HubStatTile, LinkedRecordsPanel,
 } from '@/components/core/hub';
@@ -65,10 +62,7 @@ const InvoiceDetailPage: React.FC = () => {
   const [creditNoteDialogOpen, setCreditNoteDialogOpen] = useState(false);
   const [returnFor, setReturnFor] = useState<{ id: string; number: string | null } | null>(null);
   const [fiscalBusy, setFiscalBusy] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [projectSaving, setProjectSaving] = useState(false);
-  const [projectOpen, setProjectOpen] = useState(false);
   /** Derived in SQL (`get_invoice_edit_verdict`): editable until myDATA returns a MARK. */
   const [editVerdict, setEditVerdict] = useState<{ editable: boolean; reason: string | null } | null>(null);
   const [editOpen, setEditOpen] = useState(false);
@@ -78,17 +72,6 @@ const InvoiceDetailPage: React.FC = () => {
   const canEditProject = can('finance.manage');
   const authCode = useFiscalAuthCode('invoices', invoiceId ?? '', (invoice as any)?.fiscal_mark ?? null);
 
-  const handleProjectChange = async (projectId: string | null) => {
-    if (!invoiceId) return;
-    setProjectSaving(true);
-    try {
-      await financeService.updateInvoice(invoiceId, { project_id: projectId } as any);
-      setInvoice((prev) => (prev ? ({ ...prev, project_id: projectId } as InvoiceWithItems) : prev));
-      toast({ title: projectId ? 'Invoice attached to the project' : 'Invoice detached from its project' });
-    } catch (e) {
-      toast({ title: 'Failed to update the project', description: (e as Error).message, variant: 'destructive' });
-    } finally { setProjectSaving(false); }
-  };
   /** Consume `?action=` from InvoiceActionsMenu. */
   const [searchParams, setSearchParams] = useSearchParams();
   useEffect(() => {
@@ -104,19 +87,6 @@ const InvoiceDetailPage: React.FC = () => {
     setSearchParams(next, { replace: true });
   }, [invoice, searchParams, setSearchParams]);
 
-  const handleDownloadPdf = async () => {
-    if (!invoice) return;
-    try {
-      setPdfBusy(true);
-      const { pdf_url } = await financeService.generateInvoicePdf(invoice.id, true);
-      if (pdf_url) window.open(pdf_url, '_blank');
-      else toast({ title: 'PDF generated but no URL returned', variant: 'destructive' });
-    } catch (err: any) {
-      toast({ title: 'PDF generation failed', description: err?.message, variant: 'destructive' });
-    } finally {
-      setPdfBusy(false);
-    }
-  };
 
   useEffect(() => {
     if (!invoiceId) return;
@@ -270,39 +240,21 @@ const InvoiceDetailPage: React.FC = () => {
           <Plus className="mr-1.5 h-4 w-4" /> Record payment
         </Button>
       )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" aria-label="More actions">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
-          {editVerdict?.editable && (
-            <DropdownMenuItem onSelect={() => setEditOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Edit invoice</DropdownMenuItem>
-          )}
-          <DropdownMenuItem disabled={pdfBusy} onSelect={() => void handleDownloadPdf()}>
-            {pdfBusy ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Download className="mr-2 h-4 w-4" />} Download PDF
-          </DropdownMenuItem>
-          {canSendFiscal && (
-            <DropdownMenuItem disabled={fiscalBusy} onSelect={() => void handleSubmitFiscal()}>
-              <Send className="mr-2 h-4 w-4" /> Send to AADE
-            </DropdownMenuItem>
-          )}
-          {canEditProject && (
-            <DropdownMenuItem onSelect={() => setProjectOpen(true)}>
-              <FolderOpen className="mr-2 h-4 w-4" /> {inv.project_id ? 'Change project' : 'Link to project'}
-            </DropdownMenuItem>
-          )}
-          {isActionable && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setCreditNoteDialogOpen(true)}>
-                <FileMinus className="mr-2 h-4 w-4" /> Issue credit note
-              </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      <InvoiceActionsMenu
+        invoiceId={invoice.id}
+        financeBase={financeBase}
+        status={invoice.status}
+        fiscalStatus={inv.fiscal_status ?? null}
+        fiscalMark={inv.fiscal_mark ?? null}
+        onChanged={() => void load()}
+        record={{
+          leadingItems: editVerdict?.editable
+            ? <DropdownMenuItem onSelect={() => setEditOpen(true)}><Pencil className="mr-2 h-4 w-4" /> Edit invoice</DropdownMenuItem>
+            : null,
+          onRecordPayment: isActionable ? () => setPaymentDialogOpen(true) : undefined,
+          onIssueCreditNote: isActionable ? () => setCreditNoteDialogOpen(true) : undefined,
+        }}
+      />
     </>
   );
 
@@ -347,6 +299,23 @@ const InvoiceDetailPage: React.FC = () => {
               </span>
             </HubProperty>
           )}
+          <HubProperty label="Project">
+            <ProjectLinkField
+              compact
+              workspaceId={inv.workspace_id}
+              projectId={inv.project_id ?? null}
+              disabled={!canEditProject}
+              onChange={async (projectId) => {
+                try {
+                  await financeService.updateInvoice(invoice.id, { project_id: projectId } as never);
+                  toast({ title: projectId ? 'Invoice attached to the project' : 'Invoice detached from its project' });
+                  await load();
+                } catch (e) {
+                  toast({ title: 'Failed to update the project', description: (e as Error).message, variant: 'destructive' });
+                }
+              }}
+            />
+          </HubProperty>
           <HubProperty label="P&L">
             <label htmlFor="invoice-exclude-pnl" className={`flex items-start gap-2 ${canEditProject && !pnlSaving ? 'cursor-pointer' : 'opacity-70'}`}>
               <Checkbox id="invoice-exclude-pnl" className="mt-0.5 h-4 w-4 rounded" checked={inv.exclude_from_pnl === true} disabled={!canEditProject || pnlSaving} onCheckedChange={() => void togglePnlExclusion()} />
@@ -364,7 +333,7 @@ const InvoiceDetailPage: React.FC = () => {
         sending={fiscalBusy}
         onSend={canSendFiscal ? () => void handleSubmitFiscal() : undefined}
       />
-      {isActionable && (
+      {invoice.status !== 'void' && invoice.status !== 'credit_noted' && (
         <CustomerLinkPanel
           kind="invoice" id={invoice.id} workspaceId={invoice.workspace_id} label={`Invoice ${invoice.internal_number ?? ''}`.trim()}
           extra={
@@ -392,17 +361,6 @@ const InvoiceDetailPage: React.FC = () => {
       left={left}
       overlays={
         <>
-          <Dialog open={projectOpen} onOpenChange={setProjectOpen}>
-            <DialogContent className="max-w-md">
-              <DialogHeader><DialogTitle>Link to Project</DialogTitle></DialogHeader>
-              <ProjectLinkField
-                workspaceId={inv.workspace_id}
-                projectId={inv.project_id ?? null}
-                onChange={async (id) => { await handleProjectChange(id); setProjectOpen(false); }}
-                disabled={projectSaving}
-              />
-            </DialogContent>
-          </Dialog>
           <RecordPaymentDialog
             workspaceId={invoice.workspace_id}
             presetInvoiceId={invoice.id}
