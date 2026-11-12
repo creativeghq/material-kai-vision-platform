@@ -102,7 +102,7 @@ export const MoodBoardDetailPage: React.FC = () => {
   const setTab = (next: string) => {
     const p = new URLSearchParams(searchParams);
     p.set('tab', next);
-    if (next !== 'room-views') { p.delete('view'); p.delete('product'); }
+    if (next !== 'room-views') { p.delete('view'); p.delete('product'); p.delete('new'); }
     setSearchParams(p, { replace: true });
   };
 
@@ -744,7 +744,7 @@ export const MoodBoardDetailPage: React.FC = () => {
           <TabsContent value="room-views" className="m-0">
             {moodboard && activeWorkspaceId && (
               <MoodboardRoomViewsTab
-                key={`${searchParams.get('view') ?? ''}:${searchParams.get('product') ?? ''}`}
+                key={`${searchParams.get('view') ?? ''}:${searchParams.get('product') ?? ''}:${searchParams.get('new') ?? ''}`}
                 workspaceId={activeWorkspaceId}
                 moodboardId={moodboard.id}
                 moodboardRoomId={moodboard.roomId ?? null}
@@ -752,6 +752,7 @@ export const MoodBoardDetailPage: React.FC = () => {
                 canEdit={!!user && user.id === moodboard.userId}
                 initialViewId={searchParams.get('view')}
                 initialProductId={searchParams.get('product')}
+                startNew={searchParams.get('new') === '1'}
                 onOpenProduct={(productId) => {
                   const item = items.find((i) => i.material_id === productId);
                   if (item) handleProductClick(item);

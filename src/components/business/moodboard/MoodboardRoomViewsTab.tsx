@@ -21,20 +21,22 @@ interface Props {
   /** Open a view for editing on arrival (`?view=`), or start one with a product (`?product=`). */
   initialViewId?: string | null;
   initialProductId?: string | null;
+  /** Open an empty editor on arrival (`?new=1`, from a project room). */
+  startNew?: boolean;
   onOpenProduct: (productId: string) => void;
 }
 
 type Mode = { kind: 'list' } | { kind: 'new'; productId: string | null } | { kind: 'edit'; view: SavedRoomView };
 
 export const MoodboardRoomViewsTab: React.FC<Props> = ({
-  workspaceId, moodboardId, moodboardRoomId, productIds, canEdit, initialViewId, initialProductId, onOpenProduct,
+  workspaceId, moodboardId, moodboardRoomId, productIds, canEdit, initialViewId, initialProductId, startNew, onOpenProduct,
 }) => {
   const { toast } = useToast();
   const [views, setViews] = useState<SavedRoomView[]>([]);
   const [stale, setStale] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<Mode>(() =>
-    initialProductId && canEdit ? { kind: 'new', productId: initialProductId } : { kind: 'list' });
+    (initialProductId || startNew) && canEdit ? { kind: 'new', productId: initialProductId ?? null } : { kind: 'list' });
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {

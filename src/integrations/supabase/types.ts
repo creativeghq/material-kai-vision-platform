@@ -25933,6 +25933,8 @@ export type Database = {
           retail_price: number | null
           room: string | null
           room_id: string | null
+          room_view_sheet_id: string | null
+          visualizer_state: string | null
           selected_attributes: Json
           selected_color: string | null
           selected_size: string | null
@@ -25969,6 +25971,8 @@ export type Database = {
           retail_price?: number | null
           room?: string | null
           room_id?: string | null
+          room_view_sheet_id?: string | null
+          visualizer_state?: string | null
           selected_attributes?: Json
           selected_color?: string | null
           selected_size?: string | null
@@ -26005,6 +26009,8 @@ export type Database = {
           retail_price?: number | null
           room?: string | null
           room_id?: string | null
+          room_view_sheet_id?: string | null
+          visualizer_state?: string | null
           selected_attributes?: Json
           selected_color?: string | null
           selected_size?: string | null

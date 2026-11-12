@@ -102,4 +102,21 @@ describe('the room_view sheet is wired end to end', () => {
     expect(svc).toMatch(/isImagePrivate\(sheetId, 'render_image_url'\)/);
     expect(read('src/services/moodboardSheetsService.ts')).toMatch(/isSheetAssetRef\(/);
   });
+
+  it('a quote line remembers the render it was quantified from, and the admin list links to it', () => {
+    const svc = read('src/modules/quotes/services/QuotesService.ts');
+    expect(svc).toMatch(/room_view_sheet_id: data\.room_view_sheet_id/);
+    expect(svc).toMatch(/visualizer_state: data\.visualizer_state/);
+    expect(read('src/components/features/visualizer/RoomViewEditor.tsx')).toMatch(/roomViewSheetId=\{existing\?\.id/);
+    expect(read('src/components/features/visualizer/SurfaceVisualizer.tsx')).toMatch(/visualizerState=\{serializeRenderState\(state\)/);
+    expect(read('src/modules/quotes/components/QuoteItemsList.tsx')).toMatch(/editPricing && \(item\.room_view_sheet_id \|\| item\.visualizer_state\)/);
+  });
+
+  it('every place a product or room is worked on can open the visualizer', () => {
+    expect(read('src/components/features/products/ProductCard.tsx')).toMatch(/\/visualizer\?product=/);
+    expect(read('src/components/features/products/ProductDetailModal.tsx')).toMatch(/\/visualizer\?product=/);
+    expect(read('src/pages/DiscoverPage.tsx')).toMatch(/\/visualizer\?product=/);
+    expect(read('src/modules/projects/components/tabs/RoomsTab.tsx')).toMatch(/tab=room-views&new=1/);
+    expect(read('src/components/business/moodboard/MoodBoardDetailPage.tsx')).toMatch(/p\.set\('tab', 'room-views'\)/);
+  });
 });

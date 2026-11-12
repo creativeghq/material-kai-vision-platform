@@ -62,8 +62,10 @@ export interface QuoteItem {
   product_id: string | null;
   quantity: number;
   notes?: string;
-  added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page' | 'moodboard';
+  added_from?: 'search' | 'agent' | '3d_generation' | 'manual' | 'product_page' | 'moodboard' | 'visualizer';
   added_at: string;
+  room_view_sheet_id?: string | null;
+  visualizer_state?: string | null;
   selected_size?: string;
   selected_color?: string;
   /** The chosen variant, every identity axis. */
@@ -676,6 +678,8 @@ export class QuotesService {
     dimensions?: string;
     installation_requirements?: string;
     delivery_date?: string;
+    room_view_sheet_id?: string | null;
+    visualizer_state?: string | null;
   }): Promise<QuoteItem> {
     // Resolve default unit from product metadata
     let customUnit: string | null = null;
@@ -774,6 +778,8 @@ export class QuotesService {
         dimensions: data.dimensions || null,
         installation_requirements: data.installation_requirements || null,
         delivery_date: data.delivery_date || null,
+        room_view_sheet_id: data.room_view_sheet_id ?? null,
+        visualizer_state: data.visualizer_state ?? null,
         custom_unit: customUnit,
         unit_price: unitPrice,
         // `line_total` is a generated column — SQL derives it from the price and the quantity.

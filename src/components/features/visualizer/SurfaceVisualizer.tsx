@@ -342,6 +342,7 @@ export const SurfaceVisualizer: React.FC<Props> = ({
             productName={product.name}
             productImage={product.texture.url ?? undefined}
             defaultQuantity={order.quantity}
+            visualizerState={serializeRenderState(state).toString()}
             defaultNotes={`${surface ? SURFACE_KIND_LABELS[surface.kind] : 'Surface'}, ${PATTERN_LABELS[pattern]}, ${groutWidthMm} mm joint (${coverage?.wastagePercent}% cutting allowance)`}
             onClose={() => setQuoteOpen(false)}
             onSuccess={(name) => { toast({ title: 'Added to quote', description: `${product.name} added to "${name}"` }); setQuoteOpen(false); }}

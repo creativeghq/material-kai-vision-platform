@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Home, Loader2, Ruler, Grid3x3 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { roomViewService } from '@/services/roomViewService';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
@@ -47,6 +48,8 @@ import { RoomGeometryModal, roomGeometrySummary } from '../RoomGeometryModal';
 
 export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, isOwner = true, showBudget = isOwner }) => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const [openingViewFor, setOpeningViewFor] = useState<string | null>(null);
   const [rooms, setRooms] = useState<ProjectRoom[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -106,6 +109,17 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
       toast({ title: 'Failed to add room', variant: 'destructive' });
     } finally {
       setCreating(false);
+    }
+  };
+
+  const startRoomView = async (room: ProjectRoom) => {
+    setOpeningViewFor(room.id);
+    try {
+      const boardId = await roomViewService.moodboardForRoom(projectId, room.id, room.name);
+      navigate(`/moodboard/${boardId}?tab=room-views&new=1`);
+    } catch (e) {
+      toast({ title: 'Could not open a room view', description: e instanceof Error ? e.message : 'Unknown error', variant: 'destructive' });
+      setOpeningViewFor(null);
     }
   };
 
@@ -207,8 +221,18 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
                     <span>Due {new Date(r.deadline).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</span>
                   )}
                 </div>
-                {(roomViews.get(r.id) ?? []).length > 0 && (
+                {(isOwner || (roomViews.get(r.id) ?? []).length > 0) && (
                   <div className="flex flex-wrap gap-1 pt-1">
+                    {isOwner && (
+                      <button
+                        type="button"
+                        onClick={() => void startRoomView(r)}
+                        disabled={openingViewFor === r.id}
+                        className="inline-flex items-center gap-1 rounded-sm border border-dashed border-hairline px-1.5 py-0.5 text-[11px] text-muted-foreground hover:bg-surface-hover hover:text-foreground"
+                      >
+                        {openingViewFor === r.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}New room view
+                      </button>
+                    )}
                     {(roomViews.get(r.id) ?? []).map((v) => (
                       <Link
                         key={v.id}

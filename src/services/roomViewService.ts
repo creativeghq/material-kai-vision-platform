@@ -84,6 +84,32 @@ export const roomViewService = {
     return (data ?? []) as { id: string; title: string; room_id: string | null }[];
   },
 
+  async moodboardForRoom(projectId: string, roomId: string, roomName: string): Promise<string> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    const { data, error } = await supabase
+      .from('moodboards')
+      .select('id')
+      .eq('room_id', roomId)
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    if (error) throw error;
+    if (data?.[0]?.id) return data[0].id as string;
+    const created = await moodboardAPI.createMoodBoard({ title: `${roomName} Moodboard`, project_id: projectId, room_id: roomId });
+    return created.id;
+  },
+
+  async moodboardForSheet(sheetId: string): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('moodboard_presentation_sheets')
+      .select('id, moodboard_id')
+      .eq('id', sheetId)
+      .maybeSingle();
+    if (error) throw error;
+    return (data?.moodboard_id as string | null) ?? null;
+  },
+
   async productsUpdatedAt(ids: string[]): Promise<{ id: string; updated_at: string | null }[]> {
     const unique = [...new Set(ids.filter(Boolean))];
     if (unique.length === 0) return [];

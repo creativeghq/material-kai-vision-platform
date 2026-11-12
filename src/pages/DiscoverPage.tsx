@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   Users, MapPin, Globe, Package,
   Layers, ChevronLeft, ChevronRight as ChevronRightIcon, Store,
-  Sparkles, LayoutList, Home,
+  Sparkles, LayoutList, Home, Grid3x3,
 } from 'lucide-react';
+import { Button } from '@/components/core/ui/button';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -188,6 +189,7 @@ function ProductTile({ product, onView, surplus, price }: {
   const rawCat = getMaterialCategory(product.metadata);
   const displayCat = rawCat ? rawCat.replace(/_/g, ' ') : catLabel(product.detectedCat);
   const [imgFailed, setImgFailed] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <div
@@ -248,6 +250,18 @@ function ProductTile({ product, onView, surplus, price }: {
             showText={false}
             className="h-7 w-7 p-0 bg-card shadow-overlay"
           />
+          {product.imageUrl && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 p-0 bg-card shadow-overlay"
+              title="See it on a surface"
+              aria-label={`See ${product.name} on a surface`}
+              onClick={() => navigate(`/visualizer?product=${product.id}`)}
+            >
+              <Grid3x3 className="h-3.5 w-3.5" />
+            </Button>
+          )}
         </div>
       </div>
 

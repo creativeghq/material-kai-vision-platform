@@ -26,6 +26,7 @@ import { TileQuantityDialog } from '@/modules/finance/components/TileQuantityDia
 import { HomogeneousStockNotice } from '@/modules/stock/components/HomogeneousStockNotice';
 import { lineIdentityService } from '@/services/lineIdentityService';
 import { composeLineName, partsNotInName } from '@/modules/finance/invoice-templates/lineName';
+import { QuoteLineRenderLink } from '@/components/features/visualizer/QuoteLineRenderLink';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
 const extractSizeFromNotes = (notes?: string | null): string | null => {
@@ -491,6 +492,9 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 <p className="text-xs text-muted-foreground mt-0.5">
                                   SKU: {isCustom ? item.custom_sku : item.product?.sku}
                                 </p>
+                              )}
+                              {editPricing && (item.room_view_sheet_id || item.visualizer_state) && (
+                                <QuoteLineRenderLink roomViewSheetId={item.room_view_sheet_id} visualizerState={item.visualizer_state} />
                               )}
                               {/* What the warehouse actually has free, or that we could not tell.
                                   A quote cannot RESERVE stock (nothing writes stock_allocations

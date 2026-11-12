@@ -27,6 +27,9 @@ interface AddToQuoteModalProps {
   defaultNotes?: string;
   /** The project room this line is for. */
   roomId?: string | null;
+  /** The render this quantity came from, so the quote line can open it. */
+  roomViewSheetId?: string | null;
+  visualizerState?: string | null;
   onClose: () => void;
   onSuccess: (quoteName: string) => void;
 }
@@ -38,6 +41,8 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
   defaultQuantity = 1,
   defaultNotes = '',
   roomId = null,
+  roomViewSheetId = null,
+  visualizerState = null,
   onClose,
   onSuccess,
 }) => {
@@ -101,10 +106,12 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         product_id: productId,
         quantity,
         notes,
-        added_from: '3d_generation',
+        added_from: roomViewSheetId || visualizerState ? 'visualizer' : '3d_generation',
         ...identityFields,
         ...(room && { room }),
         ...(roomId && { room_id: roomId }),
+        ...(roomViewSheetId && { room_view_sheet_id: roomViewSheetId }),
+        ...(visualizerState && { visualizer_state: visualizerState }),
         ...(dimensions && { dimensions }),
         ...(installationRequirements && { installation_requirements: installationRequirements }),
       });
@@ -138,10 +145,12 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         product_id: productId,
         quantity,
         notes,
-        added_from: 'manual',
+        added_from: roomViewSheetId || visualizerState ? 'visualizer' : 'manual',
         ...identityFields,
         ...(room && { room }),
         ...(roomId && { room_id: roomId }),
+        ...(roomViewSheetId && { room_view_sheet_id: roomViewSheetId }),
+        ...(visualizerState && { visualizer_state: visualizerState }),
         ...(dimensions && { dimensions }),
         ...(installationRequirements && { installation_requirements: installationRequirements }),
       });

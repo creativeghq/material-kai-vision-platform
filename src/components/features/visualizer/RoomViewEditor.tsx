@@ -369,7 +369,11 @@ export const RoomViewEditor: React.FC<Props> = ({
                     <CoveragePanel
                       coverage={coverage}
                       compact
-                      priceLine={order ? (
+                      priceLine={order && !existing ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Save the view first, so the quote line links back to this render.
+                        </p>
+                      ) : order ? (
                         <Button size="sm" variant="outline" className="mt-1 h-7 w-full text-xs"
                           onClick={() => setQuoteFor({
                             product,
@@ -408,6 +412,7 @@ export const RoomViewEditor: React.FC<Props> = ({
           defaultQuantity={quoteFor.quantity}
           defaultNotes={quoteFor.notes}
           roomId={moodboardRoomId ?? null}
+          roomViewSheetId={existing?.id ?? null}
           onClose={() => setQuoteFor(null)}
           onSuccess={(name) => { toast({ title: 'Added to quote', description: `${quoteFor.product.name} added to "${name}"` }); setQuoteFor(null); }}
         />
