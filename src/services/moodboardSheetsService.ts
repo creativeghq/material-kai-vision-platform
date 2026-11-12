@@ -5,6 +5,7 @@ import { edgeError } from '@/utils/edgeError';
 // happens here, at the four reads and the one write, so the ~30 render sites across the canvas
 // components never learn about it.
 import { resolveSheetAssets, toSheetAssetRefs } from './moodboards/sheetAssetUrls';
+import { isSheetAssetRef } from './moodboards/sheetAssetRefs';
 
 // One source (#391). `SheetType` was declared here and in five other files; re-exported
 // so every existing `import { SheetType } from '.../moodboardSheetsService'` keeps working.
@@ -257,6 +258,16 @@ class MoodboardSheetsService {
     });
     if (error || !data?.success) return null;
     return (data.data ?? null) as Record<string, any> | null;
+  }
+
+  async isImagePrivate(sheetId: string, key: string): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('moodboard_presentation_sheets')
+      .select('data')
+      .eq('id', sheetId)
+      .maybeSingle();
+    if (error) throw error;
+    return isSheetAssetRef((data?.data as Record<string, unknown> | null)?.[key]);
   }
 
   async remove(sheetId: string): Promise<void> {

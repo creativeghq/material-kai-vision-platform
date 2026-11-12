@@ -99,6 +99,7 @@ describe('the room_view sheet is wired end to end', () => {
 
   it('a saved render is checked for its private copy, so a public temp file is never the record', () => {
     const svc = read('src/services/roomViewService.ts');
-    expect(svc).toMatch(/isSheetAssetRef/);
+    expect(svc).toMatch(/isImagePrivate\(sheetId, 'render_image_url'\)/);
+    expect(read('src/services/moodboardSheetsService.ts')).toMatch(/isSheetAssetRef\(/);
   });
 });

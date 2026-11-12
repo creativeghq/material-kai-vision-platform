@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { moodboardSheetsService, type PresentationSheet } from '@/services/moodboardSheetsService';
-import { isSheetAssetRef } from '@/services/moodboards/sheetAssetRefs';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import type { RoomViewData } from '@/lib/surfaceRenderer';
 
@@ -18,14 +17,7 @@ async function uploadRender(png: Blob): Promise<string> {
 }
 
 async function assertPrivateCopy(sheetId: string): Promise<void> {
-  const { data, error } = await supabase
-    .from('moodboard_presentation_sheets')
-    .select('data')
-    .eq('id', sheetId)
-    .maybeSingle();
-  if (error) throw error;
-  const ref = (data?.data as { render_image_url?: unknown } | null)?.render_image_url;
-  if (!isSheetAssetRef(ref)) {
+  if (!(await moodboardSheetsService.isImagePrivate(sheetId, 'render_image_url'))) {
     throw new Error('The render was saved but could not be copied into the sheet\'s private storage. Save it again.');
   }
 }
