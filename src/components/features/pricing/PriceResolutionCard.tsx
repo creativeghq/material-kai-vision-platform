@@ -48,6 +48,8 @@ export interface ResolutionRow {
   status: string;
   warnings?: string[];
   applied_rules?: AppliedRule[];
+  grade?: string | null;
+  section?: string | null;
   conditional_options: ResolutionOption[];
 }
 

@@ -17,11 +17,36 @@ const discountText = (r: ResolutionRow): string | null => {
   return rule.percents.map((p) => `−${p}%`).join(' then ');
 };
 
-const groupKey = (r: ResolutionRow) => r.doc_slug || r.doc_id || r.supplier;
+const GRADE_LABEL: Record<string, string> = { lower: 'Lower Qualities', second_choice: 'Second Choice' };
+
+const basisOf = (r: ResolutionRow): number => {
+  if (r.status === 'discount_applied') return 2;
+  if (r.status.startsWith('list_price')) return 3;
+  return r.grade && r.grade !== 'standard' ? 1 : 0;
+};
+
+const groupKey = (r: ResolutionRow) => {
+  const rules = (r.applied_rules ?? []).map((a) => a.rule_id).sort().join(',');
+  return [r.supplier, basisOf(r), basisOf(r) === 1 ? r.grade : '', rules].join('|');
+};
 
 const groupTitle = (r: ResolutionRow) => {
-  const line = r.product_line?.split(' - ')[0]?.trim();
-  return [r.supplier, line && line !== r.supplier ? line : null].filter(Boolean).join(' · ');
+  const basis = basisOf(r);
+  if (basis === 2) return `${r.supplier} · List Price ${discountText(r) ?? ''}`.trim();
+  if (basis === 3) return `${r.supplier} · List Price (No Discount On File)`;
+  if (basis === 1) return `${r.supplier} · Purchase Price · ${GRADE_LABEL[r.grade ?? ''] ?? 'Other Grade'}`;
+  return `${r.supplier} · Purchase Price`;
+};
+
+const sourceName = (r: ResolutionRow) => r.section?.split(' - ')[0]?.trim() || r.product_line?.split(' - ')[0]?.trim() || null;
+
+const sourcesLine = (g: ResolutionRow[]) => {
+  const seen = new Map<string, string | null>();
+  for (const r of g) {
+    const name = sourceName(r);
+    if (name && !seen.has(name)) seen.set(name, r.effective_date ?? null);
+  }
+  return [...seen].map(([name, date]) => (date ? `${name} (${date})` : name)).join(' · ');
 };
 
 const statusTag = (r: ResolutionRow) => {
@@ -30,25 +55,27 @@ const statusTag = (r: ResolutionRow) => {
   return <Badge variant="success">Purchase Price</Badge>;
 };
 
-/** The resolved purchase prices of a `price_lookup` call, one table per price list. */
+/** The resolved purchase prices of a `price_lookup` call, one table per price basis — two lists with the same discount are one table. */
 export const PriceResolutionTable: React.FC<{ data: { rows?: ResolutionRow[] } }> = ({ data }) => {
   const rows = Array.isArray(data?.rows) ? data.rows : [];
   if (rows.length === 0) return <div className="text-sm text-muted-foreground">No price rows matched.</div>;
 
   const groups = new Map<string, ResolutionRow[]>();
   for (const r of rows) groups.set(groupKey(r), [...(groups.get(groupKey(r)) ?? []), r]);
+  const ordered = [...groups.values()].sort((a, b) => basisOf(a[0]) - basisOf(b[0]));
 
   return (
     <div className="space-y-4">
-      {[...groups.values()].map((g) => {
+      {ordered.map((g) => {
         const first = g[0];
         const quotes = [...new Set(g.flatMap((r) => (r.applied_rules ?? []).map((a) => a.quote).filter(Boolean) as string[]))];
         const warnings = [...new Set(g.flatMap((r) => r.warnings ?? []))];
+        const sources = sourcesLine(g);
         return (
           <div key={groupKey(first)} className="space-y-1.5">
             <div className="flex flex-wrap items-baseline gap-x-2">
               <h3 className="text-sm font-semibold">{groupTitle(first)}</h3>
-              {first.effective_date && <span className="text-xs text-muted-foreground">List of {first.effective_date}</span>}
+              {sources && <span className="text-xs text-muted-foreground">From {sources}</span>}
             </div>
             {quotes.map((q) => <p key={q} className="text-xs text-muted-foreground">Discount: {q}</p>)}
             <Table>

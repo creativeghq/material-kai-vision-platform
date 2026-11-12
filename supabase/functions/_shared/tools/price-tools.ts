@@ -174,10 +174,12 @@ export const createPriceLookupTool = (
             const { data: rrows, error: rerr } = await sb.rpc('resolve_purchase_prices', {
               p_workspace_id: workspaceId,
               p_query: [product_name, manufacturer, sku].filter(Boolean).join(' '),
-              p_limit: 20,
+              p_limit: 30,
+              p_per_doc: 10,
+              p_all_grades: true,
             });
             if (rerr) resolvedError = rerr.message;
-            else resolvedPrices = rrows ?? [];
+            else resolvedPrices = (rrows ?? []).map((r: any) => ({ ...r, grade: r.row_grade, section: r.row_section }));
             if (!rerr && resolvedPrices.length === 0) {
               const { data: sh } = await sb.rpc('price_supplier_hints', { p_workspace_id: workspaceId, p_query: [product_name, manufacturer, sku].filter(Boolean).join(' ') });
               supplierLines = sh ?? [];
@@ -193,7 +195,7 @@ export const createPriceLookupTool = (
               '- status purchase_price / discount_applied: final_net and final_gross are what we pay. Quote them as is and name the supplier, list and price_label.',
               '- status discount_applied: show the printed list price (printed_net), the discount as its text (applied_rules[].quote), and final_net / final_gross.',
               '- status list_price_conditional_rule or list_price_no_rule: the printed price is a LIST price. Do NOT present it as the purchase price. Show conditional_options (each with its own condition and net_if_applied) and say which condition decides it; if the same supplier has a purchase_price row for the same item, that row wins.',
-              '- Every row that answers the question goes IN the table, grouped by list (doc_slug), e.g. import prices and local-stock prices as separate groups. Never only mention another list or its price in prose.',
+              '- Every row that answers the question goes IN the table, one table per price basis: purchase prices (standard quality), purchase prices of lower qualities (grade lower, e.g. ECON / TTT), and discounted list prices (discount_applied) — two lists carrying the same discount are ONE table. Never only mention another list or its price in prose. A lower-quality row is its own option, never the price of the first-quality tile.',
               '- Always repeat the warnings array to the admin.',
               '- When you call submit_price_proposal, cite resolved_prices[].doc_id in source_doc_ids.',
             ].join('\n')
@@ -223,6 +225,8 @@ export const createPriceLookupTool = (
               warnings: r.warnings,
               applied_rules: r.applied_rules,
               conditional_options: r.conditional_options,
+              grade: r.grade,
+              section: r.section,
             })),
             timestamp: Date.now(),
           });
