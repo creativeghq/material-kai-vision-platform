@@ -12,11 +12,11 @@ import {
 const ROOT = join(__dirname, '..', '..');
 
 /** `select string_agg(quote_literal(enumlabel), ', ' order by enumsortorder)` on
- *  `moodboard_sheet_type`, 2026-08-27. Verbatim: it is evidence, not a list. */
+ *  `moodboard_sheet_type`, 2026-11-12. Verbatim: it is evidence, not a list. */
 const MOODBOARD_SHEET_TYPE_ENUM =
   "'material_board', 'color_palette', 'concept_board', 'lighting_plan', 'annotated_render', " +
   "'elevation_render_pair', 'ffe_schedule', 'full_deck', 'area_breakdown', 'plumbing_plan', " +
-  "'electrical_plan', 'scope_of_works'";
+  "'electrical_plan', 'scope_of_works', 'room_view'";
 
 function labels(agg: string): string[] {
   return [...agg.matchAll(/'([^']+)'/g)].map((m) => m[1]);
@@ -37,7 +37,7 @@ describe('#391 — the sheet vocabulary matches its Postgres enum', () => {
   it('the label extractor actually reads something', () => {
     // A parser returning [] would make the cases above pass by comparing nothing to
     // nothing — the quiet way a guard stops guarding.
-    expect(labels(MOODBOARD_SHEET_TYPE_ENUM)).toHaveLength(12);
+    expect(labels(MOODBOARD_SHEET_TYPE_ENUM)).toHaveLength(13);
     expect(labels('')).toEqual([]);
   });
 

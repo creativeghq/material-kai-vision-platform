@@ -4,7 +4,7 @@
  * step that does, and it starts from the finished composition.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, Link2, Sparkles, Loader2, Play, RotateCw } from 'lucide-react';
+import { Download, Link2, Sparkles, Loader2, Play, RotateCw, BookmarkPlus, ShoppingCart } from 'lucide-react';
 import { TileInstallStudioDialog } from '@/components/features/installation/TileInstallStudioDialog';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
@@ -16,8 +16,13 @@ import { STANDARD_GROUT_COLORS } from '@/constants/groutColors';
 import {
   renderSurface, patternWarning, normalizeFormat, PATTERNS, PATTERN_LABELS, hexToRgb,
   serializeRenderState, DEFAULT_RENDER_STATE, computeCoverage, wastageFor, compareSurfaceFidelity,
+  pinPointForSurface, orderQuantityForUnit,
   type Pattern, type Raster, type RenderState, type Pt, type WastageRates, type Fidelity,
 } from '@/lib/surfaceRenderer';
+import { roomViewService } from '@/services/roomViewService';
+import { AddToQuoteModal } from '@/modules/quotes/components/AddToQuoteModal';
+import { unitSuffix } from '@/lib/units';
+import { SaveToMoodboardDialog } from './SaveToMoodboardDialog';
 import { tileFormatLabel } from '@/components/features/roomplanner/surfaceFormat';
 import { visualizerService, SURFACE_KIND_LABELS, type VisualizerScene, type VisualizerSurface, type SurfaceProduct } from '@/services/visualizerService';
 import { loadRaster, loadMaskFor, drawRaster, rasterToBlob } from './raster';
@@ -69,6 +74,8 @@ export const SurfaceVisualizer: React.FC<Props> = ({
   const [photorealBusy, setPhotorealBusy] = useState(false);
   const [wastage, setWastage] = useState<WastageRates>({});
   const [installOpen, setInstallOpen] = useState(false);
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
 
   const surface = useMemo(() => surfaces.find((s) => s.key === surfaceKey) ?? null, [surfaces, surfaceKey]);
   const product = useMemo(() => products.find((p) => p.id === productId) ?? null, [products, productId]);
@@ -176,6 +183,51 @@ export const SurfaceVisualizer: React.FC<Props> = ({
     m2PerBox: product?.texture.packM2 ?? null,
   }) : null), [surface, format, product, groutWidthMm, pattern, rotationDeg, wastage]);
 
+  const order = coverage && product ? orderQuantityForUnit(coverage, product.unit) : null;
+
+  /** One surface, saved on a moodboard as a room view: the same sheet the moodboard's own editor makes. */
+  const saveToMoodboard = useCallback(async (board: { id: string; room_id: string | null }, title: string): Promise<string> => {
+    if (!rendered || !surface || !product || !base) throw new Error('Nothing rendered yet');
+    const png = await rasterToBlob(rendered);
+    const painted = (p: Pt) => {
+      if (!mask) return true;
+      const x = Math.min(mask.width - 1, Math.max(0, Math.floor(p.x * mask.width)));
+      const y = Math.min(mask.height - 1, Math.max(0, Math.floor(p.y * mask.height)));
+      const k = (y * mask.width + x) * 4;
+      return 0.2126 * mask.data[k] + 0.7152 * mask.data[k + 1] + 0.0722 * mask.data[k + 2] > 127;
+    };
+    const at = pinPointForSurface(surface.quad, painted);
+    const res = await roomViewService.save({
+      moodboardId: board.id,
+      title,
+      png,
+      roomId: board.room_id,
+      data: {
+        scene_id: scene.id,
+        scene_name: scene.name,
+        rendered_at: new Date().toISOString(),
+        layers: [{
+          surface_key: surface.key,
+          surface_kind: surface.kind,
+          surface_label: SURFACE_KIND_LABELS[surface.kind],
+          width_cm: surface.width_cm,
+          depth_cm: surface.depth_cm,
+          product_id: product.id,
+          product_name: product.name,
+          pattern,
+          pattern_label: PATTERN_LABELS[pattern],
+          grout_width_mm: groutWidthMm,
+          grout_color_hex: groutColorHex,
+          rotation_deg: rotationDeg,
+          format_label: tileFormatLabel(product.texture),
+          format_assumed: product.texture.formatSource === 'default',
+        }],
+        pins: [{ surface_key: surface.key, product_id: product.id, x: Math.round(at.x * 1e4) / 1e4, y: Math.round(at.y * 1e4) / 1e4 }],
+      },
+    });
+    return res.sheetId;
+  }, [rendered, surface, product, base, mask, scene, pattern, groutWidthMm, groutColorHex, rotationDeg]);
+
   const download = useCallback(async () => {
     if (!rendered) return;
     const blob = await rasterToBlob(rendered);
@@ -274,7 +326,27 @@ export const SurfaceVisualizer: React.FC<Props> = ({
           <Button size="sm" onClick={() => setInstallOpen(true)} disabled={!surface || !product}>
             <Play className="mr-1.5 h-3.5 w-3.5" />See it installed
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setSaveOpen(true)} disabled={!rendered}>
+            <BookmarkPlus className="mr-1.5 h-3.5 w-3.5" />Save to moodboard
+          </Button>
         </div>
+        <SaveToMoodboardDialog
+          open={saveOpen}
+          onOpenChange={setSaveOpen}
+          defaultTitle={product ? `${product.name} · ${scene.name}` : scene.name}
+          onSave={saveToMoodboard}
+        />
+        {quoteOpen && product && order && (
+          <AddToQuoteModal
+            productId={product.id}
+            productName={product.name}
+            productImage={product.texture.url ?? undefined}
+            defaultQuantity={order.quantity}
+            defaultNotes={`${surface ? SURFACE_KIND_LABELS[surface.kind] : 'Surface'}, ${PATTERN_LABELS[pattern]}, ${groutWidthMm} mm joint (${coverage?.wastagePercent}% cutting allowance)`}
+            onClose={() => setQuoteOpen(false)}
+            onSuccess={(name) => { toast({ title: 'Added to quote', description: `${product.name} added to "${name}"` }); setQuoteOpen(false); }}
+          />
+        )}
         <TileInstallStudioDialog
           open={installOpen}
           onOpenChange={setInstallOpen}
@@ -367,7 +439,21 @@ export const SurfaceVisualizer: React.FC<Props> = ({
             ))}
           </div>
         </div>
-        {coverage && <CoveragePanel coverage={coverage} compact={compact} />}
+        {coverage && (
+          <CoveragePanel
+            coverage={coverage}
+            compact={compact}
+            priceLine={order ? (
+              <Button size="sm" variant="outline" className="mt-1 h-7 w-full text-xs" onClick={() => setQuoteOpen(true)}>
+                <ShoppingCart className="mr-1.5 h-3.5 w-3.5" />Add {order.quantity} {unitSuffix(order.unit)} to a quote
+              </Button>
+            ) : (
+              <p className="mt-1 text-[11px] text-muted-foreground">
+                This product's selling unit is not recorded as m², box or piece, so this cannot become a quote line yet.
+              </p>
+            )}
+          />
+        )}
       </div>
     </div>
   );

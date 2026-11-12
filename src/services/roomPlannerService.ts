@@ -304,16 +304,17 @@ export const roomPlannerService = {
    * albedo when one exists, else the product photo, else none — and the format either way.
    * Throws on either read failing; a caller that swallowed that would show flat colours as fact.
    */
-  async surfaceTexturesForProducts(workspaceId: string, productIds: string[]): Promise<Map<string, SurfaceTexture>> {
+  async surfaceTexturesForProducts(workspaceId: string | null, productIds: string[]): Promise<Map<string, SurfaceTexture>> {
     const out = new Map<string, SurfaceTexture>();
     const ids = [...new Set(productIds.filter(Boolean))];
     if (ids.length === 0) return out;
+    let productsQuery = supabase
+      .from('products')
+      .select(`id, attributes, metadata, ${PRODUCT_IMAGE_SELECT}`)
+      .in('id', ids);
+    if (workspaceId) productsQuery = productsQuery.eq('workspace_id', workspaceId);
     const [productsRes, albedoByProduct] = await Promise.all([
-      supabase
-        .from('products')
-        .select(`id, attributes, metadata, ${PRODUCT_IMAGE_SELECT}`)
-        .eq('workspace_id', workspaceId)
-        .in('id', ids),
+      productsQuery,
       productMaterialMapsService.selectedAlbedoByProduct(ids),
     ]);
     if (productsRes.error) throw productsRes.error;

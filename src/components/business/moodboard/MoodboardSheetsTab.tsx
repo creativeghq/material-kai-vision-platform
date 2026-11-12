@@ -30,6 +30,8 @@ import { HubEmptyState } from '@/components/core/hub';
 interface MoodboardSheetsTabProps {
   moodboardId: string;
   moodboardTitle: string;
+  /** A room view is drawn in the Room Views tab, not the wizard. */
+  onOpenRoomViews?: () => void;
 }
 
 const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
@@ -44,20 +46,21 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   ffe_schedule: 'Furniture, Fixtures & Equipment table',
   scope_of_works: 'What will happen — phases and works, from the client-visible tasks on the project',
   area_breakdown: 'Composited design board: hero render + plan + elevation + finishes',
+  room_view: 'Moodboard products laid on a room at their real size, with numbered pins',
   full_deck: 'Multi-page presentation deck assembling outputs from other tools',
 };
 
 // Sheet types finished on a drawing canvas (SheetCanvasCard) rather than up-front wizard inputs.
 
 const SHEET_GROUPS: { label: string; types: SheetType[] }[] = [
-  { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown'] },
+  { label: 'Boards', types: ['material_board', 'color_palette', 'concept_board', 'area_breakdown', 'room_view'] },
   { label: 'Plans', types: ['lighting_plan', 'plumbing_plan', 'electrical_plan', 'annotated_render', 'elevation_render_pair'] },
   // A scope sheet answers what will HAPPEN, where the FF&E schedule answers what is supplied.
   { label: 'Schedules', types: ['ffe_schedule', 'scope_of_works'] },
   { label: 'Decks', types: ['full_deck'] },
 ];
 
-export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardSheetsTabProps) {
+export function MoodboardSheetsTab({ moodboardId, moodboardTitle, onOpenRoomViews }: MoodboardSheetsTabProps) {
   const { toast } = useToast();
   const [sheets, setSheets] = useState<PresentationSheet[]>([]);
   const [loading, setLoading] = useState(true);
@@ -124,6 +127,10 @@ export function MoodboardSheetsTab({ moodboardId, moodboardTitle }: MoodboardShe
   // (moodboard already known → it skips straight to the type-specific inputs).
   const launchWizardForSheet = (sheetType: SheetType) => {
     setPreviewType(null);
+    if (sheetType === 'room_view') {
+      onOpenRoomViews?.();
+      return;
+    }
     setWizardType(sheetType);
     setWizardOpen(true);
   };

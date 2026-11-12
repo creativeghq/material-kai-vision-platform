@@ -59,6 +59,8 @@ export interface SurfaceProduct {
   id: string;
   name: string;
   texture: SurfaceTexture;
+  unit?: string | null;
+  updatedAt?: string | null;
 }
 
 const PICKER_LIMIT = 200;
@@ -291,23 +293,32 @@ export const visualizerService = {
    * fetched even when they sort past the picker's cap — a deep link names one product.
    */
   async listSurfaceProducts(workspaceId: string, ensureIds: string[] = []): Promise<SurfaceProduct[]> {
+    const cols = 'id, name, updated_at, unit:metadata->>unit';
+    type Row = { id: string; name: string; updated_at: string | null; unit: string | null };
     const { data, error } = await supabase
       .from('products')
-      .select('id, name')
+      .select(cols)
       .eq('workspace_id', workspaceId)
       .order('name')
       .limit(PICKER_LIMIT);
     if (error) throw error;
-    const rows = (data ?? []) as { id: string; name: string }[];
+    const rows = (data ?? []) as unknown as Row[];
     const missing = ensureIds.filter((id) => id && !rows.some((r) => r.id === id));
     if (missing.length > 0) {
-      const { data: extra, error: extraErr } = await supabase.from('products').select('id, name').in('id', missing);
+      const { data: extra, error: extraErr } = await supabase.from('products').select(cols).in('id', missing);
       if (extraErr) throw extraErr;
-      rows.push(...((extra ?? []) as { id: string; name: string }[]));
+      rows.push(...((extra ?? []) as unknown as Row[]));
     }
-    const textures = await roomPlannerService.surfaceTexturesForProducts(workspaceId, rows.map((r) => r.id));
+    const own = rows.filter((r) => !missing.includes(r.id)).map((r) => r.id);
+    const [ownTextures, namedTextures] = await Promise.all([
+      roomPlannerService.surfaceTexturesForProducts(workspaceId, own),
+      roomPlannerService.surfaceTexturesForProducts(null, missing),
+    ]);
+    const textures = new Map([...ownTextures, ...namedTextures]);
     return rows
-      .map((r) => ({ id: r.id, name: r.name, texture: textures.get(r.id) }))
-      .filter((p): p is SurfaceProduct => !!p.texture && !!p.texture.url);
+      .flatMap((r): SurfaceProduct[] => {
+        const texture = textures.get(r.id);
+        return texture?.url ? [{ id: r.id, name: r.name, texture, unit: r.unit, updatedAt: r.updated_at }] : [];
+      });
   },
 };

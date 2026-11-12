@@ -8,7 +8,7 @@ import {
   DialogFooter,
 } from '@/components/core/ui/dialog';
 import { Button } from '@/components/core/ui/button';
-import { Sparkles, FileImage, Layers, Lightbulb, Droplets, Zap, Ruler, ListTree, FileText, Album, LayoutGrid, ListChecks } from 'lucide-react';
+import { Sparkles, FileImage, Layers, Lightbulb, Droplets, Zap, Ruler, ListTree, FileText, Album, LayoutGrid, ListChecks, Grid3x3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import {
   SHEET_TYPE_LABELS,
@@ -108,6 +108,13 @@ const SHEET_TYPE_META: Record<SheetType, SheetTypeMeta> = {
       'Optional: show who is doing each item (off by default — a client document should not disclose your subcontractors unless you decide it should)',
     ],
     bestFor: 'The scope section of a proposal, and the programme a client refers back to once work starts.',
+  },
+  room_view: {
+    icon: Grid3x3,
+    what: 'Your moodboard products laid on a room photo at their real format — the floor in one product, the wall in another — with the pattern and joint you chose, and a numbered pin on each surface.',
+    produces: 'A 1-page A3 PDF: the room render with a numbered pin per surface and a legend naming each product, its format, pattern and joint. Shown on the Client View with pins the client can open.',
+    inputs: ['A room — one of the library rooms or a photo of your own', 'A product for each surface you want to finish', 'Pattern, joint width and colour per surface'],
+    bestFor: 'Showing a client exactly how the chosen tile reads in a room, at its true size, before anything is ordered.',
   },
   full_deck: {
     icon: FileText,

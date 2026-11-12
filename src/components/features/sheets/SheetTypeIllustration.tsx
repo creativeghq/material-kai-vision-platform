@@ -389,6 +389,29 @@ export function SheetTypeIllustration({ sheetType, className }: Props) {
           </>
         );
 
+      case 'room_view':
+        return (
+          <>
+            {/* Back wall in a tile grid, floor in perspective, two numbered pins */}
+            <rect x={40} y={20} width={170} height={95} fill={paper} stroke={ink} strokeWidth={0.8} />
+            {[0, 1, 2, 3, 4].map((r) => (
+              <line key={`h${r}`} x1={40} y1={20 + r * 19} x2={210} y2={20 + r * 19} stroke={ink} strokeWidth={0.3} opacity={0.5} />
+            ))}
+            {[0, 1, 2, 3, 4, 5, 6].map((c) => (
+              <line key={`v${c}`} x1={40 + c * 28.3} y1={20} x2={40 + c * 28.3} y2={115} stroke={ink} strokeWidth={0.3} opacity={0.5} />
+            ))}
+            <path d="M40,115 L210,115 L245,165 L5,165 Z" fill={accent1} stroke={ink} strokeWidth={0.8} opacity={0.85} />
+            {[0, 1, 2, 3, 4, 5, 6].map((c) => (
+              <line key={`f${c}`} x1={40 + c * 28.3} y1={115} x2={5 + c * 40} y2={165} stroke={ink} strokeWidth={0.3} opacity={0.5} />
+            ))}
+            <rect x={150} y={78} width={46} height={37} fill={accent4} stroke={ink} strokeWidth={0.5} />
+            <circle cx={95} cy={60} r={6} fill={red} />
+            <text x={92.5} y={62.5} fontSize={7} fill={paper} fontWeight="bold">1</text>
+            <circle cx={120} cy={142} r={6} fill={red} />
+            <text x={117.5} y={144.5} fontSize={7} fill={paper} fontWeight="bold">2</text>
+          </>
+        );
+
       case 'full_deck':
         return (
           <>

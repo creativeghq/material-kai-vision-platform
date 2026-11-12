@@ -7,3 +7,4 @@ export * from './fidelity';
 export * from './productSpecKeys';
 export * from './render';
 export * from './state';
+export * from './roomView';

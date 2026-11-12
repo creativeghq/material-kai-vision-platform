@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Trash2, Home, Loader2, Ruler } from 'lucide-react';
+import { Plus, Trash2, Home, Loader2, Ruler, Grid3x3 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
@@ -58,12 +59,23 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
   const [newDeadline, setNewDeadline] = useState('');
   const [creating, setCreating] = useState(false);
   const [geometryRoom, setGeometryRoom] = useState<ProjectRoom | null>(null);
+  // Room views saved on this project's moodboards, by the room they were saved for (#560).
+  const [roomViews, setRoomViews] = useState<Map<string, Array<{ id: string; title: string | null; moodboard_id: string | null }>>>(new Map());
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await projectsService.listRooms(projectId);
+      const [data, sheets] = await Promise.all([
+        projectsService.listRooms(projectId),
+        projectsService.listProjectSheets(projectId).catch(() => []),
+      ]);
       setRooms(data);
+      const byRoom = new Map<string, Array<{ id: string; title: string | null; moodboard_id: string | null }>>();
+      for (const s of sheets) {
+        if (s.sheet_type !== 'room_view' || !s.room_id) continue;
+        byRoom.set(s.room_id, [...(byRoom.get(s.room_id) ?? []), { id: s.id, title: s.title, moodboard_id: s.moodboard_id }]);
+      }
+      setRoomViews(byRoom);
     } catch (_err) {
       toast({ title: 'Failed to load rooms', variant: 'destructive' });
     } finally {
@@ -195,6 +207,19 @@ export const RoomsTab: React.FC<RoomsTabProps> = ({ projectId, budgetCurrency, i
                     <span>Due {new Date(r.deadline).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</span>
                   )}
                 </div>
+                {(roomViews.get(r.id) ?? []).length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {(roomViews.get(r.id) ?? []).map((v) => (
+                      <Link
+                        key={v.id}
+                        to={v.moodboard_id ? `/moodboard/${v.moodboard_id}?tab=room-views&view=${v.id}` : '#'}
+                        className="inline-flex items-center gap-1 rounded-sm border border-hairline px-1.5 py-0.5 text-[11px] hover:bg-surface-hover"
+                      >
+                        <Grid3x3 className="h-3 w-3" />{v.title || 'Room View'}
+                      </Link>
+                    ))}
+                  </div>
+                )}
                 {(() => {
                   const summary = roomGeometrySummary(r);
                   return (

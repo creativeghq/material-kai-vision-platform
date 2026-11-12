@@ -240,6 +240,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
     const sheetIds: string[] = Array.isArray(view.sheet_ids) ? view.sheet_ids : [];
     let sheets: { id: string; sheet_type: string; title: string }[] = [];
     let lightingImageUrl: string | null = null;
+    let room_views: unknown[] = [];
     if (sheetIds.length > 0) {
       const { data: rows } = await supabase
         .from('moodboard_presentation_sheets')
@@ -248,6 +249,35 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       const byId = new Map((rows || []).map((r: any) => [r.id, r]));
       const ordered = sheetIds.map((id) => byId.get(id)).filter(Boolean) as any[];
       sheets = ordered.map((r) => ({ id: r.id, sheet_type: r.sheet_type, title: r.title }));
+      // Room views (#560): the picture plus its pins. Projected field by field — the sheet data is
+      // ours, but a client copy carries names and laying spec only, never a cost or a supplier.
+      room_views = await Promise.all(ordered.filter((r) => r.sheet_type === 'room_view').map(async (r) => {
+        const d = r.data || {};
+        const layers = (Array.isArray(d.layers) ? d.layers : []).slice(0, 12).map((l: any) => ({
+          surface_key: String(l?.surface_key ?? ''),
+          surface_label: String(l?.surface_label ?? ''),
+          product_id: String(l?.product_id ?? ''),
+          product_name: String(l?.product_name ?? ''),
+          pattern_label: String(l?.pattern_label ?? ''),
+          grout_width_mm: Number(l?.grout_width_mm ?? 0),
+          format_label: String(l?.format_label ?? ''),
+          format_assumed: l?.format_assumed === true,
+        }));
+        const pins = (Array.isArray(d.pins) ? d.pins : []).slice(0, 12).map((p: any) => ({
+          surface_key: String(p?.surface_key ?? ''),
+          product_id: String(p?.product_id ?? ''),
+          x: Math.max(0, Math.min(1, Number(p?.x ?? 0))),
+          y: Math.max(0, Math.min(1, Number(p?.y ?? 0))),
+        }));
+        return {
+          id: r.id,
+          title: r.title,
+          scene_name: typeof d.scene_name === 'string' ? d.scene_name : null,
+          image_url: await signSheetAsset(supabase, typeof d.render_image_url === 'string' ? d.render_image_url : null),
+          layers,
+          pins,
+        };
+      }));
       lightingImageUrl = await signSheetAsset(
         supabase,
         deriveLightingImage(ordered) || (view.cover?.cover_image_url ?? null),
@@ -435,6 +465,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         ffe,
         lighting_image_url: view.embed_lighting ? lightingImageUrl : null,
         room_plan,
+        room_views,
         snags,
       },
     });

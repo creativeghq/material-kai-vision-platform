@@ -41102,6 +41102,7 @@ export type Database = {
         | "plumbing_plan"
         | "electrical_plan"
         | "scope_of_works"
+        | "room_view"
       pdf_extraction_type: "markdown" | "tables" | "images" | "all"
       presentation_catalog_status:
         | "draft"
@@ -41426,6 +41427,7 @@ export const Constants = {
         "plumbing_plan",
         "electrical_plan",
         "scope_of_works",
+        "room_view",
       ],
       pdf_extraction_type: ["markdown", "tables", "images", "all"],
       presentation_catalog_status: [

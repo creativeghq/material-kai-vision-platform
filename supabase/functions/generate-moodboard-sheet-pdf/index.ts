@@ -47,6 +47,7 @@ import {
 } from './data-fetcher.ts';
 import {
   buildAnnotatedRender,
+  buildRoomView,
   buildAreaBreakdown,
   buildColorPalette,
   buildScopeOfWorks,
@@ -354,6 +355,14 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
       }
       case 'area_breakdown':
         await buildAreaBreakdown(pdfDoc, fonts, td, sheet.data || {});
+        break;
+      case 'room_view':
+        await buildRoomView(pdfDoc, fonts, td, {
+          render_image_url: sheet.data.render_image_url,
+          layers: sheet.data.layers || [],
+          pins: sheet.data.pins || [],
+          resolveChips: (ids) => fetchProductChips(supabase, ids, scopeWorkspaceIds),
+        });
         break;
       case 'scope_of_works': {
         let phases = sheet.data.phases || [];
@@ -747,6 +756,10 @@ function validatePdfContent(sheet_type: string, data: Record<string, any> | unde
         && !(Array.isArray(d.finishes) && d.finishes.length)) {
         return 'area_breakdown needs at least a hero_image_url (or a plan/elevation image, or finishes).';
       }
+      return null;
+    case 'room_view':
+      if (!d.render_image_url) return "Missing render_image_url for room_view — save it from the moodboard's Room Views tab.";
+      if (!Array.isArray(d.layers) || d.layers.length === 0) return 'No surfaces — room_view needs at least one finished surface.';
       return null;
     case 'full_deck':
       if (!Array.isArray(d.included_sheet_ids) || d.included_sheet_ids.length === 0) {

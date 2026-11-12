@@ -51,6 +51,7 @@ const SHEET_LABELS: Record<string, string> = {
   ffe_schedule: 'FF&E SCHEDULE',
   area_breakdown: 'AREA BREAKDOWN',
   scope_of_works: 'SCOPE OF WORKS',
+  room_view: 'ROOM VIEW',
   full_deck: 'PRESENTATION DECK',
 };
 
@@ -797,10 +798,13 @@ export async function buildAnnotatedRender(
     backdrop_image_url: string;
     annotations: AnnotationData[];
     chips?: ProductChip[];
+    subtitle?: string;
+    legendTitle?: string;
+    footnote?: string;
   },
 ): Promise<void> {
   const page = newSheetPage(pdfDoc);
-  const cy = drawSheetHeader(page, fonts, td.sheet_title, 'Annotated render');
+  const cy = drawSheetHeader(page, fonts, td.sheet_title, payload.subtitle ?? 'Annotated render');
 
   // Render area left 65%, legend right 35%
   const renderW = CONTENT_W * 0.65;
@@ -859,9 +863,14 @@ export async function buildAnnotatedRender(
   // Right legend with up to 8 chips
   const legendX = renderX + renderW + 16;
   let ly = cy - 12;
-  page.drawText('MATERIAL SELECTION', {
+  page.drawText(payload.legendTitle ?? 'MATERIAL SELECTION', {
     x: legendX, y: ly, size: 10, font: fonts.bold, color: COLOR_DARK,
   });
+  if (payload.footnote) {
+    page.drawText(truncate(payload.footnote, 140), {
+      x: renderX, y: renderY - 12, size: 7, font: fonts.regular, color: COLOR_GRAY,
+    });
+  }
   ly -= 18;
   const chips = (payload.chips || []).slice(0, 8);
   for (const chip of chips) {
@@ -909,6 +918,88 @@ async function drawLegendChip(
       dy -= 9;
     }
   }
+}
+
+/** One finished surface of a room view, as the sheet stores it. */
+export interface RoomViewLayer {
+  surface_key: string;
+  surface_label?: string;
+  product_id: string;
+  product_name?: string;
+  pattern_label?: string;
+  grout_width_mm?: number;
+  format_label?: string;
+  format_assumed?: boolean;
+}
+
+export interface RoomViewPin {
+  surface_key: string;
+  product_id: string;
+  x: number;
+  y: number;
+}
+
+/** The legend text for one surface: where it is laid and how. */
+export function roomViewLayerSpec(layer: RoomViewLayer): string {
+  const parts = [
+    layer.surface_label,
+    layer.format_label ? `${layer.format_label}${layer.format_assumed ? ' (assumed format)' : ''}` : null,
+    layer.pattern_label,
+    typeof layer.grout_width_mm === 'number' ? `${layer.grout_width_mm} mm joint` : null,
+  ].filter(Boolean);
+  return parts.join(' · ');
+}
+
+// 5b. ROOM VIEW — a deterministic surface render with a numbered pin per finished surface.
+export async function buildRoomView(
+  pdfDoc: PDFDocument,
+  fonts: SheetFonts,
+  td: TitleBlockData,
+  payload: {
+    render_image_url: string;
+    layers: RoomViewLayer[];
+    pins: RoomViewPin[];
+    resolveChips: (ids: string[]) => Promise<ProductChip[]>;
+  },
+): Promise<void> {
+  const layers = payload.layers || [];
+  const ids = [...new Set(layers.map((l) => l.product_id).filter(Boolean))];
+  const fetched = ids.length ? await payload.resolveChips(ids) : [];
+  const byId = new Map(fetched.map((c) => [c.product_id, c]));
+  // One legend entry per SURFACE, in pin order, so the number on the picture matches the legend.
+  const chips: ProductChip[] = [];
+  layers.forEach((layer, i) => {
+    const chip = byId.get(layer.product_id);
+    if (!chip) return;
+    chips.push({
+      ...chip,
+      name: `${i + 1}. ${chip.name}`,
+      description: roomViewLayerSpec(layer),
+    });
+  });
+  const annotations: AnnotationData[] = (payload.pins || []).map((pin) => {
+    const idx = layers.findIndex((l) => l.surface_key === pin.surface_key);
+    const layer = layers[idx];
+    const name = byId.get(pin.product_id)?.name ?? layer?.product_name ?? 'Product';
+    const right = pin.x < 0.75;
+    return {
+      x: pin.x,
+      y: pin.y,
+      line_endpoint_x: Math.max(0, Math.min(1, pin.x + (right ? 0.06 : -0.2))),
+      line_endpoint_y: Math.max(0, Math.min(1, pin.y - 0.06)),
+      label: `${idx + 1}  ${name}`,
+      product_id: pin.product_id,
+      source: 'auto',
+    };
+  });
+  await buildAnnotatedRender(pdfDoc, fonts, td, {
+    backdrop_image_url: payload.render_image_url,
+    annotations,
+    chips,
+    subtitle: 'Room view',
+    legendTitle: 'SURFACES',
+    footnote: "Drawn from each product's face at its recorded size and pattern. A visualisation, not a photograph.",
+  });
 }
 
 // 6. ELEVATION + RENDER PAIR — uploaded elevation w/ user dims, render below.
@@ -1604,6 +1695,14 @@ export async function buildSheetForDeck(
       buildScopeOfWorks(pdfDoc, fonts, td, phases, { intro: sheet.data.intro ?? null });
       break;
     }
+    case 'room_view':
+      await buildRoomView(pdfDoc, fonts, td, {
+        render_image_url: sheet.data.render_image_url,
+        layers: sheet.data.layers || [],
+        pins: sheet.data.pins || [],
+        resolveChips,
+      });
+      break;
     default:
       // Unknown sub-sheet type — emit a placeholder page
       const page = newSheetPage(pdfDoc);

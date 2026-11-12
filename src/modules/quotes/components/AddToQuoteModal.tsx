@@ -23,6 +23,10 @@ interface AddToQuoteModalProps {
   productName?: string;
   productImage?: string;
   defaultQuantity?: number;
+  /** Prefilled line note, e.g. the laying spec a quantity was computed from. */
+  defaultNotes?: string;
+  /** The project room this line is for. */
+  roomId?: string | null;
   onClose: () => void;
   onSuccess: (quoteName: string) => void;
 }
@@ -32,6 +36,8 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
   productName,
   productImage,
   defaultQuantity = 1,
+  defaultNotes = '',
+  roomId = null,
   onClose,
   onSuccess,
 }) => {
@@ -55,7 +61,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
   const [showCreate, setShowCreate] = useState(false);
   const [newQuoteName, setNewQuoteName] = useState('');
   const [creating, setCreating] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(defaultNotes);
   // FF&E fields
   const [showFFE, setShowFFE] = useState(false);
   const [room, setRoom] = useState('');
@@ -98,6 +104,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         added_from: '3d_generation',
         ...identityFields,
         ...(room && { room }),
+        ...(roomId && { room_id: roomId }),
         ...(dimensions && { dimensions }),
         ...(installationRequirements && { installation_requirements: installationRequirements }),
       });
@@ -134,6 +141,7 @@ export const AddToQuoteModal: React.FC<AddToQuoteModalProps> = ({
         added_from: 'manual',
         ...identityFields,
         ...(room && { room }),
+        ...(roomId && { room_id: roomId }),
         ...(dimensions && { dimensions }),
         ...(installationRequirements && { installation_requirements: installationRequirements }),
       });

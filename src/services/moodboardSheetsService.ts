@@ -67,6 +67,7 @@ export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   ffe_schedule: 'FF&E Schedule',
   area_breakdown: 'Area Breakdown',
   scope_of_works: 'Scope of Works',
+  room_view: 'Room View',
   full_deck: 'Full Presentation Deck',
 };
 
@@ -98,6 +99,7 @@ export const SHEET_TYPE_CREDITS: Record<SheetType, number> = {
   // Same as ffe_schedule: both read a table the platform already holds and render it. No
   // image generation, no model call — the cost is the render itself.
   scope_of_works: 1,
+  room_view: 1,
   full_deck: 5,
 };
 

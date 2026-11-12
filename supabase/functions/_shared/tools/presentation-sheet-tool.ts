@@ -182,6 +182,9 @@ export const createPresentationSheetTool = (
         'scope_of_works (what will HAPPEN: phases and the works inside them, derived from the '+
         'CLIENT-VISIBLE tasks on the project. Pass project_id and it builds itself. No prices — '+
         'money lives on the FF&E schedule and the quote). '+
+        'room_view (products laid on a room photo at their real format, with numbered pins, 1) is drawn in the ' +
+        'browser, so do NOT create it here: call visualize_on_surface and tell the user to press "Save to moodboard", ' +
+        'or point them to the moodboard\'s Room Views tab. ' +
         'Passive types (material_board, color_palette, concept_board, ffe_schedule, area_breakdown, scope_of_works) ' +
         'generate the PDF immediately. Interactive types (lighting_plan, plumbing_plan, electrical_plan, annotated_render, ' +
         'elevation_render_pair, full_deck) open a canvas widget for user input first. ALWAYS pass a sensible ' +

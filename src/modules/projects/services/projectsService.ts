@@ -1663,6 +1663,7 @@ class ProjectsService {
     id: string;
     moodboard_id: string | null;
     moodboard_title: string | null;
+    room_id: string | null;
     sheet_type: string;
     title: string | null;
     status: string;

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { Loader2, Box, Sun, Check, MessageSquare, FileText } from 'lucide-react';
+import { Loader2, Box, Sun, Check, MessageSquare, FileText, Grid3x3 } from 'lucide-react';
+import { RoomViewHotspots, type HotspotLayer, type HotspotPin } from '@/components/features/visualizer/RoomViewHotspots';
 import { Button } from '@/components/core/ui/button';
 import { Card } from '@/components/core/ui/card';
 import { supabase } from '@/integrations/supabase/client';
@@ -52,6 +53,8 @@ interface ClientViewData {
   ffe: CvFfe | null;
   lighting_image_url: string | null;
   snags?: CvSnag[];
+  /** Room views (#560): a picture with a pin per finished surface. */
+  room_views?: Array<{ id: string; title: string; scene_name: string | null; image_url: string | null; layers: HotspotLayer[]; pins: HotspotPin[] }>;
 }
 
 const LIGHTING_PRESETS: { label: string; filter: string }[] = [
@@ -77,6 +80,9 @@ export default function PublicClientViewPage() {
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  // A question asked from a room-view pin is filed against that sheet.
+  const [aboutSheetId, setAboutSheetId] = useState<string | null>(null);
+  const feedbackRef = useRef<HTMLTextAreaElement>(null);
 
   const sessionId = useRef<string>(
     typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
@@ -110,7 +116,7 @@ export default function PublicClientViewPage() {
         body: {
           token,
           session_id: sessionId.current,
-          feedback: { kind, status, author_name: authorName || null, body: comment || null },
+          feedback: { kind, status, author_name: authorName || null, body: comment || null, sheet_id: aboutSheetId },
         },
       });
       setSubmitted(
@@ -119,6 +125,7 @@ export default function PublicClientViewPage() {
         : 'Thanks — your comment has been sent.',
       );
       setComment('');
+      setAboutSheetId(null);
     } catch {
       setSubmitted('Could not send right now — please try again.');
     } finally {
@@ -188,6 +195,38 @@ export default function PublicClientViewPage() {
           <Card className="dashboard-card p-6 text-sm text-muted-foreground">
             The presentation PDF is still being prepared. Please check back shortly.
           </Card>
+        )}
+
+        {(view.room_views ?? []).length > 0 && (
+          <section>
+            <h2 className="text-lg font-semibold flex items-center gap-2 mb-3"><Grid3x3 className="h-5 w-5 text-primary" /> Room Views</h2>
+            <p className="mb-3 text-sm text-muted-foreground">Tap a number to see what is laid on that surface.</p>
+            <div className="grid gap-6">
+              {(view.room_views ?? []).map((rv) => (
+                <div key={rv.id}>
+                  <RoomViewHotspots
+                    imageUrl={httpUrlOrNull(rv.image_url)}
+                    alt={rv.title}
+                    layers={rv.layers}
+                    pins={rv.pins}
+                    actions={view.feedback_enabled ? (layer) => (
+                      <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                        setAboutSheetId(rv.id);
+                        setComment(`About ${layer.product_name} on the ${layer.surface_label.toLowerCase()}: `);
+                        setSubmitted(null);
+                        feedbackRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        window.setTimeout(() => feedbackRef.current?.focus(), 300);
+                      }}>
+                        <MessageSquare className="mr-1 h-3 w-3" />Ask about this
+                      </Button>
+                    ) : undefined}
+                  />
+                  <p className="mt-2 text-sm font-medium">{rv.title}</p>
+                  <p className="text-xs text-muted-foreground">Each product is drawn from its face at its recorded size. A visualisation, not a photograph.</p>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
         {/* The arranged room (#259 Ph4). Drawn to scale from the same resolved footprints the
@@ -397,6 +436,7 @@ export default function PublicClientViewPage() {
                     className="w-full rounded-md bg-background border border-border px-3 py-2 text-sm"
                   />
                   <textarea
+                    ref={feedbackRef}
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
                     placeholder="Leave a comment, or note any changes you'd like…"

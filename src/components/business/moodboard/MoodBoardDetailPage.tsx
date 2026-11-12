@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Trash2,
@@ -21,6 +21,7 @@ import {
   Search,
   CheckCircle2,
   RotateCcw,
+  Grid3x3,
 } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { SaveAsTemplateDialog } from '@/components/features/templates/SaveAsTemplateDialog';
@@ -40,6 +41,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { getProductName, getManufacturer } from '@/utils/productMetadata';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { MoodboardSheetsTab } from './MoodboardSheetsTab';
+import { MoodboardRoomViewsTab } from './MoodboardRoomViewsTab';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatDate } from '@/utils/datetime';
 import { PlatformIcon } from '@/components/core/icons/PlatformIcon';
 
@@ -91,6 +95,16 @@ export const MoodBoardDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { activeWorkspaceId } = useWorkspace();
+  const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tab = searchParams.get('tab') ?? 'products';
+  const setTab = (next: string) => {
+    const p = new URLSearchParams(searchParams);
+    p.set('tab', next);
+    if (next !== 'room-views') { p.delete('view'); p.delete('product'); }
+    setSearchParams(p, { replace: true });
+  };
 
   const [loading, setLoading] = useState(true);
   const [moodboard, setMoodboard] = useState<MoodBoard | null>(null);
@@ -584,7 +598,7 @@ export const MoodBoardDetailPage: React.FC = () => {
 
       {/* ── Tabs: Items grid | Tools (presentation-sheet generators) ────────── */}
       <div className="px-3 sm:px-6 py-4 sm:py-8">
-        <Tabs defaultValue="products" className="space-y-4">
+        <Tabs value={tab} onValueChange={setTab} className="space-y-4">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger
               value="products"
@@ -592,6 +606,13 @@ export const MoodBoardDetailPage: React.FC = () => {
             >
               <Layers className="h-4 w-4" />
               Items
+            </TabsTrigger>
+            <TabsTrigger
+              value="room-views"
+              className="flex items-center gap-2"
+            >
+              <Grid3x3 className="h-4 w-4" />
+              Room Views
             </TabsTrigger>
             <TabsTrigger
               value="sheets"
@@ -683,6 +704,23 @@ export const MoodBoardDetailPage: React.FC = () => {
                         <Eye className="h-4 w-4 text-gray-800" />
                       </button>
                     )}
+                    {!isMedia && item.material_id && user?.id === moodboard?.userId && (
+                      <button
+                        className="w-9 h-9 rounded-full bg-white/90 hover:bg-white flex items-center justify-center shadow-lg transition-colors"
+                        title="See it in a room"
+                        aria-label="See it in a room"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const p = new URLSearchParams(searchParams);
+                          p.set('tab', 'room-views');
+                          p.set('product', item.material_id!);
+                          p.delete('view');
+                          setSearchParams(p, { replace: true });
+                        }}
+                      >
+                        <Grid3x3 className="h-4 w-4 text-gray-800" />
+                      </button>
+                    )}
                     <button
                       className="w-9 h-9 rounded-full bg-white/90 hover:bg-red-50 flex items-center justify-center shadow-lg transition-colors"
                       title="Remove from moodboard"
@@ -703,11 +741,32 @@ export const MoodBoardDetailPage: React.FC = () => {
         )}
           </TabsContent>
 
+          <TabsContent value="room-views" className="m-0">
+            {moodboard && activeWorkspaceId && (
+              <MoodboardRoomViewsTab
+                key={`${searchParams.get('view') ?? ''}:${searchParams.get('product') ?? ''}`}
+                workspaceId={activeWorkspaceId}
+                moodboardId={moodboard.id}
+                moodboardRoomId={moodboard.roomId ?? null}
+                productIds={items.map((i) => i.material_id).filter((x): x is string => !!x)}
+                canEdit={!!user && user.id === moodboard.userId}
+                initialViewId={searchParams.get('view')}
+                initialProductId={searchParams.get('product')}
+                onOpenProduct={(productId) => {
+                  const item = items.find((i) => i.material_id === productId);
+                  if (item) handleProductClick(item);
+                  else toast({ title: 'That product is no longer on this moodboard' });
+                }}
+              />
+            )}
+          </TabsContent>
+
           <TabsContent value="sheets" className="m-0">
             {moodboard && (
               <MoodboardSheetsTab
                 moodboardId={moodboard.id}
                 moodboardTitle={moodboard.title}
+                onOpenRoomViews={() => setTab('room-views')}
               />
             )}
           </TabsContent>
