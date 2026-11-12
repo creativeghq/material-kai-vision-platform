@@ -52,7 +52,6 @@
     "src/modules/email/pages/EmailTemplateBuilderPage.tsx",
     "src/modules/presentation-catalogs/pages/CatalogBuilderPage.tsx",
     "src/modules/projects/pages/ProjectDetailPage.tsx",
-    "src/modules/quotes/pages/QuoteDetailRoute.tsx",
     "src/modules/quotes/pages/QuotePreviewPage.tsx",
     "src/modules/real-estate/pages/PropertyWorkbench.tsx",
     "src/pages/Admin/OrderDetailPage.tsx",

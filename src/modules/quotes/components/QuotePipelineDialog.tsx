@@ -17,6 +17,7 @@ import { useToast } from '@/hooks/use-toast';
 import { parseDecimal } from '@/utils/decimal';
 import { dealsService, type DealStage, type DealType } from '@/services/dealsService';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { humanizeLabel } from '@/utils/humanize';
 
 export interface PipelineQuote {
   id: string;
@@ -238,15 +239,13 @@ export const QuoteDealLink: React.FC<{ quote: PipelineQuote; editable: boolean; 
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <Workflow className="h-4 w-4 text-muted-foreground" />
-      <span className="text-xs font-medium text-muted-foreground">Pipeline</span>
+    <div className="flex flex-wrap items-center gap-1 text-sm">
       {quote.deal_id ? (
         <>
           <Link to={`/crm/deals/${quote.deal_id}`} className="text-primary hover:underline">
             {deal?.title ?? 'Open deal'}
           </Link>
-          {deal && <span className="text-xs capitalize text-muted-foreground">· {deal.status}</span>}
+          {deal && <span className="text-xs text-muted-foreground">· {humanizeLabel(deal.status)}</span>}
           {editable && (
             <>
               <Button variant="ghost" size="sm" className="h-7" onClick={() => setOpen(true)}>Change</Button>
@@ -257,7 +256,7 @@ export const QuoteDealLink: React.FC<{ quote: PipelineQuote; editable: boolean; 
           )}
         </>
       ) : editable ? (
-        <Button variant="outline" size="sm" className="h-7" onClick={() => setOpen(true)}>Add to pipeline</Button>
+        <button type="button" className="text-sm text-primary hover:underline" onClick={() => setOpen(true)}>Add to pipeline</button>
       ) : (
         <span className="text-muted-foreground">—</span>
       )}

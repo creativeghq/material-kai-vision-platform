@@ -295,7 +295,7 @@ const InvoiceDetailPage: React.FC = () => {
             <HubProperty label="Source">
               <span className="flex flex-wrap gap-3">
                 {inv.order_id && <Link to={`${financeBase}/orders/${inv.order_id}`} className="text-primary hover:underline">View order</Link>}
-                {(invoice as any).quote_id && <Link to={`/quotes/manage/${(invoice as any).quote_id}`} className="text-primary hover:underline">View quote</Link>}
+                {(invoice as any).quote_id && <Link to={`/quotes/${(invoice as any).quote_id}`} className="text-primary hover:underline">View quote</Link>}
               </span>
             </HubProperty>
           )}

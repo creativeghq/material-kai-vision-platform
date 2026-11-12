@@ -46,7 +46,7 @@ export const CustomerPicker: React.FC<{
   if (value) {
     return (
       <div className="space-y-1">
-        <Label>{label}</Label>
+        {label && <Label>{label}</Label>}
         <div className="flex items-center justify-between rounded-md border border-border/60 px-3 py-2">
           <span className="text-sm">{value.label}</span>
           <Button size="sm" variant="ghost" disabled={disabled} onClick={() => onChange(null)}>Change</Button>
@@ -57,7 +57,7 @@ export const CustomerPicker: React.FC<{
 
   return (
     <div className="space-y-1" ref={boxRef}>
-      <Label>{label}</Label>
+      {label && <Label>{label}</Label>}
       <div className="relative">
         <Input placeholder="Search a customer…" value={search} onChange={(e) => setSearch(e.target.value)} disabled={disabled} />
         {options.length > 0 && (

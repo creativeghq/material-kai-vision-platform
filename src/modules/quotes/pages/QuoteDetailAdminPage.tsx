@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Calendar, FileText, Package, User, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Boxes, Milestone, Activity, Timer, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature, Receipt, XCircle } from 'lucide-react';
+import { ArrowLeft, FileText, Package, DollarSign, Loader2, Plus, X, GitBranch, CheckCircle, Circle, PlayCircle, SkipForward, Gift, ListChecks, MessageSquare, Boxes, Milestone, Activity, Save, Send, Truck, FilePlus2, Eye, BookmarkPlus, FileSignature, Receipt, MoreHorizontal, Download, ScrollText } from 'lucide-react';
 import { marketplacePricingService } from '@/services/marketplacePricingService';
 
 import { Button } from '@/components/core/ui/button';
@@ -20,7 +20,6 @@ import { FINANCE_BASE } from '@/modules/finance/routes';
 import { CustomerPicker, type QuoteCustomer } from '@/modules/quotes/components/CustomerPicker';
 import { masterRequestsService } from '@/services/masterRequestsService';
 import { quotePDFService } from '../services/QuotePDFService';
-import { QuoteDownloadButtons } from '../components/QuoteDownloadButtons';
 import { trackQuoteView } from '@/services/quoteAnalyticsService';
 import { QuoteAnalyticsPanel } from '../components/QuoteAnalyticsPanel';
 import { QuoteEmailButton } from '../components/QuoteEmailButton';
@@ -33,6 +32,17 @@ import { QuoteShippingCard } from '../components/QuoteShippingCard';
 import { QuoteTermsEditor } from '../components/QuoteTermsEditor';
 import { QuoteStatusMenu } from '../components/QuoteStatusActions';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { HubRecordPage, HubPanel, HubProperty, HubPropertyList } from '@/components/core/hub';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/core/ui/dropdown-menu';
+import { useDisplayProfile } from '@/hooks/useDisplayProfile';
+import { humanizeLabel } from '@/utils/humanize';
 import { QuoteDealLink } from '../components/QuotePipelineDialog';
 import { quoteUrl, QUOTES_BASE } from '../routes';
 import {
@@ -672,425 +682,258 @@ export const QuoteDetailPage: React.FC = () => {
 
   const itemCount = quote.items?.length || quote.total_items || 0;
   const extrasTotal = pricingExtrasTotal;
+  const editableStatus = ['draft', 'submitted', 'quoted'].includes(quote.status);
+  const unpricedReason = allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first';
+  const procurement = (quote as any).quote_role !== 'client';
+  const canRevise = ['submitted', 'quoted', 'accepted', 'rejected', 'expired'].includes(quote.status);
+  const title = quote.name || 'Untitled Quote';
+  const subtitle = [
+    quote.quote_number,
+    `Created ${formatDate(quote.created_at)}`,
+    quote.expires_at ? `Expires ${formatDate(quote.expires_at)}` : null,
+  ].filter(Boolean).join(' · ');
 
-  return (
-    <div className="min-h-screen">
-      <GlobalAdminHeader
-        title={quote.name || 'Untitled Quote'}
-        description={
-          <span className="flex items-center gap-4">
-            <span className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" />
-              Created {formatDate(quote.created_at)}
-            </span>
-            <span className="flex items-center gap-1.5">
-              <Timer className="h-3.5 w-3.5" />
-              Expires {formatDate(quote.expires_at)}
-            </span>
-          </span>
-        }
-        badge="Quote Details"
-      />
+  const issueRevision = async () => {
+    if (!confirm('Create a new revision of this quote? The current quote stays as-is; a new draft revision is created with all items copied over.')) return;
+    try {
+      const newQuote = await quotesService.issueRevision(quote.id);
+      toast({ title: `Revision ${newQuote.revision_number} created`, description: 'Opening the new draft...' });
+      navigate(quoteUrl(newQuote.id));
+    } catch (err) {
+      toast({ title: 'Failed to issue revision', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+    }
+  };
 
-      <div className="p-3 sm:p-6 space-y-6">
-        {/* Back Button & Status Row */}
-        <div className="flex items-center justify-between">
-          <Button variant="outline" onClick={() => navigate(QUOTES_BASE)}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to quotes
+  const generateForEndUser = async () => {
+    const raw = window.prompt('Margin % to add on top for the end user?', '20');
+    if (raw === null) return;
+    const margin = parseDecimal(raw);
+    if (margin === null || margin < 0) {
+      toast({ title: 'Enter a valid margin %', variant: 'destructive' });
+      return;
+    }
+    try {
+      const newId = await quotesService.generateClientQuote(quote.id, margin);
+      toast({ title: 'Client quote created', description: `+${margin}% margin · opening the draft…` });
+      navigate(quoteUrl(newId));
+    } catch (err) {
+      toast({ title: 'Failed to generate', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+    }
+  };
+
+  const submitToParent = async () => {
+    try {
+      await masterRequestsService.submit(quote.id);
+      toast({ title: 'Submitted to your parent node', description: 'Track it under Requests.' });
+    } catch (err) {
+      toast({ title: 'Failed to submit', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
+    }
+  };
+
+  const downloadPdf = async () => {
+    const result = await quotePDFService.savePDF(quote.id, quote.quote_number);
+    if (result.success) toast({ title: 'PDF downloaded', description: result.filename });
+    else toast({ title: 'PDF download failed', description: result.error, variant: 'destructive' });
+  };
+
+  const actions = (
+    <>
+      <QuoteStatusMenu quote={quote} onChanged={loadQuoteDetails} />
+      <QuoteEmailButton quoteId={quote.id} onSent={loadQuoteDetails} />
+      {editableStatus && !quoteDocs.preInvoice && (
+        <Button size="sm" onClick={handleCreateDraftInvoice} disabled={creatingInvoice || !allItemsHavePrices} title={unpricedReason}>
+          {creatingInvoice
+            ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Creating...</>
+            : <><Receipt className="h-4 w-4 mr-1" /> Create draft invoice</>}
+        </Button>
+      )}
+      <IssueInvoiceButton quoteId={quote.id} quoteStatus={quote.status} />
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button size="sm" variant="outline" aria-label="More actions">
+            <MoreHorizontal className="h-4 w-4" />
           </Button>
-
-          <div className="flex items-center gap-3">
-            {/* Quote Status Badge */}
-            <QuoteStatusBadge status={quote.status} />
-            <PnlExclusionToggle kind="quote" id={quote.id} compact checked={(quote as any).exclude_from_pnl === true}
-              onChanged={(next) => setQuote({ ...quote, exclude_from_pnl: next } as typeof quote)} />
-
-            {quote.quote_number && (
-              <Badge variant="outline" className="font-mono">{quote.quote_number}</Badge>
-            )}
-
-            {/* Preview + Download PDF (client-side) */}
-            <QuoteDownloadButtons
-              quoteId={quote.id}
-              quoteNumber={quote.quote_number}
-              viewContext="admin"
-            />
-
-            {/* Email the quote to the customer (or a typed recipient) */}
-            <QuoteEmailButton quoteId={quote.id} onSent={loadQuoteDetails} />
-
-            {/* The channel this business actually sells on. Only once the quote has a public link
-                to send — offering it before that would hand the customer nothing to open. */}
-            {(quote as any).public_share_token && (
-              <SendOnWhatsAppButton
-                contactId={quote.customer_contact_id ?? null}
-                companyId={quote.customer_company_id ?? null}
-                message={`Here is your quote: ${window.location.origin}/q/${(quote as any).public_share_token}`}
-              />
-            )}
-
-            <QuoteStatusMenu quote={quote} onChanged={loadQuoteDetails} />
-
-            {(quote.status === 'submitted' || quote.status === 'draft') && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleSendQuote}
-                disabled={sendingQuote || !allItemsHavePrices}
-                title={allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first'}
-              >
-                {sendingQuote ? (
-                  <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Sending...</>
-                ) : (
-                  <><Send className="h-4 w-4 mr-1" /> Send quote</>
-                )}
-              </Button>
-            )}
-
-            {['draft', 'submitted', 'quoted'].includes(quote.status) && (
-              <Button
-                size="sm"
-                variant="secondary"
-                onClick={handleAcceptQuote}
-                disabled={acceptingQuote || !allItemsHavePrices}
-                title={allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first'}
-              >
-                {acceptingQuote
-                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Accepting...</>
-                  : <><CheckCircle className="h-4 w-4 mr-1" /> Mark accepted</>}
-              </Button>
-            )}
-
-            {['draft', 'submitted', 'quoted'].includes(quote.status) && !quoteDocs.preInvoice && (
-              <Button
-                size="sm"
-                onClick={handleCreateDraftInvoice}
-                disabled={creatingInvoice || !allItemsHavePrices}
-                title={allItemsHavePrices ? undefined : 'Price every line in the Pricing tab first'}
-              >
-                {creatingInvoice
-                  ? <><Loader2 className="h-4 w-4 mr-1 animate-spin" /> Creating...</>
-                  : <><Receipt className="h-4 w-4 mr-1" /> Create draft invoice</>}
-              </Button>
-            )}
-
-            {/* Sales/Finance: Issue invoice (creates internal invoice row from accepted quote) */}
-            {quote && <IssueInvoiceButton quoteId={quote.id} quoteStatus={quote.status} />}
-
-            {quote && (quote.status === 'submitted' || quote.status === 'quoted' || quote.status === 'accepted' || quote.status === 'rejected' || quote.status === 'expired') && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  if (!confirm('Create a new revision of this quote? The current quote stays as-is; a new draft revision is created with all items copied over.')) return;
-                  try {
-                    const newQuote = await quotesService.issueRevision(quote.id);
-                    toast({ title: `Revision ${newQuote.revision_number} created`, description: 'Opening the new draft...' });
-                    navigate(quoteUrl(newQuote.id));
-                  } catch (err) {
-                    toast({ title: 'Failed to issue revision', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
-                  }
-                }}
-              >
-                <FilePlus2 className="h-4 w-4 mr-1" />
-                Issue revision
-              </Button>
-            )}
-
-            {/* Marketplace: derive an end-user (client) quote at +margin from this (procurement) quote. */}
-            {quote && (quote as any).quote_role !== 'client' && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  const raw = window.prompt('Margin % to add on top for the end user?', '20');
-                  if (raw === null) return;
-                  const margin = parseDecimal(raw);
-                  if (margin === null || margin < 0) {
-                    toast({ title: 'Enter a valid margin %', variant: 'destructive' });
-                    return;
-                  }
-                  try {
-                    const newId = await quotesService.generateClientQuote(quote.id, margin);
-                    toast({ title: 'Client quote created', description: `+${margin}% margin · opening the draft…` });
-                    navigate(quoteUrl(newId));
-                  } catch (err) {
-                    toast({ title: 'Failed to generate', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
-                  }
-                }}
-              >
-                <FilePlus2 className="h-4 w-4 mr-1" />
-                Generate for end user
-              </Button>
-            )}
-
-            {/* Marketplace: submit a procurement quote up to the parent node to be priced. */}
-            {quote && (quote as any).quote_role !== 'client' && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    await masterRequestsService.submit(quote.id);
-                    toast({ title: 'Submitted to your parent node', description: 'Track it under Requests.' });
-                  } catch (err) {
-                    toast({ title: 'Failed to submit', description: err instanceof Error ? err.message : undefined, variant: 'destructive' });
-                  }
-                }}
-              >
-                <Send className="h-4 w-4 mr-1" />
-                Submit to parent
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Compact Quote Information Row - dashboard card styling */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Boxes className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Items</p>
-                <p className="text-lg font-semibold">{itemCount}</p>
-              </div>
-            </div>
-          </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <Gift className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Extras</p>
-                <p className="text-lg font-semibold">{quoteUpsells.length}</p>
-              </div>
-            </div>
-          </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <DollarSign className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Extras Total</p>
-                <p className="text-lg font-semibold">{formatMoney(extrasTotal, quote.currency)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <ListChecks className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">Timeline</p>
-                <p className="text-lg font-semibold">{quoteTimeline.length} steps</p>
-              </div>
-            </div>
-          </div>
-          <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-            <div className="flex items-center gap-3">
-              <div
-                className="flex items-center justify-center flex-shrink-0"
-                style={{
-                  width: '2rem',
-                  height: '2rem',
-                  borderRadius: 'var(--radius-lg)',
-                  backgroundColor: 'hsl(var(--primary) / 0.1)',
-                }}
-              >
-                <User className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-muted-foreground">User ID</p>
-                <p className="text-sm font-semibold truncate" title={quote.user_id}>{quote.user_id.substring(0, 8)}...</p>
-              </div>
-            </div>
-          </div>
-          {quote.workspace_id && (
-            <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center flex-shrink-0"
-                  style={{
-                    width: '2rem',
-                    height: '2rem',
-                    borderRadius: 'var(--radius-lg)',
-                    backgroundColor: 'hsl(var(--primary) / 0.1)',
-                  }}
-                >
-                  <Package className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground">Workspace</p>
-                  <p className="text-sm font-semibold truncate" title={quote.workspace_id}>{quote.workspace_id.substring(0, 8)}...</p>
-                </div>
-              </div>
-            </div>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuItem onSelect={() => window.open(`/quotes/${quote.id}/preview`, '_blank')}>
+            <Eye className="mr-2 h-4 w-4" /> Preview
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void downloadPdf()}>
+            <Download className="mr-2 h-4 w-4" /> Download PDF
+          </DropdownMenuItem>
+          {editableStatus && (
+            <>
+              <DropdownMenuSeparator />
+              {quote.status !== 'quoted' && (
+                <DropdownMenuItem disabled={sendingQuote || !allItemsHavePrices} onSelect={() => void handleSendQuote()}>
+                  <Send className="mr-2 h-4 w-4" /> Mark priced and notify customer
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem disabled={acceptingQuote || !allItemsHavePrices} onSelect={() => void handleAcceptQuote()}>
+                <CheckCircle className="mr-2 h-4 w-4" /> Mark accepted
+              </DropdownMenuItem>
+              {!allItemsHavePrices && (
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{unpricedReason}</DropdownMenuLabel>
+              )}
+            </>
           )}
-        </div>
+          {(canRevise || procurement) && <DropdownMenuSeparator />}
+          {canRevise && (
+            <DropdownMenuItem onSelect={() => void issueRevision()}>
+              <FilePlus2 className="mr-2 h-4 w-4" /> Issue revision
+            </DropdownMenuItem>
+          )}
+          {procurement && (
+            <>
+              <DropdownMenuItem onSelect={() => void generateForEndUser()}>
+                <FilePlus2 className="mr-2 h-4 w-4" /> Generate for end user
+              </DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => void submitToParent()}>
+                <Send className="mr-2 h-4 w-4" /> Submit to parent
+              </DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
+  );
 
-        {/* Customer — editable so a quote created without one (the common case from the New Quote
-            modal / Add-to-Quote) can be given a party: drives pricing pyramid, email recipient,
-            bill-to on invoicing. */}
-        <QuoteCustomerRow
-          quoteId={quote.id}
-          companyId={quote.customer_company_id ?? null}
-          contactId={quote.customer_contact_id ?? null}
-          onSaved={loadQuoteDetails}
-        />
-
-        <QuoteDealLink
-          quote={quote as any}
-          editable={quote.status !== 'superseded'}
-          onChanged={loadQuoteDetails}
-        />
-
-        {quote.status === 'rejected' && (
-          <div className="dashboard-card flex items-start gap-3 p-4">
-            <XCircle className="h-4 w-4 mt-0.5 text-destructive flex-shrink-0" />
-            <div className="text-sm">
-              <p className="font-medium">
-                Declined{quote.rejected_at ? ` on ${formatDate(quote.rejected_at)}` : ''}
-              </p>
-              <p className="text-muted-foreground">
-                {quote.rejection_reason || 'No reason recorded.'} Use Change status → Reopen as draft to work on it again.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* What accepting this quote PRODUCED (#378 C1). The accept trigger raises a confirmed
-            sales order from these lines and a draft pre-invoice with a pay token — correctly, and
-            until now invisibly: the operator marked a quote accepted and the fulfilment chain
-            started somewhere they had no link to. Read-only; nothing here creates anything. */}
-        {(quoteDocs.order || quoteDocs.preInvoice) && (
-          <div className="dashboard-card flex flex-wrap items-center gap-x-6 gap-y-2 p-4">
-            <span className="text-xs font-medium text-muted-foreground">Accepting this quote created</span>
-            {quoteDocs.order && (
-              <Link
-                to={`${FINANCE_BASE}/orders/${quoteDocs.order.id}`}
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-              >
-                <Package className="h-3.5 w-3.5" />
-                Order {quoteDocs.order.order_number ?? quoteDocs.order.id.slice(0, 8)}
-                <span className="text-xs text-muted-foreground">· {quoteDocs.order.status}</span>
-              </Link>
+  const left = (
+    <>
+      <HubPanel title="Details">
+        <HubPropertyList>
+          <HubProperty label="Status">
+            <QuoteStatusBadge status={quote.status} />
+            {quote.status === 'rejected' && (
+              <span className="mt-1 block text-xs text-muted-foreground">
+                Declined{quote.rejected_at ? ` ${formatDate(quote.rejected_at)}` : ''}: {quote.rejection_reason || 'no reason recorded'}
+              </span>
             )}
-            {quoteDocs.preInvoice && (
-              <Link
-                to={`${FINANCE_BASE}/invoices/${quoteDocs.preInvoice.id}`}
-                className="flex items-center gap-1.5 text-sm text-primary hover:underline"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                {quoteDocs.preInvoice.internal_number ?? 'Pre-invoice'}
-                <span className="text-xs text-muted-foreground">· {quoteDocs.preInvoice.status}</span>
-              </Link>
-            )}
-          </div>
-        )}
-
-        {/* Which job this quote belongs to (#378 L3). It could previously be answered only in the
-            create modal, so a quote raised before its project existed — the normal order of
-            events — could never join one. An accepted quote is the job's CONTRACTED revenue in
-            get_project_pnl, and generate_order_from_quote carries the job onto the order, so a
-            quote with none starts a chain that has none either. */}
-        {quote.workspace_id && (
-          <div className="max-w-md">
-            <ProjectLinkField
-              workspaceId={quote.workspace_id}
-              projectId={(quote as any).project_id ?? null}
-              onChange={async (projectId) => {
-                await quotesService.updateQuote(quote.id, { project_id: projectId });
+          </HubProperty>
+          <HubProperty label="Customer">
+            <QuoteCustomerRow
+              quoteId={quote.id}
+              companyId={quote.customer_company_id ?? null}
+              contactId={quote.customer_contact_id ?? null}
+              onSaved={loadQuoteDetails}
+            />
+          </HubProperty>
+          {(quote.customer_company_id || quote.customer_contact_id) && (
+            <AddressUnitSelect
+              className="py-1.5"
+              companyId={quote.customer_company_id}
+              contactId={quote.customer_contact_id}
+              value={quote.customer_address_unit_id ?? null}
+              label="Bill-To Address"
+              onChange={async (unitId) => {
+                await quotesService.updateQuote(quote.id, { customer_address_unit_id: unitId } as any);
                 await loadQuoteDetails();
               }}
             />
-          </div>
-        )}
+          )}
+          {quote.workspace_id && (
+            <HubProperty label="Project">
+              <ProjectLinkField
+                compact
+                workspaceId={quote.workspace_id}
+                projectId={(quote as any).project_id ?? null}
+                onChange={async (projectId) => {
+                  await quotesService.updateQuote(quote.id, { project_id: projectId });
+                  await loadQuoteDetails();
+                }}
+              />
+            </HubProperty>
+          )}
+          <HubProperty label="Pipeline">
+            <QuoteDealLink quote={quote as any} editable={quote.status !== 'superseded'} onChanged={loadQuoteDetails} />
+          </HubProperty>
+          <HubProperty label="Created By"><QuoteCreatorName userId={quote.user_id} /></HubProperty>
+          <HubProperty label="Created">{formatDate(quote.created_at)}</HubProperty>
+          <HubProperty label="Expires">{quote.expires_at ? formatDate(quote.expires_at) : null}</HubProperty>
+          <HubProperty label="P&L">
+            <PnlExclusionToggle kind="quote" id={quote.id} checked={(quote as any).exclude_from_pnl === true}
+              onChanged={(next) => setQuote({ ...quote, exclude_from_pnl: next } as typeof quote)} />
+          </HubProperty>
+        </HubPropertyList>
+      </HubPanel>
 
-        {/* Bill-to address — choose the customer's main address or one of their sub-units.
-            Self-hides when the party has no sub-units. Propagates to the invoice on conversion. */}
-        {(quote.customer_company_id || quote.customer_contact_id) && (
-          <AddressUnitSelect
-            className="max-w-md"
-            companyId={quote.customer_company_id}
-            contactId={quote.customer_contact_id}
-            value={quote.customer_address_unit_id ?? null}
-            label="Bill-To Address"
-            onChange={async (unitId) => {
-              await quotesService.updateQuote(quote.id, { customer_address_unit_id: unitId } as any);
-              await loadQuoteDetails();
-            }}
+      <HubPanel title="Totals">
+        <HubPropertyList>
+          <HubProperty label="Lines" layout="inline">{itemCount}</HubProperty>
+          <HubProperty label="Extras" layout="inline">
+            {quoteUpsells.length > 0 ? `${quoteUpsells.length} · ${formatMoney(extrasTotal, quote.currency)}` : null}
+          </HubProperty>
+          <HubProperty label="Grand Total" layout="inline">
+            <span className="font-semibold tabular-nums">{formatMoney(pricingGrandTotal, quote.currency)}</span>
+          </HubProperty>
+        </HubPropertyList>
+      </HubPanel>
+
+      {(quoteDocs.order || quoteDocs.preInvoice) && (
+        <HubPanel title="Created From This Quote">
+          <div className="space-y-1.5 text-sm">
+            {quoteDocs.order && (
+              <Link to={`${FINANCE_BASE}/orders/${quoteDocs.order.id}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                <Package className="h-3.5 w-3.5" />
+                Order {quoteDocs.order.order_number ?? quoteDocs.order.id.slice(0, 8)}
+                <span className="text-xs text-muted-foreground">· {humanizeLabel(quoteDocs.order.status)}</span>
+              </Link>
+            )}
+            {quoteDocs.preInvoice && (
+              <Link to={`${FINANCE_BASE}/invoices/${quoteDocs.preInvoice.id}`} className="flex items-center gap-1.5 text-primary hover:underline">
+                <FileText className="h-3.5 w-3.5" />
+                {quoteDocs.preInvoice.internal_number ?? 'Draft invoice'}
+                <span className="text-xs text-muted-foreground">· {humanizeLabel(quoteDocs.preInvoice.status)}</span>
+              </Link>
+            )}
+          </div>
+        </HubPanel>
+      )}
+
+      {(quote as any).public_share_token && (
+        <HubPanel title="Customer Link">
+          <SendOnWhatsAppButton
+            contactId={quote.customer_contact_id ?? null}
+            companyId={quote.customer_company_id ?? null}
+            message={`Here is your quote: ${window.location.origin}/q/${(quote as any).public_share_token}`}
           />
-        )}
+        </HubPanel>
+      )}
 
-        {/* Notes & Custom Request (if present) */}
-        {(quote.notes || quote.custom_request_text) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {quote.notes && (
-              <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <MessageSquare className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-                  <span className="text-sm font-medium">Notes</span>
-                </div>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.notes}</p>
-              </div>
-            )}
-            {quote.custom_request_text && (
-              <div className="dashboard-card p-4" style={{ border: '1px solid hsl(var(--muted-foreground) / 0.2)' }}>
-                <div className="flex items-center gap-2 mb-2">
-                  <FileText className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-                  <span className="text-sm font-medium">Custom Request</span>
-                </div>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{quote.custom_request_text}</p>
-              </div>
-            )}
-          </div>
-        )}
+      {quote.notes && (
+        <HubPanel title="Notes">
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{quote.notes}</p>
+        </HubPanel>
+      )}
+      {quote.custom_request_text && (
+        <HubPanel title="Customer Request">
+          <p className="whitespace-pre-wrap text-sm text-muted-foreground">{quote.custom_request_text}</p>
+        </HubPanel>
+      )}
+    </>
+  );
 
-        <QuoteTermsEditor
-          quoteId={quote.id}
-          terms={quote.terms}
-          readOnly={quote.status === 'accepted' || quote.status === 'rejected'}
-          onSaved={loadQuoteDetails}
+  return (
+    <HubRecordPage
+      icon={FileText}
+      title={title}
+      subtitle={subtitle}
+      breadcrumbs={[{ label: 'Quotes', to: QUOTES_BASE }, { label: title }]}
+      actions={actions}
+      left={left}
+      overlays={id && (
+        <AddProductsSheet
+          currency={quote?.currency}
+          quoteId={id}
+          open={isAddProductsOpen}
+          onOpenChange={setIsAddProductsOpen}
+          existingProductIds={(quote?.items || []).map((i: any) => i.product_id).filter(Boolean)}
+          customerCompanyId={quote?.customer_company_id}
+          customerContactId={quote?.customer_contact_id}
+          onProductsAdded={loadQuoteDetails}
         />
-
+      )}
+    >
         {/* Tabs */}
         <Tabs defaultValue="items" className="w-full mt-2">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
@@ -1121,6 +964,10 @@ export const QuoteDetailPage: React.FC = () => {
             {/* `contracts.quote_id` has always existed and contracts-api has always accepted it;
                 the panel was mounted on employees, projects and the standalone page only, so the
                 agreement a quote was won under sat invisible from it (#378 L4). */}
+            <TabsTrigger value="terms" className="flex items-center gap-2">
+              <ScrollText className="h-4 w-4" />
+              Terms
+            </TabsTrigger>
             <TabsTrigger value="contracts" className="flex items-center gap-2">
               <FileSignature className="h-4 w-4" />
               Contracts
@@ -1859,24 +1706,22 @@ export const QuoteDetailPage: React.FC = () => {
               />
             )}
           </TabsContent>
+          <TabsContent value="terms" className="mt-5">
+            <QuoteTermsEditor
+              quoteId={quote.id}
+              terms={quote.terms}
+              readOnly={quote.status === 'accepted' || quote.status === 'rejected'}
+              onSaved={loadQuoteDetails}
+            />
+          </TabsContent>
         </Tabs>
-      </div>
-
-      {/* Add Products Sheet */}
-      {id && (
-        <AddProductsSheet
-          currency={quote?.currency}
-          quoteId={id}
-          open={isAddProductsOpen}
-          onOpenChange={setIsAddProductsOpen}
-          existingProductIds={(quote?.items || []).map((i: any) => i.product_id).filter(Boolean)}
-          customerCompanyId={quote?.customer_company_id}
-          customerContactId={quote?.customer_contact_id}
-          onProductsAdded={loadQuoteDetails}
-        />
-      )}
-    </div>
+    </HubRecordPage>
   );
+};
+
+const QuoteCreatorName: React.FC<{ userId: string | null | undefined }> = ({ userId }) => {
+  const profile = useDisplayProfile(userId);
+  return <>{profile?.fullName || profile?.email || null}</>;
 };
 
 /** Editable customer on the quote — resolves the current party's name, lets the operator set/change
@@ -1898,10 +1743,10 @@ const QuoteCustomerRow: React.FC<{ quoteId: string; companyId: string | null; co
   }, [companyId, contactId]);
 
   return (
-    <div className="max-w-md">
+    <div>
       <CustomerPicker
         value={cust}
-        label="Customer"
+        label=""
         onChange={async (v) => {
           setCust(v);
           await quotesService.updateQuote(quoteId, {
