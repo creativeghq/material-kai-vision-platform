@@ -73,6 +73,19 @@ function sharedTools(caseId: string, role: Role): InnerTool[] {
       },
     },
     {
+      name: 'platform_changes',
+      description: 'Cron jobs whose name or command matches a term (schedule, active, recent runs) and migrations applied in the last 30 days whose name shares a word with it.',
+      input_schema: {
+        type: 'object',
+        properties: { term: { type: 'string', description: 'A cron job, function or table name from the evidence.' } },
+        required: ['term'],
+      },
+      run: async (a) => {
+        const r = await rpcJson('ops_platform_changes', { p_term: String(a.term ?? '').slice(0, 80) });
+        return r.ok ? wrapUntrusted('platform schedule and migrations', JSON.stringify(r.data)) : JSON.stringify({ error: r.error });
+      },
+    },
+    {
       name: 'recheck',
       description: 'Re-run detection for this case (an integrity check re-runs its domain without healing) and say whether the problem is still there.',
       input_schema: { type: 'object', properties: {} },
