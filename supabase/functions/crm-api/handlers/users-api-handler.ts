@@ -431,13 +431,17 @@ export async function handleUsers(req: Request): Promise<Response> {
           { status: 409, headers: corsHeaders },
         );
       }
-      const { data: rootOwner } = await supabase
-        .from('workspace_members')
-        .select('workspace_id, workspaces!inner(is_root)')
-        .eq('user_id', targetUserId)
-        .eq('role', 'owner')
-        .eq('workspaces.is_root', true)
-        .limit(1);
+      const { data: rootWs } = await supabase.from('workspaces').select('id').eq('is_root', true);
+      const rootIds = (rootWs ?? []).map((w: { id: string }) => w.id);
+      const { data: rootOwner } = rootIds.length
+        ? await supabase
+          .from('workspace_members')
+          .select('workspace_id')
+          .in('workspace_id', rootIds)
+          .eq('user_id', targetUserId)
+          .eq('role', 'owner')
+          .eq('status', 'active')
+        : { data: [] };
       if (rootOwner && rootOwner.length > 0) {
         return new Response(
           JSON.stringify({ error: 'This account owns the platform workspace and cannot be deleted.' }),
