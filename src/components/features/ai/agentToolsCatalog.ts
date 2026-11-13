@@ -2863,9 +2863,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
   },
   {
     id: 'field-registry',
-    capability: 'platform.admin',
+    capability: 'workspace.manage',
     name: 'Field Registry',
-    // The server binds these only for a platform operator (isPlatformOperator in agent-chat).
+    // No role holds platform.admin, so the cluster gate is workspace.manage; agent-chat binds the tools only for a platform operator.
     description: 'Work the Admin → Field Roles queue: resolve merge conflicts, decide role suggestions from ingestion, and review fields still on their first heuristic role. Every decision is logged and reversible.',
     icon: 'BadgeCheck',
     adminOnly: true,

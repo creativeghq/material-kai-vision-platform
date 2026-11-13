@@ -163,7 +163,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'field-registry': {
     adminOnly: true,
-    capability: ['platform.admin'],
+    capability: ['workspace.manage'],
     tool_ids: ['field_review_queue', 'field_review_apply'],
   },
   'tech-radar': {
