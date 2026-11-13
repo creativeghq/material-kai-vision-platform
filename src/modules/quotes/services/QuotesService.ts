@@ -5,6 +5,7 @@ import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { productDetailService, type ProductDetail } from '@/services/productDetailService';
 import { variantKey } from '@/services/lineIdentityRules';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
+import type { QuoteEconomics, QuotePipelineSummary } from '../utils/quoteEconomics';
 
 // INTERFACES
 
@@ -609,6 +610,28 @@ export class QuotesService {
       if (row.cost_snapshot != null) map.set(row.quote_item_id, Number(row.cost_snapshot));
     }
     return map;
+  }
+
+  /** Derived revenue / cost / profit per quote (`get_quote_economics`). Quotes the caller may not see costs on are absent. */
+  async getQuoteEconomics(quoteIds: string[]): Promise<Map<string, QuoteEconomics>> {
+    const map = new Map<string, QuoteEconomics>();
+    if (quoteIds.length === 0) return map;
+    const { data, error } = await supabase.rpc('get_quote_economics', { p_quote_ids: quoteIds });
+    if (error) {
+      console.error('[QuotesService] get_quote_economics failed - margin is unknown, not zero:', error);
+      return map;
+    }
+    for (const row of (data ?? []) as QuoteEconomics[]) map.set(row.quote_id, row);
+    return map;
+  }
+
+  async getPipelineSummary(workspaceId: string, days = 365): Promise<QuotePipelineSummary | null> {
+    const { data, error } = await supabase.rpc('get_quote_pipeline_summary', { p_workspace_id: workspaceId, p_days: days });
+    if (error) {
+      console.error('[QuotesService] get_quote_pipeline_summary failed:', error);
+      return null;
+    }
+    return data as unknown as QuotePipelineSummary;
   }
 
   /** Record what one line costs us to buy. `null` clears it. Sell-side only, enforced by RLS. */

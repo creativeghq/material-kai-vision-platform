@@ -37987,6 +37987,31 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      get_quote_economics: {
+        Args: { p_quote_ids: string[] }
+        Returns: {
+          cost: number | null
+          cost_basis: string | null
+          cost_status: string
+          costed_lines: number
+          costed_revenue: number
+          currency: string
+          gross_profit: number | null
+          line_count: number
+          margin_pct: number | null
+          priced_lines: number
+          quote_id: string
+          revenue_net: number
+          status: string
+          uncosted_lines: number
+          uncosted_revenue: number
+          unpriced_lines: number
+        }[]
+      }
+      get_quote_pipeline_summary: {
+        Args: { p_days?: number; p_workspace_id: string }
+        Returns: Json
+      }
       get_quote_totals: {
         Args: { p_quote_ids: string[] }
         Returns: {

@@ -37,6 +37,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/utils/datetime';
 import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
 import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
+import { formatMoney } from '@/modules/finance/services/financeService';
+import { QuotePipelineSummaryPanel } from '../components/QuotePipelineSummaryPanel';
+import { costStatusNote, type QuoteEconomics } from '../utils/quoteEconomics';
 
 type QuotesTab = typeof QUOTES_TAB[keyof typeof QUOTES_TAB];
 
@@ -149,6 +152,14 @@ export const QuotesPage: React.FC = () => {
     return () => { cancelled = true; };
     // Keyed on the ids themselves: a re-render yielding the same set must not re-fetch.
   }, [visibleQuoteIds.join(',')]);
+  const [economics, setEconomics] = useState<Map<string, QuoteEconomics>>(new Map());
+  useEffect(() => {
+    if (visibleQuoteIds.length === 0) { setEconomics(new Map()); return; }
+    let cancelled = false;
+    void quotesService.getQuoteEconomics(visibleQuoteIds).then((m) => { if (!cancelled) setEconomics(m); });
+    return () => { cancelled = true; };
+  }, [visibleQuoteIds.join(','), quotes]);
+  const showMoney = economics.size > 0;
 
 
   // Handle quote click - navigate to detail page
@@ -236,7 +247,7 @@ export const QuotesPage: React.FC = () => {
               </div>
             ) : (
               <>
-        {/* Stats Cards */}
+        {activeWorkspaceId && <QuotePipelineSummaryPanel workspaceId={activeWorkspaceId} refreshKey={quotes} />}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
             <div className="flex items-center gap-3">
@@ -324,6 +335,8 @@ export const QuotesPage: React.FC = () => {
                     <th className="text-left px-6 py-2.5 font-medium">Quote Name</th>
                     <th className="text-left px-3 py-2.5 font-medium">Status</th>
                     <th className="text-left px-3 py-2.5 font-medium">Items</th>
+                    {showMoney && <th className="text-right px-3 py-2.5 font-medium">Value</th>}
+                    {showMoney && <th className="text-right px-3 py-2.5 font-medium">Margin</th>}
                     <th className="text-left px-3 py-2.5 font-medium">Created</th>
                     <th className="text-left px-3 py-2.5 font-medium">Expires</th>
                     <th className="text-center px-3 py-2.5 font-medium">Sent</th>
@@ -351,6 +364,7 @@ export const QuotesPage: React.FC = () => {
                       </td>
                       <td className="px-3 py-2.5"><QuoteStatusWord status={quote.status} /></td>
                       <td className="px-3 py-2.5 tabular-nums">{quote.total_items || quote.items?.length || 0}</td>
+                      {showMoney && <QuoteMoneyCells e={economics.get(quote.id)} />}
                       <td className="px-3 py-2.5 text-muted-foreground">{formatDate(quote.created_at)}</td>
                       <td className="px-3 py-2.5 text-muted-foreground">{formatDate(quote.expires_at)}</td>
                       <td className="px-3 py-2.5 text-center"><DeliveryTrailCell trail={trails[quote.id]} /></td>
@@ -435,6 +449,28 @@ export const QuotesPage: React.FC = () => {
         defaultCustomer={scopedQuoteCustomer(quotes, scopedFilterValue(filterValues, 'customer'))}
       />
     </div>
+  );
+};
+
+const QuoteMoneyCells: React.FC<{ e: QuoteEconomics | undefined }> = ({ e }) => {
+  if (!e) {
+    return (<><td className="px-3 py-2.5 text-right text-muted-foreground">—</td><td className="px-3 py-2.5 text-right text-muted-foreground">—</td></>);
+  }
+  const note = costStatusNote(e);
+  const negative = e.gross_profit != null && e.gross_profit < 0;
+  return (
+    <>
+      <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap">{formatMoney(e.revenue_net, e.currency)}</td>
+      <td className="px-3 py-2.5 text-right tabular-nums whitespace-nowrap" title={note ?? undefined}>
+        {e.margin_pct == null ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <span className={negative ? 'text-destructive' : undefined}>
+            {e.margin_pct}%{e.cost_status === 'partial' && <span className="text-amber-800 dark:text-amber-300">*</span>}
+          </span>
+        )}
+      </td>
+    </>
   );
 };
 

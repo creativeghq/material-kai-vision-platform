@@ -569,18 +569,22 @@ export const createListMyQuotesTool = (
         const { data, error } = await q;
         if (error) return JSON.stringify({ success: false, error: error.message });
         const ids = (data || []).map((r: any) => r.id as string);
-        const [totals, billing] = ids.length
+        const [totals, billing, econ] = ids.length
           ? await Promise.all([
             sb.rpc('get_quote_totals', { p_quote_ids: ids }),
             sb.rpc('get_quote_billing_progress', { p_quote_ids: ids }),
+            sb.rpc('get_quote_economics', { p_quote_ids: ids }),
           ])
-          : [{ data: [], error: null }, { data: [], error: null }];
+          : [{ data: [], error: null }, { data: [], error: null }, { data: [], error: null }];
         if (totals.error || billing.error) return JSON.stringify({ success: false, error: (totals.error ?? billing.error)!.message });
+        const pipeline = await sb.rpc('get_quote_pipeline_summary', { p_workspace_id: workspaceId });
         const totalsById = new Map(((totals.data ?? []) as any[]).map((t) => [t.quote_id, t]));
         const billingById = new Map(((billing.data ?? []) as any[]).map((b) => [b.quote_id, b]));
+        const econById = new Map(((econ.data ?? []) as any[]).map((e) => [e.quote_id, e]));
         const quotes = (data || []).map((r: any) => {
           const t = totalsById.get(r.id);
           const b = billingById.get(r.id);
+          const e = econById.get(r.id);
           return {
             quote_id: r.id,
             name: r.name,
@@ -593,20 +597,27 @@ export const createListMyQuotesTool = (
             grand_total: t?.grand_total ?? null,
             billed_pct: b?.billed_pct ?? null,
             remaining_pct: b?.remaining_pct ?? null,
+            net_revenue: e?.revenue_net ?? null,
+            cost: e?.cost ?? null,
+            gross_profit: e?.gross_profit ?? null,
+            margin_pct: e?.margin_pct ?? null,
+            uncosted_revenue: e?.uncosted_revenue ?? null,
+            cost_status: e ? e.cost_status : (econ.error ? 'unknown' : 'not_permitted'),
             invoice_count: b?.invoice_count ?? 0,
             item_count: r.total_items,
             created_at: r.created_at,
           };
         });
         onChunk?.({ type: 'quotes_list', quotes });
-        return JSON.stringify({ success: true, count: quotes.length, quotes });
+        const pipeline_summary = pipeline.error ? { status: 'unknown', error: pipeline.error.message } : pipeline.data;
+        return JSON.stringify({ success: true, count: quotes.length, quotes, pipeline_summary });
       } catch (e) {
         return JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) });
       }
     },
     {
       name: 'list_my_quotes',
-      description: "List the workspace's recent quotes with status, their derived totals (subtotal, discount, VAT, grand total) and how much of each has been invoiced so far (billed_pct / remaining_pct). Use to reference or pick an existing quote (returns quote ids usable by generate_quote_pdf), or for \"how much of this quote have we billed\".",
+      description: "List the workspace's recent quotes with status, their derived totals (subtotal, discount, VAT, grand total) and how much of each has been invoiced so far (billed_pct / remaining_pct). Use to reference or pick an existing quote (returns quote ids usable by generate_quote_pdf), or for \"how much of this quote have we billed\". Each quote also carries net_revenue / cost / gross_profit / margin_pct (over lines WITH a buy price; cost_status 'partial' or 'no_cost' means some or all revenue has no buy price, so the margin is incomplete — say so, never treat it as zero cost). pipeline_summary gives open pipeline value, expected-to-win value and profit, won value, and win rate (null with win_rate_status 'not_enough_history' when fewer than 5 decided quotes) — use it for \"how much money do we expect from quotes\" or \"what profit is in our quotes\".",
       schema: z.object({
         limit: z.number().optional().describe('Max quotes to return (default 10, max 50).'),
         status: z.string().optional().describe("Optional status filter: draft / submitted / quoted / accepted / rejected / expired."),
