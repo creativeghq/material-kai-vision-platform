@@ -64,6 +64,7 @@ const GROK_UNSUPPORTED_MODES = new Set([
   // generate-interior-gemini calls Gemini unconditionally for exactly that reason, so
   // listing it here is what stops `tier: 'grok'` billing grok-aurora for a Gemini run.
   'unstage',
+  'scene-render',
 ]);
 
 export interface GenerationRoutingOptions {

@@ -234,12 +234,11 @@ async function callFluxDepthPro(
 // Credit costs and provider routing now live in _shared/generation-routing.ts so the
 // billed model and the invoked model come from one derivation.
 
-type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-3d' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture' | 'unstage';
+type GenerationMode = 'text-to-image' | 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render' | 'floor-plan-3d' | 'floor-plan-text' | 'materials-selection-board' | 'product-shot' | 'product-lifestyle' | 'material-texture' | 'unstage' | 'scene-render';
 type BoardMode = 'presentation-board' | 'selection-board' | 'photorealistic-render';
 
 interface GenerateInteriorRequest {
   mode?: GenerationMode;
-  // Common
   prompt?: string;
   room_type?: string;
   style?: string;
@@ -248,14 +247,11 @@ interface GenerateInteriorRequest {
   room_view?: string;
   aspect_ratio?: ImageAspectRatio;
   model_tier?: 'fast' | 'pro' | 'grok' | 'chatgpt';
-  // Material references (multi-reference generation)
   material_images?: string[]; // up to 14 catalog product image URLs
-  // Image edit / floor plan render
   reference_image_url?: string;
   edit_instruction?: string;
   // Second uploaded image: style/mood reference for dual-image Copy Style and Redesign modes
   style_reference_url?: string;
-  // Materials Selection Board
   board_mode?: BoardMode;
   // Product shot (purchase-sheet doors/windows, and catalog products): a clean studio
   // render of ONE item, driven by its structured spec rather than a room scene.
@@ -264,7 +260,7 @@ interface GenerateInteriorRequest {
   item_type?: 'door' | 'window' | string;
   item_name?: string;
   spec?: Record<string, unknown>;
-  // User context
+  scene_objects?: string[];
   user_id?: string;
   workspace_id?: string;
   conversation_id?: string;
@@ -502,7 +498,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // generate_gemini tool, AgentHub's edit modal, projectsService, productMaterialMapsService
   // and generate-vr-world all land here. The gate goes HERE and not in the agent's prompt
   // because three of those five callers never involve a model turn at all.
-  const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-3d', 'unstage'];
+  const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-3d', 'unstage', 'scene-render'];
   const gatedSources = EDIT_MODES.includes(mode)
     ? [body.reference_image_url, body.style_reference_url].filter((u): u is string => typeof u === 'string' && !!u)
     : [];
@@ -535,7 +531,8 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // all, which is the whole defect this file was just fixed for. `multiReference` is the
     // existing mechanism for that: it collapses the tier to Gemini and prices it as Gemini.
     multiReference: (body.material_images?.length ?? 0) > 0
-      || (mode === 'image-edit' && !!body.style_reference_url),
+      || (mode === 'image-edit' && !!body.style_reference_url)
+      || mode === 'scene-render',
   });
   const useGrok = routing.provider === 'grok';
   // ChatGPT (gpt-image-1): the same single-image generate-or-edit shape as Grok, so it
@@ -944,6 +941,41 @@ VIEW OVERRIDE — the camera position above is replaced. Photograph this specifi
       }
     }
 
+    else if (mode === 'scene-render') {
+      if (!body.reference_image_url) {
+        return jsonResponse({ success: false, error: 'reference_image_url (the 3D capture) required for scene-render mode' }, 400);
+      }
+      const captureBuffer = await fetchImageBuffer(body.reference_image_url);
+      sourceSize = readImageSize(captureBuffer);
+      const styleBuffer = body.style_reference_url ? await fetchImageBuffer(body.style_reference_url) : null;
+      const materialBuffers: Uint8Array[] = [];
+      for (const url of (body.material_images ?? []).slice(0, 6)) {
+        try { materialBuffers.push(await fetchImageBuffer(url)); } catch (err) {
+          console.warn('[generate-interior-gemini] scene-render material image skipped:', String(err));
+        }
+      }
+      const roles: string[] = [];
+      if (styleBuffer) roles.push('IMAGE 1 is a STYLE reference: take its mood, palette, materials and lighting. Take NOTHING of its layout, room or furniture positions.');
+      if (materialBuffers.length) {
+        const first = styleBuffer ? 2 : 1;
+        roles.push(`IMAGES ${first}–${first + materialBuffers.length - 1} are product or material samples for objects listed below: reproduce their look on the matching object.`);
+      }
+      roles.push('The LAST image is the 3D layout to photograph.');
+      const objects = (body.scene_objects ?? []).slice(0, 80)
+        .map((line) => `- ${String(line).replace(/\s+/g, ' ').slice(0, 160)}`).join('\n') || '- (no listed objects)';
+      const renderText = renderPromptTemplate(await getGenerationPrompt(supabase, 'scene_studio_render'), {
+        objects,
+        image_roles: roles.join('\n'),
+        style: (body.style ?? 'as the room already suggests').slice(0, 200),
+        instruction: body.prompt ? `ADDITIONAL INSTRUCTION: ${body.prompt.slice(0, 600)}` : '',
+      });
+      const result = await generateImageWithGemini(
+        { text: renderText, images: [...(styleBuffer ? [styleBuffer] : []), ...materialBuffers, captureBuffer] },
+        { model, aspectRatio: aspectRatioForSource(captureBuffer) },
+      );
+      imageUrl = await persistMeasured(result.base64, result.mimeType);
+    }
+
     // ── floor-plan-3d: the WHOLE plan as one top-down 3D cutaway, built on the plan's own walls ──
     else if (mode === 'floor-plan-3d') {
       if (!body.reference_image_url) {
@@ -1079,6 +1111,7 @@ VIEW OVERRIDE — the camera position above is replaced. Photograph this specifi
       'copy-style': 'image_to_image',
       'floor-plan-render': 'image_to_image',
       'floor-plan-3d': 'image_to_image',
+      'scene-render': 'image_to_image',
       'product-shot': 'image_to_image',
       // A reference image plus a prompt-driven board layout — neither pure branch fits.
       'materials-selection-board': 'hybrid',

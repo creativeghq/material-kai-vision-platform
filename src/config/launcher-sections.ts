@@ -11,7 +11,7 @@ import {
   MessageSquarePlus, Megaphone, LayoutTemplate, Store, Landmark, UserMinus,
   CalendarClock, Timer, ClipboardCheck,
   Boxes, TrendingUp, Ship, Truck, ArrowLeftRight, ClipboardList, MapPin, Scale,
-  Calculator, Flame, Thermometer, Grid3x3, BookOpen,
+  Calculator, Flame, Thermometer, Grid3x3, BookOpen, Box,
   Radar, Search, PenTool, Activity,
   Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
   Share2, Globe, Coins, CreditCard, ScanLine, Star, MessagesSquare,
@@ -168,6 +168,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Heating Cost Compare', to: '/tools/heating-cost', icon: Thermometer },
     { label: 'Tile Installation Guide', to: '/tools/tile-installation', icon: Grid3x3 },
     { label: 'Installation Guides', to: '/guides', icon: BookOpen, moduleSlug: 'installation-guides' },
+    { label: 'Scene Studio', to: '/scene-studio', icon: Box, moduleSlug: 'scene-studio' },
   ],
   // Contracts (nav id 'contracts'). The tile itself deep-links into the agent (drafting +
   // send-for-signature); `/contracts` is the real list page, registered by the contracts module.

@@ -196,6 +196,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'supplier-orders-api', label: 'supplier-orders-api', sublabel: 'Partner/ERP API for a claimed supplier to read inbound POs across all buyers and post status back' },
   { id: 'taric-classify', label: 'taric-classify', sublabel: 'Propose a TARIC commodity code for catalog products' },
   { id: 'taric-reference-sync', label: 'taric-reference-sync', sublabel: 'Import the EU TARIC goods nomenclature (Greek extract) into the reference table' },
+  { id: 'scene-studio-read', label: 'scene-studio-read', sublabel: 'Read a floor plan, room photo or render into an editable 3D room with walls, doors and furniture' },
   { id: 'installation-guide-extract', label: 'installation-guide-extract', sublabel: 'Read an uploaded installation manual into a step-by-step guide with the page and box of every drawing' },
   { id: 'installation-guide-appearance', label: 'installation-guide-appearance', sublabel: 'Read a product photo into the finish each part of an installation guide carries' },
   { id: 'installation-guide-public', label: 'installation-guide-public', sublabel: 'Open an installation guide through its public share link' },

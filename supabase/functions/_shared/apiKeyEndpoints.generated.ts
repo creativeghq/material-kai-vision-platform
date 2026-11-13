@@ -80,6 +80,7 @@ export const API_KEY_ENDPOINTS: ReadonlySet<string> = new Set([
   'revolut-merchant-webhooks',
   'revolut-sync',
   'scan-drawing-title-block',
+  'scene-studio-read',
   'send-quote-email',
   'seo-api',
   'seo-domain-tracker',

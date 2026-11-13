@@ -4381,6 +4381,22 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "scene-studio-read",
+    "tag": "Projects",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Read a floor plan, room photo or render into an editable 3D room",
+    "description": "Reads the one image uploaded to a Scene Studio scene into a top-down model in millimetres: rooms (outline polygons), walls (centre lines with thickness), doors and windows on those walls, every drawn or visible piece of furniture with an estimated footprint, height, rotation and colour, and, for a photo, where the camera stood. Only a floor_plan_id is accepted; the image is read server-side from t",
+    "fields": {
+      "floor_plan_id": {
+        "type": "string",
+        "required": true,
+        "description": "The scene to read. Its image, its kind (plan_image, photo or render) and its workspace all come from this row. (string ("
+      }
+    }
+  },
+  {
     "name": "send-quote-email",
     "tag": "Quotes",
     "methods": [

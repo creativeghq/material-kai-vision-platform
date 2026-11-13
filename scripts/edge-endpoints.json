@@ -18449,6 +18449,30 @@
     "response": "analyze: 202 { success, status: 'running' } (402 when credits are short). find_similar: { success, added, matches, reason: null|'not_a_vector_page'|'not_analysed'|'no_vector_content_in_box' }"
   },
   {
+    "name": "scene-studio-read",
+    "tag": "Projects",
+    "summary": "Read a floor plan, room photo or render into an editable 3D room",
+    "description": "Reads the one image uploaded to a Scene Studio scene into a top-down model in millimetres: rooms (outline polygons), walls (centre lines with thickness), doors and windows on those walls, every drawn or visible piece of furniture with an estimated footprint, height, rotation and colour, and, for a photo, where the camera stood. Only a floor_plan_id is accepted; the image is read server-side from that scene own folder and the workspace comes from the scene row. The scene is claimed atomically, credits are debited BEFORE the model runs, and the reader is a strict output_config JSON schema whose result is sanitised and written in one transaction by scene_studio_apply_read, replacing what an earlier read produced and keeping objects a person placed. A refusal, an unparseable reply or an image that is not a plan or a room marks the scene failed and refunds the credits. Sizes from a photo are estimates and are stored as such. The read runs in the background; poll floor_plans.extract_status for ready or failed.",
+    "security": [
+      "supabaseJwt",
+      "apiKeyPartner"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "floor_plan_id",
+        "type": "string (uuid)",
+        "required": true,
+        "desc": "The scene to read. Its image, its kind (plan_image, photo or render) and its workspace all come from this row."
+      }
+    ],
+    "response": "202 { success, status: extracting, floor_plan_id } — then poll floor_plans.extract_status for ready or failed"
+  },
+  {
     "name": "installation-guide-extract",
     "tag": "Projects",
     "summary": "Read an uploaded installation manual into a step-by-step guide",

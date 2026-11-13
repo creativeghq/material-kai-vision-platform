@@ -54,6 +54,8 @@ const SurfaceVisualizerPage = lazy(() => import('./pages/SurfaceVisualizerPage')
 const GuidesPage = lazy(() => import('./pages/Guides/GuidesPage'));
 const GuideDetailPage = lazy(() => import('./pages/Guides/GuideDetailPage'));
 const GuidePlayerPage = lazy(() => import('./pages/Guides/GuidePlayerPage'));
+const SceneStudioPage = lazy(() => import('./pages/SceneStudio/SceneStudioPage'));
+const SceneStudioEditorPage = lazy(() => import('./pages/SceneStudio/SceneStudioEditorPage'));
 const UserProfilePage = lazy(() => import('./pages/UserProfilePage').then(m => ({ default: m.UserProfilePage })));
 const WebsiteDetailPage = lazy(() => import('./pages/WebsiteDetailPage').then(m => ({ default: m.WebsiteDetailPage })));
 const PublicProfilePage = lazy(() => import('./pages/PublicProfilePage').then(m => ({ default: m.PublicProfilePage })));
@@ -648,6 +650,32 @@ const App = () => (
                       <AuthGuard>
                         <EntitlementGuard moduleSlug="installation-guides" moduleName="Installation Guides">
                           <GuidePlayerPage />
+                        </EntitlementGuard>
+                      </AuthGuard>
+                    </PageErrorBoundary>
+                  }
+                />
+                <Route
+                  path="/scene-studio"
+                  element={
+                    <AuthGuard>
+                      <EntitlementGuard moduleSlug="scene-studio" moduleName="Scene Studio">
+                        <Layout>
+                          <SceneStudioPage />
+                        </Layout>
+                      </EntitlementGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/scene-studio/:id"
+                  element={
+                    <PageErrorBoundary name="Scene Studio">
+                      <AuthGuard>
+                        <EntitlementGuard moduleSlug="scene-studio" moduleName="Scene Studio">
+                          <Layout>
+                            <SceneStudioEditorPage />
+                          </Layout>
                         </EntitlementGuard>
                       </AuthGuard>
                     </PageErrorBoundary>
