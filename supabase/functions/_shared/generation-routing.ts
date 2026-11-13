@@ -10,10 +10,9 @@ export const GENERATION_CREDIT_COSTS: Record<string, number> = {
   'gemini-3-pro-image': 15,
   'flux-depth-pro': 20,
   'grok-aurora': 15,
-  // gpt-image-1 at the medium 1024px tier ($0.042/image, ai_model_pricing) — between
-  // Gemini Flash ($0.067 → 6) and Grok ($0.07 → 15) on cost, priced at 10 so the
-  // ChatGPT tile is neither the cheap default nor the premium one.
-  'gpt-image-1': 10,
+  // gpt-image-2.6 at quality=medium ($0.09, ai_model_pricing): between Gemini Flash ($0.067 → 6)
+  // and Gemini Pro ($0.134 → 15) on cost.
+  'gpt-image-2.6': 10,
 };
 
 /**
@@ -80,7 +79,7 @@ export function resolveGenerationRouting(
   tier?: GenerationTier,
   opts: GenerationRoutingOptions = {},
 ): GenerationRouting {
-  // ChatGPT (gpt-image-1) serves exactly the modes Grok serves: a single-image
+  // ChatGPT (gpt-image-2.6) serves exactly the modes Grok serves: a single-image
   // generate-or-edit provider, so the diagram/board modes and multi-reference briefs
   // collapse to Gemini for it too, and are priced as Gemini's.
   const singleImageProviderCanServe = !GROK_UNSUPPORTED_MODES.has(mode) && !opts.multiReference;
@@ -91,7 +90,7 @@ export function resolveGenerationRouting(
 
   // `usesFlux` is asked about Grok only: copy-style stays on the Gemini+Flux pipeline for
   // the ChatGPT tier, because the one-step "image 1 is the style, image 2 is the room"
-  // prompt is written for Aurora and there is no gpt-image-1 template for it in the
+  // prompt is written for Aurora and there is no gpt-image template for it in the
   // prompt registry. Routing it to Flux prices it as Flux, which is what actually runs.
   const provider: RoutedProvider = usesFlux(mode, useGrok)
     ? 'flux'
@@ -99,7 +98,7 @@ export function resolveGenerationRouting(
   const modelLabel =
     provider === 'flux' ? 'flux-depth-pro'
       : provider === 'grok' ? 'grok-aurora'
-      : provider === 'openai' ? 'gpt-image-1'
+      : provider === 'openai' ? 'gpt-image-2.6'
       : geminiModel;
 
   return {

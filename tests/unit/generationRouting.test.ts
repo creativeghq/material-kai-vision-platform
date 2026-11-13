@@ -57,20 +57,20 @@ describe('generation routing', () => {
     expect(resolveGenerationRouting('copy-style', 'fast').provider).toBe('flux');
     expect(resolveGenerationRouting('copy-style', 'pro').provider).toBe('flux');
     expect(resolveGenerationRouting('copy-style', 'grok').provider).toBe('grok');
-    // No gpt-image-1 style-transfer template exists, so ChatGPT takes the Flux pipeline
+    // No gpt-image style-transfer template exists, so ChatGPT takes the Flux pipeline
     // and is billed as Flux — the model that actually runs.
     expect(resolveGenerationRouting('copy-style', 'chatgpt').provider).toBe('flux');
   });
 
-  it('routes the single-image modes to ChatGPT when ChatGPT is asked for, and prices it as gpt-image-1', () => {
+  it('routes the single-image modes to ChatGPT when ChatGPT is asked for, and prices it as gpt-image-2.6', () => {
     // Restored 2026-09-05. The interior grid renders one tile per tier, so a tile that
     // silently ran Gemini would be a duplicate image at the ChatGPT price.
     for (const mode of ['text-to-image', 'image-edit', ...PRODUCT_MODES]) {
       const r = resolveGenerationRouting(mode, 'chatgpt');
       expect(r.provider, mode).toBe('openai');
-      expect(r.modelLabel, mode).toBe('gpt-image-1');
-      expect(r.pricingKey, mode).toBe('gpt-image-1');
-      expect(r.credits, mode).toBe(GENERATION_CREDIT_COSTS['gpt-image-1']);
+      expect(r.modelLabel, mode).toBe('gpt-image-2.6');
+      expect(r.pricingKey, mode).toBe('gpt-image-2.6');
+      expect(r.credits, mode).toBe(GENERATION_CREDIT_COSTS['gpt-image-2.6']);
     }
   });
 

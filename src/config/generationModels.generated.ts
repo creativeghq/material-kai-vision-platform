@@ -145,8 +145,8 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "gpt-image-1",
     "tier": "standard",
-    "status": "active",
-    "enabled": true,
+    "status": "dead",
+    "enabled": false,
     "sort_order": 25
   },
   {
