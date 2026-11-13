@@ -128,11 +128,11 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
   },
   {
     "id": "gpt-image-1",
-    "display_name": "ChatGPT Image (gpt-image-1)",
+    "display_name": "ChatGPT Image (GPT Image 2.6)",
     "capability": "image",
     "sub_capability": "text-or-image-to-image",
     "provider": "openai",
-    "slug": "gpt-image-1",
+    "slug": "gpt-image-2.6-sunburst",
     "version": null,
     "adapter": "openai_image",
     "input_requirements": {
@@ -143,10 +143,10 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
       ],
       "needs_prompt": true
     },
-    "pricing_key": "gpt-image-1",
+    "pricing_key": "gpt-image-2.6",
     "tier": "standard",
-    "status": "dead",
-    "enabled": false,
+    "status": "active",
+    "enabled": true,
     "sort_order": 25
   },
   {
@@ -1074,7 +1074,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = 'caf9c077c3d8fc2ae311c270d32819b8';
+export const PROJECTION_FINGERPRINT = '69b1758839dc1ff9640d65236ff017a8';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
