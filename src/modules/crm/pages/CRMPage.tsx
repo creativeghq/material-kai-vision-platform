@@ -551,12 +551,17 @@ export const CRMManagement: React.FC = () => {
   const runBulk = async (ids: string[], op: (id: string) => Promise<unknown>, verb: string, after: () => Promise<void>, clear: () => void) => {
     setBulkBusy(true);
     try {
-      const results = await Promise.allSettled(ids.map(op));
-      const ok = results.filter((r) => r.status === 'fulfilled').length;
-      const fail = results.length - ok;
+      // Sequential on purpose: parallel user deletes (each cascades a workspace) exhaust the lock table.
+      const failures: string[] = [];
+      let ok = 0;
+      for (const id of ids) {
+        try { await op(id); ok += 1; } catch (e) { failures.push(e instanceof Error ? e.message : String(e)); }
+      }
+      const fail = failures.length;
+      const reasons = [...new Set(failures)].slice(0, 2).join(' · ');
       toast({
         title: fail ? `${verb}: ${ok} done, ${fail} failed` : `${verb} ${ok}`,
-        description: fail ? 'Some records could not be updated (e.g. already in that category).' : undefined,
+        description: fail ? reasons : undefined,
         variant: fail && ok === 0 ? 'destructive' : 'default',
       });
       clear();
@@ -608,7 +613,6 @@ export const CRMManagement: React.FC = () => {
     { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
 
-  // ── single-row handlers (unchanged behaviour) ─────────────────────────────
   const handleDeleteUser = async (userId: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try { await usersAPI.deleteUser(userId); toast({ title: 'Success', description: 'User deleted' }); loadUsers(); }

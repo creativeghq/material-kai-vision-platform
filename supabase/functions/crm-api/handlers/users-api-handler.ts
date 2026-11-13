@@ -425,6 +425,26 @@ export async function handleUsers(req: Request): Promise<Response> {
     if (method === 'DELETE' && path.length === 1) {
       const targetUserId = path[0];
 
+      if (auth.userId && targetUserId === auth.userId) {
+        return new Response(
+          JSON.stringify({ error: 'You cannot delete your own account.' }),
+          { status: 409, headers: corsHeaders },
+        );
+      }
+      const { data: rootOwner } = await supabase
+        .from('workspace_members')
+        .select('workspace_id, workspaces!inner(is_root)')
+        .eq('user_id', targetUserId)
+        .eq('role', 'owner')
+        .eq('workspaces.is_root', true)
+        .limit(1);
+      if (rootOwner && rootOwner.length > 0) {
+        return new Response(
+          JSON.stringify({ error: 'This account owns the platform workspace and cannot be deleted.' }),
+          { status: 409, headers: corsHeaders },
+        );
+      }
+
       // 0. Remove workspaces this user SOLELY owns (their personal consumer/reseller
       //    workspace + any solo tenant). MUST run BEFORE the auth delete: workspace_members
       //    CASCADE-vanish when the auth user is removed, so the "sole owner" check would find

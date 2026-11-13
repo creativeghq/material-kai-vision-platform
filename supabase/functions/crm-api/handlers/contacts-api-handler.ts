@@ -532,6 +532,14 @@ export async function handleContacts(req: Request): Promise<Response> {
         .eq('id', contactId);
 
       if (error) {
+        if (error.code === '23503') {
+          const what = /supplier_bills/.test(error.message) ? 'supplier bills'
+            : /invoices/.test(error.message) ? 'invoices' : 'other records';
+          return new Response(
+            JSON.stringify({ error: `This contact is on ${what}, which must keep their counterparty. It cannot be deleted.` }),
+            { status: 409, headers: corsHeaders },
+          );
+        }
         return new Response(
           JSON.stringify({ error: error.message }),
           { status: 400, headers: corsHeaders },
