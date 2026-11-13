@@ -45,6 +45,7 @@ const TABBED_PAGES: Record<string, string> = {
   '/admin/ai-configs': 'src/components/Admin/AgentConfigs/AgentConfigsPage.tsx',
   '/quotes': 'src/modules/quotes/pages/QuotesPage.tsx',
   '/finance': 'src/modules/finance/routes.ts',
+  '/admin/materials-data': 'src/components/Admin/MaterialsData/MaterialsDataPage.tsx',
 };
 
 function tabValues(file: string): Set<string> {
