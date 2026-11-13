@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { fetchDisplayProfiles } from '@/services/displayProfilesService';
 import { EmailSendError } from '@/modules/email/services/emailService';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
@@ -772,15 +771,6 @@ class CatalogsService {
     return (data || []) as CatalogEmailSendRow[];
   }
 
-  async getUserProfilesByIds(userIds: string[]): Promise<Record<string, { full_name: string | null; email: string | null; avatar_url: string | null }>> {
-    if (userIds.length === 0) return {};
-    const profiles = await fetchDisplayProfiles(userIds);
-    const out: Record<string, { full_name: string | null; email: string | null; avatar_url: string | null }> = {};
-    for (const row of profiles) {
-      out[row.userId] = { full_name: row.fullName, email: row.email, avatar_url: row.avatarUrl };
-    }
-    return out;
-  }
 }
 
 export const catalogsService = new CatalogsService();

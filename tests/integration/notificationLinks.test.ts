@@ -8,7 +8,7 @@ import { PAGE_FOR, routeExists, tabsFor } from '../helpers/routeTargets';
 
 const STORED_ALIASES: Record<string, string[]> = {
   '/profile': ['appointments', 'calendar', 'inbox'],
-  '/admin/operations': ['catalog'],
+  '/admin/operations': ['catalog', 'catalogs', 'factory-onboarding', 'system-health', 'search-analytics', 'services-billing', 'platform-overview', 'push'],
 };
 
 const NO_FLOW_BY_DESIGN: Record<string, string> = {

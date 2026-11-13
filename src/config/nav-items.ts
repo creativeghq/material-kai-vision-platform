@@ -417,4 +417,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'signals-hiring',
   'signals-technographics',
   'signals-intent',
+  'push-notifications',
+  'operator-emails',
+  'operator-whatsapp',
 ];
