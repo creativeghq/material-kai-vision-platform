@@ -133,6 +133,17 @@ export const QuoteDetailPage: React.FC = () => {
   const [cashPct, setCashPct] = useState(0);
   const [negMarginPolicy, setNegMarginPolicy] = useState<string>('warn');
   const [salesCanSeeCost, setSalesCanSeeCost] = useState(true);
+  const [costAllowed, setCostAllowed] = useState(false);
+  const showCost = salesCanSeeCost && costAllowed;
+  useEffect(() => {
+    const qid = quote?.id;
+    if (!qid) { setCostAllowed(false); return; }
+    let cancelled = false;
+    void (supabase as any).rpc('user_can_see_quote_buy_prices', { p_quote_id: qid })
+      .then(({ data }: { data: unknown }) => { if (!cancelled) setCostAllowed(data === true); });
+    return () => { cancelled = true; };
+  }, [quote?.id]);
+
   useEffect(() => {
     const ws = quote?.workspace_id;
     if (!ws) { setHasParentNode(false); return; }
@@ -993,7 +1004,7 @@ export const QuoteDetailPage: React.FC = () => {
               items={quote.items || []}
               variant="detailed"
               showAddButton={quote.status !== 'accepted' && quote.status !== 'rejected'}
-              salesCanSeeCost={salesCanSeeCost}
+              salesCanSeeCost={showCost}
               customerCompanyId={quote.customer_company_id}
               customerContactId={quote.customer_contact_id}
               onAddProducts={() => setIsAddProductsOpen(true)}
@@ -1068,7 +1079,7 @@ export const QuoteDetailPage: React.FC = () => {
                   <DollarSign className="h-4 w-4" /> Set Item Prices
                 </h3>
                 <p className="text-xs text-muted-foreground mt-0.5">Set a unit price for each item. Line totals and the grand total are calculated automatically.</p>
-                {salesCanSeeCost && (quote.items || []).length > 0 && (
+                {showCost && (quote.items || []).length > 0 && (
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" onClick={() => void handleFindBuyPrices()} disabled={findingBuy}>
                       {findingBuy ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Sparkles className="h-4 w-4 mr-1" />}
@@ -1093,7 +1104,7 @@ export const QuoteDetailPage: React.FC = () => {
                             <th className="text-left text-xs font-medium text-muted-foreground p-3">Product</th>
                             <th className="text-center text-xs font-medium text-muted-foreground p-3 w-16">Qty</th>
                             <th className="text-left text-xs font-medium text-muted-foreground p-3 w-32">Unit Price</th>
-                            {salesCanSeeCost && <th className="text-left text-xs font-medium text-muted-foreground p-3">Buy Price</th>}
+                            {showCost && <th className="text-left text-xs font-medium text-muted-foreground p-3">Buy Price</th>}
                             <th className="text-left text-xs font-medium text-muted-foreground p-3 w-24">Discount</th>
                             <th className="text-right text-xs font-medium text-muted-foreground p-3 w-28">Final Price</th>
                             <th className="text-right text-xs font-medium text-muted-foreground p-3 w-28">Line Total</th>
@@ -1152,7 +1163,7 @@ export const QuoteDetailPage: React.FC = () => {
                                     )}
                                   </div>
                                 </td>
-                                {salesCanSeeCost && (
+                                {showCost && (
                                   <td className="p-3 align-top">
                                     <QuoteLineBuyPrice
                                       cost={(item as any).cost_snapshot != null ? Number((item as any).cost_snapshot) : null}

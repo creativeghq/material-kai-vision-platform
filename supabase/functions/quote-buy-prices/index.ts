@@ -5,7 +5,7 @@ import { loadPrompt } from '../_shared/prompt-utils.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate } from '../_shared/auth.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { captureException } from '../_shared/sentry.ts';
@@ -60,11 +60,14 @@ Deno.serve(withApiLogging('quote-buy-prices', async (req) => {
   if (qErr) return jsonResponse({ success: false, error: 'Could not read the quote' }, 500);
   if (!quote?.workspace_id) return jsonResponse({ success: false, error: 'Not found' }, 404);
   const workspaceId = quote.workspace_id as string;
-  const [sells, operates] = await Promise.all([
-    userHasWorkspaceCapability(db, userId, workspaceId, 'quotes.use'),
-    userHasWorkspaceCapability(db, userId, workspaceId, 'finance.operate'),
-  ]);
-  if (!sells && !operates) return jsonResponse({ success: false, error: 'Not found' }, 404);
+  // Asked AS THE CALLER: the same rule that hides quote_item_costs from them.
+  const asUser = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY') || '', {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+    auth: { persistSession: false },
+  });
+  const { data: maySee, error: gateErr } = await asUser.rpc('user_can_see_quote_buy_prices', { p_quote_id: quoteId });
+  if (gateErr) return jsonResponse({ success: false, error: 'Could not check access' }, 500);
+  if (maySee !== true) return jsonResponse({ success: false, error: 'Not found' }, 404);
 
   const { data: items, error: iErr } = await db
     .from('quote_items')
