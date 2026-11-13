@@ -438,7 +438,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
                   submitAsk();
                 }
               }}
-              placeholder={`Ask about this ${active ? KIND_LABEL[active.kind].toLowerCase() : 'result'}…`}
+              placeholder={`Ask about this ${active ? KIND_LABEL[active.kind].split(' ').map((w) => (/\d|^[A-Z]{2,}$/.test(w) ? w : w.toLowerCase())).join(' ') : 'result'}…`}
               aria-label="Ask about this result"
               className="h-9 min-w-0 flex-1 rounded-sm border border-hairline bg-card px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             />
