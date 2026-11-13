@@ -12,8 +12,7 @@ const ALWAYS_THINKS = ['claude-opus-5-5'];
 const BETWEEN_TOOLS = ['claude-sonnet-5-5'];
 /** Thinks by default where its predecessor did not, so an unset `thinking` is turned off. */
 const THINKING_OFF_UNLESS_ASKED = ['claude-haiku-5-5'];
-/** The only models still accepting `temperature` / `top_p` / `top_k`. */
-const ACCEPTS_SAMPLING = ['claude-haiku-4-5'];
+const ACCEPTS_SAMPLING: string[] = [];
 
 const THINKING_OFF_EFFORTS = new Set<string | undefined>([undefined, 'low', 'medium', 'high']);
 const SAMPLING_KEYS = ['temperature', 'top_p', 'top_k'];
