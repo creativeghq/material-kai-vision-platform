@@ -481,6 +481,8 @@ jobs:
       # baseline + declared non-a11y debt — and pinned by a11yRatchet.test.ts, so
       # it cannot be raised to go green. When you clear some, lower it there.
       - run: npm run lint
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
   # ────────────────────────────────────────────────────────────────────
   # a11y: the a11y ratchet (per-rule counts in .github/a11y-baseline.json, fails when one
@@ -504,6 +506,8 @@ jobs:
       - run: npm ci
       - run: npm run gen:all
       - run: npm run lint:a11y
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
 
   # build-frontend: the slow half of the frontend deploy, run BESIDE the gates rather than
   # behind them. It uploads nothing to Vercel — deploy-frontend, which keeps every gate,
