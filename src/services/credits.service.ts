@@ -213,10 +213,6 @@ export const creditsAPI = {
       'claude-opus-5-5':   { input:  4.00, output: 20.00 },
       'claude-sonnet-5-5': { input:  2.00, output: 10.00 },
       'claude-haiku-5-5':  { input:  0.10, output:  0.50 },
-      // Superseded on 2026-11-01; kept so rows logged before then still price at their own rate.
-      'claude-opus-5':     { input:  5.00, output: 25.00 },
-      'claude-sonnet-5':   { input:  2.00, output: 10.00 },
-      'claude-haiku-4-5':  { input:  1.00, output:  5.00 },
 
       // OpenAI Embeddings (chat models removed — platform uses Claude only)
       'text-embedding-3-small': { input: 0.02, output: 0.00 },
