@@ -180,25 +180,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
-    name: 'ask_stark',
-    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
-    factory: 'createAskStarkTool',
-    description: 'Hand one Agent Ops case to Stark, the investigator sub-agent.',
-    params: [
-      { name: 'case_id', type: 'string', optional: false, description: 'The case id from ops_cases.' },
-      { name: 'brief', type: 'string', optional: false, description: 'One line: what you want Stark to answer. On a second round, include Veritas\'s note.' },
-    ],
-  },
-  {
-    name: 'ask_veritas',
-    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
-    factory: 'createAskVeritasTool',
-    description: 'Hand a case Stark has reported on to Veritas, the verifier sub-agent.',
-    params: [
-      { name: 'case_id', type: 'string', optional: false, description: 'The case id Stark just reported on.' },
-    ],
-  },
-  {
     name: 'assess_finance',
     file: 'supabase/functions/_shared/tools/assessment-tools.ts',
     factory: 'createAssessFinanceTool',
@@ -1705,15 +1686,6 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'limit', type: 'number', optional: true, description: 'Maximum number of results to return (1-20, default 10)' },
       { name: 'aspect', type: 'enum', enum: ['color', 'texture', 'style', 'material'], optional: true, description: 'Bias results toward one aspect when the user asks for similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for a normal all-round search.' },
       { name: 'search_spec', type: 'object', optional: true, description: 'Structured interpretation of the search query across dimensions — always provide this for transparency' },
-    ],
-  },
-  {
-    name: 'ops_cases',
-    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
-    factory: 'createOpsCasesTool',
-    description: 'Agent Ops cases waiting on the platform: what looks broken (integrity checks, providers, jobs, background agents, agent tools), who holds each case and what round it is on.',
-    params: [
-      { name: 'include_escalated', type: 'boolean', optional: true, description: 'Also list cases already left for a person.' },
     ],
   },
   {
