@@ -34,6 +34,8 @@ import { PHOTO_TOPIC_MAX_INPUT_TOKENS, PHOTO_TOPIC_MAX_OUTPUT_TOKENS, PHOTO_TOPI
 import { WRITE_MAX_INPUT_TOKENS, WRITE_MAX_OUTPUT_TOKENS } from './write.ts';
 import { DEFAULT_CLAUDE_MODEL } from '../../_shared/ai-client.ts';
 import { avoidListHits, brandDraftCheck, loadBrandContext } from '../../_shared/brand-context.ts';
+import { checkCopy, loadCopyRules } from '../../_shared/copy-check.ts';
+import { recordContentOutputs } from '../../_shared/content-outputs.ts';
 
 /** What research + planning typically settle to before the write reservation is taken. */
 const PRE_WRITE_TYPICAL_CREDITS = 40;
@@ -985,6 +987,16 @@ async function runLateStages(ctx: {
       completed_at: new Date().toISOString(),
     }, `Pipeline complete: score ${analysis.overallScore}/100, ${finalWordCount} words`
       + (brandCheck.avoid_hits.length ? `; uses words on the avoid list: ${brandCheck.avoid_hits.join(', ')}` : ''));
+
+    const articleRules = await loadCopyRules(supabase, 'article');
+    const articleCheck = checkCopy({ text: publishedMarkdown, rules: articleRules, surface: 'article' });
+    await recordContentOutputs(supabase, [{
+      workspace_id: workspaceId, user_id: userId, producer: 'seo_write', channel: 'article',
+      subject_table: 'seo_articles', subject_id: articleId,
+      rules: articleRules.status === 'unavailable' ? 'unavailable' : 'ok',
+      warnings: articleCheck.warnings, avoid_hits: brandCheck.avoid_hits.length,
+      char_count: articleCheck.length, score: analysis.overallScore ?? null,
+    }]);
 
     console.log(`[seo-pipeline] Complete! Article ${articleId}: score ${analysis.overallScore}/100, ${finalWordCount} words, ${processingTimeMs}ms`);
 

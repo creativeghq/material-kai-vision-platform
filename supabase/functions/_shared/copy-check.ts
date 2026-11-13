@@ -1,7 +1,7 @@
 /** The one copy check every writer runs. Limits come from `channel_writing_rules`, phrases from `writing_tells`; it flags, never rewrites. */
 import type { DbClient } from './supabase-client.ts';
-import { containsPhrase, startsWithPhrase } from './phrase-match.ts';
-import type { CopyWarningCode, WritingSurface, WritingTellKind } from './writingVocabulary.generated.ts';
+import { compileTellPattern, containsPhrase, foldText, startsWithPhrase } from './phrase-match.ts';
+import type { CopyWarningCode, WritingSurface, WritingTellKind, WritingTellStrength } from './writingVocabulary.generated.ts';
 
 export type { WritingTellKind };
 
@@ -26,13 +26,61 @@ export interface WritingTell {
   kind: WritingTellKind;
   phrase: string;
   surfaces: string[] | null;
+  strength?: WritingTellStrength;
+  pattern?: string | null;
+}
+
+/** system_settings `copy_style_checks`: thresholds for the rhythm tests. */
+export interface CopyStyle {
+  weak_tells_min: number;
+  dash_per_100_words: number;
+  min_words_for_rhythm: number;
+  repeated_openings_run: number;
 }
 
 export interface CopyRules {
   status: 'ok' | 'no_rule' | 'unavailable';
   rule: ChannelWritingRule | null;
   tells: WritingTell[];
+  style?: CopyStyle | null;
   error?: string;
+}
+
+/** Tell kinds whose strong hits warn under their own code and whose weak hits are pooled. */
+const STYLE_KINDS: Partial<Record<WritingTellKind, { code: CopyWarningCode; message: string }>> = {
+  ai_phrase: { code: 'ai_phrase', message: 'Stock phrasing that reads as machine-written.' },
+  engagement_bait: { code: 'engagement_bait', message: 'Reflex engagement bait.' },
+  staging: { code: 'staging', message: 'Signals importance instead of stating the point.' },
+  inflation: { code: 'inflation', message: 'Dresses an ordinary fact as pivotal or expert-backed.' },
+  chatbot_residue: { code: 'chatbot_residue', message: 'Left over from a chat reply, or writes about the text itself.' },
+};
+
+const patternCache = new Map<string, RegExp | null>();
+function tellMatches(text: string, folded: string, t: WritingTell): boolean {
+  if (!t.pattern) return containsPhrase(text, t.phrase);
+  if (!patternCache.has(t.pattern)) patternCache.set(t.pattern, compileTellPattern(t.pattern));
+  return patternCache.get(t.pattern)?.test(folded) ?? false;
+}
+
+const SENTENCE_SPLIT = /(?<=[.!?;;…])\s+|\n+/u;
+const MARKUP_LEAD = /^[\s>#*_\-+[\]!]+/u;
+
+function sentencesOf(text: string): string[] {
+  return text.split(SENTENCE_SPLIT).map((s) => s.replace(MARKUP_LEAD, '').trim()).filter((s) => /\p{L}/u.test(s));
+}
+
+/** Every sentence that carries a STRONG tell, with the tell it matched. Used to ask a reviewer for exact edits. */
+export function findTellPassages(text: string, rules: CopyRules, surface: string | null, limit = 20): Array<{ sentence: string; kind: WritingTellKind; label: string }> {
+  const tells = rules.tells.filter((t) => STYLE_KINDS[t.kind] && (t.strength ?? 'strong') === 'strong'
+    && (!t.surfaces?.length || (surface != null && t.surfaces.includes(surface))));
+  const out: Array<{ sentence: string; kind: WritingTellKind; label: string }> = [];
+  for (const s of sentencesOf(text)) {
+    const folded = foldText(s);
+    const hit = tells.find((t) => tellMatches(s, folded, t));
+    if (hit) out.push({ sentence: s, kind: hit.kind, label: hit.phrase });
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 export type { CopyWarningCode };
@@ -57,15 +105,17 @@ const LINK_RE = /https?:\/\/\S+|\bwww\.\S+/i;
 const INVISIBLE_RE = /[​-‍⁠﻿­᠎]/;
 
 export async function loadCopyRules(db: DbClient, channel: string): Promise<CopyRules> {
-  const [ruleRes, tellRes] = await Promise.all([
+  const [ruleRes, tellRes, styleRes] = await Promise.all([
     db.from('channel_writing_rules').select('*').eq('channel', channel).eq('is_active', true).maybeSingle(),
-    db.from('writing_tells').select('kind, phrase, surfaces').eq('is_active', true),
+    db.from('writing_tells').select('kind, phrase, surfaces, strength, pattern').eq('is_active', true),
+    db.from('system_settings').select('setting_value').eq('setting_key', 'copy_style_checks').maybeSingle(),
   ]);
-  if (ruleRes.error || tellRes.error) {
-    return { status: 'unavailable', rule: null, tells: [], error: (ruleRes.error ?? tellRes.error)?.message };
+  if (ruleRes.error || tellRes.error || styleRes.error) {
+    return { status: 'unavailable', rule: null, tells: [], error: (ruleRes.error ?? tellRes.error ?? styleRes.error)?.message };
   }
   const rule = (ruleRes.data ?? null) as ChannelWritingRule | null;
-  return { status: rule ? 'ok' : 'no_rule', rule, tells: (tellRes.data ?? []) as WritingTell[] };
+  const style = (styleRes.data?.setting_value ?? null) as CopyStyle | null;
+  return { status: rule ? 'ok' : 'no_rule', rule, tells: (tellRes.data ?? []) as WritingTell[], style };
 }
 
 /** Caption + hashtags exactly as the channel will show them. */
@@ -92,7 +142,10 @@ export function checkCopy(input: {
 
   const surface = rule?.surface ?? input.surface ?? null;
   const tells = rules.tells.filter((t) => !t.surfaces?.length || (surface != null && t.surfaces.includes(surface)));
-  const hitsOf = (kind: WritingTellKind) => tells.filter((t) => t.kind === kind && containsPhrase(full, t.phrase)).map((t) => t.phrase);
+  const foldedFull = foldText(full);
+  const hitsOf = (kind: WritingTellKind, strength?: WritingTellStrength) => tells
+    .filter((t) => t.kind === kind && (!strength || (t.strength ?? 'strong') === strength) && tellMatches(full, foldedFull, t))
+    .map((t) => t.phrase);
 
   const length = [...full].length;
   if (rule?.max_chars && length > rule.max_chars) add('over_limit', `${length} characters; ${rule.label} allows ${rule.max_chars}.`);
@@ -122,10 +175,36 @@ export function checkCopy(input: {
   const asks = hitsOf('ask');
   if (rule?.ask_max != null && asks.length > rule.ask_max) add('too_many_asks', `${asks.length} different asks; keep to ${rule.ask_max}.`, asks);
 
-  const ai = hitsOf('ai_phrase');
-  if (ai.length) add('ai_phrase', 'Stock phrasing that reads as machine-written.', ai);
-  const bait = hitsOf('engagement_bait');
-  if (bait.length) add('engagement_bait', 'Reflex engagement bait.', bait);
+  const weak: string[] = [];
+  for (const [kind, spec] of Object.entries(STYLE_KINDS) as [WritingTellKind, { code: CopyWarningCode; message: string }][]) {
+    const strong = hitsOf(kind, 'strong');
+    if (strong.length) add(spec.code, spec.message, strong);
+    weak.push(...hitsOf(kind, 'weak'));
+  }
+  const style = rules.style;
+  if (style && weak.length >= style.weak_tells_min) {
+    add('weak_tells', `${weak.length} weak signs of machine writing together; any one alone would be fine.`, weak);
+  }
+  const words = full.split(/\s+/).filter((w) => /\p{L}/u.test(w)).length;
+  if (style && words >= style.min_words_for_rhythm) {
+    const dashes = (full.match(/\s[—–-]\s|—/gu) ?? []).length;
+    const per100 = (dashes / words) * 100;
+    if (per100 > style.dash_per_100_words) {
+      add('dash_heavy', `${dashes} dashes in ${words} words; prefer full stops and commas.`);
+    }
+    let run = 1;
+    let worst = { word: '', run: 1 };
+    let prev = '';
+    for (const s of sentencesOf(full)) {
+      const first = foldText(s).match(/\p{L}+/u)?.[0] ?? '';
+      run = first && first === prev ? run + 1 : 1;
+      if (run > worst.run) worst = { word: first, run };
+      prev = first;
+    }
+    if (worst.run >= style.repeated_openings_run) {
+      add('repeated_openings', `${worst.run} sentences in a row start with "${worst.word}".`, [worst.word]);
+    }
+  }
   if (INVISIBLE_RE.test(full)) add('invisible_characters', 'Contains invisible characters a keyboard does not produce.');
 
   const avoid = (input.avoidList ?? []).filter((term) => term?.trim() && containsPhrase(full, term));

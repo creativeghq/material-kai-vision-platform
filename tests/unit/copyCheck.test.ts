@@ -1,7 +1,8 @@
 /** The shared copy check (#552): limits come from channel_writing_rules, phrases from writing_tells, and every writer runs it. */
 import { describe, it, expect } from 'vitest';
 import { join } from 'node:path';
-import { checkCopy, type ChannelWritingRule, type CopyRules, type WritingTell } from '../../supabase/functions/_shared/copy-check.ts';
+import { checkCopy, findTellPassages, type ChannelWritingRule, type CopyRules, type WritingTell } from '../../supabase/functions/_shared/copy-check.ts';
+import { compileTellPattern } from '../../supabase/functions/_shared/phrase-match.ts';
 import { templateLinkIssues } from '../../supabase/functions/_shared/email/campaign-preflight.ts';
 import { strippedSource } from '../helpers/sourceIndex';
 
@@ -24,6 +25,56 @@ const tells: WritingTell[] = [
 ];
 const rules = (rule: ChannelWritingRule | null = instagram, status: CopyRules['status'] = 'ok'): CopyRules => ({ status, rule, tells });
 const codes = (r: ReturnType<typeof checkCopy>) => r.warnings.map((w) => w.code);
+
+describe('style tells: patterns, strength and rhythm', () => {
+  const style = { weak_tells_min: 3, dash_per_100_words: 2, min_words_for_rhythm: 20, repeated_openings_run: 3 };
+  const styleTells: WritingTell[] = [
+    { kind: 'staging', phrase: 'Not X but Y', pattern: String.raw`\bnot (just|only|merely|simply)\b[^.!?;]{1,120}\bbut\b`, surfaces: null },
+    { kind: 'staging', phrase: 'Δεν είναι απλώς… αλλά…', pattern: String.raw`\bδεν (ειναι|προκειται για|αφορα) (απλωσ|απλα|μονο)\b[^.!;;]{1,120}\bαλλα\b`, surfaces: null },
+    { kind: 'chatbot_residue', phrase: 'Σε αυτό το άρθρο θα', pattern: String.raw`\bσε (αυτο το|αυτον τον) (αρθρο|οδηγο)\b[^.!;;]{0,40}\bθα\b`, surfaces: null },
+    { kind: 'ai_phrase', phrase: 'delve', strength: 'weak', surfaces: null },
+    { kind: 'ai_phrase', phrase: 'crucial', strength: 'weak', surfaces: null },
+    { kind: 'ai_phrase', phrase: 'vibrant', strength: 'weak', surfaces: null },
+    { kind: 'inflation', phrase: 'a testament to', surfaces: null },
+  ];
+  const sr = (): CopyRules => ({ status: 'no_rule', rule: null, tells: styleTells, style });
+  const codesOf = (text: string) => checkCopy({ text, rules: sr(), surface: 'article' }).warnings.map((w) => w.code);
+
+  it('compiles a stored pattern with a Unicode word boundary, so Greek matches', () => {
+    expect(compileTellPattern(String.raw`\bαλλα\b`)?.test('ναι αλλα οχι')).toBe(true);
+    expect(compileTellPattern(String.raw`\bαλλα\b`)?.test('αλλαγες')).toBe(false);
+    expect(compileTellPattern('(unclosed')).toBeNull();
+  });
+
+  it('flags a "not X but Y" contrast in English and in accented Greek as staging', () => {
+    expect(codesOf('It is not just a tile, but a statement.')).toContain('staging');
+    expect(codesOf('Δεν είναι απλώς ένα πλακάκι, αλλά μια δήλωση.')).toContain('staging');
+    expect(codesOf('Σε αυτό το άρθρο θα δούμε τα πλακάκια.')).toContain('chatbot_residue');
+    expect(codesOf('The tile is 20 mm thick and rated R11.')).toEqual([]);
+  });
+
+  it('warns on weak tells only when enough appear together', () => {
+    expect(codesOf('A crucial choice.')).not.toContain('weak_tells');
+    expect(codesOf('A crucial, vibrant choice; let us delve in.')).toContain('weak_tells');
+    expect(codesOf('A crucial, vibrant choice; let us delve in.')).not.toContain('ai_phrase');
+  });
+
+  it('flags dashes everywhere and the same sentence opening repeated, only above the length floor', () => {
+    const dashy = Array.from({ length: 6 }, (_, i) => `Tile ${i} is large — and heavy — so plan the floor.`).join(' ');
+    expect(codesOf(dashy)).toContain('dash_heavy');
+    const repeated = 'The tile is large. The grout is grey. The floor is flat. The edges are sharp and the room is bright and well lit today.';
+    expect(codesOf(repeated)).toContain('repeated_openings');
+    expect(codesOf('Short — punchy — text.')).not.toContain('dash_heavy');
+  });
+
+  it('returns the exact sentences that carry a strong tell, for the reviewer to edit', () => {
+    const md = '## Πλακάκια\n\nΤο πλακάκι έχει πάχος 20 mm. Δεν είναι απλώς ένα πλακάκι, αλλά μια δήλωση στυλ.';
+    const found = findTellPassages(md, sr(), 'article');
+    expect(found).toHaveLength(1);
+    expect(md).toContain(found[0].sentence);
+    expect(found[0].kind).toBe('staging');
+  });
+});
 
 describe('checkCopy', () => {
   it('passes a clean caption with no warnings', () => {

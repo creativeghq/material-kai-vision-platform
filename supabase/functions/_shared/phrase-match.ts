@@ -23,3 +23,20 @@ export function startsWithPhrase(text: string, phrase: string): boolean {
   if (!p) return false;
   return new RegExp(`^[^\\p{L}\\p{N}]*${p}(?![\\p{L}\\p{N}])`, 'u').test(foldText(text ?? ''));
 }
+
+const UNICODE_BOUNDARY = String.raw`(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))`;
+
+/**
+ * A stored tell pattern, folded like the text it runs on. Escapes are kept as written and `\b`
+ * becomes a Unicode word boundary, because JavaScript's `\b` does not see Greek letters as word
+ * characters. Returns null for a pattern that does not compile, so one bad row cannot stop a check.
+ */
+export function compileTellPattern(pattern: string): RegExp | null {
+  const src = pattern.replace(/(\\[pP]\{[^}]*\}|\\.)|([^\\]+)/gu, (_m, esc: string | undefined, lit: string | undefined) =>
+    esc !== undefined ? (esc === '\\b' ? UNICODE_BOUNDARY : esc) : foldText(lit ?? ''));
+  try {
+    return new RegExp(src, 'u');
+  } catch {
+    return null;
+  }
+}

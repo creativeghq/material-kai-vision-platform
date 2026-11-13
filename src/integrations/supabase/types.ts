@@ -28850,7 +28850,9 @@ export type Database = {
           kind: string
           language_code: string
           note: string | null
+          pattern: string | null
           phrase: string
+          strength: string
           surfaces: string[] | null
           updated_at: string
         }
@@ -28861,7 +28863,9 @@ export type Database = {
           kind: string
           language_code?: string
           note?: string | null
+          pattern?: string | null
           phrase: string
+          strength?: string
           surfaces?: string[] | null
           updated_at?: string
         }
@@ -28872,7 +28876,9 @@ export type Database = {
           kind?: string
           language_code?: string
           note?: string | null
+          pattern?: string | null
           phrase?: string
+          strength?: string
           surfaces?: string[] | null
           updated_at?: string
         }

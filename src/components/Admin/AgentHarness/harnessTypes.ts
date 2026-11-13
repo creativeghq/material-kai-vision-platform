@@ -350,6 +350,7 @@ export interface ContentProducerRow {
   avoid_hit_outputs: number;
   published: number;
   edited_before_outcome: number;
+  edited_known: number;
   avg_score: number | null;
   top_warnings: Array<{ code: string; outputs: number }>;
   channels: string[];

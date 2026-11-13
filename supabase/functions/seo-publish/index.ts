@@ -9,6 +9,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
+import { markContentOutcome } from '../_shared/content-outputs.ts';
 import { faqPairs, jsonLdScript, markdownToHtml } from '../_shared/seo/markdown-html.ts';
 
 const SEO_MODULE = 'seo-toolkit';
@@ -304,6 +305,12 @@ async function handlePublish(req: Request, body: any): Promise<Response> {
       ...(live ? { published_url: String(post.link ?? ''), published_at: row.published_at ?? new Date().toISOString() } : {}),
     }).eq('id', articleId);
     if (doneErr) console.error('[seo-publish] published but the article row was not updated', articleId, doneErr.message);
+    if (live) {
+      const { data: drafted } = await supabase.from('ai_content_outputs').select('char_count')
+        .eq('subject_table', 'seo_articles').eq('subject_id', articleId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+      await markContentOutcome(supabase, { table: 'seo_articles', id: articleId }, 'published',
+        drafted?.char_count != null ? [...String(row.markdown_content ?? '').trim()].length !== drafted.char_count : null);
+    }
     return jsonResponse({ success: true, external_id: externalId, status: post?.status ?? status, url: post?.link ?? null });
   } catch (e) {
     const err = e instanceof WpError ? e : null;

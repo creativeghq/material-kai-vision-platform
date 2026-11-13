@@ -92,6 +92,7 @@ const ContentTable: React.FC<{ rows: ContentProducerRow[] }> = ({ rows }) => (
       <TableRow>
         <TableHead>Writer</TableHead>
         <TableHead className="text-right">Outputs</TableHead>
+        <TableHead className="text-right">Score</TableHead>
         <TableHead className="text-right">With Warnings</TableHead>
         <TableHead className="text-right">Warnings per Output</TableHead>
         <TableHead className="text-right">Words to Avoid</TableHead>
@@ -112,11 +113,12 @@ const ContentTable: React.FC<{ rows: ContentProducerRow[] }> = ({ rows }) => (
             {fmtInt(r.outputs)}
             {r.outputs === 0 && r.calls > 0 && <div className="text-[11px] text-muted-foreground">{fmtInt(r.calls)} calls</div>}
           </TableCell>
+          <TableCell className="text-right tabular-nums">{r.avg_score ?? '—'}</TableCell>
           <TableCell className="text-right tabular-nums">{r.checked ? fmtPct(ratio(r.with_warnings, r.checked)) : '—'}</TableCell>
           <TableCell className="text-right tabular-nums">{r.warnings_per_output ?? '—'}</TableCell>
           <TableCell className="text-right tabular-nums">{r.outputs ? fmtInt(r.avoid_hit_outputs) : '—'}</TableCell>
           <TableCell className="text-right tabular-nums">{r.outputs ? fmtInt(r.published) : '—'}</TableCell>
-          <TableCell className="text-right tabular-nums">{r.published ? fmtPct(ratio(r.edited_before_outcome, r.published)) : '—'}</TableCell>
+          <TableCell className="text-right tabular-nums">{r.edited_known ? fmtPct(ratio(r.edited_before_outcome, r.edited_known)) : '—'}</TableCell>
           <TableCell className="text-xs">
             {r.top_warnings.length
               ? r.top_warnings.slice(0, 3).map((w) => `${warningLabel(w.code)} (${w.outputs})`).join(', ')
@@ -154,8 +156,8 @@ const SeoQuality: React.FC<{ seo: WorkQuality['seo'] }> = ({ seo }) => {
         <HubStatTile
           label="Readability"
           value={a.readability_status === 'ok' ? a.avg_readability ?? '—' : '—'}
-          category={a.readability_status === 'not_collected' ? 'Never measured: no article records a readability score' : a.readability_status === 'no_data' ? 'No completed article' : 'Average'}
-          help="readability_score is a column on seo_articles that no pipeline stage fills in yet."
+          category={a.readability_status === 'not_collected' ? 'Not measured: the formula is English-only and these articles are not English' : a.readability_status === 'no_data' ? 'No completed article' : 'Average'}
+          help="Flesch reading ease is defined for English text; an article in another language gets no score rather than a wrong one."
         />
         <HubStatTile
           label="Cited by AI Answers"

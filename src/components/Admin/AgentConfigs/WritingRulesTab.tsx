@@ -17,7 +17,8 @@ import { useToast } from '@/hooks/use-toast';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 import {
   WRITING_SURFACES, WRITING_SURFACE_LABELS, WRITING_TELL_KINDS, WRITING_TELL_KIND_HINTS, WRITING_TELL_KIND_LABELS,
-  type WritingSurface, type WritingTellKind,
+  WRITING_TELL_STRENGTHS, WRITING_TELL_STRENGTH_LABELS,
+  type WritingSurface, type WritingTellKind, type WritingTellStrength,
 } from '@/config/writingVocabulary';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -64,6 +65,10 @@ function parseLimit(field: NumberField, raw: string): { value: number | null } |
   return { value: n };
 }
 
+const BS = String.fromCharCode(92);
+const PATTERN_HINT = `A regular expression matched instead of the phrase, which then becomes its name. Write it in lower case without accents; ${BS}b is a word boundary in any language.`;
+const PATTERN_PLACEHOLDER = `${BS}bnot (just|only)${BS}b[^.]{1,120}${BS}bbut${BS}b`;
+
 const limitText = (v: number | null) => (v == null ? '—' : v.toLocaleString());
 
 const TELL_FIELDS: HubTableField<Tell>[] = [
@@ -81,8 +86,11 @@ export const WritingRulesTab: React.FC = () => {
   const [editing, setEditing] = useState<ChannelRule | null>(null);
   const [draft, setDraft] = useState<RuleDraft | null>(null);
   const [saving, setSaving] = useState(false);
-  const [newTell, setNewTell] = useState<{ kind: WritingTellKind; phrase: string; language_code: string; surfaces: WritingSurface[]; note: string }>(
-    { kind: 'ai_phrase', phrase: '', language_code: 'en', surfaces: [], note: '' },
+  const [newTell, setNewTell] = useState<{
+    kind: WritingTellKind; phrase: string; language_code: string; surfaces: WritingSurface[]; note: string;
+    strength: WritingTellStrength; pattern: string;
+  }>(
+    { kind: 'ai_phrase', phrase: '', language_code: 'en', surfaces: [], note: '', strength: 'strong', pattern: '' },
   );
 
   const load = useCallback(async () => {
@@ -129,23 +137,39 @@ export const WritingRulesTab: React.FC = () => {
   const addTell = async () => {
     const phrase = newTell.phrase.trim();
     if (!phrase) return;
+    const pattern = newTell.pattern.trim();
+    if (pattern) {
+      try { new RegExp(pattern.replace(/\\b/g, ''), 'u'); } catch (e) {
+        toast({ title: 'That pattern is not a valid regular expression', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+        return;
+      }
+    }
     const { error } = await supabase.from('writing_tells').insert({
       kind: newTell.kind,
       phrase,
       language_code: newTell.language_code.trim().toLowerCase() || 'en',
       surfaces: newTell.surfaces.length ? newTell.surfaces : null,
       note: newTell.note.trim() || null,
+      strength: newTell.strength,
+      pattern: pattern || null,
     });
     if (error) {
       toast({ title: 'Could not add the phrase', description: error.code === '23505' ? 'That phrase is already listed for this kind and language.' : error.message, variant: 'destructive' });
       return;
     }
-    setNewTell((s) => ({ ...s, phrase: '', note: '' }));
+    setNewTell((s) => ({ ...s, phrase: '', note: '', pattern: '' }));
     void load();
   };
 
   const toggleTell = async (t: Tell) => {
     const { error } = await supabase.from('writing_tells').update({ is_active: !t.is_active, updated_at: new Date().toISOString() }).eq('id', t.id);
+    if (error) toast({ title: 'Could not update', description: error.message, variant: 'destructive' });
+    else void load();
+  };
+
+  const toggleStrength = async (t: Tell) => {
+    const next: WritingTellStrength = t.strength === 'weak' ? 'strong' : 'weak';
+    const { error } = await supabase.from('writing_tells').update({ strength: next, updated_at: new Date().toISOString() }).eq('id', t.id);
     if (error) toast({ title: 'Could not update', description: error.message, variant: 'destructive' });
     else void load();
   };
@@ -258,6 +282,17 @@ export const WritingRulesTab: React.FC = () => {
               <FormField label="Note" optional>
                 <Input value={newTell.note} onChange={(e) => setNewTell((s) => ({ ...s, note: e.target.value }))} />
               </FormField>
+              <FormField label="Strength" hint="Strong: one sighting is a warning. Weak: warned on only when several appear together.">
+                <Select value={newTell.strength} onValueChange={(v) => setNewTell((s) => ({ ...s, strength: v as WritingTellStrength }))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {WRITING_TELL_STRENGTHS.map((k) => <SelectItem key={k} value={k}>{WRITING_TELL_STRENGTH_LABELS[k]}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FormField>
+              <FormField label="Pattern" optional hint={PATTERN_HINT}>
+                <Input className="font-mono text-xs" value={newTell.pattern} onChange={(e) => setNewTell((s) => ({ ...s, pattern: e.target.value }))} placeholder={PATTERN_PLACEHOLDER} />
+              </FormField>
             </FormGrid>
             <div className="flex flex-wrap items-center gap-4">
               <span className="text-xs text-muted-foreground">Applies to:</span>
@@ -300,6 +335,7 @@ export const WritingRulesTab: React.FC = () => {
                   <TableRow>
                     <TableHead>Phrase</TableHead>
                     <TableHead>Kind</TableHead>
+                    <TableHead>Strength</TableHead>
                     <TableHead className="hidden sm:table-cell">Language</TableHead>
                     <TableHead className="hidden md:table-cell">Applies To</TableHead>
                     <TableHead className="hidden lg:table-cell">Note</TableHead>
@@ -310,8 +346,16 @@ export const WritingRulesTab: React.FC = () => {
                 <TableBody>
                   {tellTable.rows.map((t) => (
                     <TableRow key={t.id}>
-                      <TableCell className="font-medium">{t.phrase}</TableCell>
+                      <TableCell className="font-medium">
+                        {t.phrase}
+                        {t.pattern && <div className="mt-0.5 break-all font-mono text-[11px] font-normal text-muted-foreground">{t.pattern}</div>}
+                      </TableCell>
                       <TableCell className="text-xs">{WRITING_TELL_KIND_LABELS[t.kind as WritingTellKind] ?? t.kind}</TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => void toggleStrength(t)} aria-label={`Make "${t.phrase}" ${t.strength === 'weak' ? 'strong' : 'weak'}`}>
+                          {WRITING_TELL_STRENGTH_LABELS[(t.strength as WritingTellStrength) ?? 'strong'] ?? t.strength}
+                        </Button>
+                      </TableCell>
                       <TableCell className="hidden text-xs uppercase sm:table-cell">{t.language_code}</TableCell>
                       <TableCell className="hidden text-xs md:table-cell">
                         {t.surfaces?.length ? t.surfaces.map((s) => WRITING_SURFACE_LABELS[s as WritingSurface] ?? s).join(', ') : 'All'}
