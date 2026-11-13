@@ -77,7 +77,7 @@ const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 // Lazy getter (same rationale as GOOGLE_API_KEY) for the xAI Grok/Aurora image
 // + edit + masked-inpaint paths (generateImageWithGrok / editImageWithGrok).
 const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
-// Images ONLY. OpenAI was removed from the platform on 2026-08-23; gpt-image-1 came back on
+// Images ONLY. OpenAI was removed from the platform on 2026-08-23; its image model came back on
 // 2026-09-05 for the interior grid (text-to-image and image edit) through this chokepoint,
 // the same way Grok's OpenAI-compatible endpoint did. No SDK, no text models here.
 const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
@@ -2373,10 +2373,9 @@ export async function editImageWithGrok(
   return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
-// ── OpenAI gpt-image-1 (interior grid: text-to-image + image edit) ──────────────
+// ── OpenAI gpt-image-2.6-sunburst (interior grid: text-to-image + image edit) ──────
 
 export const OPENAI_IMAGE_MODEL = 'gpt-image-2.6-sunburst';
-/** `ai_model_pricing.model_key` — priced per image at the medium 1024px tier. */
 const OPENAI_IMAGE_PRICING_MODEL_ID = 'gpt-image-2.6';
 
 export interface OpenAIImageResult {
@@ -2385,10 +2384,6 @@ export interface OpenAIImageResult {
   model: string;
 }
 
-/**
- * Generate an image from a text prompt with gpt-image-1 (/v1/images/generations).
- * The model returns base64 by default and has no `response_format` parameter.
- */
 export async function generateImageWithOpenAI(
   prompt: string,
   config?: UnitBillingConfig & { model?: string; size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto'; quality?: 'low' | 'medium' | 'high' },
@@ -2441,7 +2436,7 @@ export async function generateImageWithOpenAI(
 }
 
 /**
- * Edit an existing image with gpt-image-1 (/v1/images/edits, multipart). Without a mask
+ * Edit an existing image (/v1/images/edits, multipart). Without a mask
  * the whole image is re-rendered under the prompt; with a mask, transparent pixels are
  * the region to change (OpenAI's convention — the inverse of Grok's white=change).
  */
