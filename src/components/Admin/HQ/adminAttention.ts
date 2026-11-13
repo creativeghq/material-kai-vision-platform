@@ -15,6 +15,7 @@ export interface AdminAttention {
   ingestion: { needs_review: number; audited: number };
   jobs: { failed_24h: number; stale: number };
   providers: { failing: number; unprobed: number; enabled: number };
+  ops: { escalated: number; open: number; in_review: number };
   generated_at: string;
 }
 

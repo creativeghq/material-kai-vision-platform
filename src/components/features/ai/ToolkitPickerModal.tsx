@@ -2,7 +2,7 @@
 import React, { useMemo, useRef, useState } from 'react';
 import {
   X, Check, Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe,
-  Plane, Link2, FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Lock,
+  Plane, Link2, FileSearch, Layers, BadgeCheck, ShieldCheck, Newspaper, Building2, Bot, Wrench, Lock,
   AlertCircle, Coins, RotateCcw, Briefcase, FolderKanban,
   HardHat, Gavel, GitPullRequestArrow, Receipt, Scale,
   Users, CalendarOff, CalendarPlus, CalendarClock, CalendarDays, LayoutDashboard, ListChecks,
@@ -32,7 +32,7 @@ import { formatNumber } from '@/utils/decimal';
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Plane,
   Compass, BookOpen, Megaphone, LayoutTemplate, Sparkles, Search, Globe, Link2,
-  FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Briefcase, FolderKanban,
+  FileSearch, Layers, BadgeCheck, ShieldCheck, Newspaper, Building2, Bot, Wrench, Briefcase, FolderKanban,
   HardHat, Gavel, GitPullRequestArrow, Receipt, Scale,
   Users, CalendarOff, CalendarPlus, CalendarClock, CalendarDays, LayoutDashboard, ListChecks,
   Package, PackagePlus, AlertTriangle,

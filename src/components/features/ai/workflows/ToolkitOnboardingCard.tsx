@@ -2,7 +2,7 @@
 import React from 'react';
 import {
   Plane, Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
-  FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
+  FileSearch, Layers, BadgeCheck, ShieldCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle, ArrowRight,
   Briefcase, FolderKanban,
   HardHat, Gavel, GitPullRequestArrow, Receipt, Scale,
@@ -24,7 +24,7 @@ const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   Plane,
   Factory,
   Sparkles, Compass, BookOpen, Megaphone, LayoutTemplate, Search, Globe, Link2,
-  FileSearch, Layers, BadgeCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
+  FileSearch, Layers, BadgeCheck, ShieldCheck, Newspaper, Building2, Bot, Wrench, Plus, Send,
   PencilLine, ImageIcon, Mail, ListChecks, Grid3x3, Palette, AlertCircle,
   Briefcase, FolderKanban,
   HardHat, Gavel, GitPullRequestArrow, Receipt, Scale,

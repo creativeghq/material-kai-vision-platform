@@ -13,6 +13,7 @@ import {
   Package,
   Radio,
   Search,
+  ShieldAlert,
   ShieldCheck,
   Upload,
   Wallet,
@@ -48,6 +49,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'Agents',
     items: [
       { id: 'agents', label: 'Agent Harness', path: '/admin/agents', icon: Radio, description: 'Turns, models, tools, evals, failures and conversations.' },
+      { id: 'agent-ops', label: 'Agent Ops', path: '/admin/agent-ops', icon: ShieldAlert, description: 'Cases JARVIS hands to Stark and Veritas, the agents report and every background process.', count: (a) => a.ops.escalated },
       { id: 'ai-configs', label: 'AI Configurations', path: '/admin/ai-configs', icon: Brain, description: 'Prompts, chat starters, writing rules, pricing and background agents.' },
       { id: 'flows', label: 'Flows', path: '/flows', icon: Workflow, description: 'Platform notification and automation flows.' },
     ],

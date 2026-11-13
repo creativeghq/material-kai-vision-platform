@@ -79,6 +79,16 @@ const plural = (n: number, one: string, many: string) => `${fmtInt(n)} ${n === 1
 
 function platformRows(a: AdminAttention): AttentionRow[] {
   const rows: AttentionRow[] = [];
+  if (a.ops.escalated > 0) {
+    rows.push({ id: 'ops-escalated', severity: 'critical', area: 'Agent Ops', to: '/admin/agent-ops?filter=escalated',
+      title: `${plural(a.ops.escalated, 'verified case needs', 'verified cases need')} you`,
+      detail: 'Stark diagnosed it, Veritas confirmed it, and only a person can finish it.' });
+  }
+  if (a.ops.open > 0) {
+    rows.push({ id: 'ops-open', severity: 'info', area: 'Agent Ops', to: '/admin/agent-ops',
+      title: `${plural(a.ops.open, 'case is', 'cases are')} waiting for an agent review`,
+      detail: 'Run Review hands them to Stark and Veritas.' });
+  }
   if (a.providers.failing > 0) {
     rows.push({ id: 'providers', severity: 'critical', area: 'System', to: '/admin/system-health',
       title: `${plural(a.providers.failing, 'generation provider is', 'generation providers are')} failing`,
