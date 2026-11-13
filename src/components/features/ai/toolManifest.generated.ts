@@ -180,6 +180,25 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'ask_stark',
+    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
+    factory: 'createAskStarkTool',
+    description: 'Hand one Agent Ops case to Stark, the investigator sub-agent.',
+    params: [
+      { name: 'case_id', type: 'string', optional: false, description: 'The case id from ops_cases.' },
+      { name: 'brief', type: 'string', optional: false, description: 'One line: what you want Stark to answer. On a second round, include Veritas\'s note.' },
+    ],
+  },
+  {
+    name: 'ask_veritas',
+    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
+    factory: 'createAskVeritasTool',
+    description: 'Hand a case Stark has reported on to Veritas, the verifier sub-agent.',
+    params: [
+      { name: 'case_id', type: 'string', optional: false, description: 'The case id Stark just reported on.' },
+    ],
+  },
+  {
     name: 'assess_finance',
     file: 'supabase/functions/_shared/tools/assessment-tools.ts',
     factory: 'createAssessFinanceTool',
@@ -1598,6 +1617,19 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'manage_scenes',
+    file: 'supabase/functions/_shared/tools/scene-studio-tools.ts',
+    factory: 'createManageScenesTool',
+    description: 'Scene Studio: turn a floor plan, a room photo or a render into an editable 3D room the user can rearrange, recolour, swap products in, and render photo-real in any style.',
+    params: [
+      { name: 'action', type: 'enum', enum: ['create', 'status', 'list'], optional: false, description: 'What to do.' },
+      { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },
+      { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows.' },
+      { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },
+      { name: 'scene_id', type: 'string', optional: true, description: 'status: the scene to check.' },
+    ],
+  },
+  {
     name: 'manage_signal',
     file: 'supabase/functions/_shared/tools/signals-tools.ts',
     factory: 'createManageSignalTool',
@@ -1673,6 +1705,15 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'limit', type: 'number', optional: true, description: 'Maximum number of results to return (1-20, default 10)' },
       { name: 'aspect', type: 'enum', enum: ['color', 'texture', 'style', 'material'], optional: true, description: 'Bias results toward one aspect when the user asks for similar COLOR, TEXTURE, STYLE, or MATERIAL specifically. Omit for a normal all-round search.' },
       { name: 'search_spec', type: 'object', optional: true, description: 'Structured interpretation of the search query across dimensions — always provide this for transparency' },
+    ],
+  },
+  {
+    name: 'ops_cases',
+    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
+    factory: 'createOpsCasesTool',
+    description: 'Agent Ops cases waiting on the platform: what looks broken (integrity checks, providers, jobs, background agents, agent tools), who holds each case and what round it is on.',
+    params: [
+      { name: 'include_escalated', type: 'boolean', optional: true, description: 'Also list cases already left for a person.' },
     ],
   },
   {

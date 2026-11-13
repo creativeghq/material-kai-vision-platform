@@ -452,6 +452,8 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   inbox_threads_list: 'Customer Conversations',
   inbox_reply_sent: 'Reply sent',
   // Reviews
+  scene_studio_scenes: 'Your Scenes',
+  scene_studio_scene: 'Scene',
   reviews_list: 'Reviews about you',
   review_reply_posted: 'Reply posted',
   // Real Estate

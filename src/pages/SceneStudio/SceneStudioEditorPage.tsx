@@ -47,6 +47,8 @@ const layoutOf = (objects: SceneObject[]): Record<string, LayoutEntry> =>
     colour_hex: o.colour_hex, product_id: o.product_id, x_mm: o.x_mm, y_mm: o.y_mm, rotation_deg: o.rotation_deg, removed: !!o.removed_at,
   }]));
 
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
 const hasWebGL2 = () => {
   try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
 };
@@ -463,7 +465,7 @@ export default function SceneStudioEditorPage() {
               {notes.scale_basis && <Badge variant={notes.scale_basis === 'printed_dimensions' ? 'success' : 'warning'}>{notes.scale_basis === 'printed_dimensions' ? 'Printed Dimensions' : notes.scale_basis === 'typical_sizes' ? 'Sizes Estimated' : 'Scale Assumed'}</Badge>}
             </div>
             <p className="text-muted-foreground">
-              {data.rooms.length} rooms · {data.walls.length} walls · {data.openings.length} doors and windows · {objects.filter((o) => !o.removed_at).length} objects
+              {count(data.rooms.length, 'room')} · {count(data.walls.length, 'wall')} · {count(data.openings.length, 'door or window', 'doors and windows')} · {count(objects.filter((o) => !o.removed_at).length, 'object')}
             </p>
             {(notes.assumptions?.length ?? 0) > 0 && (
               <div className="space-y-1">

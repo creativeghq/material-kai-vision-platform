@@ -238,7 +238,7 @@ export default function SceneStudioPage() {
                     <Badge variant={SCENE_READ_STATUS[r.extract_status].variant}>{SCENE_READ_STATUS[r.extract_status].label}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {SCENE_SOURCE_LABEL[r.source_kind]} · {r.object_count} objects · {r.render_count} renders · {formatDate(r.updated_at)}
+                    {SCENE_SOURCE_LABEL[r.source_kind]} · {r.object_count} {r.object_count === 1 ? 'object' : 'objects'} · {r.render_count} {r.render_count === 1 ? 'render' : 'renders'} · {formatDate(r.updated_at)}
                   </p>
                 </div>
               </Card>

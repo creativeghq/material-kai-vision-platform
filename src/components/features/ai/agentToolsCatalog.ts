@@ -2884,6 +2884,27 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'ops-desk',
+    capability: 'platform.admin',
+    name: 'Agent Ops',
+    description: 'Work the Admin → Agent Ops cases: hand what looks broken to Stark, who investigates and fixes what is safe to fix, then to Veritas, who verifies the answer. What needs a person is left on the case.',
+    icon: 'ShieldCheck',
+    adminOnly: true,
+    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas'],
+    quick_starts: [
+      {
+        label: 'Review open cases', description: 'Stark investigates, Veritas verifies', icon: 'ShieldCheck',
+        prompt: 'Review the open Agent Ops cases: hand each to Stark, then Veritas, and tell me what is left for me.',
+        done: 'I\'ve worked through the open Agent Ops cases.',
+      },
+      {
+        label: 'What looks broken?', description: 'List the cases without working them', icon: 'ListChecks',
+        prompt: 'List the open Agent Ops cases, worst first, without working them yet.',
+        done: 'Here are the open Agent Ops cases.',
+      },
+    ],
+  },
+  {
     id: 'tech-radar',
     capability: 'workspace.manage',
     name: 'Tech Radar',
@@ -3226,6 +3247,25 @@ export const TOOLKITS: ToolkitDefinition[] = [
       { label: 'Material Board', description: 'Pick products → A3 PDF', prompt: 'Build a material board sheet.', icon: 'Grid3x3', opensSheetWizard: 'material_board' },
       { label: 'Color Palette', description: 'Auto-extract colors from a moodboard', prompt: 'Generate a color palette sheet.', icon: 'Palette', opensSheetWizard: 'color_palette' },
       { label: 'Full Deck', description: 'Multi-page presentation deck', prompt: 'Build a multi-page Full Deck.', icon: 'LayoutTemplate', opensSheetWizard: 'full_deck' },
+    ],
+  },
+  {
+    id: 'scene-studio',
+    capability: 'moodboards.use',
+    name: 'Scene Studio',
+    description: 'Turn a floor plan, room photo or render into an editable 3D room, then rearrange it, swap products and render it photo-real in any style.',
+    icon: 'Layers',
+    moduleSlug: 'scene-studio',
+    tool_ids: ['manage_scenes'],
+    quick_starts: [
+      {
+        label: 'My Scenes', description: 'Scenes in this workspace', icon: 'ListChecks',
+        prompt: 'Show my Scene Studio scenes.',
+        done: 'Here are your scenes.',
+        run: { tool: 'manage_scenes', fixedArgs: { action: 'list' } },
+      },
+      { label: 'Floor Plan to 3D', description: 'Attach a floor plan image', prompt: 'Turn the floor plan I attached into an editable 3D room.', icon: 'Grid3x3' },
+      { label: 'Photo to 3D', description: 'Attach a room photo or a render', prompt: 'Turn the room photo I attached into an editable 3D room I can rearrange and render.', icon: 'ImageIcon' },
     ],
   },
   {
@@ -4232,7 +4272,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   stock: 'finance', finance: 'finance', contracts: 'finance',
   'trip-expenses': 'finance', travel: 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
-  catalogs: 'studio', 'catalog-ingestion': 'studio', 'field-registry': 'studio', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
+  catalogs: 'studio', 'catalog-ingestion': 'studio', 'scene-studio': 'studio', 'field-registry': 'studio', 'ops-desk': 'operator', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
   'project-assessment': 'studio',
   'finance-assessment': 'finance',
   'real-estate-assessment': 'sales',
@@ -4369,7 +4409,7 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   'job-research': ['product-business'], 'price-monitoring': ['product-business'], crm: ['product-business'],
   'signals-hiring': ['product-business'], 'signals-technographics': ['product-business'], 'signals-intent': ['product-business'],
   // Studio / interior → Vision
-  generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
+  generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'], 'scene-studio': ['interior-designer'],
   projects: ['interior-designer', 'erp'],
   // Same two owners as the projects cluster: Vision runs the engagement, Trinity reads its money.
   'project-assessment': ['interior-designer', 'erp'],

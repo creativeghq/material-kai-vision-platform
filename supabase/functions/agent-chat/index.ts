@@ -1221,6 +1221,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       'field_review_queue', 'field_review_apply',
+      'ops_cases', 'ask_stark', 'ask_veritas',
       // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).
       // supplier_overview carries finance data and is admin/owner-gated at injection time.
       'product_provenance', 'product_price_history', 'projects_using_product',
@@ -1277,6 +1278,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'apply_lighting_preset', 'generate_vr_world', 'generate_video',
       // Deterministic surface preview: exact product, exact format, no credits (#447).
       'visualize_on_surface',
+      'manage_scenes',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
       'generate_presentation_sheet',
       // Project Workspace — interior designers benefit most from the container
@@ -2892,6 +2894,11 @@ async function executeAgent(
     tools.push(createManageReviewsTool(userId, workspaceId, userJwt, onChunk));
   }
 
+  if (config.tools.includes('manage_scenes')) {
+    const sceneStudioMod = await import('../_shared/tools/scene-studio-tools.ts');
+    tools.push(sceneStudioMod.createManageScenesTool(userId, workspaceId, userJwt, onChunk));
+  }
+
   // Appointments / meetings (crm module + entitlement gated; per-user via RLS)
   if (config.tools.includes('manage_appointments') && createManageAppointmentsTool) {
     tools.push(createManageAppointmentsTool(userId, workspaceId, userJwt, onChunk));
@@ -3171,6 +3178,14 @@ async function executeAgent(
     const fieldRegistryMod = await import('../_shared/tools/field-registry-tools.ts');
     if (config.tools.includes('field_review_queue')) tools.push(fieldRegistryMod.createFieldReviewQueueTool());
     if (config.tools.includes('field_review_apply')) tools.push(fieldRegistryMod.createFieldReviewApplyTool());
+  }
+
+  if (isAdmin && config.tools.some((t: string) => t === 'ops_cases' || t === 'ask_stark' || t === 'ask_veritas')
+      && await isPlatformOperator(supabase, userId)) {
+    const opsDeskMod = await import('../_shared/tools/ops-desk-tools.ts');
+    if (config.tools.includes('ops_cases')) tools.push(opsDeskMod.createOpsCasesTool());
+    if (config.tools.includes('ask_stark')) tools.push(opsDeskMod.createAskStarkTool(userId, workspaceId, conversation_id ?? null));
+    if (config.tools.includes('ask_veritas')) tools.push(opsDeskMod.createAskVeritasTool(userId, workspaceId, conversation_id ?? null));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached

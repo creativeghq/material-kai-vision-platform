@@ -166,6 +166,11 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     capability: ['workspace.manage'],
     tool_ids: ['field_review_queue', 'field_review_apply'],
   },
+  'ops-desk': {
+    adminOnly: true,
+    capability: ['platform.admin'],
+    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas'],
+  },
   'tech-radar': {
     adminOnly: true,
     capability: ['workspace.manage'],
@@ -198,6 +203,10 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'presentation-sheets': {
     capability: ['moodboards.use', 'projects.use', 'quotes.use'],
     tool_ids: ['generate_presentation_sheet'],
+  },
+  'scene-studio': {
+    capability: ['moodboards.use'],
+    tool_ids: ['manage_scenes'],
   },
   'generation': {
     capability: ['moodboards.use', 'projects.use', 'quotes.use', 'marketing.seo', 'realestate.listings.manage'],
