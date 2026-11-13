@@ -215,7 +215,12 @@ category (`body_material` is vitreous china in sanitary, rattan in lighting) —
 (`label_by_category`: "Material" for kitchen, "Body Material" elsewhere). The client reads it at
 runtime through `fieldRegistryService` — **never a hardcoded section/field/label map.** The seventh
 copy was 900 lines of `CATEGORY_DISPLAY_REGISTRY`, disagreeing with the DB on 124 labels and missing
-`building_materials` entirely, so a door rendered under General Materials (#368). Guarded by
+`building_materials` entirely, so a door rendered under General Materials (#368). **A field is
+never registered twice:** a unique index on `field_name_compact_key` (twin: `field_compact_key` in
+`field_registry.py`) and the `mmf_refuse_alias_twin` trigger refuse a spelling of an active field
+or alias. A same-meaning field is retired with `merge_metadata_field` from Field Roles — never a
+row delete; its name becomes the survivor's alias, and it refuses a column field or a container
+(`metadata.factory` is the maker record, not a duplicate of `factory_name`). Guarded by
 [tests/unit/test_field_registry_is_the_source.py](mivaa-pdf-extractor/tests/unit/test_field_registry_is_the_source.py)
 and [tests/unit/categoryFieldRegistry.test.ts](tests/unit/categoryFieldRegistry.test.ts).
 

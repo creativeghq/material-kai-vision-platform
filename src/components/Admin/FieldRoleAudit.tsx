@@ -10,6 +10,7 @@ import {
   HubEmptyState,
   HubFilterSelect,
   HubResetFilters,
+  HubSegmented,
   HubSortButton,
   HubToolbar,
   HUB_FILTER_ALL,
@@ -20,23 +21,28 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
+import { FieldMergeDialog, type MergeCandidate } from './fieldRoles/FieldMergeDialog';
+import { MergeConflicts, type MergeConflict } from './fieldRoles/MergeConflicts';
+import { RoleSuggestions, type RoleProposal } from './fieldRoles/RoleSuggestions';
+
 interface FieldRow {
   field_name: string;
   display_name: string | null;
   role: string;
+  role_by_category: Record<string, string> | null;
+  destination: string;
   classified_signal: string | null;
   classified_confidence: number | null;
   classified_reason: string | null;
-  classified_at: string | null;
   applies_to_categories: string[] | null;
   is_global: boolean | null;
+  aliases: string[] | null;
+  products: number;
+  distinct_values: number;
+  sample_values: string[];
 }
 
-/**
- * Strength order, mirroring the `classify_field_role` RPC. Shown so an operator can see at a
- * glance whether a verdict rests on evidence or on a guess — and the RPC, not this list, is what
- * enforces it.
- */
+/** Strength order, mirroring the `classify_field_role` RPC; the RPC is what enforces it. */
 const SIGNAL_RANK: Record<string, number> = {
   operator: 6, warehouse_feedback: 5, sku_correlation: 4, plurality: 3, llm: 2, seed: 1,
 };
@@ -54,9 +60,16 @@ const FIELD_FIELDS: HubTableField<FieldRow>[] = [
   {
     id: 'field',
     sortValue: (r) => r.display_name || r.field_name,
-    searchText: (r) => `${r.field_name} ${r.display_name ?? ''}`,
+    searchText: (r) => `${r.field_name} ${r.display_name ?? ''} ${(r.aliases ?? []).join(' ')}`,
   },
   { id: 'role', sortValue: (r) => r.role, filterValue: (r) => r.role, filterLabel: 'Role' },
+  {
+    id: 'used',
+    sortValue: (r) => r.products,
+    filterValue: (r) => (r.products > 0 ? 'used' : 'unused'),
+    filterLabel: 'Usage',
+    filterOptionLabel: (v) => (v === 'used' ? 'On products' : 'On no product'),
+  },
   {
     id: 'signal',
     sortValue: (r) => SIGNAL_RANK[r.classified_signal ?? 'seed'] ?? 0,
@@ -65,6 +78,17 @@ const FIELD_FIELDS: HubTableField<FieldRow>[] = [
     filterOptionLabel: (v) => SIGNAL_LABEL[v] ?? v,
   },
 ];
+
+/** The categories where the per-category role differs from the field's own. */
+function roleExceptions(r: FieldRow): string | null {
+  const over = Object.entries(r.role_by_category ?? {}).filter(([, role]) => role !== r.role).map(([c]) => c);
+  if (over.length === 0) return null;
+  const scope = r.applies_to_categories ?? [];
+  const kept = scope.filter(c => !over.includes(c));
+  const other = r.role === 'identity' ? 'descriptive' : 'identity';
+  if (kept.length > 0 && kept.length < over.length) return `${r.role} only in ${kept.join(', ')}; ${other} elsewhere`;
+  return `${other} in ${over.join(', ')}`;
+}
 
 const SortHead: React.FC<{
   id: string;
@@ -87,23 +111,52 @@ const SortHead: React.FC<{
   );
 };
 
+type View = 'fields' | 'suggestions' | 'conflicts';
+
 export const FieldRoleAudit: React.FC = () => {
   const { toast } = useToast();
   const [rows, setRows] = useState<FieldRow[]>([]);
+  const [proposals, setProposals] = useState<RoleProposal[]>([]);
+  const [conflicts, setConflicts] = useState<MergeConflict[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [view, setView] = useState<View>('fields');
+  const [merging, setMerging] = useState<MergeCandidate | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('material_metadata_fields')
-      .select('field_name, display_name, role, classified_signal, classified_confidence, classified_reason, classified_at, applies_to_categories, is_global')
-      .eq('status', 'active')
-      .order('field_name');
-    if (error) {
-      toast({ title: 'Could not load the registry', description: error.message, variant: 'destructive' });
+    const [fieldsRes, usageRes, proposalsRes, conflictsRes] = await Promise.all([
+      supabase
+        .from('material_metadata_fields')
+        .select('field_name, display_name, role, role_by_category, destination, classified_signal, classified_confidence, classified_reason, applies_to_categories, is_global, aliases')
+        .eq('status', 'active')
+        .order('field_name'),
+      supabase.rpc('field_registry_usage'),
+      supabase.from('field_role_proposals').select('*').eq('status', 'pending').order('last_seen_at', { ascending: false }),
+      supabase.from('field_merge_conflicts').select('*').eq('status', 'open').order('created_at'),
+    ]);
+    const failed = [fieldsRes, usageRes, proposalsRes, conflictsRes].find(r => r.error);
+    if (failed?.error) {
+      toast({ title: 'Could not load the registry', description: failed.error.message, variant: 'destructive' });
     }
-    setRows((data ?? []) as FieldRow[]);
+    const usage = new Map<string, { products: number; distinct_values: number; sample_values: string[] }>(
+      ((usageRes.data ?? []) as Array<{ field_name: string; products: number; distinct_values: number; sample_values: string[] | null }>)
+        .map(u => [u.field_name, { products: Number(u.products), distinct_values: Number(u.distinct_values), sample_values: u.sample_values ?? [] }]),
+    );
+    setRows(((fieldsRes.data ?? []) as Omit<FieldRow, 'products' | 'distinct_values' | 'sample_values'>[]).map(f => ({
+      ...f,
+      ...(usage.get(f.field_name) ?? { products: 0, distinct_values: 0, sample_values: [] }),
+    })));
+    setProposals((proposalsRes.data ?? []) as RoleProposal[]);
+
+    const open = (conflictsRes.data ?? []) as Omit<MergeConflict, 'product_name'>[];
+    const ids = [...new Set(open.map(c => c.product_id))];
+    const names = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data } = await supabase.from('products').select('id, name').in('id', ids);
+      for (const p of (data ?? []) as Array<{ id: string; name: string }>) names.set(p.id, p.name);
+    }
+    setConflicts(open.map(c => ({ ...c, product_name: names.get(c.product_id) ?? null })));
     setLoading(false);
   }, [toast]);
 
@@ -112,9 +165,7 @@ export const FieldRoleAudit: React.FC = () => {
   const override = async (field: FieldRow, role: string) => {
     setSaving(field.field_name);
     try {
-      // Through the SAME RPC every automatic signal uses. An operator outranks all of them and
-      // is the only signal that may push past the demotion veto — deliberately, since the point
-      // of an override is to disagree with the evidence on purpose.
+      // Same RPC as every automatic signal; only an operator may push past the demotion veto.
       const { data, error } = await supabase.rpc('classify_field_role', {
         p_field_name: field.field_name,
         p_role: role,
@@ -139,140 +190,186 @@ export const FieldRoleAudit: React.FC = () => {
     }
   };
 
-  const t = useHubTable(rows, FIELD_FIELDS);
+  const t = useHubTable(rows, FIELD_FIELDS, { columnId: 'used', direction: 'desc' });
   const shown = t.rows;
 
   const counts = useMemo(() => {
     const identity = rows.filter((r) => r.role === 'identity').length;
-    // A verdict still resting on the heuristic seed is the one worth chasing: nothing has
-    // looked at it since the registry was rebuilt.
-    const unrevisited = rows.filter((r) => (r.classified_signal ?? 'seed') === 'seed').length;
-    return { identity, descriptive: rows.length - identity, unrevisited };
+    const seed = rows.filter((r) => (r.classified_signal ?? 'seed') === 'seed');
+    return {
+      identity,
+      descriptive: rows.length - identity,
+      unrevisited: seed.length,
+      unrevisitedUsed: seed.filter(r => r.products > 0).length,
+      unused: rows.filter(r => r.products === 0).length,
+    };
   }, [rows]);
+
+  const roleOf = useCallback((f: string) => rows.find(r => r.field_name === f)?.role, [rows]);
+  const candidates = useMemo<MergeCandidate[]>(
+    () => rows.map(r => ({ field_name: r.field_name, display_name: r.display_name, destination: r.destination, products: r.products }))
+      .sort((a, b) => b.products - a.products),
+    [rows],
+  );
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/60">
+      <CardHeader className="border-b border-hairline">
         <CardTitle className="flex items-center gap-2">
           <ShieldCheck className="h-4 w-4" /> Field Roles
         </CardTitle>
         <CardDescription>
           Identity fields are the choices a quote or order line offers (size, colour, finish).
-          Confirm a verdict that is right, or flip one that is wrong; both take effect immediately.
+          Confirm a verdict that is right, flip one that is wrong, or merge a field that duplicates another.
         </CardDescription>
         <div className="flex flex-wrap gap-4 pt-2 text-sm">
-          <span><span className="font-medium">{counts.identity}</span> identity</span>
-          <span><span className="font-medium">{counts.descriptive}</span> descriptive</span>
-          {counts.unrevisited > 0 && (
+          <span><span className="font-medium tabular-nums">{counts.identity}</span> identity</span>
+          <span><span className="font-medium tabular-nums">{counts.descriptive}</span> descriptive</span>
+          <span><span className="font-medium tabular-nums">{counts.unused}</span> on no product</span>
+          {counts.unrevisitedUsed > 0 && (
             <span className="text-warning flex items-center gap-1">
               <TriangleAlert className="h-3.5 w-3.5" />
-              {counts.unrevisited} still on the heuristic seed
+              {counts.unrevisitedUsed} in use and still on the heuristic seed
             </span>
           )}
         </div>
+        <div className="pt-3">
+          <HubSegmented<View>
+            aria-label="Field roles view"
+            value={view}
+            onChange={setView}
+            options={[
+              { value: 'fields', label: `Fields (${rows.length})` },
+              { value: 'suggestions', label: `Suggestions (${proposals.length})` },
+              { value: 'conflicts', label: `Conflicts (${conflicts.length})` },
+            ]}
+          />
+        </div>
       </CardHeader>
       <CardContent className="p-0">
-        <HubToolbar
-          search={t.search}
-          onSearchChange={t.setSearch}
-          searchPlaceholder="Filter by field name…"
-          filters={
-            <>
-              <HubFilterSelect
-                label="Role"
-                value={t.filters.role ?? HUB_FILTER_ALL}
-                options={t.filterOptions.role}
-                onChange={(v) => t.setFilter('role', v)}
-              />
-              <HubFilterSelect
-                label="Signal"
-                value={t.filters.signal ?? HUB_FILTER_ALL}
-                options={t.filterOptions.signal}
-                onChange={(v) => t.setFilter('signal', v)}
-              />
-              <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
-            </>
-          }
-        />
-
         {loading ? (
           <div className="p-6 flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading the registry…
           </div>
-        ) : shown.length === 0 ? (
-          <HubEmptyState
-            variant="filtered"
-            title="No field matches that filter"
-            action={<Button variant="outline" size="sm" onClick={t.reset}>Clear filters</Button>}
-          />
+        ) : view === 'suggestions' ? (
+          <RoleSuggestions proposals={proposals} currentRole={roleOf} onDecided={load} onShowFields={() => setView('fields')} />
+        ) : view === 'conflicts' ? (
+          <MergeConflicts conflicts={conflicts} onResolved={load} onShowFields={() => setView('fields')} />
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <SortHead id="field" sort={t.sort} onSort={t.toggleSort}>Field</SortHead>
-                <SortHead id="role" sort={t.sort} onSort={t.toggleSort}>Role</SortHead>
-                <SortHead id="signal" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell">Decided by</SortHead>
-                <TableHead className="hidden md:table-cell">Why</TableHead>
-                <TableHead>Override</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {shown.map((r) => {
-                const signal = r.classified_signal ?? 'seed';
-                return (
-                  <TableRow key={r.field_name} className="align-top">
-                    <TableCell>
-                      <div className="break-words">{r.display_name || r.field_name}</div>
-                      <div className="text-xs text-muted-foreground break-all">{r.field_name}</div>
-                    </TableCell>
-                    {/* Status as a plain coloured word — never a filled badge (design system). */}
-                    <TableCell className={r.role === 'identity' ? 'text-primary' : 'text-muted-foreground'}>
-                      {r.role}
-                    </TableCell>
-                    <TableCell className="hidden text-xs sm:table-cell">
-                      <div className={signal === 'seed' ? 'text-warning' : ''}>{SIGNAL_LABEL[signal] ?? signal}</div>
-                      {r.classified_confidence != null && (
-                        <div className="text-muted-foreground">
-                          confidence {Math.round(Number(r.classified_confidence) * 100)}%
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden text-xs text-muted-foreground max-w-md break-words md:table-cell">
-                      {r.classified_reason || '—'}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1">
-                        {signal !== 'operator' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-xs"
-                            disabled={saving === r.field_name}
-                            onClick={() => override(r, r.role)}
-                          >
-                            Confirm {r.role}
-                          </Button>
-                        )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          className="h-7 text-xs"
-                          disabled={saving === r.field_name}
-                          onClick={() => override(r, r.role === 'identity' ? 'descriptive' : 'identity')}
-                        >
-                          {saving === r.field_name
-                            ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            : `Make ${r.role === 'identity' ? 'descriptive' : 'identity'}`}
-                        </Button>
-                      </div>
-                    </TableCell>
+          <>
+            <HubToolbar
+              search={t.search}
+              onSearchChange={t.setSearch}
+              searchPlaceholder="Filter by field name or alias…"
+              filters={
+                <>
+                  <HubFilterSelect label="Role" value={t.filters.role ?? HUB_FILTER_ALL} options={t.filterOptions.role} onChange={(v) => t.setFilter('role', v)} />
+                  <HubFilterSelect label="Usage" value={t.filters.used ?? HUB_FILTER_ALL} options={t.filterOptions.used} onChange={(v) => t.setFilter('used', v)} />
+                  <HubFilterSelect label="Signal" value={t.filters.signal ?? HUB_FILTER_ALL} options={t.filterOptions.signal} onChange={(v) => t.setFilter('signal', v)} />
+                  <HubResetFilters count={t.activeFilterCount} onReset={t.reset} />
+                </>
+              }
+            />
+            {shown.length === 0 ? (
+              <HubEmptyState
+                variant="filtered"
+                title="No field matches that filter"
+                action={<Button variant="outline" size="sm" onClick={t.reset}>Clear filters</Button>}
+              />
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortHead id="field" sort={t.sort} onSort={t.toggleSort}>Field</SortHead>
+                    <SortHead id="role" sort={t.sort} onSort={t.toggleSort}>Role</SortHead>
+                    <SortHead id="used" sort={t.sort} onSort={t.toggleSort} align="right">Used By</SortHead>
+                    <SortHead id="signal" sort={t.sort} onSort={t.toggleSort} className="hidden sm:table-cell">Decided By</SortHead>
+                    <TableHead className="hidden lg:table-cell">Why</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                </TableHeader>
+                <TableBody>
+                  {shown.map((r) => {
+                    const signal = r.classified_signal ?? 'seed';
+                    const exceptions = roleExceptions(r);
+                    return (
+                      <TableRow key={r.field_name} className="align-top">
+                        <TableCell>
+                          <div className="break-words">{r.display_name || r.field_name}</div>
+                          <div className="text-xs text-muted-foreground break-all">{r.field_name}</div>
+                          {(r.aliases?.length ?? 0) > 0 && (
+                            <div className="text-xs text-muted-foreground break-words">also: {r.aliases!.join(', ')}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <div className={r.role === 'identity' ? 'text-primary' : 'text-muted-foreground'}>{r.role}</div>
+                          {exceptions && <div className="text-xs text-muted-foreground max-w-[12rem] break-words">{exceptions}</div>}
+                        </TableCell>
+                        <TableCell className="text-right text-xs tabular-nums">
+                          {r.products === 0 ? <span className="text-muted-foreground">—</span> : (
+                            <>
+                              <div>{r.products} products</div>
+                              <div className="text-muted-foreground">{r.distinct_values} values</div>
+                              {r.sample_values.length > 0 && (
+                                <div className="text-muted-foreground max-w-[12rem] ml-auto truncate" title={r.sample_values.join(' · ')}>
+                                  {r.sample_values.join(' · ')}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden text-xs sm:table-cell">
+                          <div className={signal === 'seed' ? 'text-warning' : ''}>{SIGNAL_LABEL[signal] ?? signal}</div>
+                          {r.classified_confidence != null && (
+                            <div className="text-muted-foreground">confidence {Math.round(Number(r.classified_confidence) * 100)}%</div>
+                          )}
+                        </TableCell>
+                        <TableCell className="hidden text-xs text-muted-foreground max-w-md break-words lg:table-cell">
+                          {r.classified_reason || '—'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1">
+                            {signal !== 'operator' && (
+                              <Button size="sm" variant="outline" className="h-7 text-xs" disabled={saving === r.field_name} onClick={() => override(r, r.role)}>
+                                Confirm {r.role}
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              disabled={saving === r.field_name}
+                              onClick={() => override(r, r.role === 'identity' ? 'descriptive' : 'identity')}
+                            >
+                              {saving === r.field_name
+                                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                : `Make ${r.role === 'identity' ? 'descriptive' : 'identity'}`}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7 text-xs"
+                              onClick={() => setMerging({ field_name: r.field_name, display_name: r.display_name, destination: r.destination, products: r.products })}
+                            >
+                              Merge into…
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </>
         )}
       </CardContent>
+      <FieldMergeDialog
+        loser={merging}
+        fields={candidates}
+        onClose={() => setMerging(null)}
+        onMerged={() => { void load(); }}
+      />
     </Card>
   );
 };
