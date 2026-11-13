@@ -24,6 +24,7 @@ export const GENERATION_CREDIT_COSTS: Record<string, number> = {
  */
 export const PRICING_KEY_BY_LABEL: Record<string, string> = {
   'grok-aurora': 'xai-aurora',
+  'gpt-image-1': 'gpt-image-2.6',
 };
 
 export interface GenerationRouting {

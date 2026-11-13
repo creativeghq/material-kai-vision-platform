@@ -69,7 +69,7 @@ describe('generation routing', () => {
       const r = resolveGenerationRouting(mode, 'chatgpt');
       expect(r.provider, mode).toBe('openai');
       expect(r.modelLabel, mode).toBe('gpt-image-1');
-      expect(r.pricingKey, mode).toBe('gpt-image-1');
+      expect(r.pricingKey, mode).toBe('gpt-image-2.6');
       expect(r.credits, mode).toBe(GENERATION_CREDIT_COSTS['gpt-image-1']);
     }
   });

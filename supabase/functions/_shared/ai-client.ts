@@ -2375,9 +2375,9 @@ export async function editImageWithGrok(
 
 // ── OpenAI gpt-image-1 (interior grid: text-to-image + image edit) ──────────────
 
-export const OPENAI_IMAGE_MODEL = 'gpt-image-1';
+export const OPENAI_IMAGE_MODEL = 'gpt-image-2.6-sunburst';
 /** `ai_model_pricing.model_key` — priced per image at the medium 1024px tier. */
-const OPENAI_IMAGE_PRICING_MODEL_ID = 'gpt-image-1';
+const OPENAI_IMAGE_PRICING_MODEL_ID = 'gpt-image-2.6';
 
 export interface OpenAIImageResult {
   base64: string;
