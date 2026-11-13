@@ -61,7 +61,6 @@ import { CLAUDE_OPUS, aiSdkClaudeOptions, shapeClaudeRequest } from './claude-mo
 import { GEMINI_TEXT, geminiThinkingConfig } from './gemini-models.ts';
 import { fetchImageGuarded, readCapped } from './fetch-image.ts';
 import { resolveSecret } from './secrets.ts';
-import { replicateToken, REPLICATE_NOT_CONFIGURED } from './replicate-token.ts';
 import { assertTransferAllowed, isEeaEndpoint } from './residency-gate.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
@@ -78,6 +77,10 @@ const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 // Lazy getter (same rationale as GOOGLE_API_KEY) for the xAI Grok/Aurora image
 // + edit + masked-inpaint paths (generateImageWithGrok / editImageWithGrok).
 const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
+// Images ONLY. OpenAI was removed from the platform on 2026-08-23; gpt-image-1 came back on
+// 2026-09-05 for the interior grid (text-to-image and image edit) through this chokepoint,
+// the same way Grok's OpenAI-compatible endpoint did. No SDK, no text models here.
+const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
 /**
  * The client that writes the BILLING rows — built lazily, on first use.
  *
@@ -2370,15 +2373,11 @@ export async function editImageWithGrok(
   return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
-// ── ChatGPT Image: gpt-image-2.6-sunburst on Replicate (text-to-image + single-image edit) ──
+// ── OpenAI gpt-image-1 (interior grid: text-to-image + image edit) ──────────────
 
-export const OPENAI_IMAGE_MODEL = 'openai/gpt-image-2.6-sunburst';
-/** `ai_model_pricing.model_key` — priced per generation at quality=medium. */
-const OPENAI_IMAGE_PRICING_MODEL_ID = 'gpt-image-2.6';
-const REPLICATE_API = 'https://api.replicate.com/v1';
-
-type OpenAIImageSize = '1024x1024' | '1536x1024' | '1024x1536' | 'auto';
-type OpenAIImageQuality = 'low' | 'medium' | 'high';
+export const OPENAI_IMAGE_MODEL = 'gpt-image-1';
+/** `ai_model_pricing.model_key` — priced per image at the medium 1024px tier. */
+const OPENAI_IMAGE_PRICING_MODEL_ID = 'gpt-image-1';
 
 export interface OpenAIImageResult {
   base64: string;
@@ -2386,24 +2385,20 @@ export interface OpenAIImageResult {
   model: string;
 }
 
-async function uploadReplicateFile(token: string, bytes: Uint8Array, mimeType: string): Promise<string> {
-  const form = new FormData();
-  form.append('content', new Blob([bytes as unknown as BlobPart], { type: mimeType }), mimeType === 'image/png' ? 'image.png' : 'image.jpg');
-  const res = await fetch(`${REPLICATE_API}/files`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
-  if (!res.ok) throw new Error(`Replicate file upload failed (${res.status}): ${await res.text()}`);
-  const url = (await res.json())?.urls?.get;
-  if (!url) throw new Error('Replicate file upload returned no URL');
-  return url;
-}
-
-async function runOpenAIImage(
-  input: Record<string, unknown>,
-  task: string,
-  config: (UnitBillingConfig & { sourceBytes?: Uint8Array; sourceMimeType?: string }) | undefined,
+/**
+ * Generate an image from a text prompt with gpt-image-1 (/v1/images/generations).
+ * The model returns base64 by default and has no `response_format` parameter.
+ */
+export async function generateImageWithOpenAI(
+  prompt: string,
+  config?: UnitBillingConfig & { model?: string; size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto'; quality?: 'low' | 'medium' | 'high' },
 ): Promise<OpenAIImageResult> {
+  if (!OPENAI_API_KEY()) throw new Error('OPENAI_API_KEY not set');
+
+  const modelId = config?.model ?? OPENAI_IMAGE_MODEL;
   const _start = Date.now();
-  const log = (units: number, errorMessage?: string) => _logUnitCall({
-    task: config?.task ?? task,
+  const logOpenAI = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'openai_image_generation',
     modelKey: OPENAI_IMAGE_PRICING_MODEL_ID,
     units,
     latencyMs: Date.now() - _start,
@@ -2411,65 +2406,103 @@ async function runOpenAIImage(
     userId: config?.userId,
     workspaceId: config?.workspaceId,
   });
-  const fail = (msg: string): never => {
-    void log(0, msg);
-    throw new Error(`GPT Image 2.6: ${msg}`);
-  };
 
-  const token = await replicateToken();
-  if (!token) throw new Error(REPLICATE_NOT_CONFIGURED);
-  if (config?.sourceBytes) {
-    input.input_images = [await uploadReplicateFile(token, config.sourceBytes, config.sourceMimeType ?? 'image/jpeg')];
-  }
-
-  const createRes = await fetch(`${REPLICATE_API}/models/${OPENAI_IMAGE_MODEL}/predictions`, {
+  const response = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Prefer: 'wait=60' },
-    body: JSON.stringify({ input }),
+    headers: {
+      'Authorization': `Bearer ${OPENAI_API_KEY()}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: modelId,
+      prompt,
+      n: 1,
+      size: config?.size ?? '1536x1024',
+      // The pricing row is the medium tier; a different quality here is a different price.
+      quality: config?.quality ?? 'medium',
+    }),
   });
-  if (!createRes.ok) fail(`HTTP ${createRes.status}: ${await createRes.text()}`);
-  let prediction = await createRes.json();
 
-  const deadline = Date.now() + 120_000;
-  while (!['succeeded', 'failed', 'canceled'].includes(prediction?.status) && Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 2000));
-    const poll = await fetch(`${REPLICATE_API}/predictions/${prediction.id}`, { headers: { Authorization: `Bearer ${token}` } });
-    if (!poll.ok) fail(`poll HTTP ${poll.status}`);
-    prediction = await poll.json();
+  if (!response.ok) {
+    const err = await response.text();
+    void logOpenAI(0, `HTTP ${response.status}`);
+    throw new Error(`OpenAI image generation failed (${response.status}): ${err}`);
   }
-  if (prediction?.status !== 'succeeded') fail(prediction?.error ? String(prediction.error) : `prediction ${prediction?.status ?? 'unknown'}`);
 
-  const outUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
-  if (typeof outUrl !== 'string') fail('no image in prediction output');
-  const imgRes = await fetch(outUrl);
-  if (!imgRes.ok) fail(`output download HTTP ${imgRes.status}`);
-  const bytes = await readCapped(imgRes, 40 * 1024 * 1024);
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) {
+    void logOpenAI(0, 'no image in generation response');
+    throw new Error('OpenAI: no image in generation response');
+  }
 
-  void log(1);
-  return { base64: bytesToBase64(bytes), mimeType: imgRes.headers.get('content-type') || 'image/jpeg', model: OPENAI_IMAGE_MODEL };
+  void logOpenAI(1);
+  return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
-/** `quality` is always explicit: Replicate's default `auto` bills at the top tier. */
-function openAIImageInput(prompt: string, size: OpenAIImageSize, quality?: OpenAIImageQuality): Record<string, unknown> {
-  return { prompt, quality: quality ?? 'medium', complexity: 'high', output_format: 'jpeg', aspect_ratio: size };
-}
-
-export async function generateImageWithOpenAI(
-  prompt: string,
-  config?: UnitBillingConfig & { size?: OpenAIImageSize; quality?: OpenAIImageQuality },
-): Promise<OpenAIImageResult> {
-  return runOpenAIImage(openAIImageInput(prompt, config?.size ?? '1536x1024', config?.quality), 'openai_image_generation', config);
-}
-
-/** Re-renders the whole image under the prompt; this model takes no mask. */
+/**
+ * Edit an existing image with gpt-image-1 (/v1/images/edits, multipart). Without a mask
+ * the whole image is re-rendered under the prompt; with a mask, transparent pixels are
+ * the region to change (OpenAI's convention — the inverse of Grok's white=change).
+ */
 export async function editImageWithOpenAI(
   prompt: string,
   imageBytes: Uint8Array,
-  config?: UnitBillingConfig & { imageMimeType?: string; size?: OpenAIImageSize; quality?: OpenAIImageQuality },
+  config?: UnitBillingConfig & {
+    model?: string;
+    maskBytes?: Uint8Array;
+    imageMimeType?: string;
+    size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto';
+    quality?: 'low' | 'medium' | 'high';
+  },
 ): Promise<OpenAIImageResult> {
-  return runOpenAIImage(openAIImageInput(prompt, config?.size ?? 'auto', config?.quality), 'openai_image_edit', {
-    ...config, sourceBytes: imageBytes, sourceMimeType: config?.imageMimeType,
+  if (!OPENAI_API_KEY()) throw new Error('OPENAI_API_KEY not set');
+
+  const modelId = config?.model ?? OPENAI_IMAGE_MODEL;
+  const mimeType = config?.imageMimeType ?? 'image/jpeg';
+  const _start = Date.now();
+  const logOpenAI = (units: number, errorMessage?: string) => _logUnitCall({
+    task: config?.task ?? 'openai_image_edit',
+    modelKey: OPENAI_IMAGE_PRICING_MODEL_ID,
+    units,
+    latencyMs: Date.now() - _start,
+    ...(errorMessage ? { errorMessage } : {}),
+    userId: config?.userId,
+    workspaceId: config?.workspaceId,
   });
+
+  const form = new FormData();
+  form.append('model', modelId);
+  form.append('prompt', prompt);
+  form.append('n', '1');
+  form.append('size', config?.size ?? 'auto');
+  form.append('quality', config?.quality ?? 'medium');
+  form.append('image', new Blob([imageBytes as unknown as BlobPart], { type: mimeType }), mimeType === 'image/png' ? 'image.png' : 'image.jpg');
+  if (config?.maskBytes) {
+    form.append('mask', new Blob([config.maskBytes as unknown as BlobPart], { type: 'image/png' }), 'mask.png');
+  }
+
+  const response = await fetch('https://api.openai.com/v1/images/edits', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY()}` },
+    body: form,
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    void logOpenAI(0, `HTTP ${response.status}`);
+    throw new Error(`OpenAI image edit failed (${response.status}): ${err}`);
+  }
+
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) {
+    void logOpenAI(0, 'no image in edit response');
+    throw new Error('OpenAI: no image in edit response');
+  }
+
+  void logOpenAI(1);
+  return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
 // ── Re-exports for convenience ──

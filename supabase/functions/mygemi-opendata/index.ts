@@ -169,7 +169,7 @@ Deno.serve(withApiLogging('mygemi-opendata', async (req: Request) => {
     if (!sec.value) {
       return jsonResponse({
         error: 'gemi_not_configured',
-        message: 'ΓΕΜΗ OpenData API key is not set. Add GEMI_API_KEY under /admin/operations → Keys (register at opendata.businessportal.gr).',
+        message: 'ΓΕΜΗ OpenData API key is not set. Add GEMI_API_KEY under /admin/modules?tab=platform-keys (register at opendata.businessportal.gr).',
       }, 503);
     }
 

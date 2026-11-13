@@ -52,7 +52,7 @@ export function routedPages(): RoutedPage[] {
   starts.forEach((m, i) => {
     const segment = appSrc.slice(m.index!, starts[i + 1]?.index ?? appSrc.length);
     // Public pages (pay links, share links, kiosks) render outside the app chrome by design.
-    if (!/<Layout\b/.test(segment)) return;
+    if (!/<(?:Layout|AdminLayout)\b/.test(segment)) return;
     for (const [name, file] of appComponents) {
       if (new RegExp(`<${name}[\\s/>]`).test(segment)) routes.push({ path: m[1], file });
     }

@@ -77,9 +77,6 @@ export const CatalogsListPage: React.FC = () => {
         icon={BookOpen}
         actions={
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate('/admin/operations?tab=catalogs')}>
-              <Eye className="mr-2 h-4 w-4" /> Operations
-            </Button>
             <Button variant="outline" onClick={() => navigate('/catalogs/sources')}>
               <Upload className="mr-2 h-4 w-4" /> Source PDFs
             </Button>

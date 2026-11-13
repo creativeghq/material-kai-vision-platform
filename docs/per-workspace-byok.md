@@ -129,7 +129,7 @@ The cards render placeholders (`•••••••• (configured — leave b
 |---|---|---|
 | Scope | one tenant (`workspace_id`) | whole platform |
 | Storage | `workspace_email_config` / `workspace_aade_credentials` / `workspace_inbound_credentials` / `workspace_ergani_credentials` | `platform_secrets` |
-| Set by | the tenant (Profile → Keys) | the operator (`/admin/operations → Keys`) |
+| Set by | the tenant (Profile → Keys) | the operator (`/admin/modules?tab=platform-keys`) |
 | Runs under | the tenant's own provider account | the operator's account |
 | Fallback | ROOT workspace → platform default; others → not-configured 503 | env-first, DB-second |
 

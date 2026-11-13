@@ -281,7 +281,7 @@ When `quota.remaining === 0`:
 
 ### Cloudflare Turnstile keys
 
-Both keys live in the `platform_secrets` table as **platform-wide** entries (no `primary_module_slug`) and surface in the admin UI at **`/admin/operations → Keys`**.
+Both keys live in the `platform_secrets` table as **platform-wide** entries (no `primary_module_slug`) and surface in the admin UI at **`/admin/modules?tab=platform-keys`**.
 
 | Key | Sensitive | Where used | Source priority |
 |---|---|---|---|
@@ -292,7 +292,7 @@ Both keys live in the `platform_secrets` table as **platform-wide** entries (no 
 
 1. **MIVAA env (preferred, production)** — add to `mivaa-pdf-extractor/.github/workflows/deploy.yml` `Environment=` lines on the systemd unit. Same pattern as `PERPLEXITY_API_KEY`, `FIRECRAWL_API_KEY`, `DATAFORSEO_BASE64`. Env always wins over DB. Takes effect on next deploy.
 
-2. **`/admin/operations → Keys`** — paste values into the secrets manager UI. The Python backend's `platform_secret_resolver.py` reads the DB row with a 30s cache, so changes take effect within 30 seconds without a redeploy. Use this for emergency rotation when a redeploy isn't immediately practical.
+2. **`/admin/modules?tab=platform-keys`** — paste values into the secrets manager UI. The Python backend's `platform_secret_resolver.py` reads the DB row with a 30s cache, so changes take effect within 30 seconds without a redeploy. Use this for emergency rotation when a redeploy isn't immediately practical.
 
 Both keys are consumed exclusively by the **Python MIVAA backend**, not by Supabase edge functions. The Turnstile widget script is loaded directly from `https://challenges.cloudflare.com/turnstile/v0/api.js` on the frontend; the `siteverify` call is made server-side by [turnstile_verifier.py](../mivaa-pdf-extractor/app/services/integrations/turnstile_verifier.py).
 
@@ -394,6 +394,6 @@ The visitor pays nothing on the free tier. Authenticated users who exceed 2/day 
 
 1. **`/billing` credit-packs page**. The upsell links there but the page doesn't exist yet. Stripe checkout + credit balance display.
 2. **Higher authenticated quota + credit-debit beyond free tier**. Signed-in users currently inherit the same 2/day cap. Should become "X free / day on signup, then N credits per scan".
-3. **Per-IP analytics page under `/admin/operations`**. Data is in `public_lookup_log` (scan volume, cost per IP, cache hit rate). UI pending.
+3. **Per-IP analytics page in the admin HQ**. Data is in `public_lookup_log` (scan volume, cost per IP, cache hit rate). UI pending.
 4. **Admin cache invalidation tool**. Operator-driven flush by query or by `scan_type` when a query goes stale before the 24h TTL (e.g. a retailer relaunches with new pricing).
 5. **Vision-attached scans**. Today the scan is text-only. Could accept a product image (multipart upload) → call MIVAA's visual search to identify the product → run the price/mention scan on the identified label. Higher conversion potential as a lead-gen demo.

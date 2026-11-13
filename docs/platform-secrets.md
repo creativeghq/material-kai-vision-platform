@@ -2,7 +2,7 @@
 
 A single registry for every external-service key the platform uses, with an **env-first, DB-second** resolution model so admins can configure keys without a redeploy while deployer-set env vars always win. Referenced by nearly every edge function and the MIVAA Python backend.
 
-Admin surfaces: `/admin/operations → Keys` (platform-wide) and `/admin/modules/<slug>/settings` (per-module).
+Admin surfaces: `/admin/modules?tab=platform-keys` (platform-wide) and `/admin/modules/<slug>/settings` (per-module).
 
 ---
 
@@ -42,7 +42,7 @@ RLS: `service_role` only — reached exclusively through the admin edge function
 | `key` | env var name, e.g. `ANTHROPIC_API_KEY` |
 | `value` | plaintext; NULL = cleared (env/default still apply) |
 | `description`, `category` | admin-UI metadata |
-| `primary_module_slug` | NULL = platform-wide (shows at `/admin/operations → Keys`) |
+| `primary_module_slug` | NULL = platform-wide (shows at `/admin/modules?tab=platform-keys`) |
 | `is_sensitive` | default true — controls masking in GET responses |
 | `default_value` | third-tier fallback |
 | `last_verified_at` / `last_verified_status` / `last_verified_error` | connection-test results |
@@ -74,7 +74,7 @@ Each listed secret includes `value_masked`, `value_present`, `effective.{value_p
 
 ## 5. Admin UI
 
-- **`/admin/operations → Keys`** — `SecretsManagerCard scope={{mode:'platform'}}` for `primary_module_slug IS NULL` keys (AI providers, Stripe, VAPID, cron secret, etc.).
+- **`/admin/modules?tab=platform-keys`** — `SecretsManagerCard scope={{mode:'platform'}}` for `primary_module_slug IS NULL` keys (AI providers, Stripe, VAPID, cron secret, etc.).
 - **`/admin/modules/<slug>/settings`** — `ModuleSettingsPage` mounts `SecretsManagerCard scope={{mode:'module', moduleSlug}}`, powered by `list_for_module`. Every registered module gets this page automatically (no per-module page code).
 
 ---

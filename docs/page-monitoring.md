@@ -199,7 +199,7 @@ requires the workspace to be entitled to `page-monitoring`.
 ## Setup
 
 1. Enable the `page-monitoring` module in `/admin/modules`.
-2. Set `FIRECRAWL_WEBHOOK_SECRET` (any long random string) via env or `/admin/operations → Keys`.
+2. Set `FIRECRAWL_WEBHOOK_SECRET` (any long random string) via env or `/admin/modules?tab=platform-keys`.
    Until it is set, adding a watch fails with a 503 that says so.
 3. `FIRECRAWL_API_KEY` is already required by price monitoring; page monitoring reuses it.
 

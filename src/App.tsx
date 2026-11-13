@@ -18,6 +18,7 @@ import { CapabilityGuard } from './components/core/CapabilityGuard';
 import { PRODUCT_BROWSE_ANY } from './auth/capabilities';
 import { EntitlementGuard } from './components/core/EntitlementGuard';
 import { Layout } from './components/core/Layout';
+import { AdminLayout } from './components/Admin/HQ/AdminShell';
 import {
   CriticalErrorBoundary,
   PageErrorBoundary,
@@ -111,7 +112,15 @@ const DataHealthPage = lazy(() => import('./components/Admin/DataHealthPage'));
 const AgentConfigsPage = lazy(() => import('./components/Admin/AgentConfigs').then(m => ({ default: m.AgentConfigsPage })));
 // ApiGatewayAdmin, ModelDebuggingPanel, AIDataPage, BackgroundAgentsPage moved into
 // AI Configurations tabs; their old routes now redirect there.
-const OperationsDashboard = lazy(() => import('./components/Admin/OperationsDashboard').then(m => ({ default: m.OperationsDashboard })));
+const AdminOverview = lazy(() => import('./components/Admin/HQ/AdminOverview'));
+const OperationsRedirect = lazy(() => import('./components/Admin/HQ/OperationsRedirect'));
+const SystemHealthPage = lazy(() => import('./components/Admin/HQ/SystemHealthPage'));
+const ServicesBillingPage = lazy(() => import('./components/Admin/HQ/ServicesBillingPage'));
+const ApprovalsPage = lazy(() => import('./components/Admin/HQ/ApprovalsPage'));
+const SearchAnalyticsPage = lazy(() => import('./components/Admin/HQ/SimpleHqPages').then(m => ({ default: m.SearchAnalyticsPage })));
+const PlatformOverviewPage = lazy(() => import('./components/Admin/HQ/SimpleHqPages').then(m => ({ default: m.PlatformOverviewPage })));
+const IngestionQualityPage = lazy(() => import('./components/Admin/HQ/SimpleHqPages').then(m => ({ default: m.IngestionQualityPage })));
+const PushNotificationsPage = lazy(() => import('./pages/Operator/PushNotificationsPage'));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
@@ -668,36 +677,121 @@ const App = () => (
                     to admin-gated path so non-admins can no longer view ops data. */}
                 <Route
                   path="/analytics"
-                  element={<Navigate to="/admin/operations" replace />}
+                  element={<Navigate to="/admin" replace />}
                 />
                 <Route
                   path="/admin"
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
-                          <AgentHarnessDashboard />
-                        </Layout>
+                        <AdminLayout>
+                          <AdminOverview />
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
                 />
                 <Route
-                  path="/admin/operations"
+                  path="/admin/agents"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <AgentHarnessDashboard />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/system-health"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <SystemHealthPage />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/search"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <SearchAnalyticsPage />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/billing"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <ServicesBillingPage />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/platform"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <PlatformOverviewPage />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/approvals"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <ApprovalsPage />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/admin/ingestion-quality"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <IngestionQualityPage />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
+                  path="/push-notifications"
                   element={
                     <AuthGuard>
                       <AdminGuard>
                         <Layout>
-                          <OperationsDashboard />
+                          <PushNotificationsPage />
                         </Layout>
                       </AdminGuard>
                     </AuthGuard>
                   }
                 />
+                <Route path="/admin/operations" element={<OperationsRedirect />} />
                 {/* Legacy route redirect */}
                 <Route
                   path="/admin/analytics"
-                  element={<Navigate to="/admin/operations" replace />}
+                  element={<Navigate to="/admin" replace />}
                 />
 
                 <Route
@@ -705,9 +799,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <KnowledgeBaseManagement />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -717,9 +811,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <MaterialsDataPage />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -729,9 +823,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <PDFDocumentDetails />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -741,22 +835,22 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <AgentConfigsPage />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
                 />
                 {/* Redirect old routes to new routes */}
                 <Route path="/admin/agent-configs" element={<Navigate to="/admin/ai-configs" replace />} />
-                <Route path="/tasks" element={<Navigate to="/admin/operations" replace />} />
+                <Route path="/tasks" element={<Navigate to="/admin" replace />} />
                 {/* Relocated into AI Configurations tabs — keep deep-links alive. */}
                 <Route path="/admin/prompt-templates" element={<Navigate to="/admin/ai-configs?tab=prompts" replace />} />
                 <Route path="/admin/extraction-prompts" element={<Navigate to="/admin/ai-configs?tab=prompts" replace />} />
                 <Route path="/admin/material-analysis" element={<Navigate to="/admin/ai-configs" replace />} />
                 {/* Retired: misnamed "training" panel. Factory approvals moved to Operations. */}
-                <Route path="/admin/training-models" element={<Navigate to="/admin/operations?tab=factory-onboarding" replace />} />
+                <Route path="/admin/training-models" element={<Navigate to="/admin/approvals" replace />} />
                 {/* Folded into Operations → Performance tab. */}
                 <Route path="/admin/performance" element={<Navigate to="/admin/async-queue-monitor" replace />} />
                 <Route
@@ -764,9 +858,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <LogViewer />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -777,9 +871,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <DataHealthPage />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -873,9 +967,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <AsyncJobQueueMonitor />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -885,9 +979,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <DataImportHub />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -994,7 +1088,7 @@ const App = () => (
                 <Route path="/admin/flows" element={<Navigate to="/flows" replace />} />
                 {/* Relocated into AI Configurations → Background Agents tab. */}
                 <Route path="/admin/background-agents" element={<Navigate to="/admin/ai-configs?tab=background-agents" replace />} />
-                <Route path="/admin/supplier-claims" element={<Navigate to="/admin/operations?tab=factory-onboarding&sub=supplier-claims" replace />} />
+                <Route path="/admin/supplier-claims" element={<Navigate to="/admin/approvals?tab=supplier-claims" replace />} />
                 {/*
                   * Master catalog (#324). NOT behind AdminGuard: a confirmed manufacturer
                   * publishes their own products here. Both audiences are gated server-side —
@@ -1037,7 +1131,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route path="/admin/freight-quotes" element={<Navigate to="/admin/operations?tab=factory-onboarding&sub=freight-quotes" replace />} />
+                <Route path="/admin/freight-quotes" element={<Navigate to="/admin/approvals?tab=freight-quotes" replace />} />
                 {/* Supplier portal (claimed suppliers; RPC-gated, not admin) */}
                 <Route
                   path="/supplier-portal"
@@ -1176,9 +1270,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <ModulesPage />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }
@@ -1194,9 +1288,9 @@ const App = () => (
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <Layout>
+                        <AdminLayout>
                           <ModuleSettingsPage />
-                        </Layout>
+                        </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
                   }

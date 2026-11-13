@@ -494,6 +494,15 @@ flat canvas blurs nothing and still costs a compositor pass per scroll frame) an
 
 Side rails (`HubSideNav`, `.sidebar-item`) mark the active row with a 3px leading accent bar.
 
+**The operator HQ (`/admin/*`).** Every admin route renders inside `AdminLayout`
+(`src/components/Admin/HQ/AdminShell.tsx`): `Layout` plus one HQ rail built from `ADMIN_NAV`
+(`adminNav.ts`) — the single list of operator destinations, read by both the rail and the Overview's
+Explore cards. The rail is the screen's only rail, so a page's own sections are **top tabs**:
+`HqTabbedPage` (tabs in `?tab=`, only the active pane mounts) or `HubTabNav`. `/admin` is the
+attention-first Overview, fed by `admin_hq_attention()` (one SQL read, shared with the rail's counts).
+Guarded by the "no page routed inside the admin HQ shell brings a rail of its own" case in
+[tests/unit/responsiveTableOverflow.test.ts](../tests/unit/responsiveTableOverflow.test.ts).
+
 ---
 
 ## 9. Do / Don't

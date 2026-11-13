@@ -8,7 +8,6 @@
     "src/components/Admin/KnowledgeBase/index.ts",
     "src/components/Admin/LogViewer.tsx",
     "src/components/Admin/MaterialsData/index.ts",
-    "src/components/Admin/OperationsDashboard/index.tsx",
     "src/components/business/billing/CreditPackagesPage.tsx",
     "src/components/business/billing/SubscriptionPlansPage.tsx",
     "src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx",

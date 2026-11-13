@@ -604,7 +604,7 @@ Deno.serve(withApiLogging('stock-api', async (req) => {
                   origin, destination, mode, container_type: params.containerType,
                   title: 'New shipping quote request',
                   body: `${tenant?.name ?? 'A workspace'} requested a shipping quote: ${route}.`,
-                  action_url: '/admin/operations?tab=factory-onboarding&sub=freight-quotes',
+                  action_url: '/admin/approvals?tab=freight-quotes',
                 });
               }
             }

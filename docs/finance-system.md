@@ -420,7 +420,7 @@ Module root `src/modules/finance/` (manifest slug `sales-finance`). Route `/fina
 | `CRON_SECRET` | `platform_secrets` / env | `x-cron-secret` for inbound-sync / offline-recovery / digest crons |
 | `PUBLIC_APP_URL` | env | Pay links (`/pay/:token`), default `https://app.materialshub.gr` |
 
-Resolution is env-first, DB-second via `resolveSecret()`. Admin manages keys at `/admin/operations → Keys`. Note `STRIPE_BILLING_SECRET_KEY` is a **separate** dedicated account for platform SaaS revenue (#200) — see [online-storefront.md §5](online-storefront.md).
+Resolution is env-first, DB-second via `resolveSecret()`. Admin manages keys at `/admin/modules?tab=platform-keys`. Note `STRIPE_BILLING_SECRET_KEY` is a **separate** dedicated account for platform SaaS revenue (#200) — see [online-storefront.md §5](online-storefront.md).
 
 ---
 

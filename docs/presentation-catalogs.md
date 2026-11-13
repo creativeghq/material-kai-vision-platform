@@ -48,7 +48,7 @@ Module slug: `presentation-catalogs`. Disabled by toggling the row in `public.mo
 │   └── /admin/catalogs/:id             — body editor + email grants + log  │
 │                                                                           │
 │  /agent-hub  (KAI)  — drives the building via 8 admin-only tools          │
-│  /admin/operations?tab=catalogs       — cross-catalog views/downloads     │
+│  (no cross-catalog operator screen — see Operations below)                │
 └──────────────────────────────────────────────────────────────────────────┘
                                      │
                                      ▼
@@ -142,7 +142,7 @@ Migration: `../supabase/migrations/20260508_presentation_catalogs_module.sql` + 
 | `catalog_source_pdfs` | one per uploaded PDF | Owned by an admin user. Stores `storage_path` in `pdf-documents` (under the `catalog-source/` prefix). Manufacturer name + URL + notes for provenance. Status: `uploaded` / `processing` / `ready` / `failed`. |
 | `catalog_email_grants` | one per (catalog, email) | Admin-managed allowlist. Visitors with these emails get access in addition to platform-user / CRM auto-match. Supports `expires_at` and `revoked_at`. |
 | `catalog_access_log` | one per email-gate submit | Forensic record of every gate attempt — email + matched_kind enum + matched_user_id + matched_crm_contact_id + matched_crm_company_id + matched_grant_id + ip_address + cookie_token + cookie_expires_at. |
-| `catalog_view_events` | one per page_view / pdf_download | Granular event log per visitor session (after gate granted). FK back to `catalog_access_log` for forensic correlation. Powers the operations dashboard. |
+| `catalog_view_events` | one per page_view / pdf_download | Granular event log per visitor session (after gate granted). FK back to `catalog_access_log` for forensic correlation. Powers the per-catalog Visitors tab and the CRM timeline. |
 
 ### Enums
 
@@ -161,7 +161,6 @@ Migration: `../supabase/migrations/20260508_presentation_catalogs_module.sql` + 
 
 ### View
 
-`catalog_operations_summary` — per-catalog rollup: catalog meta + denormalized counters + lateral subqueries for gate attempts/grants/denials and view event counts. Single SELECT returns everything the operations dashboard needs.
 
 ---
 
@@ -329,20 +328,7 @@ Subsequent visits to the same slug skip the email form: `useEffect` reads the co
 
 ## Operations / observability
 
-Lives at [/admin/operations](../src/components/Admin/OperationsDashboard/OperationsDashboard.tsx) → **Catalogs** tab (deep-link: `/admin/operations?tab=catalogs`).
-
-[src/components/Admin/OperationsDashboard/CatalogOperationsTab.tsx](../src/components/Admin/OperationsDashboard/CatalogOperationsTab.tsx) is the embeddable component. Driven by the `catalog_operations_summary` view + `catalog_view_events` + `catalog_access_log` queries via `catalogsService.list*`.
-
-**Stats strip (7 cards)**:
-- Catalogs (with `n published` sub) — Mail / unique emails — Eye / page views — FileDown / downloads — Activity / gate attempts — ShieldAlert / denied (red).
-
-**Filters (4)**:
-- Catalog (one or All) — Event type (all / page_view / pdf_download) — Range (24h / 7d / 30d / all) — Email contains (substring match).
-
-**Three sub-tabs**:
-- **By catalog** — table per `catalog_operations_summary`: views / downloads / gate (granted/denied) / unique emails / last activity / open + open-public-page actions.
-- **Events** — timeline of every `page_view` + `pdf_download` event with email + matched_kind + linked user profile (joined via `getUserProfilesByIds`) + IP. Click catalog name to jump into the builder.
-- **Email-gate** — every gate attempt (granted + denied) with the same join. Lets admin see who tried, who got in, who got denied.
+There is no cross-catalog operator screen (the Catalogs tab under Operations and its `catalog_operations_summary` view were removed 2026-11-13). A catalogue that ingested badly is handled on **Admin → Ingestion Quality** (`/admin/ingestion-quality`).
 
 **Per-catalog Visitors tab** ([CatalogBuilderPage.tsx](../src/modules/presentation-catalogs/pages/CatalogBuilderPage.tsx)) shows the same data scoped to one catalog: 4 mini-stats + page-views/downloads table + gate attempts table.
 
@@ -417,7 +403,7 @@ After pulling the branch:
 
 - `../supabase/migrations/20260508_presentation_catalogs_module.sql` — 5 tables + 4 enums + RLS + 5 storage buckets + `is_admin_user()` helper + module entry + default template seed.
 - `../supabase/migrations/20260508_kai_prompt_catalogs_addendum.sql` — appends catalog tool guidance to the `kai` prompt row. Idempotent via `--END_PRESENTATION_CATALOGS_ADDENDUM--` marker.
-- `../supabase/migrations/20260508_catalog_view_events.sql` — `catalog_view_events` table + enum + 2 atomic RPCs + `catalog_operations_summary` view.
+- `../supabase/migrations/20260508_catalog_view_events.sql` — `catalog_view_events` table + enum + 2 atomic RPCs (the `catalog_operations_summary` view was dropped 2026-11-13).
 
 ### Backend (edge functions)
 
@@ -447,10 +433,6 @@ After pulling the branch:
 - [src/modules/presentation-catalogs/pages/CatalogSourcesPage.tsx](../src/modules/presentation-catalogs/pages/CatalogSourcesPage.tsx)
 - [src/modules/presentation-catalogs/pages/CatalogBuilderPage.tsx](../src/modules/presentation-catalogs/pages/CatalogBuilderPage.tsx)
 
-### Frontend (operations dashboard integration)
-
-- [src/components/Admin/OperationsDashboard/CatalogOperationsTab.tsx](../src/components/Admin/OperationsDashboard/CatalogOperationsTab.tsx) — embedded tab body.
-- [src/components/Admin/OperationsDashboard/OperationsDashboard.tsx](../src/components/Admin/OperationsDashboard/OperationsDashboard.tsx) — Catalogs tab wired in + URL `?tab=` deep-link support.
 
 ### Frontend (public + agent surface)
 
@@ -468,6 +450,6 @@ After pulling the branch:
 
 1. **No version history on catalog edits** — saves overwrite. If a published catalog is edited, the public page reflects changes immediately. Acceptable for the current admin workflow but a versioned snapshot table would let "what did the client see when they opened the link?" be answered.
 2. **Single currency per material** — no live FX. The catalog renders whatever currency was on the material when added. Cross-currency display would need a price snapshot job.
-3. **No realtime fan-out** — admin operations dashboard refreshes on demand. Realtime is not wired up because the typical write rate is dozens-per-day, not thousands.
+3. **No realtime fan-out** — the Visitors tab refreshes on demand. Realtime is not wired up because the typical write rate is dozens-per-day, not thousands.
 4. **`catalog-image-search` web fallback hits UK SERP** — `location_code=2826`. Country-aware routing would need a per-catalog `country_code` field.
 5. **Per-page Vision token usage** — extract/translate base64-encode the entire PDF on every call. Larger PDFs (>50 pages) approach the Sonnet input-token cap. A future optimization would chunk the PDF and run multiple Vision passes.

@@ -68,7 +68,7 @@ Actions: `public_meta` (landing meta, no body), `request` (`{slug, email}` → e
 
 **Email matching** (priority): platform user who is a workspace_member of the owner → CRM contact → CRM company → `catalog_email_grants` allowlist → denied (no catalog-existence leak). Token: 48 hex chars, 30-day TTL, stored in `catalog_access_log.cookie_token`.
 
-Tables: `catalog_access_log` (one row per attempt), `catalog_email_grants` (admin allowlist), `catalog_view_events` (page_view/pdf_download). All admin-read-only RLS; writes service-role. RPCs `catalog_bump_unique_email_count`, `catalog_increment_view_count`. Operator analytics: `CatalogOperationsTab` at `/admin/operations`.
+Tables: `catalog_access_log` (one row per attempt), `catalog_email_grants` (admin allowlist), `catalog_view_events` (page_view/pdf_download). All admin-read-only RLS; writes service-role. RPCs `catalog_bump_unique_email_count`, `catalog_increment_view_count`. Per-catalog analytics live on the builder's Visitors tab.
 
 > Gaps: tokens stored plaintext; no rate limiting on `request` (unlike the Turnstile-gated [public tools](../CLAUDE.md)); `pdf_view` enum value defined but never emitted.
 

@@ -2155,13 +2155,6 @@ export type Database = {
             foreignKeyName: "catalog_access_log_catalog_id_fkey"
             columns: ["catalog_id"]
             isOneToOne: false
-            referencedRelation: "catalog_operations_summary"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "catalog_access_log_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
             referencedRelation: "presentation_catalogs"
             referencedColumns: ["id"]
           },
@@ -2220,13 +2213,6 @@ export type Database = {
           revoked_at?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "catalog_email_grants_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_operations_summary"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "catalog_email_grants_catalog_id_fkey"
             columns: ["catalog_id"]
@@ -2313,13 +2299,6 @@ export type Database = {
           template_slug?: string | null
         }
         Relationships: [
-          {
-            foreignKeyName: "catalog_email_sends_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_operations_summary"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "catalog_email_sends_catalog_id_fkey"
             columns: ["catalog_id"]
@@ -2633,13 +2612,6 @@ export type Database = {
             columns: ["access_log_id"]
             isOneToOne: false
             referencedRelation: "catalog_access_log"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "catalog_view_events_catalog_id_fkey"
-            columns: ["catalog_id"]
-            isOneToOne: false
-            referencedRelation: "catalog_operations_summary"
             referencedColumns: ["id"]
           },
           {
@@ -34551,30 +34523,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      catalog_operations_summary: {
-        Row: {
-          created_at: string | null
-          gate_attempts: number | null
-          gate_denials: number | null
-          gate_grants: number | null
-          id: string | null
-          last_event_at: string | null
-          owner_user_id: string | null
-          page_views: number | null
-          pdf_downloads: number | null
-          published_at: string | null
-          slug: string | null
-          status:
-            | Database["public"]["Enums"]["presentation_catalog_status"]
-            | null
-          title: string | null
-          unique_email_count: number | null
-          unpublished_at: string | null
-          updated_at: string | null
-          view_count: number | null
-        }
-        Relationships: []
       }
       crm_categories_summary: {
         Row: {

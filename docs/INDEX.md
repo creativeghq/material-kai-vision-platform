@@ -155,7 +155,7 @@ Complete documentation for Material Kai Vision Platform.
 - Per-candidate page rasterization via MIVAA PyMuPDF (`/api/internal/catalog/rasterize-pdf-page`) — every extracted material has a real cropped image
 - Editable JSONB body renders BOTH as A4 PDF (cover + body + back cover via pdf-lib) AND as live web page at `/c/:slug`
 - Email-gate on public pages: matched against `auth.users` + `crm_contacts` + `crm_companies` + per-catalog allowlist (`catalog_email_grants`); 30-day signed cookie
-- Operations dashboard at `/admin/operations?tab=catalogs` — gate attempts (granted/denied), page views, PDF downloads, per-catalog rollup with linked user profiles
+- Per-catalog Visitors tab in the builder — gate attempts (granted/denied), page views, PDF downloads with linked user profiles
 - 5 tables, 3 RPCs, 1 view, 5 storage buckets, 6 edge functions, 1 MIVAA endpoint
 
 **[interior-video-generation.md](interior-video-generation.md)** - Interior Video Generation ✨ NEW

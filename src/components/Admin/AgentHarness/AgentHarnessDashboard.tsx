@@ -2,18 +2,11 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
-  Book,
   Bot,
   Brain,
   CheckCircle2,
   ClipboardCheck,
-  ChevronDown,
-  Database as DatabaseIcon,
-  ExternalLink,
-  FileJson,
-  FileText,
   Gauge,
-  LayoutGrid,
   Loader2,
   MessagesSquare,
   Radio,
@@ -23,21 +16,12 @@ import {
 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/core/ui/dropdown-menu';
 import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
 import { HubTabNav } from '@/components/core/hub/HubTabNav';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
-import { dataIntegrityService } from '@/services/dataIntegrityService';
 import { formatDate, timeAgo } from '@/utils/datetime';
 
 import { AgentUnmetRequestsPanel } from './AgentUnmetRequestsPanel';
@@ -59,7 +43,6 @@ import {
 } from './HarnessPanels';
 import { PriceLookupsCard } from './PriceLookupsCard';
 import { WorkQualitySection } from './WorkQualitySection';
-import { ResetPlatformDialog } from '../ResetPlatformDialog';
 import type { HarnessOverview } from './harnessTypes';
 import { delta, fmtInt, fmtMs, fmtPct, fmtUsd, ratio } from './harnessFormat';
 
@@ -70,70 +53,6 @@ const WINDOWS = [
   { value: '90', label: '90d' },
 ] as const;
 type WindowValue = (typeof WINDOWS)[number]['value'];
-
-const ADMIN_PAGES: Array<{ group: string; items: Array<{ label: string; path: string }> }> = [
-  {
-    group: 'Agent Harness',
-    items: [
-      { label: 'Prompts', path: '/admin/ai-configs?tab=prompts' },
-      { label: 'Chat Starters', path: '/admin/ai-configs?tab=starters' },
-      { label: 'Writing Rules', path: '/admin/ai-configs?tab=writing-rules' },
-      { label: 'Model Pricing', path: '/admin/ai-configs?tab=pricing' },
-      { label: 'Background Agents', path: '/admin/ai-configs?tab=background-agents' },
-      { label: 'Flows', path: '/flows' },
-    ],
-  },
-  {
-    group: 'Pipeline',
-    items: [
-      { label: 'Data Import', path: '/admin/data-import' },
-      { label: 'Job Queue', path: '/admin/async-queue-monitor' },
-      { label: 'Materials Data', path: '/admin/materials-data' },
-      { label: 'AI Review — Metadata, Relevancy, Duplicates', path: '/admin/materials-data?tab=ai-review' },
-      { label: 'Knowledge Base', path: '/admin/knowledge-base' },
-    ],
-  },
-  {
-    group: 'Operations',
-    items: [
-      { label: 'System Health', path: '/admin/operations' },
-      { label: 'Search', path: '/admin/operations?tab=search-analytics' },
-      { label: 'Services & Billing', path: '/admin/operations?tab=services-billing' },
-      { label: 'Platform Overview', path: '/admin/operations?tab=platform-overview' },
-      { label: 'Catalogs', path: '/admin/operations?tab=catalogs' },
-      { label: 'Push Notifications', path: '/admin/operations?tab=push' },
-      { label: 'Data Health', path: '/admin/data-health' },
-      { label: 'Application Logs', path: '/admin/logs' },
-    ],
-  },
-  {
-    group: 'Platform',
-    items: [
-      { label: 'Modules', path: '/admin/modules' },
-      { label: 'Subscribers', path: '/admin/modules?tab=subscribers' },
-      { label: 'Plans', path: '/admin/modules?tab=plans' },
-      { label: 'Platform Keys', path: '/admin/modules?tab=platform-keys' },
-      { label: 'API Keys', path: '/admin/modules?tab=api-keys' },
-    ],
-  },
-  {
-    group: 'Approvals',
-    items: [
-      { label: 'Brand & Reseller Approvals', path: '/admin/operations?tab=factory-onboarding' },
-      { label: 'Supplier Claims', path: '/admin/operations?tab=factory-onboarding&sub=supplier-claims' },
-      { label: 'Freight Quotes', path: '/admin/operations?tab=factory-onboarding&sub=freight-quotes' },
-      { label: 'Master Catalog', path: '/catalog-master' },
-    ],
-  },
-];
-
-const EXTERNAL_TOOLS = [
-  { label: 'Sentry', href: 'https://ethosco.sentry.io/issues/', icon: AlertTriangle },
-  { label: 'MIVAA API Docs', href: 'https://v1api.materialshub.gr/docs', icon: Book },
-  { label: 'MIVAA ReDoc', href: 'https://v1api.materialshub.gr/redoc', icon: FileText },
-  { label: 'Edge API Docs', href: '/api/edge-swagger.html', icon: DatabaseIcon },
-  { label: 'Edge OpenAPI (JSON)', href: '/api/openapi-edge.json', icon: FileJson },
-];
 
 const SECTIONS = [
   { id: 'attention', label: 'Needs Attention' },
@@ -165,14 +84,6 @@ const AgentHarnessDashboard: React.FC = () => {
     setActiveSection(id);
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, []);
-  const [openFindings, setOpenFindings] = useState(0);
-
-  useEffect(() => {
-    void dataIntegrityService.listFindings({ status: 'open' })
-      .then((f) => setOpenFindings(f.length))
-      .catch(() => setOpenFindings(0));
-  }, []);
-
   const setParam = useCallback((key: string, value: string | null) => {
     setParams((prev) => {
       const next = new URLSearchParams(prev);
@@ -260,52 +171,6 @@ const AgentHarnessDashboard: React.FC = () => {
               {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
               Refresh
             </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  <LayoutGrid className="h-3.5 w-3.5" /> Admin
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="max-h-[70vh] w-72 overflow-y-auto">
-                {ADMIN_PAGES.map((g, gi) => (
-                  <React.Fragment key={g.group}>
-                    {gi > 0 && <DropdownMenuSeparator />}
-                    <DropdownMenuLabel className="text-xs text-muted-foreground">{g.group}</DropdownMenuLabel>
-                    {g.items.map((it) => (
-                      <DropdownMenuItem key={it.path} asChild>
-                        <Link to={it.path} className="flex items-center justify-between gap-2">
-                          {it.label}
-                          {it.path === '/admin/data-health' && openFindings > 0 && (
-                            <span className="text-xs font-semibold text-[hsl(var(--error))]">{openFindings} open</span>
-                          )}
-                        </Link>
-                      </DropdownMenuItem>
-                    ))}
-                  </React.Fragment>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="gap-1.5">
-                  Tools <ChevronDown className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                {EXTERNAL_TOOLS.map((t) => (
-                  <DropdownMenuItem key={t.href} onClick={() => window.open(t.href, '_blank', 'noopener')} className="flex items-center gap-2">
-                    <t.icon className="h-4 w-4" />
-                    {t.label}
-                    <ExternalLink className="ml-auto h-3 w-3" />
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1.5">
-                  <ResetPlatformDialog />
-                </div>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </>
         }
       >

@@ -36,6 +36,9 @@ import {
   Store,
   Globe,
   UserPlus,
+  Bell,
+  Mail,
+  Radio,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -49,7 +52,7 @@ export type NavRoleRequirement = 'admin';
  * module slugs, capabilities, and entitlements are unchanged. Each app declares its `hub`;
  * apps with no `hub` fall into a catch-all "More" bucket in the launcher.
  */
-export type HubId = 'marketing' | 'sales' | 'projects' | 'finance' | 'service' | 'studio' | 'people';
+export type HubId = 'marketing' | 'sales' | 'projects' | 'finance' | 'service' | 'studio' | 'people' | 'operator';
 
 export interface Hub {
   id: HubId;
@@ -71,6 +74,7 @@ export const HUBS: readonly Hub[] = [
   { id: 'service', label: 'Service Hub', icon: Headset, description: 'Customer conversations, reviews & knowledge base.' },
   { id: 'studio', label: 'Studio Hub', icon: Palette, description: 'Moodboards, renders, room planning & client presentations.' },
   { id: 'people', label: 'People Hub', icon: Users, description: 'Employees, absences & HR documents.' },
+  { id: 'operator', label: 'Operator Hub', icon: Radio, description: 'Platform-wide push, email and WhatsApp to users and customers.' },
 ];
 
 export interface SidebarNavItem {
@@ -293,6 +297,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     launcherOrder: 10,
     description: 'Connect a website and open its SEO dashboard — articles, keywords, audits and Search Console.',
   },
+  { id: 'push-notifications', label: 'Push Notifications', path: '/push-notifications', icon: Bell, requirePlatform: true, surface: 'app', hub: 'operator', description: 'Broadcast a push notification to platform users.' },
+  { id: 'operator-emails', label: 'Emails', path: '/emails', icon: Mail, requirePlatform: true, surface: 'app', hub: 'operator', description: 'Platform email: sending domains, templates, campaigns and the delivery log.' },
+  { id: 'operator-whatsapp', label: 'WhatsApp Campaigns', path: '/messaging', icon: MessageCircle, requirePlatform: true, surface: 'app', hub: 'operator', description: 'Platform WhatsApp: channels, templates, campaigns and opt-outs.' },
   // Supplier portal lives under Finance → Payables /
   // Profile → Supplier Portal. Admin moved to the profile menu (operator-only). Network is on the
   // workspace switcher.

@@ -15,7 +15,9 @@ export const ROUTE_LIST = [
   '/inbox', '/trip-expenses',
   '/supplier-portal',
   // Admin (operator-only)
-  '/admin', '/admin/operations', '/admin/modules', '/admin/background-agents',
+  '/admin', '/admin/agents', '/admin/system-health', '/admin/search', '/admin/billing',
+  '/admin/platform', '/admin/approvals', '/admin/ingestion-quality', '/push-notifications',
+  '/admin/operations', '/admin/modules', '/admin/background-agents',
   '/admin/data-health', '/admin/knowledge-base', '/admin/materials-data',
   '/admin/flows', '/admin/data-import', '/admin/plans',
   '/admin/monitoring', '/admin/supplier-claims',

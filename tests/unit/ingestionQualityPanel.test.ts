@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { IngestionAuditList } from '@/components/Admin/OperationsDashboard/IngestionAuditList';
-import type { IngestionAuditRow } from '@/components/Admin/OperationsDashboard/ingestionAudit';
+import { IngestionAuditList } from '@/components/Admin/Ingestion/IngestionAuditList';
+import type { IngestionAuditRow } from '@/components/Admin/Ingestion/ingestionAudit';
 
 const row = (over: Partial<IngestionAuditRow>): IngestionAuditRow => ({
   id: 'r1',

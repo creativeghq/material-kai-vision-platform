@@ -230,10 +230,10 @@ const MODEL_OPTIONS = [
     active: 'bg-amber-500 border-amber-500 text-white',
   },
   {
-    // Credits mirror GENERATION_CREDIT_COSTS['gpt-image-2.6'].
+    // Restored 2026-09-05. Credits mirror GENERATION_CREDIT_COSTS['gpt-image-1'].
     id: 'chatgpt' as const,
     label: 'ChatGPT',
-    description: 'GPT Image 2.6 — most faithful room edits',
+    description: 'GPT Image — strong prompt adherence',
     credits: 10,
     icon: Bot,
     color: 'text-emerald-500',

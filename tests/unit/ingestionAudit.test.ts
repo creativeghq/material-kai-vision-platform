@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   canAcknowledge, examplesLine, exampleText, findingsSummary, formatCoverage, pagesNeedingReview, statusTone,
-} from '@/components/Admin/OperationsDashboard/ingestionAudit';
+} from '@/components/Admin/Ingestion/ingestionAudit';
 
 describe('ingestion audit mapping', () => {
   it('maps every status to a tone and unknown to neutral', () => {

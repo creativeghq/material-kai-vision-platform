@@ -98,7 +98,7 @@ export async function resolveSecrets(
  */
 export async function requireSecret(supabase: SupabaseLike, key: string): Promise<string> {
   const r = await resolveSecret(supabase, key);
-  if (!r.value) throw new Error(`Secret "${key}" is not configured. Set it via env var or /admin/operations → Keys.`);
+  if (!r.value) throw new Error(`Secret "${key}" is not configured. Set it via env var or /admin/modules?tab=platform-keys.`);
   return r.value;
 }
 

@@ -139,6 +139,9 @@ function tabKeys(file: string, depth = 0, seen = new Set<string>(), followDelega
   const src = readSource(file);
   const keys = new Set<string>();
   for (const m of src.matchAll(/<TabsContent\s+[^>]*value="([^"]+)"/g)) keys.add(m[1]);
+  if (src.includes('<HqTabbedPage')) {
+    for (const m of src.matchAll(/\{\s*id:\s*'([A-Za-z0-9_-]+)',\s*label:/g)) keys.add(m[1]);
+  }
   for (const m of src.matchAll(/<TabsContent\s+[^>]*value=\{([A-Z][A-Za-z0-9_]*)\.([A-Za-z0-9_]+)\}/g)) {
     const v = resolveConstRef(file, m[1], m[2]);
     if (v) keys.add(v);

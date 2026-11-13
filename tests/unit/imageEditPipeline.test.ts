@@ -156,7 +156,7 @@ describe('a reference image on an edit is a MATERIAL, and its pixels are sent', 
 
   it('a two-image edit runs on the only provider that takes two images', () => {
     const fn = read(GEMINI_FN);
-    // Grok and gpt-image-2.6 edit ONE image: left on those tiers the material reference is gated,
+    // Grok and gpt-image-1 edit ONE image: left on those tiers the material reference is gated,
     // charged for, and then dropped on the floor.
     expect(fn).toMatch(/multiReference:[^;]*mode === 'image-edit' && !!body\.style_reference_url/s);
   });

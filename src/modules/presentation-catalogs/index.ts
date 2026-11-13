@@ -25,8 +25,6 @@ const definition: ModuleDefinition = {
     { path: '/admin/catalogs/sources', component: legacyAdminRedirect('/catalogs/sources') },
     { path: '/admin/catalogs/:id', component: legacyAdminRedirect('/catalogs/:id') },
   ],
-  // Single entry point: catalogs are surfaced under Operations → Catalogs
-  // (/admin/operations?tab=catalogs), which links into the builder routes above.
   navItems: [],
 };
 

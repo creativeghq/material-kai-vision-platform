@@ -16,6 +16,7 @@ import {
   Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
   Share2, Globe, Coins, CreditCard, ScanLine, Star, MessagesSquare,
   Link2, FileSearch, Layers, BadgeCheck, Bot,
+  LayoutDashboard,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { HubId } from './nav-items';
@@ -353,6 +354,10 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
     { label: 'Onboarding Templates', to: '/templates?type=hr_onboarding', icon: ClipboardCheck },
     { label: 'My Documents', to: '/profile?tab=documents', icon: FolderOpen },
     { label: 'My Calendar', to: '/profile?tab=schedule&section=calendar', icon: CalendarDays },
+  ],
+  operator: [
+    { label: 'Headquarters', to: '/admin', icon: LayoutDashboard },
+    { label: 'Approvals', to: '/admin/approvals', icon: ClipboardCheck },
   ],
 };
 

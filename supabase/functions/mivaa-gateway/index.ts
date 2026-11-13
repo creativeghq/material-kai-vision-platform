@@ -514,7 +514,7 @@ serve(withApiLogging('mivaa-gateway', async (req) => {
       {
         provider: 'MIVAA',
         envVarHint: 'Set the MIVAA_API_KEY env var on the edge function host, or paste it',
-        settingsPath: '/admin/operations → Keys',
+        settingsPath: '/admin/modules?tab=platform-keys',
       },
       corsHeaders,
     );

@@ -529,7 +529,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // Pinned catalog materials make this a multi-image prompt, which only Gemini takes —
   // the routing collapses the tier to Gemini so the price collapses with it.
   const routing = resolveGenerationRouting(mode, body.model_tier, {
-    // A material reference on an EDIT makes it a two-image brief, and Grok's and gpt-image-2.6's
+    // A material reference on an EDIT makes it a two-image brief, and Grok's and gpt-image-1's
     // edit endpoints take exactly one image. Left on those tiers the reference is accepted, gated
     // (and charged for), and then silently dropped — the user's tile never reaches the model at
     // all, which is the whole defect this file was just fixed for. `multiReference` is the
@@ -538,7 +538,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       || (mode === 'image-edit' && !!body.style_reference_url),
   });
   const useGrok = routing.provider === 'grok';
-  // ChatGPT (gpt-image-2.6): the same single-image generate-or-edit shape as Grok, so it
+  // ChatGPT (gpt-image-1): the same single-image generate-or-edit shape as Grok, so it
   // sits beside `useGrok` in every branch below and is never derived from the tier here.
   const useOpenAI = routing.provider === 'openai';
   const isFluxMode = routing.provider === 'flux';
@@ -745,8 +745,8 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         const result = await editImageWithGrok(grokPrompt, sourceBuffer);
         imageUrl = await persistMeasured(result.base64, result.mimeType);
       } else if (useOpenAI) {
-        // ChatGPT (gpt-image-2.6) edit — the source photo goes in with the same
-        // targeted-edit template Grok uses; no mask, so the whole frame is re-rendered
+        // ChatGPT (gpt-image-1) edit — the source photo goes to /v1/images/edits with the
+        // same targeted-edit template Grok uses; no mask, so the whole frame is re-rendered
         // under the instruction while the template pins the architecture.
         const openAiPrompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_targeted_edit'), { instruction: instruction });
 

@@ -431,7 +431,7 @@ describe('a rail never contains another rail', () => {
     for (const [outer, src] of sources) {
       if (!isRail(src)) continue;
       for (const [name, target] of rendered(outer)) {
-        if (target === outer) continue;
+        if (target === outer || rel(target) === 'src/components/core/hub/HubSideNav.tsx') continue;
         if (NOT_TWO_SIDEBARS.has(`${rel(outer)} -> <${name}>`)) continue;
         const chain = railBelow(target, [outer]);
         if (chain) offenders.push(`${rel(outer)} -> <${name}> -> ${chain.map(rel).join(' -> ')}`);
@@ -443,6 +443,35 @@ describe('a rail never contains another rail', () => {
       + 'the page header only describes the outer one. Either give the inner surface its own page '
       + '(a record drill-down: `/websites/:id`) or switch it to `HubTabNav`, the horizontal '
       + 'underline strip.\n' + offenders.join('\n'),
+    ).toEqual([]);
+  });
+
+  it('no page routed inside the admin HQ shell brings a rail of its own', () => {
+    const app = join(SRC, 'App.tsx');
+    const appSrc = sources.get(app) ?? '';
+    const lazyFiles = new Map<string, string>();
+    for (const m of appSrc.matchAll(/const\s+(\w+)\s*=\s*lazy\(\(\)\s*=>\s*import\('([^']+)'\)/g)) {
+      const f = resolveImport(m[2], app);
+      if (f) lazyFiles.set(m[1], f);
+    }
+    const starts = [...appSrc.matchAll(/\bpath="([^"]+)"/g)];
+    const checked: string[] = [];
+    const offenders: string[] = [];
+    starts.forEach((m, i) => {
+      const segment = appSrc.slice(m.index!, starts[i + 1]?.index ?? appSrc.length);
+      if (!rendersTag(segment, 'AdminLayout')) return;
+      for (const [name, file] of lazyFiles) {
+        if (!rendersTag(segment, name)) continue;
+        checked.push(m[1]);
+        const chain = railBelow(file);
+        if (chain) offenders.push(`${m[1]} -> ${chain.map(rel).join(' -> ')}`);
+      }
+    });
+    expect(checked.length, 'no AdminLayout routes found — this check is scanning nothing').toBeGreaterThan(10);
+    expect(
+      offenders,
+      'An admin page renders a section rail inside the HQ shell, which already has one. Use top tabs '
+      + '(`HqTabbedPage` / `HubTabNav`) for the page\'s own sections.\n' + offenders.join('\n'),
     ).toEqual([]);
   });
 });

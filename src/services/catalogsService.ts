@@ -106,27 +106,6 @@ export interface CatalogAccessLogRow {
   created_at: string;
 }
 
-export interface CatalogOperationsSummary {
-  id: string;
-  title: string;
-  slug: string | null;
-  status: CatalogStatus;
-  owner_user_id: string;
-  published_at: string | null;
-  unpublished_at: string | null;
-  view_count: number;
-  unique_email_count: number;
-  created_at: string;
-  updated_at: string;
-  gate_attempts: number;
-  gate_grants: number;
-  gate_denials: number;
-  page_views: number;
-  pdf_downloads: number;
-  last_event_at: string | null;
-  public_handle: string | null;
-}
-
 export interface CatalogViewEventRow {
   id: string;
   catalog_id: string;
@@ -676,15 +655,6 @@ class CatalogsService {
 
   // ── Operations / analytics ─────────────────────────────────────────
 
-  async listOperationsSummary(): Promise<CatalogOperationsSummary[]> {
-    const { data, error } = await supabase
-      .from('catalog_operations_summary')
-      .select('*')
-      .order('last_event_at', { ascending: false, nullsFirst: false });
-    if (error) throw error;
-    return (data || []) as CatalogOperationsSummary[];
-  }
-
   async listViewEvents(opts: {
     catalogId?: string;
     eventType?: 'page_view' | 'pdf_download' | 'pdf_view' | 'all';
@@ -714,38 +684,6 @@ class CatalogsService {
       matched_kind: row.matched_kind,
       ip_address: row.ip_address,
       user_agent: row.user_agent,
-      created_at: row.created_at,
-    }));
-  }
-
-  async listAccessLogCrossCatalog(opts: {
-    catalogId?: string;
-    grantedOnly?: boolean;
-    emailContains?: string;
-    sinceIso?: string;
-    limit?: number;
-  } = {}): Promise<Array<CatalogAccessLogRow & { catalog_title?: string | null; catalog_slug?: string | null; matched_user_id: string | null }>> {
-    let q = supabase
-      .from('catalog_access_log')
-      .select('id, catalog_id, email, matched_kind, granted_access, ip_address, matched_user_id, created_at, presentation_catalogs!catalog_access_log_catalog_id_fkey(title, slug)')
-      .order('created_at', { ascending: false })
-      .limit(opts.limit ?? 100);
-    if (opts.catalogId) q = q.eq('catalog_id', opts.catalogId);
-    if (opts.grantedOnly) q = q.eq('granted_access', true);
-    if (opts.emailContains) q = q.ilike('email', `%${opts.emailContains.toLowerCase()}%`);
-    if (opts.sinceIso) q = q.gte('created_at', opts.sinceIso);
-    const { data, error } = await q;
-    if (error) throw error;
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      catalog_id: row.catalog_id,
-      catalog_title: row.presentation_catalogs?.title ?? null,
-      catalog_slug: row.presentation_catalogs?.slug ?? null,
-      email: row.email,
-      matched_kind: row.matched_kind,
-      granted_access: row.granted_access,
-      ip_address: row.ip_address,
-      matched_user_id: row.matched_user_id,
       created_at: row.created_at,
     }));
   }
