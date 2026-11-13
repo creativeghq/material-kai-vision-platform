@@ -115,7 +115,10 @@ describe('deploy wiring', () => {
     ).toBe(false);
 
     const groups = new Map<string, string>();
-    for (const job of ['deploy-frontend', 'promote', 'deploy-functions']) {
+    for (const job of [
+      'deploy-frontend', 'promote', 'deploy-functions',
+      'sync-capability-matrix', 'integration-tests', 'smoke', 'fe-smoke',
+    ]) {
       const group = /concurrency:\s*\n\s*group:\s*(\S+)/.exec(jobBlock(job))?.[1];
       expect(group, `${job} has no concurrency group — two runs can now race on it`).toBeDefined();
       // Distinct groups, and this is not tidiness: deploy-frontend and deploy-functions run

@@ -858,6 +858,9 @@ jobs:
   sync-capability-matrix:
     needs: [unit-tests, lint]
     runs-on: ubuntu-latest
+    concurrency:
+      group: live-check-sync-capability-matrix
+      cancel-in-progress: false
     environment: production
     steps:
       - uses: actions/checkout@v4
@@ -939,6 +942,9 @@ jobs:
     needs: [deploy-frontend, deploy-functions]
     if: ${{ always() && (needs.deploy-frontend.result == 'success' || needs.deploy-functions.result == 'success') }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: live-check-smoke
+      cancel-in-progress: false
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -978,6 +984,9 @@ jobs:
     needs: [deploy-frontend, changes]
     if: ${{ always() && needs.deploy-frontend.result == 'success' }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: live-check-fe-smoke
+      cancel-in-progress: false
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
@@ -1070,6 +1079,9 @@ jobs:
     needs: [changes, deploy-functions, sync-capability-matrix]
     if: ${{ always() && (needs.deploy-functions.result == 'success' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.capabilities == 'true') }}
     runs-on: ubuntu-latest
+    concurrency:
+      group: live-check-integration-tests
+      cancel-in-progress: false
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
