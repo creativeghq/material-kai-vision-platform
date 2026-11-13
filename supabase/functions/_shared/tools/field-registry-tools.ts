@@ -41,7 +41,16 @@ export const createFieldReviewApplyTool = () => tool(
   async ({ decisions }) => {
     const { data, error } = await svc().rpc('field_review_apply', { p_run_id: null, p_decisions: decisions });
     if (error) return JSON.stringify({ success: false, error: error.message });
-    return JSON.stringify({ success: true, ...data });
+    const results = (data?.results ?? []) as Array<{ ref: string; decision: string; result?: { applied?: boolean; reason?: string } }>;
+    const refused = results.filter((r) => r.decision !== 'abstain' && r.result?.applied !== true);
+    return JSON.stringify({
+      success: true,
+      sent: decisions.length,
+      recorded: results.length,
+      applied: results.filter((r) => r.result?.applied === true).length,
+      abstained: results.filter((r) => r.decision === 'abstain').length,
+      refused: refused.map((r) => ({ ref: r.ref, decision: r.decision, reason: r.result?.reason ?? 'not applied' })),
+    });
   },
   {
     name: 'field_review_apply',
