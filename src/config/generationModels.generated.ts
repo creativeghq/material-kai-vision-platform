@@ -145,8 +145,8 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "gpt-image-1",
     "tier": "standard",
-    "status": "active",
-    "enabled": true,
+    "status": "dead",
+    "enabled": false,
     "sort_order": 25
   },
   {
@@ -1074,7 +1074,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '52dad714ae7df76a7e39ca7d178dc194';
+export const PROJECTION_FINGERPRINT = 'caf9c077c3d8fc2ae311c270d32819b8';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
