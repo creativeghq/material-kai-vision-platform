@@ -55,6 +55,38 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 10
   },
   {
+    "id": "nano-banana-2.1",
+    "display_name": "Nano Banana 2.1",
+    "capability": "image",
+    "sub_capability": "text-to-image+image-to-image",
+    "provider": "replicate",
+    "slug": "google/nano-banana-2.1",
+    "version": null,
+    "adapter": "nano_banana",
+    "input_requirements": {},
+    "pricing_key": "nano-banana-2.1",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 10
+  },
+  {
+    "id": "gpt-image-2.6",
+    "display_name": "GPT Image 2.6",
+    "capability": "image",
+    "sub_capability": "text-to-image+image-to-image",
+    "provider": "replicate",
+    "slug": "openai/gpt-image-2.6-sunburst",
+    "version": null,
+    "adapter": "gpt_image",
+    "input_requirements": {},
+    "pricing_key": "gpt-image-2.6",
+    "tier": "premium",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 15
+  },
+  {
     "id": "gemini-3-pro-image",
     "display_name": "Gemini 3 Pro Image (Nano Banana Pro)",
     "capability": "image",
@@ -74,6 +106,22 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     },
     "pricing_key": "gemini-3-pro-image",
     "tier": "premium",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 20
+  },
+  {
+    "id": "seedream-5-pro",
+    "display_name": "Seedream 5 Pro",
+    "capability": "image",
+    "sub_capability": "text-to-image+image-to-image",
+    "provider": "replicate",
+    "slug": "bytedance/seedream-5-pro",
+    "version": null,
+    "adapter": "seedream5",
+    "input_requirements": {},
+    "pricing_key": "seedream-5-pro",
+    "tier": "standard",
     "status": "active",
     "enabled": true,
     "sort_order": 20
@@ -100,6 +148,38 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "status": "active",
     "enabled": true,
     "sort_order": 25
+  },
+  {
+    "id": "krea-3",
+    "display_name": "Krea 3",
+    "capability": "image",
+    "sub_capability": "text-to-image+image-to-image",
+    "provider": "replicate",
+    "slug": "krea/krea-3",
+    "version": null,
+    "adapter": "krea3",
+    "input_requirements": {},
+    "pricing_key": "krea-3",
+    "tier": "standard",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 25
+  },
+  {
+    "id": "flux-3-image",
+    "display_name": "FLUX 3",
+    "capability": "image",
+    "sub_capability": "text-to-image+image-to-image",
+    "provider": "replicate",
+    "slug": "black-forest-labs/flux-3-image",
+    "version": null,
+    "adapter": "flux3",
+    "input_requirements": {},
+    "pricing_key": "flux-3-image",
+    "tier": "premium",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 30
   },
   {
     "id": "xai-aurora",
@@ -165,7 +245,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "seedream-4",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 45
   },
   {
@@ -185,7 +265,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "playground-v2.5",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 50
   },
   {
@@ -205,7 +285,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "z-image-turbo",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 55
   },
   {
@@ -248,7 +328,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "adirik-interior-design",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 70
   },
   {
@@ -271,7 +351,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "comfyui-interior-remodel",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 80
   },
   {
@@ -294,7 +374,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "interior-v2",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 90
   },
   {
@@ -317,7 +397,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "interiorly-gen1-dev",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 100
   },
   {
@@ -340,7 +420,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "designer-architecture",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 110
   },
   {
@@ -363,7 +443,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "erayyavuz-interior-ai",
     "tier": "standard",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 120
   },
   {
@@ -386,7 +466,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "interor-2",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 130
   },
   {
@@ -409,7 +489,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "colourful-interiors",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 140
   },
   {
@@ -455,7 +535,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "stabledesign-interior",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 155
   },
   {
@@ -478,7 +558,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "stable-interiors-v2-yz",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 160
   },
   {
@@ -501,7 +581,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "interior-design-sdxl",
     "tier": "premium",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 170
   },
   {
@@ -872,13 +952,13 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "version": null,
     "adapter": "luma",
     "input_requirements": {
-      "needs_prompt": true,
-      "min_images": 0,
       "max_images": 2,
+      "min_images": 0,
       "image_roles": [
         "source",
         "last_frame"
-      ]
+      ],
+      "needs_prompt": true
     },
     "pricing_key": "ray-3.2-720p",
     "tier": "standard",
@@ -896,13 +976,13 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "version": null,
     "adapter": "luma",
     "input_requirements": {
-      "needs_prompt": true,
-      "min_images": 0,
       "max_images": 2,
+      "min_images": 0,
       "image_roles": [
         "source",
         "last_frame"
-      ]
+      ],
+      "needs_prompt": true
     },
     "pricing_key": "ray-3.2-1080p",
     "tier": "premium",
@@ -994,7 +1074,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = 'f3589dde9c002231c959d32660314da9';
+export const PROJECTION_FINGERPRINT = '52dad714ae7df76a7e39ca7d178dc194';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
