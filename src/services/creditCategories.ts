@@ -94,7 +94,7 @@ export function creditOperationCategory(op: string | null | undefined): CreditSp
   if (startsWith('stock_')) return 'Stock';
 
   if (startsWith('interior_video', 'veo_')) return 'Video Generation';
-  if (is('virtual_staging') || startsWith('interior_')) return 'Interior Design';
+  if (is('virtual_staging') || startsWith('interior_', 'scene_studio')) return 'Interior Design';
   if (startsWith('gemini_')) return 'Image Generation';
   if (startsWith('vr_', 'worldlabs')) return '3D / VR Worlds';
   if (is('image_segment', 'sam_segment', 'inpaint', 'region_edit', 'product_cutout')

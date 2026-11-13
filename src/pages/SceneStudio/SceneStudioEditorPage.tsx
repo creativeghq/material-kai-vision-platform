@@ -159,6 +159,14 @@ export default function SceneStudioEditorPage() {
     if (selectedId === objId) setSelectedId(null);
   };
   const restoreObject = (objId: string) => patchObject(objId, { removed_at: null });
+  const deleteForever = async (objId: string) => {
+    try {
+      await sceneStudioService.deleteObject(objId);
+      setObjects((list) => list.filter((o) => o.id !== objId));
+      setHistory((h) => h.map((snap) => ({ ...snap, objects: snap.objects.filter((o) => o.id !== objId) })));
+      openedWith.current = openedWith.current.filter((o) => o.id !== objId);
+    } catch (e) { fail('The object could not be deleted', e); }
+  };
   const emptyRoom = () => {
     const now = new Date().toISOString();
     changeObjects((list) => list.map((o) => (o.removed_at ? o : { ...o, removed_at: now })));
@@ -589,10 +597,13 @@ export default function SceneStudioEditorPage() {
 
           {!showRender && removed.length > 0 && !reading && (
             <div className="absolute bottom-2 right-2 max-w-[260px] rounded-sm border border-hairline bg-card/95 p-2 shadow-overlay">
-              <p className="mb-1.5 text-[11px] font-semibold text-muted-foreground">Removed · click to put back</p>
+              <p className="mb-1.5 text-[11px] font-semibold text-muted-foreground">Removed · click to put back, × to delete</p>
               <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto">
                 {removed.map((o) => (
-                  <button key={o.id} type="button" onClick={() => restoreObject(o.id)} className="rounded-sm border border-hairline bg-surface-sunken px-2 py-1 text-left text-xs hover:border-foreground/40">{o.label}</button>
+                  <span key={o.id} className="inline-flex items-center rounded-sm border border-hairline bg-surface-sunken text-xs">
+                    <button type="button" onClick={() => restoreObject(o.id)} className="px-2 py-1 text-left hover:text-foreground">{o.label}</button>
+                    <button type="button" onClick={() => void deleteForever(o.id)} className="px-1.5 py-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${o.label} for good`} title="Delete for good"><X className="h-3 w-3" /></button>
+                  </span>
                 ))}
               </div>
             </div>
