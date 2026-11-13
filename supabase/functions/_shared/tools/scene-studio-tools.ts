@@ -1,4 +1,4 @@
-/** Scene Studio tools — start an editable 3D room from a floor plan, photo or render in the chat (#564). */
+/** 3D rooms for the interior designer: a floor plan, photo or render becomes an editable room on the chat canvas (#564). */
 const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,
@@ -34,7 +34,7 @@ export const createManageScenesTool = (
       const { data, error } = await sb.from('floor_plans').select(SCENE_COLUMNS)
         .eq('workspace_id', workspaceId).order('updated_at', { ascending: false }).limit(20);
       if (error) return JSON.stringify({ success: false, error: error.message });
-      const scenes = (data ?? []).map((s: Record<string, unknown>) => ({ ...s, url: `/scene-studio/${s.id}` }));
+      const scenes = data ?? [];
       onChunk?.({ type: 'scene_studio_scenes', scenes, timestamp: Date.now() });
       return JSON.stringify({ success: true, count: scenes.length, scenes });
     }
@@ -45,7 +45,7 @@ export const createManageScenesTool = (
       if (error) return JSON.stringify({ success: false, error: error.message });
       if (!data) return JSON.stringify({ success: false, error: 'Scene not found.' });
       const { count } = await sb.from('floor_plan_objects').select('id', { count: 'exact', head: true }).eq('floor_plan_id', scene_id);
-      const scene = { ...data, object_count: count ?? 0, url: `/scene-studio/${data.id}` };
+      const scene = { ...data, object_count: count ?? 0 };
       onChunk?.({ type: 'scene_studio_scene', scene, timestamp: Date.now() });
       return JSON.stringify({ success: true, scene });
     }
@@ -58,8 +58,8 @@ export const createManageScenesTool = (
       return JSON.stringify({ success: false, error: `The image could not be fetched: ${e instanceof Error ? e.message : String(e)}` });
     }
     const { data: created, error: createErr } = await sb.from('floor_plans')
-      .insert({ workspace_id: workspaceId, name: (name ?? '').trim().slice(0, 200) || 'Scene from chat', source_kind: kind })
-      .select('id, workspace_id').single();
+      .insert({ workspace_id: workspaceId, name: (name ?? '').trim().slice(0, 200) || '3D room from chat', source_kind: kind })
+      .select('id, workspace_id, name').single();
     if (createErr || !created) return JSON.stringify({ success: false, error: createErr?.message ?? 'The scene could not be created.' });
 
     const path = `scene-studio/${created.workspace_id}/${created.id}/source.${extOf(image.mimeType)}`;
@@ -75,25 +75,25 @@ export const createManageScenesTool = (
       body: JSON.stringify({ floor_plan_id: created.id }),
     });
     const body = await res.json().catch(() => ({})) as { error?: string };
-    const scene = { id: created.id, url: `/scene-studio/${created.id}`, source_kind: kind, extract_status: res.ok ? 'extracting' : 'failed' };
+    const scene = { id: created.id, name: created.name, source_kind: kind, extract_status: res.ok ? 'extracting' : 'failed' };
     onChunk?.({ type: 'scene_studio_scene', scene, timestamp: Date.now() });
     if (!res.ok) {
       return JSON.stringify({ success: false, scene, error: body.error ?? `The image could not be sent for reading (HTTP ${res.status}).` });
     }
     return JSON.stringify({
       success: true, scene,
-      message: 'The image is being read into rooms, walls and furniture (about a minute). Check with action "status", then the user opens the scene link to rearrange it and render it in a style.',
+      message: 'The 3D room is open on the canvas and the image is being read into rooms, walls and furniture (about a minute). The user rearranges it there and clicks a style to render it; renders come back into this conversation.',
     });
   },
   {
     name: 'manage_scenes',
     description:
-      'Scene Studio: turn a floor plan, a room photo or a render into an editable 3D room the user can '
-      + 'rearrange, recolour, swap products in, and render photo-real in any style. '
+      '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user '
+      + 'rearranges it, recolours or swaps products, and renders it photo-real in any style. '
       + 'create: reads image_url (an image the user attached, or a render from this conversation) as kind '
       + 'plan_image (a floor plan drawing), photo (a photo of a room) or render (a generated image); it is '
       + 'charged once and takes about a minute. status: one scene by scene_id. list: the workspace\'s scenes. '
-      + 'Rendering and editing happen in the scene itself, at its url.',
+      + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
       action: z.enum(['create', 'status', 'list']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),

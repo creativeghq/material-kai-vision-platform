@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun, Eraser } from 'lucide-react';
+import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun, Eraser, Box } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -111,6 +111,8 @@ interface ProgressiveImageGridProps {
   onDirectImageClose?: () => void;
   /** Room type from generation context — auto-skips step 1 in Virtual Staging modal */
   roomType?: string;
+  onOpenIn3D?: (imageUrl: string) => void;
+  openingIn3D?: boolean;
 }
 
 const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
@@ -131,6 +133,8 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   directImage,
   onDirectImageClose,
   roomType,
+  onOpenIn3D,
+  openingIn3D,
 }) => {
   const [modelResults, setModelResults] = useState<ModelResult[]>([]);
   const [progress, setProgress] = useState(0);
@@ -1300,6 +1304,17 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                           ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
+                    )}
+                    {onOpenIn3D && selectedImage && (
+                      <button
+                        onClick={() => { if (!openingIn3D) onOpenIn3D(selectedImage.url); }}
+                        disabled={openingIn3D}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-card hover:bg-surface-sunken border border-hairline text-xs font-medium text-foreground disabled:opacity-50 transition-colors shadow-sm"
+                        title="Read this image into an editable 3D room: move, recolour or swap the furniture, then render it in any style"
+                      >
+                        {openingIn3D ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Box className="w-3.5 h-3.5" />}
+                        {openingIn3D ? 'Opening in 3D…' : 'Edit in 3D'}
+                      </button>
                     )}
                     {onGenerateVR && (
                       <button

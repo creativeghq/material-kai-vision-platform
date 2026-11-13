@@ -3250,25 +3250,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
-    id: 'scene-studio',
-    capability: 'moodboards.use',
-    name: 'Scene Studio',
-    description: 'Turn a floor plan, room photo or render into an editable 3D room, then rearrange it, swap products and render it photo-real in any style.',
-    icon: 'Layers',
-    moduleSlug: 'scene-studio',
-    tool_ids: ['manage_scenes'],
-    quick_starts: [
-      {
-        label: 'My Scenes', description: 'Scenes in this workspace', icon: 'ListChecks',
-        prompt: 'Show my Scene Studio scenes.',
-        done: 'Here are your scenes.',
-        run: { tool: 'manage_scenes', fixedArgs: { action: 'list' } },
-      },
-      { label: 'Floor Plan to 3D', description: 'Attach a floor plan image', prompt: 'Turn the floor plan I attached into an editable 3D room.', icon: 'Grid3x3' },
-      { label: 'Photo to 3D', description: 'Attach a room photo or a render', prompt: 'Turn the room photo I attached into an editable 3D room I can rearrange and render.', icon: 'ImageIcon' },
-    ],
-  },
-  {
     id: 'generation',
     capability: ['moodboards.use', 'projects.use', 'quotes.use', 'marketing.seo', 'realestate.listings.manage'],
     name: 'Interior Design',
@@ -3286,8 +3267,17 @@ export const TOOLKITS: ToolkitDefinition[] = [
       'check_generation_status',
       // Deterministic surface preview — exact product, exact format, drawn in the browser (#447).
       'visualize_on_surface',
+      'manage_scenes',
     ],
     quick_starts: [
+      { label: 'Editable 3D From a Plan', description: 'Attach a floor plan; get a 3D room you can rearrange and render', prompt: 'Turn the floor plan I attached into an editable 3D room.', icon: 'Grid3x3' },
+      { label: 'Editable 3D From a Photo', description: 'Attach a room photo or render; move, recolour and swap its furniture', prompt: 'Turn the room photo I attached into an editable 3D room I can rearrange and render.', icon: 'ImageIcon' },
+      {
+        label: 'My 3D Rooms', description: '3D rooms in this workspace', icon: 'Layers',
+        prompt: 'Show my 3D rooms.',
+        done: 'Here are your 3D rooms.',
+        run: { tool: 'manage_scenes', fixedArgs: { action: 'list' } },
+      },
       {
         // A DIRECT run: no model turn, no credits. autoFields adds the pattern select, the joint
         // width and colour and the rotation from the tool's own schema.
@@ -4272,7 +4262,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   stock: 'finance', finance: 'finance', contracts: 'finance',
   'trip-expenses': 'finance', travel: 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
-  catalogs: 'studio', 'catalog-ingestion': 'studio', 'scene-studio': 'studio', 'field-registry': 'studio', 'ops-desk': 'operator', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
+  catalogs: 'studio', 'catalog-ingestion': 'studio', 'field-registry': 'studio', 'ops-desk': 'operator', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
   'project-assessment': 'studio',
   'finance-assessment': 'finance',
   'real-estate-assessment': 'sales',
@@ -4409,7 +4399,7 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   'job-research': ['product-business'], 'price-monitoring': ['product-business'], crm: ['product-business'],
   'signals-hiring': ['product-business'], 'signals-technographics': ['product-business'], 'signals-intent': ['product-business'],
   // Studio / interior → Vision
-  generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'], 'scene-studio': ['interior-designer'],
+  generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
   projects: ['interior-designer', 'erp'],
   // Same two owners as the projects cluster: Vision runs the engagement, Trinity reads its money.
   'project-assessment': ['interior-designer', 'erp'],

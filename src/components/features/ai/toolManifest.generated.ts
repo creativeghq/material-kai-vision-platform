@@ -1620,7 +1620,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'manage_scenes',
     file: 'supabase/functions/_shared/tools/scene-studio-tools.ts',
     factory: 'createManageScenesTool',
-    description: 'Scene Studio: turn a floor plan, a room photo or a render into an editable 3D room the user can rearrange, recolour, swap products in, and render photo-real in any style.',
+    description: '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user rearranges it, recolours or swaps products, and renders it photo-real in any style. create: reads image_url …',
     params: [
       { name: 'action', type: 'enum', enum: ['create', 'status', 'list'], optional: false, description: 'What to do.' },
       { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },

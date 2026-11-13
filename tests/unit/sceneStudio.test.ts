@@ -98,7 +98,7 @@ describe('scene reader output', () => {
 });
 
 describe('scene studio wiring', () => {
-  const editor = blankComments(readFileSync('src/pages/SceneStudio/SceneStudioEditorPage.tsx', 'utf8'));
+  const editor = blankComments(readFileSync('src/components/features/scenestudio/SceneEditor.tsx', 'utf8'));
   const reader = blankComments(readFileSync('supabase/functions/scene-studio-read/index.ts', 'utf8'));
 
   it('renders and edits only through the shared image chokepoint', () => {
@@ -111,5 +111,14 @@ describe('scene studio wiring', () => {
     expect(reader.indexOf('debitExternalServiceCredits(')).toBeLessThan(reader.indexOf('readSource(admin, plan'));
     expect(reader).toContain("userHasWorkspaceCapability(admin, uid, plan.workspace_id, 'moodboards.use')");
     expect(reader).not.toMatch(/body\.workspace_id|workspace_id\s*}\s*=\s*\(await req\.json/);
+  });
+
+  it('lives in the interior designer canvas, not on a page of its own', () => {
+    const app = blankComments(readFileSync('src/App.tsx', 'utf8'));
+    const hub = blankComments(readFileSync('src/components/features/ai/AgentHub.tsx', 'utf8'));
+    expect(app).not.toContain('/scene-studio');
+    expect(hub).toContain('<SceneEditor');
+    for (const chunk of ['scene_studio_scene', 'scene_studio_scenes']) expect(hub).toContain(`chunk.type === '${chunk}'`);
+    expect(hub).toMatch(/onRendered=\{\(ev\) => handleSceneRendered/);
   });
 });

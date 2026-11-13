@@ -146,6 +146,11 @@ import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
  * (LightingPreviewModal, ProductCard).
  */
 const WorldViewer = lazy(() => import('./WorldViewer').then((m) => ({ default: m.WorldViewer })));
+const SceneEditor = lazy(() => import('@/components/features/scenestudio/SceneEditor'));
+import { sceneStudioService, type SceneProduct } from '@/services/sceneStudioService';
+import { sceneSourceLabel as formatSceneSource } from '@/lib/scene/sceneLabels';
+import { useEntitlements } from '@/hooks/useEntitlements';
+import type { SceneRenderedEvent } from '@/components/features/scenestudio/SceneEditor';
 import { vrWorldService } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 import { moodboardAPI } from '@/services/moodboardAPI';
@@ -452,8 +457,6 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   inbox_threads_list: 'Customer Conversations',
   inbox_reply_sent: 'Reply sent',
   // Reviews
-  scene_studio_scenes: 'Your Scenes',
-  scene_studio_scene: 'Scene',
   reviews_list: 'Reviews about you',
   review_reply_posted: 'Reply posted',
   // Real Estate
@@ -780,6 +783,8 @@ interface Message {
     credits_used?: number;
   }; // Rendered presentation sheet PDF ready for download
   quoteData?: QuoteCanvasData; // Agent-created quote (real quotes row) + branded PDF, shown on canvas
+  sceneData?: { scene_id: string; name: string; source_kind: string };
+  sceneListData?: { scenes: Array<{ id: string; name: string; source_kind: string; extract_status: string; updated_at: string }> };
   mentionSummaryData?: {
     product_id: string;
     days: number;
@@ -2529,6 +2534,66 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
   }, [workspaceId, currentConversationId, toast]);
 
+  const scenePinned = useMemo<SceneProduct[]>(
+    () => pinnedMaterials.map((m) => ({ id: m.id, name: m.name, imageUrl: m.imageUrl ?? null, attributes: null, metadata: null })),
+    [pinnedMaterials],
+  );
+
+  const openSceneInCanvas = useCallback((sceneData: NonNullable<Message['sceneData']>) => {
+    const existing = messages.find((m) => m.sceneData?.scene_id === sceneData.scene_id);
+    if (existing) { setActiveCanvasId(existing.id); return; }
+    const msg: Message = {
+      id: `msg-scene-${Date.now()}`,
+      role: 'assistant',
+      content: 'Your 3D room is open on the canvas. Arrange it, then pick a style to render it.',
+      timestamp: new Date(),
+      agentId: 'interior-designer',
+      sceneData,
+    };
+    setMessages((prev) => [...prev, msg]);
+    setActiveCanvasId(msg.id);
+    const convId = conversationIdRef.current;
+    if (convId) {
+      void saveAndLinkMessage(msg.id, { conversationId: convId, role: 'assistant', content: msg.content, metadata: { agentId: 'interior-designer', sceneData } });
+    }
+  }, [messages, saveAndLinkMessage]);
+
+  const { isModuleAvailable } = useEntitlements();
+  const can3D = isModuleAvailable('scene-studio');
+  const [openingIn3D, setOpeningIn3D] = useState(false);
+  const handleOpenIn3D = useCallback(async (imageUrl: string, kind: 'plan_image' | 'photo' | 'render' = 'render') => {
+    if (!workspaceId || openingIn3D) return;
+    setOpeningIn3D(true);
+    try {
+      const name = kind === 'plan_image' ? 'Floor plan in 3D' : kind === 'photo' ? 'Room photo in 3D' : 'Render in 3D';
+      const scene = await sceneStudioService.openFromImage(workspaceId, imageUrl, kind, name);
+      setGeminiModalImage(null);
+      openSceneInCanvas({ scene_id: scene.id, name: scene.name, source_kind: scene.source_kind });
+      toast({ title: 'Reading the image into 3D', description: 'Rooms, walls and furniture appear on the canvas in about a minute.' });
+    } catch (e) {
+      toast({ title: 'The image could not be opened in 3D', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    } finally {
+      setOpeningIn3D(false);
+    }
+  }, [workspaceId, openingIn3D, openSceneInCanvas, toast]);
+
+  const handleSceneRendered = useCallback((ev: SceneRenderedEvent, sceneName: string) => {
+    const geminiImageData = { image_url: ev.image_url, mode: ev.kind === 'full' ? 'scene-render' : 'image-edit', model: 'scene-studio', job_id: '', credits_used: ev.credits_used };
+    const msg: Message = {
+      id: `msg-scene-render-${Date.now()}`,
+      role: 'assistant',
+      content: ev.kind === 'full' ? `${sceneName}, rendered in ${ev.label}.` : `${sceneName}: ${ev.label} in the render.`,
+      timestamp: new Date(),
+      agentId: 'interior-designer',
+      geminiImageData,
+    };
+    setMessages((prev) => [...prev, msg]);
+    const convId = conversationIdRef.current;
+    if (convId) {
+      void saveAndLinkMessage(msg.id, { conversationId: convId, role: 'assistant', content: msg.content, metadata: { agentId: 'interior-designer', geminiImageData } });
+    }
+  }, [saveAndLinkMessage]);
+
   // Use a product image as input for a 3D interior design scene
   const handleUseProductIn3DScene = useCallback((imageUrl: string, productName: string) => {
     setAttachedImages([imageUrl]);
@@ -3510,6 +3575,39 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   agentId: selectedAgent,
                   model: selectedModel,
                 };
+              } else if (chunk.type === 'scene_studio_scene') {
+                const sc = chunk.scene ?? {};
+                if (sc.id) {
+                  const sceneData = { scene_id: sc.id as string, name: (sc.name as string) || '3D room', source_kind: (sc.source_kind as string) || 'photo' };
+                  const scMsg: Message = {
+                    id: `msg-scene-${Date.now()}`,
+                    role: 'assistant',
+                    content: sc.extract_status === 'failed' ? 'The 3D room could not be started.' : 'Your 3D room is open on the canvas. Arrange it, then pick a style to render it.',
+                    timestamp: new Date(),
+                    agentId: selectedAgent,
+                    model: selectedModel,
+                    sceneData,
+                  };
+                  setMessages((prev) => (prev.some((m) => m.sceneData?.scene_id === sceneData.scene_id) ? prev : [...prev, scMsg]));
+                  if (conversationId) {
+                    await saveAndLinkMessage(scMsg.id, { conversationId, role: 'assistant', content: scMsg.content, metadata: { agentId: selectedAgent, model: selectedModel, sceneData } });
+                  }
+                }
+              } else if (chunk.type === 'scene_studio_scenes') {
+                const sceneListData = { scenes: Array.isArray(chunk.scenes) ? chunk.scenes : [] };
+                const listMsg: Message = {
+                  id: `msg-scenes-${Date.now()}`,
+                  role: 'assistant',
+                  content: sceneListData.scenes.length ? `${sceneListData.scenes.length} 3D ${sceneListData.scenes.length === 1 ? 'room' : 'rooms'} in this workspace.` : 'No 3D rooms yet.',
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  sceneListData,
+                };
+                setMessages((prev) => [...prev, listMsg]);
+                if (conversationId) {
+                  await saveAndLinkMessage(listMsg.id, { conversationId, role: 'assistant', content: listMsg.content, metadata: { agentId: selectedAgent, model: selectedModel, sceneListData } });
+                }
               } else if (chunk.type === 'quote_created') {
                 const quoteData: QuoteCanvasData = {
                   quote_id: chunk.quote_id,
@@ -4632,6 +4730,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           inputRequestData: msg.metadata?.inputRequestData as InputRequestData | undefined,
           sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
           quoteData: msg.metadata?.quoteData as any | undefined,
+          sceneData: msg.metadata?.sceneData as Message['sceneData'],
+          sceneListData: msg.metadata?.sceneListData as Message['sceneListData'],
           catalogData: msg.metadata?.catalogData as any | undefined,
           catalogExtractionData: msg.metadata?.catalogExtractionData as any | undefined,
           catalogImageCandidatesData: msg.metadata?.catalogImageCandidatesData as any | undefined,
@@ -4762,6 +4862,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (m.kitchenCostData) return { id: m.id, kind: 'calc', title: 'Kitchen cost' };
     if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
     if (m.sheetCanvasData) return { id: m.id, kind: 'sheet', title: m.sheetCanvasData.title || 'Presentation sheet' };
+    if (m.sceneData) return { id: m.id, kind: 'scene', title: m.sceneData.name || '3D room' };
+    if (m.sceneListData) return { id: m.id, kind: 'scene', title: '3D rooms', meta: count(m.sceneListData.scenes.length, 'room') };
     if (m.quoteData) return { id: m.id, kind: 'quote', title: m.quoteData.quote_number ? `Quote ${m.quoteData.quote_number}` : (m.quoteData.name || 'Quote') };
     if (m.virtualStagingData) return { id: m.id, kind: 'staging', title: 'Virtual staging', preview: m.virtualStagingData.image_url };
     if (m.visualizerData) return { id: m.id, kind: 'render', title: `Surface preview · ${m.visualizerData.product_name}` };
@@ -5066,6 +5168,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       roomType={message.generation_job.room_type}
       onImageClick={(url, name) => setLightboxImage({ url, name })}
       onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
+      onOpenIn3D={can3D ? (imageUrl) => void handleOpenIn3D(imageUrl, 'render') : undefined}
+      openingIn3D={openingIn3D}
       onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
       onGenerateMaterialsBoard={(imageUrl, boardMode) => handleGenerateMaterialsBoard(imageUrl, boardMode, message)}
       onGenerateVirtualStaging={(imageUrl, params) => handleGenerateVirtualStaging(imageUrl, params)}
@@ -5668,6 +5772,37 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.quoteData) return <QuoteCanvasCard data={message.quoteData} />;
+    if (message.sceneData) {
+      return (
+        <Suspense fallback={<div className="flex h-64 items-center justify-center text-xs text-muted-foreground">Loading the 3D room…</div>}>
+          <SceneEditor
+            sceneId={message.sceneData.scene_id}
+            pinned={scenePinned}
+            onRendered={(ev) => handleSceneRendered(ev, message.sceneData!.name)}
+            onWalkThrough={(imageUrl, prompt) => handleGenerateVR(imageUrl, { prompt }, message)}
+          />
+        </Suspense>
+      );
+    }
+    if (message.sceneListData) {
+      return message.sceneListData.scenes.length === 0 ? (
+        <p className="p-4 text-sm text-muted-foreground">No 3D rooms yet. Attach a floor plan or a room photo and ask for a 3D room, or open any generated image in 3D.</p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {message.sceneListData.scenes.map((sc) => (
+            <button
+              key={sc.id}
+              type="button"
+              onClick={() => openSceneInCanvas({ scene_id: sc.id, name: sc.name, source_kind: sc.source_kind })}
+              className="panel-interactive rounded-sm border border-hairline bg-card p-3 text-left"
+            >
+              <span className="block truncate text-sm font-medium">{sc.name}</span>
+              <span className="block text-xs text-muted-foreground">{formatSceneSource(sc.source_kind)} · {sc.extract_status === 'extracting' ? 'Reading' : sc.extract_status === 'failed' ? 'Failed' : 'Ready'}</span>
+            </button>
+          ))}
+        </div>
+      );
+    }
     if (message.sheetCanvasData) {
       return (
         <SheetCanvasCard
@@ -7431,6 +7566,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }}
           onDirectImageClose={() => setGeminiModalImage(null)}
           workspaceId={workspaceId}
+          onOpenIn3D={can3D ? (imageUrl) => void handleOpenIn3D(imageUrl, geminiModalImage.kind === 'uploaded' ? 'photo' : 'render') : undefined}
+          openingIn3D={openingIn3D}
           onGenerateVR={(imageUrl, context) => {
             const ownerMsg = messages.find(m => m.geminiImageData?.image_url === imageUrl) ?? messages[messages.length - 1];
             handleGenerateVR(imageUrl, context, ownerMsg);

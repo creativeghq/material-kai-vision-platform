@@ -23,7 +23,6 @@ import {
   Star,
   CalendarClock,
   BookOpen,
-  Box,
   ImagePlus,
   Building2,
   Layers,
@@ -172,7 +171,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // by RLS and the editor draws the workspace's own catalogue.
   { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', hub: 'projects', description: 'Reusable room and scope templates that price a project in one click.' },
   { id: 'installation-guides', label: 'Installation Guides', path: '/guides', icon: BookOpen, moduleSlug: 'installation-guides', surface: 'app', hub: 'projects', description: 'Upload a supplier manual and watch it put together, step by step, in 3D.' },
-  { id: 'scene-studio', label: 'Scene Studio', path: '/scene-studio', icon: Box, moduleSlug: 'scene-studio', surface: 'app', hub: 'studio', description: 'Turn a floor plan, photo or render into a 3D room you can rearrange, restyle and render photo-real.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
   { id: 'catalogs', label: 'Catalogs', path: '/agent-hub?capability=catalog', icon: BookOpen, requireCapability: 'agent.use', moduleSlug: 'presentation-catalogs', surface: 'app', hub: 'studio', description: 'Build branded product catalogs — in the AI studio.' },
   // Image Studio — general image generation/editing (Vision + Gemini pipeline), for marketing
@@ -388,7 +386,6 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'surface-visualizer',
   'blueprints',
   'installation-guides',
-  'scene-studio',
   'catalogs',
   'image-studio',
   // Vertical modules

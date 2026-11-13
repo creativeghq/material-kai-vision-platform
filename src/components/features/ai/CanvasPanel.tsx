@@ -8,7 +8,7 @@ import {
   ArrowUpRight, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
   Wand2, Calculator, MessageSquareQuote, ShieldQuestion, MoreHorizontal, X, Trash2,
-  ListChecks, PanelRight, CornerDownLeft,
+  ListChecks, PanelRight, CornerDownLeft, Box,
 } from 'lucide-react';
 import {
   Dialog,
@@ -29,7 +29,7 @@ export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'render'
   | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
-  | 'demo' | 'calc' | 'clarify' | 'confirm' | 'run';
+  | 'demo' | 'calc' | 'clarify' | 'confirm' | 'run' | 'scene';
 
 export interface CanvasArtifact {
   id: string;
@@ -96,6 +96,7 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   // The WORK, not its output. A run is openable — from its line in the chat — but it no longer
   // opens ITSELF: watching a checklist is worth a click, never worth the screen.
   run: ListChecks,
+  scene: Box,
 };
 
 const KIND_LABEL: Record<CanvasArtifactKind, string> = {
@@ -123,6 +124,7 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   clarify: 'Needs your input',
   confirm: 'Needs your approval',
   run: 'How it ran',
+  scene: '3D Room',
 };
 
 /** The artifact's own label, for anything that needs to name a kind outside this file. */

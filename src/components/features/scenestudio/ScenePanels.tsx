@@ -1,5 +1,5 @@
 /** Scene Studio side panels (#564): styles to render in, the selected object, paint, and the catalogue picker. */
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { Loader2, Package, RotateCcw, RotateCw, Search, Sparkles, Trash2, Wand2, X } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
@@ -16,6 +16,8 @@ import { SCENE_OBJECT_KINDS } from '@/lib/scene/sceneReadSchema';
 export type StyleChoice =
   | { kind: 'style'; value: string; label: string; brief: string }
   | { kind: 'reference'; url: string; label: string };
+
+export const PinnedProductsContext = createContext<SceneProduct[]>([]);
 
 const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -106,6 +108,7 @@ export const ProductPicker: React.FC<{
   onCancel(): void;
   title: string;
 }> = ({ workspaceId, onPick, onCancel, title }) => {
+  const pinned = useContext(PinnedProductsContext);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<SceneProduct[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -125,6 +128,19 @@ export const ProductPicker: React.FC<{
         <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onCancel} aria-label="Close"><X className="h-3.5 w-3.5" /></Button>
       </div>
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your catalogue" autoFocus />
+      {!q.trim() && pinned.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-[11px] font-medium text-muted-foreground">Pinned In This Chat</p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {pinned.map((p) => (
+              <button key={p.id} type="button" onClick={() => onPick(p)} className="overflow-hidden rounded-sm border border-primary/40 bg-card text-left hover:border-primary" title={p.name}>
+                {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="aspect-square w-full object-cover" loading="lazy" /> : <div className="flex aspect-square items-center justify-center"><Package className="h-5 w-5 text-muted-foreground" /></div>}
+                <span className="block truncate px-1 py-0.5 text-[11px]">{p.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {error ? <p className="text-xs text-destructive">{error}</p> : results === null ? (
         <p className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Searching</p>
       ) : results.length === 0 ? (

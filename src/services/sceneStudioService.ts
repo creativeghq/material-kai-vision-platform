@@ -162,29 +162,7 @@ async function fetchProducts(ids: string[]): Promise<Record<string, SceneProduct
   return out;
 }
 
-export interface RecentGeneration { id: string; image_url: string; prompt: string | null; created_at: string }
-
 export const sceneStudioService = {
-  async list(workspaceId: string): Promise<Array<SceneRow & { object_count: number; render_count: number; cover_url: string | null }>> {
-    const { data, error } = await supabase
-      .from('floor_plans')
-      .select(`${SCENE_COLUMNS}, floor_plan_objects(count), scene_renders(image_url, created_at)`)
-      .eq('workspace_id', workspaceId)
-      .order('updated_at', { ascending: false });
-    if (error) throw new Error(error.message);
-    return ((data ?? []) as Record<string, unknown>[]).map((r) => {
-      const renders = ((r.scene_renders ?? []) as Array<{ image_url: string; created_at: string }>)
-        .sort((a, b) => b.created_at.localeCompare(a.created_at));
-      const objects = r.floor_plan_objects as Array<{ count: number }> | undefined;
-      return {
-        ...(r as unknown as SceneRow),
-        object_count: objects?.[0]?.count ?? 0,
-        render_count: renders.length,
-        cover_url: renders[0]?.image_url ?? null,
-      };
-    });
-  },
-
   async create(input: {
     workspaceId: string;
     name: string;
@@ -229,6 +207,12 @@ export const sceneStudioService = {
       .from('floor_plans').update({ source_storage_path: path }).eq('id', scene.id).select(SCENE_COLUMNS).single();
     if (upErr) throw new Error(upErr.message);
     return updated as SceneRow;
+  },
+
+  async openFromImage(workspaceId: string, imageUrl: string, kind: 'plan_image' | 'photo' | 'render', name: string): Promise<SceneRow> {
+    const scene = await this.create({ workspaceId, name, kind, imageUrl });
+    await this.read(scene.id);
+    return scene;
   },
 
   async addRectRoom(sceneId: string, widthMm: number, depthMm: number, name: string): Promise<void> {
@@ -294,16 +278,6 @@ export const sceneStudioService = {
     };
   },
 
-  async rename(id: string, name: string): Promise<void> {
-    const { error } = await supabase.from('floor_plans').update({ name: name.trim().slice(0, 200) || 'Untitled scene' }).eq('id', id);
-    if (error) throw new Error(error.message);
-  },
-
-  async remove(id: string): Promise<void> {
-    const { error } = await supabase.from('floor_plans').delete().eq('id', id);
-    if (error) throw new Error(error.message);
-  },
-
   async saveObjects(objects: SceneObject[]): Promise<void> {
     if (!objects.length) return;
     const rows = objects.map((o) => ({
@@ -339,6 +313,8 @@ export const sceneStudioService = {
 
   fetchProducts,
 
+  products: fetchProducts,
+
   async searchProducts(workspaceId: string, query: string): Promise<SceneProduct[]> {
     const q = query.trim();
     let req = supabase
@@ -354,22 +330,6 @@ export const sceneStudioService = {
       id: r.id as string, name: (r.name as string) || 'Product', imageUrl: firstImage(r),
       attributes: (r.attributes as Record<string, unknown>) ?? null, metadata: (r.metadata as Record<string, unknown>) ?? null,
     }));
-  },
-
-  async recentGenerations(limit = 24): Promise<RecentGeneration[]> {
-    const { data, error } = await supabase
-      .from('generation_3d')
-      .select('id, image_urls, prompt, created_at')
-      .eq('generation_status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(limit);
-    if (error) throw new Error(error.message);
-    const out: RecentGeneration[] = [];
-    for (const r of (data ?? []) as Array<{ id: string; image_urls: unknown; prompt: string | null; created_at: string }>) {
-      const url = Array.isArray(r.image_urls) ? r.image_urls.find((u) => typeof u === 'string' && /^https:\/\//.test(u)) : null;
-      if (url) out.push({ id: r.id, image_url: url as string, prompt: r.prompt, created_at: r.created_at });
-    }
-    return out;
   },
 
   async uploadCapture(scene: Pick<SceneRow, 'workspace_id' | 'id'>, blob: Blob, name: string): Promise<string> {
@@ -393,10 +353,6 @@ export const sceneStudioService = {
     return data as SceneRender;
   },
 
-  async setRenderWorld(renderId: string, vrWorldId: string): Promise<void> {
-    const { error } = await supabase.from('scene_renders').update({ vr_world_id: vrWorldId }).eq('id', renderId);
-    if (error) throw new Error(error.message);
-  },
 };
 
 function pickObjectFields(o: Omit<SceneObject, 'id' | 'floor_plan_id' | 'removed_at'>) {
