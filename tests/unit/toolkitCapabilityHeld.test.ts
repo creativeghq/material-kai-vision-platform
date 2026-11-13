@@ -10,6 +10,6 @@ describe('every toolkit capability is held by some workspace role', () => {
       const caps = t.capability === undefined ? [] : Array.isArray(t.capability) ? t.capability : [t.capability];
       return caps.length > 0 && !caps.some((c) => held.has(c)) ? [`${t.id} (${caps.join(', ')})`] : [];
     });
-    expect(orphaned, 'agent-chat binds a cluster only when the caller's workspace ROLE holds its capability, so these can never bind. Gate on a role capability and check the operator at the push site.').toEqual([]);
+    expect(orphaned, "agent-chat binds a cluster only when the caller's workspace ROLE holds its capability, so these can never bind. Gate on a role capability and check the operator at the push site.").toEqual([]);
   });
 });
