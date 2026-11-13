@@ -269,7 +269,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Catalogue Waiting for Review', description: 'Discovery finished and the job is parked until someone reviews the product list', icon: 'ShieldAlert', color: 'red',
     defaultData: { label: 'Catalogue Waiting for Review', category: 'trigger', triggerType: 'ingestion_review_waiting', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'field_registry_review_due', group: 'Catalogs',
-    label: 'Field Registry Review Due', description: 'Every 5 days, when field-role suggestions, merge conflicts or unreviewed fields are waiting', icon: 'ShieldAlert', color: 'amber',
+    label: 'Field Registry Review', description: 'Every 5 days: what JARVIS decided on Field Roles and what is left for a person', icon: 'ShieldAlert', color: 'amber',
     defaultData: { label: 'Field Registry Review Due', category: 'trigger', triggerType: 'field_registry_review_due', config: {} } as TriggerNodeData },
   // Expense cards (trip / monthly / …)
   { type: 'triggerNode', category: 'trigger', subType: 'expense_card_submitted', group: 'Finance',

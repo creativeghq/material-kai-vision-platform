@@ -1,6 +1,6 @@
 /** Field-role audit (#347 phase 4.5). */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { Bot, Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 
 import { FieldMergeDialog, type MergeCandidate } from './fieldRoles/FieldMergeDialog';
 import { MergeConflicts, type MergeConflict } from './fieldRoles/MergeConflicts';
+import { ReviewLog, type ReviewDecision } from './fieldRoles/ReviewLog';
 import { RoleSuggestions, type RoleProposal } from './fieldRoles/RoleSuggestions';
 
 interface FieldRow {
@@ -111,7 +112,7 @@ const SortHead: React.FC<{
   );
 };
 
-type View = 'fields' | 'suggestions' | 'conflicts';
+type View = 'fields' | 'suggestions' | 'conflicts' | 'log';
 
 export const FieldRoleAudit: React.FC = () => {
   const { toast } = useToast();
@@ -122,10 +123,12 @@ export const FieldRoleAudit: React.FC = () => {
   const [saving, setSaving] = useState<string | null>(null);
   const [view, setView] = useState<View>('fields');
   const [merging, setMerging] = useState<MergeCandidate | null>(null);
+  const [decisions, setDecisions] = useState<ReviewDecision[]>([]);
+  const [asking, setAsking] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [fieldsRes, usageRes, proposalsRes, conflictsRes] = await Promise.all([
+    const [fieldsRes, usageRes, proposalsRes, conflictsRes, decisionsRes] = await Promise.all([
       supabase
         .from('material_metadata_fields')
         .select('field_name, display_name, role, role_by_category, destination, classified_signal, classified_confidence, classified_reason, applies_to_categories, is_global, aliases')
@@ -134,8 +137,9 @@ export const FieldRoleAudit: React.FC = () => {
       supabase.rpc('field_registry_usage'),
       supabase.from('field_role_proposals').select('*').eq('status', 'pending').order('last_seen_at', { ascending: false }),
       supabase.from('field_merge_conflicts').select('*').eq('status', 'open').order('created_at'),
+      supabase.from('field_review_decisions').select('*').order('created_at', { ascending: false }).limit(300),
     ]);
-    const failed = [fieldsRes, usageRes, proposalsRes, conflictsRes].find(r => r.error);
+    const failed = [fieldsRes, usageRes, proposalsRes, conflictsRes, decisionsRes].find(r => r.error);
     if (failed?.error) {
       toast({ title: 'Could not load the registry', description: failed.error.message, variant: 'destructive' });
     }
@@ -148,6 +152,7 @@ export const FieldRoleAudit: React.FC = () => {
       ...(usage.get(f.field_name) ?? { products: 0, distinct_values: 0, sample_values: [] }),
     })));
     setProposals((proposalsRes.data ?? []) as RoleProposal[]);
+    setDecisions((decisionsRes.data ?? []) as ReviewDecision[]);
 
     const open = (conflictsRes.data ?? []) as Omit<MergeConflict, 'product_name'>[];
     const ids = [...new Set(open.map(c => c.product_id))];
@@ -190,6 +195,19 @@ export const FieldRoleAudit: React.FC = () => {
     }
   };
 
+  const askJarvis = async () => {
+    setAsking(true);
+    const { data, error } = await supabase.rpc('request_field_registry_review');
+    setAsking(false);
+    const res = data as { requested?: boolean; reason?: string } | null;
+    if (error || !res?.requested) {
+      toast({ title: 'JARVIS did not start', description: error?.message ?? res?.reason, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'JARVIS is reviewing', description: 'A run takes about two minutes; its decisions appear under JARVIS Log.' });
+    setView('log');
+  };
+
   const t = useHubTable(rows, FIELD_FIELDS, { columnId: 'used', direction: 'desc' });
   const shown = t.rows;
 
@@ -215,9 +233,17 @@ export const FieldRoleAudit: React.FC = () => {
   return (
     <Card>
       <CardHeader className="border-b border-hairline">
-        <CardTitle className="flex items-center gap-2">
-          <ShieldCheck className="h-4 w-4" /> Field Roles
-        </CardTitle>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4" /> Field Roles
+          </CardTitle>
+          <div className="flex gap-2">
+            <Button size="sm" variant="outline" onClick={() => { void load(); }}>Refresh</Button>
+            <Button size="sm" onClick={askJarvis} disabled={asking}>
+              {asking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Bot className="h-4 w-4" />} Ask JARVIS to review
+            </Button>
+          </div>
+        </div>
         <CardDescription>
           Identity fields are the choices a quote or order line offers (size, colour, finish).
           Confirm a verdict that is right, flip one that is wrong, or merge a field that duplicates another.
@@ -242,6 +268,7 @@ export const FieldRoleAudit: React.FC = () => {
               { value: 'fields', label: `Fields (${rows.length})` },
               { value: 'suggestions', label: `Suggestions (${proposals.length})` },
               { value: 'conflicts', label: `Conflicts (${conflicts.length})` },
+              { value: 'log', label: 'JARVIS Log' },
             ]}
           />
         </div>
@@ -253,6 +280,8 @@ export const FieldRoleAudit: React.FC = () => {
           </div>
         ) : view === 'suggestions' ? (
           <RoleSuggestions proposals={proposals} currentRole={roleOf} onDecided={load} onShowFields={() => setView('fields')} />
+        ) : view === 'log' ? (
+          <ReviewLog decisions={decisions} onChanged={load} onAskJarvis={askJarvis} asking={asking} />
         ) : view === 'conflicts' ? (
           <MergeConflicts conflicts={conflicts} onResolved={load} onShowFields={() => setView('fields')} />
         ) : (

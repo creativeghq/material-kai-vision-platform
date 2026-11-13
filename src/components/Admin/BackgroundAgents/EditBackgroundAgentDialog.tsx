@@ -48,6 +48,7 @@ const RUNNER_FACTS: Record<string, RunnerFacts> = {
     keys: [['batch_size', 'default 20, max 50'], ['min_age_hours', 'default 1'], ['stale_after_hours', 'default 2']],
   },
   'social-insights-sync': { usesModel: false, usesPrompt: false, keys: [] },
+  'field-registry-steward': { usesModel: true, usesPrompt: false, keys: [['max_iterations', 'tool-loop iterations per run (default 12)']] },
   'tech-radar': { usesModel: false, usesPrompt: false, keys: [['subject_id', 'tech_radar_subjects.id (required)'], ['force', 'review even if not due']] },
 };
 

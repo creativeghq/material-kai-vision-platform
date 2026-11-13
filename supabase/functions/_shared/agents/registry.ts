@@ -10,6 +10,7 @@ import { FactoryEnrichmentAgent }   from './factory-enrichment-agent.ts';
 import { ModelHealthCheckAgent }    from './model-health-check-agent.ts';
 import { TechRadarAgent }           from './tech-radar-agent.ts';
 import { EmbeddingBackfillAgent }   from './embedding-backfill-agent.ts';
+import { FieldRegistryStewardAgent } from './field-registry-steward-agent.ts';
 import { isModuleEnabled, moduleSupabaseClient } from '../modules/registry.ts';
 
 const RUNNERS: AgentRunner[] = [
@@ -22,6 +23,7 @@ const RUNNERS: AgentRunner[] = [
   new ModelHealthCheckAgent(),
   new TechRadarAgent(),
   new EmbeddingBackfillAgent(),
+  new FieldRegistryStewardAgent(),
 ];
 
 /**
