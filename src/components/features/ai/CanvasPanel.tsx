@@ -29,7 +29,7 @@ export type CanvasArtifactKind =
   | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'render'
   | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
-  | 'demo' | 'calc' | 'clarify' | 'confirm' | 'run' | 'scene';
+  | 'demo' | 'calc' | 'clarify' | 'confirm' | 'scene' | 'run';
 
 export interface CanvasArtifact {
   id: string;
