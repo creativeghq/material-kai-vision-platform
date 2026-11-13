@@ -137,10 +137,10 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
     setFolderView(on);
     try { localStorage.setItem(FOLDER_VIEW_KEY, on ? 'folders' : 'list'); } catch { /* per-viewer convenience only */ }
   };
-  const [openFolders, setOpenFolders] = React.useState<Set<string>>(new Set());
-  const toggleFolder = (id: string) => setOpenFolders((prev) => {
-    const next = new Set(prev);
-    if (next.has(id)) next.delete(id); else next.add(id);
+  const [folderChoice, setFolderChoice] = React.useState<Map<string, boolean>>(new Map());
+  const toggleFolder = (id: string, currentlyOpen: boolean) => setFolderChoice((prev) => {
+    const next = new Map(prev);
+    next.set(id, !currentlyOpen);
     return next;
   });
   const showFolders = mode === 'whatsapp' && folderView && view === 'all' && !String(query ?? '').trim() && labelIds.length === 0;
@@ -539,14 +539,14 @@ export const ThreadListPane: React.FC<{ s: InboxPageState }> = ({ s }) => {
             />
           )
         ) : showFolders ? folders.map((f) => {
-          const open = openFolders.has(f.id) || f.threads.some((t) => t.id === activeId);
+          const open = folderChoice.get(f.id) ?? f.threads.some((t) => t.id === activeId);
           const fresh = f.unread > 0;
           const latestName = f.latest ? threadDisplayName(f.latest) : '';
           return (
             <div key={f.id} className="border-b border-hairline">
               <button
                 type="button"
-                onClick={() => toggleFolder(f.id)}
+                onClick={() => toggleFolder(f.id, open)}
                 aria-expanded={open}
                 className={`w-full text-left px-4 py-3 flex gap-3 border-l-2 transition-colors ${
                   fresh ? 'bg-[hsl(var(--success-bg))] border-l-[hsl(var(--success))]' : 'border-l-transparent hover:bg-surface-hover'}`}

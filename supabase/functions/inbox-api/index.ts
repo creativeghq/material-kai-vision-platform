@@ -3587,7 +3587,7 @@ async function handleJwtAction(
       const cpEmail = isMember && thread.channel === 'email'
         ? counterpartyEmail(thread, (await resolveSecret(db, 'INBOUND_EMAIL_DOMAIN')).value || DEFAULT_INBOUND_DOMAIN)
         : null;
-      const [draftIsCurrent, wa, starredMessageIds, pinnedMessage, opens, cpPhoto] = await Promise.all([
+      const [draftIsCurrent, wa, starredMessageIds, pinnedMessage, opens, , cpPhoto] = await Promise.all([
         isMember && thread.agent_draft
           ? db.rpc('inbox_newest_inbound_message_id', { p_thread_id: threadId })
             .then(({ data: newestId }) => !!newestId && newestId === thread.agent_draft_for_message_id)

@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { messagingService, type WhatsAppNumber } from '@/modules/messaging/services/messagingService';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { castSlotFor, nameGender } from '@/utils/characterAvatar';
+import { safeImageSrc } from '@/utils/safeUrl';
 import { fetchDisplayProfiles } from '@/services/displayProfilesService';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -89,7 +90,7 @@ function buildParticipantLabels(
       });
     } else if (p.participant_type === 'customer') {
       // Server-derived slot — never re-answered from the name, or one person gets two faces.
-      next.set(p.id, { label: customerName, kind: 'customer', userId: p.user_id, avatarSlot: p.avatar_slot ?? null, avatarUrl: customerPhotoUrl ?? undefined });
+      next.set(p.id, { label: customerName, kind: 'customer', userId: p.user_id, avatarSlot: p.avatar_slot ?? null, avatarUrl: safeImageSrc(customerPhotoUrl) ?? undefined });
     } else {
       next.set(p.id, { label: 'Assistant', kind: 'agent', userId: null });
     }

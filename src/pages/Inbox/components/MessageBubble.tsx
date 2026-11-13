@@ -418,6 +418,8 @@ export const MessageBubble: React.FC<{
   const isPinned = typeof meta.pinned_at === 'string' && !!meta.pinned_at;
   const isForwarded = !!meta.forwarded_from;
   const displayLabel = info?.label ?? externalAuthor ?? undefined;
+  const [photoFailed, setPhotoFailed] = useState(false);
+  const photo = !photoFailed && info?.avatarUrl ? info.avatarUrl : null;
 
   const event = isSystem ? classifyThreadEvent(m) : null;
   if (event) return <ThreadEventCard m={m} event={event} onTakeOver={onTakeOver} />;
@@ -495,9 +497,10 @@ export const MessageBubble: React.FC<{
           */}
         {!isAgent && (
           <AvatarImage
-            src={info?.avatarUrl || castAvatarSrc(castSeedForSender(m, displayLabel), info?.avatarSlot)}
+            src={photo || castAvatarSrc(castSeedForSender(m, displayLabel), info?.avatarSlot)}
             alt={displayLabel ?? ''}
             className="object-cover"
+            onLoadingStatusChange={(st) => { if (st === 'error' && photo) setPhotoFailed(true); }}
           />
         )}
         <AvatarFallback className={`text-[10px] ${isAgent ? 'bg-primary/15 text-primary' : avatarTint(displayLabel)}`}>
