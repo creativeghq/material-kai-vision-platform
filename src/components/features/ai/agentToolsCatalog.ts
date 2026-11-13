@@ -2884,27 +2884,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
-    id: 'ops-desk',
-    capability: 'platform.admin',
-    name: 'Agent Ops',
-    description: 'Work the Admin → Agent Ops cases: hand what looks broken to Stark, who investigates and fixes what is safe to fix, then to Veritas, who verifies the answer. What needs a person is left on the case.',
-    icon: 'ShieldCheck',
-    adminOnly: true,
-    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas'],
-    quick_starts: [
-      {
-        label: 'Review open cases', description: 'Stark investigates, Veritas verifies', icon: 'ShieldCheck',
-        prompt: 'Review the open Agent Ops cases: hand each to Stark, then Veritas, and tell me what is left for me.',
-        done: 'I\'ve worked through the open Agent Ops cases.',
-      },
-      {
-        label: 'What looks broken?', description: 'List the cases without working them', icon: 'ListChecks',
-        prompt: 'List the open Agent Ops cases, worst first, without working them yet.',
-        done: 'Here are the open Agent Ops cases.',
-      },
-    ],
-  },
-  {
     id: 'tech-radar',
     capability: 'workspace.manage',
     name: 'Tech Radar',
@@ -4272,7 +4251,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   stock: 'finance', finance: 'finance', contracts: 'finance',
   'trip-expenses': 'finance', travel: 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
-  catalogs: 'studio', 'catalog-ingestion': 'studio', 'scene-studio': 'studio', 'field-registry': 'studio', 'ops-desk': 'operator', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
+  catalogs: 'studio', 'catalog-ingestion': 'studio', 'scene-studio': 'studio', 'field-registry': 'studio', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
   'project-assessment': 'studio',
   'finance-assessment': 'finance',
   'real-estate-assessment': 'sales',

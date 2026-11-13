@@ -166,11 +166,6 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     capability: ['workspace.manage'],
     tool_ids: ['field_review_queue', 'field_review_apply'],
   },
-  'ops-desk': {
-    adminOnly: true,
-    capability: ['platform.admin'],
-    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas'],
-  },
   'tech-radar': {
     adminOnly: true,
     capability: ['workspace.manage'],
