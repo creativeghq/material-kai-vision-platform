@@ -26,11 +26,7 @@ export function startsWithPhrase(text: string, phrase: string): boolean {
 
 const UNICODE_BOUNDARY = String.raw`(?:(?<![\p{L}\p{N}])(?=[\p{L}\p{N}])|(?<=[\p{L}\p{N}])(?![\p{L}\p{N}]))`;
 
-/**
- * A stored tell pattern, folded like the text it runs on. Escapes are kept as written and `\b`
- * becomes a Unicode word boundary, because JavaScript's `\b` does not see Greek letters as word
- * characters. Returns null for a pattern that does not compile, so one bad row cannot stop a check.
- */
+/** Folds a stored pattern like the text; `\b` becomes a Unicode boundary (JS `\b` ignores Greek). Null if it does not compile. */
 export function compileTellPattern(pattern: string): RegExp | null {
   const src = pattern.replace(/(\\[pP]\{[^}]*\}|\\.)|([^\\]+)/gu, (_m, esc: string | undefined, lit: string | undefined) =>
     esc !== undefined ? (esc === '\\b' ? UNICODE_BOUNDARY : esc) : foldText(lit ?? ''));

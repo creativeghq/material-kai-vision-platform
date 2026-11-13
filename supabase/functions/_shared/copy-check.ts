@@ -30,7 +30,6 @@ export interface WritingTell {
   pattern?: string | null;
 }
 
-/** system_settings `copy_style_checks`: thresholds for the rhythm tests. */
 export interface CopyStyle {
   weak_tells_min: number;
   dash_per_100_words: number;
@@ -46,7 +45,6 @@ export interface CopyRules {
   error?: string;
 }
 
-/** Tell kinds whose strong hits warn under their own code and whose weak hits are pooled. */
 const STYLE_KINDS: Partial<Record<WritingTellKind, { code: CopyWarningCode; message: string }>> = {
   ai_phrase: { code: 'ai_phrase', message: 'Stock phrasing that reads as machine-written.' },
   engagement_bait: { code: 'engagement_bait', message: 'Reflex engagement bait.' },
@@ -69,7 +67,6 @@ function sentencesOf(text: string): string[] {
   return text.split(SENTENCE_SPLIT).map((s) => s.replace(MARKUP_LEAD, '').trim()).filter((s) => /\p{L}/u.test(s));
 }
 
-/** Every sentence that carries a STRONG tell, with the tell it matched. Used to ask a reviewer for exact edits. */
 export function findTellPassages(text: string, rules: CopyRules, surface: string | null, limit = 20): Array<{ sentence: string; kind: WritingTellKind; label: string }> {
   const tells = rules.tells.filter((t) => STYLE_KINDS[t.kind] && (t.strength ?? 'strong') === 'strong'
     && (!t.surfaces?.length || (surface != null && t.surfaces.includes(surface))));
@@ -118,7 +115,6 @@ export async function loadCopyRules(db: DbClient, channel: string): Promise<Copy
   return { status: rule ? 'ok' : 'no_rule', rule, tells: (tellRes.data ?? []) as WritingTell[], style };
 }
 
-/** Caption + hashtags exactly as the channel will show them. */
 export function composePublishedText(text: string, hashtags?: string[] | null): string {
   const tags = (hashtags ?? []).map((t) => String(t).trim()).filter(Boolean)
     .map((t) => (t.startsWith('#') ? t : `#${t}`));
