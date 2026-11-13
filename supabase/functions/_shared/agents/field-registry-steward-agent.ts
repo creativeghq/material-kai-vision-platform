@@ -1,5 +1,3 @@
-/** Background Agent: Field Registry Steward — JARVIS works the Field Roles review queue. */
-
 import type { AgentRunner, AgentRunContext, AgentRunResult } from './types.ts';
 import { runLangGraphAgent, logAgentAiUsage } from './base-agent.ts';
 import { loadPrompt } from '../prompt-utils.ts';
