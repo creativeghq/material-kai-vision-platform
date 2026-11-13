@@ -31,6 +31,10 @@ describe('ingestion audit mapping', () => {
     expect(findingsSummary({ status: 'passed', findings: [] })).toBe('0');
     expect(findingsSummary({ status: 'audit_error', findings: [] })).toBe('—');
     expect(findingsSummary({ status: 'failed', findings: null })).toBe('—');
+    expect(findingsSummary({ status: 'needs_review', findings: [
+      { severity: 'warn', code: 'a', message: 'm', count: 1, examples: [] },
+      { severity: 'info', code: 'b', message: 'm', count: 1, examples: [] },
+    ] })).toBe('1 (+1 info)');
   });
   it('renders examples as text, not JSON', () => {
     expect(exampleText({ page: 4, code: 'A1' })).toBe('page: 4, code: A1');

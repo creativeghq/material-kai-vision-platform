@@ -19,21 +19,32 @@ const render = (rows: IngestionAuditRow[], onAck?: () => void) =>
   renderToStaticMarkup(createElement(IngestionAuditList, { rows, filenames: { d1: 'catalogue.pdf' }, onAcknowledge: onAck }));
 
 describe('ingestion audit list', () => {
-  it('shows filename, status, coverage and an Acknowledge action', () => {
+  it('shows filename, status, coverage and a Mark clean action', () => {
     const html = render([row({})], () => undefined);
     expect(html).toContain('catalogue.pdf');
     expect(html).toContain('Failed');
     expect(html).toContain('50%');
     expect(html).toContain('—');
-    expect(html).toContain('Acknowledge');
+    expect(html).toContain('Mark clean');
   });
-  it('shows acknowledged rows as such, without the button', () => {
+  it('shows a row marked clean as Clean, without the button', () => {
     const html = render([row({ acknowledged_at: '2026-10-31T10:00:00Z' })], () => undefined);
-    expect(html).toContain('Acknowledged');
-    expect(html).not.toContain('>Acknowledge<');
+    expect(html).toContain('>Clean<');
+    expect(html).toContain('Marked clean');
+    expect(html).not.toContain('>Mark clean<');
   });
-  it('does not offer acknowledge on a passed audit', () => {
-    expect(render([row({ status: 'passed', findings: [] })], () => undefined)).not.toContain('>Acknowledge<');
+  it('does not offer mark clean on a passed audit', () => {
+    expect(render([row({ status: 'passed', findings: [] })], () => undefined)).not.toContain('>Mark clean<');
+  });
+  it('labels an info finding as Info, not as a warning', () => {
+    const html = renderToStaticMarkup(createElement(IngestionAuditList, {
+      rows: [row({ status: 'passed', findings: [{ severity: 'info', code: 'crops_rendered_above_source', message: 'Big crops', count: 3, examples: [] }] })],
+      filenames: {},
+    }));
+    expect(html).toContain('0 (+1 info)');
+  });
+  it('says nothing needs attention when every row was filtered out as clean', () => {
+    expect(renderToStaticMarkup(createElement(IngestionAuditList, { rows: [], filenames: {}, hiddenClean: 4 }))).toContain('Nothing needs attention');
   });
   it('explains an empty list', () => {
     expect(render([])).toContain('No ingestion audits yet');

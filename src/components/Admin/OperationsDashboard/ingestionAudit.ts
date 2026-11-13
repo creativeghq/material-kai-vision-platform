@@ -2,7 +2,7 @@ export type AuditStatus = 'passed' | 'needs_review' | 'failed' | 'unverifiable' 
 export type BadgeTone = 'success' | 'warning' | 'error' | 'neutral';
 
 export interface AuditFinding {
-  severity: 'warn' | 'fail';
+  severity: 'warn' | 'fail' | 'info';
   code: string;
   message: string;
   count: number;
@@ -49,6 +49,12 @@ export const statusTone = (s: string): BadgeTone => (isStatus(s) ? STATUS_TONE[s
 export const statusLabel = (s: string): string => (isStatus(s) ? STATUS_LABEL[s] : s.replace(/_/g, ' '));
 export const canAcknowledge = (s: string): boolean => s === 'failed' || s === 'needs_review';
 
+/** A row someone still has to look at: not passed and not marked clean. */
+export const needsAttention = (row: Pick<IngestionAuditRow, 'status' | 'acknowledged_at'>): boolean =>
+  row.status !== 'passed' && !row.acknowledged_at;
+
+export const isInfo = (f: AuditFinding): boolean => f.severity === 'info';
+
 export function formatCoverage(v: number | null | undefined): string {
   if (typeof v !== 'number' || !Number.isFinite(v)) return '—';
   const pct = Math.min(100, Math.max(0, v * 100));
@@ -89,7 +95,9 @@ export function examplesLine(f: AuditFinding, limit = 3): string {
 }
 
 export function findingsSummary(row: Pick<IngestionAuditRow, 'findings' | 'status'>): string {
-  const n = findingsOf(row).length;
-  if (n === 0) return row.status === 'passed' ? '0' : '—';
-  return String(n);
+  const all = findingsOf(row);
+  if (all.length === 0) return row.status === 'passed' ? '0' : '—';
+  const info = all.filter(isInfo).length;
+  const open = all.length - info;
+  return info > 0 ? `${open} (+${info} info)` : String(open);
 }
