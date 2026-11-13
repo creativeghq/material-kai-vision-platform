@@ -72,8 +72,6 @@ Real instances this class covers: `stamp_job_refresh_cost` referencing a column 
 
 Watches the reaper's **output**, not its exit code. `cleanup-test-artifacts-daily` reported success every night while deleting nothing: its name pattern required `[._-]` and the harness emits `E2E wsA <rid>` with a **space**. 3,057 test workspaces accumulated under a green cron.
 
-Since 2026-11-13 the job runs **hourly** (`40 * * * *`, name kept), still only reaping fixtures older than 120 minutes. A CI job killed by `timeout-minutes` never reaches its `afterAll` teardown, so leaked `e2e-…` users sat in the admin user list for up to a day.
-
 > **Rule: when you add a janitor cron, add a probe on the mess it is supposed to clear.** A cron's exit code tells you it ran, not that it worked.
 
 ### `ops.integrity_registry_broken`
