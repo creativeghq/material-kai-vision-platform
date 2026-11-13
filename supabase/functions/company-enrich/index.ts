@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { GEMINI_TEXT, geminiOutputTokens, geminiThinkingConfig } from '../_shared/gemini-models.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 // Invariant 1 — tenancy comes from membership, never from the request body.
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
@@ -26,7 +27,7 @@ const APOLLO_API_KEY = () => Deno.env.get('APOLLO_API_KEY') || '';
 /** `GOOGLE_GENERATIVE_AI_API_KEY`, not `GEMINI_API_KEY`. */
 const GEMINI_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 /** One constant for URL, price lookup and logged model_name; must match an `ai_model_pricing` model_key. */
-const GEMINI_MODEL = 'gemini-3.5-flash';
+const GEMINI_MODEL = GEMINI_TEXT;
 
 // Ceiling reserved up front for affordability (web search ~2cr + Apollo ~7.5cr worst case).
 const ENRICH_CREDIT_CEILING = 12;
@@ -654,6 +655,7 @@ async function findCompetitorsViaGemini(
       body: JSON.stringify({
         contents: [{ role: 'user', parts: [{ text: competitorResearchQuery(prompts.competitorResearch, seed) }] }],
         tools: [{ google_search: {} }],
+        generationConfig: { thinkingConfig: geminiThinkingConfig(GEMINI_MODEL) },
       }),
       signal: rc.signal,
     });
@@ -663,7 +665,7 @@ async function findCompetitorsViaGemini(
     const researchText = (research?.candidates?.[0]?.content?.parts ?? [])
       .map((p: any) => p?.text).filter(Boolean).join('\n') || '';
     let inTok = research?.usageMetadata?.promptTokenCount ?? 0;
-    let outTok = research?.usageMetadata?.candidatesTokenCount ?? 0;
+    let outTok = geminiOutputTokens(research?.usageMetadata);
     if (!researchText) { note('gemini (grounding returned no text)'); return []; }
 
     // Step 2 — structured extraction (JSON mode, no grounding).
@@ -680,6 +682,7 @@ async function findCompetitorsViaGemini(
             parts: [{ text: `${prompts.competitorExtractGemini}\n\n${fenceResearch(researchText, 14000)}` }],
           }],
           generationConfig: {
+            thinkingConfig: geminiThinkingConfig(GEMINI_MODEL),
             responseMimeType: 'application/json',
             responseSchema: {
               type: 'OBJECT',
@@ -710,7 +713,7 @@ async function findCompetitorsViaGemini(
       if (extractRes.ok) {
         const extract = await extractRes.json();
         inTok += extract?.usageMetadata?.promptTokenCount ?? 0;
-        outTok += extract?.usageMetadata?.candidatesTokenCount ?? 0;
+        outTok += geminiOutputTokens(extract?.usageMetadata);
         const raw = (extract?.candidates?.[0]?.content?.parts ?? []).map((p: any) => p?.text).filter(Boolean).join('');
         const parsed = raw ? JSON.parse(raw) : null;
         list = Array.isArray(parsed?.competitors) ? parsed.competitors : [];

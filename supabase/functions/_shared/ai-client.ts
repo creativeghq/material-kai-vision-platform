@@ -58,6 +58,7 @@ import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
 import { resolveTokenPrice, resolveUnitPrice, tokenCostParts } from './ai-logger.ts';
 import { CLAUDE_OPUS, aiSdkClaudeOptions, shapeClaudeRequest } from './claude-models.ts';
+import { GEMINI_TEXT, geminiThinkingConfig } from './gemini-models.ts';
 import { fetchImageGuarded, readCapped } from './fetch-image.ts';
 import { resolveSecret } from './secrets.ts';
 import { assertTransferAllowed, isEeaEndpoint } from './residency-gate.ts';
@@ -300,7 +301,7 @@ const klingai = new Proxy(function () {}, {
 }) as unknown as ReturnType<typeof createKlingAI>;
 
 // ── Default models ──
-const DEFAULT_GEMINI_MODEL = 'gemini-3.5-flash';
+const DEFAULT_GEMINI_MODEL = GEMINI_TEXT;
 const DEFAULT_CLAUDE_MODEL = CLAUDE_OPUS;
 
 // ── Billing identity for the per-unit models ───────────────────────────────
@@ -394,6 +395,7 @@ export async function transcribeAudioWithGemini(
       }],
       temperature: config.temperature ?? 0,
       maxOutputTokens: config.maxTokens ?? 2048,
+      providerOptions: geminiProviderOptions(modelId, config.thinkingLevel),
       abortSignal: AbortSignal.timeout(config.timeoutMs ?? 60_000),
     });
 
@@ -432,30 +434,43 @@ export async function transcribeAudioWithGemini(
   }
 }
 
+function geminiProviderOptions(modelId: string, level?: AIGenerateConfig['thinkingLevel']) {
+  const thinkingConfig = geminiThinkingConfig(modelId, level);
+  return thinkingConfig ? { google: { thinkingConfig } } : undefined;
+}
+
 // ── Gemini: Text generation ──
 export async function generateWithGemini(
   prompt: string,
-  config?: AIGenerateConfig & { systemPrompt?: string },
+  config?: AIGenerateConfig & {
+    systemPrompt?: string;
+    images?: { data: Uint8Array; mediaType: string }[];
+    timeoutMs?: number;
+  },
 ): Promise<AIGenerateResult<string>> {
   const modelId = config?.model || DEFAULT_GEMINI_MODEL;
   const _start = Date.now();
+  const images = config?.images ?? [];
 
   try {
     const result = await generateText({
       model: google(modelId),
       system: config?.systemPrompt,
-      prompt,
+      ...(images.length
+        ? {
+            messages: [{
+              role: 'user' as const,
+              content: [
+                ...images.map((i) => ({ type: 'image' as const, image: i.data, mediaType: i.mediaType })),
+                { type: 'text' as const, text: prompt },
+              ],
+            }],
+          }
+        : { prompt }),
+      abortSignal: config?.timeoutMs ? AbortSignal.timeout(config.timeoutMs) : undefined,
       temperature: config?.temperature ?? 0.7,
       maxOutputTokens: config?.maxTokens ?? 4096,
-      providerOptions: config?.thinkingLevel
-        ? {
-            google: {
-              thinkingConfig: {
-                thinkingLevel: config.thinkingLevel,
-              },
-            },
-          }
-        : undefined,
+      providerOptions: geminiProviderOptions(modelId, config?.thinkingLevel),
     });
 
     const usage = await result.usage;
@@ -516,15 +531,7 @@ export async function generateStructuredWithGemini<T>(
       temperature: config?.temperature ?? 0.3,
       maxOutputTokens: config?.maxTokens ?? 4096,
       output: Output.object({ schema }),
-      providerOptions: config?.thinkingLevel
-        ? {
-            google: {
-              thinkingConfig: {
-                thinkingLevel: config.thinkingLevel,
-              },
-            },
-          }
-        : undefined,
+      providerOptions: geminiProviderOptions(modelId, config?.thinkingLevel),
     });
 
     const usage = await result.usage;

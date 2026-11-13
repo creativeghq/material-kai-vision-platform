@@ -564,11 +564,11 @@ export const createCheckLlmVisibilityTool = (
     },
     {
       name: 'check_llm_visibility',
-      description: 'Inspect how a product, brand or keyword appears in AI answers (Haiku, GPT-4o-mini, Gemini Flash, Sonar). Returns share-of-voice, average rank, sentiment per model, which sources the answers cited, ghost citations (our page used as a source without naming us), competitors, and the 90-day trend. Give EITHER product_id OR subject (the tracked brand/keyword name). Set force_run:true to fire a fresh probe (2 credits); otherwise reads the most recent snapshot (0 credits).',
+      description: 'Inspect how a product, brand or keyword appears in AI answers (Haiku, GPT-5 mini, Gemini, Sonar). Returns share-of-voice, average rank, sentiment per model, which sources the answers cited, ghost citations (our page used as a source without naming us), competitors, and the 90-day trend. Give EITHER product_id OR subject (the tracked brand/keyword name). Set force_run:true to fire a fresh probe (2 credits); otherwise reads the most recent snapshot (0 credits).',
       schema: z.object({
         product_id: z.string().optional().describe('Product UUID, for a product enrolment.'),
         subject: z.string().optional().describe('A tracked brand or keyword — its name, or its tracked-subject UUID. Use this for anything that is not a catalog product.'),
-        models: z.array(z.string()).optional().describe('Subset of the tier configured for this subject. Cheap: claude-haiku-5-5, gemini-2.0-flash, sonar. Frontier: claude-opus-5-5, gemini-3.1-pro, sonar-pro.'),
+        models: z.array(z.string()).optional().describe('Subset of the tier configured for this subject. Cheap: claude-haiku-5-5, gemini-4-hydrogen, sonar. Frontier: claude-opus-5-5, gemini-4-carbon, sonar-pro.'),
         force_run: z.boolean().default(false).describe('If true, fires a new probe run instead of reading the latest snapshot.'),
       }),
     },

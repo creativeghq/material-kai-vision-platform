@@ -382,11 +382,11 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'check_llm_visibility',
     file: 'supabase/functions/_shared/tools/mention-tools.ts',
     factory: 'createCheckLlmVisibilityTool',
-    description: 'Inspect how a product, brand or keyword appears in AI answers (Haiku, GPT-4o-mini, Gemini Flash, Sonar).',
+    description: 'Inspect how a product, brand or keyword appears in AI answers (Haiku, GPT-5 mini, Gemini, Sonar).',
     params: [
       { name: 'product_id', type: 'string', optional: true, description: 'Product UUID, for a product enrolment.' },
       { name: 'subject', type: 'string', optional: true, description: 'A tracked brand or keyword — its name, or its tracked-subject UUID. Use this for anything that is not a catalog product.' },
-      { name: 'models', type: 'array', optional: true, description: 'Subset of the tier configured for this subject. Cheap: claude-haiku-5-5, gemini-2.0-flash, sonar. Frontier: claude-opus-5-5, gemini-3.1-pro, sonar-pro.' },
+      { name: 'models', type: 'array', optional: true, description: 'Subset of the tier configured for this subject. Cheap: claude-haiku-5-5, gemini-4-hydrogen, sonar. Frontier: claude-opus-5-5, gemini-4-carbon, sonar-pro.' },
       { name: 'force_run', type: 'boolean', optional: true, description: 'If true, fires a new probe run instead of reading the latest snapshot.' },
     ],
   },

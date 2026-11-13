@@ -8,6 +8,7 @@ import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../_shared/repl
 import { resolveOutputPath, isPlatformGeneratedImage, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import {
   generateImageWithGemini,
+  generateWithGemini,
   generateImageWithGrok,
   editImageWithGrok,
   generateImageWithOpenAI,
@@ -42,7 +43,6 @@ import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 import { assertEditableSource } from '../_shared/image-edit-gate.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
 
 /**
  * Safe chunked base64 encoder — avoids call-stack overflow on large images.
@@ -63,40 +63,23 @@ function toBase64(bytes: Uint8Array): string {
  * This spec is then used in Step 2 to edit the room — the inspiration image
  * never reaches the image generator, eliminating spatial bleed entirely.
  */
-async function extractDesignSpec(supabase: DbClient, imageBuffer: Uint8Array, style?: string): Promise<string> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s hard timeout
-
-  try {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${GOOGLE_API_KEY()}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{
-            role: 'user',
-            parts: [
-              { inlineData: { mimeType: 'image/jpeg', data: toBase64(imageBuffer) } },
-              { text: renderPromptTemplate(await loadPrompt(supabase, 'tool', 'interior_aesthetic_analyst'), { style: style ? `\nDESIGN STYLE: ${style}` : '' }) },
-            ],
-          }],
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(`Design spec extraction failed (${response.status}): ${await response.text()}`);
-    }
-
-    const result = await response.json();
-    const text = result.candidates?.[0]?.content?.parts?.find((p: any) => p.text)?.text;
-    if (!text) throw new Error('Gemini returned no design spec');
-    return text;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+async function extractDesignSpec(
+  supabase: DbClient, imageBuffer: Uint8Array, style: string | undefined,
+  billing: { userId: string; workspaceId?: string | null },
+): Promise<string> {
+  const instruction = renderPromptTemplate(
+    await loadPrompt(supabase, 'tool', 'interior_aesthetic_analyst'),
+    { style: style ? `\nDESIGN STYLE: ${style}` : '' },
+  );
+  const result = await generateWithGemini(instruction, {
+    images: [{ data: imageBuffer, mediaType: 'image/jpeg' }],
+    timeoutMs: 12_000,
+    task: 'interior_design_spec',
+    userId: billing.userId,
+    workspaceId: billing.workspaceId ?? undefined,
+  });
+  if (!result.text) throw new Error('Gemini returned no design spec');
+  return result.text;
 }
 
 /**
@@ -881,7 +864,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         let fluxPrompt: string;
         let designSpec: string | null = null;
         try {
-          designSpec = await extractDesignSpec(supabase, inspirationBuffer, body.style);
+          designSpec = await extractDesignSpec(supabase, inspirationBuffer, body.style, { userId: resolvedUserId, workspaceId: body.workspace_id });
           fluxPrompt = await buildFluxCopyStylePrompt(supabase, designSpec, body.room_type, body.prompt);
         } catch (specErr) {
           console.warn('[copy-style] Spec extraction failed, using fallback:', specErr);
@@ -930,7 +913,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         const styleBuffer = await fetchImageBuffer(body.style_reference_url);
         let applyPrompt: string;
         try {
-          const designSpec = await extractDesignSpec(supabase, styleBuffer, body.style);
+          const designSpec = await extractDesignSpec(supabase, styleBuffer, body.style, { userId: resolvedUserId, workspaceId: body.workspace_id });
           applyPrompt = await buildApplySpecPrompt(supabase, designSpec, body.prompt);
         } catch (specErr) {
           console.warn('[generate-interior-gemini] Spec extraction failed (floor-plan-render), using fallback:', specErr);

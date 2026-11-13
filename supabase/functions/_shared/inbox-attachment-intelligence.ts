@@ -1,6 +1,7 @@
 /** Inbox attachment intelligence — a voice note is HEARD and a document is READ. */
 
 import { getToolPrompt } from './prompt-utils.ts';
+import { GEMINI_TEXT } from './gemini-models.ts';
 import { reserveCredits, refundCredits, settleCredits } from './credit-reserve.ts';
 import { resolveTokenPrice, tokenCostUsd } from './ai-logger.ts';
 import { callClaudeMessages, transcribeAudioWithGemini } from './ai-client.ts';
@@ -15,7 +16,7 @@ import {
 type Db = any;
 
 /** One name each, so the price lookup and the usage row cannot come to different answers. */
-export const TRANSCRIPTION_MODEL = 'gemini-3.5-flash';
+export const TRANSCRIPTION_MODEL = GEMINI_TEXT;
 export const CLASSIFICATION_MODEL = 'claude-haiku-5-5';
 /** The `prompts.category` AND the `ai_usage_logs.operation_type` of each pass. */
 export const TRANSCRIPTION_TASK = 'inbox_audio_transcription';

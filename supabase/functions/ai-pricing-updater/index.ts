@@ -45,8 +45,8 @@ const PROVIDER_PRICING_SOURCES: Record<string, {
     // Google AI pricing
     // https://ai.google.dev/gemini-api/docs/pricing
     fallback_prices: {
-      'gemini-3.5-flash': { input: 0.50, output: 3.00 },
-      'gemini-3.1-pro': { input: 2.00, output: 12.00 },
+      'gemini-4-hydrogen': { input: 1.50, output: 7.50 },
+      'gemini-4-carbon': { input: 4.00, output: 20.00 },
     },
   },
   firecrawl: {
