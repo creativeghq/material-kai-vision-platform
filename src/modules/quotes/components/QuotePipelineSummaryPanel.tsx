@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
-import { formatMoney } from '@/modules/finance/services/financeService';
+import { formatMoney } from '@/utils/decimal';
 import { quotesService } from '../services/QuotesService';
 import { EMPTY_BUCKET, type QuotePipelineSummary } from '../utils/quoteEconomics';
 
@@ -32,7 +32,6 @@ export const QuotePipelineSummaryPanel: React.FC<{ workspaceId: string; refreshK
   if (!summary || summary.status !== 'ok') return null;
 
   const cur = summary.currency || 'EUR';
-  const money = (n: number | null | undefined) => (n == null ? '—' : formatMoney(n, cur));
   const open = summary.buckets?.open ?? EMPTY_BUCKET;
   const won = summary.buckets?.won ?? EMPTY_BUCKET;
   const draft = summary.buckets?.draft ?? EMPTY_BUCKET;
@@ -47,7 +46,7 @@ export const QuotePipelineSummaryPanel: React.FC<{ workspaceId: string; refreshK
     return (
       <Note tone={b.uncosted_value > 0 ? 'warning' : 'muted'}>
         {b.margin_pct != null ? `${b.margin_pct}% margin` : 'Margin unknown'}
-        {b.uncosted_value > 0 ? ` · ${money(b.uncosted_value)} has no buy price` : ''}
+        {b.uncosted_value > 0 ? ` · ${formatMoney(b.uncosted_value, cur)} has no buy price` : ''}
       </Note>
     );
   };
@@ -57,30 +56,30 @@ export const QuotePipelineSummaryPanel: React.FC<{ workspaceId: string; refreshK
       <HubStatGrid>
         <HubStatTile
           label="Open Pipeline"
-          value={money(open.value)}
+          value={formatMoney(open.value, cur)}
           category={`${open.count} open quote${open.count === 1 ? '' : 's'}`}
           help={`Net value (after discount, before VAT) of quotes sent or submitted and not yet expired. ${scopeNote}`}
-          chart={draft.count > 0 ? <Note>{money(draft.value)} more in {draft.count} draft{draft.count === 1 ? '' : 's'}</Note> : undefined}
+          chart={draft.count > 0 ? <Note>{formatMoney(draft.value, cur)} more in {draft.count} draft{draft.count === 1 ? '' : 's'}</Note> : undefined}
         />
         <HubStatTile
           label="Expected To Win"
-          value={enoughHistory ? money(summary.expected_value) : 'No verdict'}
+          value={enoughHistory ? formatMoney(summary.expected_value, cur) : 'No verdict'}
           category={enoughHistory ? `at ${summary.win_rate_value_pct}% win rate` : undefined}
           help={`Open pipeline × your win rate by value over the ${windowLabel}. Needs at least ${MIN_DECIDED} accepted or lost quotes.`}
           chart={!enoughHistory ? <Note>Needs {MIN_DECIDED} decided quotes — {summary.decided_count ?? 0} so far</Note> : undefined}
         />
         <HubStatTile
           label="Profit On Open Quotes"
-          value={money(open.profit)}
+          value={formatMoney(open.profit, cur)}
           help="Sell price minus buy price, over the lines that have a buy price. Lines without one are left out and named, never counted at zero cost."
           chart={marginNote(open)}
         />
         <HubStatTile
           label="Won"
-          value={money(won.value)}
+          value={formatMoney(won.value, cur)}
           category={`${won.count} accepted · ${windowLabel}`}
           help={`Net value of accepted quotes over the ${windowLabel}. Profit uses the buy price frozen when the quote was accepted.`}
-          chart={won.count > 0 ? (won.profit != null ? <Note>{money(won.profit)} profit{won.margin_pct != null ? ` · ${won.margin_pct}%` : ''}</Note> : marginNote(won)) : undefined}
+          chart={won.count > 0 ? (won.profit != null ? <Note>{formatMoney(won.profit, cur)} profit{won.margin_pct != null ? ` · ${won.margin_pct}%` : ''}</Note> : marginNote(won)) : undefined}
         />
         <HubStatTile
           label="Win Rate"

@@ -37,7 +37,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { formatDate } from '@/utils/datetime';
 import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
 import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
-import { formatMoney } from '@/modules/finance/services/financeService';
+import { formatMoney } from '@/utils/decimal';
 import { QuotePipelineSummaryPanel } from '../components/QuotePipelineSummaryPanel';
 import { costStatusNote, type QuoteEconomics } from '../utils/quoteEconomics';
 
