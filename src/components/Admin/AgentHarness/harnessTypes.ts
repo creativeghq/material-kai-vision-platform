@@ -320,3 +320,59 @@ export interface ConversationTrace {
   evals: Array<{ case_key: string; passed: boolean; at: string; failures: unknown; failure_classes: string[] | null; error: string | null }>;
   checkpoint_bytes: number | null;
 }
+
+/** `admin_agent_work_quality`: what every AI capability did, and how good the content was. */
+export type WorkStatus = 'ok' | 'no_data' | 'not_collected' | 'collector_failed';
+
+export interface WorkAreaRow {
+  area: string;
+  label: string;
+  description: string;
+  calls: number;
+  calls_prev: number;
+  cost_usd: number;
+  cost_usd_prev: number;
+  billed_usd: number;
+  no_workspace_calls: number;
+  last_at: string | null;
+  operations: Array<{ label: string; calls: number; cost_usd: number }>;
+  status: WorkStatus;
+}
+
+export interface ContentProducerRow {
+  producer: string;
+  label: string;
+  outputs: number;
+  calls: number;
+  checked: number;
+  with_warnings: number;
+  warnings_per_output: number | null;
+  avoid_hit_outputs: number;
+  published: number;
+  edited_before_outcome: number;
+  avg_score: number | null;
+  top_warnings: Array<{ code: string; outputs: number }>;
+  channels: string[];
+  status: WorkStatus;
+  note: string | null;
+}
+
+export interface WorkQuality {
+  days: number;
+  areas: WorkAreaRow[];
+  unclassified: Array<{ operation: string; calls: number; cost_usd: number; last_at: string }>;
+  content: ContentProducerRow[];
+  seo: {
+    articles: {
+      started: number; completed: number; failed: number; published: number;
+      avg_seo_score: number | null; min_seo_score: number | null; avg_words: number | null;
+      readability_status: WorkStatus; avg_readability: number | null; status: WorkStatus;
+      lowest: Array<{ id: string; keyword: string; seo_score: number }> | null;
+    };
+    answer_checks: {
+      checks: number; answered: number; failed: number; cited: number; cited_rate: number | null; status: WorkStatus;
+    };
+    lessons: { pending: number; approved: number; dismissed: number; new_in_window: number; oldest_pending_at: string | null };
+  };
+  generated_at: string;
+}

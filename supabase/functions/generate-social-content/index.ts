@@ -13,6 +13,7 @@ import { assertSameWorkspace } from '../_shared/same-workspace.ts';
 import { checkCopy, loadCopyRules } from '../_shared/copy-check.ts';
 import { SOCIAL_POST_FORMATS, type SocialPostFormat } from '../_shared/social-post-formats.ts';
 import { captureException } from '../_shared/sentry.ts';
+import { recordContentOutputs } from '../_shared/content-outputs.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -181,6 +182,11 @@ Deno.serve(withApiLogging('generate-social-content', async (req) => {
       }).eq('id', postId);
       if (updateErr) saveError = `The captions were written but the draft could not be updated: ${updateErr.message}`;
     }
+    await recordContentOutputs(supabase, captions.map((c, i) => ({
+      workspace_id: ws ?? null, user_id: userId, producer: 'social_content_generation', channel: platform,
+      subject_table: savedPostId ? 'social_posts' : null, subject_id: savedPostId ?? null, variant_index: i,
+      model: 'claude-haiku-5-5', rules: rules.status, warnings: c.warnings, avoid_hits: c.avoid_hits.length, char_count: c.char_count,
+    })));
 
     return jsonResponse({
       success: true,

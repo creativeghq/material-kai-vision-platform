@@ -7,6 +7,7 @@ import { authenticate, userHasWorkspaceCapability } from '../../_shared/auth.ts'
 import { assertEntitled } from '../../_shared/entitlement.ts';
 import { zernioApi, ensureZernioSecrets } from '../zernio.ts';
 import { checkCopy, composePublishedText, loadCopyRules } from '../../_shared/copy-check.ts';
+import { markContentOutcome } from '../../_shared/content-outputs.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -189,6 +190,10 @@ export async function handleZernioPublish(req: Request, body: any): Promise<Resp
     if (statusUpdateErr) {
       console.error('[zernio-publish] Post published to Zernio but local status update failed:', statusUpdateErr);
     }
+    const drafted: unknown[] = Array.isArray(post.metadata?.all_captions) ? post.metadata.all_captions : [];
+    const sentCaption = String(post.caption ?? '').trim();
+    await markContentOutcome(supabase, { table: 'social_posts', id: post_id }, 'published',
+      drafted.length ? !drafted.some((v: any) => String(v?.caption ?? '').trim() === sentCaption) : null);
 
     return jsonResponse({
       success: !statusUpdateErr,

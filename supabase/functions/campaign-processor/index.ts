@@ -15,6 +15,7 @@ import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 import { campaignPreflight } from '../_shared/email/campaign-preflight.ts';
 import { loadBrandContext } from '../_shared/brand-context.ts';
+import { markContentOutcome } from '../_shared/content-outputs.ts';
 
 const SEND_RATE_PER_MINUTE = 8; // ~500 per hour
 
@@ -163,6 +164,9 @@ serve(withApiLogging('campaign-processor', async (req) => {
           };
           const { error: pfErr } = await supabase.from('campaigns').update({ metadata: campaign.metadata }).eq('id', campaign.id);
           if (pfErr) { console.error(`Campaign ${campaign.id}: could not record the pre-send check:`, pfErr); continue; }
+          const draftSubjects: unknown[] = Array.isArray(campaign.metadata?.copy_draft?.subjects) ? campaign.metadata.copy_draft.subjects : [];
+          await markContentOutcome(supabase, { table: 'campaigns', id: campaign.id }, 'sent',
+            draftSubjects.length ? !draftSubjects.some((x: any) => String(x?.text ?? '').trim() === String(check.subject ?? '').trim()) : null);
         }
         campaign.preview_text = check.preview_text;
       }

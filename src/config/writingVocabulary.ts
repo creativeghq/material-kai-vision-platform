@@ -25,3 +25,27 @@ export const WRITING_TELL_KIND_HINTS: Record<WritingTellKind, string> = {
   banned_opener: 'Flagged only at the start of the text.',
   ask: 'Each different ask found is counted against the channel’s ask limit.',
 };
+
+export const COPY_WARNING_CODES = [
+  'over_limit', 'below_target', 'above_target', 'first_line_cut', 'opens_with_tag',
+  'banned_opener', 'too_many_hashtags', 'filler_hashtag', 'link_not_clickable',
+  'too_many_asks', 'ai_phrase', 'engagement_bait', 'invisible_characters', 'avoid_list',
+] as const;
+export type CopyWarningCode = typeof COPY_WARNING_CODES[number];
+
+export const COPY_WARNING_LABELS: Record<CopyWarningCode, string> = {
+  over_limit: 'Over the Platform Limit',
+  below_target: 'Shorter Than Target',
+  above_target: 'Longer Than Target',
+  first_line_cut: 'First Line Cut Off',
+  opens_with_tag: 'Opens With a Tag',
+  banned_opener: 'Stock Opener',
+  too_many_hashtags: 'Too Many Hashtags',
+  filler_hashtag: 'Filler Hashtag',
+  link_not_clickable: 'Unclickable Link',
+  too_many_asks: 'Too Many Asks',
+  ai_phrase: 'Stock Phrase',
+  engagement_bait: 'Engagement Bait',
+  invisible_characters: 'Invisible Characters',
+  avoid_list: 'Words to Avoid',
+};

@@ -12,6 +12,7 @@ import { withApiLogging } from '../_shared/api-logger.ts';
 import { brandDraftCheck, formatBrandContextForPrompt, loadBrandContext } from '../_shared/brand-context.ts';
 import { checkCopy, loadCopyRules } from '../_shared/copy-check.ts';
 import { captureException } from '../_shared/sentry.ts';
+import { recordContentOutputs } from '../_shared/content-outputs.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -142,6 +143,17 @@ Deno.serve(withApiLogging('generate-email-copy', async (req) => {
       if (upErr) saveError = `The copy was written but could not be saved onto the campaign: ${upErr.message}`;
       else if (!saved?.length) saveError = 'The copy was written but not saved: the campaign started sending while it was being written.';
     }
+
+    const avoidCount = (w: { code: string; hits?: string[] }[]) => w.find((x) => x.code === 'avoid_list')?.hits?.length ?? 0;
+    const base = {
+      workspace_id: workspaceId, user_id: userId, producer: 'email_copy_generation', model: MODEL,
+      subject_table: campaign ? 'campaigns' : null, subject_id: campaign?.id ?? null,
+    };
+    await recordContentOutputs(supabase, [
+      ...subjects.map((x, i) => ({ ...base, channel: 'email_subject', variant_index: i, rules: subjectRules.status, warnings: x.warnings, avoid_hits: avoidCount(x.warnings), char_count: x.char_count })),
+      { ...base, channel: 'email_preheader', rules: preheaderRules.status, warnings: preview.warnings, avoid_hits: avoidCount(preview.warnings), char_count: preview.length },
+      { ...base, channel: 'email_body', rules: subjectRules.status, warnings: bodyCheck.warnings, avoid_hits: avoidCount(bodyCheck.warnings), char_count: bodyCheck.length },
+    ]);
 
     return jsonResponse({
       success: true,

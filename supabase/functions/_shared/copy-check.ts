@@ -1,7 +1,7 @@
 /** The one copy check every writer runs. Limits come from `channel_writing_rules`, phrases from `writing_tells`; it flags, never rewrites. */
 import type { DbClient } from './supabase-client.ts';
 import { containsPhrase, startsWithPhrase } from './phrase-match.ts';
-import type { WritingSurface, WritingTellKind } from './writingVocabulary.generated.ts';
+import type { CopyWarningCode, WritingSurface, WritingTellKind } from './writingVocabulary.generated.ts';
 
 export type { WritingTellKind };
 
@@ -35,10 +35,7 @@ export interface CopyRules {
   error?: string;
 }
 
-export type CopyWarningCode =
-  | 'over_limit' | 'below_target' | 'above_target' | 'first_line_cut' | 'opens_with_tag'
-  | 'banned_opener' | 'too_many_hashtags' | 'filler_hashtag' | 'link_not_clickable'
-  | 'too_many_asks' | 'ai_phrase' | 'engagement_bait' | 'invisible_characters' | 'avoid_list';
+export type { CopyWarningCode };
 
 export interface CopyWarning {
   code: CopyWarningCode;

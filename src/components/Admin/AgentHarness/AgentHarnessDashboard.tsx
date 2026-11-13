@@ -6,6 +6,7 @@ import {
   Bot,
   Brain,
   CheckCircle2,
+  ClipboardCheck,
   ChevronDown,
   Database as DatabaseIcon,
   ExternalLink,
@@ -57,6 +58,7 @@ import {
   ToolsTable,
 } from './HarnessPanels';
 import { PriceLookupsCard } from './PriceLookupsCard';
+import { WorkQualitySection } from './WorkQualitySection';
 import { ResetPlatformDialog } from '../ResetPlatformDialog';
 import type { HarnessOverview } from './harnessTypes';
 import { delta, fmtInt, fmtMs, fmtPct, fmtUsd, ratio } from './harnessFormat';
@@ -137,6 +139,7 @@ const SECTIONS = [
   { id: 'attention', label: 'Needs Attention' },
   { id: 'health', label: 'Health' },
   { id: 'agents', label: 'Agents & Models' },
+  { id: 'work', label: 'Work & Quality' },
   { id: 'tools', label: 'Tools' },
   { id: 'failures', label: 'Failures' },
   { id: 'quality', label: 'Quality' },
@@ -484,6 +487,15 @@ const AgentHarnessDashboard: React.FC = () => {
                   <ModelsTable rows={data.models} />
                 </Panel>
               </div>
+            </HarnessSection>
+
+            <HarnessSection
+              id="work"
+              icon={ClipboardCheck}
+              title="Work & Quality"
+              subtitle="What every AI capability did in this window, what it cost, and how good the content it wrote was."
+            >
+              <WorkQualitySection days={Number(days)} windowCaption={windowCaption} />
             </HarnessSection>
 
             <HarnessSection
