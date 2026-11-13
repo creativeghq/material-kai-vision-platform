@@ -704,6 +704,24 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'field_review_apply',
+    file: 'supabase/functions/_shared/tools/field-registry-tools.ts',
+    factory: 'createFieldReviewApplyTool',
+    description: 'Decide items field_review_queue returned.',
+    params: [
+      { name: 'decisions', type: 'array', optional: false },
+    ],
+  },
+  {
+    name: 'field_review_queue',
+    file: 'supabase/functions/_shared/tools/field-registry-tools.ts',
+    factory: 'createFieldReviewQueueTool',
+    description: 'The next items waiting on Admin → Field Roles, each with the evidence to decide it: merge conflicts (two values one product held), role suggestions from ingestion, and fields still on their first heuristic role. Items…',
+    params: [
+      { name: 'limit', type: 'number', optional: true, description: 'Items per batch (default 25).' },
+    ],
+  },
+  {
     name: 'find_companies_in_market',
     file: 'supabase/functions/_shared/tools/signals-tools.ts',
     factory: 'createFindCompaniesInMarketTool',

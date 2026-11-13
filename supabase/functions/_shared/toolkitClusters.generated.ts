@@ -161,6 +161,11 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     capability: ['marketing.seo'],
     tool_ids: ['manage_social'],
   },
+  'field-registry': {
+    adminOnly: true,
+    capability: ['platform.admin'],
+    tool_ids: ['field_review_queue', 'field_review_apply'],
+  },
   'tech-radar': {
     adminOnly: true,
     capability: ['workspace.manage'],

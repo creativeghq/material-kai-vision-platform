@@ -2862,6 +2862,28 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'field-registry',
+    capability: 'platform.admin',
+    name: 'Field Registry',
+    // The server binds these only for a platform operator (isPlatformOperator in agent-chat).
+    description: 'Work the Admin → Field Roles queue: resolve merge conflicts, decide role suggestions from ingestion, and review fields still on their first heuristic role. Every decision is logged and reversible.',
+    icon: 'BadgeCheck',
+    adminOnly: true,
+    tool_ids: ['field_review_queue', 'field_review_apply'],
+    quick_starts: [
+      {
+        label: 'Review the field roles', description: 'Work through what is waiting', icon: 'BadgeCheck',
+        prompt: 'Work through the Field Roles review queue: decide what the evidence supports and tell me what you left for me.',
+        done: 'I\'ve worked through the Field Roles queue.',
+      },
+      {
+        label: 'What is waiting?', description: 'Show the queue without deciding', icon: 'ListChecks',
+        prompt: 'Show me what is waiting on Field Roles, without deciding anything yet.',
+        done: 'Here is what is waiting on Field Roles.',
+      },
+    ],
+  },
+  {
     id: 'tech-radar',
     capability: 'workspace.manage',
     name: 'Tech Radar',
@@ -4210,7 +4232,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   stock: 'finance', finance: 'finance', contracts: 'finance',
   'trip-expenses': 'finance', travel: 'finance', expenses: 'finance', 'company-assets': 'finance',
   // Studio
-  catalogs: 'studio', 'catalog-ingestion': 'studio', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
+  catalogs: 'studio', 'catalog-ingestion': 'studio', 'field-registry': 'studio', 'presentation-sheets': 'studio', projects: 'studio', construction: 'studio', generation: 'studio',
   'project-assessment': 'studio',
   'finance-assessment': 'finance',
   'real-estate-assessment': 'sales',
@@ -4343,6 +4365,7 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   quotes: ['erp'], finance: ['erp'], 'knowledge-graph': ['erp', 'product-business'],
   // Product & business → Pepper
   catalogs: ['product-business'], b2b: ['product-business'], 'tech-radar': ['product-business'],
+  'field-registry': ['product-business'],
   'job-research': ['product-business'], 'price-monitoring': ['product-business'], crm: ['product-business'],
   'signals-hiring': ['product-business'], 'signals-technographics': ['product-business'], 'signals-intent': ['product-business'],
   // Studio / interior → Vision

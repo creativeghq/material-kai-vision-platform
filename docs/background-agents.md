@@ -49,7 +49,6 @@ chain triggers: child agents with parent_agent_id auto-dispatch on completion
 | `social-analytics-sync` | Social Analytics Sync | Syncs per-post engagement metrics from Zernio |
 | `social-insights-sync` | Social Insights Sync | Syncs account-level follower/reach snapshots from Zernio |
 | `factory-enrichment` | Factory Enrichment | Enriches factory/manufacturer records via Apollo, Firecrawl, Hunter.io |
-| `field-registry-steward` | Field Registry Steward | JARVIS works the Field Roles queue (merge conflicts, role suggestions, unreviewed roles) hourly on every 5th day; decisions go through `field_review_apply`, are logged in `field_review_decisions` with the prior state, and a person can reverse each one. Prompt: `prompts` agent/`field_registry_steward`. Report: `field_registry_review_digest()` at 23:00 UTC |
 
 To add a new agent type: implement `AgentRunner` in `_shared/agents/your-agent.ts`, import and add to `_shared/agents/registry.ts`.
 

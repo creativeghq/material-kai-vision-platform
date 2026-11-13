@@ -1220,6 +1220,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'manage_company_assets',
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
+      'field_review_queue', 'field_review_apply',
       // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).
       // supplier_overview carries finance data and is admin/owner-gated at injection time.
       'product_provenance', 'product_price_history', 'projects_using_product',
@@ -1368,6 +1369,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // sub-agents is four analysis agents and Pepper held two. An owner binds the cluster.
       'research_analysis', 'analytics_analysis',
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
+      'field_review_queue', 'field_review_apply',
       'track_job_search', 'list_my_job_searches', 'find_jobs', 'get_job_digest_preview', 'manage_job_sites',
       'find_hiring_companies', 'find_companies_using_technology', 'find_companies_in_market', 'company_signals', 'manage_signal',
       'price_lookup', 'submit_price_proposal', 'product_analysis', 'business_analysis', 'dispatch_background_task',
@@ -3162,6 +3164,13 @@ async function executeAgent(
   }
   if (config.tools.includes('update_finding') && createUpdateFindingTool) {
     tools.push(createUpdateFindingTool(userId, workspaceId, onChunk));
+  }
+
+  if (isAdmin && config.tools.some((t: string) => t === 'field_review_queue' || t === 'field_review_apply')
+      && await isPlatformOperator(supabase, userId)) {
+    const fieldRegistryMod = await import('../_shared/tools/field-registry-tools.ts');
+    if (config.tools.includes('field_review_queue')) tools.push(fieldRegistryMod.createFieldReviewQueueTool());
+    if (config.tools.includes('field_review_apply')) tools.push(fieldRegistryMod.createFieldReviewApplyTool());
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached
