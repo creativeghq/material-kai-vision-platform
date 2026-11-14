@@ -236,13 +236,31 @@ const safeString = (val: unknown, fallback = ''): string => {
 
 
 export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
-  product,
+  product: passedProduct,
   isOpen,
   onClose,
   onGenerateVR,
   onGenerateVideo,
   vrGenerating,
 }) => {
+  // Callers pass partial products (an agent result carries scalar metadata only), so the record
+  // fills every key the caller left out: sizes, colours and the format lines come from it.
+  const [record, setRecord] = useState<Record<string, unknown> | null>(null);
+  const product = React.useMemo(() => {
+    if (!passedProduct || !record || record.id !== passedProduct.id) return passedProduct;
+    const fill = (k: string) => ({
+      ...((record[k] ?? {}) as Record<string, unknown>),
+      ...(((passedProduct as unknown as Record<string, unknown>)[k] ?? {}) as Record<string, unknown>),
+    });
+    return {
+      ...passedProduct,
+      description: safeString(passedProduct.description) || safeString(record.description),
+      metadata: fill('metadata'),
+      attributes: fill('attributes'),
+      properties: fill('properties'),
+      specifications: fill('specifications'),
+    } as Product;
+  }, [passedProduct, record]);
   // Admin diagnostic surfaces (embeddings/relevances, myDATA card, price lookup) gate on
   // node-admin via the unified capability layer (replaces the per-mount workspace_members fetch).
   // pricing.manage is granted to exactly the owner/admin personas (operator/dealer/architect),
@@ -285,20 +303,19 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Price lookup drawer (admin-only)
   const [priceLookupOpen, setPriceLookupOpen] = useState(false);
 
-  // Callers pass partial products; the description is read from the record when they omit it.
-  const [recordDescription, setRecordDescription] = useState('');
   // The catalogue's item tables carry every colour x size x code; the rough model list then repeats them.
   const [skuTableCount, setSkuTableCount] = useState(0);
   useEffect(() => { setSkuTableCount(0); }, [product?.id]);
   useEffect(() => {
-    setRecordDescription('');
-    if (!isOpen || !product?.id || safeString(product.description)) return;
+    setRecord(null);
+    const id = passedProduct?.id;
+    if (!isOpen || !id) return;
     let cancelled = false;
-    productDetailService.fetch(product.id)
-      .then((d) => { if (!cancelled) setRecordDescription(safeString((d as { description?: unknown } | null)?.description)); })
-      .catch(() => { /* no description beats an error card here */ });
+    productDetailService.fetch(id)
+      .then((d) => { if (!cancelled && d) setRecord(d as unknown as Record<string, unknown>); })
+      .catch(() => { /* the passed fields still render; a missing extra beats an error card */ });
     return () => { cancelled = true; };
-  }, [isOpen, product?.id, product?.description]);
+  }, [isOpen, passedProduct?.id]);
 
   // All hooks must be declared before any conditional return (Rules of Hooks)
 
@@ -2163,7 +2180,7 @@ It becomes searchable from this product and by the agents. Its visibility stays 
             {/* The product's own description only; raw catalogue chunks are never shown as one. */}
             {(() => {
               const longDesc = safeString((product as unknown as Record<string, unknown>).long_description);
-              const ownDesc = longDesc || safeString(product.description) || recordDescription;
+              const ownDesc = longDesc || safeString(product.description);
               // What the photos show leads, then the catalogue's own words, under one heading.
               const visualDesc = safeString(extractValue(appearanceData?.vision_description));
               const fullDesc = [visualDesc, ownDesc].filter(Boolean).join(' ');

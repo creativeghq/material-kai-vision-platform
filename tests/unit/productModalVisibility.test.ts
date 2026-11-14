@@ -139,6 +139,7 @@ describe('product modal — null product is a render, not a crash', () => {
       const after = region.slice(at + 'product'.length, at + 'product'.length + 2);
       const before = region.slice(Math.max(0, at - 1), at);
       if (after.startsWith('?.') || before === '!') continue;      // optional read / null check
+      if (/\bconst\s+$/.test(region.slice(Math.max(0, at - 8), at))) continue;
       offenders.push(`line ${src.slice(0, start + at).split('\n').length}`);
     }
 

@@ -230,7 +230,7 @@ async function rerankMivaaPayload(
   return data;
 }
 
-/** A catalogue product named verbatim in the query leads the results; vector neighbours must not outrank it. */
+/** A catalogue product named verbatim in the query IS the result; vector neighbours are dropped. */
 // deno-lint-ignore no-explicit-any
 async function pinNamedProducts(data: any, query: string, workspaceId: string): Promise<any> {
   if (!data || typeof data !== 'object') return data;
@@ -261,8 +261,9 @@ async function pinNamedProducts(data: any, query: string, workspaceId: string): 
     }),
     matched_by: 'name',
   }));
-  const rest = existing.filter((r) => !namedIds.has(idOf(r)));
-  data.results = [...pinned, ...rest].slice(0, Math.max(existing.length, pinned.length));
+  // The query named the product, so vector neighbours are other tiles, not answers.
+  data.results = pinned;
+  data.dropped_neighbours = existing.filter((r) => !namedIds.has(idOf(r))).length;
   data.name_matches = named.map((n) => ({ name: n.name, factory: n.factory }));
   return data;
 }
