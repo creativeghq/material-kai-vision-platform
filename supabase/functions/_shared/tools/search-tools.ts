@@ -70,6 +70,7 @@ function projectProductRow(r: any): Record<string, unknown> {
     unit: r.unit,
     stock: r.stock,
     tags: Array.isArray(r.tags) ? r.tags.slice(0, 8) : undefined,
+    matched_by: r.matched_by,
   };
   for (const k of Object.keys(out)) if (out[k] === undefined || out[k] === null || out[k] === '') delete out[k];
   return out;
@@ -229,6 +230,43 @@ async function rerankMivaaPayload(
   return data;
 }
 
+/** A catalogue product named verbatim in the query leads the results; vector neighbours must not outrank it. */
+// deno-lint-ignore no-explicit-any
+async function pinNamedProducts(data: any, query: string, workspaceId: string): Promise<any> {
+  if (!data || typeof data !== 'object') return data;
+  const { data: named, error } = await supabase.rpc('catalog_series_in_query', {
+    p_workspace_id: workspaceId,
+    p_query: query,
+  });
+  if (error) {
+    console.warn('catalog name match failed', error.message);
+    return data;
+  }
+  if (!Array.isArray(named) || named.length === 0) return data;
+  // deno-lint-ignore no-explicit-any
+  const existing: any[] = Array.isArray(data.results) ? data.results : [];
+  // deno-lint-ignore no-explicit-any
+  const idOf = (r: any) => r?.id ?? r?.product_id;
+  const namedIds = new Set(named.map((n) => n.product_id));
+  // deno-lint-ignore no-explicit-any
+  const pinned = named.map((n: any) => ({
+    ...(existing.find((r) => idOf(r) === n.product_id) ?? {
+      id: n.product_id,
+      product_name: n.name,
+      description: n.description,
+      category: n.category,
+      metadata: n.metadata ?? {},
+      image_url: n.image_url ?? undefined,
+      factory: n.factory ?? undefined,
+    }),
+    matched_by: 'name',
+  }));
+  const rest = existing.filter((r) => !namedIds.has(idOf(r)));
+  data.results = [...pinned, ...rest].slice(0, Math.max(existing.length, pinned.length));
+  data.name_matches = named.map((n) => ({ name: n.name, factory: n.factory }));
+  return data;
+}
+
 // MIVAA's /api/rag/* search endpoints now require authentication.
 // The agent is trusted infrastructure: it authenticates as the Material Kai platform
 // service with MIVAA_API_KEY and passes the user's workspace_id, which MIVAA trusts
@@ -380,7 +418,11 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
           }
 
           const data = await response.json();
-          const ranked = await rerankMivaaPayload(data, query, 'material_search_rerank');
+          const ranked = await pinNamedProducts(
+            await rerankMivaaPayload(data, query, 'material_search_rerank'),
+            query,
+            workspaceId,
+          );
           // Say WHY it is empty, so the agent stops guessing synonyms at an empty catalogue.
           const hitCount = RERANKABLE_KEYS.reduce(
             (n, k) => n + (Array.isArray(ranked?.[k]) ? ranked[k].length : 0),
