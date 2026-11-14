@@ -9,6 +9,7 @@
     "attach_payment_to_inbound_doc",
     "brand_overview",
     "campaign_materialize_recipients",
+    "catalog_series_in_query",
     "commit_sourcing_options",
     "create_simple_flow",
     "crm_set_primary_bank_account",
