@@ -74,7 +74,7 @@ const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 function cardFacts(product: Product, detail: ProductDetail | undefined): CardFacts {
   const md = { ...(product.metadata as Record<string, unknown>), ...((detail?.metadata ?? {}) as Record<string, unknown>) };
   const at = ((detail as { attributes?: Record<string, unknown> } | undefined)?.attributes ?? {}) as Record<string, unknown>;
-  const finish = firstText(at.finish, md.finish, md.surface_finish);
+  const finish = firstText(at.finish, md.finish);
   return {
     maker: firstText(md.factory_name, md.factory_group_name, md.brand),
     material: firstText(at.material, md.material, md.material_type),

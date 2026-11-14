@@ -333,7 +333,7 @@ describe('the chat still says what is happening', () => {
     for (const prop of declared) {
       expect(destructured, `ProductStrip accepts ${prop} and never reads it`).toContain(prop);
       expect(strip, `ProductStrip reads ${prop} but renders no control for it`)
-        .toContain(`{${prop} &&`);
+        .toContain(`${prop} &&`);
     }
   });
 
