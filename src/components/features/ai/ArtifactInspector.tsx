@@ -172,23 +172,25 @@ export const BoardInspector: React.FC<{ data: any }> = ({ data }) => (
 export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
   const products: any[] = Array.isArray(data?.products) ? data.products : [];
   const count = products.length;
-  const categories = Array.from(
-    new Set(products.map((p) => p?.category).filter((c): c is string => typeof c === 'string' && c.length > 0)),
-  );
+  const makerOf = (p: any): string | null => {
+    const m = p?.metadata?.factory_name;
+    return typeof m === 'string' && m.trim() ? m.trim() : null;
+  };
+  const makers = Array.from(new Set(products.map(makerOf).filter((m): m is string => !!m)));
   return (
     <Shell kicker="Material Search" title={data?.title || `${count} products`}>
       <div>
         <SectionH>Summary</SectionH>
         <Field k="Results" v={count} />
-        {categories.length > 0 && <Field k="Categories" v={categories.length} />}
+        {makers.length > 0 && <Field k="Makers" v={makers.length} />}
       </div>
-      {categories.length > 0 && (
+      {makers.length > 0 && (
         <div>
-          <SectionH>Categories</SectionH>
+          <SectionH>Makers</SectionH>
           <div className="flex flex-wrap gap-1.5">
-            {categories.slice(0, 8).map((c) => (
-              <span key={c} className="rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] text-muted-foreground">
-                {c}
+            {makers.slice(0, 8).map((m) => (
+              <span key={m} className="rounded-sm border border-hairline bg-surface-sunken px-2 py-0.5 text-[11px] text-muted-foreground">
+                {m}
               </span>
             ))}
           </div>
@@ -199,6 +201,7 @@ export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
         <div className="flex flex-col gap-1.5">
           {products.slice(0, 12).map((p, i) => {
             const url = primaryImageUrl(p);
+            const maker = makerOf(p);
             return (
               <div key={p?.id || i} className="flex items-center gap-2.5">
                 <div className="h-9 w-9 shrink-0 overflow-hidden rounded-md border border-border bg-muted/40">
@@ -206,7 +209,7 @@ export const ProductsInspector: React.FC<{ data: any }> = ({ data }) => {
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[13px] font-medium text-foreground">{p?.name || 'Untitled'}</div>
-                  {p?.category && <div className="truncate text-[11px] text-muted-foreground">{p.category}</div>}
+                  {maker && <div className="truncate text-[11px] text-muted-foreground">{maker}</div>}
                 </div>
               </div>
             );

@@ -616,7 +616,7 @@ function createAgentGraph(
                 sku: r.sku || r.metadata?.sku || '',
                 name: productName,
                 description: r.description || r.content || '',
-                category: r.category || r.metadata?.category || 'materials',
+                category: r.category || r.metadata?.category || null,
                 type: r.type || r.metadata?.material || 'general',
                 status: 'active',
                 images: imageUrl ? [{ url: imageUrl, alt: productName, isPrimary: true }] : [],
