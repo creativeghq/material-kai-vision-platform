@@ -24,6 +24,12 @@ export type { InboundLinkSummary } from '@/modules/finance/utils/inboundCorrelat
  * `get_inbound_document_detail` — what was on a document, merged with the delivery note that
  * itemises it when the document names nothing itself.
  */
+export interface BankLineDocCandidate {
+  doc_id: string; issuer_name: string | null; issuer_vat: string | null; issue_date: string | null;
+  doc_number: string | null; doc_type: string; due: number; currency: string;
+  exact_amount: boolean; same_party: boolean; day_gap: number | null; has_bill: boolean;
+}
+
 export interface InboundDocumentDetail {
   document: {
     id: string; mark: string | null; doc_type: string | null; label: string;
@@ -687,6 +693,15 @@ export const inboundService = {
     } as never);
     if (error) throw error;
     return (data ?? []) as unknown as InboundPaymentCandidate[];
+  },
+
+  /** The reverse: received documents an outgoing bank line could be paying, ranked in SQL. */
+  async suggestDocsForBankLine(txId: string, query?: string): Promise<BankLineDocCandidate[]> {
+    const { data, error } = await supabase.rpc('suggest_inbound_docs_for_bank_tx' as never, {
+      p_tx_id: txId, p_query: query?.trim() || null,
+    } as never);
+    if (error) throw error;
+    return (data ?? []) as unknown as BankLineDocCandidate[];
   },
 
   /** Books the expense if needed and allocates in ONE transaction; attaching the same pair twice replays. */

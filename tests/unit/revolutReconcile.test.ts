@@ -130,10 +130,11 @@ describe('revolut feed · nothing goes unnoticed', () => {
     expect(SYNC).toMatch(/page cap reached/);
   });
 
-  it('offers both directions in the feed review queue, transfers only', () => {
-    const review = FEED_TAB.slice(FEED_TAB.indexOf("statusF === 'review'"));
-    expect(review).toMatch(/\.eq\('type',\s*'transfer'\)/);
-    expect(review.slice(0, 400)).not.toMatch(/\.eq\('direction',\s*'in'\)/);
+  it('offers both directions in the feed review queue: transfers, plus outgoing card spend', () => {
+    const review = FEED_TAB.slice(FEED_TAB.indexOf("statusF === 'review'")).slice(0, 400);
+    expect(review).toContain(".or('type.eq.transfer,and(direction.eq.out,type.eq.card_payment)')");
+    expect(review).not.toMatch(/topup|exchange|fee|refund/);
+    expect(review).not.toMatch(/\.eq\('direction',\s*'in'\)/);
   });
 });
 

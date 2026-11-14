@@ -168,7 +168,7 @@ export async function notifyCardSpends(service: any, workspaceId: string): Promi
       type: 'card_spend_threshold',
       title: 'Large card spend',
       body: `${String(tx.currency).toUpperCase()} ${Number(tx.amount).toFixed(2)} at ${tx.counterparty_name ?? tx.reference ?? 'unknown merchant'}.`,
-      action_url: '/finance?tab=settings&section=banks',
+      action_url: `/finance?tab=bank_feed&tx=${tx.id}`,
       workspace_id: workspaceId,
       amount: Number(tx.amount),
       currency: String(tx.currency).toUpperCase(),

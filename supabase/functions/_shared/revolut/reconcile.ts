@@ -703,7 +703,7 @@ async function notifyUnmatched(
     body: direction === 'in'
       ? `${currency} ${amount.toFixed(2)} from ${party} — no invoice matched. Review the bank feed.`
       : `${currency} ${amount.toFixed(2)} paid to ${party} — no supplier bill matched. Review the bank feed.`,
-    action_url: '/finance?tab=settings&section=banks',
+    action_url: `/finance?tab=bank_feed&tx=${tx.id}`,
     workspace_id: workspaceId,
     direction,
     amount,

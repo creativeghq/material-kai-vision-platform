@@ -101,10 +101,7 @@ export const SettingsTab: React.FC<Props> = ({ workspaceId, onSettingsChanged })
   const { isOperator } = usePermissions();
   const { activeWorkspace } = useWorkspace();
   const [settings, setSettings] = useState<FinanceSettings | null>(null);
-  // `?section=` is a real deep-link into this pane: the Revolut reconciler and the bank-sync
-  // both notify with `/finance?tab=settings&section=banks`. Until this read it, every one of
-  // those landed on **General** — the route resolved, the Settings pane opened, and the operator
-  // was simply somewhere else, with no sign anything had been missed.
+  // `?section=` is a real deep-link into this pane; links already sent use `section=banks`.
   const [searchParams, setSearchParams] = useSearchParams();
   const rawSection = searchParams.get('section');
   const legacyPane = rawSection ? LEGACY_SECTION_PANE[rawSection] : undefined;

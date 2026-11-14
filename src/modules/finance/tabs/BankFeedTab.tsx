@@ -3,6 +3,7 @@
  * Stripe and Viva. Lives next to Payables — this is operational money data, not settings.
  */
 import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowDownLeft, ArrowUpRight, Landmark, Loader2, MoreHorizontal, RefreshCw, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -18,6 +19,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
 import { ImportStatementDialog } from '@/modules/finance/components/ImportStatementDialog';
 import { formatDate } from '@/utils/datetime';
+import { inboundService, type BankLineDocCandidate } from '@/modules/finance/services/inboundService';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 // One source (#391).
 import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVocabulary';
@@ -109,7 +111,16 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [to, setTo] = React.useState('');
 
   // Pickers
-  const [picking, setPicking] = React.useState<{ row: FeedRow; kind: 'invoice' | 'bill' | 'order' | 'plan' | 'party' } | null>(null);
+  const [picking, setPicking] = React.useState<{ row: FeedRow; kind: 'invoice' | 'bill' | 'order' | 'plan' | 'party' | 'expense' } | null>(null);
+  const [pickDocs, setPickDocs] = React.useState<BankLineDocCandidate[] | null>(null);
+  // A notification links one line (`?tx=`); the feed then shows that line until the user widens it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusTx = searchParams.get('tx');
+  const clearFocus = () => {
+    const p = new URLSearchParams(searchParams);
+    p.delete('tx');
+    setSearchParams(p, { replace: true });
+  };
   const [pickQuery, setPickQuery] = React.useState('');
   const [pickInvoices, setPickInvoices] = React.useState<InvoiceLite[]>([]);
   const [pickParties, setPickParties] = React.useState<PartyLite[]>([]);
@@ -127,17 +138,16 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         .eq('workspace_id', workspaceId)
         .order('booked_at', { ascending: false })
         .limit(100);
+      if (focusTx) query = query.eq('id', focusTx);
       if (provider) query = query.eq('provider', provider);
       if (direction) query = query.eq('direction', direction);
-      // Review = anything reconcilable that found no home, BOTH directions: money paid
-      // out by hand in the Revolut app needs a human as much as an unmatched receipt
-      // does. `type=transfer` mirrors the matcher, so own-money lines (top-ups,
-      // exchanges, fees) never turn up here asking to be matched to an invoice.
+      // Review = reconcilable lines with no home, both directions, plus card spend waiting for its
+      // receipt. Own-money lines (top-ups, exchanges, fees) never turn up asking to be matched.
       if (statusF === 'review') {
         query = query
           .in('match_status', ['suggested', 'unmatched', 'partial'])
           .eq('provider', 'revolut')
-          .eq('type', 'transfer');
+          .or('type.eq.transfer,and(direction.eq.out,type.eq.card_payment)');
       }
       else if (statusF) query = query.eq('match_status', statusF);
       if (from) query = query.gte('booked_at', `${from}T00:00:00Z`);
@@ -167,7 +177,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     } catch (e) {
       toast({ title: 'Failed to load the bank feed', description: (e as Error).message, variant: 'destructive' });
     } finally { setLoading(false); }
-  }, [workspaceId, provider, direction, statusF, q, from, to, toast]);
+  }, [workspaceId, provider, direction, statusF, q, from, to, toast, focusTx]);
 
   React.useEffect(() => { void load(); }, [load]);
 
@@ -227,6 +237,18 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     setPicking(null);
     toast({ title: 'Payment booked on account', description: `Shown on ${party.name}'s statement in Finance → Parties.` });
   });
+  const payDocument = (row: FeedRow, doc: BankLineDocCandidate) => act('Attach', async () => {
+    const who = doc.issuer_name ?? 'this supplier';
+    if (!window.confirm(`Record this ${Number(row.amount).toFixed(2)} ${row.currency} payment against ${who}${doc.doc_number ? ` ${doc.doc_number}` : ''}? `
+      + (doc.has_bill ? 'This books an outgoing payment.' : 'This books the document as an expense and records the payment.'))) return;
+    const out = await inboundService.attachPayment(doc.doc_id, { kind: 'feed_line', id: row.id });
+    setPicking(null);
+    const left = Number(out?.payment_unallocated ?? 0);
+    toast({
+      title: left > 0.005 ? 'Part of the payment attached' : 'Expense paid',
+      description: left > 0.005 ? `${left.toFixed(2)} ${row.currency} of this line is still unassigned. Attach it to another document.` : `${who} is settled by this line.`,
+    });
+  });
   const ignore = (row: FeedRow, ig: boolean) => act('Update', async () => {
     await callRevolutApi('ignore-transaction', workspaceId, { transaction_row_id: row.id, ignore: ig });
   });
@@ -235,8 +257,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   React.useEffect(() => {
     if (!picking) return;
     if (picking.kind === 'plan') setPickPlans(null);
+    if (picking.kind === 'expense') setPickDocs(null);
     const run = async () => {
       const term = pickQuery.trim();
+      if (picking.kind === 'expense') {
+        try { setPickDocs(await inboundService.suggestDocsForBankLine(picking.row.id, term)); }
+        catch (e) { setPickDocs([]); toast({ title: 'Could not load documents', description: (e as Error).message, variant: 'destructive' }); }
+        return;
+      }
       if (picking.kind === 'plan') {
         const { data } = await supabase.rpc('bank_tx_plan_candidates', { p_tx_id: picking.row.id, p_limit: 5 });
         setPickPlans((data ?? []) as PlanCandidate[]);
@@ -286,7 +314,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       setPickInvoices((data ?? []) as InvoiceLite[]);
     };
     void run();
-  }, [picking, pickQuery, workspaceId]);
+  }, [picking, pickQuery, workspaceId, toast]);
 
 
   return (
@@ -364,6 +392,12 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         </div>
       </CardHeader>
       <CardContent className="p-0">
+        {focusTx && (
+          <div className="flex items-center justify-between gap-2 border-b border-hairline bg-surface-sunken px-5 py-2 text-xs text-muted-foreground">
+            <span>Showing the transaction from your notification.</span>
+            <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={clearFocus}>Show all transactions</Button>
+          </div>
+        )}
         {loading ? (
           <div className="flex justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
@@ -437,6 +471,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       )}
                       {revolut && r.direction === 'out' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
                         <>
+                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'expense' }); setPickQuery(''); }}>Match to expense document…</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'bill' }); setPickQuery(''); }}>Match to supplier bill…</DropdownMenuItem>
                           {r.match_status !== 'partial' && (
                             <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>Match to a planned payment…</DropdownMenuItem>
@@ -485,7 +520,8 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>
-              {picking?.kind === 'bill' ? 'Match to a Supplier Bill'
+              {picking?.kind === 'expense' ? 'Match to an Expense Document'
+                : picking?.kind === 'bill' ? 'Match to a Supplier Bill'
                 : picking?.kind === 'party' ? (picking.row.direction === 'in' ? 'Received From — On Account' : 'Paid To — On Account')
                 : picking?.kind === 'plan' ? 'Close a Planned Payment'
                 : picking?.kind === 'order' ? 'Attach to an Order (Settles Its Open Invoice)'
@@ -495,10 +531,30 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           </DialogHeader>
           {picking?.kind !== 'plan' && (
             <Input autoFocus value={pickQuery} onChange={(e) => setPickQuery(e.target.value)}
-              placeholder={picking?.kind === 'bill' ? 'Bill number or supplier…' : picking?.kind === 'party' ? 'Company name or VAT…' : picking?.kind === 'order' ? 'Order number…' : 'Invoice number…'} />
+              placeholder={picking?.kind === 'expense' ? 'Supplier, VAT number or document number…' : picking?.kind === 'bill' ? 'Bill number or supplier…' : picking?.kind === 'party' ? 'Company name or VAT…' : picking?.kind === 'order' ? 'Order number…' : 'Invoice number…'} />
           )}
           <div className="max-h-64 space-y-1 overflow-y-auto">
-            {picking?.kind === 'party' ? (
+            {picking?.kind === 'expense' ? (
+              pickDocs === null
+                ? <p className="px-3 py-2 text-xs text-muted-foreground">Looking for received documents…</p>
+                : pickDocs.length === 0
+                ? <p className="px-3 py-2 text-xs text-muted-foreground">
+                    No open received document within 60 days of this line. If the receipt has not reached myDATA yet, it will appear here once it syncs. Search by supplier to look further back.
+                  </p>
+                : pickDocs.map((d) => (
+                  <button key={d.doc_id} type="button" disabled={busy}
+                    className="flex w-full items-center justify-between gap-3 rounded-md px-3 py-2 text-left text-sm hover:bg-muted"
+                    onClick={() => picking && payDocument(picking.row, d)}>
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">{d.issuer_name ?? d.issuer_vat ?? 'Unknown supplier'}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {[d.doc_number, d.issue_date ? formatDate(d.issue_date) : null, d.exact_amount ? 'same amount' : null, d.same_party ? 'same merchant' : null].filter(Boolean).join(' · ')}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{Number(d.due).toFixed(2)} {d.currency}</span>
+                  </button>
+                ))
+            ) : picking?.kind === 'party' ? (
               pickParties.length === 0
                 ? <p className="px-3 py-2 text-xs text-muted-foreground">No CRM company matches. Search by another part of the name, or by VAT number.</p>
                 : pickParties.map((p) => (
@@ -541,7 +597,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                   <span className="text-xs text-muted-foreground">due {Number(inv.amount_due).toFixed(2)} {inv.currency}</span>
                 </button>
               ))}
-            {picking?.kind === 'party' ? null : picking?.kind === 'plan' ? (
+            {picking?.kind === 'party' || picking?.kind === 'expense' ? null : picking?.kind === 'plan' ? (
               pickPlans === null
                 ? <p className="px-3 py-2 text-xs text-muted-foreground">Looking for open plans of this amount…</p>
                 : pickPlans.length === 0 && (

@@ -82,3 +82,29 @@ describe('the agent tool', () => {
     expect(write).toBeGreaterThan(gate);
   });
 });
+
+describe('attaching from the bank line', () => {
+  it('candidates come from SQL and the attach is the same one-call RPC the document side uses', () => {
+    expect(SERVICE).toMatch(/rpc\('suggest_inbound_docs_for_bank_tx'/);
+    expect(FEED).toMatch(/inboundService\.suggestDocsForBankLine/);
+    expect(FEED).toMatch(/inboundService\.attachPayment\(doc\.doc_id, \{ kind: 'feed_line', id: row\.id \}\)/);
+    expect(FEED).toMatch(/window\.confirm/);
+  });
+});
+
+describe('a bank notification opens its own line', () => {
+  it.each([
+    'supabase/functions/_shared/revolut/sync-core.ts',
+    'supabase/functions/_shared/revolut/reconcile.ts',
+  ])('%s links the feed line, never the settings pane', (file) => {
+    const src = read(file);
+    expect(src).not.toMatch(/action_url:\s*'\/finance\?tab=settings/);
+    expect(src).toMatch(/action_url:\s*`\/finance\?tab=bank_feed&tx=\$\{tx\.id\}`/);
+  });
+
+  it('the feed narrows to the linked line and offers the way back', () => {
+    expect(FEED).toMatch(/searchParams\.get\('tx'\)/);
+    expect(FEED).toMatch(/if \(focusTx\) query = query\.eq\('id', focusTx\)/);
+    expect(FEED).toMatch(/Show all transactions/);
+  });
+});
