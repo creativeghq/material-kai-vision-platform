@@ -64,6 +64,11 @@ const layoutOf = (objects: SceneObject[]): Record<string, LayoutEntry> =>
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
+const FREE_STANDING = new Set([
+  'sofa', 'armchair', 'chair', 'stool', 'dining_table', 'coffee_table', 'side_table', 'desk', 'bed', 'nightstand',
+  'wardrobe', 'cabinet', 'shelving', 'tv_unit', 'lamp', 'plant', 'toilet', 'bathtub', 'vanity',
+]);
+
 const roomArea = (outline: Array<[number, number]>) => {
   let sum = 0;
   for (let i = 0; i < outline.length; i++) {
@@ -354,8 +359,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     return sceneStudioService.uploadCapture(data.scene, blob, `object-${o.id.slice(0, 8)}`);
   };
 
-  const make3d = async (o: SceneObject) => {
-    if (!data || making3d) return;
+  const make3d = async (o: SceneObject, quiet = false) => {
+    if (!data || (making3d && !quiet)) return;
     setMaking3d(o.id);
     try {
       const result = o.product_id
@@ -363,17 +368,42 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
         : await sceneStudioService.make3d({ floor_plan_object_id: o.id, image_path: await cropFromRender(o) });
       const states = new Map((await sceneStudioService.objectModelStates(id)).map((r) => [r.id, r]));
       setObjects((list) => list.map((x) => (states.has(x.id) ? { ...x, ...states.get(x.id) } : x)));
+      if (quiet) return true;
       toast({
         title: result.status === 'ready' ? `${o.label} is now 3D` : `Making ${o.label} 3D`,
         description: result.charged
           ? `${result.credits_used ?? 10} credits used.${result.status === 'processing' ? ' It appears in the room in about a minute.' : ''}`
           : 'Another 3D model of it is being made right now. Try again in a minute; nothing was charged.',
       });
+      return true;
     } catch (e) {
-      fail('The object could not be made 3D', e);
+      if (!quiet) fail('The object could not be made 3D', e);
+      return false;
     } finally {
       setMaking3d(null);
     }
+  };
+
+  const batchCandidates = objects.filter((o) => !o.removed_at && FREE_STANDING.has(o.kind) && o.model_status !== 'ready' && o.model_status !== 'processing');
+  const inRender = (o: SceneObject) => !!o.product_id || renders.some((r) => r.id_pass_path && Object.values(r.id_map ?? {}).includes(o.id));
+  const batchReady = batchCandidates.filter(inRender);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
+  const runBatch = async () => {
+    setBatchOpen(false);
+    const list = [...batchReady];
+    setBatchProgress({ done: 0, total: list.length, failed: 0 });
+    let failed = 0;
+    for (let i = 0; i < list.length; i++) {
+      const ok = await make3d(list[i], true);
+      if (!ok) failed++;
+      setBatchProgress({ done: i + 1, total: list.length, failed });
+    }
+    toast({
+      title: `${list.length - failed} of ${list.length} objects are being made 3D`,
+      description: `${(list.length - failed) * 10} credits used.${failed ? ` ${failed} could not start and cost nothing.` : ''} They appear in the room over the next minutes.`,
+    });
+    setBatchProgress(null);
   };
 
   const goToRoom = (roomId: string | undefined, inside: boolean) => {
@@ -676,7 +706,20 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             </div>
           )}
         </div>
-        <p className="text-[11px] text-muted-foreground">The 3D room is a schematic of the layout, not a survey. Realism comes from Render.</p>
+        <div className="space-y-1.5 border-t border-hairline pt-3">
+          <Label className="text-xs">Photo-Real Furniture</Label>
+          {batchProgress ? (
+            <p className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Starting {batchProgress.done} of {batchProgress.total}…</p>
+          ) : (
+            <Button variant="outline" size="sm" className="w-full gap-1.5" disabled={!batchReady.length} onClick={() => setBatchOpen(true)}>
+              <BoxIcon className="h-3.5 w-3.5" />Make All Furniture 3D{batchReady.length ? ` (${batchReady.length * 10} credits)` : ''}
+            </Button>
+          )}
+          {batchCandidates.length > batchReady.length && (
+            <p className="text-[11px] text-muted-foreground">{count(batchCandidates.length - batchReady.length, 'piece')} not in a render yet. Render the room first to include them.</p>
+          )}
+        </div>
+        <p className="text-[11px] text-muted-foreground">Built-ins (kitchen, wardrobes fitted to walls) stay as true-size models; free-standing furniture can become photo-real.</p>
       </CardContent>
     </Card>
   );
@@ -835,6 +878,21 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             ))}
           </div>
         )}
+
+        <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Make All Furniture 3D</DialogTitle>
+              <DialogDescription>
+                {count(batchReady.length, 'piece')} of furniture become photo-real 3D models: {batchReady.map((o) => o.label).slice(0, 8).join(', ')}{batchReady.length > 8 ? '…' : ''}. Each costs 10 credits, {batchReady.length * 10} credits in total; anything that fails is refunded. They appear in the room over the next minutes.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBatchOpen(false)}>Cancel</Button>
+              <Button className="gap-1.5" onClick={() => void runBatch()}><BoxIcon className="h-4 w-4" />Make {batchReady.length} pieces 3D</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={!!photoWalkRoom} onOpenChange={(o) => { if (!o) setPhotoWalkRoom(null); }}>
           <DialogContent className="max-w-md">

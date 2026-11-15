@@ -8,7 +8,9 @@ import {
 } from 'three';
 import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
-import { PresetLighting, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';
+import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing';
+import { ToneMappingMode } from 'postprocessing';
+import { Ceiling, DoorOrWindow, ObjectShape, RoomLighting, oakFloorTexture } from '@/components/features/scenestudio/sceneDetail';
 import { loadSharedTexture } from '@/components/features/ar/materialOverrides';
 import { tileFormatM } from '@/components/features/roomplanner/surfaceFormat';
 import {
@@ -109,7 +111,6 @@ const SparkLayer: React.FC = () => {
 };
 
 const MAX_CAPTURE_SIDE = 1536;
-const FLOOR_DEFAULT = '#c9b8a2';
 const WALL_DEFAULT = '#efebe4';
 const SELECT_COLOUR = '#ff7a3d';
 
@@ -143,10 +144,10 @@ function useTileTexture(product: SceneProduct | undefined): { map: Texture | nul
 }
 
 const FloorMesh: React.FC<{
-  room: PlanRoom; frame: PlanFrame; surface?: SceneSurface; product?: SceneProduct; wireframe: boolean;
+  room: PlanRoom; frame: PlanFrame; surface?: SceneSurface; product?: SceneProduct; wireframe: boolean; ceilingHeight: number;
   onPick(e: ThreeEvent<MouseEvent>): void;
   onDouble?(e: ThreeEvent<MouseEvent>): void;
-}> = ({ room, frame, surface, product, wireframe, onPick, onDouble }) => {
+}> = ({ room, frame, surface, product, wireframe, ceilingHeight, onPick, onDouble }) => {
   const shape = useMemo(() => {
     const s = new Shape();
     room.outline.forEach(([x, y], i) => {
@@ -156,15 +157,28 @@ const FloorMesh: React.FC<{
     s.closePath();
     return s;
   }, [room.outline, frame]);
+  const ceilingShape = useMemo(() => {
+    const s = new Shape();
+    room.outline.forEach(([x, y], i) => {
+      const [sx, sz] = toScene(x, y, frame);
+      if (i === 0) s.moveTo(sx, sz); else s.lineTo(sx, sz);
+    });
+    s.closePath();
+    return s;
+  }, [room.outline, frame]);
+  const oak = useMemo(() => oakFloorTexture(), []);
   const { map, tileW, tileL } = useTileTexture(product);
   useEffect(() => { if (map) { map.repeat.set(1 / tileW, 1 / tileL); map.needsUpdate = true; } }, [map, tileW, tileL]);
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow userData={{ surface: 'floor', roomId: room.id }} onClick={onPick} onDoubleClick={onDouble}>
-      <shapeGeometry args={[shape]} />
-      {map
-        ? <meshStandardMaterial key="tex" map={map} roughness={0.85} wireframe={wireframe} />
-        : <meshStandardMaterial key="flat" color={surface?.colour_hex ?? FLOOR_DEFAULT} roughness={0.9} wireframe={wireframe} />}
-    </mesh>
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow userData={{ surface: 'floor', roomId: room.id }} onClick={onPick} onDoubleClick={onDouble}>
+        <shapeGeometry args={[shape]} />
+        {map
+          ? <meshStandardMaterial key="tex" map={map} roughness={0.85} wireframe={wireframe} />
+          : <meshStandardMaterial key="oak" map={oak} color={surface?.colour_hex ? new Color(surface.colour_hex).lerp(new Color('#ffffff'), 0.55) : '#ffffff'} roughness={0.55} wireframe={wireframe} />}
+      </mesh>
+      <Ceiling height={ceilingHeight}><shapeGeometry args={[ceilingShape]} /></Ceiling>
+    </group>
   );
 };
 
@@ -200,9 +214,16 @@ const WallMesh: React.FC<{
         const h = low ? Math.min(p.height, Math.max(0, cap - (p.center[1] - p.height / 2))) : p.height;
         if (h <= 0.001) return null;
         const y = low ? (p.center[1] - p.height / 2) + h / 2 : p.center[1];
+        const onFloor = !low && p.center[1] - p.height / 2 < 0.01;
         return (
+          <React.Fragment key={i}>
+          {onFloor && (
+            <mesh position={[p.center[0], 0.045, p.center[2]]} rotation={[0, p.rotationY, 0]} castShadow receiveShadow>
+              <boxGeometry args={[p.length, 0.09, p.thickness + 0.024]} />
+              <meshStandardMaterial color="#f7f5f1" roughness={0.4} wireframe={wireframe} />
+            </mesh>
+          )}
           <mesh
-            key={i}
             position={[p.center[0], y, p.center[2]]}
             rotation={[0, p.rotationY, 0]}
             castShadow
@@ -221,6 +242,7 @@ const WallMesh: React.FC<{
             <meshStandardMaterial attach="material-4" color={plusColour} roughness={0.95} wireframe={wireframe} />
             <meshStandardMaterial attach="material-5" color={minusColour} roughness={0.95} wireframe={wireframe} />
           </mesh>
+          </React.Fragment>
         );
       })}
     </group>
@@ -231,18 +253,10 @@ const OpeningMesh: React.FC<{ wall: PlanWall; opening: PlanOpening; frame: PlanF
   const p = useMemo(() => openingPlacement(wall, opening, frame), [wall, opening, frame]);
   const thickness = Math.max(wall.thickness_mm, 20) / 1000;
   if (opening.kind === 'opening') return null;
-  const isWindow = opening.kind === 'window';
   return (
-    <mesh position={p.center} rotation={[0, p.rotationY, 0]}>
-      <boxGeometry args={[p.width, p.height, isWindow ? 0.02 : thickness * 0.4]} />
-      <meshStandardMaterial
-        color={isWindow ? '#bcdff5' : '#6d4c41'}
-        transparent={isWindow}
-        opacity={isWindow ? 0.35 : 1}
-        roughness={isWindow ? 0.05 : 0.7}
-        wireframe={wireframe}
-      />
-    </mesh>
+    <group position={p.center} rotation={[0, p.rotationY, 0]}>
+      <DoorOrWindow kind={opening.kind === 'window' ? 'window' : 'door'} width={p.width} height={p.height} depth={thickness} wireframe={wireframe} />
+    </group>
   );
 };
 
@@ -300,29 +314,20 @@ const ObjectMesh: React.FC<{
   };
 
   const body = (() => {
-    const material = <meshStandardMaterial color={colour} roughness={0.8} wireframe={wireframe} visible={!modelUrl || wireframe} />;
     const edges = selected ? <Edges userData={{ helper: true }} color={SELECT_COLOUR} lineWidth={2} /> : null;
     const common = { castShadow: true, receiveShadow: true, userData: { objectId: obj.id, idHex } };
-    if (modelUrl) {
-      return (
-        <group>
-          <mesh {...common} position={[0, h / 2, 0]}><boxGeometry args={[w, h, d]} />{material}{edges}</mesh>
-          <SplatModel url={modelUrl} w={w} d={d} h={h} />
-        </group>
-      );
-    }
-    if (obj.kind === 'plant') {
-      return (
-        <group>
-          <mesh {...common} position={[0, h * 0.15, 0]}><cylinderGeometry args={[w * 0.3, w * 0.25, h * 0.3, 16]} /><meshStandardMaterial color="#e0dcd4" wireframe={wireframe} />{edges}</mesh>
-          <mesh {...common} position={[0, h * 0.65, 0]}><sphereGeometry args={[Math.max(w, d) * 0.5, 16, 12]} />{material}</mesh>
-        </group>
-      );
-    }
-    if (obj.kind === 'lamp' || obj.kind === 'pendant') {
-      return <mesh {...common} position={[0, h / 2, 0]}><cylinderGeometry args={[w * 0.5, w * 0.35, h, 20]} />{material}{edges}</mesh>;
-    }
-    return <mesh {...common} position={[0, h / 2, 0]}><boxGeometry args={[w, h, d]} />{material}{edges}</mesh>;
+    return (
+      <group>
+        <mesh userData={common.userData} position={[0, h / 2, 0]}>
+          <boxGeometry args={[w, h, d]} />
+          <meshBasicMaterial visible={false} />
+          {edges}
+        </mesh>
+        {modelUrl
+          ? <SplatModel url={modelUrl} w={w} d={d} h={h} />
+          : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} />}
+      </group>
+    );
   })();
 
   return (
@@ -661,7 +666,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
 
   return (
     <Canvas
-      shadows
+      shadows="soft"
       dpr={[1, 2]}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ position: initial.position, fov: initial.fov, near: 0.05, far: 500 }}
@@ -669,16 +674,17 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       style={{ touchAction: 'none' }}
     >
       <color attach="background" args={['#e9e6e1']} />
-      <PresetLighting preset={DEFAULT_PRESET} />
+      <RoomLighting span={span} />
       {hasModels && <SparkLayer />}
       <group userData={{ splat: true }}>
-        <ContactShadows position={[0, 0.004, 0]} scale={span * 1.6} far={2.5} blur={2.2} opacity={0.45} resolution={1024} />
+        <ContactShadows position={[0, 0.004, 0]} scale={span * 1.6} far={2.5} blur={2.2} opacity={0.3} resolution={1024} />
       </group>
       {rooms.map((room) => (
         <FloorMesh
           key={room.id}
           room={room}
           frame={frame}
+          ceilingHeight={defaultWallHeightMm / 1000}
           surface={surfaceOf.get(`${room.id}:floor`)}
           product={products[surfaceOf.get(`${room.id}:floor`)?.product_id ?? '']}
           wireframe={wireframe}
@@ -750,6 +756,12 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
+      {!wireframe && (
+        <EffectComposer multisampling={4}>
+          <N8AO aoRadius={0.5} distanceFalloff={0.6} intensity={2.2} halfRes quality="medium" />
+          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        </EffectComposer>
+      )}
       {walkPose && (
         <WalkController
           start={walkPose.start} facing={walkPose.facing} walls={walls} openings={openings} frame={frame}
