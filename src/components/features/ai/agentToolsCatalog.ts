@@ -3278,6 +3278,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
         done: 'Here are your 3D rooms.',
         run: { tool: 'manage_scenes', fixedArgs: { action: 'list' } },
       },
+      { label: 'Walk Through a Room', description: 'Walk a 3D room at eye height, room to room', prompt: 'Open my latest 3D room in walk mode.', icon: 'Compass' },
+      { label: 'Make an Object 3D', description: 'Turn a sofa, bed or lamp in a 3D room into a photo-real model', prompt: 'In my latest 3D room, make the sofa 3D.', icon: 'Package' },
+      { label: 'Photo-Real Walk', description: 'A walkable photo-real world of one space', prompt: 'Give me a photo-real walk of the living room in my latest 3D room.', icon: 'Globe' },
       {
         // A DIRECT run: no model turn, no credits. autoFields adds the pattern select, the joint
         // width and colour and the rotation from the tool's own schema.

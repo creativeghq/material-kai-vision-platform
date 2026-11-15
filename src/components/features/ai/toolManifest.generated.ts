@@ -1622,11 +1622,14 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageScenesTool',
     description: '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user rearranges it, recolours or swaps products, and renders it photo-real in any style. create: reads image_url …',
     params: [
-      { name: 'action', type: 'enum', enum: ['create', 'status', 'list'], optional: false, description: 'What to do.' },
+      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open'], optional: false, description: 'What to do.' },
       { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },
       { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows.' },
       { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },
-      { name: 'scene_id', type: 'string', optional: true, description: 'status: the scene to check.' },
+      { name: 'scene_id', type: 'string', optional: true, description: 'status/open: the scene.' },
+      { name: 'object', type: 'string', optional: true, description: 'open: the object to focus, by its name in the room (e.g. sofa).' },
+      { name: 'mode', type: 'enum', enum: ['view', 'walk', 'make_3d', 'photo_walk'], optional: true, description: 'open: what to do in the room.' },
+      { name: 'room', type: 'string', optional: true, description: 'open: the space to go to, by name (e.g. living room).' },
     ],
   },
   {

@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Eye, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
-  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding,
+  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Globe,
 } from 'lucide-react';
 
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -13,6 +13,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/core/ui/tooltip';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import { VR_CREDIT_COSTS } from '@/services/vrWorldService';
@@ -51,6 +52,7 @@ export interface SceneEditorProps {
   pinned?: SceneProduct[];
   onRendered?(event: SceneRenderedEvent): void;
   onWalkThrough?(imageUrl: string, prompt: string): void;
+  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk'; object_id: string | null; room_id?: string | null; nonce: number };
 }
 
 interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[] }
@@ -93,7 +95,7 @@ const DockButton: React.FC<{ label: string; hint?: string; active?: boolean; dis
   </Tooltip>
 );
 
-const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen(): void; onStand?(): void }> = ({ title, meta, active, onOpen, onStand }) => (
+const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen(): void; onStand?(): void; onPhotoWalk?(): void }> = ({ title, meta, active, onOpen, onStand, onPhotoWalk }) => (
   <div className={`flex w-48 shrink-0 items-stretch overflow-hidden rounded-md border bg-card ${active ? 'border-primary ring-1 ring-primary' : 'border-hairline'}`}>
     <button type="button" onClick={onOpen} className="min-w-0 flex-1 px-3 py-2 text-left hover:bg-surface-sunken">
       <span className="block truncate text-sm font-medium">{title}</span>
@@ -104,6 +106,11 @@ const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen
         <Footprints className="h-4 w-4" />
       </button>
     )}
+    {onPhotoWalk && (
+      <button type="button" onClick={onPhotoWalk} className="flex items-center border-l border-hairline px-2.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground" title="Photo-real walk" aria-label={`Photo-real walk of ${title}`}>
+        <Globe className="h-4 w-4" />
+      </button>
+    )}
   </div>
 );
 
@@ -111,7 +118,7 @@ const hasWebGL2 = () => {
   try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
 };
 
-export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWalkThrough }: SceneEditorProps) {
+export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWalkThrough, intent }: SceneEditorProps) {
   const { toast } = useToast();
   const canvasRef = useRef<SceneCanvasHandle>(null);
 
@@ -400,8 +407,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     return [...new Set(urls)].filter((u) => u.startsWith('https://')).slice(0, 6);
   };
 
-  const render = async (choice: StyleChoice | null) => {
-    if (!data || !canvasRef.current || rendering) return;
+  const render = async (choice: StyleChoice | null): Promise<SceneRender | null> => {
+    if (!data || !canvasRef.current || rendering) return null;
     setRendering(true);
     setStyleChoice(choice);
     try {
@@ -434,12 +441,49 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       setShowRender(true);
       onRendered?.({ image_url: saved.image_url, label: choice?.label ?? 'Render', credits_used: result.credits_used, kind: 'full' });
       toast({ title: 'Rendered', description: `${result.credits_used} credits used. The render is also in the conversation.` });
+      return saved;
     } catch (e) {
       fail('The render failed', e);
+      return null;
     } finally {
       setRendering(false);
     }
   };
+
+  const [photoWalkRoom, setPhotoWalkRoom] = useState<string | null>(null);
+  const [photoWalking, setPhotoWalking] = useState(false);
+  const runPhotoWalk = async (roomId: string) => {
+    if (!onWalkThrough || !data) return;
+    setPhotoWalkRoom(null);
+    setPhotoWalking(true);
+    try {
+      setWalkRoomId(undefined);
+      setFocusRoomId(roomId);
+      setEyeLevel(true);
+      canvasRef.current?.focusRoom(roomId, true);
+      await new Promise((r) => setTimeout(r, 1300));
+      const saved = await render(styleChoice);
+      const roomName = data.rooms.find((r) => r.id === roomId)?.name ?? scene.name;
+      if (saved) onWalkThrough(saved.image_url, `${roomName}${saved.style_label ? ` — ${saved.style_label}` : ''}`);
+    } finally {
+      setPhotoWalking(false);
+    }
+  };
+
+  const handledIntent = useRef<number | null>(null);
+  useEffect(() => {
+    if (!intent || !data || handledIntent.current === intent.nonce) return;
+    handledIntent.current = intent.nonce;
+    const obj = intent.object_id ? objects.find((o) => o.id === intent.object_id) : undefined;
+    const roomId = intent.room_id ?? obj?.room_id ?? undefined;
+    if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
+    if (intent.mode === 'photo_walk') { setPhotoWalkRoom(roomId ?? data.rooms[0]?.id ?? null); return; }
+    if (roomId) goToRoom(roomId, false);
+    if (obj) setSelectedId(obj.id);
+    if (intent.mode === 'make_3d' && obj) {
+      toast({ title: `${obj.label} is selected`, description: 'Press Make 3D in the panel below the room to confirm (10 credits).' });
+    }
+  }, [intent, data]);
 
   const selected = objects.find((o) => o.id === selectedId) ?? null;
   const changedSinceRender = (o: SceneObject | null) => {
@@ -786,10 +830,26 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 active={focusRoomId === r.id}
                 onOpen={() => { setEyeLevel(false); goToRoom(r.id, false); }}
                 onStand={() => startWalk(r.id)}
+                onPhotoWalk={onWalkThrough ? () => setPhotoWalkRoom(r.id) : undefined}
               />
             ))}
           </div>
         )}
+
+        <Dialog open={!!photoWalkRoom} onOpenChange={(o) => { if (!o) setPhotoWalkRoom(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Photo-Real Walk of {data.rooms.find((r) => r.id === photoWalkRoom)?.name ?? 'this space'}</DialogTitle>
+              <DialogDescription>
+                The space is rendered photo-real from eye height{styleChoice ? ` in ${styleChoice.label}` : ''}, then turned into a world you can walk around. It costs one render plus {VR_CREDIT_COSTS['marble-1.1']} credits and takes a few minutes; the world appears in the conversation.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPhotoWalkRoom(null)}>Cancel</Button>
+              <Button className="gap-1.5" disabled={photoWalking || rendering} onClick={() => photoWalkRoom && void runPhotoWalk(photoWalkRoom)}><Globe className="h-4 w-4" />Make the walk</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {renders.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">

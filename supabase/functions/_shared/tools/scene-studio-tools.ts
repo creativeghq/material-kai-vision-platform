@@ -24,7 +24,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -37,6 +37,43 @@ export const createManageScenesTool = (
       const scenes = data ?? [];
       onChunk?.({ type: 'scene_studio_scenes', scenes, timestamp: Date.now() });
       return JSON.stringify({ success: true, count: scenes.length, scenes });
+    }
+
+    if (action === 'open') {
+      if (!scene_id) return JSON.stringify({ success: false, error: 'open needs scene_id (list the scenes first).' });
+      const { data: scene, error } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      let target: { id: string; label: string } | null = null;
+      if (object) {
+        const { data: objs } = await sb.from('floor_plan_objects').select('id, label, kind')
+          .eq('floor_plan_id', scene_id).is('removed_at', null);
+        const list = (objs ?? []) as Array<{ id: string; label: string; kind: string }>;
+        const needle = object.trim().toLowerCase();
+        const found = list.find((o) => o.label.toLowerCase() === needle)
+          ?? list.find((o) => o.label.toLowerCase().includes(needle) || o.kind.replace(/_/g, ' ').includes(needle));
+        if (!found) {
+          return JSON.stringify({ success: false, error: `No object called "${object}" in this room.`, objects: list.map((o) => o.label).slice(0, 30) });
+        }
+        target = { id: found.id, label: found.label };
+      }
+      let roomId: string | null = null;
+      if (room) {
+        const { data: rooms } = await sb.from('floor_plan_rooms').select('id, name').eq('floor_plan_id', scene_id);
+        const list = (rooms ?? []) as Array<{ id: string; name: string }>;
+        const needle = room.trim().toLowerCase();
+        const hit = list.find((r) => r.name.toLowerCase() === needle) ?? list.find((r) => r.name.toLowerCase().includes(needle));
+        if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: list.map((r) => r.name) });
+        roomId = hit.id;
+      }
+      const intent = { mode: mode ?? 'view', object_id: target?.id ?? null, room_id: roomId, nonce: Date.now() };
+      onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
+      const next = mode === 'make_3d'
+        ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
+        : mode === 'photo_walk'
+          ? 'The room is open with the photo-real walk offer; the user confirms it there (a render plus 190 credits).'
+          : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.' : 'The room is open on the canvas.';
+      return JSON.stringify({ success: true, scene_id, object: target, mode: intent.mode, message: next });
     }
 
     if (action === 'status') {
@@ -93,13 +130,18 @@ export const createManageScenesTool = (
       + 'create: reads image_url (an image the user attached, or a render from this conversation) as kind '
       + 'plan_image (a floor plan drawing), photo (a photo of a room) or render (a generated image); it is '
       + 'charged once and takes about a minute. status: one scene by scene_id. list: the workspace\'s scenes. '
+      + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
+      + 'for Make 3D (10 credits, the user confirms), mode photo_walk offers a photo-real walk the user confirms. '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
-      scene_id: z.string().uuid().optional().describe('status: the scene to check.'),
+      scene_id: z.string().uuid().optional().describe('status/open: the scene.'),
+      object: z.string().max(120).optional().describe('open: the object to focus, by its name in the room (e.g. sofa).'),
+      mode: z.enum(['view', 'walk', 'make_3d', 'photo_walk']).optional().describe('open: what to do in the room.'),
+      room: z.string().max(120).optional().describe('open: the space to go to, by name (e.g. living room).'),
     }),
   },
 );

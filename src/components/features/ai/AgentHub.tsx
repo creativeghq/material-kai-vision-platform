@@ -783,7 +783,7 @@ interface Message {
     credits_used?: number;
   }; // Rendered presentation sheet PDF ready for download
   quoteData?: QuoteCanvasData; // Agent-created quote (real quotes row) + branded PDF, shown on canvas
-  sceneData?: { scene_id: string; name: string; source_kind: string };
+  sceneData?: { scene_id: string; name: string; source_kind: string; intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk'; object_id: string | null; room_id?: string | null; nonce: number } };
   sceneListData?: { scenes: Array<{ id: string; name: string; source_kind: string; extract_status: string; updated_at: string }> };
   mentionSummaryData?: {
     product_id: string;
@@ -3578,18 +3578,24 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (chunk.type === 'scene_studio_scene') {
                 const sc = chunk.scene ?? {};
                 if (sc.id) {
-                  const sceneData = { scene_id: sc.id as string, name: (sc.name as string) || '3D room', source_kind: (sc.source_kind as string) || 'photo' };
+                  const intent = sc.intent && typeof sc.intent === 'object' ? sc.intent as NonNullable<NonNullable<Message['sceneData']>['intent']> : undefined;
+                  const sceneData = { scene_id: sc.id as string, name: (sc.name as string) || '3D room', source_kind: (sc.source_kind as string) || 'photo', ...(intent ? { intent } : {}) };
+                  const opened = intent?.mode === 'walk' ? 'is open in walk mode: WASD or arrows to walk, drag to look.'
+                    : intent?.mode === 'make_3d' ? 'is open with the object selected. Press Make 3D to confirm (10 credits).'
+                      : intent?.mode === 'photo_walk' ? 'is open. Confirm the photo-real walk there.'
+                        : 'is open on the canvas. Arrange it, then pick a style to render it.';
                   const scMsg: Message = {
                     id: `msg-scene-${Date.now()}`,
                     role: 'assistant',
-                    content: sc.extract_status === 'failed' ? 'The 3D room could not be started.' : 'Your 3D room is open on the canvas. Arrange it, then pick a style to render it.',
+                    content: sc.extract_status === 'failed' ? 'The 3D room could not be started.' : `${sceneData.name} ${opened}`,
                     timestamp: new Date(),
                     agentId: selectedAgent,
                     model: selectedModel,
                     sceneData,
                   };
-                  setMessages((prev) => (prev.some((m) => m.sceneData?.scene_id === sceneData.scene_id) ? prev : [...prev, scMsg]));
-                  if (conversationId) {
+                  const known = !intent && messages.some((m) => m.sceneData?.scene_id === sceneData.scene_id);
+                  setMessages((prev) => (!intent && prev.some((m) => m.sceneData?.scene_id === sceneData.scene_id) ? prev : [...prev, scMsg]));
+                  if (conversationId && !known) {
                     await saveAndLinkMessage(scMsg.id, { conversationId, role: 'assistant', content: scMsg.content, metadata: { agentId: selectedAgent, model: selectedModel, sceneData } });
                   }
                 }
@@ -5780,6 +5786,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             pinned={scenePinned}
             onRendered={(ev) => handleSceneRendered(ev, message.sceneData!.name)}
             onWalkThrough={(imageUrl, prompt) => handleGenerateVR(imageUrl, { prompt }, message)}
+            intent={message.sceneData.intent}
           />
         </Suspense>
       );
