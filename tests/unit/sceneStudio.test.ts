@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   dilateMask, effectiveSize, hexToRgb, idColour, maskBox, maskForColour, planBounds, planFrame, pointInPolygon,
-  productSizeMm, rgbToHex, rotationToPlan, rotationToScene, toPlan, toScene, wallPieces,
+  productSizeMm, rgbToHex, rotationToPlan, rotationToScene, toPlan, toScene, walkBlocked, walkStep, wallPieces,
 } from '@/lib/scene/sceneGeometry';
 import { sanitizeSceneRead, wallsFromRooms } from '@/lib/scene/sceneReadSchema';
 import { blankComments } from '../helpers/stripComments';
@@ -120,5 +120,22 @@ describe('scene studio wiring', () => {
     expect(hub).toContain('<SceneEditor');
     for (const chunk of ['scene_studio_scene', 'scene_studio_scenes']) expect(hub).toContain(`chunk.type === '${chunk}'`);
     expect(hub).toMatch(/onRendered=\{\(ev\) => handleSceneRendered/);
+  });
+});
+
+describe('walking through a 3D room', () => {
+  const wall = { id: 'w', x1_mm: 0, y1_mm: 0, x2_mm: 4000, y2_mm: 0, thickness_mm: 120, height_mm: null };
+  const door = { id: 'd', wall_id: 'w', kind: 'door' as const, offset_mm: 1500, width_mm: 900, sill_mm: 0, head_mm: 2100 };
+  const window = { ...door, id: 'win', kind: 'window' as const, offset_mm: 3000, width_mm: 800 };
+
+  it('stops at a wall and lets you through a door, never a window', () => {
+    expect(walkBlocked(500, 100, [wall], [door, window])).toBe(true);
+    expect(walkBlocked(1950, 0, [wall], [door, window])).toBe(false);
+    expect(walkBlocked(3400, 0, [wall], [door, window])).toBe(true);
+    expect(walkBlocked(500, 1500, [wall], [door, window])).toBe(false);
+  });
+
+  it('slides along a wall instead of sticking to it', () => {
+    expect(walkStep([500, 600], [600, 300], [wall], [])).toEqual([600, 600]);
   });
 });

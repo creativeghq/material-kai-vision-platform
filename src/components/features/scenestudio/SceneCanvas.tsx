@@ -13,7 +13,7 @@ import { loadSharedTexture } from '@/components/features/ar/materialOverrides';
 import { tileFormatM } from '@/components/features/roomplanner/surfaceFormat';
 import {
   effectiveSize, idColour, openingPlacement, planBounds, planFrame, pointInPolygon, rgbToHex,
-  rotationToPlan, rotationToScene, toPlan, toScene, wallPieces,
+  rotationToPlan, rotationToScene, toPlan, toScene, walkStep, wallPieces,
   type PlanFrame, type PlanOpening, type PlanRoom, type PlanWall,
 } from '@/lib/scene/sceneGeometry';
 import type { SceneCamera, SceneObject, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
@@ -59,6 +59,8 @@ interface Props {
   onRemoveObject(id: string): void;
   onPaint(roomId: string, surface: 'floor' | 'walls'): void;
   onFocusRoom?(roomId: string): void;
+  walkRoomId?: string | null;
+  onWalkEnd?(): void;
   modelUrls?: Record<string, string>;
 }
 
@@ -483,14 +485,133 @@ const Bridge = forwardRef<SceneCanvasHandle, {
 });
 Bridge.displayName = 'SceneCanvasBridge';
 
+/** First-person walking: WASD or arrows, drag to look, click the floor to glide there; walls block, doors let you through. */
+const WalkController: React.FC<{
+  start: [number, number]; facing: [number, number]; walls: PlanWall[]; openings: PlanOpening[]; frame: PlanFrame;
+  controls: React.MutableRefObject<OrbitControlsImpl | null>; onExit(): void;
+}> = ({ start, facing, walls, openings, frame, controls, onExit }) => {
+  const { camera, gl } = useThree();
+  const keys = useRef(new Set<string>());
+  const look = useRef({ yaw: 0, pitch: 0 });
+  const glide = useRef<[number, number] | null>(null);
+  const exitRef = useRef(onExit);
+  exitRef.current = onExit;
+  const EYE = 1.6;
+
+  useEffect(() => {
+    const orbit = controls.current;
+    if (orbit) orbit.enabled = false;
+    camera.position.set(start[0], EYE, start[1]);
+    look.current = { yaw: Math.atan2(-(facing[0] - start[0]), -(facing[1] - start[1])), pitch: -0.05 };
+    (camera as PerspectiveCamera).fov = 70;
+    (camera as PerspectiveCamera).updateProjectionMatrix();
+
+    const el = gl.domElement;
+    let drag: { x: number; y: number; moved: boolean } | null = null;
+    const onDown = (e: PointerEvent) => { drag = { x: e.clientX, y: e.clientY, moved: false }; el.setPointerCapture?.(e.pointerId); };
+    const onMove = (e: PointerEvent) => {
+      if (!drag) return;
+      const dx = e.clientX - drag.x; const dy = e.clientY - drag.y;
+      if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+      look.current.yaw -= dx * 0.004;
+      look.current.pitch = Math.max(-1.2, Math.min(1.2, look.current.pitch - dy * 0.004));
+      drag.x = e.clientX; drag.y = e.clientY;
+    };
+    const onUp = (e: PointerEvent) => {
+      const wasClick = drag && !drag.moved;
+      drag = null;
+      if (!wasClick) return;
+      const r = el.getBoundingClientRect();
+      const ndc = new Vector3(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1, 0.5).unproject(camera);
+      const dir = ndc.sub(camera.position).normalize();
+      if (dir.y >= -0.01) return;
+      const t = -camera.position.y / dir.y;
+      glide.current = [camera.position.x + dir.x * t, camera.position.z + dir.z * t];
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'Escape') { exitRef.current(); return; }
+      const k = e.key.toLowerCase();
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'shift'].includes(k)) {
+        e.preventDefault();
+        if (e.type === 'keydown') keys.current.add(k); else keys.current.delete(k);
+        glide.current = null;
+      }
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('pointermove', onMove);
+    el.addEventListener('pointerup', onUp);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    return () => {
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('pointermove', onMove);
+      el.removeEventListener('pointerup', onUp);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+      keys.current.clear();
+      if (orbit) {
+        const ahead = new Vector3(0, 0, -2).applyEuler(camera.rotation).add(camera.position);
+        orbit.target.set(ahead.x, Math.max(0.5, ahead.y), ahead.z);
+        orbit.enabled = true;
+        orbit.update();
+      }
+    };
+  }, [camera, gl, controls, start, facing]);
+
+  useFrame((_, dt) => {
+    const k = keys.current;
+    const { yaw, pitch } = look.current;
+    let mx = 0; let mz = 0;
+    if (k.has('w') || k.has('arrowup')) mz -= 1;
+    if (k.has('s') || k.has('arrowdown')) mz += 1;
+    if (k.has('a') || k.has('arrowleft')) mx -= 1;
+    if (k.has('d') || k.has('arrowright')) mx += 1;
+    const speed = (k.has('shift') ? 3 : 1.4) * Math.min(dt, 0.05);
+    let nx = camera.position.x; let nz = camera.position.z;
+    if (mx || mz) {
+      const len = Math.hypot(mx, mz);
+      const sx = (mx / len) * speed; const sz = (mz / len) * speed;
+      nx += sx * Math.cos(yaw) + sz * Math.sin(yaw);
+      nz += -sx * Math.sin(yaw) + sz * Math.cos(yaw);
+    } else if (glide.current) {
+      const [gx, gz] = glide.current;
+      const dx = gx - nx; const dz = gz - nz; const dist = Math.hypot(dx, dz);
+      if (dist < 0.05) glide.current = null;
+      else { const step = Math.min(dist, 1.6 * Math.min(dt, 0.05)); nx += (dx / dist) * step; nz += (dz / dist) * step; }
+    }
+    if (nx !== camera.position.x || nz !== camera.position.z) {
+      const from = toPlan(camera.position.x, camera.position.z, frame);
+      const to = toPlan(nx, nz, frame);
+      const [px, py] = walkStep(from, to, walls, openings);
+      if (px === from[0] && py === from[1]) glide.current = null;
+      const [sx2, sz2] = toScene(px, py, frame);
+      camera.position.set(sx2, EYE, sz2);
+    }
+    camera.rotation.set(pitch, yaw, 0, 'YXZ');
+  });
+
+  return null;
+};
+
 export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => {
   const {
     rooms, walls, openings, surfaces, objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
-    onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {},
+    onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
   } = props;
   const hasModels = Object.keys(modelUrls).length > 0;
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
   const frame = useMemo(() => planFrame(bounds), [bounds]);
+  const walkPose = useMemo(() => {
+    if (walkRoomId === undefined) return null;
+    const room = rooms.find((r) => r.id === walkRoomId) ?? rooms[0];
+    if (!room || room.outline.length < 3) return null;
+    const pts = room.outline.map(([px, py]) => toScene(px, py, frame));
+    const cx = pts.reduce((a, q) => a + q[0], 0) / pts.length;
+    const cz = pts.reduce((a, q) => a + q[1], 0) / pts.length;
+    const far = pts.reduce((best, q) => (Math.hypot(q[0] - cx, q[1] - cz) > Math.hypot(best[0] - cx, best[1] - cz) ? q : best), pts[0]);
+    return { start: [cx + (far[0] - cx) * 0.6, cz + (far[1] - cz) * 0.6] as [number, number], facing: [cx, cz] as [number, number] };
+  }, [walkRoomId, rooms, frame]);
   const span = Math.max((bounds.maxX - bounds.minX) / 1000, (bounds.maxY - bounds.minY) / 1000, 2);
   const centre = useMemo(() => new Vector3(0, 0, 0), []);
   const controls = useRef<OrbitControlsImpl | null>(null);
@@ -629,6 +750,12 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
+      {walkPose && (
+        <WalkController
+          start={walkPose.start} facing={walkPose.facing} walls={walls} openings={openings} frame={frame}
+          controls={controls} onExit={() => onWalkEnd?.()}
+        />
+      )}
     </Canvas>
   );
 });

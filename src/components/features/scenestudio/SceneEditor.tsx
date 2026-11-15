@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Eye, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
-  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon,
+  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding,
 } from 'lucide-react';
 
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -100,7 +100,7 @@ const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen
       <span className="block truncate text-[11px] text-muted-foreground">{meta}</span>
     </button>
     {onStand && (
-      <button type="button" onClick={onStand} className="flex items-center border-l border-hairline px-2.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground" title="Stand inside" aria-label={`Stand inside ${title}`}>
+      <button type="button" onClick={onStand} className="flex items-center border-l border-hairline px-2.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground" title="Walk in" aria-label={`Walk in ${title}`}>
         <Footprints className="h-4 w-4" />
       </button>
     )}
@@ -142,6 +142,9 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [focusRoomId, setFocusRoomId] = useState<string | null>(null);
   const [eyeLevel, setEyeLevel] = useState(false);
   const [making3d, setMaking3d] = useState<string | null>(null);
+  const [walkRoomId, setWalkRoomId] = useState<string | null | undefined>(undefined);
+  const walking = walkRoomId !== undefined;
+  const startWalk = (roomId: string | null) => { setShowRender(false); setSelectedId(null); setTool('view'); setWalkRoomId(roomId ?? focusRoomId ?? data?.rooms[0]?.id ?? null); };
   const webgl = useMemo(hasWebGL2, []);
 
   const apply = useCallback((d: SceneData) => {
@@ -368,6 +371,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
   const goToRoom = (roomId: string | undefined, inside: boolean) => {
     if (!roomId) return;
+    setWalkRoomId(undefined);
     setShowRender(false);
     setFocusRoomId(roomId);
     canvasRef.current?.focusRoom(roomId, inside);
@@ -671,6 +675,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 onPaint={(roomId, surface) => void paint(roomId, surface)}
                 onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
                 modelUrls={modelUrls}
+                walkRoomId={walkRoomId}
+                onWalkEnd={() => setWalkRoomId(undefined)}
               />
             </Suspense>
           )}
@@ -679,15 +685,16 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             <>
               <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.10))]" />
 
-              <div className="absolute left-3 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
+              {!walking && <div className="absolute left-3 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
                 {TOOLS.map((t) => (
                   <DockButton key={t.id} side="right" label={t.label} hint={t.hint} active={tool === t.id} onClick={() => setTool(t.id)}>
                     <t.icon className="h-4 w-4" />
                   </DockButton>
                 ))}
-              </div>
+              </div>}
 
               <div className="absolute right-3 top-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
+                <DockButton label={walking ? 'Stop Walking' : 'Walk'} hint="Walk through the rooms at eye height: WASD or arrows, drag to look, click the floor to go there" active={walking} onClick={() => (walking ? setWalkRoomId(undefined) : startWalk(null))}><PersonStanding className="h-4 w-4" /></DockButton>
                 <DockButton label="Floor Plan" hint="Look straight down on the whole plan" onClick={() => { setFocusRoomId(null); canvasRef.current?.topView(); }}><MapIcon className="h-4 w-4" /></DockButton>
                 <DockButton label="Reset View" hint="Back to the starting view" onClick={() => { setFocusRoomId(null); canvasRef.current?.resetView(); }}><Hand className="h-4 w-4" /></DockButton>
                 <DockButton label="Wireframe" hint="See through walls and furniture" active={wireframe} onClick={() => setWireframe((w) => !w)}><Grid3x3 className="h-4 w-4" /></DockButton>
@@ -699,13 +706,20 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 ><Footprints className="h-4 w-4" /></DockButton>
               </div>
 
-              <div className="absolute bottom-3 left-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
+              {!walking && <div className="absolute bottom-3 left-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
                 <DockButton side="top" label="Undo" hint="Ctrl+Z" disabled={!history.length} onClick={() => void undo()}><Undo2 className="h-4 w-4" /></DockButton>
                 <DockButton side="top" label="Reset Layout" hint="Put everything back where it was when the room was opened" onClick={resetLayout}><RotateCw className="h-4 w-4" /></DockButton>
                 <DockButton side="top" label="Empty the Room" hint="Take every object out; they wait in the tray" disabled={!objects.some((o) => !o.removed_at)} onClick={emptyRoom}><Trash2 className="h-4 w-4" /></DockButton>
-              </div>
+              </div>}
 
-              {tool !== 'view' && toolHint && (
+              {walking && (
+                <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-hairline bg-card px-3 py-1.5 text-xs shadow-overlay">
+                  <span className="text-muted-foreground">WASD or arrows to walk · drag to look · click the floor to go there · Shift to hurry</span>
+                  <Button size="sm" variant="outline" className="h-7" onClick={() => setWalkRoomId(undefined)}>Stop · Esc</Button>
+                </div>
+              )}
+
+              {!walking && tool !== 'view' && toolHint && (
                 <div className="pointer-events-none absolute bottom-3 left-1/2 max-w-[50%] -translate-x-1/2 rounded-md border border-hairline bg-card px-3 py-1.5 text-center text-xs text-muted-foreground shadow-overlay">{toolHint}</div>
               )}
 
@@ -771,7 +785,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 meta={`${roomArea(r.outline).toFixed(1)} m² · ${count(objects.filter((o) => !o.removed_at && o.room_id === r.id).length, 'object')}`}
                 active={focusRoomId === r.id}
                 onOpen={() => { setEyeLevel(false); goToRoom(r.id, false); }}
-                onStand={() => { setEyeLevel(true); goToRoom(r.id, true); }}
+                onStand={() => startWalk(r.id)}
               />
             ))}
           </div>

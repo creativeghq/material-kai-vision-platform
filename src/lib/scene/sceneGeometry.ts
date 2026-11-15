@@ -225,3 +225,27 @@ export function describeObject(label: string, kind: string, size: SizeMm, colour
   const colour = colourHex ? `, colour ${colourHex}` : '';
   return `${what} (${kind.replace(/_/g, ' ')}), about ${cm(size.width_mm)} × ${cm(size.depth_mm)} cm, ${cm(size.height_mm)} cm high${colour}`;
 }
+
+export function walkBlocked(xMm: number, yMm: number, walls: PlanWall[], openings: PlanOpening[], radiusMm = 250): boolean {
+  for (const w of walls) {
+    const dx = w.x2_mm - w.x1_mm;
+    const dy = w.y2_mm - w.y1_mm;
+    const len2 = dx * dx + dy * dy;
+    if (len2 === 0) continue;
+    const t = Math.max(0, Math.min(1, ((xMm - w.x1_mm) * dx + (yMm - w.y1_mm) * dy) / len2));
+    const dist = Math.hypot(xMm - (w.x1_mm + t * dx), yMm - (w.y1_mm + t * dy));
+    if (dist >= w.thickness_mm / 2 + radiusMm) continue;
+    const along = t * Math.sqrt(len2);
+    const passable = openings.some((o) => o.wall_id === w.id && o.kind !== 'window'
+      && along >= o.offset_mm + radiusMm * 0.5 && along <= o.offset_mm + o.width_mm - radiusMm * 0.5);
+    if (!passable) return true;
+  }
+  return false;
+}
+
+export function walkStep(from: [number, number], to: [number, number], walls: PlanWall[], openings: PlanOpening[]): [number, number] {
+  if (!walkBlocked(to[0], to[1], walls, openings)) return to;
+  if (!walkBlocked(to[0], from[1], walls, openings)) return [to[0], from[1]];
+  if (!walkBlocked(from[0], to[1], walls, openings)) return [from[0], to[1]];
+  return from;
+}
