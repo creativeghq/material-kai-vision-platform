@@ -688,8 +688,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
               </div>
 
               <div className="absolute right-3 top-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
-                <DockButton label="Floor plan" hint="Look straight down on the whole plan" onClick={() => { setFocusRoomId(null); canvasRef.current?.topView(); }}><MapIcon className="h-4 w-4" /></DockButton>
-                <DockButton label="Reset view" hint="Back to the starting view" onClick={() => { setFocusRoomId(null); canvasRef.current?.resetView(); }}><Hand className="h-4 w-4" /></DockButton>
+                <DockButton label="Floor Plan" hint="Look straight down on the whole plan" onClick={() => { setFocusRoomId(null); canvasRef.current?.topView(); }}><MapIcon className="h-4 w-4" /></DockButton>
+                <DockButton label="Reset View" hint="Back to the starting view" onClick={() => { setFocusRoomId(null); canvasRef.current?.resetView(); }}><Hand className="h-4 w-4" /></DockButton>
                 <DockButton label="Wireframe" hint="See through walls and furniture" active={wireframe} onClick={() => setWireframe((w) => !w)}><Grid3x3 className="h-4 w-4" /></DockButton>
                 <DockButton
                   label={eyeLevel ? 'Eye level: on' : 'Eye level: off'}
@@ -701,8 +701,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
               <div className="absolute bottom-3 left-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
                 <DockButton side="top" label="Undo" hint="Ctrl+Z" disabled={!history.length} onClick={() => void undo()}><Undo2 className="h-4 w-4" /></DockButton>
-                <DockButton side="top" label="Reset layout" hint="Put everything back where it was when the room was opened" onClick={resetLayout}><RotateCw className="h-4 w-4" /></DockButton>
-                <DockButton side="top" label="Empty the room" hint="Take every object out; they wait in the tray" disabled={!objects.some((o) => !o.removed_at)} onClick={emptyRoom}><Trash2 className="h-4 w-4" /></DockButton>
+                <DockButton side="top" label="Reset Layout" hint="Put everything back where it was when the room was opened" onClick={resetLayout}><RotateCw className="h-4 w-4" /></DockButton>
+                <DockButton side="top" label="Empty the Room" hint="Take every object out; they wait in the tray" disabled={!objects.some((o) => !o.removed_at)} onClick={emptyRoom}><Trash2 className="h-4 w-4" /></DockButton>
               </div>
 
               {tool !== 'view' && toolHint && (
