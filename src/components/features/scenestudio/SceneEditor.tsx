@@ -272,10 +272,16 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   }, [anyProcessing, id]);
 
   const cropFromRender = async (o: SceneObject): Promise<string> => {
-    if (!data || !activeRender?.id_pass_path) throw new Error('Render the room first: the 3D model is made from how the object looks in a render.');
-    const hex = Object.entries(activeRender.id_map ?? {}).find(([, objId]) => objId === o.id)?.[0];
-    if (!hex) throw new Error('This object is not in the current render. Render the room again first.');
-    const [pass, base] = await Promise.all([loadImage(publicUrl(activeRender.id_pass_path)), loadImage(activeRender.image_url)]);
+    const source = (activeRender && activeRender.layout_snapshot?.[o.id] ? activeRender : null)
+      ?? renders.find((r) => r.id_pass_path && Object.values(r.id_map ?? {}).includes(o.id)) ?? null;
+    if (!data || !source?.id_pass_path) {
+      throw new Error(renders.length
+        ? 'This object is not in any render yet. Render the room again, then make it 3D.'
+        : 'Render the room first: the 3D model is made from how the object looks in a render.');
+    }
+    const hex = Object.entries(source.id_map ?? {}).find(([, objId]) => objId === o.id)?.[0];
+    if (!hex) throw new Error('This object is not in any render yet. Render the room again first.');
+    const [pass, base] = await Promise.all([loadImage(publicUrl(source.id_pass_path)), loadImage(source.image_url)]);
     const mask = await objectMask([{ image: pass, hex }]);
     if (!mask.box) throw new Error('This object cannot be seen in the current render.');
     const W = base.naturalWidth; const H = base.naturalHeight;

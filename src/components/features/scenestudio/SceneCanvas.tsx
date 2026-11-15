@@ -3,7 +3,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, use
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Edges, OrbitControls } from '@react-three/drei';
 import {
-  Box3, Color, DoubleSide, Material, Matrix4, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
+  Box3, Color, DoubleSide, Material, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
   type Object3D, type PerspectiveCamera, type Texture,
 } from 'three';
 import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
@@ -62,8 +62,7 @@ interface Props {
   modelUrls?: Record<string, string>;
 }
 
-const SPLAT_TURN = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -Math.PI / 2)
-  .multiply(new Quaternion(1, 0, 0, 0));
+const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
 
 /** A generated 3D model standing in for an object, fitted inside its true-size box with its front to +Z. */
 const SplatModel: React.FC<{ url: string; w: number; d: number; h: number }> = ({ url, w, d, h }) => {
@@ -75,7 +74,16 @@ const SplatModel: React.FC<{ url: string; w: number; d: number; h: number }> = (
     mesh.quaternion.copy(SPLAT_TURN);
     mesh.initialized.then(() => {
       if (!live) return;
-      const box: Box3 = mesh.getBoundingBox(true).clone().applyMatrix4(new Matrix4().makeRotationFromQuaternion(SPLAT_TURN));
+      const xs: number[] = []; const ys: number[] = []; const zs: number[] = [];
+      const v = new Vector3();
+      mesh.forEachSplat((_i, center, _s, _q, opacity) => {
+        if (opacity < 0.2) return;
+        v.copy(center).applyQuaternion(SPLAT_TURN);
+        xs.push(v.x); ys.push(v.y); zs.push(v.z);
+      });
+      if (xs.length < 100) return;
+      const q = (arr: number[], p: number) => { const a = [...arr].sort((m, n) => m - n); return a[Math.floor(p * (a.length - 1))]; };
+      const box = new Box3(new Vector3(q(xs, 0.02), q(ys, 0.01), q(zs, 0.02)), new Vector3(q(xs, 0.98), q(ys, 0.99), q(zs, 0.98)));
       const size = box.getSize(new Vector3());
       const scale = Math.min(w / Math.max(size.x, 1e-6), d / Math.max(size.z, 1e-6), h / Math.max(size.y, 1e-6));
       const c = box.getCenter(new Vector3());
