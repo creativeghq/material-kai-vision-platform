@@ -18,10 +18,10 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfigService';
 import { ImportStatementDialog } from '@/modules/finance/components/ImportStatementDialog';
+import { TablePagination, TABLE_PAGE_SIZE, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
 import { inboundService, type BankLineDocCandidate } from '@/modules/finance/services/inboundService';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
-// One source (#391).
 import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVocabulary';
 
 interface FeedRow {
@@ -129,15 +129,24 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [planHints, setPlanHints] = React.useState<Map<string, PlanHint>>(new Map());
   const [hintsFailed, setHintsFailed] = React.useState(false);
 
+  // Page is keyed to the filters, so changing any filter lands on page 1 without a second fetch.
+  const filterKey = JSON.stringify([provider, direction, statusF, q, from, to, focusTx]);
+  const [pageState, setPageState] = React.useState({ key: filterKey, page: 1 });
+  const page = pageState.key === filterKey ? pageState.page : 1;
+  const setPage = (p: number) => setPageState({ key: filterKey, page: p });
+  const [total, setTotal] = React.useState(0);
+
   const load = React.useCallback(async () => {
     setLoading(true);
     try {
+      const start = (page - 1) * TABLE_PAGE_SIZE;
       let query = supabase
         .from('revolut_bank_transactions')
-        .select('id, provider, booked_at, counterparty_name, reference, amount, currency, direction, type, state, match_status, matched_invoice_id, suggested_invoice_ids')
+        .select('id, provider, booked_at, counterparty_name, reference, amount, currency, direction, type, state, match_status, matched_invoice_id, suggested_invoice_ids', { count: 'exact' })
         .eq('workspace_id', workspaceId)
         .order('booked_at', { ascending: false })
-        .limit(100);
+        .order('id', { ascending: false })
+        .range(start, start + TABLE_PAGE_SIZE - 1);
       if (focusTx) query = query.eq('id', focusTx);
       if (provider) query = query.eq('provider', provider);
       if (direction) query = query.eq('direction', direction);
@@ -153,8 +162,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       if (from) query = query.gte('booked_at', `${from}T00:00:00Z`);
       if (to) query = query.lte('booked_at', `${to}T23:59:59Z`);
       if (q.trim()) query = query.or(`counterparty_name.ilike.%${q.trim()}%,reference.ilike.%${q.trim()}%`);
-      const { data, error } = await query;
+      const { data, error, count } = await query;
       if (error) throw new Error(error.message);
+      const n = count ?? 0;
+      setTotal(n);
+      if (n > 0 && (data ?? []).length === 0 && page > 1) {
+        setPageState({ key: filterKey, page: clampPage(page, n) });
+        return;
+      }
       const feed = (data ?? []).map((r) => ({
         ...r,
         suggested_invoice_ids: Array.isArray(r.suggested_invoice_ids) ? r.suggested_invoice_ids as string[] : null,
@@ -177,7 +192,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     } catch (e) {
       toast({ title: 'Failed to load the bank feed', description: (e as Error).message, variant: 'destructive' });
     } finally { setLoading(false); }
-  }, [workspaceId, provider, direction, statusF, q, from, to, toast, focusTx]);
+  }, [workspaceId, provider, direction, statusF, q, from, to, toast, focusTx, page, filterKey]);
 
   React.useEffect(() => { void load(); }, [load]);
 
@@ -509,10 +524,8 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             That is not a statement that none of them match.
           </p>
         )}
-        {!loading && rows.length >= 100 && (
-          <p className="border-t border-border/60 px-5 py-2 text-xs text-muted-foreground">
-            Showing the latest 100 — narrow the filters or date range to see older lines.
-          </p>
+        {!loading && (
+          <TablePagination page={page} total={total} onPageChange={setPage} label="transactions" />
         )}
       </CardContent>
 
