@@ -37,6 +37,7 @@ export interface SceneCanvasHandle {
   setPose(pose: CameraPose): void;
   topView(): void;
   resetView(): void;
+  focusRoom(roomId: string, eyeLevel: boolean): void;
 }
 
 interface Props {
@@ -56,6 +57,7 @@ interface Props {
   onMoveObject(id: string, patch: Partial<Pick<SceneObject, 'x_mm' | 'y_mm' | 'rotation_deg' | 'room_id'>>, commit: boolean): void;
   onRemoveObject(id: string): void;
   onPaint(roomId: string, surface: 'floor' | 'walls'): void;
+  onFocusRoom?(roomId: string): void;
 }
 
 const MAX_CAPTURE_SIDE = 1536;
@@ -95,7 +97,8 @@ function useTileTexture(product: SceneProduct | undefined): { map: Texture | nul
 const FloorMesh: React.FC<{
   room: PlanRoom; frame: PlanFrame; surface?: SceneSurface; product?: SceneProduct; wireframe: boolean;
   onPick(e: ThreeEvent<MouseEvent>): void;
-}> = ({ room, frame, surface, product, wireframe, onPick }) => {
+  onDouble?(e: ThreeEvent<MouseEvent>): void;
+}> = ({ room, frame, surface, product, wireframe, onPick, onDouble }) => {
   const shape = useMemo(() => {
     const s = new Shape();
     room.outline.forEach(([x, y], i) => {
@@ -108,7 +111,7 @@ const FloorMesh: React.FC<{
   const { map, tileW, tileL } = useTileTexture(product);
   useEffect(() => { if (map) { map.repeat.set(1 / tileW, 1 / tileL); map.needsUpdate = true; } }, [map, tileW, tileL]);
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow userData={{ surface: 'floor', roomId: room.id }} onClick={onPick}>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow userData={{ surface: 'floor', roomId: room.id }} onClick={onPick} onDoubleClick={onDouble}>
       <shapeGeometry args={[shape]} />
       {map
         ? <meshStandardMaterial key="tex" map={map} roughness={0.85} wireframe={wireframe} />
@@ -286,8 +289,10 @@ const ObjectMesh: React.FC<{
 /** Exposes capture and camera moves to the page. Lives inside the Canvas so it can reach the renderer. */
 const Bridge = forwardRef<SceneCanvasHandle, {
   controls: React.MutableRefObject<OrbitControlsImpl | null>; span: number; initial: CameraPose; idHexById: Record<string, string>;
-}>(({ controls, span, initial, idHexById }, ref) => {
+  rooms: PlanRoom[]; frame: PlanFrame;
+}>(({ controls, span, initial, idHexById, rooms, frame }, ref) => {
   const { gl, scene, camera, size } = useThree();
+  const flight = useRef<{ from: CameraPose; to: CameraPose; t: number } | null>(null);
 
   const setPose = (pose: CameraPose) => {
     camera.position.set(...pose.position);
@@ -300,6 +305,33 @@ const Bridge = forwardRef<SceneCanvasHandle, {
   const currentPose = (): CameraPose => {
     const t = controls.current?.target ?? new Vector3();
     return { position: camera.position.toArray() as [number, number, number], target: [t.x, t.y, t.z], fov: (camera as PerspectiveCamera).fov };
+  };
+
+  const flyTo = (to: CameraPose) => { flight.current = { from: currentPose(), to, t: 0 }; };
+  useFrame((_, delta) => {
+    const f = flight.current;
+    if (!f) return;
+    f.t = Math.min(1, f.t + delta / 0.9);
+    const k = f.t < 0.5 ? 4 * f.t ** 3 : 1 - (-2 * f.t + 2) ** 3 / 2;
+    const mix = (a: number[], b: number[]) => a.map((v, i) => v + (b[i] - v) * k) as [number, number, number];
+    setPose({ position: mix(f.from.position, f.to.position), target: mix(f.from.target, f.to.target), fov: f.from.fov + (f.to.fov - f.from.fov) * k });
+    if (f.t >= 1) flight.current = null;
+  });
+
+  const roomPose = (roomId: string, eyeLevel: boolean): CameraPose | null => {
+    const room = rooms.find((r) => r.id === roomId);
+    if (!room || room.outline.length < 3) return null;
+    const pts = room.outline.map(([x, y]) => toScene(x, y, frame));
+    const cx = pts.reduce((a, p) => a + p[0], 0) / pts.length;
+    const cz = pts.reduce((a, p) => a + p[1], 0) / pts.length;
+    if (eyeLevel) {
+      const far = pts.reduce((best, p) => (Math.hypot(p[0] - cx, p[1] - cz) > Math.hypot(best[0] - cx, best[1] - cz) ? p : best), pts[0]);
+      return { position: [cx + (far[0] - cx) * 0.72, 1.6, cz + (far[1] - cz) * 0.72], target: [cx, 1.1, cz], fov: 70 };
+    }
+    const w = Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0]));
+    const d = Math.max(...pts.map((p) => p[1])) - Math.min(...pts.map((p) => p[1]));
+    const s = Math.max(w, d, 2);
+    return { position: [cx + s * 0.7, s * 1.15, cz + s * 0.85], target: [cx, 0.3, cz], fov: 45 };
   };
 
   const snapshot = (smooth: boolean): HTMLCanvasElement => {
@@ -384,10 +416,11 @@ const Bridge = forwardRef<SceneCanvasHandle, {
         setPose(before);
       }
     },
-    setPose,
-    topView() { setPose({ position: [0, span * 1.35, 0.01], target: [0, 0, 0], fov: 45 }); },
-    resetView() { setPose(initial); },
-  }), [gl, scene, camera, size, idHexById, span, initial]);
+    setPose(pose) { flight.current = null; setPose(pose); },
+    topView() { flyTo({ position: [0, span * 1.35, 0.01], target: [0, 0, 0], fov: 45 }); },
+    resetView() { flyTo(initial); },
+    focusRoom(roomId, eyeLevel) { const pose = roomPose(roomId, eyeLevel); if (pose) flyTo(pose); },
+  }), [gl, scene, camera, size, idHexById, span, initial, rooms, frame]);
 
   return null;
 });
@@ -396,7 +429,7 @@ Bridge.displayName = 'SceneCanvasBridge';
 export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => {
   const {
     rooms, walls, openings, surfaces, objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
-    onSelect, onMoveObject, onRemoveObject, onPaint,
+    onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom,
   } = props;
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
   const frame = useMemo(() => planFrame(bounds), [bounds]);
@@ -471,6 +504,11 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
             e.stopPropagation();
             onPaint(room.id, 'floor');
           }}
+          onDouble={(e) => {
+            if (tool !== 'view' || !onFocusRoom) return;
+            e.stopPropagation();
+            onFocusRoom(room.id);
+          }}
         />
       ))}
       {walls.map((wall) => (
@@ -527,7 +565,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         minDistance={0.5}
         maxDistance={span * 4}
       />
-      <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} />
+      <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
     </Canvas>
   );
 });

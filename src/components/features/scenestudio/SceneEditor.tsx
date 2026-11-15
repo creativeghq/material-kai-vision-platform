@@ -31,7 +31,7 @@ import {
 const SceneCanvas = lazy(() => import('@/components/features/scenestudio/SceneCanvas').then((m) => ({ default: m.SceneCanvas })));
 
 const TOOLS: Array<{ id: SceneTool; label: string; icon: React.ComponentType<{ className?: string }>; hint: string }> = [
-  { id: 'view', label: 'View', icon: Eye, hint: 'Drag to turn the view · right-drag to pan · scroll to zoom · click an object to select it' },
+  { id: 'view', label: 'View', icon: Eye, hint: 'Drag to turn the view · right-drag to pan · scroll to zoom · double-click a floor to go to that room · click an object to select it' },
   { id: 'move', label: 'Move', icon: Move, hint: 'Drag an object across the floor · right-drag to pan' },
   { id: 'turn', label: 'Turn', icon: RotateCw, hint: 'Drag around an object to turn it (15° steps, hold Shift for free) · right-drag to pan' },
   { id: 'remove', label: 'Remove', icon: Trash2, hint: 'Click an object to take it out of the room — it waits in the tray to be put back' },
@@ -93,6 +93,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [pickingPaint, setPickingPaint] = useState(false);
   const [adding, setAdding] = useState<null | 'form' | 'product'>(null);
   const [newObj, setNewObj] = useState({ label: '', kind: 'other' });
+  const [focusRoomId, setFocusRoomId] = useState<string | null>(null);
+  const [eyeLevel, setEyeLevel] = useState(false);
   const webgl = useMemo(hasWebGL2, []);
 
   const apply = useCallback((d: SceneData) => {
@@ -250,6 +252,12 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       setAdding(null);
       setNewObj({ label: '', kind: 'other' });
     } catch (e) { fail('The object could not be added', e); }
+  };
+
+  const goToRoom = (roomId: string, inside: boolean) => {
+    setShowRender(false);
+    setFocusRoomId(roomId);
+    canvasRef.current?.focusRoom(roomId, inside);
   };
 
   const activeRender = renders.find((r) => r.id === activeRenderId) ?? null;
@@ -501,9 +509,26 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 <t.icon className="h-3.5 w-3.5" />{t.label}
               </Button>
             ))}
-            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.topView(); }}><MapIcon className="h-3.5 w-3.5" />Floor plan</Button>
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); setFocusRoomId(null); canvasRef.current?.topView(); }}><MapIcon className="h-3.5 w-3.5" />Floor plan</Button>
             <Button size="sm" variant={wireframe ? 'secondary' : 'ghost'} className="gap-1.5" onClick={() => setWireframe((w) => !w)}><Grid3x3 className="h-3.5 w-3.5" />Wireframe</Button>
-            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.resetView(); }}><Hand className="h-3.5 w-3.5" />Reset view</Button>
+            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); setFocusRoomId(null); canvasRef.current?.resetView(); }}><Hand className="h-3.5 w-3.5" />Reset view</Button>
+            {data.rooms.length > 0 && (
+              <div className="ml-auto flex items-center gap-1">
+                <Select value={focusRoomId ?? ''} onValueChange={(v) => goToRoom(v, eyeLevel)}>
+                  <SelectTrigger className="h-8 w-44" aria-label="Go to a room"><SelectValue placeholder="Go to a room" /></SelectTrigger>
+                  <SelectContent>{data.rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  variant={eyeLevel ? 'secondary' : 'ghost'}
+                  className="gap-1.5"
+                  title="Stand in the room at eye height instead of looking down on it"
+                  onClick={() => { const next = !eyeLevel; setEyeLevel(next); if (focusRoomId) goToRoom(focusRoomId, next); }}
+                >
+                  <Footprints className="h-3.5 w-3.5" />Stand inside
+                </Button>
+              </div>
+            )}
           </div>
 
           <div className="relative h-[56vh] min-h-[380px] bg-surface-sunken">
@@ -539,6 +564,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                   onMoveObject={onMoveObject}
                   onRemoveObject={removeObject}
                   onPaint={(roomId, surface) => void paint(roomId, surface)}
+                  onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
                 />
               </Suspense>
             )}

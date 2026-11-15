@@ -7,7 +7,7 @@
  */
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
-import { WebGLRenderer, Scene, PerspectiveCamera } from 'three';
+import { WebGLRenderer, Scene, PerspectiveCamera, Raycaster, Vector2, Vector3, type Object3D } from 'three';
 // Static import ensures @sparkjsdev/spark shares the SAME Three.js module instance
 // as the rest of the app — dynamic import() creates a separate chunk with its own
 // THREE, causing instanceof checks to fail and constructors to appear as undefined.
@@ -170,6 +170,32 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
 
     const controls = new SparkControls({ canvas });
 
+    const raycaster = new Raycaster();
+    const ndc = new Vector2();
+    let glide: { from: Vector3; to: Vector3; start: number } | null = null;
+    let down: { x: number; y: number; t: number } | null = null;
+    const onPointerDown = (e: PointerEvent) => { down = { x: e.clientX, y: e.clientY, t: performance.now() }; glide = null; };
+    const onPointerUp = (e: PointerEvent) => {
+      const d = down;
+      down = null;
+      const mesh = sceneRef.current?.splatMesh as SplatMesh | undefined;
+      if (!d || !mesh || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 5 || performance.now() - d.t > 400) return;
+      const rect = canvas.getBoundingClientRect();
+      ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(ndc, camera);
+      const hits: { distance: number; point: Vector3; object: Object3D }[] = [];
+      mesh.raycast(raycaster, hits);
+      if (!hits.length) return;
+      hits.sort((a, b) => a.distance - b.distance);
+      const from = camera.position.clone();
+      const flat = new Vector3(hits[0].point.x - from.x, 0, hits[0].point.z - from.z);
+      const dist = flat.length();
+      if (dist < 0.3) return;
+      glide = { from, to: from.clone().add(flat.normalize().multiplyScalar(Math.max(0, dist - 0.6))), start: performance.now() };
+    };
+    canvas.addEventListener('pointerdown', onPointerDown);
+    canvas.addEventListener('pointerup', onPointerUp);
+
     const resizeToContainer = () => {
       if (!container || disposed) return;
       const w = container.clientWidth || 600;
@@ -191,6 +217,11 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       if (disposed) { renderer.setAnimationLoop(null); return; }
       if (!isVisibleRef.current) return;
       if (sceneRef.current?.splatMesh) controls.update(camera);
+      if (glide) {
+        const k = Math.min(1, (performance.now() - glide.start) / 900);
+        camera.position.lerpVectors(glide.from, glide.to, k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
+        if (k >= 1) glide = null;
+      }
       renderer.render(scene, camera);
     });
 
@@ -219,6 +250,8 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
 
     return () => {
       disposed = true;
+      canvas.removeEventListener('pointerdown', onPointerDown);
+      canvas.removeEventListener('pointerup', onPointerUp);
       if (sceneRef.current) {
         const { renderer: r, spark: s, splatMesh: m, resizeObserver: ro } = sceneRef.current;
         r?.setAnimationLoop(null);
@@ -406,9 +439,10 @@ export const WorldViewer: React.FC<WorldViewerProps> = ({
       </div>
 
       {/* First-person help overlay */}
-      {navMode === 'firstperson' && isSceneReady && (
+      {isSceneReady && (
         <div className="absolute bottom-3 left-3 px-3 py-1.5 bg-black/60 text-white/70 rounded-lg text-xs backdrop-blur-sm z-20">
-          WASD to move &middot; Mouse to look &middot; Shift for speed
+          Click a spot to walk there &middot; drag to look
+          {navMode === 'firstperson' && <> &middot; WASD to move &middot; Shift for speed</>}
         </div>
       )}
 
