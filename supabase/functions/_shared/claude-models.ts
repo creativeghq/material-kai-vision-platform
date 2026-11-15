@@ -3,11 +3,12 @@
 export const CLAUDE_OPUS = 'claude-opus-5-5';
 export const CLAUDE_SONNET = 'claude-sonnet-5-5';
 export const CLAUDE_HAIKU = 'claude-haiku-5-5';
+export const CLAUDE_FABLE = 'claude-fable-5-2';
 
 /** `tool_choice` `any`/`tool` is a 400 on these. */
-const REJECTS_FORCED_TOOL_CHOICE = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1', 'claude-mythos-5-1'];
+const REJECTS_FORCED_TOOL_CHOICE = ['claude-opus-5-5', 'claude-sonnet-5-5', 'claude-fable-5-1', 'claude-mythos-5-1', 'claude-fable-5-2', 'claude-mythos-5-2'];
 /** Thinking cannot be disabled; effort is the only control. */
-const ALWAYS_THINKS = ['claude-opus-5-5'];
+const ALWAYS_THINKS = ['claude-opus-5-5', 'claude-fable-5', 'claude-mythos-5'];
 /** `disabled` is a 400; `between_tools` is the no-thinking setting. */
 const BETWEEN_TOOLS = ['claude-sonnet-5-5'];
 /** Thinks by default where its predecessor did not, so an unset `thinking` is turned off. */

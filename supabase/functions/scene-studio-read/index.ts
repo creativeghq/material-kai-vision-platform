@@ -11,7 +11,7 @@ import { captureException } from '../_shared/sentry.ts';
 import { SCENE_READ_SCHEMA, sanitizeSceneRead } from '../_shared/sceneReadSchema.generated.ts';
 
 const BUCKET = 'generation-images';
-const MODEL = 'claude-sonnet-5-5';
+const MODEL = 'claude-fable-5-2';
 const MAX_IMAGE_BYTES = 4_500_000;
 const STALE_READ_MS = 10 * 60 * 1000;
 const READABLE_KINDS = ['plan_image', 'photo', 'render'];
@@ -69,6 +69,7 @@ async function readSource(admin: DbClient, plan: Plan, uid: string, charge: Char
 
     const subcategory = plan.source_kind === 'plan_image' ? 'plan' : 'photo';
     const system = await loadPrompt(admin, 'extraction', 'scene_studio', subcategory);
+    const started = Date.now();
     const res = await callClaudeMessages({
       model: MODEL,
       max_tokens: 16000,
@@ -83,7 +84,12 @@ async function readSource(admin: DbClient, plan: Plan, uid: string, charge: Char
       }],
     }, {
       task: `scene-studio-read:${subcategory}`, userId: uid, workspaceId: plan.workspace_id, timeoutMs: 240_000, costLoggedByCaller: true,
-    }) as { stop_reason?: string; content?: Array<{ type: string; text?: string }> };
+    }) as { stop_reason?: string; content?: Array<{ type: string; text?: string }>; usage?: { input_tokens?: number; output_tokens?: number } };
+    await admin.from('ai_call_logs').insert({
+      task: `scene-studio-read:${subcategory}`, model: MODEL,
+      input_tokens: res.usage?.input_tokens ?? 0, output_tokens: res.usage?.output_tokens ?? 0,
+      cost: null, latency_ms: Date.now() - started, action: 'use_ai_result', error_message: res.stop_reason === 'end_turn' ? null : res.stop_reason ?? null,
+    });
     if (res.stop_reason === 'refusal') return await fail('The image could not be read (the reader declined it).');
     if (res.stop_reason === 'max_tokens') return await fail('The image holds more than one read can describe. Crop it to one floor or room.');
     const text = (res.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('').trim();

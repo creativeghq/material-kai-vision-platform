@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 
 import {
-  CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET, acceptsSamplingParams, langchainToolChoice, shapeClaudeRequest,
+  CLAUDE_FABLE, CLAUDE_HAIKU, CLAUDE_OPUS, CLAUDE_SONNET, acceptsSamplingParams, langchainToolChoice, shapeClaudeRequest,
 } from '../../supabase/functions/_shared/claude-models';
 
 const forced = (model: string, extra: Record<string, unknown> = {}) => ({
@@ -11,7 +11,7 @@ const forced = (model: string, extra: Record<string, unknown> = {}) => ({
 });
 
 describe('shapeClaudeRequest', () => {
-  it.each([CLAUDE_OPUS, CLAUDE_SONNET])('turns a forced tool into auto plus an instruction on %s', (model) => {
+  it.each([CLAUDE_OPUS, CLAUDE_SONNET, CLAUDE_FABLE])('turns a forced tool into auto plus an instruction on %s', (model) => {
     const out = shapeClaudeRequest(forced(model, { system: 'Extract.' }));
     expect(out.tool_choice).toEqual({ type: 'auto' });
     expect(String(out.system)).toContain('`record` tool');
@@ -34,6 +34,9 @@ describe('shapeClaudeRequest', () => {
     expect(opus.thinking).toBeUndefined();
     expect(opus.output_config).toEqual({ effort: 'low' });
     expect(shapeClaudeRequest({ model: CLAUDE_SONNET, thinking: off }).thinking).toEqual({ type: 'between_tools' });
+    const fable = shapeClaudeRequest({ model: CLAUDE_FABLE, thinking: off });
+    expect(fable.thinking).toBeUndefined();
+    expect(fable.output_config).toEqual({ effort: 'low' });
   });
 
   it('drops sampling parameters for every current model', () => {
