@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Eye, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
-  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X,
+  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon,
 } from 'lucide-react';
 
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -95,6 +95,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [newObj, setNewObj] = useState({ label: '', kind: 'other' });
   const [focusRoomId, setFocusRoomId] = useState<string | null>(null);
   const [eyeLevel, setEyeLevel] = useState(false);
+  const [making3d, setMaking3d] = useState<string | null>(null);
   const webgl = useMemo(hasWebGL2, []);
 
   const apply = useCallback((d: SceneData) => {
@@ -254,6 +255,65 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     } catch (e) { fail('The object could not be added', e); }
   };
 
+  const modelUrls = useMemo(() => Object.fromEntries(objects
+    .filter((o) => o.model_status === 'ready' && o.model_storage_path)
+    .map((o) => [o.id, publicUrl(o.model_storage_path!)])), [objects]);
+
+  const anyProcessing = objects.some((o) => o.model_status === 'processing');
+  useEffect(() => {
+    if (!anyProcessing) return;
+    const t = setInterval(async () => {
+      try {
+        const states = new Map((await sceneStudioService.objectModelStates(id)).map((r) => [r.id, r]));
+        setObjects((list) => list.map((o) => (states.has(o.id) ? { ...o, ...states.get(o.id) } : o)));
+      } catch { /* the next tick tries again */ }
+    }, 5000);
+    return () => clearInterval(t);
+  }, [anyProcessing, id]);
+
+  const cropFromRender = async (o: SceneObject): Promise<string> => {
+    if (!data || !activeRender?.id_pass_path) throw new Error('Render the room first: the 3D model is made from how the object looks in a render.');
+    const hex = Object.entries(activeRender.id_map ?? {}).find(([, objId]) => objId === o.id)?.[0];
+    if (!hex) throw new Error('This object is not in the current render. Render the room again first.');
+    const [pass, base] = await Promise.all([loadImage(publicUrl(activeRender.id_pass_path)), loadImage(activeRender.image_url)]);
+    const mask = await objectMask([{ image: pass, hex }]);
+    if (!mask.box) throw new Error('This object cannot be seen in the current render.');
+    const W = base.naturalWidth; const H = base.naturalHeight;
+    const padX = (mask.box.x1 - mask.box.x0) * 0.15; const padY = (mask.box.y1 - mask.box.y0) * 0.15;
+    const x0 = Math.max(0, (mask.box.x0 - padX) * W); const y0 = Math.max(0, (mask.box.y0 - padY) * H);
+    const x1 = Math.min(W, (mask.box.x1 + padX) * W); const y1 = Math.min(H, (mask.box.y1 + padY) * H);
+    const scale = Math.max(1, 1024 / Math.max(x1 - x0, y1 - y0));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round((x1 - x0) * scale); canvas.height = Math.round((y1 - y0) * scale);
+    const ctx = canvas.getContext('2d')!;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(base, x0, y0, x1 - x0, y1 - y0, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('Crop failed'))), 'image/png'));
+    return sceneStudioService.uploadCapture(data.scene, blob, `object-${o.id.slice(0, 8)}`);
+  };
+
+  const make3d = async (o: SceneObject) => {
+    if (!data || making3d) return;
+    setMaking3d(o.id);
+    try {
+      const result = o.product_id
+        ? await sceneStudioService.make3d({ product_id: o.product_id, workspace_id: data.scene.workspace_id, floor_plan_object_id: o.id })
+        : await sceneStudioService.make3d({ floor_plan_object_id: o.id, image_path: await cropFromRender(o) });
+      const states = new Map((await sceneStudioService.objectModelStates(id)).map((r) => [r.id, r]));
+      setObjects((list) => list.map((x) => (states.has(x.id) ? { ...x, ...states.get(x.id) } : x)));
+      toast({
+        title: result.status === 'ready' ? `${o.label} is now 3D` : `Making ${o.label} 3D`,
+        description: result.charged
+          ? `${result.credits_used ?? 10} credits used.${result.status === 'processing' ? ' It appears in the room in about a minute.' : ''}`
+          : 'Another 3D model of it is being made right now. Try again in a minute; nothing was charged.',
+      });
+    } catch (e) {
+      fail('The object could not be made 3D', e);
+    } finally {
+      setMaking3d(null);
+    }
+  };
+
   const goToRoom = (roomId: string, inside: boolean) => {
     setShowRender(false);
     setFocusRoomId(roomId);
@@ -408,6 +468,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const noRoom = data.rooms.length === 0 && data.walls.length === 0;
 
   const sidePanel = selected && !selected.removed_at ? (
+    <div className="space-y-3">
     <ObjectInspector
       obj={selected}
       product={selected.product_id ? products[selected.product_id] : undefined}
@@ -421,6 +482,25 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       onDelete={() => removeObject(selected.id)}
       onClose={() => setSelectedId(null)}
     />
+    <Card>
+      <CardContent className="space-y-2 p-3 text-xs">
+        {selected.model_status === 'ready' ? (
+          <p className="flex items-center gap-1.5"><BoxIcon className="h-3.5 w-3.5" />Shown as a photo-real 3D model.</p>
+        ) : selected.model_status === 'processing' ? (
+          <p className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Making the 3D model. It appears in the room in about a minute.</p>
+        ) : (
+          <>
+            {selected.model_status === 'failed' && <p className="text-destructive">The last attempt failed and was refunded{selected.model_error ? `: ${selected.model_error}` : '.'}</p>}
+            <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={making3d === selected.id} onClick={() => void make3d(selected)}>
+              {making3d === selected.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BoxIcon className="h-3.5 w-3.5" />}
+              Make 3D (10 credits)
+            </Button>
+            <p className="text-muted-foreground">{selected.product_id ? 'Made from the product photo, once, then kept for every room.' : 'Made from how it looks in the current render.'}</p>
+          </>
+        )}
+      </CardContent>
+    </Card>
+    </div>
   ) : tool === 'paint' ? (
     <Card>
       <CardHeader className="pb-2"><CardTitle className="text-sm">Paint</CardTitle></CardHeader>
@@ -565,6 +645,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                   onRemoveObject={removeObject}
                   onPaint={(roomId, surface) => void paint(roomId, surface)}
                   onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
+                  modelUrls={modelUrls}
                 />
               </Suspense>
             )}

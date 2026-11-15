@@ -32,6 +32,7 @@ interface Target {
   workspaceId: string;
   folder: string;
   source: { url?: string; path?: string };
+  linkObjectId?: string;
 }
 
 interface Charge { uid: string; credits: number; transactionId: string | null; workspaceId: string }
@@ -51,6 +52,9 @@ async function refund(admin: DbClient, charge: Charge, reason: string, meta: Rec
 
 async function markFailed(admin: DbClient, t: Target, message: string) {
   const msg = message.slice(0, 500);
+  if (t.linkObjectId) {
+    await admin.from('floor_plan_objects').update({ model_status: 'failed', model_error: msg, model_updated_at: new Date().toISOString() }).eq('id', t.linkObjectId);
+  }
   const { error } = t.kind === 'product'
     ? await admin.from('product_3d_models').update({ status: 'failed', error: msg }).eq('id', t.rowId)
     : await admin.from('floor_plan_objects').update({ model_status: 'failed', model_error: msg, model_updated_at: new Date().toISOString() }).eq('id', t.rowId);
@@ -86,7 +90,7 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': Deno.env.get('CRON_SECRET') || '' },
       body: JSON.stringify({
-        target: t.kind, row_id: t.rowId, image_path: cleanPath, out_path: `${t.folder}/${stamp}.ply`,
+        target: t.kind, row_id: t.rowId, image_path: cleanPath, out_path: `${t.folder}/${stamp}.ply`, link_object_id: t.linkObjectId ?? null,
         refund: { user_id: charge.uid, credits: charge.credits, transaction_id: charge.transactionId, workspace_id: charge.workspaceId },
       }),
     });
@@ -146,6 +150,13 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     else if (row?.status === 'processing' && Date.parse(row.updated_at) > Date.now() - STALE_MS) processing = true;
     else if (!imageUrl) throw new HttpError(409, 'This product has no photo to make a 3D model from.');
     target.rowId = row?.id ?? '';
+    if (body.floor_plan_object_id) {
+      const { data: link } = await admin.from('floor_plan_objects')
+        .select('id, product_id, floor_plans(workspace_id)').eq('id', body.floor_plan_object_id).maybeSingle();
+      const linkWs = (link?.floor_plans as { workspace_id?: string } | null)?.workspace_id;
+      if (!link || link.product_id !== product.id || linkWs !== ws) throw new HttpError(404, 'Object not found');
+      target.linkObjectId = link.id;
+    }
   } else if (body.floor_plan_object_id) {
     const { data: obj } = await admin.from('floor_plan_objects')
       .select('id, label, kind, floor_plan_id, product_id, model_status, model_storage_path, model_updated_at, floor_plans(workspace_id)')
@@ -206,9 +217,17 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   }
 
   if (ready) {
+    if (target.linkObjectId) {
+      await admin.from('floor_plan_objects').update({
+        model_status: 'ready', model_storage_path: ready, model_error: null, model_updated_at: new Date().toISOString(),
+      }).eq('id', target.linkObjectId);
+    }
     return json({ success: true, status: 'ready', charged: true, credits_used: debit.credits_debited, url: publicUrl(admin, ready) });
   }
 
+  if (target.linkObjectId) {
+    await admin.from('floor_plan_objects').update({ model_status: 'processing', model_error: null, model_updated_at: new Date().toISOString() }).eq('id', target.linkObjectId);
+  }
   const charge: Charge = { uid, credits: debit.credits_debited, transactionId: debit.transaction_id ?? null, workspaceId: target.workspaceId };
   const work = generate(admin, target, charge);
   const runtime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;

@@ -3,9 +3,10 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, use
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Edges, OrbitControls } from '@react-three/drei';
 import {
-  Color, DoubleSide, Material, Mesh, MeshBasicMaterial, Plane, Shape, Vector3,
+  Box3, Color, DoubleSide, Material, Matrix4, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
   type Object3D, type PerspectiveCamera, type Texture,
 } from 'three';
+import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PresetLighting, DEFAULT_PRESET } from '@/components/features/lighting/PresetLighting';
 import { loadSharedTexture } from '@/components/features/ar/materialOverrides';
@@ -58,7 +59,44 @@ interface Props {
   onRemoveObject(id: string): void;
   onPaint(roomId: string, surface: 'floor' | 'walls'): void;
   onFocusRoom?(roomId: string): void;
+  modelUrls?: Record<string, string>;
 }
+
+const SPLAT_TURN = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), -Math.PI / 2)
+  .multiply(new Quaternion(1, 0, 0, 0));
+
+/** A generated 3D model standing in for an object, fitted inside its true-size box with its front to +Z. */
+const SplatModel: React.FC<{ url: string; w: number; d: number; h: number }> = ({ url, w, d, h }) => {
+  const [fit, setFit] = useState<{ mesh: SplatMesh; scale: number; offset: [number, number, number] } | null>(null);
+  useEffect(() => {
+    let live = true;
+    const mesh = new SplatMesh({ url });
+    mesh.userData.splat = true;
+    mesh.quaternion.copy(SPLAT_TURN);
+    mesh.initialized.then(() => {
+      if (!live) return;
+      const box: Box3 = mesh.getBoundingBox(true).clone().applyMatrix4(new Matrix4().makeRotationFromQuaternion(SPLAT_TURN));
+      const size = box.getSize(new Vector3());
+      const scale = Math.min(w / Math.max(size.x, 1e-6), d / Math.max(size.z, 1e-6), h / Math.max(size.y, 1e-6));
+      const c = box.getCenter(new Vector3());
+      setFit({ mesh, scale, offset: [-c.x * scale, -box.min.y * scale, -c.z * scale] });
+    }).catch(() => { /* the box stays as the stand-in */ });
+    return () => { live = false; mesh.dispose(); };
+  }, [url, w, d, h]);
+  if (!fit) return null;
+  return <group position={fit.offset} scale={fit.scale}><primitive object={fit.mesh} /></group>;
+};
+
+const SparkLayer: React.FC = () => {
+  const { gl, scene } = useThree();
+  useEffect(() => {
+    const spark = new SparkRenderer({ renderer: gl });
+    spark.userData.splat = true;
+    scene.add(spark);
+    return () => { scene.remove(spark); };
+  }, [gl, scene]);
+  return null;
+};
 
 const MAX_CAPTURE_SIDE = 1536;
 const FLOOR_DEFAULT = '#c9b8a2';
@@ -201,8 +239,8 @@ const OpeningMesh: React.FC<{ wall: PlanWall; opening: PlanOpening; frame: PlanF
 const ObjectMesh: React.FC<{
   obj: SceneObject; idHex: string; frame: PlanFrame; product?: SceneProduct; selected: boolean; wireframe: boolean;
   tool: SceneTool; floorPlane: Plane; controls: React.MutableRefObject<OrbitControlsImpl | null>;
-  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void;
-}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove }) => {
+  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void; modelUrl?: string;
+}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove, modelUrl }) => {
   const size = effectiveSize(obj, product);
   const w = size.width_mm / 1000;
   const d = size.depth_mm / 1000;
@@ -252,9 +290,17 @@ const ObjectMesh: React.FC<{
   };
 
   const body = (() => {
-    const material = <meshStandardMaterial color={colour} roughness={0.8} wireframe={wireframe} />;
+    const material = <meshStandardMaterial color={colour} roughness={0.8} wireframe={wireframe} visible={!modelUrl || wireframe} />;
     const edges = selected ? <Edges userData={{ helper: true }} color={SELECT_COLOUR} lineWidth={2} /> : null;
     const common = { castShadow: true, receiveShadow: true, userData: { objectId: obj.id, idHex } };
+    if (modelUrl) {
+      return (
+        <group>
+          <mesh {...common} position={[0, h / 2, 0]}><boxGeometry args={[w, h, d]} />{material}{edges}</mesh>
+          <SplatModel url={modelUrl} w={w} d={d} h={h} />
+        </group>
+      );
+    }
     if (obj.kind === 'plant') {
       return (
         <group>
@@ -360,9 +406,11 @@ const Bridge = forwardRef<SceneCanvasHandle, {
     const made: Material[] = [black];
     const prevBackground = scene.background;
     const prevFog = scene.fog;
+    const splats: Object3D[] = [];
+    scene.traverse((o) => { if (o.userData?.splat && o.visible) { splats.push(o); o.visible = false; } });
     scene.traverse((o) => {
       const mesh = o as Mesh;
-      if (!mesh.isMesh) return;
+      if (!mesh.isMesh || mesh.userData?.splat) return;
       swapped.push([mesh, mesh.material]);
       const hex = mesh.userData?.objectId ? idHexById[mesh.userData.objectId as string] : null;
       if (hex) {
@@ -380,6 +428,7 @@ const Bridge = forwardRef<SceneCanvasHandle, {
       return snapshot(false);
     } finally {
       swapped.forEach(([mesh, mat]) => { mesh.material = mat; });
+      splats.forEach((o) => { o.visible = true; });
       made.forEach((m) => m.dispose());
       scene.background = prevBackground;
       scene.fog = prevFog;
@@ -429,8 +478,9 @@ Bridge.displayName = 'SceneCanvasBridge';
 export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => {
   const {
     rooms, walls, openings, surfaces, objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
-    onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom,
+    onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {},
   } = props;
+  const hasModels = Object.keys(modelUrls).length > 0;
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
   const frame = useMemo(() => planFrame(bounds), [bounds]);
   const span = Math.max((bounds.maxX - bounds.minX) / 1000, (bounds.maxY - bounds.minY) / 1000, 2);
@@ -491,6 +541,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     >
       <color attach="background" args={['#e9e6e1']} />
       <PresetLighting preset={DEFAULT_PRESET} />
+      {hasModels && <SparkLayer />}
       {rooms.map((room) => (
         <FloorMesh
           key={room.id}
@@ -553,6 +604,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
             onMoveObject(id, next, commit);
           }}
           onRemove={() => onRemoveObject(o.id)}
+          modelUrl={modelUrls[o.id]}
         />
       ))}
       <OrbitControls
