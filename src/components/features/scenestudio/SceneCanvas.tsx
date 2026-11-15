@@ -1,7 +1,7 @@
 /** The editable Scene Studio room (#564): walls cut around openings, floors, and every object as a true-size stand-in. */
 import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { Edges, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
 import {
   Box3, Color, DoubleSide, Material, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
   type Object3D, type PerspectiveCamera, type Texture,
@@ -550,6 +550,9 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       <color attach="background" args={['#e9e6e1']} />
       <PresetLighting preset={DEFAULT_PRESET} />
       {hasModels && <SparkLayer />}
+      <group userData={{ splat: true }}>
+        <ContactShadows position={[0, 0.004, 0]} scale={span * 1.6} far={2.5} blur={2.2} opacity={0.45} resolution={1024} />
+      </group>
       {rooms.map((room) => (
         <FloorMesh
           key={room.id}

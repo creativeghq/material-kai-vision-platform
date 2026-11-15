@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/core/ui/tooltip';
 import { useToast } from '@/hooks/use-toast';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import { VR_CREDIT_COSTS } from '@/services/vrWorldService';
@@ -60,6 +61,51 @@ const layoutOf = (objects: SceneObject[]): Record<string, LayoutEntry> =>
   }]));
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+const roomArea = (outline: Array<[number, number]>) => {
+  let sum = 0;
+  for (let i = 0; i < outline.length; i++) {
+    const [x1, y1] = outline[i];
+    const [x2, y2] = outline[(i + 1) % outline.length];
+    sum += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(sum) / 2 / 1e6;
+};
+
+const DockButton: React.FC<{ label: string; hint?: string; active?: boolean; disabled?: boolean; side?: 'right' | 'left' | 'top' | 'bottom'; onClick(): void; children: React.ReactNode }> = ({ label, hint, active, disabled, side = 'bottom', onClick, children }) => (
+  <Tooltip>
+    <TooltipTrigger asChild>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={active}
+        disabled={disabled}
+        onClick={onClick}
+        className={`flex h-9 w-9 items-center justify-center rounded-sm transition-colors disabled:opacity-40 ${active ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-surface-sunken'}`}
+      >
+        {children}
+      </button>
+    </TooltipTrigger>
+    <TooltipContent side={side} className="max-w-[220px]">
+      <p className="text-xs font-semibold">{label}</p>
+      {hint && <p className="text-[11px] text-muted-foreground">{hint}</p>}
+    </TooltipContent>
+  </Tooltip>
+);
+
+const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen(): void; onStand?(): void }> = ({ title, meta, active, onOpen, onStand }) => (
+  <div className={`flex w-48 shrink-0 items-stretch overflow-hidden rounded-md border bg-card ${active ? 'border-primary ring-1 ring-primary' : 'border-hairline'}`}>
+    <button type="button" onClick={onOpen} className="min-w-0 flex-1 px-3 py-2 text-left hover:bg-surface-sunken">
+      <span className="block truncate text-sm font-medium">{title}</span>
+      <span className="block truncate text-[11px] text-muted-foreground">{meta}</span>
+    </button>
+    {onStand && (
+      <button type="button" onClick={onStand} className="flex items-center border-l border-hairline px-2.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground" title="Stand inside" aria-label={`Stand inside ${title}`}>
+        <Footprints className="h-4 w-4" />
+      </button>
+    )}
+  </div>
+);
 
 const hasWebGL2 = () => {
   try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
@@ -320,7 +366,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     }
   };
 
-  const goToRoom = (roomId: string, inside: boolean) => {
+  const goToRoom = (roomId: string | undefined, inside: boolean) => {
+    if (!roomId) return;
     setShowRender(false);
     setFocusRoomId(roomId);
     canvasRef.current?.focusRoom(roomId, inside);
@@ -460,6 +507,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
   const references = useMemo(() => renders.filter((r) => r.kind === 'full').slice(0, 9).map((r) => ({ url: r.image_url, label: r.style_label ?? 'Earlier render' })), [renders]);
   const removed = objects.filter((o) => o.removed_at);
+  const totalArea = useMemo(() => (data?.rooms ?? []).reduce((sum, r) => sum + roomArea(r.outline), 0), [data]);
   const toolHint = TOOLS.find((t) => t.id === tool)?.hint;
 
   if (loadError) {
@@ -588,119 +636,146 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   return (
     <PinnedProductsContext.Provider value={pinned}>
       <div className="space-y-3">
-        <Card className="overflow-hidden">
-          <div className="flex flex-wrap items-center gap-1 border-b border-hairline bg-surface-sunken p-1.5">
-            {TOOLS.map((t) => (
-              <Button key={t.id} size="sm" variant={tool === t.id && !showRender ? 'secondary' : 'ghost'} className="gap-1.5" onClick={() => { setTool(t.id); setShowRender(false); }}>
-                <t.icon className="h-3.5 w-3.5" />{t.label}
-              </Button>
-            ))}
-            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); setFocusRoomId(null); canvasRef.current?.topView(); }}><MapIcon className="h-3.5 w-3.5" />Floor plan</Button>
-            <Button size="sm" variant={wireframe ? 'secondary' : 'ghost'} className="gap-1.5" onClick={() => setWireframe((w) => !w)}><Grid3x3 className="h-3.5 w-3.5" />Wireframe</Button>
-            <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); setFocusRoomId(null); canvasRef.current?.resetView(); }}><Hand className="h-3.5 w-3.5" />Reset view</Button>
-            {data.rooms.length > 0 && (
-              <div className="ml-auto flex items-center gap-1">
-                <Select value={focusRoomId ?? ''} onValueChange={(v) => goToRoom(v, eyeLevel)}>
-                  <SelectTrigger className="h-8 w-44" aria-label="Pick a room"><SelectValue placeholder="Pick a room" /></SelectTrigger>
-                  <SelectContent>{data.rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
-                </Select>
-                <Button
-                  size="sm"
-                  variant={eyeLevel ? 'secondary' : 'ghost'}
-                  className="gap-1.5"
-                  title="Stand in the room at eye height instead of looking down on it"
-                  onClick={() => { const next = !eyeLevel; setEyeLevel(next); if (focusRoomId) goToRoom(focusRoomId, next); }}
-                >
-                  <Footprints className="h-3.5 w-3.5" />Stand inside
+        <div className="relative h-[64vh] min-h-[440px] overflow-hidden rounded-md border border-hairline bg-surface-sunken">
+          {reading ? (
+            <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" />Reading the image into rooms, walls and furniture. This takes about a minute.
+            </div>
+          ) : noRoom ? (
+            <HubEmptyState
+              icon={Box}
+              title={scene.extract_status === 'failed' ? 'The image could not be read' : 'No room yet'}
+              description={scene.extract_status === 'failed' ? (scene.extract_error ?? undefined) : 'Add a rectangular room to start.'}
+              action={<Button onClick={async () => { try { await sceneStudioService.addRectRoom(scene.id, 5000, 4000, 'Room'); void load(); } catch (e) { fail('The room could not be added', e); } }}>Add a 5 × 4 m room</Button>}
+            />
+          ) : !webgl ? (
+            <HubEmptyState icon={Box} title="3D is not available in this browser" description="This device does not support WebGL 2. Open the conversation on a computer to edit the room in 3D." />
+          ) : (
+            <Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>}>
+              <SceneCanvas
+                ref={canvasRef}
+                rooms={data.rooms}
+                walls={data.walls}
+                openings={data.openings}
+                surfaces={surfaces}
+                objects={objects}
+                products={products}
+                defaultWallHeightMm={scene.default_wall_height_mm}
+                viewCamera={scene.view_camera}
+                tool={tool}
+                wireframe={wireframe}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onMoveObject={onMoveObject}
+                onRemoveObject={removeObject}
+                onPaint={(roomId, surface) => void paint(roomId, surface)}
+                onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
+                modelUrls={modelUrls}
+              />
+            </Suspense>
+          )}
+
+          {!reading && !noRoom && webgl && !showRender && (
+            <>
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_60%,rgba(0,0,0,0.10))]" />
+
+              <div className="absolute left-3 top-1/2 flex -translate-y-1/2 flex-col gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
+                {TOOLS.map((t) => (
+                  <DockButton key={t.id} side="right" label={t.label} hint={t.hint} active={tool === t.id} onClick={() => setTool(t.id)}>
+                    <t.icon className="h-4 w-4" />
+                  </DockButton>
+                ))}
+              </div>
+
+              <div className="absolute right-3 top-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
+                <DockButton label="Floor plan" hint="Look straight down on the whole plan" onClick={() => { setFocusRoomId(null); canvasRef.current?.topView(); }}><MapIcon className="h-4 w-4" /></DockButton>
+                <DockButton label="Reset view" hint="Back to the starting view" onClick={() => { setFocusRoomId(null); canvasRef.current?.resetView(); }}><Hand className="h-4 w-4" /></DockButton>
+                <DockButton label="Wireframe" hint="See through walls and furniture" active={wireframe} onClick={() => setWireframe((w) => !w)}><Grid3x3 className="h-4 w-4" /></DockButton>
+                <DockButton
+                  label={eyeLevel ? 'Eye level: on' : 'Eye level: off'}
+                  hint="Stand in the space at eye height instead of looking down on it"
+                  active={eyeLevel}
+                  onClick={() => { const next = !eyeLevel; setEyeLevel(next); goToRoom(focusRoomId ?? data.rooms[0]?.id, next); }}
+                ><Footprints className="h-4 w-4" /></DockButton>
+              </div>
+
+              <div className="absolute bottom-3 left-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
+                <DockButton side="top" label="Undo" hint="Ctrl+Z" disabled={!history.length} onClick={() => void undo()}><Undo2 className="h-4 w-4" /></DockButton>
+                <DockButton side="top" label="Reset layout" hint="Put everything back where it was when the room was opened" onClick={resetLayout}><RotateCw className="h-4 w-4" /></DockButton>
+                <DockButton side="top" label="Empty the room" hint="Take every object out; they wait in the tray" disabled={!objects.some((o) => !o.removed_at)} onClick={emptyRoom}><Trash2 className="h-4 w-4" /></DockButton>
+              </div>
+
+              {tool !== 'view' && toolHint && (
+                <div className="pointer-events-none absolute bottom-3 left-1/2 max-w-[50%] -translate-x-1/2 rounded-md border border-hairline bg-card px-3 py-1.5 text-center text-xs text-muted-foreground shadow-overlay">{toolHint}</div>
+              )}
+
+              {removed.length > 0 && (
+                <div className="absolute right-3 top-16 max-w-[240px] rounded-md border border-hairline bg-card p-2 shadow-overlay">
+                  <p className="mb-1.5 text-[11px] font-semibold text-muted-foreground">Removed · click to put back</p>
+                  <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto">
+                    {removed.map((o) => (
+                      <span key={o.id} className="inline-flex items-center rounded-sm border border-hairline bg-surface-sunken text-xs">
+                        <button type="button" onClick={() => restoreObject(o.id)} className="px-2 py-1 text-left hover:text-foreground">{o.label}</button>
+                        <button type="button" onClick={() => void deleteForever(o.id)} className="px-1.5 py-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${o.label} for good`} title="Delete for good"><X className="h-3 w-3" /></button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="absolute bottom-3 right-3 flex items-center gap-2">
+                {styleChoice && <span className="rounded-md border border-hairline bg-card px-2.5 py-1.5 text-xs shadow-overlay">{styleChoice.label}</span>}
+                <Button className="gap-1.5 shadow-overlay" disabled={rendering} onClick={() => void render(styleChoice)}>
+                  {rendering ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                  {rendering ? 'Rendering' : 'Render'}
                 </Button>
               </div>
-            )}
-          </div>
+            </>
+          )}
 
-          <div className="relative h-[56vh] min-h-[380px] bg-surface-sunken">
-            {reading ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
-                <Loader2 className="h-6 w-6 animate-spin" />Reading the image into rooms, walls and furniture. This takes about a minute.
+          {rendering && !showRender && (
+            <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-md border border-hairline bg-card px-3 py-1.5 text-xs shadow-overlay">
+              <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />Rendering{styleChoice ? ` in ${styleChoice.label}` : ''}…
+            </div>
+          )}
+
+          {showRender && activeRender && (
+            <div className="absolute inset-0 bg-background">
+              <img src={activeRender.image_url} alt={activeRender.style_label ?? 'Render'} className="h-full w-full object-contain" />
+              <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-wrap items-center gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowRender(false)}><Layers className="h-3.5 w-3.5" />Back to 3D</Button>
+                <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.setPose(activeRender.camera as unknown as Parameters<SceneCanvasHandle['setPose']>[0]); }}><Eye className="h-3.5 w-3.5" />Edit from this view</Button>
+                {onWalkThrough && (
+                  <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(activeRender.image_url, `${scene.name}${activeRender.style_label ? ` — ${activeRender.style_label}` : ''}`)}>
+                    <Footprints className="h-3.5 w-3.5" />Walk through ({VR_CREDIT_COSTS['marble-1.1']} credits)
+                  </Button>
+                )}
+                <a className="px-2 text-xs text-muted-foreground underline" href={activeRender.image_url} target="_blank" rel="noreferrer">Full size</a>
               </div>
-            ) : noRoom ? (
-              <HubEmptyState
-                icon={Box}
-                title={scene.extract_status === 'failed' ? 'The image could not be read' : 'No room yet'}
-                description={scene.extract_status === 'failed' ? (scene.extract_error ?? undefined) : 'Add a rectangular room to start.'}
-                action={<Button onClick={async () => { try { await sceneStudioService.addRectRoom(scene.id, 5000, 4000, 'Room'); void load(); } catch (e) { fail('The room could not be added', e); } }}>Add a 5 × 4 m room</Button>}
+            </div>
+          )}
+        </div>
+
+        {data.rooms.length > 0 && !reading && (
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            <SpaceCard
+              title="Whole Home"
+              meta={`${count(data.rooms.length, 'space')} · ${totalArea.toFixed(1)} m²`}
+              active={focusRoomId === null}
+              onOpen={() => { setFocusRoomId(null); setShowRender(false); canvasRef.current?.resetView(); }}
+            />
+            {data.rooms.map((r) => (
+              <SpaceCard
+                key={r.id}
+                title={r.name}
+                meta={`${roomArea(r.outline).toFixed(1)} m² · ${count(objects.filter((o) => !o.removed_at && o.room_id === r.id).length, 'object')}`}
+                active={focusRoomId === r.id}
+                onOpen={() => { setEyeLevel(false); goToRoom(r.id, false); }}
+                onStand={() => { setEyeLevel(true); goToRoom(r.id, true); }}
               />
-            ) : !webgl ? (
-              <HubEmptyState icon={Box} title="3D is not available in this browser" description="This device does not support WebGL 2. Open the conversation on a computer to edit the room in 3D." />
-            ) : (
-              <Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>}>
-                <SceneCanvas
-                  ref={canvasRef}
-                  rooms={data.rooms}
-                  walls={data.walls}
-                  openings={data.openings}
-                  surfaces={surfaces}
-                  objects={objects}
-                  products={products}
-                  defaultWallHeightMm={scene.default_wall_height_mm}
-                  viewCamera={scene.view_camera}
-                  tool={tool}
-                  wireframe={wireframe}
-                  selectedId={selectedId}
-                  onSelect={setSelectedId}
-                  onMoveObject={onMoveObject}
-                  onRemoveObject={removeObject}
-                  onPaint={(roomId, surface) => void paint(roomId, surface)}
-                  onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
-                  modelUrls={modelUrls}
-                />
-              </Suspense>
-            )}
-
-            {showRender && activeRender && (
-              <div className="absolute inset-0 flex flex-col bg-background">
-                <img src={activeRender.image_url} alt={activeRender.style_label ?? 'Render'} className="min-h-0 flex-1 object-contain" />
-                <div className="flex flex-wrap items-center gap-1.5 border-t border-hairline bg-card p-1.5">
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowRender(false)}><Layers className="h-3.5 w-3.5" />Back to 3D</Button>
-                  <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.setPose(activeRender.camera as unknown as Parameters<SceneCanvasHandle['setPose']>[0]); }}><Eye className="h-3.5 w-3.5" />Edit from this view</Button>
-                  {onWalkThrough && (
-                    <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(activeRender.image_url, `${scene.name}${activeRender.style_label ? ` — ${activeRender.style_label}` : ''}`)}>
-                      <Footprints className="h-3.5 w-3.5" />Walk through ({VR_CREDIT_COSTS['marble-1.1']} credits)
-                    </Button>
-                  )}
-                  <a className="ml-auto text-xs text-muted-foreground underline" href={activeRender.image_url} target="_blank" rel="noreferrer">Open full size</a>
-                </div>
-              </div>
-            )}
-
-            {!showRender && removed.length > 0 && !reading && (
-              <div className="absolute bottom-2 right-2 max-w-[260px] rounded-sm border border-hairline bg-card/95 p-2 shadow-overlay">
-                <p className="mb-1.5 text-[11px] font-semibold text-muted-foreground">Removed · click to put back, × to delete</p>
-                <div className="flex max-h-40 flex-wrap gap-1 overflow-y-auto">
-                  {removed.map((o) => (
-                    <span key={o.id} className="inline-flex items-center rounded-sm border border-hairline bg-surface-sunken text-xs">
-                      <button type="button" onClick={() => restoreObject(o.id)} className="px-2 py-1 text-left hover:text-foreground">{o.label}</button>
-                      <button type="button" onClick={() => void deleteForever(o.id)} className="px-1.5 py-1 text-muted-foreground hover:text-destructive" aria-label={`Delete ${o.label} for good`} title="Delete for good"><X className="h-3 w-3" /></button>
-                    </span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {!showRender && toolHint && !reading && !noRoom && (
-              <div className="pointer-events-none absolute bottom-2 left-2 max-w-[60%] rounded-sm bg-card/90 px-2 py-1 text-[11px] text-muted-foreground">{toolHint}</div>
-            )}
+            ))}
           </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 border-t border-hairline bg-surface-sunken p-1.5">
-            <Button size="sm" variant="ghost" className="gap-1.5" disabled={!history.length} onClick={() => void undo()}><Undo2 className="h-3.5 w-3.5" />Undo</Button>
-            <Button size="sm" variant="ghost" className="gap-1.5" disabled={!objects.some((o) => !o.removed_at)} onClick={emptyRoom}>Empty the room</Button>
-            <Button size="sm" variant="ghost" className="gap-1.5" onClick={resetLayout}>Reset layout</Button>
-            <Button size="sm" className="ml-auto gap-1.5" disabled={rendering || reading || noRoom || !webgl} onClick={() => void render(styleChoice)}>
-              {rendering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-              {rendering ? 'Rendering' : 'Render'}
-            </Button>
-          </div>
-        </Card>
+        )}
 
         {renders.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
