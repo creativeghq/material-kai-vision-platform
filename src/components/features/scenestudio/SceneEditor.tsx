@@ -515,7 +515,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             {data.rooms.length > 0 && (
               <div className="ml-auto flex items-center gap-1">
                 <Select value={focusRoomId ?? ''} onValueChange={(v) => goToRoom(v, eyeLevel)}>
-                  <SelectTrigger className="h-8 w-44" aria-label="Go to a room"><SelectValue placeholder="Go to a room" /></SelectTrigger>
+                  <SelectTrigger className="h-8 w-44" aria-label="Pick a room"><SelectValue placeholder="Pick a room" /></SelectTrigger>
                   <SelectContent>{data.rooms.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <Button
