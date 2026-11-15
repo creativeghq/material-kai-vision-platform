@@ -18473,6 +18473,47 @@
     "response": "202 { success, status: extracting, floor_plan_id } — then poll floor_plans.extract_status for ready or failed"
   },
   {
+    "name": "object-3d",
+    "tag": "Projects",
+    "summary": "Show a product or a 3D-room object as a photo-real 3D model",
+    "description": "Returns a photo-real 3D model (a Gaussian splat .ply) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits BEFORE any work; a request that finds another generation already running is not charged. Generation makes a clean single-object shot with the image model, then Idol on Modal turns it into 3D and stray specks are removed. A failure anywhere refunds the credits and leaves no model behind. The workspace for a product request is checked for moodboards.use and the 3D rooms module; an object's workspace comes from its room.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [],
+    "request": [
+      {
+        "name": "product_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "A product the caller can see. Requires workspace_id."
+      },
+      {
+        "name": "workspace_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "The caller's workspace that is charged, for a product request."
+      },
+      {
+        "name": "floor_plan_object_id",
+        "type": "string (uuid)",
+        "required": false,
+        "desc": "An object in one of the caller's 3D rooms."
+      },
+      {
+        "name": "image_path",
+        "type": "string",
+        "required": false,
+        "desc": "For a room object with no model yet: a capture of that object stored in its room's folder."
+      }
+    ],
+    "response": "200 { status: ready, url, credits_used } | 202 { status: processing, charged, row_id } — poll product_3d_models.status or floor_plan_objects.model_status"
+  },
+  {
     "name": "installation-guide-extract",
     "tag": "Projects",
     "summary": "Read an uploaded installation manual into a step-by-step guide",

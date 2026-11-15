@@ -3447,6 +3447,33 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "object-3d",
+    "tag": "Projects",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Show a product or a 3D-room object as a photo-real 3D model",
+    "description": "Returns a photo-real 3D model (a Gaussian splat .ply) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits BEFORE any w",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "description": "A product the caller can see. Requires workspace_id. (string (uuid))"
+      },
+      "workspace_id": {
+        "type": "string",
+        "description": "The caller's workspace that is charged, for a product request. (string (uuid))"
+      },
+      "floor_plan_object_id": {
+        "type": "string",
+        "description": "An object in one of the caller's 3D rooms. (string (uuid))"
+      },
+      "image_path": {
+        "type": "string",
+        "description": "For a room object with no model yet: a capture of that object stored in its room's folder."
+      }
+    }
+  },
+  {
     "name": "ontology-propose-targets",
     "tag": "Warehouse",
     "methods": [
