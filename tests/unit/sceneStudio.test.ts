@@ -5,6 +5,8 @@ import {
   productSizeMm, rgbToHex, rotationToPlan, rotationToScene, toPlan, toScene, walkBlocked, walkStep, wallPieces,
 } from '@/lib/scene/sceneGeometry';
 import { sanitizeSceneRead, wallsFromRooms } from '@/lib/scene/sceneReadSchema';
+import { indexSurfaces, resolveFinish, splashFinish, wallFaceFinish } from '@/lib/scene/sceneSurfaces';
+import type { SceneSurface } from '@/services/sceneStudioService';
 import { blankComments } from '../helpers/stripComments';
 
 const wall = { id: 'w', x1_mm: 0, y1_mm: 0, x2_mm: 4000, y2_mm: 0, thickness_mm: 100, height_mm: null };
@@ -137,5 +139,55 @@ describe('walking through a 3D room', () => {
 
   it('slides along a wall instead of sticking to it', () => {
     expect(walkStep([500, 600], [600, 300], [wall], [])).toEqual([600, 600]);
+  });
+});
+
+describe('finishing a room surface by surface', () => {
+  const row = (surface: SceneSurface['surface'], extra: Partial<SceneSurface> = {}): SceneSurface => ({
+    id: `${surface}-${extra.wall_id ?? ''}`, room_id: 'r', surface, wall_id: null, band_from_mm: null, band_to_mm: null,
+    product_id: null, colour_hex: '#112233', ...extra,
+  });
+
+  it('gives one wall its own finish over the room walls, and only that wall', () => {
+    const idx = indexSurfaces([row('walls'), row('wall', { wall_id: 'w2', colour_hex: '#aa0000' })]);
+    expect(wallFaceFinish(idx, 'r', 'w2')?.colour_hex).toBe('#aa0000');
+    expect(wallFaceFinish(idx, 'r', 'w1')?.colour_hex).toBe('#112233');
+    expect(wallFaceFinish(idx, 'other', 'w2')).toBeNull();
+  });
+
+  it('keeps a backsplash on top of the wall finish, never instead of it', () => {
+    const idx = indexSurfaces([row('wall', { wall_id: 'w1' }), row('splash', { wall_id: 'w1', band_from_mm: 900, band_to_mm: 1500, colour_hex: '#ffffff' })]);
+    expect(wallFaceFinish(idx, 'r', 'w1')?.surface).toBe('wall');
+    expect(splashFinish(idx, 'r', 'w1')?.band_to_mm).toBe(1500);
+  });
+
+  it('shows a chosen colour option as that option, and a product without one as its photo at its real size', () => {
+    const product = {
+      id: 'p', name: 'Laminate', imageUrl: 'https://x/p.jpg', attributes: { width_mm: 190, length_mm: 1380 },
+      metadata: { colour_options: [{ hex: '#A49084', name: 'Vintage Oak', swatch_url: 'https://x/s.png' }] },
+    };
+    const opt = resolveFinish(row('floor', { product_id: 'p', colour_hex: '#a49084' }), product);
+    expect(opt).toMatchObject({ imageUrl: 'https://x/s.png', label: 'Laminate — Vintage Oak', jointed: true, tileW: 0.19 });
+    expect(resolveFinish(row('floor', { product_id: 'p', colour_hex: null }), product)?.imageUrl).toBe('https://x/p.jpg');
+    expect(resolveFinish(row('walls'), undefined)).toMatchObject({ hex: '#112233', imageUrl: null, jointed: false });
+  });
+
+  it('lays a wall piece knowing where it starts, so tiles run on across a door', () => {
+    const f = planFrame(planBounds([], [wall]));
+    const pieces = wallPieces(wall, [{ id: 'd', wall_id: 'w', kind: 'door', offset_mm: 1000, width_mm: 900, sill_mm: 0, head_mm: 2100 }], f, 2700);
+    const after = pieces.find((p) => p.start > 1.8 && p.bottom === 0);
+    expect(after?.start).toBeCloseTo(1.9, 5);
+    expect(after?.wallLength).toBeCloseTo(4, 5);
+    expect(pieces.find((p) => p.bottom > 2)?.bottom).toBeCloseTo(2.1, 5);
+  });
+
+  it('photo mode leaves click boxes and splat furniture out of the traced scene', () => {
+    const src = blankComments(readFileSync('src/components/features/scenestudio/PhotoMode.tsx', 'utf8'));
+    expect(src).toMatch(/invisibleMaterial\(mesh\.material\)/);
+    expect(src).toMatch(/withTraceView\(scene, \(\) => tracer\.setScene/);
+    expect(src).toMatch(/new ThreeMesh\(sub, material\)/);
+    expect(src).toMatch(/_generator = new PathTracingSceneGenerator\(\)/);
+    const canvas = blankComments(readFileSync('src/components/features/scenestudio/SceneCanvas.tsx', 'utf8'));
+    expect(canvas).toMatch(/!wireframe && !photo && \(\s*<EffectComposer/);
   });
 });

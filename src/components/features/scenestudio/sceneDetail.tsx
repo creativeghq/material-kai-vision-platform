@@ -1,6 +1,6 @@
 /** What makes the 3D room read as a real interior: light, default surfaces, and real shapes for every object kind. */
 import React, { useEffect, useMemo, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { CanvasTexture, DoubleSide, PMREMGenerator, RepeatWrapping, SRGBColorSpace, type Mesh, type Texture } from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -78,15 +78,25 @@ export function oakFloorTexture(): Texture {
 }
 
 /** The ceiling of a room, shown only while the camera is below it (standing or walking inside). */
-export const Ceiling: React.FC<{ height: number; children: React.ReactNode }> = ({ height, children }) => {
+export const Ceiling: React.FC<{
+  height: number; children: React.ReactNode; onClick?(e: ThreeEvent<MouseEvent>): void; onHover?(on: boolean): void;
+}> = ({ height, children, onClick, onHover }) => {
   const ref = useRef<Mesh>(null);
   useFrame(({ camera }) => {
     if (ref.current) ref.current.visible = camera.position.y < height - 0.05;
   });
   return (
-    <mesh ref={ref} rotation={[Math.PI / 2, 0, 0]} position={[0, height, 0]} visible={false}>
+    <mesh
+      ref={ref}
+      rotation={[Math.PI / 2, 0, 0]}
+      position={[0, height, 0]}
+      visible={false}
+      userData={{ surface: 'ceiling' }}
+      onClick={(e) => { if (ref.current?.visible) onClick?.(e); }}
+      onPointerOver={() => { if (ref.current?.visible) onHover?.(true); }}
+      onPointerOut={() => onHover?.(false)}
+    >
       {children}
-      <meshStandardMaterial color="#f4f2ee" roughness={0.95} side={DoubleSide} />
     </mesh>
   );
 };

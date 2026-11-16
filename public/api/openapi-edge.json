@@ -33125,6 +33125,97 @@
         }
       }
     },
+    "/surface-texture": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Make a product's seamless surface texture for 3D rooms",
+        "operationId": "post_surface_texture",
+        "description": "Returns the clean, flat, seamless texture of a catalogue product (a tile, a wood, a wall covering) that 3D rooms lay at the product's real size. Made once from the product's best photo with the image model and kept in product_material_maps as the product's selected albedo; a product that already has one is served it at no charge. Making one debits 6 credits BEFORE the model call and refunds them on any failure. The workspace is checked for moodboards.use and the 3D rooms module, and the product must be visible to the caller.\n\n**Response:** `200 { status: ready, charged, credits_used?, albedo_url }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "product_id": {
+                    "type": "string",
+                    "description": "A product the caller can see. (string (uuid))"
+                  },
+                  "workspace_id": {
+                    "type": "string",
+                    "description": "The caller's workspace that is charged. (string (uuid))"
+                  }
+                },
+                "required": [
+                  "product_id",
+                  "workspace_id"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
     "/installation-guide-extract": {
       "post": {
         "tags": [

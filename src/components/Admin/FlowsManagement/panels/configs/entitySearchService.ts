@@ -198,6 +198,7 @@ const EDGE_FUNCTIONS: EntityResult[] = [
   { id: 'taric-reference-sync', label: 'taric-reference-sync', sublabel: 'Import the EU TARIC goods nomenclature (Greek extract) into the reference table' },
   { id: 'scene-studio-read', label: 'scene-studio-read', sublabel: 'Read a floor plan, room photo or render into an editable 3D room with walls, doors and furniture' },
   { id: 'object-3d', label: 'object-3d', sublabel: 'Show a product or a 3D-room object as a photo-real 3D model, generated once and kept in the library' },
+  { id: 'surface-texture', label: 'surface-texture', sublabel: 'Make a product seamless surface texture for 3D rooms, once, kept on the product' },
   { id: 'installation-guide-extract', label: 'installation-guide-extract', sublabel: 'Read an uploaded installation manual into a step-by-step guide with the page and box of every drawing' },
   { id: 'installation-guide-appearance', label: 'installation-guide-appearance', sublabel: 'Read a product photo into the finish each part of an installation guide carries' },
   { id: 'installation-guide-public', label: 'installation-guide-public', sublabel: 'Open an installation guide through its public share link' },

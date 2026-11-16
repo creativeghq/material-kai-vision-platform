@@ -4,15 +4,19 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
 import {
   Box3, Color, DoubleSide, Material, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
-  type Object3D, type PerspectiveCamera, type Texture,
+  type Object3D, type PerspectiveCamera, type RectAreaLight,
 } from 'three';
 import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import { Ceiling, DoorOrWindow, ObjectShape, RoomLighting, oakFloorTexture } from '@/components/features/scenestudio/sceneDetail';
-import { loadSharedTexture } from '@/components/features/ar/materialOverrides';
-import { tileFormatM } from '@/components/features/roomplanner/surfaceFormat';
+import { canvasRelief, useFinishMaps } from '@/components/features/scenestudio/surfaceMaps';
+import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
+import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+import {
+  indexSurfaces, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, type Finish, type SurfaceTarget,
+} from '@/lib/scene/sceneSurfaces';
 import {
   effectiveSize, idColour, openingPlacement, planBounds, planFrame, pointInPolygon, rgbToHex,
   rotationToPlan, rotationToScene, toPlan, toScene, walkStep, wallPieces,
@@ -21,6 +25,8 @@ import {
 import type { SceneCamera, SceneObject, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 
 export type SceneTool = 'view' | 'move' | 'turn' | 'remove' | 'paint';
+
+export type PaintScope = 'wall' | 'walls' | 'splash';
 
 export interface CameraPose { position: [number, number, number]; target: [number, number, number]; fov: number }
 
@@ -59,7 +65,11 @@ interface Props {
   /** `commit` is false while dragging and true on release, so a drag is ONE undo step. */
   onMoveObject(id: string, patch: Partial<Pick<SceneObject, 'x_mm' | 'y_mm' | 'rotation_deg' | 'room_id'>>, commit: boolean): void;
   onRemoveObject(id: string): void;
-  onPaint(roomId: string, surface: 'floor' | 'walls'): void;
+  onPaint(target: SurfaceTarget): void;
+  paintScope?: PaintScope;
+  splashBand?: { fromMm: number; toMm: number };
+  photo?: boolean;
+  onPhotoProgress?(samples: number, settled: boolean, preparing: boolean): void;
   onFocusRoom?(roomId: string): void;
   walkRoomId?: string | null;
   onWalkEnd?(): void;
@@ -123,31 +133,38 @@ const KIND_COLOURS: Record<string, string> = {
   shower: '#cfd8dc', vanity: '#d7ccc8', stairs: '#a1887f', fireplace: '#8d8d8d', radiator: '#f5f5f5', other: '#9e9aa6',
 };
 
-function useTileTexture(product: SceneProduct | undefined): { map: Texture | null; tileW: number; tileL: number } {
-  const [map, setMap] = useState<Texture | null>(null);
-  const url = product?.imageUrl ?? null;
-  const fmt = useMemo(() => (product ? tileFormatM(product) : null), [product]);
-  useEffect(() => {
-    setMap(null);
-    if (!url) return;
-    let live = true;
-    loadSharedTexture(url).then((shared) => {
-      if (!live) return;
-      const own = shared.clone();
-      own.needsUpdate = true;
-      setMap(own);
-    }).catch(() => { if (live) setMap(null); });
-    return () => { live = false; };
-  }, [url]);
-  useEffect(() => () => { map?.dispose(); }, [map]);
-  return { map, tileW: fmt?.tileWidthM ?? 0.6, tileL: fmt?.tileLengthM ?? 0.6 };
-}
+/** One material slot carrying a finish laid at its real size, with relief and gloss; plaster when there is none. */
+const FinishMaterial: React.FC<{
+  attach?: string; finish: Finish | null; fallback: string; w: number; h: number; offX?: number; offY?: number;
+  wireframe: boolean; highlight?: boolean; side?: typeof DoubleSide;
+}> = ({ attach, finish, fallback, w, h, offX = 0, offY = 0, wireframe, highlight, side }) => {
+  const maps = useFinishMaps(finish, w, h, offX, offY);
+  const colour = finish?.imageUrl ? '#ffffff' : finish?.hex ?? fallback;
+  return (
+    <meshStandardMaterial
+      key={maps ? `m${maps.map ? 1 : 0}` : 'n'}
+      attach={attach}
+      color={colour}
+      map={maps?.map ?? null}
+      normalMap={maps?.normalMap ?? null}
+      roughnessMap={maps?.roughnessMap ?? null}
+      roughness={1}
+      emissive={highlight ? '#3d7bff' : '#000000'}
+      emissiveIntensity={highlight ? 0.22 : 0}
+      side={side}
+      wireframe={wireframe}
+    />
+  );
+};
 
 const FloorMesh: React.FC<{
   room: PlanRoom; frame: PlanFrame; surface?: SceneSurface; product?: SceneProduct; wireframe: boolean; ceilingHeight: number;
+  ceiling: Finish | null; highlightFloor: boolean; highlightCeiling: boolean;
   onPick(e: ThreeEvent<MouseEvent>): void;
+  onPickCeiling(e: ThreeEvent<MouseEvent>): void;
+  onHover(surface: 'floor' | 'ceiling' | null): void;
   onDouble?(e: ThreeEvent<MouseEvent>): void;
-}> = ({ room, frame, surface, product, wireframe, ceilingHeight, onPick, onDouble }) => {
+}> = ({ room, frame, surface, product, wireframe, ceilingHeight, ceiling, highlightFloor, highlightCeiling, onPick, onPickCeiling, onHover, onDouble }) => {
   const shape = useMemo(() => {
     const s = new Shape();
     room.outline.forEach(([x, y], i) => {
@@ -167,17 +184,42 @@ const FloorMesh: React.FC<{
     return s;
   }, [room.outline, frame]);
   const oak = useMemo(() => oakFloorTexture(), []);
-  const { map, tileW, tileL } = useTileTexture(product);
-  useEffect(() => { if (map) { map.repeat.set(1 / tileW, 1 / tileL); map.needsUpdate = true; } }, [map, tileW, tileL]);
+  const oakRelief = useMemo(() => canvasRelief(oak.image as HTMLCanvasElement, 1.4, 0.5), [oak]);
+  const finish = useMemo(() => resolveFinish(surface ?? null, product), [surface, product]);
+  const tiled = !!finish?.imageUrl;
   return (
     <group>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]} receiveShadow userData={{ surface: 'floor', roomId: room.id }} onClick={onPick} onDoubleClick={onDouble}>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0.002, 0]}
+        receiveShadow
+        userData={{ surface: 'floor', roomId: room.id }}
+        onClick={onPick}
+        onDoubleClick={onDouble}
+        onPointerOver={() => onHover('floor')}
+        onPointerOut={() => onHover(null)}
+      >
         <shapeGeometry args={[shape]} />
-        {map
-          ? <meshStandardMaterial key="tex" map={map} roughness={0.85} wireframe={wireframe} />
-          : <meshStandardMaterial key="oak" map={oak} color={surface?.colour_hex ? new Color(surface.colour_hex).lerp(new Color('#ffffff'), 0.55) : '#ffffff'} roughness={0.55} wireframe={wireframe} />}
+        {tiled
+          ? <FinishMaterial finish={finish} fallback="#ffffff" w={1} h={1} wireframe={wireframe} highlight={highlightFloor} />
+          : (
+            <meshStandardMaterial
+              key="oak"
+              map={oak}
+              normalMap={oakRelief.normalMap}
+              roughnessMap={oakRelief.roughnessMap}
+              color={surface?.colour_hex ? new Color(surface.colour_hex).lerp(new Color('#ffffff'), 0.55) : '#ffffff'}
+              roughness={1}
+              emissive={highlightFloor ? '#3d7bff' : '#000000'}
+              emissiveIntensity={highlightFloor ? 0.22 : 0}
+              wireframe={wireframe}
+            />
+          )}
       </mesh>
-      <Ceiling height={ceilingHeight}><shapeGeometry args={[ceilingShape]} /></Ceiling>
+      <Ceiling height={ceilingHeight} onClick={onPickCeiling} onHover={(on) => onHover(on ? 'ceiling' : null)}>
+        <shapeGeometry args={[ceilingShape]} />
+        <FinishMaterial finish={ceiling} fallback="#f4f2ee" w={1} h={1} wireframe={wireframe} highlight={highlightCeiling} side={DoubleSide} />
+      </Ceiling>
     </group>
   );
 };
@@ -186,9 +228,12 @@ interface WallSides { plus: string | null; minus: string | null; exterior: 'plus
 
 const WallMesh: React.FC<{
   wall: PlanWall; openings: PlanOpening[]; frame: PlanFrame; heightMm: number; sides: WallSides;
-  colourOf(roomId: string | null): string; wireframe: boolean; cutaway: boolean; centre: Vector3;
+  finishOf(roomId: string | null): Finish | null; splashOf(roomId: string | null): { finish: Finish; fromM: number; toM: number } | null;
+  highlightOf(roomId: string | null): boolean;
+  wireframe: boolean; cutaway: boolean; centre: Vector3;
   onPick(e: ThreeEvent<MouseEvent>, roomId: string | null): void;
-}> = ({ wall, openings, frame, heightMm, sides, colourOf, wireframe, cutaway, centre, onPick }) => {
+  onHover(roomId: string | null): void;
+}> = ({ wall, openings, frame, heightMm, sides, finishOf, splashOf, highlightOf, wireframe, cutaway, centre, onPick, onHover }) => {
   const pieces = useMemo(() => wallPieces(wall, openings, frame, heightMm), [wall, openings, frame, heightMm]);
   const [low, setLow] = useState(false);
   const outward = useMemo(() => {
@@ -205,8 +250,16 @@ const WallMesh: React.FC<{
     const shouldBeLow = tmp.dot(outward) > 0.35 && camera.position.y > 1.9;
     if (shouldBeLow !== low) setLow(shouldBeLow);
   });
-  const plusColour = colourOf(sides.plus);
-  const minusColour = colourOf(sides.minus);
+  const plusFinish = finishOf(sides.plus);
+  const minusFinish = finishOf(sides.minus);
+  const plusSplash = splashOf(sides.plus);
+  const minusSplash = splashOf(sides.minus);
+  const plusLit = highlightOf(sides.plus);
+  const minusLit = highlightOf(sides.minus);
+  const sideOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
+    const idx = e.face?.materialIndex;
+    return idx === 4 ? sides.plus : idx === 5 ? sides.minus : (sides.plus ?? sides.minus);
+  };
   const cap = 0.12;
   return (
     <group>
@@ -229,19 +282,42 @@ const WallMesh: React.FC<{
             castShadow
             receiveShadow
             userData={{ surface: 'walls', wallId: wall.id }}
-            onClick={(e) => {
-              const idx = e.face?.materialIndex;
-              onPick(e, idx === 4 ? sides.plus : idx === 5 ? sides.minus : (sides.plus ?? sides.minus));
-            }}
+            onClick={(e) => onPick(e, sideOf(e))}
+            onPointerMove={(e) => onHover(sideOf(e))}
+            onPointerOut={() => onHover(null)}
           >
             <boxGeometry args={[p.length, h, p.thickness]} />
             <meshStandardMaterial attach="material-0" color={WALL_DEFAULT} roughness={0.95} wireframe={wireframe} />
             <meshStandardMaterial attach="material-1" color={WALL_DEFAULT} roughness={0.95} wireframe={wireframe} />
             <meshStandardMaterial attach="material-2" color={low ? '#ffffff' : WALL_DEFAULT} roughness={0.95} wireframe={wireframe} />
             <meshStandardMaterial attach="material-3" color={WALL_DEFAULT} roughness={0.95} wireframe={wireframe} />
-            <meshStandardMaterial attach="material-4" color={plusColour} roughness={0.95} wireframe={wireframe} />
-            <meshStandardMaterial attach="material-5" color={minusColour} roughness={0.95} wireframe={wireframe} />
+            <FinishMaterial attach="material-4" finish={plusFinish} fallback={WALL_DEFAULT} w={p.length} h={h} offX={p.start} offY={p.bottom} wireframe={wireframe} highlight={plusLit} />
+            <FinishMaterial attach="material-5" finish={minusFinish} fallback={WALL_DEFAULT} w={p.length} h={h} offX={p.wallLength - p.start - p.length} offY={p.bottom} wireframe={wireframe} highlight={minusLit} />
           </mesh>
+          {!low && ([[plusSplash, 1, sides.plus], [minusSplash, -1, sides.minus]] as const).map(([band, dir, roomId]) => {
+            if (!band) return null;
+            const lo = Math.max(band.fromM, p.bottom);
+            const hi = Math.min(band.toM, p.bottom + p.height);
+            if (hi - lo < 0.01) return null;
+            const along = dir === 1 ? p.start : p.wallLength - p.start - p.length;
+            return (
+              <group key={dir} position={[p.center[0], 0, p.center[2]]} rotation={[0, p.rotationY, 0]}>
+                <mesh
+                  position={[0, (lo + hi) / 2, dir * (p.thickness / 2 + 0.004)]}
+                  rotation={[0, dir === 1 ? 0 : Math.PI, 0]}
+                  castShadow
+                  receiveShadow
+                  userData={{ surface: 'splash', wallId: wall.id }}
+                  onClick={(e) => onPick(e, roomId)}
+                  onPointerMove={(e) => { e.stopPropagation(); onHover(roomId); }}
+                  onPointerOut={() => onHover(null)}
+                >
+                  <boxGeometry args={[p.length, hi - lo, 0.008]} />
+                  <FinishMaterial attach="material" finish={band.finish} fallback={WALL_DEFAULT} w={p.length} h={hi - lo} offX={along} offY={lo} wireframe={wireframe} highlight={highlightOf(roomId)} />
+                </mesh>
+              </group>
+            );
+          })}
           </React.Fragment>
         );
       })}
@@ -599,10 +675,21 @@ const WalkController: React.FC<{
   return null;
 };
 
+let rectLightsReady = false;
+
+/** Daylight coming in through one window: a soft area light in the opening, aimed into the room and slightly down. */
+const WindowLight: React.FC<{ pos: [number, number, number]; look: [number, number, number]; width: number; height: number }> = ({ pos, look, width, height }) => {
+  const ref = useRef<RectAreaLight>(null);
+  if (!rectLightsReady) { RectAreaLightUniformsLib.init(); rectLightsReady = true; }
+  useEffect(() => { ref.current?.lookAt(look[0], look[1], look[2]); }, [look]);
+  return <rectAreaLight ref={ref} position={pos} width={width} height={height} intensity={3.2} color="#fff6e8" />;
+};
+
 export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => {
   const {
     rooms, walls, openings, surfaces, objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
+    paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
   } = props;
   const hasModels = Object.keys(modelUrls).length > 0;
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
@@ -631,11 +718,17 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     return { position: [span * 0.85, span * 0.95, span * 0.95], target: [0, 0.3, 0], fov: 45 };
   }, [viewCamera, frame, span]);
 
-  const surfaceOf = useMemo(() => {
-    const map = new Map<string, SceneSurface>();
-    for (const s of surfaces) map.set(`${s.room_id}:${s.surface}`, s);
-    return map;
-  }, [surfaces]);
+  const surfaceIndex = useMemo(() => indexSurfaces(surfaces), [surfaces]);
+  const roomSurface = (roomId: string, surface: 'floor' | 'ceiling') => surfaceIndex.get(surfaceKey({ room_id: roomId, surface }));
+  const finishOfSurface = (sf: SceneSurface | null | undefined) => resolveFinish(sf ?? null, sf?.product_id ? products[sf.product_id] : undefined);
+
+  const [hover, setHover] = useState<string | null>(null);
+  const hoverAt = (key: string | null) => setHover((h) => (h === key ? h : key));
+  const wallTarget = (roomId: string, wallId: string): SurfaceTarget =>
+    paintScope === 'walls' ? { roomId, surface: 'walls' }
+      : paintScope === 'splash' ? { roomId, surface: 'splash', wallId, fromMm: splashBand.fromMm, toMm: splashBand.toMm }
+        : { roomId, surface: 'wall', wallId };
+  const wallHoverKey = (roomId: string, wallId: string) => (paintScope === 'walls' ? `walls:${roomId}` : `wall:${roomId}:${wallId}`);
 
   const wallSides = useMemo(() => {
     const out = new Map<string, WallSides>();
@@ -660,7 +753,21 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     return out;
   }, [objects]);
 
-  const colourOfWalls = (roomId: string | null) => (roomId ? surfaceOf.get(`${roomId}:walls`)?.colour_hex : null) ?? WALL_DEFAULT;
+  const windowLights = useMemo(() => openings.flatMap((o) => {
+    if (o.kind !== 'window') return [];
+    const wall = walls.find((w) => w.id === o.wall_id);
+    const sides = wall ? wallSides.get(wall.id) : undefined;
+    if (!wall || !sides || !sides.exterior) return [];
+    const p = openingPlacement(wall, o, frame);
+    const len = Math.hypot(wall.x2_mm - wall.x1_mm, wall.y2_mm - wall.y1_mm) || 1;
+    const sign = sides.exterior === 'minus' ? 1 : -1;
+    const nx = (-(wall.y2_mm - wall.y1_mm) / len) * sign;
+    const nz = ((wall.x2_mm - wall.x1_mm) / len) * sign;
+    const inset = Math.max(wall.thickness_mm, 20) / 2000 + 0.03;
+    const pos: [number, number, number] = [p.center[0] + nx * inset, p.center[1], p.center[2] + nz * inset];
+    const look: [number, number, number] = [pos[0] + nx, pos[1] - 0.25, pos[2] + nz];
+    return [{ id: o.id, pos, look, width: p.width, height: p.height }];
+  }), [openings, walls, wallSides, frame]);
 
   const roomOfPoint = (xMm: number, yMm: number) => rooms.find((r) => pointInPolygon(xMm, yMm, r.outline))?.id ?? null;
 
@@ -675,6 +782,8 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     >
       <color attach="background" args={['#e9e6e1']} />
       <RoomLighting span={span} />
+      {!wireframe && windowLights.map((l) => <WindowLight key={l.id} {...l} />)}
+      {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
       {hasModels && <SparkLayer />}
       <group userData={{ splat: true }}>
         <ContactShadows position={[0, 0.004, 0]} scale={span * 1.6} far={2.5} blur={2.2} opacity={0.3} resolution={1024} />
@@ -685,13 +794,22 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           room={room}
           frame={frame}
           ceilingHeight={defaultWallHeightMm / 1000}
-          surface={surfaceOf.get(`${room.id}:floor`)}
-          product={products[surfaceOf.get(`${room.id}:floor`)?.product_id ?? '']}
+          surface={roomSurface(room.id, 'floor')}
+          product={products[roomSurface(room.id, 'floor')?.product_id ?? '']}
+          ceiling={finishOfSurface(roomSurface(room.id, 'ceiling'))}
+          highlightFloor={tool === 'paint' && hover === `floor:${room.id}`}
+          highlightCeiling={tool === 'paint' && hover === `ceiling:${room.id}`}
           wireframe={wireframe}
+          onHover={(sf) => { if (tool === 'paint') hoverAt(sf ? `${sf}:${room.id}` : null); }}
           onPick={(e) => {
             if (tool !== 'paint') return;
             e.stopPropagation();
-            onPaint(room.id, 'floor');
+            onPaint({ roomId: room.id, surface: 'floor' });
+          }}
+          onPickCeiling={(e) => {
+            if (tool !== 'paint') return;
+            e.stopPropagation();
+            onPaint({ roomId: room.id, surface: 'ceiling' });
           }}
           onDouble={(e) => {
             if (tool !== 'view' || !onFocusRoom) return;
@@ -708,14 +826,21 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           frame={frame}
           heightMm={defaultWallHeightMm}
           sides={wallSides.get(wall.id)!}
-          colourOf={colourOfWalls}
+          finishOf={(roomId) => finishOfSurface(wallFaceFinish(surfaceIndex, roomId, wall.id))}
+          splashOf={(roomId) => {
+            const sf = splashFinish(surfaceIndex, roomId, wall.id);
+            const f = finishOfSurface(sf);
+            return sf && f ? { finish: f, fromM: (sf.band_from_mm ?? 0) / 1000, toM: (sf.band_to_mm ?? 0) / 1000 } : null;
+          }}
+          highlightOf={(roomId) => tool === 'paint' && !!roomId && hover === wallHoverKey(roomId, wall.id)}
           wireframe={wireframe}
           cutaway
           centre={centre}
+          onHover={(roomId) => { if (tool === 'paint') hoverAt(roomId ? wallHoverKey(roomId, wall.id) : null); }}
           onPick={(e, roomId) => {
             if (tool !== 'paint' || !roomId) return;
             e.stopPropagation();
-            onPaint(roomId, 'walls');
+            onPaint(wallTarget(roomId, wall.id));
           }}
         />
       ))}
@@ -756,7 +881,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
-      {!wireframe && (
+      {!wireframe && !photo && (
         <EffectComposer multisampling={4}>
           <N8AO aoRadius={0.5} distanceFalloff={0.6} intensity={2.2} halfRes quality="medium" />
           <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />

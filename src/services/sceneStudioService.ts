@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError, parseEdgeError } from '@/utils/edgeError';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
+import type { SurfaceTarget } from '@/lib/scene/sceneSurfaces';
 
 export const SCENE_BUCKET = 'generation-images';
 const MAX_SOURCE_LONG_SIDE = 2048;
@@ -49,12 +50,22 @@ export interface SceneObject {
   model_error?: string | null;
 }
 
-export interface SceneSurface { id: string; room_id: string; surface: 'floor' | 'ceiling' | 'walls'; product_id: string | null; colour_hex: string | null }
+export interface SceneSurface {
+  id: string;
+  room_id: string;
+  surface: 'floor' | 'ceiling' | 'walls' | 'wall' | 'splash';
+  wall_id: string | null;
+  band_from_mm: number | null;
+  band_to_mm: number | null;
+  product_id: string | null;
+  colour_hex: string | null;
+}
 
 export interface SceneProduct {
   id: string;
   name: string;
   imageUrl: string | null;
+  albedoUrl?: string | null;
   attributes: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
 }
@@ -93,6 +104,7 @@ export interface SceneData {
 
 const SCENE_COLUMNS = 'id, workspace_id, project_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, created_at, updated_at';
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error';
+const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, product_id, colour_hex';
 const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, instruction, image_url, vr_world_id, layout_snapshot, created_at';
 
 const num = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
@@ -144,12 +156,22 @@ async function uploadTo(path: string, blob: Blob, contentType: string): Promise<
   if (error) throw new Error(`Upload failed: ${error.message}`);
 }
 
+const PRODUCT_COLUMNS = 'id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, is_selected, option_value_id)';
+
+function selectedAlbedo(row: Record<string, unknown>): string | null {
+  const maps = row.product_material_maps;
+  if (!Array.isArray(maps)) return null;
+  const m = maps.find((x) => (x as { is_selected?: boolean; option_value_id?: string | null }).is_selected && !(x as { option_value_id?: string | null }).option_value_id) as
+    { storage_bucket?: string; albedo_path?: string | null } | undefined;
+  return m?.albedo_path ? supabase.storage.from(m.storage_bucket || SCENE_BUCKET).getPublicUrl(m.albedo_path).data.publicUrl : null;
+}
+
 async function fetchProducts(ids: string[]): Promise<Record<string, SceneProduct>> {
   const unique = [...new Set(ids.filter(Boolean))];
   if (!unique.length) return {};
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url))')
+    .select(PRODUCT_COLUMNS)
     .in('id', unique);
   if (error) throw new Error(`Products could not be loaded: ${error.message}`);
   const out: Record<string, SceneProduct> = {};
@@ -158,6 +180,7 @@ async function fetchProducts(ids: string[]): Promise<Record<string, SceneProduct
       id: r.id as string,
       name: (r.name as string) || 'Product',
       imageUrl: firstImage(r),
+      albedoUrl: selectedAlbedo(r),
       attributes: (r.attributes as Record<string, unknown>) ?? null,
       metadata: (r.metadata as Record<string, unknown>) ?? null,
     };
@@ -252,7 +275,7 @@ export const sceneStudioService = {
       supabase.from('floor_plan_rooms').select('id, name, outline, height_mm, walk_order').eq('floor_plan_id', id).order('walk_order', { ascending: true, nullsFirst: false }),
       supabase.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm, height_mm').eq('floor_plan_id', id),
       supabase.from('floor_plan_openings').select('id, wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', id),
-      supabase.from('floor_plan_surfaces').select('id, room_id, surface, product_id, colour_hex').eq('floor_plan_id', id),
+      supabase.from('floor_plan_surfaces').select(SURFACE_COLUMNS).eq('floor_plan_id', id),
       supabase.from('floor_plan_objects').select(OBJECT_COLUMNS).eq('floor_plan_id', id).order('created_at', { ascending: true }),
       supabase.from('scene_renders').select(RENDER_COLUMNS).eq('floor_plan_id', id).order('created_at', { ascending: false }),
     ]);
@@ -320,23 +343,40 @@ export const sceneStudioService = {
     if (error) throw new Error(error.message);
   },
 
-  async setSurface(sceneId: string, roomId: string, surface: SceneSurface['surface'], patch: { product_id: string | null; colour_hex: string | null }): Promise<SceneSurface> {
+  async setSurface(sceneId: string, target: SurfaceTarget, patch: { product_id: string | null; colour_hex: string | null }): Promise<SceneSurface> {
+    const wallId = 'wallId' in target ? target.wallId : null;
+    const band = target.surface === 'splash' ? { band_from_mm: target.fromMm, band_to_mm: target.toMm } : { band_from_mm: null, band_to_mm: null };
     const { data, error } = await supabase.from('floor_plan_surfaces')
-      .upsert({ floor_plan_id: sceneId, room_id: roomId, surface, product_id: patch.product_id, colour_hex: patch.colour_hex }, { onConflict: 'room_id,surface' })
-      .select('id, room_id, surface, product_id, colour_hex').single();
+      .upsert(
+        { floor_plan_id: sceneId, room_id: target.roomId, surface: target.surface, wall_id: wallId, ...band, product_id: patch.product_id, colour_hex: patch.colour_hex },
+        { onConflict: 'room_id,surface,wall_id' },
+      )
+      .select(SURFACE_COLUMNS).single();
     if (error) throw new Error(error.message);
     return data as SceneSurface;
+  },
+
+  async clearSurfaces(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    const { error } = await supabase.from('floor_plan_surfaces').delete().in('id', ids);
+    if (error) throw new Error(error.message);
   },
 
   fetchProducts,
 
   products: fetchProducts,
 
+  async makeTexture(workspaceId: string, productId: string): Promise<{ albedo_url: string; charged: boolean; credits_used?: number }> {
+    const { data, error } = await supabase.functions.invoke('surface-texture', { body: { workspace_id: workspaceId, product_id: productId } });
+    if (error) throw await edgeError(error, 'The texture could not be made');
+    return data as { albedo_url: string; charged: boolean; credits_used?: number };
+  },
+
   async searchProducts(workspaceId: string, query: string): Promise<SceneProduct[]> {
     const q = query.trim();
     let req = supabase
       .from('products')
-      .select('id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url))')
+      .select(PRODUCT_COLUMNS)
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(24);
@@ -344,7 +384,7 @@ export const sceneStudioService = {
     const { data, error } = await req;
     if (error) throw new Error(error.message);
     return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-      id: r.id as string, name: (r.name as string) || 'Product', imageUrl: firstImage(r),
+      id: r.id as string, name: (r.name as string) || 'Product', imageUrl: firstImage(r), albedoUrl: selectedAlbedo(r),
       attributes: (r.attributes as Record<string, unknown>) ?? null, metadata: (r.metadata as Record<string, unknown>) ?? null,
     }));
   },

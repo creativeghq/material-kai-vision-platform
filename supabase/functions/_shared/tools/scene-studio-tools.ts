@@ -1,4 +1,3 @@
-/** 3D rooms for the interior designer: a floor plan, photo or render becomes an editable room on the chat canvas (#564). */
 const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
   tool: <S extends { _output: unknown }>(
     fn: (input: S['_output']) => unknown,
@@ -24,7 +23,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, product, colour }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -74,6 +73,40 @@ export const createManageScenesTool = (
           ? 'The room is open with the photo-real walk offer; the user confirms it there (a render plus 190 credits).'
           : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.' : 'The room is open on the canvas.';
       return JSON.stringify({ success: true, scene_id, object: target, mode: intent.mode, message: next });
+    }
+
+    if (action === 'finish') {
+      if (!scene_id || !room || !area) return JSON.stringify({ success: false, error: 'finish needs scene_id, room and area.' });
+      if (!product && !colour) return JSON.stringify({ success: false, error: 'finish needs a product or a colour.' });
+      const { data: rooms } = await sb.from('floor_plan_rooms').select('id, name').eq('floor_plan_id', scene_id);
+      const spaces = (rooms ?? []) as Array<{ id: string; name: string }>;
+      const needle = room.trim().toLowerCase();
+      const hit = spaces.find((r) => r.name.toLowerCase() === needle) ?? spaces.find((r) => r.name.toLowerCase().includes(needle));
+      if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: spaces.map((r) => r.name) });
+      let productRow: { id: string; name: string } | null = null;
+      if (product) {
+        const isId = /^[0-9a-f-]{36}$/i.test(product.trim());
+        const q = sb.from('products').select('id, name').eq('workspace_id', workspaceId).limit(10);
+        const { data: found } = isId ? await q.eq('id', product.trim()) : await q.ilike('name', `%${product.trim().replace(/[%_,()]/g, ' ')}%`);
+        const list = (found ?? []) as Array<{ id: string; name: string }>;
+        productRow = list.find((p) => p.name.toLowerCase() === product.trim().toLowerCase()) ?? list[0] ?? null;
+        if (!productRow) return JSON.stringify({ success: false, error: `No product called "${product}" in this workspace's catalogue.` });
+        if (list.length > 1 && productRow.name.toLowerCase() !== product.trim().toLowerCase()) {
+          return JSON.stringify({ success: false, error: 'More than one product matches; name one exactly.', matches: list.map((p) => p.name) });
+        }
+      }
+      const { error: upErr } = await sb.from('floor_plan_surfaces').upsert(
+        { floor_plan_id: scene_id, room_id: hit.id, surface: area, wall_id: null, band_from_mm: null, band_to_mm: null, product_id: productRow?.id ?? null, colour_hex: colour?.toLowerCase() ?? null },
+        { onConflict: 'room_id,surface,wall_id' },
+      );
+      if (upErr) return JSON.stringify({ success: false, error: upErr.message });
+      if (area === 'walls') await sb.from('floor_plan_surfaces').delete().eq('room_id', hit.id).eq('surface', 'wall');
+      const { data: scene } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
+      if (scene) onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent: { mode: 'view', object_id: null, room_id: hit.id, nonce: Date.now() } }, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true, room: hit.name, area, product: productRow?.name ?? null, colour: colour ?? null,
+        message: `The ${area} of ${hit.name} now show ${productRow ? productRow.name : colour}. One wall or a backsplash is picked by clicking it with Paint in the room.`,
+      });
     }
 
     if (action === 'status') {
@@ -132,16 +165,20 @@ export const createManageScenesTool = (
       + 'charged once and takes about a minute. status: one scene by scene_id. list: the workspace\'s scenes. '
       + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
       + 'for Make 3D (10 credits, the user confirms), mode photo_walk offers a photo-real walk the user confirms. '
+      + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space (free). '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
-      scene_id: z.string().uuid().optional().describe('status/open: the scene.'),
+      scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open: the object to focus, by its name in the room (e.g. sofa).'),
       mode: z.enum(['view', 'walk', 'make_3d', 'photo_walk']).optional().describe('open: what to do in the room.'),
-      room: z.string().max(120).optional().describe('open: the space to go to, by name (e.g. living room).'),
+      room: z.string().max(120).optional().describe('open/finish: the space, by name (e.g. living room).'),
+      area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
+      product: z.string().max(200).optional().describe('finish: the catalogue product to lay, by exact name or id.'),
+      colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
     }),
   },
 );

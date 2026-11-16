@@ -33,7 +33,7 @@ export function rotationToPlan(rad: number): number {
   return ((d % 360) + 360) % 360;
 }
 
-export interface WallPiece { center: [number, number, number]; length: number; height: number; thickness: number; rotationY: number }
+export interface WallPiece { center: [number, number, number]; length: number; height: number; thickness: number; rotationY: number; start: number; bottom: number; wallLength: number }
 
 export function wallPieces(wall: PlanWall, openings: PlanOpening[], f: PlanFrame, defaultHeightMm: number): WallPiece[] {
   const dx = wall.x2_mm - wall.x1_mm;
@@ -50,7 +50,7 @@ export function wallPieces(wall: PlanWall, openings: PlanOpening[], f: PlanFrame
     if (to - from < 1 || top - bottom < 1) return null;
     const mid = (from + to) / 2;
     const [x, z] = toScene(wall.x1_mm + ux * mid, wall.y1_mm + uy * mid, f);
-    return { center: [x, (bottom + top) / 2000, z], length: (to - from) / 1000, height: (top - bottom) / 1000, thickness, rotationY };
+    return { center: [x, (bottom + top) / 2000, z], length: (to - from) / 1000, height: (top - bottom) / 1000, thickness, rotationY, start: from / 1000, bottom: bottom / 1000, wallLength: len / 1000 };
   };
 
   const cuts = openings

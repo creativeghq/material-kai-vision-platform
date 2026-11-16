@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Eye, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
-  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Globe,
+  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Globe, Aperture, Eraser,
 } from 'lucide-react';
 
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -25,7 +25,10 @@ import { describeBox, describeObject, effectiveSize, polygonCentroid } from '@/l
 import { compositeMasked, loadImage, objectMask } from '@/lib/scene/sceneCompositing';
 import { SCENE_OBJECT_KINDS } from '@/lib/scene/sceneReadSchema';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
-import type { SceneCanvasHandle, SceneTool } from '@/components/features/scenestudio/SceneCanvas';
+import type { PaintScope, SceneCanvasHandle, SceneTool } from '@/components/features/scenestudio/SceneCanvas';
+import {
+  DEFAULT_SPLASH, colourOptions, describeTarget, resolveFinish, surfaceKey, targetKey, type SurfaceTarget,
+} from '@/lib/scene/sceneSurfaces';
 import {
   ColourRow, ObjectInspector, PinnedProductsContext, ProductPicker, StylePanel, type StyleChoice,
 } from '@/components/features/scenestudio/ScenePanels';
@@ -37,7 +40,7 @@ const TOOLS: Array<{ id: SceneTool; label: string; icon: React.ComponentType<{ c
   { id: 'move', label: 'Move', icon: Move, hint: 'Drag an object across the floor · right-drag to pan' },
   { id: 'turn', label: 'Turn', icon: RotateCw, hint: 'Drag around an object to turn it (15° steps, hold Shift for free) · right-drag to pan' },
   { id: 'remove', label: 'Remove', icon: Trash2, hint: 'Click an object to take it out of the room — it waits in the tray to be put back' },
-  { id: 'paint', label: 'Paint', icon: Paintbrush, hint: 'Pick a colour or product, then click a floor or a wall' },
+  { id: 'paint', label: 'Paint', icon: Paintbrush, hint: 'Pick a colour or product, then click a floor, a wall or a ceiling' },
 ];
 
 export interface SceneRenderedEvent {
@@ -68,6 +71,17 @@ const FREE_STANDING = new Set([
   'sofa', 'armchair', 'chair', 'stool', 'dining_table', 'coffee_table', 'side_table', 'desk', 'bed', 'nightstand',
   'wardrobe', 'cabinet', 'shelving', 'tv_unit', 'lamp', 'plant', 'toilet', 'bathtub', 'vanity',
 ]);
+
+const PAINT_SCOPES: Array<{ id: PaintScope; label: string }> = [
+  { id: 'wall', label: 'This Wall' },
+  { id: 'walls', label: 'All Walls' },
+  { id: 'splash', label: 'Backsplash' },
+];
+
+const targetOf = (s: SceneSurface): SurfaceTarget =>
+  s.surface === 'wall' ? { roomId: s.room_id, surface: 'wall', wallId: s.wall_id ?? '' }
+    : s.surface === 'splash' ? { roomId: s.room_id, surface: 'splash', wallId: s.wall_id ?? '', fromMm: s.band_from_mm ?? DEFAULT_SPLASH.fromMm, toMm: s.band_to_mm ?? DEFAULT_SPLASH.toMm }
+      : { roomId: s.room_id, surface: s.surface };
 
 const roomArea = (outline: Array<[number, number]>) => {
   let sum = 0;
@@ -148,7 +162,14 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [styles, setStyles] = useState<VocabularyTerm[]>([]);
   const [paintColour, setPaintColour] = useState<string | null>('#efebe4');
   const [paintProduct, setPaintProduct] = useState<SceneProduct | null>(null);
+  const [paintOption, setPaintOption] = useState<string | null>(null);
+  const [makingTexture, setMakingTexture] = useState(false);
   const [pickingPaint, setPickingPaint] = useState(false);
+  const [paintScope, setPaintScope] = useState<PaintScope>('wall');
+  const [erasing, setErasing] = useState(false);
+  const [splashTopCm, setSplashTopCm] = useState(String(DEFAULT_SPLASH.toMm / 10));
+  const [photo, setPhoto] = useState(false);
+  const [photoSamples, setPhotoSamples] = useState<{ n: number; settled: boolean; preparing: boolean }>({ n: 0, settled: false, preparing: true });
   const [adding, setAdding] = useState<null | 'form' | 'product'>(null);
   const [newObj, setNewObj] = useState({ label: '', kind: 'other' });
   const [focusRoomId, setFocusRoomId] = useState<string | null>(null);
@@ -254,16 +275,21 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     const prevObjects = objects;
     setObjects(last.objects);
     void persistObjects(last.objects, prevObjects);
-    const bySurface = new Map(surfaces.map((s) => [`${s.room_id}:${s.surface}`, s]));
-    const restored = new Map(last.surfaces.map((s) => [`${s.room_id}:${s.surface}`, s]));
-    for (const [key, s] of bySurface) {
-      const old = restored.get(key);
-      if (JSON.stringify(old) === JSON.stringify(s)) continue;
-      try {
-        await sceneStudioService.setSurface(id, s.room_id, s.surface, { product_id: old?.product_id ?? null, colour_hex: old?.colour_hex ?? null });
-      } catch (e) { fail('The paint could not be undone', e); }
+    const now = new Map(surfaces.map((s) => [surfaceKey(s), s]));
+    const restored = new Map(last.surfaces.map((s) => [surfaceKey(s), s]));
+    const restoredRows: SceneSurface[] = [];
+    try {
+      await sceneStudioService.clearSurfaces([...now].filter(([key]) => !restored.has(key)).map(([, s]) => s.id));
+      for (const [key, old] of restored) {
+        const cur = now.get(key);
+        if (cur && cur.product_id === old.product_id && cur.colour_hex === old.colour_hex && cur.band_to_mm === old.band_to_mm) { restoredRows.push(cur); continue; }
+        restoredRows.push(await sceneStudioService.setSurface(id, targetOf(old), { product_id: old.product_id, colour_hex: old.colour_hex }));
+      }
+      setSurfaces(restoredRows);
+    } catch (e) {
+      fail('The paint could not be undone', e);
+      void load();
     }
-    setSurfaces(last.surfaces);
   };
 
   useEffect(() => {
@@ -276,16 +302,44 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const paint = async (roomId: string, surface: 'floor' | 'walls') => {
+  const makeTexture = async (p: SceneProduct) => {
+    if (!data) return;
+    setMakingTexture(true);
+    try {
+      const res = await sceneStudioService.makeTexture(data.scene.workspace_id, p.id);
+      const next = { ...p, albedoUrl: res.albedo_url };
+      setProducts((map) => ({ ...map, [p.id]: next }));
+      setPaintProduct((cur) => (cur?.id === p.id ? next : cur));
+      toast({
+        title: `${p.name} has a clean texture`,
+        description: res.charged ? `${res.credits_used ?? 6} credits used. Every room that uses this product now shows it.` : 'It already had one. No credits used.',
+      });
+    } catch (e) { fail('The texture could not be made', e); } finally { setMakingTexture(false); }
+  };
+
+  const paint = async (target: SurfaceTarget) => {
+    const key = targetKey(target);
+    if (erasing) {
+      const gone = surfaces.filter((s) => surfaceKey(s) === key || (target.surface === 'walls' && s.room_id === target.roomId && s.surface === 'wall'));
+      if (!gone.length) return;
+      remember();
+      try {
+        await sceneStudioService.clearSurfaces(gone.map((s) => s.id));
+        setSurfaces((list) => list.filter((s) => !gone.includes(s)));
+      } catch (e) { fail('The finish could not be removed', e); }
+      return;
+    }
     if (!paintColour && !paintProduct) return;
     remember();
     try {
-      const saved = await sceneStudioService.setSurface(id, roomId, surface, {
+      const saved = await sceneStudioService.setSurface(id, target, {
         product_id: paintProduct?.id ?? null,
-        colour_hex: paintProduct ? null : paintColour,
+        colour_hex: paintProduct ? (paintOption ?? null) : paintColour,
       });
+      const replaced = surfaces.filter((s) => target.surface === 'walls' && s.room_id === target.roomId && s.surface === 'wall');
+      if (replaced.length) await sceneStudioService.clearSurfaces(replaced.map((s) => s.id));
       if (paintProduct) setProducts((p) => ({ ...p, [paintProduct.id]: paintProduct }));
-      setSurfaces((list) => [...list.filter((s) => !(s.room_id === roomId && s.surface === surface)), saved]);
+      setSurfaces((list) => [...list.filter((s) => surfaceKey(s) !== key && !replaced.includes(s)), saved]);
     } catch (e) { fail('The surface could not be painted', e); }
   };
 
@@ -416,6 +470,18 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
   const activeRender = renders.find((r) => r.id === activeRenderId) ?? null;
 
+  const wallLabel = (wallId: string | null, roomId: string): string | undefined => {
+    const wall = data?.walls.find((w) => w.id === wallId);
+    const room = data?.rooms.find((r) => r.id === roomId);
+    if (!wall || !room) return undefined;
+    const [cx, cy] = polygonCentroid(room.outline);
+    const mx = (wall.x1_mm + wall.x2_mm) / 2 - cx;
+    const my = (wall.y1_mm + wall.y2_mm) / 2 - cy;
+    const side = Math.abs(mx) > Math.abs(my) ? (mx > 0 ? 'right-hand' : 'left-hand') : (my > 0 ? 'bottom' : 'top');
+    const len = Math.hypot(wall.x2_mm - wall.x1_mm, wall.y2_mm - wall.y1_mm) / 1000;
+    return `the ${side} wall (${len.toFixed(1)} m, as drawn on the plan)`;
+  };
+
   const sceneLines = () => {
     const lines = objects.filter((o) => !o.removed_at).map((o) => {
       const p = o.product_id ? products[o.product_id] : undefined;
@@ -423,9 +489,11 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     });
     for (const s of surfaces) {
       const room = data?.rooms.find((r) => r.id === s.room_id);
-      const p = s.product_id ? products[s.product_id] : undefined;
-      const what = p ? `the product "${p.name}"` : s.colour_hex ? `colour ${s.colour_hex}` : null;
-      if (what) lines.push(`${s.surface === 'floor' ? 'Floor' : 'Walls'} of ${room?.name ?? 'the room'}: ${what}`);
+      const f = resolveFinish(s, s.product_id ? products[s.product_id] : undefined);
+      const what = f?.label ? `the product "${f.label}"${f.jointed ? `, laid as ${Math.round(f.tileW * 100)} × ${Math.round(f.tileL * 100)} cm pieces` : ''}` : s.colour_hex ? `colour ${s.colour_hex}` : null;
+      if (!what) continue;
+      const band = s.surface === 'splash' ? ` from ${Math.round((s.band_from_mm ?? 0) / 10)} to ${Math.round((s.band_to_mm ?? 0) / 10)} cm above the floor` : '';
+      lines.push(`${describeTarget(s, room?.name ?? 'the room', wallLabel(s.wall_id, s.room_id))}${band}: ${what}`);
     }
     return lines;
   };
@@ -433,7 +501,10 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const materialImages = () => {
     const urls: string[] = [];
     for (const o of objects) if (!o.removed_at && o.product_id && products[o.product_id]?.imageUrl) urls.push(products[o.product_id].imageUrl!);
-    for (const s of surfaces) if (s.product_id && products[s.product_id]?.imageUrl) urls.push(products[s.product_id].imageUrl!);
+    for (const s of surfaces) {
+      const f = resolveFinish(s, s.product_id ? products[s.product_id] : undefined);
+      if (s.product_id && f?.imageUrl) urls.push(f.imageUrl);
+    }
     return [...new Set(urls)].filter((u) => u.startsWith('https://')).slice(0, 6);
   };
 
@@ -638,8 +709,27 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       <CardHeader className="pb-2"><CardTitle className="text-sm">Paint</CardTitle></CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-1">
+          <Label className="text-xs">Walls</Label>
+          <div className="grid grid-cols-3 gap-1">
+            {PAINT_SCOPES.map((sc) => (
+              <Button key={sc.id} size="sm" variant={paintScope === sc.id ? 'secondary' : 'outline'} className="h-8 px-1 text-xs" onClick={() => setPaintScope(sc.id)}>{sc.label}</Button>
+            ))}
+          </div>
+          {paintScope === 'splash' && (
+            <div className="flex items-center gap-2 pt-1">
+              <Label htmlFor="splash-top" className="text-xs">Backsplash From 90 cm Up To</Label>
+              <Input id="splash-top" className="h-8 w-20" inputMode="numeric" value={splashTopCm} onChange={(e) => setSplashTopCm(e.target.value.replace(/[^0-9]/g, ''))} />
+              <span className="text-xs text-muted-foreground">cm</span>
+            </div>
+          )}
+          <p className="text-[11px] text-muted-foreground">Floors and ceilings are painted by clicking them; stand inside a room to reach its ceiling.</p>
+        </div>
+        <Button size="sm" variant={erasing ? 'secondary' : 'outline'} className="w-full gap-1.5" onClick={() => setErasing((v) => !v)}>
+          <Eraser className="h-3.5 w-3.5" />{erasing ? 'Removing Finishes: Click a Surface' : 'Remove a Finish'}
+        </Button>
+        <div className="space-y-1">
           <Label className="text-xs">Colour</Label>
-          <ColourRow value={paintProduct ? null : paintColour} onChange={(hex) => { setPaintColour(hex); setPaintProduct(null); }} />
+          <ColourRow value={paintProduct ? null : paintColour} onChange={(hex) => { setPaintColour(hex); setPaintProduct(null); setPaintOption(null); setErasing(false); }} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs">Or a product (tile, wood, paint)</Label>
@@ -647,14 +737,48 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             <div className="flex items-center gap-2 rounded-sm border border-primary p-1.5">
               {paintProduct.imageUrl && <img src={paintProduct.imageUrl} alt={paintProduct.name} className="h-8 w-8 rounded-sm object-cover" />}
               <span className="min-w-0 flex-1 truncate text-xs">{paintProduct.name}</span>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => setPaintProduct(null)} aria-label="Clear product"><X className="h-3.5 w-3.5" /></Button>
+              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => { setPaintProduct(null); setPaintOption(null); }} aria-label="Clear product"><X className="h-3.5 w-3.5" /></Button>
             </div>
           )}
+          {paintProduct && colourOptions(paintProduct).length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-xs">Colour Option</Label>
+              <div className="flex flex-wrap gap-1">
+                {colourOptions(paintProduct).map((o) => (
+                  <button
+                    key={o.hex}
+                    type="button"
+                    title={o.name}
+                    aria-label={o.name}
+                    onClick={() => setPaintOption(paintOption === o.hex ? null : o.hex)}
+                    className={`h-7 w-7 overflow-hidden rounded-sm border ${paintOption === o.hex ? 'border-primary ring-2 ring-primary/40' : 'border-hairline'}`}
+                    style={{ backgroundColor: o.hex }}
+                  >
+                    {o.swatch_url && <img src={o.swatch_url} alt="" className="h-full w-full object-cover" />}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-muted-foreground">{paintOption ? colourOptions(paintProduct).find((o) => o.hex === paintOption)?.name : 'No option picked: the product photo is used.'}</p>
+            </div>
+          )}
+          {paintProduct && !paintOption && (
+            paintProduct.albedoUrl
+              ? <p className="text-[11px] text-muted-foreground">Laid with its clean texture.</p>
+              : (
+                <div className="space-y-1 rounded-sm border border-hairline bg-surface-sunken p-2">
+                  <p className="text-[11px] text-muted-foreground">Laid from the product photo, which may show a whole room. A clean texture is one flat piece of the material, made once and kept on the product for every room.</p>
+                  <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => void makeTexture(paintProduct)}>
+                    {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                    {makingTexture ? 'Making the Texture…' : 'Make a Clean Texture (6 credits)'}
+                  </Button>
+                </div>
+              )
+          )}
           {pickingPaint
-            ? <ProductPicker workspaceId={scene.workspace_id} title="Paint with a product" onCancel={() => setPickingPaint(false)} onPick={(p) => { setPaintProduct(p); setPickingPaint(false); }} />
+            ? <ProductPicker workspaceId={scene.workspace_id} title="Paint with a product" onCancel={() => setPickingPaint(false)} onPick={(p) => { setPaintProduct(p); setPaintOption(null); setPickingPaint(false); setErasing(false); }} />
             : <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => setPickingPaint(true)}><Package className="h-3.5 w-3.5" />Choose a product</Button>}
         </div>
-        <p className="text-xs text-muted-foreground">Then click a floor, or a wall on the side of the room you want painted. Tiles are laid at their real size.</p>
+        <p className="text-xs text-muted-foreground">Then click a floor, a wall or a ceiling; what will change lights up blue. Tiles are laid at their real size, with joints.</p>
       </CardContent>
     </Card>
   ) : (
@@ -759,7 +883,11 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 onSelect={setSelectedId}
                 onMoveObject={onMoveObject}
                 onRemoveObject={removeObject}
-                onPaint={(roomId, surface) => void paint(roomId, surface)}
+                onPaint={(target) => void paint(target)}
+                paintScope={paintScope}
+                splashBand={{ fromMm: DEFAULT_SPLASH.fromMm, toMm: Math.max(DEFAULT_SPLASH.fromMm + 100, Math.min(3000, Number(splashTopCm || 0) * 10 || DEFAULT_SPLASH.toMm)) }}
+                photo={photo}
+                onPhotoProgress={(n, settled, preparing) => setPhotoSamples((p) => (p.n === n && p.settled === settled && p.preparing === preparing ? p : { n, settled, preparing }))}
                 onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
                 modelUrls={modelUrls}
                 walkRoomId={walkRoomId}
@@ -784,7 +912,13 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 <DockButton label={walking ? 'Stop Walking' : 'Walk'} hint="Walk through the rooms at eye height: WASD or arrows, drag to look, click the floor to go there" active={walking} onClick={() => (walking ? setWalkRoomId(undefined) : startWalk(null))}><PersonStanding className="h-4 w-4" /></DockButton>
                 <DockButton label="Floor Plan" hint="Look straight down on the whole plan" onClick={() => { setFocusRoomId(null); canvasRef.current?.topView(); }}><MapIcon className="h-4 w-4" /></DockButton>
                 <DockButton label="Reset View" hint="Back to the starting view" onClick={() => { setFocusRoomId(null); canvasRef.current?.resetView(); }}><Hand className="h-4 w-4" /></DockButton>
-                <DockButton label="Wireframe" hint="See through walls and furniture" active={wireframe} onClick={() => setWireframe((w) => !w)}><Grid3x3 className="h-4 w-4" /></DockButton>
+                <DockButton
+                  label={photo ? 'Photo Mode: on' : 'Photo Mode'}
+                  hint="Real bounced light and daylight through the windows. Stop moving and the view turns photographic in a few seconds. Free."
+                  active={photo}
+                  onClick={() => { setPhoto((v) => !v); setWireframe(false); setPhotoSamples({ n: 0, settled: false, preparing: true }); }}
+                ><Aperture className="h-4 w-4" /></DockButton>
+                <DockButton label="Wireframe" hint="See through walls and furniture" active={wireframe} onClick={() => { setWireframe((w) => !w); setPhoto(false); }}><Grid3x3 className="h-4 w-4" /></DockButton>
                 <DockButton
                   label={eyeLevel ? 'Eye level: on' : 'Eye level: off'}
                   hint="Stand in the space at eye height instead of looking down on it"
@@ -792,6 +926,13 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                   onClick={() => { const next = !eyeLevel; setEyeLevel(next); goToRoom(focusRoomId ?? data.rooms[0]?.id, next); }}
                 ><Footprints className="h-4 w-4" /></DockButton>
               </div>
+
+              {photo && (
+                <div className="pointer-events-none absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1.5 rounded-sm border border-hairline bg-card px-2.5 py-1 text-xs shadow-overlay">
+                  <Aperture className="h-3.5 w-3.5 text-primary" />
+                  {photoSamples.preparing ? 'Photo Mode · Preparing the light (first time takes a moment)' : photoSamples.settled ? 'Photo Mode · Finished' : photoSamples.n < 2 ? 'Photo Mode · Hold still' : `Photo Mode · Refining ${photoSamples.n}`}
+                </div>
+              )}
 
               {!walking && <div className="absolute bottom-3 left-3 flex gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
                 <DockButton side="top" label="Undo" hint="Ctrl+Z" disabled={!history.length} onClick={() => void undo()}><Undo2 className="h-4 w-4" /></DockButton>

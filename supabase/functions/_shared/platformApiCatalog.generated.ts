@@ -4885,6 +4885,27 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
+    "name": "surface-texture",
+    "tag": "Projects",
+    "methods": [
+      "POST"
+    ],
+    "summary": "Make a product's seamless surface texture for 3D rooms",
+    "description": "Returns the clean, flat, seamless texture of a catalogue product (a tile, a wood, a wall covering) that 3D rooms lay at the product's real size. Made once from the product's best photo with the image model and kept in product_material_maps as the product's selected albedo; a product that already has one is served it at no charge. Making one debits 6 credits BEFORE the model call and refunds them o",
+    "fields": {
+      "product_id": {
+        "type": "string",
+        "required": true,
+        "description": "A product the caller can see. (string (uuid))"
+      },
+      "workspace_id": {
+        "type": "string",
+        "required": true,
+        "description": "The caller's workspace that is charged. (string (uuid))"
+      }
+    }
+  },
+  {
     "name": "takeoff-from-drawing",
     "tag": "Projects",
     "methods": [
