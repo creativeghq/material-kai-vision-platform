@@ -746,7 +746,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     setRenders((list) => [saved, ...list]);
     setActiveRenderId(saved.id);
     setAreaEditing(false);
-    onRendered?.({ image_url: saved.image_url, label: 'Area changed', credits_used: result.credits_used, kind: 'area_edit' });
+    onRendered?.({ image_url: saved.image_url, label: 'Area Changed', credits_used: result.credits_used, kind: 'area_edit' });
     toast({ title: 'The area is changed in the render', description: `${result.credits_used} credits used. Everything outside it is exactly as it was.` });
   };
 
