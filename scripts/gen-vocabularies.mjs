@@ -14,6 +14,7 @@ export const VOCABULARIES = [
   ['src/modules/crm/leadVocabulary.ts', 'supabase/functions/_shared/crm/leadVocabulary.generated.ts'],
   ['src/lib/installation/guideSchema.ts', 'supabase/functions/_shared/installationGuideSchema.generated.ts'],
   ['src/lib/scene/sceneReadSchema.ts', 'supabase/functions/_shared/sceneReadSchema.generated.ts'],
+  ['src/lib/scene/kitchenComposition.ts', 'supabase/functions/_shared/kitchenComposition.generated.ts'],
   ['src/config/brandProfileFields.ts', 'supabase/functions/_shared/brandProfileFields.generated.ts'],
   ['src/config/writingVocabulary.ts', 'supabase/functions/_shared/writingVocabulary.generated.ts'],
   ['src/config/b2bCompanyTypes.ts', 'supabase/functions/_shared/b2bCompanyTypes.generated.ts'],

@@ -11,6 +11,7 @@ import { callerDbClient } from '../caller-client.ts';
 import { serviceClient } from '../supabase-client.ts';
 import { fetchImageGuarded } from '../fetch-image.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
+import { KITCHEN_KINDS, kitchenCompositionFromRoom, type RoomComposition } from '../kitchenComposition.generated.ts';
 
 const MODULE_SLUG = 'scene-studio';
 const BUCKET = 'generation-images';
@@ -24,7 +25,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -132,6 +133,56 @@ export const createManageScenesTool = (
       });
     }
 
+    if (action === 'price_kitchen') {
+      if (!scene_id) return JSON.stringify({ success: false, error: 'price_kitchen needs scene_id.' });
+      const { data: scene } = await sb.from('floor_plans').select(`${SCENE_COLUMNS}, workspace_id, project_id, project_plan_id`).eq('id', scene_id).maybeSingle();
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      const { data: objs } = await sb.from('floor_plan_objects').select('id, kind, width_mm, depth_mm, height_mm, removed_at').eq('floor_plan_id', scene_id);
+      const objects = ((objs ?? []) as Array<{ id: string; kind: string; width_mm: number; depth_mm: number; height_mm: number; removed_at: string | null }>)
+        .map((o) => ({ ...o, width_mm: Number(o.width_mm), depth_mm: Number(o.depth_mm), height_mm: Number(o.height_mm) }));
+      if (!objects.some((o) => !o.removed_at && KITCHEN_KINDS.has(o.kind))) return JSON.stringify({ success: false, error: 'There is no kitchen in this 3D room to price.' });
+      const engine = async (body: Record<string, unknown>) => {
+        const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/project-plan-engine`, {
+          method: 'POST', headers: { Authorization: `Bearer ${jwt}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        const out = await res.json().catch(() => ({})) as { plan?: { id: string; subtotal: number; source_currency: string; project_id: string | null }; error?: string };
+        if (!res.ok || !out.plan) throw new Error(out.error ?? `The plan engine answered HTTP ${res.status}.`);
+        return out.plan;
+      };
+      try {
+        let plan;
+        if (scene.project_plan_id) {
+          const { data: existing } = await sb.from('project_plans').select('id, dimensions, composition').eq('id', scene.project_plan_id).maybeSingle();
+          const previous = ((existing?.composition as { config?: RoomComposition } | null)?.config) ?? {};
+          plan = await engine({ action: 'rescale', plan_id: scene.project_plan_id, dimensions: existing?.dimensions ?? {}, composition: kitchenCompositionFromRoom(objects, previous) });
+        } else {
+          let projectId = scene.project_id as string | null;
+          if (!projectId && project) {
+            const { data: found } = await sb.from('projects').select('id, name').eq('workspace_id', workspaceId).ilike('name', `%${project.trim().replace(/[%_,()]/g, ' ')}%`).limit(5);
+            const list = (found ?? []) as Array<{ id: string; name: string }>;
+            if (list.length > 1) return JSON.stringify({ success: false, error: 'More than one project matches; name one exactly.', matches: list.map((p) => p.name) });
+            projectId = list[0]?.id ?? null;
+          }
+          if (!projectId) return JSON.stringify({ success: false, error: 'This 3D room is not on a project yet. Ask which project the kitchen is quoted on and pass project.' });
+          const { data: bps } = await sb.from('blueprints').select('id, workspace_id').eq('project_type', 'kitchen_cabinets').eq('status', 'active')
+            .or(`workspace_id.eq.${workspaceId},is_platform_starter.eq.true`).order('updated_at', { ascending: false });
+          const bpList = (bps ?? []) as Array<{ id: string; workspace_id: string | null }>;
+          const blueprint = bpList.find((b) => b.workspace_id === workspaceId) ?? bpList[0];
+          if (!blueprint) return JSON.stringify({ success: false, error: 'No kitchen blueprint is available to price from.' });
+          plan = await engine({ action: 'create-from-blueprint', project_id: projectId, blueprint_id: blueprint.id, title: `${scene.name} — kitchen`.slice(0, 200), composition: kitchenCompositionFromRoom(objects) });
+          await sb.from('floor_plans').update({ project_id: projectId, project_plan_id: plan.id }).eq('id', scene_id);
+        }
+        onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, project_plan_id: plan.id, intent: { mode: 'view', object_id: null, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true, plan_id: plan.id, subtotal: plan.subtotal, currency: plan.source_currency,
+          plan_link: plan.project_id ? `/projects/${plan.project_id}?tab=plan` : null,
+          message: 'The kitchen is priced on its project plan. Door model and worktop are chosen in the room (Kitchen Price) or on the plan; "Create quote" there turns it into a draft quote.',
+        });
+      } catch (e) {
+        return JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+
     if (action === 'status') {
       if (!scene_id) return JSON.stringify({ success: false, error: 'status needs scene_id.' });
       const { data, error } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
@@ -190,9 +241,11 @@ export const createManageScenesTool = (
       + 'for Make 3D (10 credits, the user confirms), mode photo_walk offers a photo-real walk the user confirms. '
       + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space, '
       + 'or on one part of an object (object + part, e.g. the sofa upholstery or the kitchen fronts); free. '
+      + 'price_kitchen: prices the kitchen units standing in the room on a project plan from the kitchen blueprint '
+      + '(runs, cabinet counts, sizes; the door model and worktop chosen on the plan are kept) and returns the subtotal. '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
@@ -204,6 +257,7 @@ export const createManageScenesTool = (
       part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),
       product: z.string().max(200).optional().describe('finish: the catalogue product to lay, by exact name or id.'),
       colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
+      project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet.'),
     }),
   },
 );

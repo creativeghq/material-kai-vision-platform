@@ -25,6 +25,7 @@ import { describeBox, describeObject, effectiveSize, polygonCentroid } from '@/l
 import { compositeMasked, loadImage, objectMask } from '@/lib/scene/sceneCompositing';
 import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
+import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
 import type { PaintScope, SceneCanvasHandle, SceneTool } from '@/components/features/scenestudio/SceneCanvas';
 import {
@@ -910,6 +911,11 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             </div>
           )}
         </div>
+        <KitchenPrice
+          scene={scene}
+          objects={objects}
+          onSceneChange={(patch) => setData((d) => (d ? { ...d, scene: { ...d.scene, ...patch } } : d))}
+        />
         <div className="space-y-1.5 border-t border-hairline pt-3">
           <Label className="text-xs">Photo-Real Furniture</Label>
           {batchProgress ? (

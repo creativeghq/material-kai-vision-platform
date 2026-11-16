@@ -8,6 +8,7 @@ import { sanitizeSceneRead, wallsFromRooms } from '@/lib/scene/sceneReadSchema';
 import { indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, wallFaceFinish } from '@/lib/scene/sceneSurfaces';
 import { objectParts } from '@/lib/scene/objectParts';
 import { groupSplats, tintSplats } from '@/lib/scene/splatTint';
+import { kitchenCompositionFromRoom } from '@/lib/scene/kitchenComposition';
 import { SCENE_OBJECT_KINDS, slotsForKind } from '@/lib/scene/sceneReadSchema';
 import type { SceneSurface } from '@/services/sceneStudioService';
 import { blankComments } from '../helpers/stripComments';
@@ -243,5 +244,30 @@ describe('a photo-real 3D model previews a new material', () => {
     expect(out[200 * 3 + 1]).toBeGreaterThan(out[200 * 3]);
     expect(out[5 * 3]).toBeCloseTo(rgb[5 * 3], 5);
     expect(out[206 * 3 + 1]).not.toBeCloseTo(out[200 * 3 + 1], 5);
+  });
+});
+
+describe('the kitchen standing in a 3D room is priced from the kitchen blueprint', () => {
+  const unit = (id: string, kind: string, w: number, h = 900, d = 600) => ({ id, kind, width_mm: w, depth_mm: d, height_mm: h });
+
+  it('turns runs into module rows per zone, a sink into a sink base, and the base run into the worktop', () => {
+    const c = kitchenCompositionFromRoom([unit('a', 'kitchen_base', 2400), unit('s', 'sink', 1200), unit('w', 'kitchen_wall', 1600, 720, 350), unit('t', 'kitchen_tall', 600, 2100)]);
+    expect(c.base.enabled).toBe(true);
+    expect(c.base.modules?.some((m) => m.type === 'sink_base' && m.width_cm === 90)).toBe(true);
+    expect(c.base.modules?.reduce((sum, m) => sum + m.width_cm * m.qty, 0)).toBe(360);
+    expect(c.base.globals?.height).toBe(76);
+    expect(c.wall.globals?.depth).toBe(35);
+    expect(c.tall.modules?.[0].type).toBe('larder');
+    expect(c.island.enabled).toBe(false);
+    expect(c.worktop.length_m).toBe(3.6);
+    expect(c.appliances.enabled).toBe(false);
+  });
+
+  it('keeps the door model and worktop already chosen on the plan', () => {
+    const prev = { base: { globals: { door_model: 'lacquer-id', height: 72 } }, worktop: { globals: { material: 'quartz-id' } } };
+    const c = kitchenCompositionFromRoom([unit('a', 'kitchen_base', 1800)], prev);
+    expect(c.base.globals?.door_model).toBe('lacquer-id');
+    expect(c.worktop.globals?.material).toBe('quartz-id');
+    expect(c.worktop.length_m).toBe(1.8);
   });
 });

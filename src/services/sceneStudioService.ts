@@ -3,6 +3,9 @@ import { edgeError, parseEdgeError } from '@/utils/edgeError';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
 import type { SurfaceTarget } from '@/lib/scene/sceneSurfaces';
 import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
+import { kitchenCompositionFromRoom, type RoomComposition } from '@/lib/scene/kitchenComposition';
+import { projectPlansService, type PlanWithItems } from '@/services/projectPlansService';
+import type { Composition, PlanComposition } from '@/utils/blueprintComposition';
 
 export const SCENE_BUCKET = 'generation-images';
 const MAX_SOURCE_LONG_SIDE = 2048;
@@ -16,6 +19,7 @@ export interface SceneRow {
   id: string;
   workspace_id: string;
   project_id: string | null;
+  project_plan_id: string | null;
   name: string;
   default_wall_height_mm: number;
   source_kind: SceneSourceKind;
@@ -107,7 +111,7 @@ export interface SceneData {
   renders: SceneRender[];
 }
 
-const SCENE_COLUMNS = 'id, workspace_id, project_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, created_at, updated_at';
+const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, created_at, updated_at';
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, product_id, colour_hex';
 const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex';
@@ -393,6 +397,46 @@ export const sceneStudioService = {
     const { data, error } = await supabase.functions.invoke('surface-texture', { body: { workspace_id: workspaceId, product_id: productId } });
     if (error) throw await edgeError(error, 'The texture could not be made');
     return data as { albedo_url: string; charged: boolean; credits_used?: number };
+  },
+
+  async kitchenBlueprintId(workspaceId: string): Promise<string> {
+    const { data, error } = await supabase.from('blueprints').select('id, workspace_id, is_platform_starter')
+      .eq('project_type', 'kitchen_cabinets').eq('status', 'active')
+      .or(`workspace_id.eq.${workspaceId},is_platform_starter.eq.true`)
+      .order('updated_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as Array<{ id: string; workspace_id: string | null }>;
+    const pick = rows.find((r) => r.workspace_id === workspaceId) ?? rows[0];
+    if (!pick) throw new Error('No kitchen blueprint is available to price from.');
+    return pick.id;
+  },
+
+  /** Prices the room's kitchen on its linked plan, creating the plan (on `projectId`) the first time. */
+  async priceKitchen(scene: SceneRow, objects: SceneObject[], projectId: string | null): Promise<PlanWithItems> {
+    if (scene.project_plan_id) {
+      const plan = await projectPlansService.get(scene.project_plan_id);
+      if (plan) {
+        const previous = (plan.composition as PlanComposition).config ?? {};
+        return projectPlansService.rescale(plan.id, plan.dimensions ?? {}, kitchenCompositionFromRoom(objects, previous as RoomComposition) as unknown as Composition);
+      }
+    }
+    const project = projectId ?? scene.project_id;
+    if (!project) throw new Error('Choose the project this kitchen is quoted on.');
+    const res = await projectPlansService.createFromBlueprint({
+      project_id: project,
+      blueprint_id: await this.kitchenBlueprintId(scene.workspace_id),
+      title: `${scene.name} — kitchen`.slice(0, 200),
+      composition: kitchenCompositionFromRoom(objects) as unknown as Composition,
+    });
+    const { error } = await supabase.from('floor_plans').update({ project_id: project, project_plan_id: res.plan.id }).eq('id', scene.id);
+    if (error) throw new Error(error.message);
+    return res;
+  },
+
+  async setKitchenChoice(planId: string, change: (config: Composition) => Composition): Promise<PlanWithItems> {
+    const plan = await projectPlansService.get(planId);
+    if (!plan) throw new Error('The kitchen plan no longer exists.');
+    return projectPlansService.rescale(plan.id, plan.dimensions ?? {}, change((plan.composition as PlanComposition).config ?? {}));
   },
 
   async searchProducts(workspaceId: string, query: string): Promise<SceneProduct[]> {

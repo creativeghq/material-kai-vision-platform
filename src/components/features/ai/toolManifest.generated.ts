@@ -1622,7 +1622,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageScenesTool',
     description: '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user rearranges it, recolours or swaps products, and renders it photo-real in any style. create: reads image_url …',
     params: [
-      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish'], optional: false, description: 'What to do.' },
+      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen'], optional: false, description: 'What to do.' },
       { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },
       { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows.' },
       { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },
@@ -1634,6 +1634,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'part', type: 'enum', enum: ['upholstery', 'legs', 'frame', 'bedding', 'top', 'seat', 'fronts', 'carcass', 'worktop', 'handles', 'plinth', 'shade', 'base', 'fabric', 'body'], optional: true, description: 'finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.' },
       { name: 'product', type: 'string', optional: true, description: 'finish: the catalogue product to lay, by exact name or id.' },
       { name: 'colour', type: 'string', optional: true, description: 'finish: a paint colour as #rrggbb, instead of a product.' },
+      { name: 'project', type: 'string', optional: true, description: 'price_kitchen: the project to price on, by name, when the room has none yet.' },
     ],
   },
   {

@@ -140,7 +140,7 @@ class ProjectPlansService {
   }
 
   /** Create a new plan instance for a project from a blueprint. */
-  createFromBlueprint(input: { project_id: string; blueprint_id: string; dimensions?: Record<string, number>; title?: string }): Promise<PlanWithItems> {
+  createFromBlueprint(input: { project_id: string; blueprint_id: string; dimensions?: Record<string, number>; title?: string; composition?: Composition }): Promise<PlanWithItems> {
     return callEngine<PlanWithItems>('create-from-blueprint', input);
   }
 
