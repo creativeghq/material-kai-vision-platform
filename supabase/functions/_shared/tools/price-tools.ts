@@ -6,6 +6,7 @@
  */
 
 import { resolveContactPricingSource } from '../crm/party-inheritance.ts';
+import { supplierLinesNote } from './price-supplier-lines.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -180,7 +181,7 @@ export const createPriceLookupTool = (
             });
             if (rerr) resolvedError = rerr.message;
             else resolvedPrices = (rrows ?? []).map((r: any) => ({ ...r, grade: r.row_grade, section: r.row_section }));
-            if (!rerr && resolvedPrices.length === 0) {
+            if (!rerr) {
               const { data: sh } = await sb.rpc('price_supplier_hints', { p_workspace_id: workspaceId, p_query: [product_name, manufacturer, sku].filter(Boolean).join(' ') });
               supplierLines = sh ?? [];
             }
@@ -405,9 +406,7 @@ export const createPriceLookupTool = (
           resolved_prices: resolvedPrices,
           resolved_prices_error: resolvedError,
           supplier_product_lines: supplierLines.length > 0 ? supplierLines : undefined,
-          supplier_product_lines_note: supplierLines.length > 0
-            ? 'The query names a supplier but no price row matched the other words. Do NOT guess a price: list these product lines and ask which product (name or size) is meant.'
-            : undefined,
+          supplier_product_lines_note: supplierLinesNote(supplierLines, resolvedPrices),
           hints,
           guidance,
           customer_discount: customerDiscount,

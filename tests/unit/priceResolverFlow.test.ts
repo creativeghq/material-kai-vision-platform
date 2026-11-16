@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
+import { supplierLinesNote } from '../../supabase/functions/_shared/tools/price-supplier-lines';
 
 const TOOLS = stripComments(
   readFileSync(join(__dirname, '..', '..', 'supabase/functions/_shared/tools/price-tools.ts'), 'utf8').replace(/\r\n/g, '\n'),
@@ -36,6 +37,23 @@ describe('price_lookup → SQL resolver', () => {
       readFileSync(join(__dirname, '..', '..', 'supabase/functions/_shared/tools/search-tools.ts'), 'utf8').replace(/\r\n/g, '\n'),
     );
     expect(SEARCH).toMatch(/rpc\('price_supplier_hints'/);
+  });
+
+  it('a named supplier\'s collections are attached even when the resolver returned rows, from one note', () => {
+    expect(LOOKUP).not.toMatch(/resolvedPrices\.length === 0\)\s*\{\s*const \{ data: sh \} = await sb\.rpc\('price_supplier_hints'/);
+    expect(LOOKUP).toMatch(/supplier_product_lines_note: supplierLinesNote\(supplierLines, resolvedPrices\)/);
+    const SEARCH = stripComments(
+      readFileSync(join(__dirname, '..', '..', 'supabase/functions/_shared/tools/search-tools.ts'), 'utf8').replace(/\r\n/g, '\n'),
+    );
+    expect(SEARCH).toMatch(/supplier_product_lines_note = supplierLinesNote\(lines, priced \?\? \[\]\)/);
+  });
+
+  it('rows from other suppliers are never read as "no price list for the one named"', () => {
+    const del = [{ supplier: 'Del Conca' }];
+    expect(supplierLinesNote([], [{ supplier: 'Izida 1894' }])).toBeUndefined();
+    expect(supplierLinesNote(del, [])).toMatch(/no price row matched/);
+    expect(supplierLinesNote(del, [{ supplier: 'Izida 1894' }])).toMatch(/Del Conca, whose price list IS on file/);
+    expect(supplierLinesNote(del, [{ supplier: 'Del Conca' }])).toMatch(/collection CODE/);
   });
 
   it('a price question to knowledge_base_search is answered from the same resolver, admin only', () => {

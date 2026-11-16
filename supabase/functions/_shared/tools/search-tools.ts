@@ -29,6 +29,7 @@ import { resolveTokenPrice, tokenCostParts } from '../ai-logger.ts';
 // One wording for every untrusted block (security invariant 9).
 import { wrapUntrusted, UNTRUSTED_FIELDS_NOTE } from '../untrusted.ts';
 import { clipText } from '../tool-result-shape.ts';
+import { supplierLinesNote } from './price-supplier-lines.ts';
 import { CLAUDE_HAIKU, langchainThinking } from '../claude-models.ts';
 
 /** Rerank whichever result array a MIVAA /api/rag/search payload came back with, in place. */
@@ -840,16 +841,16 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
                 p_query: query,
                 p_limit: 6,
               });
-              if (pricedErr) {
-                console.warn('[knowledge_base_search] resolve_purchase_prices failed:', pricedErr.message);
-              } else if (!priced || priced.length === 0) {
+              if (!pricedErr) {
                 const { data: lines } = await supabase.rpc('price_supplier_hints', { p_workspace_id: workspaceId, p_query: query });
                 if (lines && lines.length > 0) {
                   (results as Record<string, unknown>).supplier_product_lines = lines;
-                  (results as Record<string, unknown>).supplier_product_lines_note =
-                    'The query names a supplier but no price row matched the other words. Do NOT guess a price: list these product lines and ask which product (name or size) is meant.';
+                  (results as Record<string, unknown>).supplier_product_lines_note = supplierLinesNote(lines, priced ?? []);
                 }
-              } else {
+              }
+              if (pricedErr) {
+                console.warn('[knowledge_base_search] resolve_purchase_prices failed:', pricedErr.message);
+              } else if (priced && priced.length > 0) {
                 results.found = true;
                 (results as Record<string, unknown>).resolved_prices = priced.map((r: any) => ({
                   supplier: r.supplier, item: r.item_text, price_label: r.price_label, unit: r.unit, currency: r.currency,

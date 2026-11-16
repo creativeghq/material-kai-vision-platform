@@ -57,6 +57,27 @@ suite('resolve_purchase_prices · golden items against the live price store', ()
     },
   );
 
+  it('a series priced under its collection code is found by that code', async () => {
+    const rows = await resolve('Del Conca HME 60x120', 5);
+    expect(rows.some((r) => /DINAMIKA HME/.test(r.item_text) && r.status === 'purchase_price' && Number(r.final_net) === 23)).toBe(true);
+  });
+
+  it('a supplier named with an unmatched series still lists that supplier\'s collections in the size', async () => {
+    const { data, error } = await svc.rpc('price_supplier_hints', { p_workspace_id: OPERATOR_WS, p_query: 'Del Conca Marble Edition 60x120' });
+    expect(error).toBeNull();
+    const del = (data ?? []).find((l: { supplier: string }) => l.supplier === 'Del Conca');
+    expect(del?.examples).toContain('DINAMIKA HME - HSE');
+  });
+
+  it.each([['120x260', '120x260'], ['SIZE 100X300 CM', '100x300'], ['100 x 300 εκ.', '100x300'], ['600x1200', '60x120'], ['10X5Χ15,3cm', '5x10'], ['400Χ100Χ25ΜΜ', '10x40']])(
+    'a slab, an uppercase or Greek unit and a Greek separator read as the real size: %s',
+    async (text, size) => {
+      const { data, error } = await svc.rpc('kb_extract_sizes', { p_text: text });
+      expect(error).toBeNull();
+      expect(data).toEqual([size]);
+    },
+  );
+
   it.each(['tagina onyx 280x120', 'tagina onyx 120 x 280', '120x280 onyx', 'onyx diamond 120*280'])(
     'the same tile is found however "%s" is written',
     async (q) => {
