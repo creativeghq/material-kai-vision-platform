@@ -117,6 +117,7 @@
     "list_supplier_products",
     "list_workspace_product_suppliers",
     "price_supplier_hints",
+    "product_sale_unit",
     "record_payment_fx",
     "refund_credits",
     "resolve_campaign_audience",
