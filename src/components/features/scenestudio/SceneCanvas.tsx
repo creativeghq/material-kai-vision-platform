@@ -11,7 +11,9 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, oakFloorTexture, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
-import { canvasRelief } from '@/components/features/scenestudio/surfaceMaps';
+import { canvasRelief, finishTone } from '@/components/features/scenestudio/surfaceMaps';
+import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
+import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import {
@@ -75,13 +77,28 @@ interface Props {
   walkRoomId?: string | null;
   onWalkEnd?(): void;
   modelUrls?: Record<string, string>;
+  staleModels?: Set<string>;
 }
 
 const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
 
+const splatBandsOf = (kind: string) => {
+  const slots = slotsForKind(kind);
+  return { low: slots.includes('legs') || slots.includes('plinth'), top: slots.includes('worktop') };
+};
+
+const splatTintOf = (kind: string, f: SlotFinishes): Partial<Record<SplatGroup, Finish | null>> => {
+  const slots = slotsForKind(kind);
+  return { main: f[slots[0]] ?? null, low: f.legs ?? f.plinth ?? null, top: f.worktop ?? null };
+};
+
 /** A generated 3D model standing in for an object, fitted inside its true-size box with its front to +Z. */
-const SplatModel: React.FC<{ url: string; w: number; d: number; h: number }> = ({ url, w, d, h }) => {
+const SplatModel: React.FC<{
+  url: string; w: number; d: number; h: number;
+  tint?: Partial<Record<SplatGroup, Finish | null>>; bands?: { low: boolean; top: boolean };
+}> = ({ url, w, d, h, tint, bands }) => {
   const [fit, setFit] = useState<{ mesh: SplatMesh; scale: number; offset: [number, number, number] } | null>(null);
+  const source = useRef<{ y: Float32Array; rgb: Float32Array; opacity: Float32Array; groups?: Uint8Array; tinted: boolean } | null>(null);
   useEffect(() => {
     let live = true;
     const mesh = new SplatMesh({ url });
@@ -90,14 +107,19 @@ const SplatModel: React.FC<{ url: string; w: number; d: number; h: number }> = (
     mesh.initialized.then(() => {
       if (!live) return;
       const xs: number[] = []; const ys: number[] = []; const zs: number[] = [];
+      const n = mesh.packedSplats.numSplats;
+      const all = { y: new Float32Array(n), rgb: new Float32Array(n * 3), opacity: new Float32Array(n), tinted: false };
       const v = new Vector3();
-      mesh.forEachSplat((_i, center, _s, _q, opacity) => {
-        if (opacity < 0.2) return;
+      mesh.forEachSplat((i, center, _s, _q, opacity, color) => {
         v.copy(center).applyQuaternion(SPLAT_TURN);
+        all.y[i] = v.y; all.opacity[i] = opacity;
+        all.rgb[i * 3] = color.r; all.rgb[i * 3 + 1] = color.g; all.rgb[i * 3 + 2] = color.b;
+        if (opacity < 0.2) return;
         xs.push(v.x); ys.push(v.y); zs.push(v.z);
       });
+      source.current = all;
       if (xs.length < 100) return;
-      const q = (arr: number[], p: number) => { const a = [...arr].sort((m, n) => m - n); return a[Math.floor(p * (a.length - 1))]; };
+      const q = (arr: number[], p: number) => { const a = [...arr].sort((m, n2) => m - n2); return a[Math.floor(p * (a.length - 1))]; };
       const box = new Box3(new Vector3(q(xs, 0.02), q(ys, 0.01), q(zs, 0.02)), new Vector3(q(xs, 0.98), q(ys, 0.99), q(zs, 0.98)));
       const size = box.getSize(new Vector3());
       const scale = Math.min(w / Math.max(size.x, 1e-6), d / Math.max(size.z, 1e-6), h / Math.max(size.y, 1e-6));
@@ -106,6 +128,32 @@ const SplatModel: React.FC<{ url: string; w: number; d: number; h: number }> = (
     }).catch(() => { /* the box stays as the stand-in */ });
     return () => { live = false; mesh.dispose(); };
   }, [url, w, d, h]);
+  const tintKey = JSON.stringify([tint, bands]);
+  const wish = useRef({ tint, bands });
+  wish.current = { tint, bands };
+  useEffect(() => {
+    const { tint, bands } = wish.current;
+    const src = source.current;
+    if (!fit || !src) return;
+    let live = true;
+    const wanted = Object.entries(tint ?? {}).filter(([, f]) => !!f) as Array<[SplatGroup, Finish]>;
+    if (!wanted.length && !src.tinted) return;
+    const linear = (c: number) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+    void Promise.all(wanted.map(async ([g, f]) => [g, (await finishTone(f)).map(linear) as [number, number, number]] as const)).then((pairs) => {
+      if (!live) return;
+      src.groups ??= groupSplats(src.y, src.rgb, src.opacity, bands ?? { low: false, top: false });
+      const colours = pairs.length ? tintSplats(src.rgb, src.groups, Object.fromEntries(pairs)) : src.rgb;
+      const tmp = new Color();
+      fit.mesh.packedSplats.forEachSplat((i, center, scales, quat, opacity) => {
+        tmp.setRGB(colours[i * 3], colours[i * 3 + 1], colours[i * 3 + 2]);
+        fit.mesh.packedSplats.setSplat(i, center, scales, quat, opacity, tmp);
+      });
+      fit.mesh.packedSplats.needsUpdate = true;
+      fit.mesh.needsUpdate = true;
+      src.tinted = pairs.length > 0;
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, [fit, tintKey]);
   if (!fit) return null;
   return <group position={fit.offset} scale={fit.scale}><primitive object={fit.mesh} /></group>;
 };
@@ -316,8 +364,8 @@ const OpeningMesh: React.FC<{ wall: PlanWall; opening: PlanOpening; frame: PlanF
 const ObjectMesh: React.FC<{
   obj: SceneObject; idHex: string; frame: PlanFrame; product?: SceneProduct; selected: boolean; wireframe: boolean;
   tool: SceneTool; floorPlane: Plane; controls: React.MutableRefObject<OrbitControlsImpl | null>;
-  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void; modelUrl?: string; finishes?: SlotFinishes;
-}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove, modelUrl, finishes }) => {
+  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void; modelUrl?: string; finishes?: SlotFinishes; modelStale?: boolean;
+}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove, modelUrl, finishes, modelStale }) => {
   const size = effectiveSize(obj, product);
   const w = size.width_mm / 1000;
   const d = size.depth_mm / 1000;
@@ -377,7 +425,13 @@ const ObjectMesh: React.FC<{
           {edges}
         </mesh>
         {modelUrl
-          ? <SplatModel url={modelUrl} w={w} d={d} h={h} />
+          ? (
+            <SplatModel
+              url={modelUrl} w={w} d={d} h={h}
+              tint={modelStale ? splatTintOf(obj.kind, finishes ?? {}) : undefined}
+              bands={splatBandsOf(obj.kind)}
+            />
+          )
           : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} />}
       </group>
     );
@@ -666,7 +720,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
   const {
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
-    paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
+    staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
   } = props;
   const hasModels = Object.keys(modelUrls).length > 0;
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
@@ -850,6 +904,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           onRemove={() => onRemoveObject(o.id)}
           modelUrl={modelUrls[o.id]}
           finishes={finishesByObject[o.id]}
+          modelStale={staleModels?.has(o.id)}
         />
       ))}
       <OrbitControls

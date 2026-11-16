@@ -7,6 +7,7 @@ import {
 import { sanitizeSceneRead, wallsFromRooms } from '@/lib/scene/sceneReadSchema';
 import { indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, wallFaceFinish } from '@/lib/scene/sceneSurfaces';
 import { objectParts } from '@/lib/scene/objectParts';
+import { groupSplats, tintSplats } from '@/lib/scene/splatTint';
 import { SCENE_OBJECT_KINDS, slotsForKind } from '@/lib/scene/sceneReadSchema';
 import type { SceneSurface } from '@/services/sceneStudioService';
 import { blankComments } from '../helpers/stripComments';
@@ -211,5 +212,36 @@ describe('every object takes any material, slot by slot', () => {
     const own = [...rows, { id: 'c', object_id: 'k', slot: 'carcass' as const, product_id: null, colour_hex: '#ffffff' }];
     expect(objectSlotFinishes(k, own, {}).carcass?.hex).toBe('#ffffff');
     expect(objectSlotFinishes(k, own, {}).worktop).toBeUndefined();
+  });
+});
+
+describe('a photo-real 3D model previews a new material', () => {
+  const model = () => {
+    const n = 400;
+    const y = new Float32Array(n); const rgb = new Float32Array(n * 3); const op = new Float32Array(n).fill(1);
+    for (let i = 0; i < n; i++) {
+      y[i] = i / n;
+      const leg = i < 30; const cushion = i >= 300 && i < 330;
+      const c = leg ? [0.3, 0.2, 0.1] : cushion ? [0.9, 0.1, 0.1] : [0.6 + (i % 7) * 0.02, 0.6, 0.6];
+      rgb.set(c, i * 3);
+    }
+    return { y, rgb, op };
+  };
+
+  it('keeps the legs out of the upholstery and leaves a contrasting cushion alone', () => {
+    const { y, rgb, op } = model();
+    const g = groupSplats(y, rgb, op, { low: true, top: false });
+    expect(g[5]).toBe(1);
+    expect(g[200]).toBe(0);
+    expect(g[310]).toBe(255);
+  });
+
+  it('tints a group to the target colour while keeping each splat\'s relative shading', () => {
+    const { y, rgb, op } = model();
+    const g = groupSplats(y, rgb, op, { low: true, top: false });
+    const out = tintSplats(rgb, g, { main: [0.1, 0.4, 0.2] });
+    expect(out[200 * 3 + 1]).toBeGreaterThan(out[200 * 3]);
+    expect(out[5 * 3]).toBeCloseTo(rgb[5 * 3], 5);
+    expect(out[206 * 3 + 1]).not.toBeCloseTo(out[200 * 3 + 1], 5);
   });
 });

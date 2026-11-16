@@ -18509,6 +18509,12 @@
         "type": "string",
         "required": false,
         "desc": "For a room object with no model yet: a capture of that object stored in its room's folder."
+      },
+      {
+        "name": "finish",
+        "type": "object { description: string, image_url?: https URL }",
+        "required": false,
+        "desc": "Make the model in a chosen finish (e.g. 'upholstery in green velvet, legs in black'); the image shows the material. A product keeps one model per finish in product_3d_model_variants, keyed server-side on the description and image; the same finish is served from there afterwards."
       }
     ],
     "response": "200 { status: ready, url, credits_used } | 202 { status: processing, charged, row_id } — poll product_3d_models.status or floor_plan_objects.model_status"

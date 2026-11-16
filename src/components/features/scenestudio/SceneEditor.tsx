@@ -336,6 +336,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       return [`${SCENE_SLOT_LABELS[slot].toLowerCase()} in ${what}`];
     }).join(', ');
   };
+  const staleModels = new Set(objects.filter((o) => o.model_status === 'ready' && (o.model_finish ?? '') !== describeFinishes(o)).map((o) => o.id));
   const finishImage = (o: SceneObject): string | undefined => {
     const slots = objectSlotFinishes(o, finishes, products);
     return slotsForKind(o.kind).map((slot) => slots[slot]?.imageUrl).find((u): u is string => !!u && u.startsWith('https://'));
@@ -466,9 +467,11 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     if (!data || (making3d && !quiet)) return;
     setMaking3d(o.id);
     try {
+      const fin = describeFinishes(o);
+      const finish = fin ? { description: fin, image_url: finishImage(o) } : undefined;
       const result = o.product_id
-        ? await sceneStudioService.make3d({ product_id: o.product_id, workspace_id: data.scene.workspace_id, floor_plan_object_id: o.id })
-        : await sceneStudioService.make3d({ floor_plan_object_id: o.id, image_path: await cropFromRender(o) });
+        ? await sceneStudioService.make3d({ product_id: o.product_id, workspace_id: data.scene.workspace_id, floor_plan_object_id: o.id, finish })
+        : await sceneStudioService.make3d({ floor_plan_object_id: o.id, image_path: await cropFromRender(o), finish });
       const states = new Map((await sceneStudioService.objectModelStates(id)).map((r) => [r.id, r]));
       setObjects((list) => list.map((x) => (states.has(x.id) ? { ...x, ...states.get(x.id) } : x)));
       if (quiet) return true;
@@ -755,8 +758,17 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     />
     <Card>
       <CardContent className="space-y-2 p-3 text-xs">
-        {selected.model_status === 'ready' ? (
-          <p className="flex items-center gap-1.5"><BoxIcon className="h-3.5 w-3.5" />Shown as a photo-real 3D model.</p>
+        {selected.model_status === 'ready' && staleModels.has(selected.id) ? (
+          <>
+            <p className="flex items-center gap-1.5"><BoxIcon className="h-3.5 w-3.5" />The 3D model is previewed in the new materials.</p>
+            <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={making3d === selected.id} onClick={() => void make3d(selected)}>
+              {making3d === selected.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BoxIcon className="h-3.5 w-3.5" />}
+              Make 3D in these materials (10 credits)
+            </Button>
+            <p className="text-muted-foreground">The preview re-tints the model; this remakes it photo-real in {describeFinishes(selected) || 'its original finish'}, once, then keeps it for every room.</p>
+          </>
+        ) : selected.model_status === 'ready' ? (
+          <p className="flex items-center gap-1.5"><BoxIcon className="h-3.5 w-3.5" />Shown as a photo-real 3D model{selected.model_finish ? `, ${selected.model_finish}` : ''}.</p>
         ) : selected.model_status === 'processing' ? (
           <p className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Making the 3D model. It appears in the room in about a minute.</p>
         ) : (
@@ -942,6 +954,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 openings={data.openings}
                 surfaces={surfaces}
                 finishes={finishes}
+                staleModels={staleModels}
                 objects={objects}
                 products={products}
                 defaultWallHeightMm={scene.default_wall_height_mm}

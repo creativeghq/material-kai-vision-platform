@@ -49,6 +49,7 @@ export interface SceneObject {
   model_status?: 'processing' | 'ready' | 'failed' | null;
   model_storage_path?: string | null;
   model_error?: string | null;
+  model_finish?: string | null;
 }
 
 export interface SceneSurface {
@@ -107,7 +108,7 @@ export interface SceneData {
 }
 
 const SCENE_COLUMNS = 'id, workspace_id, project_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, created_at, updated_at';
-const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error';
+const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, product_id, colour_hex';
 const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex';
 const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, instruction, image_url, vr_world_id, layout_snapshot, created_at';
@@ -312,14 +313,14 @@ export const sceneStudioService = {
     };
   },
 
-  async objectModelStates(sceneId: string): Promise<Array<Pick<SceneObject, 'id' | 'model_status' | 'model_storage_path' | 'model_error'>>> {
+  async objectModelStates(sceneId: string): Promise<Array<Pick<SceneObject, 'id' | 'model_status' | 'model_storage_path' | 'model_error' | 'model_finish'>>> {
     const { data, error } = await supabase.from('floor_plan_objects')
-      .select('id, model_status, model_storage_path, model_error').eq('floor_plan_id', sceneId).not('model_status', 'is', null);
+      .select('id, model_status, model_storage_path, model_error, model_finish').eq('floor_plan_id', sceneId).not('model_status', 'is', null);
     if (error) throw new Error(error.message);
-    return (data ?? []) as Array<Pick<SceneObject, 'id' | 'model_status' | 'model_storage_path' | 'model_error'>>;
+    return (data ?? []) as Array<Pick<SceneObject, 'id' | 'model_status' | 'model_storage_path' | 'model_error' | 'model_finish'>>;
   },
 
-  async make3d(body: { floor_plan_object_id?: string; image_path?: string; product_id?: string; workspace_id?: string }): Promise<{ status: 'ready' | 'processing'; url?: string; charged: boolean; credits_used?: number }> {
+  async make3d(body: { floor_plan_object_id?: string; image_path?: string; product_id?: string; workspace_id?: string; finish?: { description: string; image_url?: string } }): Promise<{ status: 'ready' | 'processing'; url?: string; charged: boolean; credits_used?: number }> {
     const { data, error } = await supabase.functions.invoke('object-3d', { body });
     if (error) throw await edgeError(error, 'The 3D model could not be started');
     if (!data?.success) throw new Error(data?.error || 'The 3D model could not be started.');

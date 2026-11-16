@@ -3470,6 +3470,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "image_path": {
         "type": "string",
         "description": "For a room object with no model yet: a capture of that object stored in its room's folder."
+      },
+      "finish": {
+        "type": "string",
+        "description": "Make the model in a chosen finish (e.g. 'upholstery in green velvet, legs in black'); the image shows the material. A pr"
       }
     }
   },

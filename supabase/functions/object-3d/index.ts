@@ -25,7 +25,9 @@ const json = (payload: unknown, status = 200) =>
 const publicUrl = (admin: DbClient, path: string) => admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl as string;
 
 interface Target {
-  kind: 'product' | 'scene_object';
+  kind: 'product' | 'variant' | 'scene_object';
+  finish?: { text: string; imageUrl: string | null };
+  variantKey?: string;
   id: string;
   rowId: string;
   what: string;
@@ -50,13 +52,20 @@ async function refund(admin: DbClient, charge: Charge, reason: string, meta: Rec
   if (error) void captureException(new Error(`object-3d refund failed: ${error.message}`), { tags: { function: SERVICE } });
 }
 
+const productTable = (t: Target) => (t.kind === 'variant' ? 'product_3d_model_variants' : 'product_3d_models');
+
+async function sha32(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
 async function markFailed(admin: DbClient, t: Target, message: string) {
   const msg = message.slice(0, 500);
   if (t.linkObjectId) {
     await admin.from('floor_plan_objects').update({ model_status: 'failed', model_error: msg, model_updated_at: new Date().toISOString() }).eq('id', t.linkObjectId);
   }
-  const { error } = t.kind === 'product'
-    ? await admin.from('product_3d_models').update({ status: 'failed', error: msg }).eq('id', t.rowId)
+  const { error } = t.kind !== 'scene_object'
+    ? await admin.from(productTable(t)).update({ status: 'failed', error: msg }).eq('id', t.rowId)
     : await admin.from('floor_plan_objects').update({ model_status: 'failed', model_error: msg, model_updated_at: new Date().toISOString() }).eq('id', t.rowId);
   if (error) console.error('[object-3d] could not mark failed:', error.message);
 }
@@ -71,9 +80,17 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
     } else {
       bytes = (await fetchImageGuarded(t.source.url!)).bytes;
     }
-    const prompt = (await loadPrompt(admin, 'generation', 'object_3d', 'clean_shot')).split('{object}').join(t.what);
+    const images = [bytes];
+    let prompt: string;
+    if (t.finish) {
+      if (t.finish.imageUrl) images.push((await fetchImageGuarded(t.finish.imageUrl)).bytes);
+      prompt = (await loadPrompt(admin, 'generation', 'object_3d', 'clean_shot_finish'))
+        .split('{object}').join(t.what).split('{finish}').join(t.finish.text);
+    } else {
+      prompt = (await loadPrompt(admin, 'generation', 'object_3d', 'clean_shot')).split('{object}').join(t.what);
+    }
     const shot = await generateImageWithGemini(
-      { text: prompt, images: [bytes] },
+      { text: prompt, images },
       { task: 'object-3d-clean-shot', userId: charge.uid, workspaceId: charge.workspaceId },
     );
     const stamp = Date.now();
@@ -81,8 +98,8 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
     const cleanBytes = Uint8Array.from(atob(shot.base64), (c) => c.charCodeAt(0));
     const { error: upErr } = await admin.storage.from(BUCKET).upload(cleanPath, cleanBytes, { contentType: shot.mimeType || 'image/png', upsert: false });
     if (upErr) throw new Error(`The clean shot could not be stored: ${upErr.message}`);
-    if (t.kind === 'product') {
-      await admin.from('product_3d_models').update({ input_image_path: cleanPath, source_image_url: t.source.url ?? null }).eq('id', t.rowId);
+    if (t.kind !== 'scene_object') {
+      await admin.from(productTable(t)).update({ input_image_path: cleanPath, source_image_url: t.source.url ?? null }).eq('id', t.rowId);
     } else {
       await admin.from('floor_plan_objects').update({ model_source_url: publicUrl(admin, cleanPath) }).eq('id', t.rowId);
     }
@@ -91,6 +108,7 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': Deno.env.get('CRON_SECRET') || '' },
       body: JSON.stringify({
         target: t.kind, row_id: t.rowId, image_path: cleanPath, out_path: `${t.folder}/${stamp}.ply`, link_object_id: t.linkObjectId ?? null,
+        model_finish: t.finish?.text ?? null,
         refund: { user_id: charge.uid, credits: charge.credits, transaction_id: charge.transactionId, workspace_id: charge.workspaceId },
       }),
     });
@@ -114,7 +132,11 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const body = (await req.json().catch(() => ({}))) as {
     product_id?: string; floor_plan_object_id?: string; workspace_id?: string; image_path?: string;
+    finish?: { description?: string; image_url?: string };
   };
+  const finishText = typeof body.finish?.description === 'string' ? body.finish.description.trim().slice(0, 600) : '';
+  const finishImage = typeof body.finish?.image_url === 'string' && body.finish.image_url.startsWith('https://') ? body.finish.image_url : null;
+  const finish = finishText ? { text: finishText, imageUrl: finishImage } : undefined;
 
   let target: Target;
   let productWorkspace = '';
@@ -140,12 +162,17 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
       .maybeSingle();
     productWorkspace = product.workspace_id;
     const imageUrl = (img?.document_images as { image_url?: string } | null)?.image_url;
+    const variantKey = finish ? await sha32(`${finish.text}|${finish.imageUrl ?? ''}`) : null;
     target = {
-      kind: 'product', id: product.id, rowId: '', what: `the product "${product.name}"`, workspaceId: ws,
-      folder: `object-3d/products/${product.id}`, source: { url: imageUrl },
+      kind: variantKey ? 'variant' : 'product', id: product.id, rowId: '', what: `the product "${product.name}"`, workspaceId: ws,
+      folder: variantKey ? `object-3d/products/${product.id}/variants/${variantKey}` : `object-3d/products/${product.id}`,
+      source: { url: imageUrl }, finish, variantKey: variantKey ?? undefined,
     };
-    const { data: row } = await admin.from('product_3d_models')
-      .select('id, status, storage_path, updated_at').eq('product_id', product.id).eq('format', 'ply').maybeSingle();
+    const { data: row } = variantKey
+      ? await admin.from('product_3d_model_variants')
+        .select('id, status, storage_path, updated_at').eq('product_id', product.id).eq('variant_key', variantKey).maybeSingle()
+      : await admin.from('product_3d_models')
+        .select('id, status, storage_path, updated_at').eq('product_id', product.id).eq('format', 'ply').maybeSingle();
     if (row?.status === 'ready') ready = row.storage_path;
     else if (row?.status === 'processing' && Date.parse(row.updated_at) > Date.now() - STALE_MS) processing = true;
     else if (!imageUrl) throw new HttpError(409, 'This product has no photo to make a 3D model from.');
@@ -159,16 +186,16 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     }
   } else if (body.floor_plan_object_id) {
     const { data: obj } = await admin.from('floor_plan_objects')
-      .select('id, label, kind, floor_plan_id, product_id, model_status, model_storage_path, model_updated_at, floor_plans(workspace_id)')
+      .select('id, label, kind, floor_plan_id, product_id, model_status, model_storage_path, model_updated_at, model_finish, floor_plans(workspace_id)')
       .eq('id', body.floor_plan_object_id).maybeSingle();
     const ws = (obj?.floor_plans as { workspace_id?: string } | null)?.workspace_id;
     if (!obj || !ws || !(await userHasWorkspaceCapability(admin, uid, ws, 'moodboards.use'))) throw new HttpError(404, 'Object not found');
     const folder = `scene-studio/${ws}/${obj.floor_plan_id}`;
     target = {
       kind: 'scene_object', id: obj.id, rowId: obj.id, what: `the ${obj.label} (${String(obj.kind).replace(/_/g, ' ')})`, workspaceId: ws,
-      folder: `${folder}/object-3d/${obj.id}`, source: { path: body.image_path },
+      folder: `${folder}/object-3d/${obj.id}`, source: { path: body.image_path }, finish,
     };
-    if (obj.model_status === 'ready' && obj.model_storage_path) ready = obj.model_storage_path;
+    if (obj.model_status === 'ready' && obj.model_storage_path && (obj.model_finish ?? '') === (finish?.text ?? '')) ready = obj.model_storage_path;
     else if (obj.model_status === 'processing' && obj.model_updated_at && Date.parse(obj.model_updated_at) > Date.now() - STALE_MS) processing = true;
     else if (!body.image_path || !body.image_path.startsWith(`${folder}/`) || body.image_path.includes('..')) {
       throw new HttpError(400, 'image_path must be a capture of this 3D room.');
@@ -184,16 +211,22 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
 
   if (!ready) {
     const staleBefore = new Date(Date.now() - STALE_MS).toISOString();
-    if (target.kind === 'product') {
+    if (target.kind !== 'scene_object') {
       if (!target.rowId) {
-        const { data: ins, error } = await admin.from('product_3d_models').insert({
-          product_id: target.id, workspace_id: productWorkspace,
-          format: 'ply', storage_bucket: BUCKET, storage_path: `${target.folder}/pending`, status: 'processing', source: 'generated', created_by: uid,
-        }).select('id').maybeSingle();
+        const { data: ins, error } = target.kind === 'variant'
+          ? await admin.from('product_3d_model_variants').insert({
+            product_id: target.id, workspace_id: productWorkspace, variant_key: target.variantKey,
+            finish_description: target.finish!.text, finish_image_url: target.finish!.imageUrl,
+            storage_bucket: BUCKET, status: 'processing', created_by: uid,
+          }).select('id').maybeSingle()
+          : await admin.from('product_3d_models').insert({
+            product_id: target.id, workspace_id: productWorkspace,
+            format: 'ply', storage_bucket: BUCKET, storage_path: `${target.folder}/pending`, status: 'processing', source: 'generated', created_by: uid,
+          }).select('id').maybeSingle();
         if (error || !ins) return json({ success: true, status: 'processing', charged: false });
         target.rowId = ins.id;
       } else {
-        const { data: claimed } = await admin.from('product_3d_models')
+        const { data: claimed } = await admin.from(productTable(target))
           .update({ status: 'processing', error: null, created_by: uid })
           .eq('id', target.rowId)
           .or(`status.eq.failed,and(status.eq.processing,updated_at.lt.${staleBefore})`)
@@ -219,7 +252,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   if (ready) {
     if (target.linkObjectId) {
       await admin.from('floor_plan_objects').update({
-        model_status: 'ready', model_storage_path: ready, model_error: null, model_updated_at: new Date().toISOString(),
+        model_status: 'ready', model_storage_path: ready, model_error: null, model_finish: finish?.text ?? null, model_updated_at: new Date().toISOString(),
       }).eq('id', target.linkObjectId);
     }
     return json({ success: true, status: 'ready', charged: true, credits_used: debit.credits_debited, url: publicUrl(admin, ready) });

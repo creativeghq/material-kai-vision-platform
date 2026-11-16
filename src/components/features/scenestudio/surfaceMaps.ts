@@ -150,3 +150,28 @@ export function useFinishMaps(finish: Finish | null, widthM: number, heightM: nu
   useEffect(() => () => { own?.map?.dispose(); own?.normalMap.dispose(); own?.roughnessMap.dispose(); }, [own]);
   return own;
 }
+
+const tones = new Map<string, Promise<[number, number, number]>>();
+
+export function finishTone(f: Finish): Promise<[number, number, number]> {
+  if (f.hex && !f.imageUrl) {
+    const n = Number.parseInt(f.hex.slice(1), 16);
+    return Promise.resolve([((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255]);
+  }
+  const url = f.imageUrl!;
+  const hit = tones.get(url);
+  if (hit) return hit;
+  const job = loadImage(url).then((img) => {
+    const c = document.createElement('canvas'); c.width = 24; c.height = 24;
+    const g = c.getContext('2d', { willReadFrequently: true })!;
+    g.drawImage(img, 0, 0, 24, 24);
+    const d = g.getImageData(0, 0, 24, 24).data;
+    let r = 0; let gr = 0; let b = 0;
+    for (let i = 0; i < d.length; i += 4) { r += d[i]; gr += d[i + 1]; b += d[i + 2]; }
+    const k = (d.length / 4) * 255;
+    return [r / k, gr / k, b / k] as [number, number, number];
+  });
+  job.catch(() => tones.delete(url));
+  tones.set(url, job);
+  return job;
+}
