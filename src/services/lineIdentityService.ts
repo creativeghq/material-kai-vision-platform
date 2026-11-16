@@ -48,6 +48,40 @@ export const lineIdentityService = {
     return out;
   },
 
+  async check(rows: LineVariantRow[]): Promise<Map<string, LineVariantCheck>> {
+    const out = new Map<string, LineVariantCheck>();
+    const asked = rows.filter((r) => r.productId);
+    if (asked.length === 0) return out;
+    const { data, error } = await supabase.rpc('check_line_variants', {
+      p_rows: asked.map((r) => ({
+        key: r.key, product_id: r.productId, attributes: r.attributes ?? {}, text: r.text ?? null,
+      })) as unknown as Json,
+    });
+    if (error) throw new Error(`Could not check colour and size: ${error.message}`);
+    for (const r of (data ?? []) as Array<{ row_key: string; status: LineVariantCheck['status']; message: string | null; attributes: Record<string, string> }>) {
+      out.set(r.row_key, { status: r.status, message: r.message, attributes: r.attributes ?? {} });
+    }
+    return out;
+  },
+
+  async problems(rows: LineVariantRow[]): Promise<string[]> {
+    const res = await lineIdentityService.check(rows);
+    return [...res.values()].filter((r) => r.status !== 'ok').map((r) => r.message ?? 'A line has no colour or size chosen');
+  },
+
   rank: rankIdentityOptions,
   project: projectIdentity,
 };
+
+export interface LineVariantRow {
+  key: string;
+  productId: string | null | undefined;
+  attributes?: unknown;
+  text?: string | null;
+}
+
+export interface LineVariantCheck {
+  status: 'ok' | 'incomplete' | 'invalid';
+  message: string | null;
+  attributes: Record<string, string>;
+}

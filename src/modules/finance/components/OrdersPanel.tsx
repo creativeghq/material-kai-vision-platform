@@ -13,6 +13,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 import { variantKey } from '@/services/lineIdentityRules';
+import { lineIdentityService } from '@/services/lineIdentityService';
 import { productUomService } from '@/services/productUomService';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { Input } from '@/components/core/ui/input';
@@ -1072,6 +1073,13 @@ export const NewOrderModal: React.FC<{
     if (!party) { toast({ title: isSales ? 'Pick a customer' : 'Pick a supplier', variant: 'destructive' }); return; }
     const clean = items.filter((it) => it.description.trim() && (Number(it.quantity) || 0) > 0);
     if (clean.length === 0) { toast({ title: 'Add at least one product', variant: 'destructive' }); return; }
+    const variantProblems = await lineIdentityService.problems(clean.map((it, i) => ({
+      key: String(i), productId: it.product_id, attributes: it.selected_attributes, text: it.description,
+    }))).catch((e: unknown) => [e instanceof Error ? e.message : 'Could not check colour and size']);
+    if (variantProblems.length) {
+      toast({ title: 'Choose the colour and size', description: variantProblems.join(' · '), variant: 'destructive' });
+      return;
+    }
     setBusy(true);
     try {
       // A contact who belongs to a business is attributed to the BUSINESS (same as quotes/invoices).
@@ -2515,6 +2523,13 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
     if (!order) return;
     const clean = editItems.filter((l) => l.description.trim() && (Number(l.quantity) || 0) > 0);
     if (clean.length === 0) { toast({ title: 'Add at least one product', variant: 'destructive' }); return; }
+    const variantProblems = await lineIdentityService.problems(clean.map((l, i) => ({
+      key: String(i), productId: l.product_id, attributes: l.selected_attributes, text: l.description,
+    }))).catch((e: unknown) => [e instanceof Error ? e.message : 'Could not check colour and size']);
+    if (variantProblems.length) {
+      toast({ title: 'Choose the colour and size', description: variantProblems.join(' · '), variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     try {
       await ordersService.updateItems(order.id, order.workspace_id, clean.map((l) => ({

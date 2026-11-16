@@ -4,6 +4,7 @@ import { ADMIN_ROLES, isAdmin as isAdminRole } from '@/auth/roles';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { productDetailService, type ProductDetail } from '@/services/productDetailService';
 import { variantKey } from '@/services/lineIdentityRules';
+import { lineIdentityService } from '@/services/lineIdentityService';
 import { productUomService } from '@/services/productUomService';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import type { QuoteEconomics, QuotePipelineSummary } from '../utils/quoteEconomics';
@@ -702,6 +703,7 @@ export class QuotesService {
       project_id?: string | null;
     },
   ): Promise<Quote> {
+    if (data.status === 'quoted') await this.assertLineVariants(quoteId);
     const { data: quote, error } = await supabase
       .from('quotes')
       .update(data)
@@ -716,6 +718,18 @@ export class QuotesService {
     }
 
     return quote;
+  }
+
+  async assertLineVariants(quoteId: string): Promise<void> {
+    const { data: rows, error } = await supabase
+      .from('quote_items')
+      .select('id, product_id, selected_attributes, custom_product_name')
+      .eq('quote_id', quoteId);
+    if (error) throw error;
+    const problems = await lineIdentityService.problems((rows ?? []).map((r) => ({
+      key: r.id, productId: r.product_id, attributes: r.selected_attributes, text: r.custom_product_name,
+    })));
+    if (problems.length) throw new Error(`Choose the colour and size first. ${problems.join(' · ')}`);
   }
 
   /** Fans a decision out to the workspace admins through the seeded "Quote Accepted/Rejected" flow. */
@@ -984,8 +998,9 @@ export class QuotesService {
     data: {
       quantity?: number;
       notes?: string;
-      selected_size?: string;
-      selected_color?: string;
+      selected_size?: string | null;
+      selected_color?: string | null;
+      selected_attributes?: Record<string, string>;
       unit_price?: number | null;
       discounted_price?: number | null;
       custom_unit?: string;

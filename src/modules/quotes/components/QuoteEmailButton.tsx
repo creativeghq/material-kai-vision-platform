@@ -16,6 +16,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useConnectEmailGate } from '@/modules/email/hooks/useConnectEmailGate';
 import { unwrapEmailSendError } from '@/modules/email/lib/emailSenderGate';
+import { quotesService } from '../services/QuotesService';
 
 /**
  * QuoteEmailButton — emails the quote to a recipient via the `send-quote-email`
@@ -44,6 +45,7 @@ export const QuoteEmailButton: React.FC<Props> = ({ quoteId, defaultEmail, onSen
   const send = async () => {
     try {
       setSending(true);
+      await quotesService.assertLineVariants(quoteId);
       const { data, error } = await supabase.functions.invoke('send-quote-email', {
         body: { quote_id: quoteId, to: to.trim() || undefined, message: message.trim() || undefined },
       });

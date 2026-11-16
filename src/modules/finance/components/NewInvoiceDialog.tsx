@@ -61,6 +61,7 @@ import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPick
 import { unitDef } from '@/lib/units';
 import { UNIT_LABEL_BY_CODE } from '@/modules/finance/invoice-templates/labels';
 import { projectIdentity, variantKey, availabilityKey, SIZE_KEYS, COLOR_KEYS, type VariantAvailability } from '@/services/lineIdentityRules';
+import { lineIdentityService } from '@/services/lineIdentityService';
 import { ordersService } from '@/modules/finance/services/ordersService';
 import { productUomService } from '@/services/productUomService';
 
@@ -1267,6 +1268,14 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (!customer && !selfBillSupplierId) { setTab('details'); toast({ title: 'Pick a customer', variant: 'destructive' }); return; }
     const clean = lines.filter((l) => l.description.trim() && parseDecimalOr(l.quantity, 0) > 0);
     if (clean.length === 0) { setTab('items'); toast({ title: 'Add at least one line item', variant: 'destructive' }); return; }
+    const variantProblems = await lineIdentityService.problems(clean.map((l, i) => ({
+      key: String(i), productId: l.product_id, attributes: l.selected_attributes, text: l.description,
+    }))).catch((e: unknown) => [e instanceof Error ? e.message : 'Could not check colour and size']);
+    if (variantProblems.length) {
+      setTab('items');
+      toast({ title: 'Choose the colour and size', description: variantProblems.join(' · '), variant: 'destructive' });
+      return;
+    }
     const overDiscounted = clean.find(discountExceedsLine);
     if (overDiscounted) {
       setTab('items');

@@ -30,11 +30,11 @@ import { findExistingParty, normalizeEmail } from '../crm-party.ts';
 const itemSchema = z.object({
   product_id: z.string().uuid().optional().describe('Catalog product UUID. When set and no unit_price is given, the seller price is resolved automatically from the workspace pricing rules.'),
   configuration_id: z.string().uuid().optional().describe('Saved product configuration UUID (a product plus its chosen options, from the configurator). The line is priced from the configuration — base price PLUS the option deltas — and linked back to it. Use this instead of product_id whenever the customer picked options; passing the bare product_id quotes the base price and silently drops what they chose.'),
-  name: z.string().optional().describe('Custom product name (required when product_id is not set).'),
+  name: z.string().optional().describe('The line name EXACTLY as the user wrote it (e.g. "Ceramica Euro Country Nut 120*30"). Required when product_id is not set. On a catalog line it is printed verbatim AND read for the colour and size when `variant` does not state them.'),
   description: z.string().optional().describe('Custom product description.'),
   sku: z.string().optional().describe('Custom SKU / code.'),
   unit: z.string().optional().describe("Unit of measure for a custom item, e.g. 'sqm', 'pcs', 'm'. Defaults to 'pcs'."),
-  variant: z.record(z.string()).optional().describe('For a catalog product: which variant this line is, as axis → value, e.g. {"piece_type": "Step"} or {"piece_type": "Skirting", "color": "grey"}. A special piece (skirting, step, trim, mosaic) MUST name its piece_type, because it is sold in its own unit (often per piece) and priced on its own, never as the field tile per m2. Only values the product offers are accepted; an invalid one returns the valid options.'),
+  variant: z.record(z.string()).optional().describe('For a catalog product: which variant this line is, as axis → value, e.g. {"piece_type": "Step"} or {"piece_type": "Skirting", "color": "grey"}. A special piece (skirting, step, trim, mosaic) MUST name its piece_type, because it is sold in its own unit (often per piece) and priced on its own, never as the field tile per m2. Only values the product offers are accepted; an invalid one returns the valid options. Colour and size are REQUIRED when the product offers more than one: state them here or in `name`, and if the user did not say, ask them.'),
   quantity: z.number().positive().describe('Quantity in the line\'s unit of sale (e.g. 75 for 75 sqm of field tiles, 12 for 12 step pieces).'),
   unit_price: z.number().nonnegative().optional().describe('Unit price ex-VAT. Required for custom items; on a catalog line it overrides the auto-resolved price.'),
   discounted_price: z.number().nonnegative().optional().describe('Optional per-line discounted unit price; wins over unit_price for the line total.'),
@@ -67,6 +67,8 @@ interface ResolvedLine {
 
 interface LineVariant {
   ok: boolean;
+  complete: boolean;
+  missing: Array<{ label: string; options: string[] }>;
   attributes: Record<string, string>;
   variant_key: string | null;
   selected_size: string | null;
@@ -105,7 +107,7 @@ async function resolveLine(
   if (item.product_id) {
     // The variant is checked against what the product offers (the quote picker's options), in SQL.
     const { data: v, error: vErr } = await sb.rpc('resolve_line_variant', {
-      p_product_id: item.product_id, p_attrs: item.variant ?? {},
+      p_product_id: item.product_id, p_attrs: item.variant ?? {}, p_text: item.name ?? null,
     });
     if (vErr) return { error: `Could not read the variants of product ${item.product_id}: ${vErr.message}` };
     variant = v as LineVariant;
@@ -114,6 +116,10 @@ async function resolveLine(
     if (!variant.ok) {
       const bad = variant.errors.map((e) => `${e.label} "${e.value}" is not offered (options: ${e.options.join(', ')})`).join('; ');
       return { error: `${name}: ${bad}. Pick one of the listed values, or leave that axis out.` };
+    }
+    if (!variant.complete) {
+      const need = variant.missing.map((m) => `${m.label.toLowerCase()} (options: ${m.options.join(', ')})`).join('; ');
+      return { error: `${item.name || name}: choose the ${need}. Ask the user which one; never pick it for them.` };
     }
     const parts = Object.values(variant.attributes);
     label = parts.length ? `${name} — ${parts.join(' · ')}` : name;
@@ -198,6 +204,7 @@ async function resolveLine(
   };
   if (item.product_id) {
     payload.product_id = item.product_id;
+    if (item.name?.trim()) payload.custom_product_name = item.name.trim();
     if (productUnit) payload.custom_unit = productUnit;
     payload.selected_attributes = variant?.attributes ?? {};
     payload.selected_size = variant?.selected_size ?? null;

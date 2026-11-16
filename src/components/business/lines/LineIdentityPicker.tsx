@@ -5,7 +5,7 @@ import { ChevronDown, PackageCheck } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/core/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
-import { lineIdentityService, type LineIdentityOption } from '@/services/lineIdentityService';
+import { lineIdentityService, type LineIdentityOption, type LineVariantCheck } from '@/services/lineIdentityService';
 
 export interface LineIdentityPickerProps {
   productId?: string | null;
@@ -23,16 +23,28 @@ export interface LineIdentityPickerProps {
   }) => void;
   disabled?: boolean;
   className?: string;
+  text?: string | null;
 }
 
 /** Sentinel for "no choice made" — Radix Select cannot hold an empty string as a value. */
 const NONE = '__none__';
 
 export const LineIdentityPicker: React.FC<LineIdentityPickerProps> = ({
-  productId, value, onChange, disabled, className,
+  productId, value, onChange, disabled, className, text,
 }) => {
   const [opts, setOpts] = useState<LineIdentityOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [check, setCheck] = useState<LineVariantCheck | null>(null);
+  const valueKey = JSON.stringify(value ?? {});
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!productId) { setCheck(null); return; }
+    lineIdentityService.check([{ key: 'line', productId, attributes: JSON.parse(valueKey), text: text ?? null }])
+      .then((m) => { if (!cancelled) setCheck(m.get('line') ?? null); })
+      .catch(() => { if (!cancelled) setCheck(null); });
+    return () => { cancelled = true; };
+  }, [productId, valueKey, text]);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,7 +71,9 @@ export const LineIdentityPicker: React.FC<LineIdentityPickerProps> = ({
 
   const displayOf = (field: string, v: string) =>
     opts.find((o) => o.field_name === field)?.display?.find((d) => d.value === v);
-  const summary = chosen.length ? chosen.map(([f, v]) => displayOf(f, v)?.label ?? v).join(' · ') : 'Choose variant';
+  const needsChoice = !!check && check.status !== 'ok';
+  const chosenText = chosen.map(([f, v]) => displayOf(f, v)?.label ?? v).join(' · ');
+  const summary = needsChoice ? (chosenText ? `${chosenText} · choose colour & size` : 'Choose colour & size') : (chosenText || 'Choose variant');
   const chosenHex = chosen.map(([f, v]) => displayOf(f, v)?.hex).find(Boolean);
 
   return (
@@ -70,8 +84,8 @@ export const LineIdentityPicker: React.FC<LineIdentityPickerProps> = ({
           variant="ghost"
           size="sm"
           disabled={disabled || loading}
-          className={`h-7 px-2 text-xs font-normal ${chosen.length ? '' : 'text-muted-foreground'} ${className ?? ''}`}
-          title="Which variant is this line?"
+          className={`h-7 px-2 text-xs font-normal ${needsChoice ? 'text-amber-800 dark:text-amber-300' : chosen.length ? '' : 'text-muted-foreground'} ${className ?? ''}`}
+          title={check?.message ?? 'Which variant is this line?'}
         >
           {chosenHex && <span className="mr-1.5 h-3 w-3 shrink-0 rounded-sm border border-hairline" style={{ backgroundColor: chosenHex }} />}
           <span className="truncate max-w-[14rem]">{summary}</span>

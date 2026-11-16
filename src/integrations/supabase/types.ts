@@ -37987,6 +37987,16 @@ export type Database = {
           workspace_id: string
         }[]
       }
+      check_line_variants: {
+        Args: { p_rows: Json }
+        Returns: {
+          attributes: Json
+          detail: Json
+          message: string | null
+          row_key: string
+          status: string
+        }[]
+      }
       get_quote_economics: {
         Args: { p_quote_ids: string[] }
         Returns: {

@@ -26,6 +26,7 @@ import { TileQuantityDialog } from '@/modules/finance/components/TileQuantityDia
 import { HomogeneousStockNotice } from '@/modules/stock/components/HomogeneousStockNotice';
 import { lineIdentityService } from '@/services/lineIdentityService';
 import { composeLineName, partsNotInName } from '@/modules/finance/invoice-templates/lineName';
+import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
 import { QuoteLineRenderLink } from '@/components/features/visualizer/QuoteLineRenderLink';
 
 // Helper to extract size from notes (format: "Size: 15×38 cm")
@@ -46,7 +47,7 @@ interface QuoteItemsListProps {
   /** Quantity update (customer + admin) */
   onUpdateQuantity?: (itemId: string, quantity: number) => Promise<void>;
   /** Pricing + unit + FF&E update (admin only) */
-  onUpdateItem?: (itemId: string, data: { unit_price?: number | null; discounted_price?: number | null; custom_unit?: string; notes?: string; room?: string; dimensions?: string; installation_requirements?: string; delivery_date?: string | null; price_source?: string | null; price_lookup_call_id?: string | null }) => Promise<void>;
+  onUpdateItem?: (itemId: string, data: { selected_attributes?: Record<string, string>; selected_size?: string | null; selected_color?: string | null; unit_price?: number | null; discounted_price?: number | null; custom_unit?: string; notes?: string; room?: string; dimensions?: string; installation_requirements?: string; delivery_date?: string | null; price_source?: string | null; price_lookup_call_id?: string | null }) => Promise<void>;
   onRemoveItem?: (itemId: string) => Promise<void>;
   /** When true admin pricing fields (price, discounted, unit) are editable */
   editPricing?: boolean;
@@ -453,7 +454,11 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                         // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                         // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
                         // row is invalid ARIA and yields a focus stop with no name.
-                        onClick={() => !isCustom && !editPricing && item.product && handleViewProduct(item.product)}
+                        onClick={(e) => {
+                          const t = e.target as HTMLElement;
+                          if (!e.currentTarget.contains(t) || t.closest('[data-line-variant]')) return;
+                          if (!isCustom && !editPricing && item.product) handleViewProduct(item.product);
+                        }}
                       >
                         {/* Product + Dimensions */}
                         <td className="px-5 py-3">
@@ -529,7 +534,17 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                   quantity={item.quantity ?? 0}
                                 />
                               )}
-                              <div className="flex flex-wrap gap-1 mt-1">
+                              <div className="flex flex-wrap items-center gap-1 mt-1">
+                                {!isCustom && item.product_id && onUpdateItem && (
+                                  <span data-line-variant>
+                                    <LineIdentityPicker
+                                      productId={item.product_id}
+                                      value={(item.selected_attributes as Record<string, string> | null) ?? {}}
+                                      text={item.custom_product_name ?? null}
+                                      onChange={(next) => { void onUpdateItem(item.id, next); }}
+                                    />
+                                  </span>
+                                )}
                                 {unnamedParts.map((part) => (
                                   <Badge key={part} variant="secondary" className="text-[10px] gap-1 font-normal px-1.5 py-0">
                                     {part === (item.selected_size || selectedSize) && <Ruler className="h-2 w-2" />}

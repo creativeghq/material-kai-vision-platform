@@ -688,7 +688,7 @@ export const QuoteDetailPage: React.FC = () => {
       toast({ title: 'Quote Sent', description: 'Quote has been sent to the customer for review.' });
     } catch (error) {
       console.error('Error sending quote:', error);
-      toast({ title: 'Error', description: 'Failed to send quote to customer', variant: 'destructive' });
+      toast({ title: 'Quote not sent', description: error instanceof Error ? error.message : 'Failed to send quote to customer', variant: 'destructive' });
     } finally {
       setSendingQuote(false);
     }
