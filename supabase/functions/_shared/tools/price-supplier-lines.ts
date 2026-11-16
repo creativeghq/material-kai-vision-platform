@@ -1,4 +1,3 @@
-/** What to tell the model about `price_supplier_hints` rows next to the resolver's answer. */
 export function supplierLinesNote(
   lines: ReadonlyArray<{ supplier: string }>,
   resolved: ReadonlyArray<{ supplier: string }>,
