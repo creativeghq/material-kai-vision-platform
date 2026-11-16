@@ -133,7 +133,7 @@ export async function fetchQuoteData(
         key: it.id,
         product_id: it.product_id ?? null,
         attributes: it.selected_attributes ?? {},
-        name: it.products ? (it.products.name ?? null) : (it.custom_product_name ?? null),
+        name: it.custom_product_name || it.products?.name || null,
       })),
     });
     for (const r of (names ?? []) as Array<{ row_key: string; line_name: string | null }>) {

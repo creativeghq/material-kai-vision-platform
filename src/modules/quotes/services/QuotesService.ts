@@ -180,6 +180,7 @@ export interface Product {
 
 export interface QuoteItemWithProduct extends QuoteItem {
   product?: Product;
+  line_image_url?: string | null;
 }
 
 /**
@@ -547,6 +548,7 @@ export class QuotesService {
     const itemsWithImages = (items || []).map(item => ({
       ...item,
       cost_snapshot: costByItemId.get(item.id) ?? null,
+      line_image_url: item.product ? (productImageMap[`${item.product.id}|${lineImageKey(item) ?? ''}`] ?? null) : null,
       product: item.product ? {
         ...item.product,
         image_url: productImageMap[`${item.product.id}|${lineImageKey(item) ?? ''}`] || item.product.image_url,

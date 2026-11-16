@@ -290,7 +290,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
       key: i.id,
       productId: i.product_id,
       attributes: i.selected_attributes,
-      name: i.product_id ? i.product?.name : i.custom_product_name,
+      name: i.custom_product_name || i.product?.name,
     }))).then((m) => { if (!cancelled) setLineNames(m); });
     return () => { cancelled = true; };
   }, [items]);
@@ -465,8 +465,8 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                 <div className="w-full h-full flex items-center justify-center bg-primary/10">
                                   <PenLine className="h-4 w-4 text-primary/60" />
                                 </div>
-                              ) : item.product && getProductImageUrl(item.product) ? (
-                                <img src={getProductImageUrl(item.product) || ''} alt={getProductName(item.product)} className="w-full h-full object-cover" loading="lazy" />
+                              ) : item.product && (item.line_image_url || getProductImageUrl(item.product)) ? (
+                                <img src={item.line_image_url || getProductImageUrl(item.product) || ''} alt={getProductName(item.product)} className="w-full h-full object-cover" loading="lazy" />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center">
                                   <Package className="h-4 w-4 text-muted-foreground/50" />
