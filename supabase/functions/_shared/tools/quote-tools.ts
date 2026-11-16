@@ -34,7 +34,8 @@ const itemSchema = z.object({
   description: z.string().optional().describe('Custom product description.'),
   sku: z.string().optional().describe('Custom SKU / code.'),
   unit: z.string().optional().describe("Unit of measure for a custom item, e.g. 'sqm', 'pcs', 'm'. Defaults to 'pcs'."),
-  quantity: z.number().positive().describe('Quantity (e.g. 75 for 75 sqm).'),
+  variant: z.record(z.string()).optional().describe('For a catalog product: which variant this line is, as axis → value, e.g. {"piece_type": "Step"} or {"piece_type": "Skirting", "color": "grey"}. A special piece (skirting, step, trim, mosaic) MUST name its piece_type, because it is sold in its own unit (often per piece) and priced on its own, never as the field tile per m2. Only values the product offers are accepted; an invalid one returns the valid options.'),
+  quantity: z.number().positive().describe('Quantity in the line\'s unit of sale (e.g. 75 for 75 sqm of field tiles, 12 for 12 step pieces).'),
   unit_price: z.number().nonnegative().optional().describe('Unit price ex-VAT. Required for custom items; on a catalog line it overrides the auto-resolved price.'),
   discounted_price: z.number().nonnegative().optional().describe('Optional per-line discounted unit price; wins over unit_price for the line total.'),
   image_url: z.string().optional().describe('Optional image URL for a custom item (ignored for catalog items, which use the product image).'),
@@ -60,6 +61,19 @@ interface ResolvedLine {
   label: string;
   /** Procurement cost the resolver returned, written to `quote_item_costs` after the insert. */
   cost_snapshot: number | null;
+  unit: string | null;
+  note: string | null;
+}
+
+interface LineVariant {
+  ok: boolean;
+  attributes: Record<string, string>;
+  variant_key: string | null;
+  selected_size: string | null;
+  selected_color: string | null;
+  errors: Array<{ label: string; value: string; options: string[] }>;
+  ignored: Array<{ axis: string; value: string }>;
+  offered: Record<string, { label: string; options: string[] }>;
 }
 
 /**
@@ -75,7 +89,7 @@ async function resolveLine(
   customerCompanyId: string | null,
   customerContactId: string | null,
 ): Promise<ResolvedLine | { error: string }> {
-  const label = item.name || item.product_id || 'item';
+  let label = item.name || item.product_id || 'item';
   let unitPrice = item.unit_price ?? null;
   let retailPrice: number | null = null;
   let costSnapshot: number | null = null;
@@ -86,15 +100,41 @@ async function resolveLine(
   // whose quotes all came from the agent.
   let priceSource: string | null = null;
   let productUnit: string | null = null;
-  // The unit of sale from SQL `product_sale_unit` (#580), the same read `QuotesService.addItem`
-  // makes, so an agent-created line prices identically to a hand-typed one (#332 step 1c).
+  let variant: LineVariant | null = null;
+  let note: string | null = null;
   if (item.product_id) {
+    // The variant is checked against what the product offers (the quote picker's options), in SQL.
+    const { data: v, error: vErr } = await sb.rpc('resolve_line_variant', {
+      p_product_id: item.product_id, p_attrs: item.variant ?? {},
+    });
+    if (vErr) return { error: `Could not read the variants of product ${item.product_id}: ${vErr.message}` };
+    variant = v as LineVariant;
+    const { data: prod } = await sb.from('products').select('name').eq('id', item.product_id).maybeSingle();
+    const name = (prod as { name?: string } | null)?.name ?? label;
+    if (!variant.ok) {
+      const bad = variant.errors.map((e) => `${e.label} "${e.value}" is not offered (options: ${e.options.join(', ')})`).join('; ');
+      return { error: `${name}: ${bad}. Pick one of the listed values, or leave that axis out.` };
+    }
+    const parts = Object.values(variant.attributes);
+    label = parts.length ? `${name} — ${parts.join(' · ')}` : name;
+    const pieces = variant.offered.piece_type?.options ?? [];
+    if (!variant.attributes.piece_type && pieces.some((p) => p.toLowerCase() !== 'field')) {
+      note = `${name} also comes as ${pieces.filter((p) => p.toLowerCase() !== 'field').join(', ')}; this line was quoted as the main (Field) piece.`;
+    }
+    if (variant.ignored.length) {
+      note = [note, `Ignored (not a choice on ${name}): ${variant.ignored.map((i) => `${i.axis}=${i.value}`).join(', ')}.`].filter(Boolean).join(' ');
+    }
+    // The unit of sale from SQL `product_sale_unit` (#580), the same read `QuotesService.addItem`
+    // makes, so an agent-created line prices identically to a hand-typed one (#332 step 1c).
     try {
       const { data: sale } = await sb.rpc('product_sale_unit', {
-        p_product_id: item.product_id, p_variant_key: null, p_workspace_id: workspaceId,
+        p_product_id: item.product_id, p_variant_key: variant.variant_key, p_workspace_id: workspaceId,
       });
       productUnit = (sale as { unit?: string | null } | null)?.unit ?? null;
     } catch { /* non-fatal — no unit simply means no break can match */ }
+    if (!productUnit && variant.attributes.piece_type) {
+      note = [note, `The unit of sale for ${variant.attributes.piece_type} is not stated for ${name}; the line has no unit and no price until it is.`].filter(Boolean).join(' ');
+    }
   }
 
   // Catalog line without an explicit price → resolve the seller price the same way
@@ -113,6 +153,7 @@ async function resolveLine(
       p_company_id: customerCompanyId,
       p_contact_id: customerContactId,
       p_audience: 'seller',
+      p_variant_key: variant?.variant_key ?? null,
       ...breakArgs,
     });
     const p = (priced || {}) as Record<string, unknown>;
@@ -158,6 +199,9 @@ async function resolveLine(
   if (item.product_id) {
     payload.product_id = item.product_id;
     if (productUnit) payload.custom_unit = productUnit;
+    payload.selected_attributes = variant?.attributes ?? {};
+    payload.selected_size = variant?.selected_size ?? null;
+    payload.selected_color = variant?.selected_color ?? null;
     if (retailPrice != null) payload.retail_price = retailPrice;
     if (priceSource) payload.price_source = priceSource;
   } else {
@@ -167,7 +211,10 @@ async function resolveLine(
     payload.custom_unit = item.unit || 'pcs';
     if (item.image_url) payload.custom_image_url = item.image_url;
   }
-  return { payload, line_total: lineTotal, label, cost_snapshot: costSnapshot };
+  return {
+    payload, line_total: lineTotal, label, cost_snapshot: costSnapshot,
+    unit: (payload.custom_unit as string | undefined) ?? null, note,
+  };
 }
 
 /** create_quote */
@@ -280,7 +327,8 @@ export const createCreateQuoteTool = (
         const costBases: Array<number | null> = [];
         // Compact per-line summary for the canvas card's line-items accordion
         // (the branded PDF already shows full detail; this surfaces it as data too).
-        const lineSummaries: Array<{ label: string; line_total: number; pricing_status?: string; room?: string | null }> = [];
+        const lineSummaries: Array<{ label: string; line_total: number; pricing_status?: string; room?: string | null; quantity?: number; unit?: string | null }> = [];
+        const lineNotes: string[] = [];
         let subtotal = 0;
         // A configured line is NOT resolved here. `add_configuration_to_quote` reads the chosen
         // options, checks the option rules, prices through the same derivation and inserts the row
@@ -302,7 +350,10 @@ export const createCreateQuoteTool = (
             line_total: resolved.line_total ?? 0,
             pricing_status: (resolved.payload as any).pricing_status,
             room: ((resolved.payload as any).room ?? null) as string | null,
+            quantity: it.quantity,
+            unit: resolved.unit,
           });
+          if (resolved.note) lineNotes.push(resolved.note);
           subtotal += resolved.line_total ?? 0; // call-for-price lines contribute 0 to the total
         }
         if (payloads.length > 0) {
@@ -459,6 +510,8 @@ export const createCreateQuoteTool = (
           grand_total: round2(grandTotal),
           currency: 'EUR',
           pdf_generated: Boolean(pdfUrl),
+          lines: lineSummaries.map((l) => ({ label: l.label, quantity: l.quantity ?? null, unit: l.unit ?? null, line_total: l.line_total, pricing_status: l.pricing_status })),
+          ...(lineNotes.length ? { notes: lineNotes } : {}),
           message: `Created quote${quoteNumber ? ` ${quoteNumber}` : ''} with ${lineCount} item(s), total €${round2(grandTotal).toFixed(2)}. You can review it beside this chat or any time under Quotes.`,
         });
       } catch (e) {
@@ -470,7 +523,8 @@ export const createCreateQuoteTool = (
       description:
         'Create a real, editable quote from a list of products and generate its branded PDF, then open it on the canvas. ' +
         'Use for "make/create/build a quote" requests. Each item is either a catalog product (pass product_id — the seller ' +
-        'price is resolved automatically), a CONFIGURED product (pass configuration_id — priced with the chosen options ' +
+        'price is resolved automatically; for a special piece such as a step or skirting add variant:{piece_type:"Step"}, ' +
+        'since it is sold and priced in its own unit), a CONFIGURED product (pass configuration_id — priced with the chosen options ' +
         'and linked to them; use this whenever the customer picked options, because a bare product_id quotes the base ' +
         'price and drops what they chose), or a custom item (pass name + unit_price + unit, e.g. 75 sqm at €34/sqm → ' +
         '{name:"Tagina", unit:"sqm", quantity:75, unit_price:34}). Optionally link a CRM customer (company OR contact). ' +

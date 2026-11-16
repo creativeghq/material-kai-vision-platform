@@ -121,6 +121,7 @@
     "record_payment_fx",
     "refund_credits",
     "resolve_campaign_audience",
+    "resolve_line_variant",
     "resolve_product_spec",
     "resolve_purchase_prices",
     "resolve_sourcing_options",
