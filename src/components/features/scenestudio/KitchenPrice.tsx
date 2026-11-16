@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, Calculator, FileText, Loader2, RefreshCw } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
+import { formatMoney } from '@/utils/decimal';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -13,11 +14,10 @@ import { sceneStudioService, type SceneObject, type SceneRow } from '@/services/
 import { KITCHEN_KINDS, kitchenSignature } from '@/lib/scene/kitchenComposition';
 import type { Composition, PlanComposition, RateChoice } from '@/utils/blueprintComposition';
 
+const WHOLE = { decimals: 0, maxDecimals: 0 };
 const UNIT_ZONES = ['base', 'wall', 'tall', 'island', 'highboard'];
 const TOP_ZONES = ['worktop', 'island_worktop', 'bar'];
 
-const money = (n: number, currency: string) =>
-  new Intl.NumberFormat(undefined, { style: 'currency', currency: currency || 'EUR', maximumFractionDigits: 0 }).format(n);
 
 export const KitchenPrice: React.FC<{
   scene: SceneRow;
@@ -111,7 +111,7 @@ export const KitchenPrice: React.FC<{
           <SelectContent>
             {choices.map((c) => (
               <SelectItem key={c.id} value={c.id} className="text-xs">
-                {c.label} · {money(c.unit_price, plan?.source_currency ?? 'EUR')}{c.unit ? `/${c.unit}` : ''}
+                {c.label} · {formatMoney(c.unit_price, plan?.source_currency ?? 'EUR', WHOLE)}{c.unit ? `/${c.unit}` : ''}
               </SelectItem>
             ))}
           </SelectContent>
@@ -145,7 +145,7 @@ export const KitchenPrice: React.FC<{
       ) : (
         <>
           <div className="flex items-baseline justify-between">
-            <span className="text-lg font-semibold tabular-nums">{money(plan.subtotal ?? 0, plan.source_currency)}</span>
+            <span className="text-lg font-semibold tabular-nums">{formatMoney(plan.subtotal ?? 0, plan.source_currency, WHOLE)}</span>
             <span className="text-[11px] text-muted-foreground">before tax</span>
           </div>
           {choiceSelect('Door Model', 'Cabinet model', UNIT_ZONES, 'door_model')}
@@ -155,7 +155,7 @@ export const KitchenPrice: React.FC<{
               {topLines.map((l) => (
                 <li key={l.id} className="flex justify-between gap-2">
                   <span className="truncate text-muted-foreground">{l.label}</span>
-                  <span className="shrink-0 tabular-nums">{money(l.line_total, plan.source_currency)}</span>
+                  <span className="shrink-0 tabular-nums">{formatMoney(l.line_total, plan.source_currency, WHOLE)}</span>
                 </li>
               ))}
             </ul>

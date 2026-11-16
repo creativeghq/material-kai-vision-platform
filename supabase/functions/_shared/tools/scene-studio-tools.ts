@@ -170,7 +170,8 @@ export const createManageScenesTool = (
           const blueprint = bpList.find((b) => b.workspace_id === workspaceId) ?? bpList[0];
           if (!blueprint) return JSON.stringify({ success: false, error: 'No kitchen blueprint is available to price from.' });
           plan = await engine({ action: 'create-from-blueprint', project_id: projectId, blueprint_id: blueprint.id, title: `${scene.name} — kitchen`.slice(0, 200), composition: kitchenCompositionFromRoom(objects) });
-          await sb.from('floor_plans').update({ project_id: projectId, project_plan_id: plan.id }).eq('id', scene_id);
+          const { error: linkErr } = await sb.from('floor_plans').update({ project_id: projectId, project_plan_id: plan.id }).eq('id', scene_id);
+          if (linkErr) return JSON.stringify({ success: false, plan_id: plan.id, error: `The kitchen was priced but the room could not be linked to its plan: ${linkErr.message}` });
         }
         onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, project_plan_id: plan.id, intent: { mode: 'view', object_id: null, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
         return JSON.stringify({
