@@ -74,14 +74,14 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   const imageUrl = (img?.document_images as { image_url?: string } | null)?.image_url;
   if (!imageUrl) throw new HttpError(409, 'This product has no photo to make a texture from.');
 
-  const debit = await debitExternalServiceCredits(admin, uid, SERVICE, 'surface_texture', 1, { product_id: product.id }, ws);
+  const debit = await debitExternalServiceCredits(admin, uid, SERVICE, 'scene_studio_texture', 1, { product_id: product.id }, ws);
   if (!debit.success) {
     return json({ success: false, error: debit.error ?? 'Insufficient credits', credits_required: debit.credits_debited, service: SERVICE }, 402);
   }
 
   try {
     const source = await fetchImageGuarded(imageUrl);
-    const prompt = (await loadPrompt(admin, 'generation', 'surface_texture', 'albedo'))
+    const prompt = (await loadPrompt(admin, 'generation', 'scene_texture', 'albedo'))
       .split('{product}').join(`"${product.name}"`)
       .split('{format}').join(formatText(product.attributes as Record<string, unknown> | null, product.metadata as Record<string, unknown> | null));
     const out = await generateImageWithGemini(
@@ -121,7 +121,7 @@ async function refundCharge(
   const { error } = await admin.rpc('refund_credits', {
     p_user_id: uid,
     p_amount: credits,
-    p_operation_type: 'surface_texture_refund',
+    p_operation_type: 'scene_studio_texture_refund',
     p_description: `Texture not made: ${reason.slice(0, 120)}`,
     p_metadata: { refunds_transaction_id: transactionId },
     p_workspace_id: ws,
