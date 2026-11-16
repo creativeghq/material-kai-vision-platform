@@ -85,21 +85,21 @@ async function resolveLine(
   // `finance.quantity_breaks_never_fire` would have reported the feature dead on a workspace
   // whose quotes all came from the agent.
   let priceSource: string | null = null;
+  let productUnit: string | null = null;
+  // The unit of sale from SQL `product_sale_unit` (#580), the same read `QuotesService.addItem`
+  // makes, so an agent-created line prices identically to a hand-typed one (#332 step 1c).
+  if (item.product_id) {
+    try {
+      const { data: sale } = await sb.rpc('product_sale_unit', {
+        p_product_id: item.product_id, p_variant_key: null, p_workspace_id: workspaceId,
+      });
+      productUnit = (sale as { unit?: string | null } | null)?.unit ?? null;
+    } catch { /* non-fatal — no unit simply means no break can match */ }
+  }
 
   // Catalog line without an explicit price → resolve the seller price the same way
   // QuotesService.addItem does (audience 'seller' folds in customer discounts).
   if (item.product_id && unitPrice == null) {
-    // The PRODUCT's unit, not `item.unit` — that field is for custom lines only, and the model
-    // does not supply one for a catalog line. `QuotesService.addItem` reads exactly this, which
-    // is what makes an agent-created line price identically to a hand-typed one (#332 step 1c).
-    let productUnit: string | null = null;
-    try {
-      const { data: prod } = await sb
-        .from('products').select('metadata').eq('id', item.product_id).maybeSingle();
-      const meta = (prod as { metadata?: { unit?: string } } | null)?.metadata;
-      productUnit = meta?.unit ?? null;
-    } catch { /* non-fatal — no unit simply means no break can match */ }
-
     // Together or not at all: `get_product_price_break` does
     // `coalesce(convert_to_base_unit(product, qty, unit), qty)`, so a quantity sent without its
     // unit is read as already being in base units and can match the wrong threshold — "5 pallets"
@@ -157,6 +157,7 @@ async function resolveLine(
   };
   if (item.product_id) {
     payload.product_id = item.product_id;
+    if (productUnit) payload.custom_unit = productUnit;
     if (retailPrice != null) payload.retail_price = retailPrice;
     if (priceSource) payload.price_source = priceSource;
   } else {

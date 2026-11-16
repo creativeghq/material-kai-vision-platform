@@ -4,6 +4,7 @@ import { ADMIN_ROLES, isAdmin as isAdminRole } from '@/auth/roles';
 import { getActiveWorkspaceId } from '@/utils/activeWorkspace';
 import { productDetailService, type ProductDetail } from '@/services/productDetailService';
 import { variantKey } from '@/services/lineIdentityRules';
+import { productUomService } from '@/services/productUomService';
 import { UnifiedSearchService } from '@/services/unifiedSearchService';
 import type { QuoteEconomics, QuotePipelineSummary } from '../utils/quoteEconomics';
 
@@ -801,23 +802,12 @@ export class QuotesService {
     room_view_sheet_id?: string | null;
     visualizer_state?: string | null;
   }): Promise<QuoteItem> {
-    // Resolve default unit from product metadata
+    // The variant's unit of sale (#580); null = not stated for this piece, left for the operator.
     let customUnit: string | null = null;
-    try {
-      const { data: product } = await supabase
-        .from('products')
-        .select('metadata')
-        .eq('id', data.product_id)
-        .single();
-      if (product?.metadata?.unit) {
-        customUnit = product.metadata.unit;
-      }
-    } catch { /* non-fatal — falls back to null (displays as pcs) */ }
+    const lineVariant = variantKey(data.selected_attributes as Record<string, string> | undefined) ?? null;
 
-    // pre-fill the line from the cascade resolver so catalog lines aren't blank.
     // For an OWN product the resolved figure IS the sell price; for an operator-catalog
-    // product it's the seller's COST (snapshotted so margin is computable) and seeds the
-    // unit_price as a starting sell the seller marks up.
+    // product it's the seller's COST (snapshotted so margin is computable).
     const qtyNow = data.quantity || 1;
     let unitPrice: number | null = null;
     let costSnapshot: number | null = null;
@@ -836,9 +826,9 @@ export class QuotesService {
         .eq('id', data.quote_id)
         .single();
       quoteWorkspaceId = quote?.workspace_id ?? null;
+      customUnit = (await productUomService.saleUnit(data.product_id, lineVariant, quoteWorkspaceId).catch(() => null))?.unit ?? null;
       if (quote?.workspace_id) {
         // Pass the quote's customer so the resolver applies their pricing-level discount.
-        // audience='seller' → staff get cost_basis + margin (never exposed to the buyer).
         // Quantity + unit so `product_price_breaks` can fire (#347 defect 16).
         const breakArgs = customUnit && qtyNow > 0
           ? { p_quantity: qtyNow, p_unit: customUnit }
@@ -849,11 +839,8 @@ export class QuotesService {
           p_company_id: quote.customer_company_id ?? null,
           p_contact_id: quote.customer_contact_id ?? null,
           p_audience: 'seller',
-          // #374 Phase 4 — price THIS variant. The resolver prefers a row keyed to it and
-          // falls back to the product-wide row, so a line that has chosen nothing prices
-          // exactly as before. `variantKey` is the twin of SQL `_variant_key`, held equal by
-          // tests/unit/variantKeyParity.test.ts.
-          p_variant_key: variantKey(data.selected_attributes as Record<string, string> | undefined) ?? null,
+          // #374 Phase 4 — price THIS variant; `variantKey` is the twin of SQL `_variant_key`.
+          p_variant_key: lineVariant,
           ...breakArgs,
         });
         const p: any = priced;
@@ -1034,24 +1021,20 @@ export class QuotesService {
               .select('workspace_id, customer_company_id, customer_contact_id')
               .eq('id', current.quote_id).single();
             if (q?.workspace_id) {
-              // The product's own unit, so the resolver can convert the new quantity and match a
-              // break threshold. It used to be read AFTER the pricing call (for the Layer-B
-              // category, now gone), which is precisely why this branch — the "quantity changed,
-              // reprice" path — could never tell the resolver what unit the quantity was in.
-              const { data: prod } = await supabase.from('products').select('metadata').eq('id', current.product_id).single();
-              const unit: string | null = prod?.metadata?.unit ?? current.custom_unit ?? null;
-              // Together or not at all — an unconvertible/absent unit makes the resolver read the
-              // raw quantity as base units and match the wrong threshold.
+              // The quantity is in the LINE's unit, so that is the unit a break is matched in.
+              // Together or not at all — an absent unit makes the resolver read the raw
+              // quantity as base units and match the wrong threshold.
+              const lineAttrs = (current as { selected_attributes?: Record<string, string> | null }).selected_attributes;
+              const unit: string | null = current.custom_unit
+                ?? (await productUomService.saleUnit(current.product_id, variantKey(lineAttrs) ?? null, q.workspace_id).catch(() => null))?.unit
+                ?? null;
               const breakArgs = unit && qty > 0 ? { p_quantity: qty, p_unit: unit } : {};
               const { data: priced } = await supabase.rpc('get_product_price_for_workspace', {
                 p_workspace_id: q.workspace_id, p_product_id: current.product_id,
                 p_company_id: q.customer_company_id ?? null, p_contact_id: q.customer_contact_id ?? null,
                 p_audience: 'seller',
-                // #374 Phase 4 — a quantity change must reprice the SAME variant, not the
-                // product-wide row. Without this the line silently jumped to the base price.
-                p_variant_key: variantKey(
-                  (current as { selected_attributes?: Record<string, string> | null }).selected_attributes,
-                ) ?? null,
+                // #374 Phase 4 — a quantity change must reprice the SAME variant.
+                p_variant_key: variantKey(lineAttrs) ?? null,
                 ...breakArgs,
               });
               const p: any = priced;

@@ -570,6 +570,14 @@ never assumed per m2. Never match a price to a product on item text alone, and n
 collection name). A new loader inserts rows and nothing else; `lint_price_row_facts()` (service_role) must return all
 zeros after a load. Unit is NEVER guessed: a row with no printed or section unit stays `unconfirmed`.
 
+## The unit of sale belongs to the PIECE, never to the category or the series (#580)
+A series sells field tiles per m² and its skirting, steps and mosaics per piece or metre. The unit of a line is
+`product_sale_unit(product, variant_key, workspace)` — never `products.metadata.unit` — and a special piece
+(`piece_type` other than Field) whose unit nobody printed is **NULL, not m²**: leave it blank for the operator. A
+special piece also prices only from rows keyed to its own variant, never the field tile's. `"per unit"` in a price
+list is a placeholder, not a piece. Details: [docs/units-and-quantity-pricing.md](docs/units-and-quantity-pricing.md).
+Guarded by [tests/unit/unitOfSale.test.ts](tests/unit/unitOfSale.test.ts) + probe `catalog.special_piece_line_unit`.
+
 ## Embeddings & VECS — footguns
 **VECS is the single source of truth for image embeddings.** All vectors are halfvec.
 

@@ -200,6 +200,42 @@ Writes require `is_workspace_finance_manager` at the RLS boundary.
 no conversion between them** — the exact state in which document quantities move stock 1:1. It
 does not fire merely because the units differ, which is legitimate.
 
+## The unit of sale belongs to the piece (#580)
+
+A tile series sells its field tiles per m² and its skirting, steps, trims and mosaic sheets per
+piece, per metre or per sheet. Before #580 a product held one unit for the whole series, so a step
+was quoted per m² and, with no step price of its own, at the field tile's per-m² price. Both are
+valid numbers, so nothing raised.
+
+- **Piece Type** (`piece_type`, identity axis for tiles, wood and vinyl) names the piece on the
+  line. `Field` is the main piece; every other value is a special piece
+  (`piece_type_is_special`).
+- **Units by Piece Type** (`metadata.piece_units`, e.g. `{"Skirting": "pcs"}`) holds only units the
+  supplier printed. Both fields' hints reach the extraction prompt through the field registry.
+- **`product_sale_unit(product, variant_key, workspace)` is the one derivation.** Order: a price
+  row keyed to the exact variant → for a special piece, its `piece_units` entry, else **NULL
+  (`not_stated`)** → the product-wide price row → `metadata.unit` → packaging → `pcs`. A special
+  piece never falls through to the field unit. A product whose only piece type is special is
+  treated as that piece even when the line names no piece.
+- **A special piece prices only from rows keyed to it.** `get_product_price_for_workspace`,
+  `_pricing_cost` and `_pricing_retail_explain` skip the product-wide row and `products.cost` for
+  it, so an unpriced step is `unpriced`, never the field tile's price. The resolver returns
+  `price_unit`, `unit_source` and `piece_type`.
+- **Geometry and stock follow the variant.** `product_m2_per_piece(product, variant_key)` uses the
+  variant's own size (a field tile's too, not the series' first size), `get_product_uom` /
+  `convert_to_base_unit` take the variant, a special piece is counted in its own unit with none of
+  the field packaging, and `_resolve_warehouse_item` opens its stock row in that unit.
+- **Line writers ask SQL.** Quotes, orders, invoices and the agent's quote tool set the line unit
+  from `product_sale_unit`, never from `products.metadata.unit`; a not-stated piece leaves the unit
+  blank for the operator. Lists and the quote PDF show the line's own `custom_unit`.
+- `quote_items` is unique per **(quote, product, variant)**, not per product, so a quote can carry
+  a series' tiles and its skirting as two lines.
+
+Probes: `catalog.special_piece_line_unit` (critical — a piece line in the wrong unit, or carrying
+m² when its unit is not stated), `catalog.special_piece_unit_not_stated` (warning) and
+`catalog.special_pieces_untyped` (info — the product's own SKU list names special pieces its Piece
+Type does not). Guarded by [tests/unit/unitOfSale.test.ts](../tests/unit/unitOfSale.test.ts).
+
 ## A caution about the resolver's caller gate
 
 `get_product_price_for_workspace` is SECURITY DEFINER and distinguishes a *buyer* payload from a

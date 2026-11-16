@@ -415,9 +415,13 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                   const isCustom = !item.product_id;
                   const isExpanded = expandedItemId === item.id;
 
+                  // A piece line with no stated unit shows none rather than the field piece's (#580).
                   const unit = isCustom
                     ? (item.custom_unit || 'pcs')
-                    : (item.product?.metadata?.unit || 'pcs');
+                    : (item.custom_unit
+                      || ((item as { selected_attributes?: Record<string, unknown> | null }).selected_attributes?.piece_type
+                        ? '—'
+                        : (item.product?.metadata?.unit || 'pcs')));
 
                   // Effective total for display
                   const effectivePrice = (item as any).discounted_price ?? item.unit_price;

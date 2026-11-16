@@ -391,6 +391,7 @@ export type OrderLinkTarget =
 
 import { round2 as r2 } from '@/utils/decimal';
 import { productDetailService } from '@/services/productDetailService';
+import { productUomService } from '@/services/productUomService';
 
 /**
  * Apply an order-level discount ('percent' or a flat 'amount') across the lines. The SAME effective
@@ -1775,7 +1776,7 @@ export const ordersService = {
   }): Promise<LinePricing> {
     // `cost` is not selectable from `products` by the browser (#358) — it comes from the
     // sell-side-gated RPC. `supplier_company_id` still is, and is read here directly.
-    const [{ data: prod }, costs, available] = await Promise.all([
+    const [{ data: prod }, costs, available, sale] = await Promise.all([
       supabase.from('products').select('supplier_company_id').eq('id', opts.productId).maybeSingle(),
       productDetailService.costs([opts.productId]),
       // #374 Phase 3 — what can actually ship THIS line: rows keyed to its variant, plus
@@ -1787,10 +1788,10 @@ export const ordersService = {
           if (!a) return null;
           return variantKey(opts.selectedAttributes) ? a.exact + a.unassigned : a.productTotal;
         }),
+      productUomService.saleUnit(opts.productId, variantKey(opts.selectedAttributes) ?? null, opts.workspaceId).catch(() => null),
     ]);
-    // NB: products.measurement_unit_code is the integer myDATA code, NOT our text unit label
-    // (item/m²/…), so we don't seed the line's unit from it — the user picks it.
-    const unit: string | null = null;
+    // The variant's unit of sale (#580); null = not stated for this piece, so the user picks it.
+    const unit: string | null = sale?.unit ?? null;
     const cost = costs.get(opts.productId)?.cost ?? null;
     const supplier = (prod?.supplier_company_id as string | null) ?? null;
     if (opts.orderType === 'purchase') {
@@ -1799,14 +1800,15 @@ export const ordersService = {
       // gave the buy side its own ladder: what the SUPPLIER charges at volume.
       const supplierId = opts.companyId ?? supplier;
       const hasQtyBuy = opts.quantity != null && Number.isFinite(Number(opts.quantity)) && Number(opts.quantity) > 0;
-      if (supplierId && hasQtyBuy && opts.unit) {
+      const buyUnit = opts.unit ?? unit;
+      if (supplierId && hasQtyBuy && buyUnit) {
         try {
           const { data: brk } = await supabase.rpc('get_supplier_price_break', {
             p_workspace_id: opts.workspaceId,
             p_supplier_company_id: supplierId,
             p_product_id: opts.productId,
             p_quantity: Number(opts.quantity),
-            p_unit: opts.unit,
+            p_unit: buyUnit,
             p_variant_key: variantKey(opts.selectedAttributes) ?? null,
           });
           const tier = (brk ?? null) as { unit_cost?: number; discount_percent?: number } | null;
@@ -1871,8 +1873,9 @@ export const ordersService = {
     try {
       // Quantity + unit travel together or not at all — see the note on `opts.quantity`.
       const hasQty = opts.quantity != null && Number.isFinite(Number(opts.quantity)) && Number(opts.quantity) > 0;
-      const qtyArgs = hasQty && opts.unit
-        ? { p_quantity: Number(opts.quantity), p_unit: opts.unit }
+      const qtyUnit = opts.unit ?? unit;
+      const qtyArgs = hasQty && qtyUnit
+        ? { p_quantity: Number(opts.quantity), p_unit: qtyUnit }
         : {};
       const { data } = await supabase.rpc('get_product_price_for_workspace', {
         p_workspace_id: opts.workspaceId, p_product_id: opts.productId,

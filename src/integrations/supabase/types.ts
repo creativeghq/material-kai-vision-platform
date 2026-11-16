@@ -39447,6 +39447,10 @@ export type Database = {
         Args: { p_product_id: string; p_quantity: number; p_unit?: string }
         Returns: number
       }
+      product_sale_unit: {
+        Args: { p_product_id: string; p_variant_key: string | null; p_workspace_id: string | null }
+        Returns: Json
+      }
       promote_agent_memory: {
         Args: {
           p_agent_id: string

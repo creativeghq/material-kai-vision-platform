@@ -34,7 +34,23 @@ export interface PriceBreak {
   variant_key: string | null;
 }
 
+/** SQL `product_sale_unit` (#580). `unit` null = not stated for this piece: ask, never default. */
+export interface SaleUnit {
+  unit: string | null;
+  source: 'variant_price' | 'piece_units' | 'not_stated' | 'price' | 'product' | 'packaging' | 'default';
+  piece_type: string | null;
+  special: boolean;
+}
+
 export const productUomService = {
+  async saleUnit(productId: string, variantKey: string | null, workspaceId: string | null): Promise<SaleUnit | null> {
+    const { data, error } = await supabase.rpc('product_sale_unit', {
+      p_product_id: productId, p_variant_key: variantKey, p_workspace_id: workspaceId,
+    });
+    if (error) throw error;
+    return (data ?? null) as unknown as SaleUnit | null;
+  },
+
   /** The derived ladder. Safe to call for a product with no packaging row — returns base only. */
   async getUom(productId: string): Promise<ProductUom> {
     const { data, error } = await supabase.rpc('get_product_uom', { p_product_id: productId });
@@ -85,8 +101,7 @@ export const productUomService = {
       product_id: row.product_id,
       min_quantity: row.min_quantity,
       unit: row.unit ?? 'pcs',
-      // The CHECK constraint allows exactly one of these; normalise blank input to null so a
-      // half-filled form fails loudly at the constraint instead of storing a zero discount.
+      // The CHECK allows exactly one of these; blank → null so a half-filled form fails loudly.
       discount_percent: row.discount_percent ?? null,
       unit_price: row.unit_price ?? null,
       currency: row.currency ?? 'EUR',
@@ -118,8 +133,7 @@ export const productUomService = {
       p_audience: 'seller',
       p_quantity: quantity,
       p_unit: unit,
-      // The preview must price the SAME variant the breaks above are being edited for, or it
-      // reassures the operator with a number the resolver would not actually charge.
+      // The SAME variant the breaks are being edited for, or the preview shows a price never charged.
       p_variant_key: variantKey,
     });
     if (error) throw error;

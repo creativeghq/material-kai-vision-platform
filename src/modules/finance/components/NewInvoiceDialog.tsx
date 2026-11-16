@@ -62,6 +62,7 @@ import { unitDef } from '@/lib/units';
 import { UNIT_LABEL_BY_CODE } from '@/modules/finance/invoice-templates/labels';
 import { projectIdentity, variantKey, availabilityKey, SIZE_KEYS, COLOR_KEYS, type VariantAvailability } from '@/services/lineIdentityRules';
 import { ordersService } from '@/modules/finance/services/ordersService';
+import { productUomService } from '@/services/productUomService';
 
 interface Customer {
   type: 'contact' | 'company';
@@ -270,7 +271,7 @@ const emptyLine = (g?: Partial<LineItem>): LineItem => ({
 // customer is being invoiced for, and an invoice is a fiscal record. Where the product genuinely
 // offers a choice the operator now makes it in the variant picker, which ranks stocked values
 // first; where it offers one value, that value is a fact and still flows through.
-function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string } {
+function pickFromMeta(meta: any): { color?: string; size?: string } {
   if (!meta || typeof meta !== 'object') return {};
   const app = meta.appearance ?? {};
   const dims = Array.isArray(meta.dimensions) ? meta.dimensions : [];
@@ -278,7 +279,7 @@ function pickFromMeta(meta: any): { unit?: string; color?: string; size?: string
   const soleDim = dims.length === 1 ? dims[0] : null;
   const color = app.color ?? app.colour ?? meta.color ?? soleVariant.color ?? '';
   const size = app.size ?? meta.size ?? soleVariant.format ?? soleVariant.size ?? (soleDim?.label ?? soleDim?.value ?? '');
-  return { unit: meta.unit, color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
+  return { color: typeof color === 'string' ? color : '', size: typeof size === 'string' ? size : '' };
 }
 
 export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenChange, onCreated, initialCustomer, initialItems, initialDocType, initialNotes, initialCategoryId, editInvoiceId }) => {
@@ -878,6 +879,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     } catch { return ''; }
   };
 
+  /** The variant's unit of sale (#580) as line fields; blank when the piece's unit is not stated. */
+  const saleUnitFields = async (productId: string, attrs: Record<string, string>) => {
+    const unit = (await productUomService.saleUnit(productId, variantKey(attrs) ?? null, workspaceId).catch(() => null))?.unit ?? null;
+    return { unit: unit ?? '', measurement_unit_code: unit ? (unitDef(unit)?.mydataCode?.toString() ?? '') : '' };
+  };
+
   /** A new variant is a different item: re-price it unless the operator has typed their own price. */
   const changeVariant = async (idx: number, next: { selected_attributes: Record<string, string>; selected_color: string | null; selected_size: string | null }) => {
     const line = lines[idx];
@@ -887,10 +894,12 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       size: next.selected_size ?? '',
     });
     if (!line?.product_id) return;
+    const unitFields = await saleUnitFields(line.product_id, next.selected_attributes);
+    update(idx, unitFields);
     const untouched = !line.unit_price.trim() || line.unit_price === '0' || line.unit_price === line.auto_price;
     if (!untouched) return;
-    const price = await resolveCatalogPrice(line.product_id, next.selected_attributes, line.quantity, line.unit || null);
-    if (price) update(idx, { unit_price: price, auto_price: price });
+    const price = await resolveCatalogPrice(line.product_id, next.selected_attributes, line.quantity, unitFields.unit || null);
+    update(idx, { unit_price: price, auto_price: price });
   };
 
   const pickProduct = async (idx: number, p: any) => {
@@ -901,7 +910,8 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     if (meta.color) attrs[COLOR_KEYS[0]] = meta.color;
     if (meta.size) attrs[SIZE_KEYS[0]] = meta.size;
     const projected = projectIdentity(attrs);
-    const price = await resolveCatalogPrice(p.id, attrs, lines[idx]?.quantity ?? '', meta.unit || null);
+    const unitFields = await saleUnitFields(p.id, attrs);
+    const price = await resolveCatalogPrice(p.id, attrs, lines[idx]?.quantity ?? '', unitFields.unit || null);
     // Cost is internal and optional; an unknown or foreign-currency cost stays blank rather than
     // landing as a wrong margin.
     const pc = (await productDetailService.costs([p.id])).get(p.id);
@@ -911,8 +921,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
       item_type: (p as { item_type?: string | null }).item_type ?? 'good',
       description: p.name ?? '',
       sku: p.sku ?? '',
-      unit: meta.unit ?? '',
-      ...(meta.unit ? { measurement_unit_code: unitDef(meta.unit)?.mydataCode?.toString() ?? '' } : {}),
+      ...unitFields,
       selected_attributes: attrs,
       product_income: {
         type: p.mydata_income_classification_type ?? null,

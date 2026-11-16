@@ -12,6 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { LineIdentityPicker } from '@/components/business/lines/LineIdentityPicker';
+import { variantKey } from '@/services/lineIdentityRules';
+import { productUomService } from '@/services/productUomService';
 import { PriceLookupDrawer } from '@/components/features/pricing/PriceLookupDrawer';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -165,6 +167,13 @@ const vatCodeOf = (pct?: number | null) => VAT_CATEGORIES.find((v) => v.pct === 
 const UNIT_OPTIONS: Array<{ code: string; label: string }> =
   UNITS.map((u) => ({ code: u.key, label: u.label }));
 const DEFAULT_UNIT = 'pcs';
+
+/** The variant's unit of sale (#580); '' when the piece's unit is not stated, so the user picks it. */
+async function variantUnitCode(productId: string | null | undefined, attrs: Record<string, string>, workspaceId: string): Promise<string | null> {
+  if (!productId) return null;
+  const sale = await productUomService.saleUnit(productId, variantKey(attrs) ?? null, workspaceId).catch(() => null);
+  return sale ? (sale.unit ?? '') : null;
+}
 
 /** Orders list + create — mounted as the first Finance → Documents tab. */
 export const OrdersPanel: React.FC<{
@@ -940,7 +949,8 @@ export const NewOrderModal: React.FC<{
         workspaceId, productId: p.id, orderType,
         companyId: party?.type === 'company' ? party.id : null,
         contactId: party?.type === 'contact' ? party.id : null,
-        quantity: line?.quantity ?? 1, unit: line?.unit_code ?? DEFAULT_UNIT,
+        // A new product's quantity is in ITS unit of sale, not the blank line's placeholder.
+        quantity: line?.quantity ?? 1, unit: null,
         // The identity already on the line decides which variant's price applies. Omitting it
         // priced every line as the base product, so a variant price could never win.
         selectedAttributes: line?.selected_attributes ?? null,
@@ -949,7 +959,7 @@ export const NewOrderModal: React.FC<{
         if (idx !== i) return l;
         const next: Line = { ...l, available: pr.available, supplier_company_id: pr.supplier_company_id, price_source: pr.discount_source };
         if (pr.unit_cost != null) next.unit_cost = pr.unit_cost;
-        if (pr.measurement_unit_code) next.unit_code = pr.measurement_unit_code;
+        next.unit_code = pr.measurement_unit_code ?? '';
         if (pr.unit_price != null && (!l.unit_price || l.unit_price === 0)) {
           next.unit_price = pr.unit_price;
           next.price_auto = true;
@@ -960,7 +970,7 @@ export const NewOrderModal: React.FC<{
   };
 
   /** Reprice catalog lines when the QUANTITY or UNIT changes — not only when a product is picked. */
-  const repriceKey = items.map((l) => `${l.product_id ?? ''}:${l.quantity}:${l.unit_code}:${l.price_auto ? 1 : 0}`).join('|');
+  const repriceKey = items.map((l) => `${l.product_id ?? ''}:${l.quantity}:${l.unit_code}:${l.price_auto ? 1 : 0}:${variantKey(l.selected_attributes ?? {}) ?? ''}`).join('|');
   useEffect(() => {
     if (locked || orderType === 'purchase') return;
     const targets = items
@@ -1436,7 +1446,11 @@ export const NewOrderModal: React.FC<{
                     <LineIdentityPicker
                       productId={l.product_id}
                       value={l.selected_attributes ?? {}}
-                      onChange={(next) => setItem(i, next)}
+                      onChange={(next) => {
+                        setItem(i, next);
+                        void variantUnitCode(l.product_id, next.selected_attributes, workspaceId)
+                          .then((code) => { if (code != null) setItem(i, { unit_code: code }); });
+                      }}
                     />
                     {/* #375 — read-only: the choices were made in the configurator and the price
                         was frozen from them. Editing them here would change what the customer was
@@ -3642,7 +3656,11 @@ export const OrderDetailDialog: React.FC<{ orderId: string | null; categories: F
                       <LineIdentityPicker
                         productId={l.product_id}
                         value={l.selected_attributes ?? {}}
-                        onChange={(next) => setEditItem(i, next)}
+                        onChange={(next) => {
+                          setEditItem(i, next);
+                          void variantUnitCode(l.product_id, next.selected_attributes, order.workspace_id)
+                            .then((code) => { if (code != null) setEditItem(i, { unit_code: code }); });
+                        }}
                       />
                       {/* Sales only: the KB price chain answers "what do we SELL this for",
                           folding in the customer's standing discount. On a purchase order the

@@ -170,7 +170,9 @@ export async function fetchQuoteData(
         item.configured_options,
       ) || null,
       quantity: item.quantity,
-      unit: isCustom ? (item.custom_unit || 'pcs') : (metadata?.unit || 'pcs'),
+      unit: isCustom
+        ? (item.custom_unit || 'pcs')
+        : (item.custom_unit || (item.selected_attributes?.piece_type ? '—' : (metadata?.unit || 'pcs'))),
       unit_price: parseFloat(item.unit_price) || 0,
       discounted_price: item.discounted_price != null ? parseFloat(item.discounted_price) : null,
       line_total: parseFloat(item.line_total) || 0,
