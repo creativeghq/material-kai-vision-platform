@@ -310,6 +310,14 @@ async function withLineProducts<T extends { product_id?: string | null }>(items:
   return items.map((it) => ({ ...it, product: it.product_id ? products.get(it.product_id) ?? null : null }));
 }
 
+/** The variant a line's picture must show: its attributes plus the chosen colour and size. */
+function lineImageKey(it: { selected_attributes?: unknown; selected_color?: string | null; selected_size?: string | null }): string | null {
+  const attrs = { ...((it.selected_attributes as Record<string, string> | null) ?? {}) };
+  if (it.selected_color && !attrs.color) attrs.color = it.selected_color;
+  if (it.selected_size && !attrs.size) attrs.size = it.selected_size;
+  return variantKey(attrs);
+}
+
 export class QuotesService {
   /**
    * Create a new quote
@@ -525,10 +533,7 @@ export class QuotesService {
         const { data: imageRows } = await (supabase as any).rpc('get_product_variant_images', {
           p_pairs: (items || [])
             .filter((it) => it.product?.id)
-            .map((it) => ({
-              product_id: it.product!.id,
-              variant_key: variantKey(it.selected_attributes as Record<string, string> | null),
-            })),
+            .map((it) => ({ product_id: it.product!.id, variant_key: lineImageKey(it) })),
         });
         for (const r of (imageRows ?? []) as Array<{ product_id: string; variant_key: string | null; image_url: string | null }>) {
           const k = `${r.product_id}|${r.variant_key ?? ''}`;
@@ -543,7 +548,7 @@ export class QuotesService {
       cost_snapshot: costByItemId.get(item.id) ?? null,
       product: item.product ? {
         ...item.product,
-        image_url: productImageMap[`${item.product.id}|${variantKey(item.selected_attributes as Record<string, string> | null) ?? ''}`] || item.product.image_url,
+        image_url: productImageMap[`${item.product.id}|${lineImageKey(item) ?? ''}`] || item.product.image_url,
         cost: productCosts.get(item.product.id)?.cost ?? null,
         cost_currency: productCosts.get(item.product.id)?.cost_currency ?? null,
       } : item.product,

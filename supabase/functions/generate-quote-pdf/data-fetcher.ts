@@ -98,7 +98,7 @@ export async function fetchQuoteData(
       .map(async (it: any) => {
         try {
           const { data: imageRows } = await supabase.rpc('get_product_variant_images', {
-            p_pairs: [{ product_id: it.products.id, attributes: it.selected_attributes ?? {} }],
+            p_pairs: [{ product_id: it.products.id, attributes: it.selected_attributes ?? {}, color: it.selected_color ?? null, size: it.selected_size ?? null }],
           });
           const url = ((imageRows ?? []) as Array<{ image_url: string | null }>)[0]?.image_url;
           if (url) lineImageMap[it.id] = url;
