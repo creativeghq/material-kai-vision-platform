@@ -1,4 +1,5 @@
-import type { SceneProduct, SceneSurface } from '@/services/sceneStudioService';
+import type { SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
+import { SCENE_SLOT_FOLLOWS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { tileFormatM } from '@/components/features/roomplanner/surfaceFormat';
 
 export type SurfaceTarget =
@@ -52,7 +53,7 @@ export interface Finish {
   label: string | null;
 }
 
-export function resolveFinish(surface: SceneSurface | null, product: SceneProduct | undefined): Finish | null {
+export function resolveFinish(surface: Pick<SceneSurface, 'colour_hex'> | null, product: SceneProduct | undefined): Finish | null {
   if (!surface) return null;
   if (!product) return surface.colour_hex ? { imageUrl: null, hex: surface.colour_hex, tileW: 1, tileL: 1, jointed: false, label: null } : null;
   const fmt = tileFormatM(product);
@@ -76,4 +77,17 @@ export function describeTarget(t: { surface: string }, roomName: string, wallLab
     case 'wall': return `${wallLabel ?? 'One wall'} of ${roomName}`;
     default: return `Backsplash on ${wallLabel ?? 'one wall'} of ${roomName}`;
   }
+}
+
+export function objectSlotFinishes(
+  obj: { id: string; kind: string }, rows: SceneObjectFinish[], products: Record<string, SceneProduct>,
+): Partial<Record<SceneObjectSlot, Finish | null>> {
+  const own = new Map(rows.filter((r) => r.object_id === obj.id).map((r) => [r.slot, r]));
+  const out: Partial<Record<SceneObjectSlot, Finish | null>> = {};
+  for (const slot of slotsForKind(obj.kind)) {
+    const row = own.get(slot) ?? (SCENE_SLOT_FOLLOWS[slot] ? own.get(SCENE_SLOT_FOLLOWS[slot]!) : undefined);
+    if (!row) continue;
+    out[slot] = resolveFinish(row, row.product_id ? products[row.product_id] : undefined);
+  }
+  return out;
 }

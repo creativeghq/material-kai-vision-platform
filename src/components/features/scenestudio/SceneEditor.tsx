@@ -19,15 +19,16 @@ import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import { VR_CREDIT_COSTS } from '@/services/vrWorldService';
 import {
   publicUrl, sceneStudioService,
-  type LayoutEntry, type SceneData, type SceneObject, type SceneProduct, type SceneRender, type SceneSurface,
+  type LayoutEntry, type SceneData, type SceneObject, type SceneObjectFinish, type SceneProduct, type SceneRender, type SceneSurface,
 } from '@/services/sceneStudioService';
 import { describeBox, describeObject, effectiveSize, polygonCentroid } from '@/lib/scene/sceneGeometry';
 import { compositeMasked, loadImage, objectMask } from '@/lib/scene/sceneCompositing';
-import { SCENE_OBJECT_KINDS } from '@/lib/scene/sceneReadSchema';
+import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
+import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
 import type { PaintScope, SceneCanvasHandle, SceneTool } from '@/components/features/scenestudio/SceneCanvas';
 import {
-  DEFAULT_SPLASH, colourOptions, describeTarget, resolveFinish, surfaceKey, targetKey, type SurfaceTarget,
+  DEFAULT_SPLASH, colourOptions, describeTarget, objectSlotFinishes, resolveFinish, surfaceKey, targetKey, type SurfaceTarget,
 } from '@/lib/scene/sceneSurfaces';
 import {
   ColourRow, ObjectInspector, PinnedProductsContext, ProductPicker, StylePanel, type StyleChoice,
@@ -58,11 +59,15 @@ export interface SceneEditorProps {
   intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk'; object_id: string | null; room_id?: string | null; nonce: number };
 }
 
-interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[] }
+interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[]; finishes: SceneObjectFinish[] }
 
-const layoutOf = (objects: SceneObject[]): Record<string, LayoutEntry> =>
+const finishSig = (objectId: string, finishes: SceneObjectFinish[]) =>
+  finishes.filter((f) => f.object_id === objectId).map((f) => `${f.slot}:${f.product_id ?? ''}:${f.colour_hex ?? ''}`).sort().join('|');
+
+const layoutOf = (objects: SceneObject[], finishes: SceneObjectFinish[]): Record<string, LayoutEntry> =>
   Object.fromEntries(objects.map((o) => [o.id, {
     colour_hex: o.colour_hex, product_id: o.product_id, x_mm: o.x_mm, y_mm: o.y_mm, rotation_deg: o.rotation_deg, removed: !!o.removed_at,
+    finishes: finishSig(o.id, finishes),
   }]));
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -145,6 +150,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [loadError, setLoadError] = useState<string | null>(null);
   const [objects, setObjects] = useState<SceneObject[]>([]);
   const [surfaces, setSurfaces] = useState<SceneSurface[]>([]);
+  const [finishes, setFinishes] = useState<SceneObjectFinish[]>([]);
   const [products, setProducts] = useState<Record<string, SceneProduct>>({});
   const [renders, setRenders] = useState<SceneRender[]>([]);
   const [history, setHistory] = useState<Snapshot[]>([]);
@@ -184,6 +190,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     setData(d);
     setObjects(d.objects);
     setSurfaces(d.surfaces);
+    setFinishes(d.finishes);
     setProducts(d.products);
     setRenders(d.renders);
     openedWith.current = d.objects;
@@ -218,7 +225,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
   const fail = (title: string, e: unknown) => toast({ title, description: e instanceof Error ? e.message : undefined, variant: 'destructive' });
 
-  const remember = () => setHistory((h) => [...h.slice(-49), { objects, surfaces }]);
+  const remember = () => setHistory((h) => [...h.slice(-49), { objects, surfaces, finishes }]);
 
   const persistObjects = async (next: SceneObject[], prev: SceneObject[]) => {
     const before = new Map(prev.map((o) => [o.id, JSON.stringify(o)]));
@@ -237,7 +244,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     changeObjects((list) => list.map((o) => (o.id === objId ? { ...o, ...patch } : o)));
 
   const onMoveObject = (objId: string, patch: Partial<SceneObject>, commit: boolean) => {
-    if (!dragStart.current) dragStart.current = { objects, surfaces };
+    if (!dragStart.current) dragStart.current = { objects, surfaces, finishes };
     setObjects((list) => list.map((o) => (o.id === objId ? { ...o, ...patch } : o)));
     if (commit) {
       const start = dragStart.current;
@@ -286,10 +293,52 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
         restoredRows.push(await sceneStudioService.setSurface(id, targetOf(old), { product_id: old.product_id, colour_hex: old.colour_hex }));
       }
       setSurfaces(restoredRows);
+      const nowF = new Map(finishes.map((f) => [`${f.object_id}:${f.slot}`, f]));
+      const wasF = new Map(last.finishes.map((f) => [`${f.object_id}:${f.slot}`, f]));
+      await sceneStudioService.clearObjectFinishes([...nowF].filter(([key]) => !wasF.has(key)).map(([, f]) => f.id));
+      const restoredF: SceneObjectFinish[] = [];
+      for (const [key, old] of wasF) {
+        const cur = nowF.get(key);
+        if (cur && cur.product_id === old.product_id && cur.colour_hex === old.colour_hex) { restoredF.push(cur); continue; }
+        restoredF.push(await sceneStudioService.setObjectFinish(id, old.object_id, old.slot, { product_id: old.product_id, colour_hex: old.colour_hex }));
+      }
+      setFinishes(restoredF);
     } catch (e) {
       fail('The paint could not be undone', e);
       void load();
     }
+  };
+
+  const setSlot = async (o: SceneObject, slot: SceneObjectSlot, patch: { product: SceneProduct | null; colour_hex: string | null }) => {
+    remember();
+    try {
+      const saved = await sceneStudioService.setObjectFinish(id, o.id, slot, { product_id: patch.product?.id ?? null, colour_hex: patch.colour_hex });
+      if (patch.product) setProducts((map) => ({ ...map, [patch.product!.id]: patch.product! }));
+      setFinishes((list) => [...list.filter((f) => !(f.object_id === o.id && f.slot === slot)), saved]);
+    } catch (e) { fail(`The ${SCENE_SLOT_LABELS[slot].toLowerCase()} could not be changed`, e); }
+  };
+  const resetSlot = async (o: SceneObject, slot: SceneObjectSlot) => {
+    const row = finishes.find((f) => f.object_id === o.id && f.slot === slot);
+    if (!row) return;
+    remember();
+    try {
+      await sceneStudioService.clearObjectFinishes([row.id]);
+      setFinishes((list) => list.filter((f) => f.id !== row.id));
+    } catch (e) { fail('The material could not be reset', e); }
+  };
+
+  const describeFinishes = (o: SceneObject): string => {
+    const slots = objectSlotFinishes(o, finishes, products);
+    return slotsForKind(o.kind).flatMap((slot) => {
+      const f = slots[slot];
+      if (!f) return [];
+      const what = f.label ? `"${f.label}"` : `colour ${f.hex}`;
+      return [`${SCENE_SLOT_LABELS[slot].toLowerCase()} in ${what}`];
+    }).join(', ');
+  };
+  const finishImage = (o: SceneObject): string | undefined => {
+    const slots = objectSlotFinishes(o, finishes, products);
+    return slotsForKind(o.kind).map((slot) => slots[slot]?.imageUrl).find((u): u is string => !!u && u.startsWith('https://'));
   };
 
   useEffect(() => {
@@ -485,7 +534,9 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const sceneLines = () => {
     const lines = objects.filter((o) => !o.removed_at).map((o) => {
       const p = o.product_id ? products[o.product_id] : undefined;
-      return describeObject(o.label, o.kind, effectiveSize(o, p), o.colour_hex, p?.name ?? null);
+      const base = describeObject(o.label, o.kind, effectiveSize(o, p), o.colour_hex, p?.name ?? null);
+      const fin = describeFinishes(o);
+      return fin ? `${base}; ${fin}` : base;
     });
     for (const s of surfaces) {
       const room = data?.rooms.find((r) => r.id === s.room_id);
@@ -501,6 +552,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const materialImages = () => {
     const urls: string[] = [];
     for (const o of objects) if (!o.removed_at && o.product_id && products[o.product_id]?.imageUrl) urls.push(products[o.product_id].imageUrl!);
+    for (const o of objects) { const img = !o.removed_at ? finishImage(o) : undefined; if (img) urls.push(img); }
     for (const s of surfaces) {
       const f = resolveFinish(s, s.product_id ? products[s.product_id] : undefined);
       if (s.product_id && f?.imageUrl) urls.push(f.imageUrl);
@@ -535,7 +587,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
         floor_plan_id: id, parent_render_id: null, kind: 'full', edited_object_id: null,
         camera: cap.camera as unknown as Record<string, unknown>, capture_path: capturePath, id_pass_path: idPath, id_map: cap.idMap,
         style_reference_url: choice?.kind === 'reference' ? choice.url : null, style_label: choice?.label ?? null,
-        instruction: null, image_url: result.image_url, layout_snapshot: layoutOf(objects),
+        instruction: null, image_url: result.image_url, layout_snapshot: layoutOf(objects, finishes),
       });
       setRenders((list) => [saved, ...list]);
       setActiveRenderId(saved.id);
@@ -591,7 +643,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     if (!o || !activeRender) return false;
     const was = activeRender.layout_snapshot?.[o.id];
     if (!was) return false;
-    return was.colour_hex !== o.colour_hex || was.product_id !== o.product_id;
+    return was.colour_hex !== o.colour_hex || was.product_id !== o.product_id || (was.finishes ?? '') !== finishSig(o.id, finishes);
   };
 
   const applyToRender = async (o: SceneObject) => {
@@ -618,15 +670,19 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       const size = effectiveSize(o, p);
       const cm = (mm: number) => Math.round(mm / 10);
       const where = describeBox(mask.box);
+      const fin = describeFinishes(o);
+      const finImage = finishImage(o);
       const instruction = p
-        ? `Replace the ${o.label} in the ${where} with the product shown in the first image ("${p.name}"), about ${cm(size.width_mm)} × ${cm(size.depth_mm)} cm and ${cm(size.height_mm)} cm high, standing in the same place, at the same scale and perspective${o.colour_hex ? `, in colour ${o.colour_hex}` : ''}. Change nothing else in the picture.`
-        : `Change the colour of the ${o.label} in the ${where} to ${o.colour_hex}. Keep its shape, its material and texture, its position and every other part of the picture exactly as it is.`;
+        ? `Replace the ${o.label} in the ${where} with the product shown in the first image ("${p.name}"), about ${cm(size.width_mm)} × ${cm(size.depth_mm)} cm and ${cm(size.height_mm)} cm high, standing in the same place, at the same scale and perspective${fin ? `, with its ${fin}` : o.colour_hex ? `, in colour ${o.colour_hex}` : ''}. Change nothing else in the picture.`
+        : fin
+          ? `Give the ${o.label} in the ${where} its new materials: ${fin}${finImage ? ' (the first image shows the material)' : ''}. Keep its shape, its proportions, its position and every other part of the picture exactly as it is.`
+          : `Change the colour of the ${o.label} in the ${where} to ${o.colour_hex}. Keep its shape, its material and texture, its position and every other part of the picture exactly as it is.`;
       const [idPath, result] = await Promise.all([
         sceneStudioService.uploadCapture(data.scene, fresh.idPass, 'ids'),
         sceneStudioService.generate({
           mode: 'image-edit',
           reference_image_url: activeRender.image_url,
-          style_reference_url: p?.imageUrl && p.imageUrl.startsWith('https://') ? p.imageUrl : undefined,
+          style_reference_url: p?.imageUrl && p.imageUrl.startsWith('https://') ? p.imageUrl : finImage,
           edit_instruction: instruction,
           model_tier: 'fast',
           workspace_id: data.scene.workspace_id,
@@ -640,7 +696,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
         camera: activeRender.camera, capture_path: activeRender.capture_path, id_pass_path: idPath, id_map: fresh.idMap,
         style_reference_url: activeRender.style_reference_url, style_label: activeRender.style_label,
         instruction, image_url: publicUrl(compositePath),
-        layout_snapshot: { ...activeRender.layout_snapshot, ...layoutOf([o]) },
+        layout_snapshot: { ...activeRender.layout_snapshot, ...layoutOf([o], finishes) },
       });
       setRenders((list) => [saved, ...list]);
       setActiveRenderId(saved.id);
@@ -684,6 +740,18 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       onApplyToRender={() => void applyToRender(selected)}
       onDelete={() => removeObject(selected.id)}
       onClose={() => setSelectedId(null)}
+      materials={(
+        <SlotMaterials
+          obj={selected}
+          rows={finishes}
+          products={products}
+          workspaceId={scene.workspace_id}
+          makingTexture={makingTexture}
+          onSet={(slot, patch) => void setSlot(selected, slot, patch)}
+          onReset={(slot) => void resetSlot(selected, slot)}
+          onMakeTexture={(p) => void makeTexture(p)}
+        />
+      )}
     />
     <Card>
       <CardContent className="space-y-2 p-3 text-xs">
@@ -873,6 +941,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 walls={data.walls}
                 openings={data.openings}
                 surfaces={surfaces}
+                finishes={finishes}
                 objects={objects}
                 products={products}
                 defaultWallHeightMm={scene.default_wall_height_mm}

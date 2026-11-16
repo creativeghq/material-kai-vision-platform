@@ -191,7 +191,8 @@ export const ObjectInspector: React.FC<{
   onApplyToRender(): void;
   onDelete(): void;
   onClose(): void;
-}> = ({ obj, product, workspaceId, hasRender, applyBusy, changedSinceRender, onChange, onProduct, onApplyToRender, onDelete, onClose }) => {
+  materials: React.ReactNode;
+}> = ({ obj, product, workspaceId, hasRender, applyBusy, changedSinceRender, onChange, onProduct, onApplyToRender, onDelete, onClose, materials }) => {
   const [picking, setPicking] = useState(false);
   const size = effectiveSize(obj, product);
   const [label, setLabel] = useState(obj.label);
@@ -233,10 +234,7 @@ export const ObjectInspector: React.FC<{
             <SelectContent>{kinds.map((k) => <SelectItem key={k.value} value={k.value}>{k.label}</SelectItem>)}</SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Colour</Label>
-          <ColourRow value={obj.colour_hex} onChange={(hex) => onChange({ colour_hex: hex })} />
-        </div>
+        {materials}
         <div className="space-y-1">
           <Label className="text-xs">Product</Label>
           {product ? (

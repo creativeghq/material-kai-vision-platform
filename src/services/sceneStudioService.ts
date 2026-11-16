@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { edgeError, parseEdgeError } from '@/utils/edgeError';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
 import type { SurfaceTarget } from '@/lib/scene/sceneSurfaces';
+import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 
 export const SCENE_BUCKET = 'generation-images';
 const MAX_SOURCE_LONG_SIDE = 2048;
@@ -61,6 +62,8 @@ export interface SceneSurface {
   colour_hex: string | null;
 }
 
+export interface SceneObjectFinish { id: string; object_id: string; slot: SceneObjectSlot; product_id: string | null; colour_hex: string | null }
+
 export interface SceneProduct {
   id: string;
   name: string;
@@ -89,7 +92,7 @@ export interface SceneRender {
   created_at: string;
 }
 
-export interface LayoutEntry { colour_hex: string | null; product_id: string | null; x_mm: number; y_mm: number; rotation_deg: number; removed: boolean }
+export interface LayoutEntry { colour_hex: string | null; product_id: string | null; x_mm: number; y_mm: number; rotation_deg: number; removed: boolean; finishes?: string }
 
 export interface SceneData {
   scene: SceneRow;
@@ -97,6 +100,7 @@ export interface SceneData {
   walls: PlanWall[];
   openings: PlanOpening[];
   surfaces: SceneSurface[];
+  finishes: SceneObjectFinish[];
   objects: SceneObject[];
   products: Record<string, SceneProduct>;
   renders: SceneRender[];
@@ -105,6 +109,7 @@ export interface SceneData {
 const SCENE_COLUMNS = 'id, workspace_id, project_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, created_at, updated_at';
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, product_id, colour_hex';
+const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex';
 const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, instruction, image_url, vr_world_id, layout_snapshot, created_at';
 
 const num = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
@@ -271,18 +276,20 @@ export const sceneStudioService = {
   async load(id: string): Promise<SceneData | null> {
     const scene = await this.getScene(id);
     if (!scene) return null;
-    const [rooms, walls, openings, surfaces, objects, renders] = await Promise.all([
+    const [rooms, walls, openings, surfaces, objects, renders, finishes] = await Promise.all([
       supabase.from('floor_plan_rooms').select('id, name, outline, height_mm, walk_order').eq('floor_plan_id', id).order('walk_order', { ascending: true, nullsFirst: false }),
       supabase.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm, height_mm').eq('floor_plan_id', id),
       supabase.from('floor_plan_openings').select('id, wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', id),
       supabase.from('floor_plan_surfaces').select(SURFACE_COLUMNS).eq('floor_plan_id', id),
       supabase.from('floor_plan_objects').select(OBJECT_COLUMNS).eq('floor_plan_id', id).order('created_at', { ascending: true }),
       supabase.from('scene_renders').select(RENDER_COLUMNS).eq('floor_plan_id', id).order('created_at', { ascending: false }),
+      supabase.from('floor_plan_object_finishes').select(FINISH_COLUMNS).eq('floor_plan_id', id),
     ]);
-    for (const r of [rooms, walls, openings, surfaces, objects, renders]) if (r.error) throw new Error(r.error.message);
+    for (const r of [rooms, walls, openings, surfaces, objects, renders, finishes]) if (r.error) throw new Error(r.error.message);
+    const fin = (finishes.data ?? []) as SceneObjectFinish[];
     const objs = ((objects.data ?? []) as Record<string, unknown>[]).map(toObject);
     const surf = (surfaces.data ?? []) as SceneSurface[];
-    const products = await fetchProducts([...objs.map((o) => o.product_id ?? ''), ...surf.map((s) => s.product_id ?? '')]);
+    const products = await fetchProducts([...objs.map((o) => o.product_id ?? ''), ...surf.map((s) => s.product_id ?? ''), ...fin.map((f) => f.product_id ?? '')]);
     return {
       scene,
       rooms: ((rooms.data ?? []) as Record<string, unknown>[]).map((r) => ({
@@ -298,6 +305,7 @@ export const sceneStudioService = {
         offset_mm: num(o.offset_mm), width_mm: num(o.width_mm), sill_mm: num(o.sill_mm), head_mm: num(o.head_mm, 2100),
       })),
       surfaces: surf,
+      finishes: fin,
       objects: objs,
       products,
       renders: (renders.data ?? []) as SceneRender[],
@@ -354,6 +362,20 @@ export const sceneStudioService = {
       .select(SURFACE_COLUMNS).single();
     if (error) throw new Error(error.message);
     return data as SceneSurface;
+  },
+
+  async setObjectFinish(sceneId: string, objectId: string, slot: SceneObjectSlot, patch: { product_id: string | null; colour_hex: string | null }): Promise<SceneObjectFinish> {
+    const { data, error } = await supabase.from('floor_plan_object_finishes')
+      .upsert({ floor_plan_id: sceneId, object_id: objectId, slot, product_id: patch.product_id, colour_hex: patch.colour_hex }, { onConflict: 'object_id,slot' })
+      .select(FINISH_COLUMNS).single();
+    if (error) throw new Error(error.message);
+    return data as SceneObjectFinish;
+  },
+
+  async clearObjectFinishes(ids: string[]): Promise<void> {
+    if (!ids.length) return;
+    const { error } = await supabase.from('floor_plan_object_finishes').delete().in('id', ids);
+    if (error) throw new Error(error.message);
   },
 
   async clearSurfaces(ids: string[]): Promise<void> {

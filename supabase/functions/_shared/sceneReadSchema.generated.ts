@@ -10,6 +10,34 @@ export const SCENE_OBJECT_KINDS = [
 ] as const;
 export type SceneObjectKind = typeof SCENE_OBJECT_KINDS[number];
 
+export const SCENE_OBJECT_SLOTS = [
+  'upholstery', 'legs', 'frame', 'bedding', 'top', 'seat', 'fronts', 'carcass', 'worktop', 'handles', 'plinth',
+  'shade', 'base', 'fabric', 'body',
+] as const;
+export type SceneObjectSlot = typeof SCENE_OBJECT_SLOTS[number];
+
+export const SCENE_SLOT_LABELS: Record<SceneObjectSlot, string> = {
+  upholstery: 'Upholstery', legs: 'Legs', frame: 'Frame', bedding: 'Bedding', top: 'Top', seat: 'Seat',
+  fronts: 'Fronts', carcass: 'Carcass', worktop: 'Worktop', handles: 'Handles', plinth: 'Plinth',
+  shade: 'Shade', base: 'Base', fabric: 'Fabric', body: 'Body',
+};
+
+export const SCENE_KIND_SLOTS: Partial<Record<SceneObjectKind, readonly SceneObjectSlot[]>> = {
+  sofa: ['upholstery', 'legs'], armchair: ['upholstery', 'legs'], bed: ['frame', 'bedding'],
+  dining_table: ['top', 'legs'], coffee_table: ['top', 'legs'], side_table: ['top', 'legs'], desk: ['top', 'legs'],
+  chair: ['seat', 'legs'], stool: ['seat', 'legs'],
+  kitchen_base: ['fronts', 'carcass', 'worktop', 'handles', 'plinth'], island: ['fronts', 'carcass', 'worktop', 'handles', 'plinth'],
+  sink: ['fronts', 'carcass', 'worktop', 'handles', 'plinth'], kitchen_wall: ['fronts', 'carcass', 'handles'],
+  kitchen_tall: ['fronts', 'carcass', 'handles', 'plinth'], wardrobe: ['fronts', 'carcass', 'handles', 'plinth'],
+  cabinet: ['fronts', 'handles', 'legs'], nightstand: ['fronts', 'handles', 'legs'], tv_unit: ['fronts', 'handles', 'legs'],
+  vanity: ['fronts', 'handles', 'legs'], lamp: ['shade', 'base'], pendant: ['shade'], rug: ['fabric'], curtain: ['fabric'],
+};
+
+export const SCENE_SLOT_FOLLOWS: Partial<Record<SceneObjectSlot, SceneObjectSlot>> = { carcass: 'fronts' };
+
+export const slotsForKind = (kind: string): readonly SceneObjectSlot[] =>
+  SCENE_KIND_SLOTS[kind as SceneObjectKind] ?? ['body'];
+
 export const SCENE_OPENING_KINDS = ['door', 'window', 'opening'] as const;
 export type SceneOpeningKind = typeof SCENE_OPENING_KINDS[number];
 

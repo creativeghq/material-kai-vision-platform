@@ -10,19 +10,19 @@ import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
-import { Ceiling, DoorOrWindow, ObjectShape, RoomLighting, oakFloorTexture } from '@/components/features/scenestudio/sceneDetail';
-import { canvasRelief, useFinishMaps } from '@/components/features/scenestudio/surfaceMaps';
+import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, oakFloorTexture, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
+import { canvasRelief } from '@/components/features/scenestudio/surfaceMaps';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import {
-  indexSurfaces, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, type Finish, type SurfaceTarget,
+  indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, type Finish, type SurfaceTarget,
 } from '@/lib/scene/sceneSurfaces';
 import {
   effectiveSize, idColour, openingPlacement, planBounds, planFrame, pointInPolygon, rgbToHex,
   rotationToPlan, rotationToScene, toPlan, toScene, walkStep, wallPieces,
   type PlanFrame, type PlanOpening, type PlanRoom, type PlanWall,
 } from '@/lib/scene/sceneGeometry';
-import type { SceneCamera, SceneObject, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
+import type { SceneCamera, SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 
 export type SceneTool = 'view' | 'move' | 'turn' | 'remove' | 'paint';
 
@@ -54,6 +54,7 @@ interface Props {
   walls: PlanWall[];
   openings: PlanOpening[];
   surfaces: SceneSurface[];
+  finishes?: SceneObjectFinish[];
   objects: SceneObject[];
   products: Record<string, SceneProduct>;
   defaultWallHeightMm: number;
@@ -131,30 +132,6 @@ const KIND_COLOURS: Record<string, string> = {
   artwork: '#b0a8a0', mirror: '#cfd8dc', curtain: '#e8e0d4', kitchen_base: '#eceff1', kitchen_wall: '#eceff1',
   kitchen_tall: '#eceff1', island: '#eceff1', appliance: '#9e9e9e', sink: '#e0e0e0', toilet: '#fafafa', bathtub: '#fafafa',
   shower: '#cfd8dc', vanity: '#d7ccc8', stairs: '#a1887f', fireplace: '#8d8d8d', radiator: '#f5f5f5', other: '#9e9aa6',
-};
-
-/** One material slot carrying a finish laid at its real size, with relief and gloss; plaster when there is none. */
-const FinishMaterial: React.FC<{
-  attach?: string; finish: Finish | null; fallback: string; w: number; h: number; offX?: number; offY?: number;
-  wireframe: boolean; highlight?: boolean; side?: typeof DoubleSide;
-}> = ({ attach, finish, fallback, w, h, offX = 0, offY = 0, wireframe, highlight, side }) => {
-  const maps = useFinishMaps(finish, w, h, offX, offY);
-  const colour = finish?.imageUrl ? '#ffffff' : finish?.hex ?? fallback;
-  return (
-    <meshStandardMaterial
-      key={maps ? `m${maps.map ? 1 : 0}` : 'n'}
-      attach={attach}
-      color={colour}
-      map={maps?.map ?? null}
-      normalMap={maps?.normalMap ?? null}
-      roughnessMap={maps?.roughnessMap ?? null}
-      roughness={1}
-      emissive={highlight ? '#3d7bff' : '#000000'}
-      emissiveIntensity={highlight ? 0.22 : 0}
-      side={side}
-      wireframe={wireframe}
-    />
-  );
 };
 
 const FloorMesh: React.FC<{
@@ -339,8 +316,8 @@ const OpeningMesh: React.FC<{ wall: PlanWall; opening: PlanOpening; frame: PlanF
 const ObjectMesh: React.FC<{
   obj: SceneObject; idHex: string; frame: PlanFrame; product?: SceneProduct; selected: boolean; wireframe: boolean;
   tool: SceneTool; floorPlane: Plane; controls: React.MutableRefObject<OrbitControlsImpl | null>;
-  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void; modelUrl?: string;
-}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove, modelUrl }) => {
+  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void; modelUrl?: string; finishes?: SlotFinishes;
+}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove, modelUrl, finishes }) => {
   const size = effectiveSize(obj, product);
   const w = size.width_mm / 1000;
   const d = size.depth_mm / 1000;
@@ -401,7 +378,7 @@ const ObjectMesh: React.FC<{
         </mesh>
         {modelUrl
           ? <SplatModel url={modelUrl} w={w} d={d} h={h} />
-          : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} />}
+          : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} />}
       </group>
     );
   })();
@@ -687,7 +664,7 @@ const WindowLight: React.FC<{ pos: [number, number, number]; look: [number, numb
 
 export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => {
   const {
-    rooms, walls, openings, surfaces, objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
+    rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
   } = props;
@@ -719,6 +696,10 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
   }, [viewCamera, frame, span]);
 
   const surfaceIndex = useMemo(() => indexSurfaces(surfaces), [surfaces]);
+  const finishesByObject = useMemo(
+    () => Object.fromEntries(objects.map((o) => [o.id, objectSlotFinishes(o, finishes, products)])),
+    [objects, finishes, products],
+  );
   const roomSurface = (roomId: string, surface: 'floor' | 'ceiling') => surfaceIndex.get(surfaceKey({ room_id: roomId, surface }));
   const finishOfSurface = (sf: SceneSurface | null | undefined) => resolveFinish(sf ?? null, sf?.product_id ? products[sf.product_id] : undefined);
 
@@ -868,6 +849,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           }}
           onRemove={() => onRemoveObject(o.id)}
           modelUrl={modelUrls[o.id]}
+          finishes={finishesByObject[o.id]}
         />
       ))}
       <OrbitControls

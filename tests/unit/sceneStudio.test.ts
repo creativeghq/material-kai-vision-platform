@@ -5,7 +5,9 @@ import {
   productSizeMm, rgbToHex, rotationToPlan, rotationToScene, toPlan, toScene, walkBlocked, walkStep, wallPieces,
 } from '@/lib/scene/sceneGeometry';
 import { sanitizeSceneRead, wallsFromRooms } from '@/lib/scene/sceneReadSchema';
-import { indexSurfaces, resolveFinish, splashFinish, wallFaceFinish } from '@/lib/scene/sceneSurfaces';
+import { indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, wallFaceFinish } from '@/lib/scene/sceneSurfaces';
+import { objectParts } from '@/lib/scene/objectParts';
+import { SCENE_OBJECT_KINDS, slotsForKind } from '@/lib/scene/sceneReadSchema';
 import type { SceneSurface } from '@/services/sceneStudioService';
 import { blankComments } from '../helpers/stripComments';
 
@@ -189,5 +191,25 @@ describe('finishing a room surface by surface', () => {
     expect(src).toMatch(/_generator = new PathTracingSceneGenerator\(\)/);
     const canvas = blankComments(readFileSync('src/components/features/scenestudio/SceneCanvas.tsx', 'utf8'));
     expect(canvas).toMatch(/!wireframe && !photo && \(\s*<EffectComposer/);
+  });
+});
+
+describe('every object takes any material, slot by slot', () => {
+  it('only paints a part with a slot its kind declares, and every declared slot reaches a part', () => {
+    for (const kind of SCENE_OBJECT_KINDS.filter((k) => k !== 'plant' && k !== 'pendant')) {
+      const declared = slotsForKind(kind);
+      const used = new Set(objectParts(kind, 1.2, 0.8, 0.9, '#999999').map((p) => p.slot).filter(Boolean));
+      for (const slot of used) expect(declared, `${kind} paints ${slot}`).toContain(slot);
+      for (const slot of declared) expect(used.has(slot), `${kind} declares ${slot} but draws none`).toBe(true);
+    }
+  });
+
+  it('a kitchen carcass follows its fronts until it is given its own finish', () => {
+    const rows = [{ id: 'f', object_id: 'k', slot: 'fronts' as const, product_id: null, colour_hex: '#224466' }];
+    const k = { id: 'k', kind: 'kitchen_base' };
+    expect(objectSlotFinishes(k, rows, {}).carcass?.hex).toBe('#224466');
+    const own = [...rows, { id: 'c', object_id: 'k', slot: 'carcass' as const, product_id: null, colour_hex: '#ffffff' }];
+    expect(objectSlotFinishes(k, own, {}).carcass?.hex).toBe('#ffffff');
+    expect(objectSlotFinishes(k, own, {}).worktop).toBeUndefined();
   });
 });

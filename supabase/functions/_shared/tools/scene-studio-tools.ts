@@ -10,6 +10,7 @@ import { moduleGate } from './module-gate.ts';
 import { callerDbClient } from '../caller-client.ts';
 import { serviceClient } from '../supabase-client.ts';
 import { fetchImageGuarded } from '../fetch-image.ts';
+import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 
 const MODULE_SLUG = 'scene-studio';
 const BUCKET = 'generation-images';
@@ -23,7 +24,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, product, colour }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -76,13 +77,8 @@ export const createManageScenesTool = (
     }
 
     if (action === 'finish') {
-      if (!scene_id || !room || !area) return JSON.stringify({ success: false, error: 'finish needs scene_id, room and area.' });
+      if (!scene_id || (!object && (!room || !area))) return JSON.stringify({ success: false, error: 'finish needs scene_id and either an object, or a room and an area.' });
       if (!product && !colour) return JSON.stringify({ success: false, error: 'finish needs a product or a colour.' });
-      const { data: rooms } = await sb.from('floor_plan_rooms').select('id, name').eq('floor_plan_id', scene_id);
-      const spaces = (rooms ?? []) as Array<{ id: string; name: string }>;
-      const needle = room.trim().toLowerCase();
-      const hit = spaces.find((r) => r.name.toLowerCase() === needle) ?? spaces.find((r) => r.name.toLowerCase().includes(needle));
-      if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: spaces.map((r) => r.name) });
       let productRow: { id: string; name: string } | null = null;
       if (product) {
         const isId = /^[0-9a-f-]{36}$/i.test(product.trim());
@@ -95,6 +91,33 @@ export const createManageScenesTool = (
           return JSON.stringify({ success: false, error: 'More than one product matches; name one exactly.', matches: list.map((p) => p.name) });
         }
       }
+      if (object) {
+        const { data: objs } = await sb.from('floor_plan_objects').select('id, label, kind').eq('floor_plan_id', scene_id).is('removed_at', null);
+        const list = (objs ?? []) as Array<{ id: string; label: string; kind: string }>;
+        const needle = object.trim().toLowerCase();
+        const found = list.find((o) => o.label.toLowerCase() === needle)
+          ?? list.find((o) => o.label.toLowerCase().includes(needle) || o.kind.replace(/_/g, ' ').includes(needle));
+        if (!found) return JSON.stringify({ success: false, error: `No object called "${object}" in this room.`, objects: list.map((o) => o.label).slice(0, 30) });
+        const slots = slotsForKind(found.kind);
+        const slot = part ?? slots[0];
+        if (!slots.includes(slot)) return JSON.stringify({ success: false, error: `A ${found.kind.replace(/_/g, ' ')} has no ${slot}.`, parts: slots });
+        const { error: finErr } = await sb.from('floor_plan_object_finishes').upsert(
+          { floor_plan_id: scene_id, object_id: found.id, slot, product_id: productRow?.id ?? null, colour_hex: colour?.toLowerCase() ?? null },
+          { onConflict: 'object_id,slot' },
+        );
+        if (finErr) return JSON.stringify({ success: false, error: finErr.message });
+        const { data: scene } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
+        if (scene) onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent: { mode: 'view', object_id: found.id, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true, object: found.label, part: slot, product: productRow?.name ?? null, colour: colour ?? null,
+          message: `The ${slot} of the ${found.label} now shows ${productRow ? productRow.name : colour}. Render, or "Apply to render" on the object, shows it photo-real.`,
+        });
+      }
+      const { data: rooms } = await sb.from('floor_plan_rooms').select('id, name').eq('floor_plan_id', scene_id);
+      const spaces = (rooms ?? []) as Array<{ id: string; name: string }>;
+      const needle = room!.trim().toLowerCase();
+      const hit = spaces.find((r) => r.name.toLowerCase() === needle) ?? spaces.find((r) => r.name.toLowerCase().includes(needle));
+      if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: spaces.map((r) => r.name) });
       const { error: upErr } = await sb.from('floor_plan_surfaces').upsert(
         { floor_plan_id: scene_id, room_id: hit.id, surface: area, wall_id: null, band_from_mm: null, band_to_mm: null, product_id: productRow?.id ?? null, colour_hex: colour?.toLowerCase() ?? null },
         { onConflict: 'room_id,surface,wall_id' },
@@ -165,7 +188,8 @@ export const createManageScenesTool = (
       + 'charged once and takes about a minute. status: one scene by scene_id. list: the workspace\'s scenes. '
       + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
       + 'for Make 3D (10 credits, the user confirms), mode photo_walk offers a photo-real walk the user confirms. '
-      + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space (free). '
+      + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space, '
+      + 'or on one part of an object (object + part, e.g. the sofa upholstery or the kitchen fronts); free. '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
       action: z.enum(['create', 'status', 'list', 'open', 'finish']).describe('What to do.'),
@@ -173,10 +197,11 @@ export const createManageScenesTool = (
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
-      object: z.string().max(120).optional().describe('open: the object to focus, by its name in the room (e.g. sofa).'),
+      object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),
       mode: z.enum(['view', 'walk', 'make_3d', 'photo_walk']).optional().describe('open: what to do in the room.'),
       room: z.string().max(120).optional().describe('open/finish: the space, by name (e.g. living room).'),
       area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
+      part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),
       product: z.string().max(200).optional().describe('finish: the catalogue product to lay, by exact name or id.'),
       colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
     }),

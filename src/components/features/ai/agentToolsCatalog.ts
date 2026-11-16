@@ -3282,6 +3282,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       { label: 'Make an Object 3D', description: 'Turn a sofa, bed or lamp in a 3D room into a photo-real model', prompt: 'In my latest 3D room, make the sofa 3D.', icon: 'Package' },
       { label: 'Photo-Real Walk', description: 'A walkable photo-real world of one space', prompt: 'Give me a photo-real walk of the living room in my latest 3D room.', icon: 'Globe' },
       { label: 'Finish a Room Surface', description: 'Lay a tile, wood or paint on a floor, the walls or a ceiling of a 3D room', prompt: 'In my latest 3D room, lay Amonito on the living room floor.', icon: 'Palette' },
+      { label: 'Change an Object Material', description: 'A new fabric, colour or finish for one part of a sofa, kitchen, table or bed', prompt: 'In my latest 3D room, make the sofa upholstery dark green and the legs black.', icon: 'Palette' },
       {
         // A DIRECT run: no model turn, no credits. autoFields adds the pattern select, the joint
         // width and colour and the rotation from the tool's own schema.
