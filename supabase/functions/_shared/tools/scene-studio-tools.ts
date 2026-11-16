@@ -121,7 +121,7 @@ export const createManageScenesTool = (
       if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: spaces.map((r) => r.name) });
       const { error: upErr } = await sb.from('floor_plan_surfaces').upsert(
         { floor_plan_id: scene_id, room_id: hit.id, surface: area, wall_id: null, band_from_mm: null, band_to_mm: null, product_id: productRow?.id ?? null, colour_hex: colour?.toLowerCase() ?? null },
-        { onConflict: 'room_id,surface,wall_id' },
+        { onConflict: 'room_id,surface,wall_id,zone_key' },
       );
       if (upErr) return JSON.stringify({ success: false, error: upErr.message });
       if (area === 'walls') await sb.from('floor_plan_surfaces').delete().eq('room_id', hit.id).eq('surface', 'wall');

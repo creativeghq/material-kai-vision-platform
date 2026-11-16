@@ -59,10 +59,15 @@ export interface SceneObject {
 export interface SceneSurface {
   id: string;
   room_id: string;
-  surface: 'floor' | 'ceiling' | 'walls' | 'wall' | 'splash';
+  surface: 'floor' | 'ceiling' | 'walls' | 'wall' | 'splash' | 'zone';
   wall_id: string | null;
   band_from_mm: number | null;
   band_to_mm: number | null;
+  zone_key?: string | null;
+  zone_u0_mm?: number | null;
+  zone_u1_mm?: number | null;
+  zone_v0_mm?: number | null;
+  zone_v1_mm?: number | null;
   product_id: string | null;
   colour_hex: string | null;
 }
@@ -82,7 +87,7 @@ export interface SceneRender {
   id: string;
   floor_plan_id: string;
   parent_render_id: string | null;
-  kind: 'full' | 'object_edit';
+  kind: 'full' | 'object_edit' | 'area_edit';
   edited_object_id: string | null;
   camera: Record<string, unknown>;
   capture_path: string | null;
@@ -113,7 +118,7 @@ export interface SceneData {
 
 const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, created_at, updated_at';
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish';
-const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, product_id, colour_hex';
+const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex';
 const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex';
 const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, instruction, image_url, vr_world_id, layout_snapshot, created_at';
 
@@ -359,10 +364,13 @@ export const sceneStudioService = {
   async setSurface(sceneId: string, target: SurfaceTarget, patch: { product_id: string | null; colour_hex: string | null }): Promise<SceneSurface> {
     const wallId = 'wallId' in target ? target.wallId : null;
     const band = target.surface === 'splash' ? { band_from_mm: target.fromMm, band_to_mm: target.toMm } : { band_from_mm: null, band_to_mm: null };
+    const zone = target.surface === 'zone'
+      ? { zone_key: target.zoneKey, zone_u0_mm: Math.round(target.u0), zone_u1_mm: Math.round(target.u1), zone_v0_mm: Math.round(target.v0), zone_v1_mm: Math.round(target.v1) }
+      : { zone_key: null, zone_u0_mm: null, zone_u1_mm: null, zone_v0_mm: null, zone_v1_mm: null };
     const { data, error } = await supabase.from('floor_plan_surfaces')
       .upsert(
-        { floor_plan_id: sceneId, room_id: target.roomId, surface: target.surface, wall_id: wallId, ...band, product_id: patch.product_id, colour_hex: patch.colour_hex },
-        { onConflict: 'room_id,surface,wall_id' },
+        { floor_plan_id: sceneId, room_id: target.roomId, surface: target.surface, wall_id: wallId, ...band, ...zone, product_id: patch.product_id, colour_hex: patch.colour_hex },
+        { onConflict: 'room_id,surface,wall_id,zone_key' },
       )
       .select(SURFACE_COLUMNS).single();
     if (error) throw new Error(error.message);

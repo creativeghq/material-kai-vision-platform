@@ -5,7 +5,7 @@ import {
   productSizeMm, rgbToHex, rotationToPlan, rotationToScene, toPlan, toScene, walkBlocked, walkStep, wallPieces,
 } from '@/lib/scene/sceneGeometry';
 import { sanitizeSceneRead, wallsFromRooms } from '@/lib/scene/sceneReadSchema';
-import { indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, wallFaceFinish } from '@/lib/scene/sceneSurfaces';
+import { indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, surfaceKey, targetKey, wallFaceFinish, zonesOn } from '@/lib/scene/sceneSurfaces';
 import { objectParts } from '@/lib/scene/objectParts';
 import { groupSplats, tintSplats } from '@/lib/scene/splatTint';
 import { kitchenCompositionFromRoom } from '@/lib/scene/kitchenComposition';
@@ -269,5 +269,20 @@ describe('the kitchen standing in a 3D room is priced from the kitchen blueprint
     expect(c.base.globals?.door_model).toBe('lacquer-id');
     expect(c.worktop.globals?.material).toBe('quartz-id');
     expect(c.worktop.length_m).toBe(1.8);
+  });
+});
+
+describe('a free area drawn on a wall or a floor is its own surface', () => {
+  const zone = (id: string, wall: string | null): SceneSurface => ({
+    id, room_id: 'r', surface: 'zone', wall_id: wall, band_from_mm: null, band_to_mm: null,
+    zone_key: `k-${id}`, zone_u0_mm: 0, zone_u1_mm: 600, zone_v0_mm: 0, zone_v1_mm: 2100, product_id: null, colour_hex: '#ffffff',
+  });
+
+  it('keeps two areas on one wall apart, and a floor area off every wall', () => {
+    const list = [zone('a', 'w1'), zone('b', 'w1'), zone('c', null)];
+    expect(zonesOn(list, 'r', 'w1').map((z) => z.id)).toEqual(['a', 'b']);
+    expect(zonesOn(list, 'r', null).map((z) => z.id)).toEqual(['c']);
+    expect(surfaceKey(list[0])).not.toBe(surfaceKey(list[1]));
+    expect(targetKey({ roomId: 'r', surface: 'zone', wallId: 'w1', zoneKey: 'k-a', u0: 0, u1: 1, v0: 0, v1: 1 })).toBe(surfaceKey(list[0]));
   });
 });

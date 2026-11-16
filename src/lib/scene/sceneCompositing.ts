@@ -66,3 +66,26 @@ export async function compositeMasked(base: HTMLImageElement, edited: HTMLImageE
   octx.drawImage(layer, 0, 0);
   return new Promise((resolve, reject) => out.toBlob((b) => (b ? resolve(b) : reject(new Error('The edit could not be composed.'))), 'image/jpeg', 0.92));
 }
+
+export function paintedMask(img: HTMLImageElement): ObjectMask {
+  const { data, width, height } = pixels(img);
+  const raw = new Uint8Array(width * height);
+  for (let i = 0; i < raw.length; i++) raw[i] = data[i * 4] > 127 ? 1 : 0;
+  const r = Math.max(4, Math.round(Math.max(width, height) * 0.015));
+  const grown = dilateMask(raw, width, height, r);
+  const inverse = new Uint8Array(grown.length);
+  for (let i = 0; i < grown.length; i++) inverse[i] = grown[i] ? 0 : 1;
+  const shrunk = dilateMask(inverse, width, height, r);
+  const on = new Uint8Array(grown.length);
+  for (let i = 0; i < on.length; i++) on[i] = shrunk[i] ? 0 : 1;
+  const box = maskBox(on, width, height);
+  const c = document.createElement('canvas');
+  c.width = width; c.height = height;
+  const ctx = c.getContext('2d')!;
+  const out = ctx.createImageData(width, height);
+  for (let i = 0; i < on.length; i++) {
+    out.data[i * 4] = 255; out.data[i * 4 + 1] = 255; out.data[i * 4 + 2] = 255; out.data[i * 4 + 3] = on[i] ? 255 : 0;
+  }
+  ctx.putImageData(out, 0, 0);
+  return { canvas: c, box };
+}

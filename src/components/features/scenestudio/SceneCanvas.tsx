@@ -17,7 +17,7 @@ import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import {
-  indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, type Finish, type SurfaceTarget,
+  indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, zonesOn, type Finish, type SurfaceTarget,
 } from '@/lib/scene/sceneSurfaces';
 import {
   effectiveSize, idColour, openingPlacement, planBounds, planFrame, pointInPolygon, rgbToHex,
@@ -28,7 +28,7 @@ import type { SceneCamera, SceneObject, SceneObjectFinish, SceneProduct, SceneSu
 
 export type SceneTool = 'view' | 'move' | 'turn' | 'remove' | 'paint';
 
-export type PaintScope = 'wall' | 'walls' | 'splash';
+export type PaintScope = 'wall' | 'walls' | 'splash' | 'area';
 
 export interface CameraPose { position: [number, number, number]; target: [number, number, number]; fov: number }
 
@@ -189,7 +189,9 @@ const FloorMesh: React.FC<{
   onPickCeiling(e: ThreeEvent<MouseEvent>): void;
   onHover(surface: 'floor' | 'ceiling' | null): void;
   onDouble?(e: ThreeEvent<MouseEvent>): void;
-}> = ({ room, frame, surface, product, wireframe, ceilingHeight, ceiling, highlightFloor, highlightCeiling, onPick, onPickCeiling, onHover, onDouble }) => {
+  onAreaDown?(e: ThreeEvent<PointerEvent>): void;
+  onAreaMove?(e: ThreeEvent<PointerEvent>): void;
+}> = ({ room, frame, surface, product, wireframe, ceilingHeight, ceiling, highlightFloor, highlightCeiling, onPick, onPickCeiling, onHover, onDouble, onAreaDown, onAreaMove }) => {
   const shape = useMemo(() => {
     const s = new Shape();
     room.outline.forEach(([x, y], i) => {
@@ -221,6 +223,8 @@ const FloorMesh: React.FC<{
         userData={{ surface: 'floor', roomId: room.id }}
         onClick={onPick}
         onDoubleClick={onDouble}
+        onPointerDown={onAreaDown}
+        onPointerMove={onAreaMove}
         onPointerOver={() => onHover('floor')}
         onPointerOut={() => onHover(null)}
       >
@@ -251,14 +255,21 @@ const FloorMesh: React.FC<{
 
 interface WallSides { plus: string | null; minus: string | null; exterior: 'plus' | 'minus' | null }
 
+interface WallOverlay {
+  key: string; finish: Finish | null; fromM: number; toM: number; aFrom: number; aTo: number; lift: number;
+  highlight?: boolean; preview?: boolean; onClick?(e: ThreeEvent<MouseEvent>): void;
+}
+
 const WallMesh: React.FC<{
   wall: PlanWall; openings: PlanOpening[]; frame: PlanFrame; heightMm: number; sides: WallSides;
-  finishOf(roomId: string | null): Finish | null; splashOf(roomId: string | null): { finish: Finish; fromM: number; toM: number } | null;
+  finishOf(roomId: string | null): Finish | null; overlaysOf(roomId: string | null): WallOverlay[];
   highlightOf(roomId: string | null): boolean;
   wireframe: boolean; cutaway: boolean; centre: Vector3;
   onPick(e: ThreeEvent<MouseEvent>, roomId: string | null): void;
   onHover(roomId: string | null): void;
-}> = ({ wall, openings, frame, heightMm, sides, finishOf, splashOf, highlightOf, wireframe, cutaway, centre, onPick, onHover }) => {
+  onAreaDown?(e: ThreeEvent<PointerEvent>, roomId: string | null): void;
+  onAreaMove?(e: ThreeEvent<PointerEvent>, roomId: string | null): void;
+}> = ({ wall, openings, frame, heightMm, sides, finishOf, overlaysOf, highlightOf, wireframe, cutaway, centre, onPick, onHover, onAreaDown, onAreaMove }) => {
   const pieces = useMemo(() => wallPieces(wall, openings, frame, heightMm), [wall, openings, frame, heightMm]);
   const [low, setLow] = useState(false);
   const outward = useMemo(() => {
@@ -277,8 +288,8 @@ const WallMesh: React.FC<{
   });
   const plusFinish = finishOf(sides.plus);
   const minusFinish = finishOf(sides.minus);
-  const plusSplash = splashOf(sides.plus);
-  const minusSplash = splashOf(sides.minus);
+  const plusOverlays = overlaysOf(sides.plus);
+  const minusOverlays = overlaysOf(sides.minus);
   const plusLit = highlightOf(sides.plus);
   const minusLit = highlightOf(sides.minus);
   const sideOf = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
@@ -308,7 +319,8 @@ const WallMesh: React.FC<{
             receiveShadow
             userData={{ surface: 'walls', wallId: wall.id }}
             onClick={(e) => onPick(e, sideOf(e))}
-            onPointerMove={(e) => onHover(sideOf(e))}
+            onPointerDown={(e) => onAreaDown?.(e, sideOf(e))}
+            onPointerMove={(e) => { onHover(sideOf(e)); onAreaMove?.(e, sideOf(e)); }}
             onPointerOut={() => onHover(null)}
           >
             <boxGeometry args={[p.length, h, p.thickness]} />
@@ -319,30 +331,35 @@ const WallMesh: React.FC<{
             <FinishMaterial attach="material-4" finish={plusFinish} fallback={WALL_DEFAULT} w={p.length} h={h} offX={p.start} offY={p.bottom} wireframe={wireframe} highlight={plusLit} />
             <FinishMaterial attach="material-5" finish={minusFinish} fallback={WALL_DEFAULT} w={p.length} h={h} offX={p.wallLength - p.start - p.length} offY={p.bottom} wireframe={wireframe} highlight={minusLit} />
           </mesh>
-          {!low && ([[plusSplash, 1, sides.plus], [minusSplash, -1, sides.minus]] as const).map(([band, dir, roomId]) => {
-            if (!band) return null;
-            const lo = Math.max(band.fromM, p.bottom);
-            const hi = Math.min(band.toM, p.bottom + p.height);
-            if (hi - lo < 0.01) return null;
-            const along = dir === 1 ? p.start : p.wallLength - p.start - p.length;
+          {!low && ([[plusOverlays, 1, sides.plus], [minusOverlays, -1, sides.minus]] as const).flatMap(([list, dir, roomId]) => list.map((o) => {
+            const lo = Math.max(o.fromM, p.bottom);
+            const hi = Math.min(o.toM, p.bottom + p.height);
+            const a0 = Math.max(o.aFrom, p.start);
+            const a1 = Math.min(o.aTo, p.start + p.length);
+            if (hi - lo < 0.01 || a1 - a0 < 0.01) return null;
+            const lx = (a0 + a1) / 2 - (p.start + p.length / 2);
+            const along = dir === 1 ? a0 : p.wallLength - a1;
             return (
-              <group key={dir} position={[p.center[0], 0, p.center[2]]} rotation={[0, p.rotationY, 0]}>
+              <group key={`${dir}-${o.key}`} position={[p.center[0], 0, p.center[2]]} rotation={[0, p.rotationY, 0]}>
                 <mesh
-                  position={[0, (lo + hi) / 2, dir * (p.thickness / 2 + 0.004)]}
+                  position={[lx, (lo + hi) / 2, dir * (p.thickness / 2 + o.lift)]}
                   rotation={[0, dir === 1 ? 0 : Math.PI, 0]}
-                  castShadow
+                  castShadow={!o.preview}
                   receiveShadow
-                  userData={{ surface: 'splash', wallId: wall.id }}
-                  onClick={(e) => onPick(e, roomId)}
-                  onPointerMove={(e) => { e.stopPropagation(); onHover(roomId); }}
+                  userData={o.preview ? { helper: true } : { surface: 'zone', wallId: wall.id }}
+                  onClick={(e) => { if (o.onClick) o.onClick(e); else onPick(e, roomId); }}
+                  onPointerDown={(e) => onAreaDown?.(e, roomId)}
+                  onPointerMove={(e) => { e.stopPropagation(); onHover(roomId); onAreaMove?.(e, roomId); }}
                   onPointerOut={() => onHover(null)}
                 >
-                  <boxGeometry args={[p.length, hi - lo, 0.008]} />
-                  <FinishMaterial attach="material" finish={band.finish} fallback={WALL_DEFAULT} w={p.length} h={hi - lo} offX={along} offY={lo} wireframe={wireframe} highlight={highlightOf(roomId)} />
+                  <boxGeometry args={[a1 - a0, hi - lo, 0.006]} />
+                  {o.preview
+                    ? <meshBasicMaterial attach="material" color="#3d7bff" transparent opacity={0.35} depthWrite={false} />
+                    : <FinishMaterial attach="material" finish={o.finish} fallback={WALL_DEFAULT} w={a1 - a0} h={hi - lo} offX={along} offY={lo} wireframe={wireframe} highlight={o.highlight ?? highlightOf(roomId)} />}
                 </mesh>
               </group>
             );
-          })}
+          }))}
           </React.Fragment>
         );
       })}
@@ -759,10 +776,56 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
 
   const [hover, setHover] = useState<string | null>(null);
   const hoverAt = (key: string | null) => setHover((h) => (h === key ? h : key));
-  const wallTarget = (roomId: string, wallId: string): SurfaceTarget =>
-    paintScope === 'walls' ? { roomId, surface: 'walls' }
+  const wallTarget = (roomId: string, wallId: string): SurfaceTarget | null =>
+    paintScope === 'area' ? null
+    : paintScope === 'walls' ? { roomId, surface: 'walls' }
       : paintScope === 'splash' ? { roomId, surface: 'splash', wallId, fromMm: splashBand.fromMm, toMm: splashBand.toMm }
         : { roomId, surface: 'wall', wallId };
+  const [drag, setDrag] = useState<{ roomId: string; wallId: string | null; start: [number, number]; end: [number, number] } | null>(null);
+  const dragRef = useRef(drag);
+  dragRef.current = drag;
+  const dragRect = (d: { start: [number, number]; end: [number, number] }) => ({
+    u0: Math.min(d.start[0], d.end[0]), u1: Math.max(d.start[0], d.end[0]), v0: Math.min(d.start[1], d.end[1]), v1: Math.max(d.start[1], d.end[1]),
+  });
+  const uvAt = (point: Vector3, wall: PlanWall | null): [number, number] => {
+    if (!wall) return toPlan(point.x, point.z, frame);
+    const [sx, sz] = toScene(wall.x1_mm, wall.y1_mm, frame);
+    const len = Math.hypot(wall.x2_mm - wall.x1_mm, wall.y2_mm - wall.y1_mm) || 1;
+    const dx = (wall.x2_mm - wall.x1_mm) / len; const dz = (wall.y2_mm - wall.y1_mm) / len;
+    return [Math.round(((point.x - sx) * dx + (point.z - sz) * dz) * 1000), Math.round(point.y * 1000)];
+  };
+  const beginArea = (e: ThreeEvent<PointerEvent>, roomId: string, wall: PlanWall | null) => {
+    if (tool !== 'paint' || paintScope !== 'area' || e.button !== 0) return;
+    e.stopPropagation();
+    if (controls.current) controls.current.enabled = false;
+    const uv = uvAt(e.point, wall);
+    setDrag({ roomId, wallId: wall?.id ?? null, start: uv, end: uv });
+  };
+  const moveArea = (e: ThreeEvent<PointerEvent>, roomId: string, wall: PlanWall | null) => {
+    const d = dragRef.current;
+    if (!d || d.roomId !== roomId || d.wallId !== (wall?.id ?? null)) return;
+    const uv = uvAt(e.point, wall);
+    setDrag({ ...d, end: uv });
+  };
+  useEffect(() => {
+    const up = () => {
+      const d = dragRef.current;
+      if (!d) return;
+      setDrag(null);
+      if (controls.current) controls.current.enabled = true;
+      const r = dragRect(d);
+      if (r.u1 - r.u0 < 50 || r.v1 - r.v0 < 50) return;
+      onPaint({ roomId: d.roomId, surface: 'zone', wallId: d.wallId, zoneKey: crypto.randomUUID(), ...r });
+    };
+    window.addEventListener('pointerup', up);
+    return () => window.removeEventListener('pointerup', up);
+  }, [onPaint]);
+  const zoneTarget = (z: SceneSurface): SurfaceTarget => ({
+    roomId: z.room_id, surface: 'zone', wallId: z.wall_id ?? null, zoneKey: z.zone_key ?? '',
+    u0: z.zone_u0_mm ?? 0, u1: z.zone_u1_mm ?? 0, v0: z.zone_v0_mm ?? 0, v1: z.zone_v1_mm ?? 0,
+  });
+  const floorZones = surfaces.filter((z) => z.surface === 'zone' && !z.wall_id);
+
   const wallHoverKey = (roomId: string, wallId: string) => (paintScope === 'walls' ? `walls:${roomId}` : `wall:${roomId}:${wallId}`);
 
   const wallSides = useMemo(() => {
@@ -837,10 +900,12 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           wireframe={wireframe}
           onHover={(sf) => { if (tool === 'paint') hoverAt(sf ? `${sf}:${room.id}` : null); }}
           onPick={(e) => {
-            if (tool !== 'paint') return;
+            if (tool !== 'paint' || paintScope === 'area') return;
             e.stopPropagation();
             onPaint({ roomId: room.id, surface: 'floor' });
           }}
+          onAreaDown={(e) => beginArea(e, room.id, null)}
+          onAreaMove={(e) => moveArea(e, room.id, null)}
           onPickCeiling={(e) => {
             if (tool !== 'paint') return;
             e.stopPropagation();
@@ -853,6 +918,31 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           }}
         />
       ))}
+      {[...floorZones.map((z) => ({ z, r: { u0: z.zone_u0_mm ?? 0, u1: z.zone_u1_mm ?? 0, v0: z.zone_v0_mm ?? 0, v1: z.zone_v1_mm ?? 0 } })),
+        ...(drag && !drag.wallId ? [{ z: null, r: dragRect(drag) }] : [])].map(({ z, r }) => {
+        const [x0, z0] = toScene(r.u0, r.v0, frame);
+        const [x1, z1] = toScene(r.u1, r.v1, frame);
+        const w = x1 - x0; const d = z1 - z0;
+        if (w < 0.01 || d < 0.01) return null;
+        return (
+          <mesh
+            key={z?.id ?? 'floor-preview'}
+            rotation={[-Math.PI / 2, 0, 0]}
+            position={[(x0 + x1) / 2, z ? 0.004 : 0.006, (z0 + z1) / 2]}
+            receiveShadow
+            userData={z ? { surface: 'zone', roomId: z.room_id } : { helper: true }}
+            onClick={(e) => { if (!z || tool !== 'paint') return; e.stopPropagation(); onPaint(zoneTarget(z)); }}
+            onPointerDown={(e) => { if (z) beginArea(e, z.room_id, null); }}
+            onPointerMove={(e) => { if (z) { moveArea(e, z.room_id, null); if (tool === 'paint') hoverAt(`zone:${z.id}`); } }}
+            onPointerOut={() => hoverAt(null)}
+          >
+            <planeGeometry args={[w, d]} />
+            {z
+              ? <FinishMaterial finish={finishOfSurface(z)} fallback="#cfc6b8" w={w} h={d} wireframe={wireframe} highlight={tool === 'paint' && hover === `zone:${z.id}`} />
+              : <meshBasicMaterial color="#3d7bff" transparent opacity={0.35} depthWrite={false} />}
+          </mesh>
+        );
+      })}
       {walls.map((wall) => (
         <WallMesh
           key={wall.id}
@@ -862,10 +952,24 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           heightMm={defaultWallHeightMm}
           sides={wallSides.get(wall.id)!}
           finishOf={(roomId) => finishOfSurface(wallFaceFinish(surfaceIndex, roomId, wall.id))}
-          splashOf={(roomId) => {
+          overlaysOf={(roomId) => {
+            const out: WallOverlay[] = [];
             const sf = splashFinish(surfaceIndex, roomId, wall.id);
             const f = finishOfSurface(sf);
-            return sf && f ? { finish: f, fromM: (sf.band_from_mm ?? 0) / 1000, toM: (sf.band_to_mm ?? 0) / 1000 } : null;
+            if (sf && f) out.push({ key: 'splash', finish: f, fromM: (sf.band_from_mm ?? 0) / 1000, toM: (sf.band_to_mm ?? 0) / 1000, aFrom: 0, aTo: 1e6, lift: 0.004 });
+            for (const z of zonesOn(surfaces, roomId, wall.id)) {
+              out.push({
+                key: z.id, finish: finishOfSurface(z), lift: 0.007,
+                fromM: (z.zone_v0_mm ?? 0) / 1000, toM: (z.zone_v1_mm ?? 0) / 1000, aFrom: (z.zone_u0_mm ?? 0) / 1000, aTo: (z.zone_u1_mm ?? 0) / 1000,
+                highlight: tool === 'paint' && hover === `zone:${z.id}`,
+                onClick: (e) => { if (tool !== 'paint') return; e.stopPropagation(); onPaint(zoneTarget(z)); },
+              });
+            }
+            if (drag && drag.wallId === wall.id && drag.roomId === roomId) {
+              const r = dragRect(drag);
+              out.push({ key: 'preview', finish: null, preview: true, lift: 0.01, fromM: r.v0 / 1000, toM: r.v1 / 1000, aFrom: r.u0 / 1000, aTo: r.u1 / 1000 });
+            }
+            return out;
           }}
           highlightOf={(roomId) => tool === 'paint' && !!roomId && hover === wallHoverKey(roomId, wall.id)}
           wireframe={wireframe}
@@ -875,8 +979,11 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           onPick={(e, roomId) => {
             if (tool !== 'paint' || !roomId) return;
             e.stopPropagation();
-            onPaint(wallTarget(roomId, wall.id));
+            const t = wallTarget(roomId, wall.id);
+            if (t) onPaint(t);
           }}
+          onAreaDown={(e, roomId) => { if (roomId) beginArea(e, roomId, wall); }}
+          onAreaMove={(e, roomId) => { if (roomId) moveArea(e, roomId, wall); }}
         />
       ))}
       {openings.map((o) => {

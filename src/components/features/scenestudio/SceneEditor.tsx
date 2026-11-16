@@ -22,7 +22,8 @@ import {
   type LayoutEntry, type SceneData, type SceneObject, type SceneObjectFinish, type SceneProduct, type SceneRender, type SceneSurface,
 } from '@/services/sceneStudioService';
 import { describeBox, describeObject, effectiveSize, polygonCentroid } from '@/lib/scene/sceneGeometry';
-import { compositeMasked, loadImage, objectMask } from '@/lib/scene/sceneCompositing';
+import { compositeMasked, loadImage, objectMask, paintedMask } from '@/lib/scene/sceneCompositing';
+import { RegionEditCanvas, type RegionEditResult } from '@/components/features/ai/RegionEditCanvas';
 import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
@@ -49,7 +50,7 @@ export interface SceneRenderedEvent {
   image_url: string;
   label: string;
   credits_used: number;
-  kind: 'full' | 'object_edit';
+  kind: 'full' | 'object_edit' | 'area_edit';
 }
 
 export interface SceneEditorProps {
@@ -82,10 +83,12 @@ const PAINT_SCOPES: Array<{ id: PaintScope; label: string }> = [
   { id: 'wall', label: 'This Wall' },
   { id: 'walls', label: 'All Walls' },
   { id: 'splash', label: 'Backsplash' },
+  { id: 'area', label: 'Area' },
 ];
 
 const targetOf = (s: SceneSurface): SurfaceTarget =>
-  s.surface === 'wall' ? { roomId: s.room_id, surface: 'wall', wallId: s.wall_id ?? '' }
+  s.surface === 'zone' ? { roomId: s.room_id, surface: 'zone', wallId: s.wall_id ?? null, zoneKey: s.zone_key ?? '', u0: s.zone_u0_mm ?? 0, u1: s.zone_u1_mm ?? 0, v0: s.zone_v0_mm ?? 0, v1: s.zone_v1_mm ?? 0 }
+    : s.surface === 'wall' ? { roomId: s.room_id, surface: 'wall', wallId: s.wall_id ?? '' }
     : s.surface === 'splash' ? { roomId: s.room_id, surface: 'splash', wallId: s.wall_id ?? '', fromMm: s.band_from_mm ?? DEFAULT_SPLASH.fromMm, toMm: s.band_to_mm ?? DEFAULT_SPLASH.toMm }
       : { roomId: s.room_id, surface: s.surface };
 
@@ -171,6 +174,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [paintProduct, setPaintProduct] = useState<SceneProduct | null>(null);
   const [paintOption, setPaintOption] = useState<string | null>(null);
   const [makingTexture, setMakingTexture] = useState(false);
+  const [areaEditing, setAreaEditing] = useState(false);
   const [pickingPaint, setPickingPaint] = useState(false);
   const [paintScope, setPaintScope] = useState<PaintScope>('wall');
   const [erasing, setErasing] = useState(false);
@@ -714,6 +718,38 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     }
   };
 
+  const applyArea = async (r: RegionEditResult) => {
+    if (!data || !activeRender) return;
+    const base = await loadImage(activeRender.image_url);
+    const mask = paintedMask(await loadImage(r.maskDataUrl));
+    if (!mask.box) throw new Error('Paint over the area to change first.');
+    const material = paintProduct;
+    const materialImage = material ? (material.albedoUrl ?? material.imageUrl ?? undefined) : undefined;
+    const instruction = `In the ${describeBox(mask.box)} of this photograph only: ${r.prompt}`
+      + (material ? ` The material to use is shown in the second image ("${material.name}"); lay it at a realistic real-world scale, following the surface's perspective.` : '');
+    const result = await sceneStudioService.generate({
+      mode: 'image-edit',
+      reference_image_url: activeRender.image_url,
+      style_reference_url: materialImage && materialImage.startsWith('https://') ? materialImage : undefined,
+      edit_instruction: instruction,
+      model_tier: 'fast',
+      workspace_id: data.scene.workspace_id,
+    });
+    const composite = await compositeMasked(base, await loadImage(result.image_url), mask.canvas, 4);
+    const path = await sceneStudioService.uploadCapture(data.scene, composite, 'area');
+    const saved = await sceneStudioService.saveRender({
+      floor_plan_id: id, parent_render_id: activeRender.id, kind: 'area_edit', edited_object_id: null,
+      camera: activeRender.camera, capture_path: activeRender.capture_path, id_pass_path: activeRender.id_pass_path, id_map: activeRender.id_map,
+      style_reference_url: activeRender.style_reference_url, style_label: activeRender.style_label,
+      instruction, image_url: publicUrl(path), layout_snapshot: activeRender.layout_snapshot,
+    });
+    setRenders((list) => [saved, ...list]);
+    setActiveRenderId(saved.id);
+    setAreaEditing(false);
+    onRendered?.({ image_url: saved.image_url, label: 'Area changed', credits_used: result.credits_used, kind: 'area_edit' });
+    toast({ title: 'The area is changed in the render', description: `${result.credits_used} credits used. Everything outside it is exactly as it was.` });
+  };
+
   const references = useMemo(() => renders.filter((r) => r.kind === 'full').slice(0, 9).map((r) => ({ url: r.image_url, label: r.style_label ?? 'Earlier render' })), [renders]);
   const removed = objects.filter((o) => o.removed_at);
   const totalArea = useMemo(() => (data?.rooms ?? []).reduce((sum, r) => sum + roomArea(r.outline), 0), [data]);
@@ -791,11 +827,14 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       <CardContent className="space-y-3">
         <div className="space-y-1">
           <Label className="text-xs">Walls</Label>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-2 gap-1">
             {PAINT_SCOPES.map((sc) => (
               <Button key={sc.id} size="sm" variant={paintScope === sc.id ? 'secondary' : 'outline'} className="h-8 px-1 text-xs" onClick={() => setPaintScope(sc.id)}>{sc.label}</Button>
             ))}
           </div>
+          {paintScope === 'area' && (
+            <p className="pt-1 text-[11px] text-muted-foreground">Drag a rectangle on a wall or a floor: it becomes its own area with this finish. Click an area to repaint it; the eraser removes it.</p>
+          )}
           {paintScope === 'splash' && (
             <div className="flex items-center gap-2 pt-1">
               <Label htmlFor="splash-top" className="text-xs">Backsplash From 90 cm Up To</Label>
@@ -1075,6 +1114,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
               <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 flex-wrap items-center gap-1 rounded-md border border-hairline bg-card p-1 shadow-overlay">
                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowRender(false)}><Layers className="h-3.5 w-3.5" />Back to 3D</Button>
                 <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.setPose(activeRender.camera as unknown as Parameters<SceneCanvasHandle['setPose']>[0]); }}><Eye className="h-3.5 w-3.5" />Edit from this view</Button>
+                <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setAreaEditing(true)}><Paintbrush className="h-3.5 w-3.5" />Change an area</Button>
                 {onWalkThrough && (
                   <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(activeRender.image_url, `${scene.name}${activeRender.style_label ? ` — ${activeRender.style_label}` : ''}`)}>
                     <Footprints className="h-3.5 w-3.5" />Walk through ({VR_CREDIT_COSTS['marble-1.1']} credits)
@@ -1106,6 +1146,14 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
               />
             ))}
           </div>
+        )}
+
+        {areaEditing && activeRender && (
+          <RegionEditCanvas
+            imageUrl={activeRender.image_url}
+            onClose={() => setAreaEditing(false)}
+            onApply={async (r) => { try { await applyArea(r); } catch (e) { fail('The area could not be changed', e); } }}
+          />
         )}
 
         <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
