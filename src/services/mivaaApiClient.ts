@@ -342,22 +342,6 @@ export class MivaaApiClient {
   // ==================== AI ANALYSIS ====================
 
   /**
-   * Analyze material using AI (semantic analysis)
-   * Replaces: ai-material-analysis, hybrid-material-analysis, material-recognition Edge Functions
-   */
-  async analyzeMaterial(payload: {
-    image_url?: string;
-    image_data?: string;
-    text?: string;
-    analysis_type?: 'semantic' | 'visual' | 'hybrid';
-  }): Promise<MivaaApiResponse> {
-    return this.request('/api/semantic-analysis', {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
-  }
-
-  /**
    * Analyze image using Claude Opus 5.5 vision (with Anthropic tool_use
    * schema-locked output via the `emit_vision_analysis` tool defined in
    * mivaa-pdf-extractor/app/models/vision_analysis.py).

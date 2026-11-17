@@ -121,10 +121,10 @@ const TOOLS: ToolEntry[] = [
 const WORKSPACE_TOOLS: ToolEntry[] = [
   {
     slug: 'recognition',
-    to: '/recognition',
-    title: 'Material recognition',
+    to: '/agent-hub?capability=visual-search',
+    title: 'Material Recognition',
     description:
-      'Upload a photo of a material or surface and identify it — AI vision returns the closest matches from your catalog.',
+      'Attach a photo to the agent and ask what the material is — it finds the closest products in your catalogue, ready to add to a quote.',
     icon: ScanSearch,
     badge: 'Signed in · AI',
   },

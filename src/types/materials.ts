@@ -484,22 +484,6 @@ export interface ProcessingJob {
   [key: string]: unknown;
 }
 
-export interface RecognitionResult {
-  id: string;
-  fileName: string;
-  materialId?: string;
-  confidence: number;
-  materialType: string;
-  properties: Record<string, unknown>;
-  composition: Record<string, unknown>;
-  sustainability: Record<string, unknown>;
-  imageUrl: string;
-  imageBase64?: string;
-  processingTime: number;
-  matchedMaterial?: Material;
-  extractedProperties?: Record<string, unknown>;
-}
-
 export interface ApiResponse<T> {
   success: boolean;
   data: T;

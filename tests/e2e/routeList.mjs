@@ -6,7 +6,7 @@ export const ROUTE_LIST = [
   '/tools/tile-installation',
   '/knowledge-base', '/brands',
   // Core authed
-  '/', '/profile', '/moodboard', '/agent-hub', '/compare', '/recognition',
+  '/', '/profile', '/moodboard', '/agent-hub', '/compare',
   '/blueprints', '/projects', '/portal', '/market-trends',
   '/billing/subscriptions', '/billing/credits',
   '/apps', '/search-hub', '/tasks', '/requests', '/templates', '/shared', '/settings',

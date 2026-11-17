@@ -11,7 +11,6 @@
     "src/components/business/billing/CreditPackagesPage.tsx",
     "src/components/business/billing/SubscriptionPlansPage.tsx",
     "src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx",
-    "src/components/features/recognition/MaterialRecognition.tsx",
     "src/modules/banking-revolut/pages/RevolutCallbackPage.tsx",
     "src/modules/crm/pages/CRMPage.tsx",
     "src/modules/crm/pages/CompanyDetailPage.tsx",

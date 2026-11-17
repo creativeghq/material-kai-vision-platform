@@ -346,7 +346,7 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   ],
   studio: [
     { label: 'Kitchen Calculator', to: '/tools/kitchen-cost', icon: Calculator },
-    { label: 'Identify a material', to: '/recognition', icon: ScanLine },
+    { label: 'Identify a Material', to: '/agent-hub?capability=visual-search', icon: ScanLine },
     { label: 'Moodboard Templates', to: '/templates?type=moodboard', icon: LayoutTemplate },
   ],
   // HR's card is the manager view of everyone; these are the employee's own surfaces.

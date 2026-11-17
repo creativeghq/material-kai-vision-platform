@@ -89,7 +89,6 @@ const TemplateEditorPage = lazy(() => import('./pages/Templates/TemplateEditorPa
 const StartHerePage = lazy(() => import('./pages/StartHere/StartHerePage'));
 
 // Feature pages
-const MaterialRecognition = lazy(() => import('./components/features/recognition/MaterialRecognition').then(m => ({ default: m.MaterialRecognition })));
 const MoodBoardPage = lazy(() => import('./components/business/moodboard/MoodBoardPage').then(m => ({ default: m.MoodBoardPage })));
 const MoodBoardDetailPage = lazy(() => import('./components/business/moodboard/MoodBoardDetailPage').then(m => ({ default: m.MoodBoardDetailPage })));
 
@@ -328,16 +327,7 @@ const App = () => (
                 {/* The standalone /apps hub was folded into Profile → Modules, which lists the
                     same Hub-grouped catalog plus cost, credit and subscription state. */}
                 <Route path="/apps" element={<Navigate to="/profile?tab=modules" replace />} />
-                <Route
-                  path="/recognition"
-                  element={
-                    <AuthGuard>
-                      <Layout>
-                        <MaterialRecognition />
-                      </Layout>
-                    </AuthGuard>
-                  }
-                />
+                <Route path="/recognition" element={<Navigate to="/agent-hub?capability=visual-search" replace />} />
                 <Route
                   path="/network"
                   element={
