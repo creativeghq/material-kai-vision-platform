@@ -31,6 +31,7 @@ import type {
   AssignUserConfig,
   AddTagConfig,
   AddNoteConfig,
+  CreateLeadConfig,
   UpdateContactConfig,
   UpdateProductConfig,
   CreateTaskConfig,
@@ -664,6 +665,27 @@ export function ActionConfigForm({ data, onChange }: ActionConfigFormProps) {
               className="text-sm"
             />
           </div>
+        </div>
+      );
+    }
+
+    case 'create_lead': {
+      const cfg = config as CreateLeadConfig;
+      const fields: Array<[keyof CreateLeadConfig, string]> = [
+        ['name', 'Name'], ['email', 'Email'], ['phone', 'Phone'], ['title', 'Interest'], ['request', 'Request'],
+      ];
+      return (
+        <div className="space-y-3">
+          <p className="text-xs text-muted-foreground">
+            Creates the lead for the conversation in <code>{'{{trigger.data.source_ref}}'}</code>. Running it again for the
+            same conversation returns the existing lead. Outputs <code>lead_id</code>, <code>created</code> and <code>owner_user_id</code>.
+          </p>
+          {fields.map(([key, label]) => (
+            <div key={key} className="space-y-1.5">
+              <Label className="text-xs">{label}</Label>
+              <Input value={cfg[key] || ''} onChange={(e) => onChange({ ...cfg, [key]: e.target.value })} className="h-8 text-sm" />
+            </div>
+          ))}
         </div>
       );
     }

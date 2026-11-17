@@ -6,7 +6,7 @@ import {
   UserPen, PackageCheck, ScrollText, CheckSquare, Kanban, CalendarClock, Link2,
   BotMessageSquare, LayoutGrid, ImagePlus,
   Compass, FileSearch, Building2, UserSearch, MailCheck,
-  MessageCircle, Megaphone, TrendingDown, MessageSquareReply,
+  MessageCircle, Megaphone, TrendingDown, MessageSquareReply, UserPlus,
 } from 'lucide-react';
 import type {
   ActionNodeData, ActionType,
@@ -31,6 +31,7 @@ const actionIcons: Record<ActionType, React.ElementType> = {
   assign_user: UserCog,
   add_tag: Tag,
   add_note: StickyNote,
+  create_lead: UserPlus,
   update_contact: UserPen,
   update_product: PackageCheck,
   create_task: CheckSquare,

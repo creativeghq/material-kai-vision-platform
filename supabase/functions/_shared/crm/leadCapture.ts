@@ -8,6 +8,7 @@ export interface LeadCaptureRule {
   match_mode: 'starts_with' | 'contains';
   pattern: string;
   mail_account_id: string | null;
+  assign_to_user_id?: string | null;
 }
 
 export interface CapturedLeadFields {

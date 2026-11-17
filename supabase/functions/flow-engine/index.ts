@@ -1320,6 +1320,23 @@ async function executeAction(
       return { output: { added: true, tag, entity_id: id } };
     }
 
+    case 'create_lead': {
+      const ruleId = String(resolved.rule_id ?? '');
+      const sourceRef = String(resolved.source_ref ?? '');
+      if (!ruleId || !sourceRef) return { output: { skipped: true, reason: 'missing_rule_or_source_ref' } };
+      const { data: rule } = await supabase.from('lead_capture_rules').select('workspace_id').eq('id', ruleId).maybeSingle();
+      if (!rule) return { output: { skipped: true, reason: 'rule_not_found' } };
+      if (!scope?.isGlobal && rule.workspace_id !== scope?.workspaceId) return { output: { skipped: true, reason: 'rule_outside_flow_workspace' } };
+      const text = (k: string) => (typeof resolved[k] === 'string' && !/^\{\{.*\}\}$/.test(resolved[k] as string) ? resolved[k] as string : null);
+      const { data, error } = await supabase.rpc('capture_inbound_lead', {
+        p_rule_id: ruleId, p_source_ref: sourceRef, p_name: text('name'), p_email: text('email'), p_phone: text('phone'),
+        p_title: text('title'), p_request: text('request'), p_received_at: text('received_at') ?? new Date().toISOString(),
+      });
+      if (error) throw new Error(`create_lead failed: ${error.message}`);
+      const r = (data ?? {}) as { lead_id?: string; created?: boolean; owner_user_id?: string | null };
+      return { output: { lead_id: r.lead_id ?? null, created: !!r.created, owner_user_id: r.owner_user_id ?? null } };
+    }
+
     case 'add_note': {
       const kind = String(resolved.entity_type ?? 'contact');
       const id = String(resolved.entity_id ?? '');
@@ -2140,7 +2157,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'video_generation_completed', 'video_generation_failed',
   'vr_world_created', 'vr_world_failed', 'virtual_staging_completed', 'svbrdf_extraction_complete',
   'agent_search_completed', 'daily_brief', 'inbox.message_received', 'inbox.thread_assigned',
-  'inbox.thread_labeled', 'inbox.follow_up_due', 'crm_lead_captured',
+  'inbox.thread_labeled', 'inbox.follow_up_due', 'inquiry_received',
   'seo.ranking_movement', 'seo.backlink_movement', 'seo.site_health_changed',
   'seo.article_refresh_due', 'seo.refresh_ready',
 ]);

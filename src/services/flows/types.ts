@@ -219,7 +219,7 @@ export type TriggerType =
   | 'crm_contact_created'
   | 'crm_company_created'
   // An inbound email / WhatsApp message matched a lead capture rule (operator-only for now)
-  | 'crm_lead_captured'
+  | 'inquiry_received'
   // Email Marketing engagement (high-volume — see note in the config interfaces below)
   | 'email_opened'
   | 'email_clicked'
@@ -354,7 +354,7 @@ export interface ProjectRequestRaisedTriggerConfig {}
 export interface ProjectRequestAnsweredTriggerConfig {}
 export interface CrmContactCreatedTriggerConfig {}
 export interface CrmCompanyCreatedTriggerConfig {}
-export interface CrmLeadCapturedTriggerConfig {}
+export interface InquiryReceivedTriggerConfig {}
 /** Opens/clicks are HIGH-VOLUME. Each event fires a metered flow run — pair with a
  *  Filter node (e.g. only a specific campaign) to avoid running on every open. */
 export interface EmailOpenedTriggerConfig {}
@@ -704,7 +704,7 @@ export type TriggerConfigMap = {
   project_request_raised: ProjectRequestRaisedTriggerConfig;
   project_request_answered: ProjectRequestAnsweredTriggerConfig;
   crm_contact_created: CrmContactCreatedTriggerConfig;
-  crm_lead_captured: CrmLeadCapturedTriggerConfig;
+  inquiry_received: InquiryReceivedTriggerConfig;
   crm_company_created: CrmCompanyCreatedTriggerConfig;
   email_opened: EmailOpenedTriggerConfig;
   email_clicked: EmailClickedTriggerConfig;
@@ -822,6 +822,7 @@ export type ActionType =
   | 'assign_user'
   | 'add_tag'
   | 'add_note'
+  | 'create_lead'
   | 'update_contact'
   | 'update_product'
   | 'create_task'
@@ -944,6 +945,17 @@ export interface AddNoteConfig {
   entity_type: 'contact' | 'quote';
   entity_id: string;
   note: string;
+}
+
+export interface CreateLeadConfig {
+  rule_id: string;
+  source_ref: string;
+  name: string;
+  email: string;
+  phone: string;
+  title: string;
+  request: string;
+  received_at: string;
 }
 
 export interface UpdateContactConfig {
@@ -1136,7 +1148,7 @@ export interface ConditionNodeData extends BaseNodeData {
 export interface ActionNodeData extends BaseNodeData {
   category: 'action';
   actionType: ActionType;
-  config: SendSmsConfig | SendWhatsAppConfig | SendEmailConfig | SendCampaignConfig | SendPriceAlertConfig | SendPushConfig | SendQuoteConfig | BuildQuoteConfig | ApproveQuoteConfig | CreateNotificationConfig | HttpRequestConfig | AssignUserConfig | AddTagConfig | AddNoteConfig | UpdateContactConfig | UpdateProductConfig | RunEdgeFunctionConfig | LogEventConfig | SendAgentMessageConfig | CreateMoodboardConfig | AddToMoodboardConfig | WebSearchConfig | FirecrawlScrapeConfig | ApolloEnrichConfig | HunterFindContactsConfig | ZeroBounceValidateConfig;
+  config: SendSmsConfig | SendWhatsAppConfig | SendEmailConfig | SendCampaignConfig | SendPriceAlertConfig | SendPushConfig | SendQuoteConfig | BuildQuoteConfig | ApproveQuoteConfig | CreateNotificationConfig | HttpRequestConfig | AssignUserConfig | AddTagConfig | AddNoteConfig | CreateLeadConfig | UpdateContactConfig | UpdateProductConfig | RunEdgeFunctionConfig | LogEventConfig | SendAgentMessageConfig | CreateMoodboardConfig | AddToMoodboardConfig | WebSearchConfig | FirecrawlScrapeConfig | ApolloEnrichConfig | HunterFindContactsConfig | ZeroBounceValidateConfig;
 }
 
 export type FlowNodeData = TriggerNodeData | ConditionNodeData | ActionNodeData;

@@ -25,6 +25,7 @@ const EMPTY: LeadCaptureRuleInput = {
 export const LeadCaptureRulesDialog: React.FC<{ workspaceId: string; open: boolean; onClose: () => void }> = ({ workspaceId, open, onClose }) => {
   const { toast } = useToast();
   const [rules, setRules] = useState<LeadCaptureRule[]>([]);
+  const [leadCounts, setLeadCounts] = useState<Map<string, number>>(new Map());
   const [accounts, setAccounts] = useState<MailAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<{ id: string | null; form: LeadCaptureRuleInput } | null>(null);
@@ -33,11 +34,13 @@ export const LeadCaptureRulesDialog: React.FC<{ workspaceId: string; open: boole
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [rows, status] = await Promise.all([
+      const [rows, counts, status] = await Promise.all([
         leadCaptureRulesService.list(workspaceId),
+        leadCaptureRulesService.leadCounts(workspaceId),
         gmailApi.status(workspaceId).catch(() => ({ configured: false, accounts: [] as MailAccount[] })),
       ]);
       setRules(rows);
+      setLeadCounts(counts);
       setAccounts(status.accounts.filter((a) => a.status === 'active'));
     } catch (e) {
       toast({ title: 'Could not load capture rules', description: (e as Error).message, variant: 'destructive' });
@@ -101,8 +104,8 @@ export const LeadCaptureRulesDialog: React.FC<{ workspaceId: string; open: boole
         <DialogHeader>
           <DialogTitle>Lead capture rules</DialogTitle>
           <DialogDescription>
-            An incoming email or WhatsApp message that matches a rule becomes a lead automatically — one lead per conversation,
-            assigned to you. Replying moves it from New to Contacted. What happens next is a flow: Automations → Lead Captured.
+            A rule decides what counts as an inquiry. Each match runs the Inquiry Received flow in Flows, which by default creates
+            the lead (one per conversation, assigned to you) and notifies you. Replying moves a lead from New to Contacted.
           </DialogDescription>
         </DialogHeader>
 
@@ -184,7 +187,8 @@ export const LeadCaptureRulesDialog: React.FC<{ workspaceId: string; open: boole
                   <div className="text-xs text-muted-foreground">
                     {r.match_count > 0 && r.last_matched_at
                       ? `Matched ${r.match_count} time${r.match_count === 1 ? '' : 's'}, last ${formatDate(r.last_matched_at)}`
-                      : 'Has not matched anything yet'}
+                      : 'Has not matched anything new yet'}
+                    {` · ${leadCounts.get(r.id) ?? 0} lead${(leadCounts.get(r.id) ?? 0) === 1 ? '' : 's'}`}
                   </div>
                 </div>
                 <Switch checked={r.enabled} onCheckedChange={(v) => void toggle(r, v)} aria-label={`Turn ${r.label} ${r.enabled ? 'off' : 'on'}`} />

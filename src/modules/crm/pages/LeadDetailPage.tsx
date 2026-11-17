@@ -224,6 +224,27 @@ export const LeadDetailPage: React.FC = () => {
               </>
             }
           />
+          {(lead.source_ref?.startsWith('gmail:') || lead.source_ref?.startsWith('whatsapp:')) && !converted && (
+            <HubPanel
+              title="Conversation"
+              action={
+                <Button size="sm" variant="ghost" disabled={busy}
+                  onClick={() => void run(() => crmLeadsService.setAutoTracking(lead.id, !lead.auto_tracking), 'Could not change syncing')}>
+                  {lead.auto_tracking ? 'Stop syncing' : 'Resume syncing'}
+                </Button>
+              }
+            >
+              <p className="text-xs text-muted-foreground">
+                {lead.auto_tracking
+                  ? 'Summary, status and follow-up are kept in step with the conversation automatically.'
+                  : 'Not synced: the status was set by hand. Resume to let the conversation update it again.'}
+                {lead.conversation_synced_at ? ` Last read ${formatDate(lead.conversation_synced_at)}.` : ''}
+              </p>
+              {lead.conversation_summary
+                ? <p className="mt-2 whitespace-pre-wrap text-sm">{lead.conversation_summary}</p>
+                : <p className="mt-2 text-sm text-muted-foreground">—</p>}
+            </HubPanel>
+          )}
           <HubPanel title="Details">
             <HubPropertyList>
               <HubProperty label="Status">

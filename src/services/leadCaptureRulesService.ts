@@ -46,6 +46,14 @@ export const leadCaptureRulesService = {
     if (error) throw new Error(error.message);
     return (data ?? []) as LeadCaptureRule[];
   },
+  async leadCounts(workspaceId: string): Promise<Map<string, number>> {
+    const { data, error } = await supabase.from('crm_leads').select('capture_rule_id')
+      .eq('workspace_id', workspaceId).not('capture_rule_id', 'is', null);
+    if (error) throw new Error(error.message);
+    const out = new Map<string, number>();
+    for (const r of data ?? []) if (r.capture_rule_id) out.set(r.capture_rule_id, (out.get(r.capture_rule_id) ?? 0) + 1);
+    return out;
+  },
   async create(workspaceId: string, input: LeadCaptureRuleInput): Promise<void> {
     const { data: auth } = await supabase.auth.getUser();
     const { error } = await table().insert({ workspace_id: workspaceId, assign_to_user_id: auth.user?.id ?? null, ...payload(input) });

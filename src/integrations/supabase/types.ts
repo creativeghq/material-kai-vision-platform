@@ -5114,6 +5114,10 @@ export type Database = {
       }
       crm_leads: {
         Row: {
+          auto_tracking: boolean
+          capture_rule_id: string | null
+          conversation_summary: string | null
+          conversation_synced_at: string | null
           company_name: string | null
           converted_at: string | null
           converted_contact_id: string | null
@@ -5139,6 +5143,10 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          auto_tracking?: boolean
+          capture_rule_id?: string | null
+          conversation_summary?: string | null
+          conversation_synced_at?: string | null
           company_name?: string | null
           converted_at?: string | null
           converted_contact_id?: string | null
@@ -5164,6 +5172,10 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          auto_tracking?: boolean
+          capture_rule_id?: string | null
+          conversation_summary?: string | null
+          conversation_synced_at?: string | null
           company_name?: string | null
           converted_at?: string | null
           converted_contact_id?: string | null

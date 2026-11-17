@@ -26,6 +26,10 @@ export interface Lead {
   converted_at: string | null;
   converted_contact_id: string | null;
   converted_deal_id: string | null;
+  capture_rule_id: string | null;
+  conversation_summary: string | null;
+  conversation_synced_at: string | null;
+  auto_tracking: boolean;
 }
 
 export interface LeadInput {
@@ -64,7 +68,7 @@ export interface LeadQuote {
 const LEAD_QUOTE_SELECT = 'id, quote_number, name, status, grand_total, currency, created_at';
 
 const LEAD_SELECT =
-  'id, workspace_id, name, email, phone, company_name, source, title, request, notes, estimated_value, currency, status, lost_reason, follow_up_on, source_ref, created_at, updated_at, converted_at, converted_contact_id, converted_deal_id';
+  'id, workspace_id, name, email, phone, company_name, source, title, request, notes, estimated_value, currency, status, lost_reason, follow_up_on, source_ref, created_at, updated_at, converted_at, converted_contact_id, converted_deal_id, capture_rule_id, conversation_summary, conversation_synced_at, auto_tracking';
 
 const blank = (v: string | null | undefined) => (v && v.trim() ? v.trim() : null);
 
@@ -118,6 +122,11 @@ export const crmLeadsService = {
       .single();
     if (error) throw error;
     return data as Lead;
+  },
+
+  async setAutoTracking(leadId: string, on: boolean): Promise<void> {
+    const { error } = await supabase.from('crm_leads').update({ auto_tracking: on }).eq('id', leadId);
+    if (error) throw error;
   },
 
   async remove(leadId: string): Promise<void> {

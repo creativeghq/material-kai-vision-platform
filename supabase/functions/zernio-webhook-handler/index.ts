@@ -14,7 +14,7 @@ import {
   fetchZernioMediaUrl,
 } from '../_shared/zernio.ts';
 import { emitFlowEvent, emitFlowEventToWorkspaceRoles, emitInboxMessageEvent } from '../_shared/flow-events.ts';
-import { captureInboundLead, loadLeadCaptureRules } from '../_shared/crm/captureLead.ts';
+import { loadLeadCaptureRules, reportInquiry } from '../_shared/crm/captureLead.ts';
 import { firstMatchingRule, leadFromWhatsApp } from '../_shared/crm/leadCapture.ts';
 import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 import {
@@ -781,7 +781,7 @@ async function handleInboundMessage(supabase: any, payload: any): Promise<Inboun
       try {
         const rule = firstMatchingRule(await loadLeadCaptureRules(supabase, { channel: 'whatsapp', workspaceId }), { body: bodyText });
         if (rule) {
-          await captureInboundLead(supabase, rule, `whatsapp:${threadId}`,
+          await reportInquiry(supabase, rule, `whatsapp:${threadId}`,
             leadFromWhatsApp({ text: bodyText, profileName: contactName, phone }), new Date().toISOString());
         }
       } catch (err) {

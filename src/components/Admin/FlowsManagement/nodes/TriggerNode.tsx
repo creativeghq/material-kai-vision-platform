@@ -161,7 +161,7 @@ const triggerIcons: Record<TriggerType, React.ElementType> = {
   project_request_raised: MessageSquarePlus,
   project_request_answered: MessageSquareReply,
   crm_contact_created: UserPlus,
-  crm_lead_captured: UserPlus,
+  inquiry_received: UserPlus,
   crm_company_created: Building2,
   email_opened: MailOpen,
   email_clicked: MousePointerClick,
