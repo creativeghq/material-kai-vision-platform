@@ -200,7 +200,7 @@ export function ToolkitFormModal({ state, onClose, onSubmit, onRunTool, onGenera
         <DialogFooter>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button onClick={handleSubmit} disabled={missingRequired.length > 0}>
-            {state.quickStart.generation ? 'Generate' : 'Run'}
+            {state.quickStart.submitLabel ?? (state.quickStart.generation ? 'Generate' : 'Run')}
           </Button>
         </DialogFooter>
       </DialogContent>

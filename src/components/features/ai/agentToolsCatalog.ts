@@ -1436,6 +1436,8 @@ export interface ToolkitQuickStart {
   opensSheetWizard?: string;
   /** Hint that this process needs an attached image to do its best work. */
   imageRequired?: boolean;
+  /** The form's submit caption, when "Generate" / "Run" would misdescribe it. */
+  submitLabel?: string;
 }
 
 export interface ToolkitDefinition {
@@ -1525,6 +1527,20 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'description', label: 'What are you looking for?', kind: 'text', required: true, placeholder: 'cement-based grey tiles for a modern bathroom' },
           { key: 'count', label: 'How many results?', kind: 'number', default: '5' },
+        ],
+      },
+      {
+        // No `mode`: the photo is attached and the prompt sent as an ordinary turn, which visual_search answers.
+        label: 'Identify a Material', description: 'Attach a photo — find what it is and where to buy it', icon: 'ImageIcon',
+        imageRequired: true,
+        submitLabel: 'Identify',
+        prompt: 'Identify the material in this photo and show me where I can buy it.',
+        done: 'Here is what I found in your photo.',
+        promptTemplate: 'Identify the material in this photo and show me where I can buy it (Focus on: {{focus}}).',
+        generation: { imageKeys: ['photo'] },
+        form: [
+          { key: 'photo', label: 'Photo', kind: 'image', required: true, help: 'A photo of the material itself, or of a room where it is used.' },
+          { key: 'focus', label: 'Which Part of the Photo? (optional)', kind: 'text', placeholder: 'e.g. the wall panelling above the kitchen counter' },
         ],
       },
       {
