@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRightCircle, FileText, Kanban, List, Plus, Trash2, UserPlus } from 'lucide-react';
+import { ArrowRightCircle, FileText, Kanban, List, Plus, Trash2, UserPlus, Zap } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -23,6 +23,8 @@ import { crmLeadsService, type Lead } from '@/services/crmLeadsService';
 import { LeadFormFields, EMPTY_LEAD_FORM, formToLeadInput, type LeadFormState } from './LeadFormFields';
 import { LeadsBoard } from './LeadsBoard';
 import { ConvertLeadDialog } from './ConvertLeadDialog';
+import { LeadCaptureRulesDialog } from './LeadCaptureRulesDialog';
+import { useWorkspace } from '@/contexts/WorkspaceContext';
 
 type StatusFilter = 'open' | 'all' | LeadStatus;
 
@@ -42,6 +44,8 @@ export const LeadsPanel: React.FC<{ workspaceId: string | null }> = ({ workspace
   const [form, setForm] = useState<LeadFormState>(EMPTY_LEAD_FORM);
   const [saving, setSaving] = useState(false);
   const [converting, setConverting] = useState<Lead | null>(null);
+  const [rulesOpen, setRulesOpen] = useState(false);
+  const { isPlatformOperator } = useWorkspace();
 
   const load = useCallback(async () => {
     if (!workspaceId) { setLeads([]); setLoading(false); return; }
@@ -129,7 +133,12 @@ export const LeadsPanel: React.FC<{ workspaceId: string | null }> = ({ workspace
           <CardTitle>Leads</CardTitle>
           <CardDescription>Enquiries that are not contacts yet. Convert one when it proceeds.</CardDescription>
         </div>
-        <Button size="sm" onClick={openNew} disabled={!workspaceId}><Plus className="h-4 w-4 mr-1" />New lead</Button>
+        <div className="flex flex-wrap gap-2">
+          {isPlatformOperator && workspaceId && (
+            <Button size="sm" variant="outline" onClick={() => setRulesOpen(true)}><Zap className="h-4 w-4 mr-1" />Capture rules</Button>
+          )}
+          <Button size="sm" onClick={openNew} disabled={!workspaceId}><Plus className="h-4 w-4 mr-1" />New lead</Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -231,6 +240,9 @@ export const LeadsPanel: React.FC<{ workspaceId: string | null }> = ({ workspace
       </Dialog>
 
       <ConvertLeadDialog lead={converting} onClose={() => { setConverting(null); void load(); }} />
+      {isPlatformOperator && workspaceId && (
+        <LeadCaptureRulesDialog workspaceId={workspaceId} open={rulesOpen} onClose={() => setRulesOpen(false)} />
+      )}
     </Card>
   );
 };

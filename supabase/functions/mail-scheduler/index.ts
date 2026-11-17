@@ -5,7 +5,9 @@ import { isCronAuthorized } from '../_shared/auth.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { gmailAccessToken, gmailFetch, gmailHeader, sendPreparedGmail, type PreparedGmailSend } from '../_shared/gmail-client.ts';
-import { parseAddress } from '../_shared/mail-mime.ts';
+import { parseAddress, parseGmailPayload, type GmailPart } from '../_shared/mail-mime.ts';
+import { captureInboundLead, loadLeadCaptureRules } from '../_shared/crm/captureLead.ts';
+import { firstMatchingRule, htmlToText, leadFromEmail, type LeadCaptureRule } from '../_shared/crm/leadCapture.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { AUTO_REPLY_GMAIL_HEADERS, isAutoReplyFromHeaderList } from '../_shared/mail-auto-reply.ts';
 
@@ -179,16 +181,21 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
 const SYNC_ACCOUNTS = 20;
 const SYNC_MESSAGES = 25;
 
-/** New mail in SHARED mailboxes becomes a `mail.received` flow event. Personal mail never leaves its owner. */
-async function syncHistory(db: Db): Promise<{ accounts: number; events: number; failed: number }> {
+/** New mail in SHARED mailboxes becomes `mail.received`. A personal mailbox is read only for messages its owner's lead capture rules match. */
+async function syncHistory(db: Db): Promise<{ accounts: number; events: number; leads: number; failed: number }> {
+  const emailRules = await loadLeadCaptureRules(db, { channel: 'email' });
+  const ruleAccountIds = [...new Set(emailRules.map((r) => r.mail_account_id).filter((v): v is string => !!v))];
   const { data: accounts, error } = await db.from('mail_accounts')
-    .select('id, user_id, workspace_id, email, display_name, status, history_id')
-    .eq('status', 'active').eq('is_shared', true)
+    .select('id, user_id, workspace_id, email, display_name, status, history_id, is_shared')
+    .eq('status', 'active')
+    .or(ruleAccountIds.length ? `is_shared.eq.true,id.in.(${ruleAccountIds.join(',')})` : 'is_shared.eq.true')
     .order('last_synced_at', { ascending: true, nullsFirst: true }).limit(SYNC_ACCOUNTS);
   if (error) throw new HttpError(500, `account scan failed: ${error.message}`);
   let events = 0;
+  let leads = 0;
   let failed = 0;
   for (const account of accounts ?? []) {
+    const rules = emailRules.filter((r) => r.mail_account_id === account.id);
     try {
       const token = await gmailAccessToken(db, account);
       if (!account.history_id) {
@@ -207,8 +214,7 @@ async function syncHistory(db: Db): Promise<{ accounts: number; events: number; 
         }
         throw e;
       }
-      const added = ((history.history ?? []) as Array<{ messagesAdded?: Array<{ message: { id: string; threadId: string; labelIds?: string[] } }> }>)
-        .flatMap((h) => h.messagesAdded ?? []).map((m) => m.message)
+      const added = addedMessages(history)
         .filter((m) => !(m.labelIds ?? []).includes('SENT') && !(m.labelIds ?? []).includes('DRAFT'));
       const unique = [...new Map(added.map((m) => [m.id, m])).values()].slice(0, SYNC_MESSAGES);
       for (const m of unique) {
@@ -216,11 +222,19 @@ async function syncHistory(db: Db): Promise<{ accounts: number; events: number; 
         if (!msg) continue;
         const from = parseAddress(gmailHeader(msg, 'From'));
         if (from.address === account.email.toLowerCase()) continue;
+        const subject = gmailHeader(msg, 'Subject') || '(no subject)';
+        if (rules.length) {
+          try {
+            if (await captureFromGmail(db, token, rules, m, subject, from)) leads++;
+          } catch (e) {
+            console.error('[mail-scheduler] lead capture failed', account.id, m.id, (e as Error).message);
+          }
+        }
+        if (!account.is_shared) continue;
         const { data: contact } = from.address
           ? await db.from('crm_contacts').select('id, name').eq('workspace_id', account.workspace_id)
             .ilike('email', from.address.replace(/[%_\\]/g, '\\$&')).limit(1).maybeSingle()
           : { data: null };
-        const subject = gmailHeader(msg, 'Subject') || '(no subject)';
         const who = contact?.name || from.name || from.address || 'someone';
         await emitFlowEvent('mail.received', {
           type: 'mail.received',
@@ -243,13 +257,50 @@ async function syncHistory(db: Db): Promise<{ accounts: number; events: number; 
         });
         events++;
       }
+      if (rules.length) await markRepliedLeads(db, token, account);
       await stampSync(db, account.id, String(history.historyId ?? account.history_id), null);
     } catch (e) {
       failed++;
       await stampSync(db, account.id, account.history_id, (e as Error).message.slice(0, 500));
     }
   }
-  return { accounts: accounts?.length ?? 0, events, failed };
+  return { accounts: accounts?.length ?? 0, events, leads, failed };
+}
+
+type AddedMessage = { id: string; threadId: string; labelIds?: string[] };
+
+function addedMessages(history: Record<string, unknown>): AddedMessage[] {
+  return ((history.history ?? []) as Array<{ messagesAdded?: Array<{ message: AddedMessage }> }>)
+    .flatMap((h) => h.messagesAdded ?? []).map((m) => m.message);
+}
+
+async function captureFromGmail(
+  db: Db, token: string, rules: LeadCaptureRule[], m: AddedMessage, subject: string,
+  from: { name: string | null; address: string | null },
+): Promise<boolean> {
+  let rule = firstMatchingRule(rules, { subject });
+  if (!rule && !rules.some((r) => r.match_field === 'body')) return false;
+  const full = await gmailFetch(token, `/messages/${m.id}?format=full`);
+  const parsed = parseGmailPayload((full.payload ?? {}) as GmailPart);
+  const bodyText = parsed.text ?? (parsed.html ? htmlToText(parsed.html) : '');
+  rule = rule ?? firstMatchingRule(rules, { subject, body: bodyText });
+  if (!rule) return false;
+  const fields = leadFromEmail({
+    subject, html: parsed.html, text: parsed.text, fromName: from.name, fromAddress: from.address, rulePattern: rule.pattern,
+  });
+  const receivedAt = full.internalDate ? new Date(Number(full.internalDate)).toISOString() : new Date().toISOString();
+  const { created } = await captureInboundLead(db, rule, `gmail:${m.threadId}`, fields, receivedAt);
+  return created;
+}
+
+async function markRepliedLeads(db: Db, token: string, account: { workspace_id: string; history_id: string }) {
+  const sent = await gmailFetch(token, `/history?startHistoryId=${encodeURIComponent(account.history_id)}&historyTypes=messageAdded&labelId=SENT&maxResults=100`)
+    .catch(() => null);
+  if (!sent) return;
+  const refs = [...new Set(addedMessages(sent).map((m) => `gmail:${m.threadId}`))];
+  if (!refs.length) return;
+  const { error } = await db.rpc('mark_leads_contacted', { p_workspace_id: account.workspace_id, p_source_refs: refs });
+  if (error) console.error('[mail-scheduler] replied leads not marked contacted', error.message);
 }
 
 async function stampSync(db: Db, accountId: string, historyId: string | null, err: string | null) {

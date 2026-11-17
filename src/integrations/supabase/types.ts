@@ -14521,6 +14521,75 @@ export type Database = {
           },
         ]
       }
+      lead_capture_rules: {
+        Row: {
+          id: string
+          workspace_id: string
+          label: string
+          channel: string
+          match_field: string
+          match_mode: string
+          pattern: string
+          mail_account_id: string | null
+          assign_to_user_id: string | null
+          enabled: boolean
+          last_matched_at: string | null
+          match_count: number
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          workspace_id: string
+          label: string
+          channel: string
+          match_field: string
+          match_mode?: string
+          pattern: string
+          mail_account_id?: string | null
+          assign_to_user_id?: string | null
+          enabled?: boolean
+          last_matched_at?: string | null
+          match_count?: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          workspace_id?: string
+          label?: string
+          channel?: string
+          match_field?: string
+          match_mode?: string
+          pattern?: string
+          mail_account_id?: string | null
+          assign_to_user_id?: string | null
+          enabled?: boolean
+          last_matched_at?: string | null
+          match_count?: number
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_capture_rules_mail_account_id_fkey"
+            columns: ["mail_account_id"]
+            isOneToOne: false
+            referencedRelation: "mail_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_capture_rules_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       llm_mention_probes: {
         Row: {
           competitors_mentioned: string[] | null

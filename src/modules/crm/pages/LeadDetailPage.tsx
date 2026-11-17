@@ -253,7 +253,13 @@ export const LeadDetailPage: React.FC = () => {
                   : null}
               </HubProperty>
               <HubProperty label="Received">{formatDate(lead.created_at)}</HubProperty>
-              <HubProperty label="Reference">{lead.source_ref}</HubProperty>
+              <HubProperty label="Conversation">
+                {lead.source_ref?.startsWith('whatsapp:')
+                  ? <Link className="text-primary hover:underline" to={`/inbox?thread=${lead.source_ref.slice('whatsapp:'.length)}`}>Open in Inbox</Link>
+                  : lead.source_ref?.startsWith('gmail:')
+                    ? <a className="text-primary hover:underline" href={`https://mail.google.com/mail/u/0/#all/${lead.source_ref.slice('gmail:'.length)}`} target="_blank" rel="noopener noreferrer">Open in Gmail</a>
+                    : lead.source_ref}
+              </HubProperty>
             </HubPropertyList>
           </HubPanel>
         </>

@@ -218,6 +218,8 @@ export type TriggerType =
   // CRM: a new contact / company was created
   | 'crm_contact_created'
   | 'crm_company_created'
+  // An inbound email / WhatsApp message matched a lead capture rule (operator-only for now)
+  | 'crm_lead_captured'
   // Email Marketing engagement (high-volume — see note in the config interfaces below)
   | 'email_opened'
   | 'email_clicked'
@@ -352,6 +354,7 @@ export interface ProjectRequestRaisedTriggerConfig {}
 export interface ProjectRequestAnsweredTriggerConfig {}
 export interface CrmContactCreatedTriggerConfig {}
 export interface CrmCompanyCreatedTriggerConfig {}
+export interface CrmLeadCapturedTriggerConfig {}
 /** Opens/clicks are HIGH-VOLUME. Each event fires a metered flow run — pair with a
  *  Filter node (e.g. only a specific campaign) to avoid running on every open. */
 export interface EmailOpenedTriggerConfig {}
@@ -701,6 +704,7 @@ export type TriggerConfigMap = {
   project_request_raised: ProjectRequestRaisedTriggerConfig;
   project_request_answered: ProjectRequestAnsweredTriggerConfig;
   crm_contact_created: CrmContactCreatedTriggerConfig;
+  crm_lead_captured: CrmLeadCapturedTriggerConfig;
   crm_company_created: CrmCompanyCreatedTriggerConfig;
   email_opened: EmailOpenedTriggerConfig;
   email_clicked: EmailClickedTriggerConfig;
