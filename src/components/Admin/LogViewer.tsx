@@ -12,9 +12,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
-import { CalendarDays, Download, RefreshCw, Trash2, Clock, AlertCircle, Database, ListFilter } from 'lucide-react';
+import { CalendarDays, Download, RefreshCw, Trash2, Clock, AlertCircle, Database, ListFilter, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
 import {
   FilterBar,
@@ -273,15 +273,7 @@ export function LogViewer() {
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Application Logs"
-        description="Backend Python logs from database"
-        breadcrumbs={[
-          { label: 'Admin', path: '/admin' },
-          { label: 'Logs' },
-        ]}
-        badge="Monitoring"
-      />
+      <PageHeader icon={FileText} title="Application Logs" subtitle="Backend logs stored in the database." />
 
       <div className="p-3 sm:p-6 space-y-4">
         <Card>

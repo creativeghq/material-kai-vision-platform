@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Card, CardContent } from '@/components/core/ui/card';
-import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { MyFlowsTab } from './MyFlowsTab';
 import { FlowBuilderTab } from './FlowBuilderTab';
 import { RunHistoryTab } from './RunHistoryTab';
@@ -91,11 +91,7 @@ export const FlowsManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Flows"
-        description="Build visual workflow automations with triggers, conditions, and actions"
-        badge="Automation"
-      />
+      <PageHeader icon={Workflow} title="Flows" subtitle="Visual workflow automations with triggers, conditions and actions." />
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}

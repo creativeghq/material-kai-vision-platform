@@ -42,6 +42,7 @@ import {
   ExternalLink,
   Play,
   PauseCircle,
+  ListChecks,
 } from 'lucide-react';
 import {
   Dialog,
@@ -56,7 +57,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/core/ui/accordion';
-import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import type { ProductProgress, BackgroundJob, XMLImportJob, JobTypeMetrics, QueueMetrics } from './types';
 import { PRODUCT_STAGES, getPipelineForJobType } from './constants';
 import { LiveTimer } from './components/LiveTimer';
@@ -1383,11 +1384,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   if (loading) {
     return (
       <div className="min-h-screen">
-        <GlobalAdminHeader
-          title="Async Job Queue Monitor"
-          description="Monitor background job processing queues and progress"
-          badge="Admin"
-        />
+        <PageHeader icon={ListChecks} title="Job Queue" subtitle="Processing jobs, their stages and progress, and document health." />
         <div className="p-6">
           <div className="flex items-center justify-center h-64">
             <div className="text-center">
@@ -1403,11 +1400,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   if (error) {
     return (
       <div className="min-h-screen">
-        <GlobalAdminHeader
-          title="Async Job Queue Monitor"
-          description="Monitor background job processing queues and progress"
-          badge="Admin"
-        />
+        <PageHeader icon={ListChecks} title="Job Queue" subtitle="Processing jobs, their stages and progress, and document health." />
         <div className="p-6">
           <Alert className="bg-red-500/10 border-red-500/20">
             <AlertTriangle className="h-4 w-4 text-red-600" />
@@ -1423,11 +1416,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   if (!metrics) {
     return (
       <div className="min-h-screen">
-        <GlobalAdminHeader
-          title="Async Job Queue Monitor"
-          description="Monitor background job processing queues and progress"
-          badge="Admin"
-        />
+        <PageHeader icon={ListChecks} title="Job Queue" subtitle="Processing jobs, their stages and progress, and document health." />
         <div className="p-6">
           <p className="text-muted-foreground">No queue data available</p>
         </div>
@@ -1440,11 +1429,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="PDF Processing Monitor"
-        description="Real-time monitoring of PDF processing jobs, stages, and analytics"
-        badge="Admin"
-      />
+      <PageHeader icon={ListChecks} title="Job Queue" subtitle="Processing jobs, their stages and progress, and document health." />
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Info Banner when coming from data-import */}

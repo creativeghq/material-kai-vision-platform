@@ -1,13 +1,5 @@
 {
   "pages": [
-    "src/components/Admin/AgentConfigs/index.tsx",
-    "src/components/Admin/AsyncJobQueueMonitor/index.tsx",
-    "src/components/Admin/DataHealthPage.tsx",
-    "src/components/Admin/DataImportHub.tsx",
-    "src/components/Admin/FlowsManagement/index.ts",
-    "src/components/Admin/KnowledgeBase/index.ts",
-    "src/components/Admin/LogViewer.tsx",
-    "src/components/Admin/MaterialsData/index.ts",
     "src/components/business/billing/CreditPackagesPage.tsx",
     "src/components/business/billing/SubscriptionPlansPage.tsx",
     "src/components/business/mention-monitoring/MentionMonitoringDashboard.tsx",
@@ -30,7 +22,6 @@
     "src/modules/quotes/pages/TimelineStepsManagementPage.tsx",
     "src/modules/quotes/pages/UpsellsManagementPage.tsx",
     "src/pages/Admin/FinancePage.tsx",
-    "src/pages/Admin/MasterCatalogPage.tsx",
     "src/pages/Admin/OrderDetailPage.tsx",
     "src/pages/AgentHub.tsx",
     "src/pages/MaterialComparePage.tsx",
@@ -40,7 +31,6 @@
     "src/pages/TripExpensesPage.tsx"
   ],
   "records": [
-    "src/components/Admin/Secrets/ModuleSettingsPage.tsx",
     "src/components/business/moodboard/MoodBoardDetailPage.tsx",
     "src/modules/crm/pages/CompanyDetailPage.tsx",
     "src/modules/crm/pages/ContactDetailPage.tsx",

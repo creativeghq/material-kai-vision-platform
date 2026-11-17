@@ -8,6 +8,7 @@ import {
   Loader2,
   Trash2,
   RefreshCw,
+  KeyRound,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -54,7 +55,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { statusTone } from '@/utils/statusTone';
 
-import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 import { getErrorMessage } from '@/core/errors/utils';
@@ -278,14 +279,7 @@ export const ApiGatewayAdmin: React.FC<ApiGatewayAdminProps> = ({ embedded = fal
   return (
     <div className={embedded ? '' : 'min-h-screen'}>
       {!embedded && (
-        <GlobalAdminHeader
-          title="API Gateway Management"
-          description="Manage API keys and monitor API usage"
-          breadcrumbs={[
-            { label: 'Admin', path: '/admin' },
-            { label: 'API Gateway' },
-          ]}
-        />
+        <PageHeader icon={KeyRound} title="API Gateway" subtitle="API keys and API usage." />
       )}
 
       <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>

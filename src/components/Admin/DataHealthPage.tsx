@@ -8,7 +8,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
+import { Badge } from '@/components/core/ui/badge';
 import { TaricReferencePanel } from './TaricReferencePanel';
 import { TaricRulesPanel } from './TaricRulesPanel';
 import { formatDate } from '@/utils/datetime';
@@ -192,11 +193,7 @@ export default function DataHealthPage() {
 
   return (
     <>
-      <GlobalAdminHeader
-        title="Data Health"
-        description="Continuous integrity checks across the platform — drift the database can't prevent on its own."
-        badge={openCritical > 0 ? `${openCritical} critical` : undefined}
-      />
+      <PageHeader icon={ShieldCheck} title="Data Health" subtitle="Continuous integrity checks across the platform — drift the database can't prevent on its own." actions={openCritical > 0 ? <Badge variant="error">{openCritical} critical</Badge> : undefined} />
       <div className="p-4 sm:p-6 space-y-4">
         {/* Summary + run controls */}
         <Card className="dashboard-card">

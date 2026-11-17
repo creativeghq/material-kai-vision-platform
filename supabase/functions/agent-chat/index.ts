@@ -1897,6 +1897,11 @@ async function executeAgent(
   // if the user's request needs them. Exposed via a meta-tool registered alongside
   // the regular tools.
   for (const m of BOUND_META_TOOLS) toolkitToolIds.add(m);
+  // An Agent Ops turn is about the platform: catalog search cost 30–45s per review turn.
+  const chosenToolkits = (selectedToolkits || []).filter((id) => !TOOLKIT_CLUSTERS[id]?.alwaysOn);
+  if (chosenToolkits.length === 1 && chosenToolkits[0] === 'ops-desk') {
+    for (const t of TOOLKIT_CLUSTERS['core']?.tool_ids ?? []) if (t !== 'find_records') toolkitToolIds.delete(t);
+  }
 
   // Curated specialists bind their WHOLE toolkit by default — the point of a
   // specialist is that its focused kit is ready without a load_toolkit hop. The

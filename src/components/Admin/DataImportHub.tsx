@@ -19,7 +19,7 @@ import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import XMLImportTab from './DataImport/XMLImportTab';
 import ImportHistoryTab from './DataImport/ImportHistoryTab';
 import MaterialCategoriesTab from './DataImport/MaterialCategoriesTab';
-import { GlobalAdminHeader } from './GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -73,11 +73,7 @@ const DataImportHub: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Data Import Hub"
-        description="Import products from XML files or manual entry"
-        badge="Admin"
-      />
+      <PageHeader icon={Upload} title="Data Import" subtitle="Import products from PDF catalogues, XML feeds, CSV files or manual entry." />
 
       {/* Main Content */}
       <div className="p-3 sm:p-6 space-y-6">

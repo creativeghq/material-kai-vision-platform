@@ -7,12 +7,13 @@ import {
   BarChart3,
   Brain,
   ExternalLink,
+  BookOpen,
 } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
 
 import { DocumentList } from './DocumentList';
@@ -111,14 +112,7 @@ export const KnowledgeBaseManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Knowledge Base & Documentation"
-        description="Manage documentation with AI embeddings, semantic search, and product attachments"
-        breadcrumbs={[
-          { label: 'Admin', path: '/admin' },
-          { label: 'Knowledge Base' },
-        ]}
-      />
+      <PageHeader icon={BookOpen} title="Knowledge Base" subtitle="Documentation with AI embeddings, semantic search and product attachments." />
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}

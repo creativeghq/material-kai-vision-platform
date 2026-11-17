@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/c
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { SectionHeader } from '@/components/shared/SectionHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
@@ -101,8 +101,8 @@ export default function MasterCatalogPage() {
   }, [gate]);
 
   return (
-    <div className="p-6 space-y-4">
-      <SectionHeader
+    <div>
+      <PageHeader
         icon={Boxes}
         title="Master Catalog"
         subtitle="Manufacturer-published product data outranks our catalog extraction. A published price is an offer to the operator, never a change to anyone's negotiated cost."
@@ -112,6 +112,7 @@ export default function MasterCatalogPage() {
           </Button>
         }
       />
+      <div className="p-3 sm:p-6 space-y-4">
 
       {loading ? (
         <div className="flex items-center gap-2 justify-center py-16 text-muted-foreground">
@@ -254,6 +255,7 @@ export default function MasterCatalogPage() {
 
       <PublishDialog row={editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); void load(); }} />
       <HistoryDialog data={history} onClose={() => setHistory(null)} />
+    </div>
     </div>
   );
 }

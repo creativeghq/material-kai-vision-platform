@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
-import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { AdminStatCard } from '../AdminStatCard';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
@@ -132,15 +132,7 @@ export const MaterialsDataPage: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader
-        title="Materials Data"
-        description="Products, chunks, images and embeddings from every ingestion source, and the AI review of them"
-        badge="All Sources"
-        breadcrumbs={[
-          { label: 'Admin', path: '/admin' },
-          { label: 'Materials Data' },
-        ]}
-      />
+      <PageHeader icon={Package} title="Materials Data" subtitle="Products, chunks, images and embeddings from every ingestion source, and the AI review of them." />
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}

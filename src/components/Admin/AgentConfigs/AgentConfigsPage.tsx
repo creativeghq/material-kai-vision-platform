@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { formatDate as formatDateValue } from '@/utils/datetime';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bot, Plus, History, FileText, Trash2, AlertTriangle, DollarSign, ListChecks, Boxes, RefreshCw, MessageSquare } from 'lucide-react';
-import { GlobalAdminHeader } from '../GlobalAdminHeader';
+import { Bot, Plus, History, FileText, Trash2, AlertTriangle, DollarSign, ListChecks, Boxes, RefreshCw, MessageSquare, Brain } from 'lucide-react';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
@@ -238,13 +238,11 @@ export const AgentConfigsPage: React.FC = () => {
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen p-6 bg-background">
-        <GlobalAdminHeader
-          title="AI Configurations"
-          description="Manage AI prompts, chat starters, writing rules, model pricing and background agents. Prompt changes are tracked and versioned."
-        />
+      <div className="min-h-screen bg-background">
+        <PageHeader icon={Brain} title="AI Configurations" subtitle="Prompts, chat starters, writing rules, model pricing and background agents. Prompt changes are tracked and versioned." />
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="mt-6">
+        <div className="p-3 sm:p-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange}>
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-6">
             <TabsTrigger value="prompts" className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
@@ -536,6 +534,7 @@ export const AgentConfigsPage: React.FC = () => {
             <BackgroundAgentsPage />
           </TabsContent>
         </Tabs>
+        </div>
       </div>
     </TooltipProvider>
   );

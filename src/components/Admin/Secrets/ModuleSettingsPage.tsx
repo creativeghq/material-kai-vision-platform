@@ -1,7 +1,9 @@
 import React, { Suspense, useState } from 'react';
-import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, KeyRound, Settings as SettingsIcon, Loader2, ExternalLink, Package } from 'lucide-react';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { KeyRound, Settings as SettingsIcon, Loader2, ExternalLink } from 'lucide-react';
+import { HubRecordPage } from '@/components/core/hub/HubRecordPage';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import {
   Tabs,
@@ -24,7 +26,6 @@ import { registeredModules } from '@/modules/_core';
  */
 const ModuleSettingsPage: React.FC = () => {
   const { slug: paramSlug } = useParams<{ slug: string }>();
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const slug = paramSlug ?? '';
@@ -52,38 +53,50 @@ const ModuleSettingsPage: React.FC = () => {
     setSearchParams(params, { replace: true });
   };
 
-  return (
-    <div>
-      <PageHeader
-        icon={SettingsIcon}
-        title={`${mod?.manifest.name ?? slug} — Settings`}
-        subtitle={
-          panels.length > 0
-            ? 'API credentials and feature-level configuration for this module.'
-            : 'API keys and credentials for this module. Environment variables take priority over values stored here.'
-        }
-        actions={
+  const facts = (
+    <Card>
+      <CardHeader className="pb-2"><CardTitle className="text-sm">Module</CardTitle></CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {mod ? (
           <>
-            <Button asChild variant="ghost" size="sm" className="gap-2">
-              <Link to="/admin/modules">
-                <Package className="h-4 w-4" /> All Modules
-              </Link>
-            </Button>
-            {dedicatedPagePath && (
-              <Button asChild variant="outline" size="sm" className="gap-2">
-                <Link to={dedicatedPagePath}>
-                  Full {mod?.manifest.name} page
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </Button>
-            )}
-            <Button variant="ghost" size="sm" className="gap-2" onClick={() => navigate(-1)}>
-              <ArrowLeft className="h-4 w-4" /> Back
-            </Button>
+            <p className="text-muted-foreground">{mod.manifest.description}</p>
+            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-xs">
+              <dt className="text-muted-foreground">Slug</dt><dd className="font-mono">{mod.manifest.slug}</dd>
+              <dt className="text-muted-foreground">Category</dt><dd className="capitalize">{mod.manifest.category}</dd>
+              <dt className="text-muted-foreground">Tier</dt><dd><Badge variant="neutral" className="capitalize">{mod.manifest.priceTier}</Badge></dd>
+              <dt className="text-muted-foreground">Version</dt><dd className="tabular-nums">{mod.manifest.version}</dd>
+              {mod.manifest.parent && (<><dt className="text-muted-foreground">Extends</dt><dd className="font-mono">{mod.manifest.parent}</dd></>)}
+              <dt className="text-muted-foreground">Settings</dt><dd>{panels.length + 1} {panels.length ? 'tabs' : 'tab'}</dd>
+            </dl>
           </>
-        }
-      />
-      <div className="px-3 sm:px-6 py-4 sm:py-8 space-y-4">
+        ) : (
+          <p className="text-muted-foreground">No module is registered under <span className="font-mono">{slug}</span>.</p>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <HubRecordPage
+      icon={SettingsIcon}
+      title={`${mod?.manifest.name ?? slug} — Settings`}
+      subtitle={
+        panels.length > 0
+          ? 'API credentials and feature-level configuration for this module.'
+          : 'API keys and credentials for this module. Environment variables take priority over values stored here.'
+      }
+      breadcrumbs={[{ label: 'Modules & Plans', to: '/admin/modules' }, { label: mod?.manifest.name ?? slug }]}
+      actions={dedicatedPagePath && (
+        <Button asChild variant="outline" size="sm" className="gap-2">
+          <Link to={dedicatedPagePath}>
+            Full {mod?.manifest.name} page
+            <ExternalLink className="h-3 w-3" />
+          </Link>
+        </Button>
+      )}
+      left={facts}
+    >
+      <div className="space-y-4">
         {panels.length === 0 ? (
           // Backwards-compat path: modules that haven't declared panels render
           // the original single-card layout untouched.
@@ -148,7 +161,7 @@ const ModuleSettingsPage: React.FC = () => {
           </Tabs>
         )}
       </div>
-    </div>
+    </HubRecordPage>
   );
 };
 

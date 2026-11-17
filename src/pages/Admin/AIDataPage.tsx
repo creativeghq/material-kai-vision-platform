@@ -7,7 +7,7 @@ import React, { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Database, Link2, Copy, Tags } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { MetadataManagement } from '@/components/Admin/MetadataManagement';
 import { FieldRoleAudit } from '@/components/Admin/FieldRoleAudit';
 import { RelevancyManagement } from '@/components/Admin/RelevancyManagement';
@@ -51,11 +51,7 @@ const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false, tabParam }) =
   return (
     <div className={embedded ? '' : 'min-h-screen'}>
       {!embedded && (
-        <GlobalAdminHeader
-          title="AI Data"
-          description="Pipeline output review — metadata, entity relationships, and duplicates"
-          badge="Admin"
-        />
+        <PageHeader icon={Database} title="AI Data" subtitle="Pipeline output review — metadata, entity relationships and duplicates." />
       )}
 
       <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>

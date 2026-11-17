@@ -76,7 +76,7 @@ export function routedPages(): RoutedPage[] {
 function renders(file: string, re: RegExp): boolean {
   const src = read(file);
   if (re.test(src)) return true;
-  for (const m of src.matchAll(/import\s+[^'"]*?from\s+['"]([^'"]+)['"]/g)) {
+  for (const m of src.matchAll(/(?:import|export)\s+[^'"]*?from\s+['"]([^'"]+)['"]/g)) {
     if (m[1].startsWith('@/components/core/ui')) continue;
     const dep = resolveSpec(file, m[1]);
     if (dep && dep.endsWith('.tsx') && re.test(read(dep))) return true;
