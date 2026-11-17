@@ -159,15 +159,22 @@ Deno.serve(withApiLogging('quote-buy-prices', async (req) => {
     const candidates = candidatesByLine.get(l.line_id) ?? [];
     const verdict = verdicts.get(l.line_id);
     // The model may only CHOOSE among this line's own rows; anything else is a non-answer.
-    const chosen = verdict?.row_id != null ? candidates.find((c) => c.row_id === verdict.row_id) ?? null : null;
+    const picked = verdict?.row_id != null ? candidates.find((c) => c.row_id === verdict.row_id) ?? null : null;
+    const unitClash = !!(picked && l.unit && picked.unit && l.unit.toLowerCase() !== picked.unit.toLowerCase());
+    const chosen = unitClash ? null : picked;
+    const unsure = !!chosen && (
+      (chosen.warnings ?? []).some((w) => w.startsWith('unit not confirmed'))
+      || (chosen.row_grade != null && chosen.row_grade !== 'standard'));
     const status = candidates.length === 0 ? 'not_in_price_lists' : chosen ? 'matched' : 'no_match';
     return {
       line_id: l.line_id,
       name: l.name,
       unit: l.unit,
       status,
-      confidence: chosen ? verdict!.confidence : null,
-      reason: verdict?.reason ?? (candidates.length === 0 ? 'No row in your price lists mentions this product.' : null),
+      confidence: chosen ? (unsure ? 'low' : verdict!.confidence) : null,
+      reason: unitClash
+        ? `The best row is priced per ${picked!.unit}, this line per ${l.unit}; not offered as a match.`
+        : verdict?.reason ?? (candidates.length === 0 ? 'No row in your price lists mentions this product.' : null),
       candidates_checked: candidates.length,
       match: chosen && {
         row_id: chosen.row_id,
