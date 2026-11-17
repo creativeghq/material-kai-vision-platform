@@ -103,8 +103,10 @@ describe('Gmail rules run through Flows, and personal mail never reaches a works
   const engine = stripComments(readFileSync(join(process.cwd(), 'supabase/functions/flow-engine/index.ts'), 'utf8'));
   it('emits mail.received only for shared mailboxes, stamped with their workspace', () => {
     const sync = sched.slice(sched.indexOf('async function syncHistory'), sched.indexOf('async function stampSync'));
-    expect(sync).toContain(".eq('is_shared', true)");
-    expect(sync).toContain("emitFlowEvent('mail.received'");
+    const gate = sync.indexOf('if (!account.is_shared) continue;');
+    expect(gate).toBeGreaterThan(-1);
+    expect(gate).toBeLessThan(sync.indexOf("emitFlowEvent('mail.received'"));
+    expect(sync).toContain('is_shared.eq.true');
     expect(sync).toContain('workspace_id: account.workspace_id');
   });
 

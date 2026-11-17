@@ -181,7 +181,7 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
 const SYNC_ACCOUNTS = 20;
 const SYNC_MESSAGES = 25;
 
-/** New mail in SHARED mailboxes becomes `mail.received`. A personal mailbox is read only for messages its owner's lead capture rules match. */
+/** SHARED mailboxes emit `mail.received`; a personal one is read only for lead capture rule matches. */
 async function syncHistory(db: Db): Promise<{ accounts: number; events: number; leads: number; failed: number }> {
   const emailRules = await loadLeadCaptureRules(db, { channel: 'email' });
   const ruleAccountIds = [...new Set(emailRules.map((r) => r.mail_account_id).filter((v): v is string => !!v))];

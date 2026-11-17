@@ -1,8 +1,8 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { emitFlowEvent } from '../flow-events.ts';
 import type { CapturedLeadFields, LeadCaptureRule } from './leadCapture.ts';
 
-// deno-lint-ignore no-explicit-any
-type Db = any;
+type Db = SupabaseClient;
 
 const RULE_COLUMNS = 'id, workspace_id, label, channel, match_field, match_mode, pattern, mail_account_id';
 
