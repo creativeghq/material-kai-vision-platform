@@ -568,7 +568,7 @@ so the second to write deletes what the first just saved from a copy taken befor
 never returns another size, a non-standard grade only when the query asks for it, and an unconfirmed unit is a warning,
 never assumed per m2. Never match a price to a product on item text alone, and never read `selection` as a grade (it is a
 collection name). A new loader inserts rows and nothing else; `lint_price_row_facts()` (service_role) must return all
-zeros after a load. Unit is NEVER guessed: a row with no printed or section unit stays `unconfirmed`.
+zeros after a load. Unit is NEVER guessed: a row with no printed or section unit stays `unconfirmed`. An INSERT with no unit is REFUSED (`23514`) unless the loader sets `attrs.unit_unconfirmed=true` — it must say it is loading without one. `products.size_keys` is derived by trigger from `available_sizes` + `dimensions[].metric_cm` in the same cm form as `kb_price_rows.size_keys`; never write it. Enrichment never deletes `available_sizes` (it is the size axis); probe `catalog.size_axis_dropped`.
 
 ## The unit of sale belongs to the PIECE, never to the category or the series (#580)
 A series sells field tiles per m² and its skirting, steps and mosaics per piece or metre. The unit of a line is
