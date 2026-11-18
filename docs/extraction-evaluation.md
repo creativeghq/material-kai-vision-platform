@@ -98,17 +98,27 @@ The judge renders pages itself because `document_page_embeddings` renders were n
 (`ops.page_embeddings_never_written`). It never fails the job: a judge failure is recorded on
 the stage result as `field_judgements.status`.
 
-## 4. Two probes that need no cases
+## 4. A probe that needs no cases
 
 - **`extraction.confidence_uninformative`** — an `ai_usage_logs.operation_type` whose
   `confidence_score` took at most 3 distinct values across 50+ rows in 30 days. Fired on first
   run for four operation types: the health check logs one constant, the embedding paths one of
   two. A threshold on such a series is a switch, not a gate. Count distinct values before
   thresholding on a confidence.
-- **`extraction.field_registry_too_wide`** — a category whose extraction schema (its fields plus
-  the globals) exceeds 150 properties. Provider tool schemas are refused by property COUNT, not
-  size, and `$ref` reuse does not help (measured elsewhere: 200 pass, 250 fail). Highest today:
-  tiles at 137.
+
+Registry width does NOT bound extraction: the output schema is a fixed shape (52 properties) and
+registry fields travel as `discovered` rows plus prompt text, so a category can hold any number of
+fields. `extraction.field_registry_too_wide` assumed one property per field and was retired on
+2026-11-18; `test_the_extraction_schema_does_not_grow_with_the_registry` pins the fixed shape.
+
+## 5. A new field is vetted before it exists
+
+`_register_and_classify_fields` sends every new name, with the category's existing fields, to one
+`classification / field_role` call BEFORE inserting. The verdict says whether it is a twin of an
+existing field (it becomes that field's alias via `add_metadata_field_alias`, never a new row), its
+section (a registered one — `material_metadata_fields.section` is NOT NULL with a foreign key to
+`material_field_sections`), whether it is internal bookkeeping, and its role. A dropdown value that
+names several options ("Non-rectified and Rectified") is stored as the list of those options.
 
 ## What was deliberately not taken from the source
 
