@@ -21,7 +21,6 @@ import {
   HubCellEmpty, HubCellLink, HubEmptyState, HubSortButton, useHubTable, type HubTableField,
 } from '@/components/core/hub';
 import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -64,8 +63,7 @@ function toggle<T>(set: Set<T>, value: T): Set<T> {
   return next;
 }
 
-/** Platform accounts — the global account tier, never a per-workspace team role (that is Profile → Team). */
-const UsersPage: React.FC = () => {
+export const PlatformAccountsPanel: React.FC = () => {
   const { toast } = useToast();
   const { activeWorkspaceId } = useWorkspace();
 
@@ -91,7 +89,6 @@ const UsersPage: React.FC = () => {
       setUsers(response.data || []);
       setUnreadable(false);
     } catch (error: any) {
-      // A refusal is a permission state, not "0 users" — the tiles are withheld rather than reading as a fact.
       if (error?.status === 401 || error?.status === 403) {
         setUsers([]);
         setUnreadable(true);
@@ -119,7 +116,6 @@ const UsersPage: React.FC = () => {
   const subscriptionOptions: Option[] = useMemo(() =>
     [...new Set(users.map((u) => u.subscription_tier).filter(Boolean))].sort().map((s) => ({ value: s as string, label: s as string })),
     [users]);
-  // A workspace's own categories hold contacts and companies only — never platform users.
   const categoryOptions: Option[] = useMemo(
     () => categories
       .filter((c) => c.is_active && !c.workspace_id && isHandAssignableKind(c.kind))
@@ -226,14 +222,7 @@ const UsersPage: React.FC = () => {
 
   return (
     <div>
-      <PageHeader
-        icon={Users}
-        title="Users"
-        subtitle="Platform accounts: account tier, subscription, credits and status. Team roles are per workspace and live in Profile → Team."
-        actions={<Button size="sm" onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add user</Button>}
-      />
-
-      <div className="space-y-4 p-3 sm:p-6">
+      <div className="space-y-4">
         {!unreadable && (
           <HubStatGrid>
             <HubStatTile label="Total Users" value={loading ? '—' : stats.total} category="Registered accounts" />
@@ -243,9 +232,12 @@ const UsersPage: React.FC = () => {
         )}
 
         <Card>
-          <CardHeader>
-            <CardTitle>Accounts</CardTitle>
-            <CardDescription>Set the global account tier inline; open an account for its full record.</CardDescription>
+          <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3 space-y-0">
+            <div className="space-y-1.5">
+              <CardTitle>Platform Accounts</CardTitle>
+              <CardDescription>Every account on the platform and the business it runs. Set the account tier inline; open an account for its full record.</CardDescription>
+            </div>
+            <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4 mr-2" /> Add user</Button>
           </CardHeader>
           <CardContent className="space-y-3">
             <FilterBar
@@ -304,7 +296,7 @@ const UsersPage: React.FC = () => {
                         <Checkbox checked={selected.has(user.user_id)} onCheckedChange={() => setSelected((s) => toggle(s, user.user_id))} aria-label="Select row" />
                       </TableCell>
                       <TableCell className="max-w-[20rem] font-medium">
-                        <HubCellLink to={`/admin/users/${user.user_id}`} className="inline-flex max-w-full items-center gap-2">
+                        <HubCellLink to={`/crm/users/${user.user_id}`} className="inline-flex max-w-full items-center gap-2">
                           <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <span className="block min-w-0 max-w-[16rem] truncate" title={user.email}>{user.email}</span>
                         </HubCellLink>
@@ -368,4 +360,4 @@ const UsersPage: React.FC = () => {
   );
 };
 
-export default UsersPage;
+export default PlatformAccountsPanel;

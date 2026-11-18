@@ -16,7 +16,7 @@ export const ROUTE_LIST = [
   '/supplier-portal',
   // Admin (operator-only)
   '/admin', '/admin/agents', '/admin/system-health', '/admin/search', '/admin/billing',
-  '/admin/platform', '/admin/users', '/admin/approvals', '/admin/ingestion-quality', '/push-notifications',
+  '/admin/platform', '/admin/approvals', '/admin/ingestion-quality', '/push-notifications',
   '/admin/operations', '/admin/modules', '/admin/background-agents',
   '/admin/data-health', '/admin/knowledge-base', '/admin/materials-data',
   '/flows', '/admin/data-import', '/admin/agent-ops', '/admin/ai-configs',

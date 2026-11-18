@@ -15,7 +15,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Upload,
-  Users,
   Wallet,
   Workflow,
 } from 'lucide-react';
@@ -71,7 +70,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { id: 'system-health', label: 'System Health', path: '/admin/system-health', icon: HeartPulse, description: 'Services, providers, capabilities and storage.', count: (a) => a.providers.failing },
       { id: 'search', label: 'Search Analytics', path: '/admin/search', icon: Search, description: 'Query volume, latency, cache and zero results.' },
       { id: 'billing', label: 'Services & Billing', path: '/admin/billing', icon: Wallet, description: 'Channel costs, third-party services and email delivery.' },
-      { id: 'users', label: 'Users', path: '/admin/users', icon: Users, description: 'Platform accounts, roles, subscriptions and credits.' },
       { id: 'platform', label: 'Platform Overview', path: '/admin/platform', icon: Globe, description: 'Workspaces, users, quotes, AI spend and growth.' },
       { id: 'approvals', label: 'Approvals', path: '/admin/approvals', icon: ClipboardCheck, description: 'Brands, access, resellers, marketplace, claims and freight.', count: approvalsTotal },
     ],

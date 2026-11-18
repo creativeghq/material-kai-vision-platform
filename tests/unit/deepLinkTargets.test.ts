@@ -117,7 +117,7 @@ describe('the route table itself', () => {
    * into that prefix was bounced off a customer record they can open one URL over, and nothing
    * anywhere reported it: the route resolved, the guard did its job, the page simply refused.
    */
-  it('links CRM at /crm and platform accounts at /admin/users — /admin/crm is retired', () => {
+  it('links CRM at /crm — /admin/crm is retired', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles) {
       blankedSource(file).split('\n').forEach((line, i) => {
@@ -127,7 +127,7 @@ describe('the route table itself', () => {
     expect(
       offenders,
       'CRM record pages live at /crm/... (capability crm.view); a platform account is ' +
-      '/admin/users/:id. The /admin/crm prefix no longer exists, so a link there 404s.\n' + offenders.join('\n'),
+      '/crm/users/:id. The /admin/crm prefix no longer exists, so a link there 404s.\n' + offenders.join('\n'),
     ).toEqual([]);
   });
 

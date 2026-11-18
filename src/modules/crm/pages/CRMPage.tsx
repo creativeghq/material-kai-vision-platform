@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Navigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
 import { Users, Building2, Trash2, Tags, Plus, Kanban, UserPlus } from 'lucide-react';
 
@@ -31,6 +31,8 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PipelineBoard } from '@/components/business/crm/PipelineBoard';
 import { LeadsPanel } from '../components/LeadsPanel';
+import { TeamPanel } from '@/components/core/Team/TeamPanel';
+import { PlatformAccountsPanel } from './CrmUsersTab';
 import {
   LIFECYCLE_STAGE_OPTIONS, STATUS_OPTIONS, professionalTypeLabel, type Option,
 } from '../crmConstants';
@@ -39,7 +41,7 @@ import { HubCellEmpty, HubCellLink, HubEmptyState } from '@/components/core/hub'
 // Pipeline renders FIRST, but contacts is the landing tab: bare `/crm` is the main nav target,
 // and defaulting to a module-gated tab would show an upsell as the front door of a free module.
 const TAB_VALUES = [
-  CRM_TAB.pipeline, CRM_TAB.leads, CRM_TAB.contacts, CRM_TAB.companies, CRM_TAB.categories,
+  CRM_TAB.pipeline, CRM_TAB.leads, CRM_TAB.users, CRM_TAB.contacts, CRM_TAB.companies, CRM_TAB.categories,
 ] as const;
 type TabValue = typeof TAB_VALUES[number];
 
@@ -97,7 +99,7 @@ function intersectIds(...sets: Array<Set<string> | null>): string[] | undefined 
 export const CRMManagement: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
+  const { activeWorkspaceId, activeWorkspace, workspaceRole, isPlatformOperator } = useWorkspace();
   const defaultTab: TabValue = CRM_TAB.contacts;
   // Reps and above create/move cards; a `client` is read-only. RLS on crm_deals is the real
   // boundary (admin OR the deal's owner) — this only decides whether to offer the controls,
@@ -116,8 +118,6 @@ export const CRMManagement: React.FC = () => {
     const t = searchParams.get('tab');
     return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : defaultTab;
   })();
-  // Platform accounts moved to Admin → Users; an old `?tab=users` link still lands there.
-  const legacyUsersTab = searchParams.get('tab') === 'users';
   const handleTabChange = (val: string) => {
     const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : defaultTab;
     setContactsPage(1); setCompaniesPage(1);
@@ -484,10 +484,6 @@ export const CRMManagement: React.FC = () => {
   const onContactFilters = (v: FilterValues) => { setContactsPage(1); setContactValues(v); };
   const onCompanyFilters = (v: FilterValues) => { setCompaniesPage(1); setCompanyValues(v); };
 
-  if (legacyUsersTab) {
-    return <Navigate to={isPlatformOperator ? '/admin/users' : '/crm'} replace />;
-  }
-
   return (
     <div className="min-h-screen">
       <GlobalAdminHeader title="CRM Management" description="Manage customer contacts, companies and deals" badge="Admin" />
@@ -512,6 +508,7 @@ export const CRMManagement: React.FC = () => {
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="pipeline"><Kanban className="h-4 w-4 mr-2" />Pipeline</TabsTrigger>
             <TabsTrigger value="leads"><UserPlus className="h-4 w-4 mr-2" />Leads</TabsTrigger>
+            <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>
             <TabsTrigger value="contacts"><Building2 className="h-4 w-4 mr-2" />Contacts</TabsTrigger>
             <TabsTrigger value="companies"><Building2 className="h-4 w-4 mr-2" />Companies</TabsTrigger>
             <TabsTrigger value="categories"><Tags className="h-4 w-4 mr-2" />Categories</TabsTrigger>
@@ -539,6 +536,11 @@ export const CRMManagement: React.FC = () => {
           </TabsContent>
 
           {/* Contacts Tab */}
+          <TabsContent value="users" className="space-y-6 mt-6">
+            {activeWorkspaceId && <TeamPanel workspaceId={activeWorkspaceId} workspaceName={activeWorkspace?.name} />}
+            {isPlatformOperator && <PlatformAccountsPanel />}
+          </TabsContent>
+
           <TabsContent value="contacts" className="space-y-4 mt-6">
             <Card>
               <CardHeader>

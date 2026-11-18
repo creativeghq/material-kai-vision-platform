@@ -119,7 +119,6 @@ const PlatformOverviewPage = lazy(() => import('./components/Admin/HQ/SimpleHqPa
 const IngestionQualityPage = lazy(() => import('./components/Admin/HQ/SimpleHqPages').then(m => ({ default: m.IngestionQualityPage })));
 const PushNotificationsPage = lazy(() => import('./pages/Operator/PushNotificationsPage'));
 const AgentOpsPage = lazy(() => import('./components/Admin/HQ/AgentOpsPage'));
-const UsersPage = lazy(() => import('./components/Admin/HQ/UsersPage'));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
@@ -727,18 +726,6 @@ const App = () => (
                       <AdminGuard>
                         <AdminLayout>
                           <ServicesBillingPage />
-                        </AdminLayout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/users"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <AdminLayout>
-                          <UsersPage />
                         </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
