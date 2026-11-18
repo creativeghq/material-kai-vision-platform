@@ -5,7 +5,6 @@ import {
   ClipboardCheck,
   Database,
   FileSearch,
-  FileText,
   Globe,
   HeartPulse,
   LayoutDashboard,
@@ -64,7 +63,6 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { id: 'materials', label: 'Materials Data', path: '/admin/materials-data', icon: Package, description: 'Products, chunks, images, categories and the AI review.' },
       { id: 'kb', label: 'Knowledge Base', path: '/admin/knowledge-base', icon: BookOpen, description: 'Knowledge base articles, categories, search and product links.' },
       { id: 'data-health', label: 'Data Health', path: '/admin/data-health', icon: ShieldCheck, description: 'Integrity findings and the nightly sweep.', count: (a) => a.integrity.critical + a.integrity.warning },
-      { id: 'logs', label: 'Application Logs', path: '/admin/logs', icon: FileText, description: 'System and API logs.' },
     ],
   },
   {

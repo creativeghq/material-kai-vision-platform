@@ -105,7 +105,6 @@ const CreditPackagesPage = lazy(() => import('./components/business/billing/Cred
 const AgentHarnessDashboard = lazy(() => import('./components/Admin/AgentHarness/AgentHarnessDashboard'));
 const KnowledgeBaseManagement = lazy(() => import('./components/Admin/KnowledgeBase').then(m => ({ default: m.KnowledgeBaseManagement })));
 const MaterialsDataPage = lazy(() => import('./components/Admin/MaterialsData').then(m => ({ default: m.MaterialsDataPage })));
-const LogViewer = lazy(() => import('./components/Admin/LogViewer').then(m => ({ default: m.LogViewer })));
 const DataHealthPage = lazy(() => import('./components/Admin/DataHealthPage'));
 const AgentConfigsPage = lazy(() => import('./components/Admin/AgentConfigs').then(m => ({ default: m.AgentConfigsPage })));
 // ApiGatewayAdmin, ModelDebuggingPanel, AIDataPage, BackgroundAgentsPage moved into
@@ -838,18 +837,6 @@ const App = () => (
                       <AdminGuard>
                         <AdminLayout>
                           <AgentConfigsPage />
-                        </AdminLayout>
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/logs"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <AdminLayout>
-                          <LogViewer />
                         </AdminLayout>
                       </AdminGuard>
                     </AuthGuard>
