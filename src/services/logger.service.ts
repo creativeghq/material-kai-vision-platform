@@ -93,20 +93,6 @@ class LoggerService {
   }
 
   /**
-   * Clear log buffer
-   */
-  clearBuffer(): void {
-    this.logBuffer = [];
-  }
-
-  /**
-   * Clear all logs (alias for clearBuffer)
-   */
-  clearAllLogs(): void {
-    this.clearBuffer();
-  }
-
-  /**
    * Clear logs older than a specific timestamp
    */
   clearOldLogs(timestampMs: number): void {
