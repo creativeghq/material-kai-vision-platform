@@ -20,7 +20,7 @@ interface RunFilters {
   offset?: number;
 }
 
-/** Per-flow activity derived from `flow_runs`, never from the success-only `flows.run_count`. */
+/** Per-flow activity, derived from `flow_runs` — there is no stored run counter. */
 export interface FlowRunStats {
   runs30d: number;
   failed7d: number;

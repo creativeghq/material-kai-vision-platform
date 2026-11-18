@@ -2070,9 +2070,6 @@ async function handleExecuteFlow(
       })
       .eq('id', run.id);
 
-    // Atomic increment — avoids race condition when concurrent runs update run_count
-    await supabase.rpc('increment_flow_run_stats', { p_flow_id: flow_id });
-
     // Return the run with steps
     const { data: steps } = await supabase
       .from('flow_run_steps')

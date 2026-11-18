@@ -1214,7 +1214,6 @@ export interface Flow {
   created_by: string | null;
   updated_by: string | null;
   last_run_at: string | null;
-  run_count: number;
   created_at: string;
   updated_at: string;
 }

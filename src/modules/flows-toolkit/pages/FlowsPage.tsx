@@ -10,8 +10,11 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { statusTone } from '@/utils/statusTone';
 import { PageHeader } from '@/components/shared/PageHeader';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { FlowBuilderTab } from '@/components/Admin/FlowsManagement/FlowBuilderTab';
 import { flowService } from '@/services/flows';
+import type { FlowRunStats } from '@/services/flows/flowService';
+import { usePermissions } from '@/hooks/usePermissions';
 import { PlatformDefaultsSection } from '../components/PlatformDefaultsSection';
 import { AutomationSuggestions } from '../components/AutomationSuggestions';
 
@@ -20,8 +23,6 @@ interface WorkspaceFlow {
   name: string;
   trigger_type: string;
   status: string;
-  run_count: number;
-  last_run_at: string | null;
   created_at: string;
 }
 
@@ -43,6 +44,9 @@ export default function FlowsPage() {
   const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
   const navigate = useNavigate();
+  // Mirrors the server: changing or running an automation needs workspace.manage.
+  const { can } = usePermissions();
+  const canManage = can('workspace.manage');
 
   const [flows, setFlows] = useState<WorkspaceFlow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,6 +55,7 @@ export default function FlowsPage() {
   const [builderFlowId, setBuilderFlowId] = useState<string | null>(null);
   // flow_id → last run { status, error_message } so we can surface WHY a flow failed.
   const [lastRuns, setLastRuns] = useState<Record<string, { status: string; error: string | null }>>({});
+  const [runStats, setRunStats] = useState<Map<string, FlowRunStats>>(new Map());
   // Bumped when the builder closes. A fork edited (or emptied) in there changes what the Platform
   // defaults section should say about it, and that section reads a different RPC than this list.
   const [refreshTick, setRefreshTick] = useState(0);
@@ -60,7 +65,7 @@ export default function FlowsPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('flows')
-      .select('id, name, trigger_type, status, run_count, last_run_at, created_at')
+      .select('id, name, trigger_type, status, created_at')
       .eq('workspace_id', activeWorkspaceId)
       .eq('is_global', false)
       .order('created_at', { ascending: false });
@@ -86,8 +91,10 @@ export default function FlowsPage() {
         if (!map[r.flow_id]) map[r.flow_id] = { status: r.status, error: r.error_message };
       }
       setLastRuns(map);
+      setRunStats(await flowService.getFlowRunStats().catch(() => new Map<string, FlowRunStats>()));
     } else {
       setLastRuns({});
+      setRunStats(new Map());
     }
     setLoading(false);
   }, [activeWorkspaceId, toast]);
@@ -170,7 +177,7 @@ export default function FlowsPage() {
         icon={Workflow}
         title="Automations"
         subtitle="Run an action automatically when something happens in your workspace"
-        actions={
+        actions={canManage ? (
           <>
             <Button variant="outline" onClick={createViaAgent} className="gap-2">
               <Sparkles className="h-4 w-4" />
@@ -181,7 +188,7 @@ export default function FlowsPage() {
               New automation
             </Button>
           </>
-        }
+        ) : undefined}
       />
 
       <div className="p-3 sm:p-6 space-y-6">
@@ -193,6 +200,11 @@ export default function FlowsPage() {
             <p className="mt-1 text-xs text-muted-foreground">
               Each run costs 20 credits ($0.20) from your workspace pool, plus any per-action cost.
             </p>
+            {!canManage && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Only workspace owners and admins can create or change automations.
+              </p>
+            )}
           </div>
 
         {loading ? (
@@ -200,27 +212,30 @@ export default function FlowsPage() {
             <span className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />
           </div>
         ) : flows.length === 0 ? (
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm py-14 text-center">
-            <Zap className="h-8 w-8 text-muted-foreground/50 mx-auto mb-3" />
-            <p className="font-medium">No automations yet</p>
-            <p className="text-sm text-muted-foreground mt-1 mb-4">
-              Build one in the visual editor, or ask the assistant — e.g. “email the customer when their invoice is paid”.
-            </p>
-            <div className="flex items-center justify-center gap-2">
-              <Button onClick={createNew} className="gap-2">
-                <Plus className="h-4 w-4" />
-                New automation
-              </Button>
-              <Button variant="outline" onClick={createViaAgent} className="gap-2">
-                <Sparkles className="h-4 w-4" />
-                Create with AI
-              </Button>
-            </div>
-          </div>
+          <HubEmptyState
+            icon={Zap}
+            title="No automations yet"
+            description={canManage
+              ? 'Build one in the visual editor, or ask the assistant — e.g. “email the customer when their invoice is paid”.'
+              : 'Ask a workspace owner or admin to set one up.'}
+            action={canManage ? (
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button onClick={createNew} className="gap-2">
+                  <Plus className="h-4 w-4" />
+                  New automation
+                </Button>
+                <Button variant="outline" onClick={createViaAgent} className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  Create with AI
+                </Button>
+              </div>
+            ) : undefined}
+          />
         ) : (
           <div className="space-y-3">
             {flows.map((flow) => {
               const run = lastRuns[flow.id];
+              const runs30d = runStats.get(flow.id)?.runs30d ?? 0;
               const failed = run?.status === 'failed';
               const rawErr = run?.error || '';
               const isEmailNotConfigured = /email_sender_not_configured/i.test(rawErr);
@@ -248,10 +263,10 @@ export default function FlowsPage() {
                           <Clock className="h-3 w-3" />
                           {TRIGGER_LABELS[flow.trigger_type] || flow.trigger_type}
                         </span>
-                        <span>{flow.run_count} runs</span>
+                        <span>{runs30d === 1 ? '1 run' : `${runs30d} runs`} in the last 30 days</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    {canManage && <div className="flex items-center gap-2 shrink-0">
                       <Button size="sm" variant="outline" className="gap-1" onClick={() => setBuilderFlowId(flow.id)}>
                         <Pencil className="h-3.5 w-3.5" />
                         Edit
@@ -262,7 +277,7 @@ export default function FlowsPage() {
                       <Button size="sm" variant="ghost" className="text-destructive" disabled={busy === flow.id} onClick={() => remove(flow)}>
                         <Trash2 className="h-4 w-4" />
                       </Button>
-                    </div>
+                    </div>}
                   </div>
 
                   {failed && errText && (
@@ -293,18 +308,19 @@ export default function FlowsPage() {
         {/* What to automate, argued from what this user actually did — each suggestion carries the
             count it rests on. Sits above the defaults because it is the answer to the question an
             empty automations list leaves you holding. */}
-        <AutomationSuggestions
+        {canManage && <AutomationSuggestions
           onOpenFlow={(id) => setBuilderFlowId(id)}
           onChanged={() => {
             setRefreshTick((t) => t + 1);
             void load();
           }}
-        />
+        />}
 
         {/* Notifications this workspace gets from the platform's own seeded flows. Rendered even
             when the list above is empty — an owner drowning in inbox email arrives here looking
             for the off switch, and "No automations yet" was the whole page before. */}
         <PlatformDefaultsSection
+          canEdit={canManage}
           onOpenFlow={(id) => setBuilderFlowId(id)}
           refreshTick={refreshTick}
         />

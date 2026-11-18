@@ -9540,7 +9540,6 @@ export type Database = {
           is_locked: boolean
           last_run_at: string | null
           name: string
-          run_count: number
           status: Database["public"]["Enums"]["automation_flow_status"]
           tags: string[] | null
           trigger_config: Json
@@ -9560,7 +9559,6 @@ export type Database = {
           is_locked?: boolean
           last_run_at?: string | null
           name: string
-          run_count?: number
           status?: Database["public"]["Enums"]["automation_flow_status"]
           tags?: string[] | null
           trigger_config?: Json
@@ -9580,7 +9578,6 @@ export type Database = {
           is_locked?: boolean
           last_run_at?: string | null
           name?: string
-          run_count?: number
           status?: Database["public"]["Enums"]["automation_flow_status"]
           tags?: string[] | null
           trigger_config?: Json
@@ -38424,10 +38421,6 @@ export type Database = {
       }
       increment_client_view_count: {
         Args: { p_view_id: string }
-        Returns: undefined
-      }
-      increment_flow_run_stats: {
-        Args: { p_flow_id: string }
         Returns: undefined
       }
       increment_job_cost: {

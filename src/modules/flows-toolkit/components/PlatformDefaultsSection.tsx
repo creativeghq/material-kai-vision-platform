@@ -29,6 +29,8 @@ interface FlowDefault {
 }
 
 interface Props {
+  /** Holds workspace.manage. The RPCs refuse anyone else; this only decides what is offered. */
+  canEdit: boolean;
   /** Open the visual builder on a flow id — the page owns that view. */
   onOpenFlow: (flowId: string) => void;
   /** Bumped by the page when the builder closes, so a fork edited in it re-reads its state. */
@@ -47,8 +49,8 @@ const CHANNELS: Record<string, { label: string; icon: typeof Bell }> = {
   send_whatsapp: { label: 'WhatsApp', icon: MessageCircle },
 };
 
-export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) {
-  const { activeWorkspaceId, workspaceRole } = useWorkspace();
+export function PlatformDefaultsSection({ canEdit, onOpenFlow, refreshTick = 0 }: Props) {
+  const { activeWorkspaceId } = useWorkspace();
   const { toast } = useToast();
 
   const [rows, setRows] = useState<FlowDefault[]>([]);
@@ -56,10 +58,6 @@ export function PlatformDefaultsSection({ onOpenFlow, refreshTick = 0 }: Props) 
   const [busy, setBusy] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
-
-  // Mirrors `is_workspace_admin` server-side. The RPC refuses a non-admin regardless; this only
-  // decides whether the controls are offered, so a member sees the state without a dead switch.
-  const canEdit = workspaceRole === 'owner' || workspaceRole === 'admin';
 
   const load = useCallback(async () => {
     if (!activeWorkspaceId) { setLoading(false); return; }

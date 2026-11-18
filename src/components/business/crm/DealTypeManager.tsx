@@ -7,6 +7,7 @@ import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useToast } from '@/hooks/use-toast';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Textarea } from '@/components/core/ui/textarea';
 import { dealsService, dealTypesAdmin, stageEmail, type DealStage, type DealType, type StageEmailRule } from '@/services/dealsService';
 
@@ -19,6 +20,8 @@ interface Props {
 
 export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => {
   const { toast } = useToast();
+  // A stage email is a workspace automation, and those need workspace.manage server-side.
+  const canManageFlows = usePermissions().can('workspace.manage');
   const [types, setTypes] = useState<DealType[] | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [stages, setStages] = useState<DealStage[]>([]);
@@ -168,9 +171,9 @@ export const DealTypeManager: React.FC<Props> = ({ ws, onClose, onChanged }) => 
                       {/* Automatic email when a deal reaches this stage. Writes an ordinary
                           workspace flow, so it stays visible and pausable under Flows. */}
                       <button
-                        type="button" onClick={() => setEmailFor(s)} disabled={busy}
+                        type="button" onClick={() => setEmailFor(s)} disabled={busy || !canManageFlows}
                         aria-label={`Email when a deal reaches ${s.label}`}
-                        title={rules.find((r) => r.stage_key === s.key)?.active ? 'Emails the contact on this stage' : 'No email on this stage'}
+                        title={`${rules.find((r) => r.stage_key === s.key)?.active ? 'Emails the contact on this stage' : 'No email on this stage'}${canManageFlows ? '' : ' (only workspace owners and admins can change this)'}`}
                         className={`hover:text-foreground ${rules.find((r) => r.stage_key === s.key)?.active ? 'text-primary' : 'text-muted-foreground'}`}
                       >
                         <Mail className="h-3.5 w-3.5" />
