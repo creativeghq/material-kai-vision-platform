@@ -354,7 +354,14 @@ export interface ProjectRequestRaisedTriggerConfig {}
 export interface ProjectRequestAnsweredTriggerConfig {}
 export interface CrmContactCreatedTriggerConfig {}
 export interface CrmCompanyCreatedTriggerConfig {}
-export interface InquiryReceivedTriggerConfig {}
+export interface InquiryReceivedTriggerConfig {
+  workspace_id?: string;
+  channel?: 'email' | 'whatsapp';
+  mail_account_id?: string;
+  match_field?: 'subject' | 'body';
+  match_mode?: 'starts_with' | 'contains';
+  pattern?: string;
+}
 /** Opens/clicks are HIGH-VOLUME. Each event fires a metered flow run — pair with a
  *  Filter node (e.g. only a specific campaign) to avoid running on every open. */
 export interface EmailOpenedTriggerConfig {}
@@ -948,7 +955,6 @@ export interface AddNoteConfig {
 }
 
 export interface CreateLeadConfig {
-  rule_id: string;
   source_ref: string;
   name: string;
   email: string;

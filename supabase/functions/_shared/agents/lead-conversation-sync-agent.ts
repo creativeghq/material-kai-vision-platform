@@ -14,7 +14,7 @@ const SyncVerdict = z.object({
 
 interface TrackedLead {
   id: string; name: string; status: string; title: string | null; request: string | null;
-  source_ref: string; conversation_synced_at: string | null; capture_rule_id: string | null;
+  source_ref: string; conversation_synced_at: string | null; capture_flow_id: string | null;
   workspace_id: string; owner_user_id: string | null;
 }
 
@@ -48,7 +48,7 @@ export class LeadConversationSyncAgent implements AgentRunner {
     const model = agentConfig.model || this.defaultModel;
 
     const { data: leads, error } = await supabase.from('crm_leads')
-      .select('id, workspace_id, owner_user_id, name, status, title, request, source_ref, conversation_synced_at, capture_rule_id')
+      .select('id, workspace_id, owner_user_id, name, status, title, request, source_ref, conversation_synced_at, capture_flow_id')
       .eq('workspace_id', workspaceId).eq('auto_tracking', true).in('status', ['new', 'contacted', 'quoted'])
       .or('source_ref.like.gmail:%,source_ref.like.whatsapp:%')
       .order('conversation_synced_at', { ascending: true, nullsFirst: true });
@@ -118,12 +118,13 @@ export class LeadConversationSyncAgent implements AgentRunner {
   }
 
   private async gmailTurns(supabase: AgentRunContext['supabase'], lead: TrackedLead, tokens: Map<string, string>): Promise<Turn[] | null> {
-    const { data: rule } = lead.capture_rule_id
-      ? await supabase.from('lead_capture_rules').select('mail_account_id').eq('id', lead.capture_rule_id).maybeSingle()
+    const { data: flow } = lead.capture_flow_id
+      ? await supabase.from('flows').select('trigger_config').eq('id', lead.capture_flow_id).maybeSingle()
       : { data: null };
+    const mailboxId = (flow?.trigger_config as Record<string, unknown> | null)?.mail_account_id as string | undefined;
     const accountQuery = supabase.from('mail_accounts').select('id, email, display_name, status');
-    const { data: account } = rule?.mail_account_id
-      ? await accountQuery.eq('id', rule.mail_account_id).maybeSingle()
+    const { data: account } = mailboxId
+      ? await accountQuery.eq('id', mailboxId).maybeSingle()
       : await accountQuery.eq('workspace_id', lead.workspace_id).eq('user_id', lead.owner_user_id ?? '').eq('status', 'active').limit(1).maybeSingle();
     if (!account || account.status !== 'active') return null;
     let token = tokens.get(account.id);

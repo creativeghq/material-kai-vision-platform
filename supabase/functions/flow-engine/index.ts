@@ -74,6 +74,7 @@ interface ExecutionContext {
  * exactly as system/transactional mail does today.
  */
 interface FlowScope {
+  flowId?: string;
   workspaceId: string | null;
   isGlobal: boolean;
   /** The flow owner (flows.created_by) — the acting user for workspace-pool debits when a
@@ -1321,15 +1322,11 @@ async function executeAction(
     }
 
     case 'create_lead': {
-      const ruleId = String(resolved.rule_id ?? '');
       const sourceRef = String(resolved.source_ref ?? '');
-      if (!ruleId || !sourceRef) return { output: { skipped: true, reason: 'missing_rule_or_source_ref' } };
-      const { data: rule } = await supabase.from('lead_capture_rules').select('workspace_id').eq('id', ruleId).maybeSingle();
-      if (!rule) return { output: { skipped: true, reason: 'rule_not_found' } };
-      if (!scope?.isGlobal && rule.workspace_id !== scope?.workspaceId) return { output: { skipped: true, reason: 'rule_outside_flow_workspace' } };
+      if (!scope?.flowId || !sourceRef) return { output: { skipped: true, reason: 'missing_flow_or_source_ref' } };
       const text = (k: string) => (typeof resolved[k] === 'string' && !/^\{\{.*\}\}$/.test(resolved[k] as string) ? resolved[k] as string : null);
-      const { data, error } = await supabase.rpc('capture_inbound_lead', {
-        p_rule_id: ruleId, p_source_ref: sourceRef, p_name: text('name'), p_email: text('email'), p_phone: text('phone'),
+      const { data, error } = await supabase.rpc('create_lead_from_inquiry', {
+        p_flow_id: scope.flowId, p_source_ref: sourceRef, p_name: text('name'), p_email: text('email'), p_phone: text('phone'),
         p_title: text('title'), p_request: text('request'), p_received_at: text('received_at') ?? new Date().toISOString(),
       });
       if (error) throw new Error(`create_lead failed: ${error.message}`);
@@ -2029,6 +2026,7 @@ async function handleExecuteFlow(
 
   // The flow's own scope drives BYOK sender resolution AND per-run credit metering.
   const scope: FlowScope = {
+    flowId: flow_id,
     workspaceId: (flow.workspace_id as string | null) ?? null,
     isGlobal: flow.is_global === true,
     ownerUserId: (flow.created_by as string | null) ?? null,

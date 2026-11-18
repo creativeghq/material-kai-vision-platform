@@ -23,8 +23,10 @@ import type {
   HireMeReceivedTriggerConfig,
   MaterialReviewedTriggerConfig,
   ReviewReceivedTriggerConfig,
+  InquiryReceivedTriggerConfig,
 } from '@/services/flows/types';
 import { EntityPicker } from './EntityPicker';
+import { InquiryTriggerFields } from './InquiryTriggerFields';
 
 /**
  * Which star ratings a review trigger fires on.
@@ -468,6 +470,15 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
         </div>
       );
     }
+
+    case 'inquiry_received':
+      return (
+        <InquiryTriggerFields
+          config={config as InquiryReceivedTriggerConfig}
+          onChange={(next) => onChange(next as Record<string, unknown>)}
+          flowId={flowId ?? undefined}
+        />
+      );
 
     case 'review_received': {
       const cfg = config as ReviewReceivedTriggerConfig;

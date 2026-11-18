@@ -490,7 +490,7 @@ export const paletteItems: NodePaletteItem[] = [
     label: 'Contact Created', description: 'A new CRM contact was created (payload carries lead_source so imports can be filtered out)', icon: 'UserPlus', color: 'emerald',
     defaultData: { label: 'Contact Created', category: 'trigger', triggerType: 'crm_contact_created', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'inquiry_received', group: 'CRM',
-    label: 'Inquiry Received', description: 'An email or WhatsApp message matched a lead capture rule (CRM → Leads → Capture rules)', icon: 'UserPlus', color: 'emerald',
+    label: 'Inquiry Received', description: 'A Gmail or WhatsApp message matched this trigger’s text — set channel, mailbox and text on the node', icon: 'UserPlus', color: 'emerald',
     defaultData: { label: 'Inquiry Received', category: 'trigger', triggerType: 'inquiry_received', config: {} } as TriggerNodeData },
   { type: 'triggerNode', category: 'trigger', subType: 'crm_company_created', group: 'CRM',
     label: 'Company Created', description: 'A new CRM company was created', icon: 'Building2', color: 'emerald',
@@ -667,7 +667,7 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'actionNode', category: 'action', subType: 'create_lead', group: 'CRM',
     label: 'Create Lead', description: 'Create the lead for an inquiry — one per conversation', icon: 'UserPlus', color: 'blue',
     defaultData: { label: 'Create Lead', category: 'action', actionType: 'create_lead', config: {
-      rule_id: '{{trigger.data.rule_id}}', source_ref: '{{trigger.data.source_ref}}', name: '{{trigger.data.lead_name}}',
+      source_ref: '{{trigger.data.source_ref}}', name: '{{trigger.data.lead_name}}',
       email: '{{trigger.data.lead_email}}', phone: '{{trigger.data.lead_phone}}', title: '{{trigger.data.lead_title}}',
       request: '{{trigger.data.lead_request}}', received_at: '{{trigger.data.received_at}}',
     } } as ActionNodeData },

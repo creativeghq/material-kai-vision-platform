@@ -5115,7 +5115,7 @@ export type Database = {
       crm_leads: {
         Row: {
           auto_tracking: boolean
-          capture_rule_id: string | null
+          capture_flow_id: string | null
           conversation_summary: string | null
           conversation_synced_at: string | null
           company_name: string | null
@@ -5144,7 +5144,7 @@ export type Database = {
         }
         Insert: {
           auto_tracking?: boolean
-          capture_rule_id?: string | null
+          capture_flow_id?: string | null
           conversation_summary?: string | null
           conversation_synced_at?: string | null
           company_name?: string | null
@@ -5173,7 +5173,7 @@ export type Database = {
         }
         Update: {
           auto_tracking?: boolean
-          capture_rule_id?: string | null
+          capture_flow_id?: string | null
           conversation_summary?: string | null
           conversation_synced_at?: string | null
           company_name?: string | null
@@ -14526,75 +14526,6 @@ export type Database = {
           },
           {
             foreignKeyName: "knowledge_base_docs_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: false
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lead_capture_rules: {
-        Row: {
-          id: string
-          workspace_id: string
-          label: string
-          channel: string
-          match_field: string
-          match_mode: string
-          pattern: string
-          mail_account_id: string | null
-          assign_to_user_id: string | null
-          enabled: boolean
-          last_matched_at: string | null
-          match_count: number
-          created_by: string | null
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          workspace_id: string
-          label: string
-          channel: string
-          match_field: string
-          match_mode?: string
-          pattern: string
-          mail_account_id?: string | null
-          assign_to_user_id?: string | null
-          enabled?: boolean
-          last_matched_at?: string | null
-          match_count?: number
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          workspace_id?: string
-          label?: string
-          channel?: string
-          match_field?: string
-          match_mode?: string
-          pattern?: string
-          mail_account_id?: string | null
-          assign_to_user_id?: string | null
-          enabled?: boolean
-          last_matched_at?: string | null
-          match_count?: number
-          created_by?: string | null
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lead_capture_rules_mail_account_id_fkey"
-            columns: ["mail_account_id"]
-            isOneToOne: false
-            referencedRelation: "mail_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "lead_capture_rules_workspace_id_fkey"
             columns: ["workspace_id"]
             isOneToOne: false
             referencedRelation: "workspaces"

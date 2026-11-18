@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  firstMatchingRule, leadFromEmail, leadFromWhatsApp, normalizePhone, ruleMatches, type LeadCaptureRule,
+  firstMatchingSource, leadFromEmail, leadFromWhatsApp, normalizePhone, sourceMatches, type InquirySource,
 } from '../../supabase/functions/_shared/crm/leadCapture';
 import { LEAD_SOURCES } from '../../src/modules/crm/leadVocabulary';
 
-const rule = (over: Partial<LeadCaptureRule>): LeadCaptureRule => ({
-  id: 'r', workspace_id: 'w', label: 'L', channel: 'email', match_field: 'subject',
-  match_mode: 'starts_with', pattern: 'MaterialsHub inquiry', mail_account_id: 'a', ...over,
+const rule = (over: Partial<InquirySource>): InquirySource => ({
+  flow_id: 'r', name: 'F', created_by: 'u', workspace_id: 'w', channel: 'email', match_field: 'subject',
+  match_mode: 'starts_with', pattern: 'MaterialsHub inquiry', mail_account_id: 'a', trigger_config: {}, ...over,
 });
 
 const FORM_HTML = `
@@ -24,15 +24,15 @@ const FORM_HTML = `
 
 describe('lead capture matching', () => {
   it('matches the website form subject regardless of case and spacing', () => {
-    expect(ruleMatches(rule({}), { subject: 'MaterialsHub  INQUIRY — Τιμή: Ecoceramic KRAKEN' })).toBe(true);
-    expect(ruleMatches(rule({}), { subject: 'Re: MaterialsHub inquiry — Τιμή: X' })).toBe(false);
+    expect(sourceMatches(rule({}), { subject: 'MaterialsHub  INQUIRY — Τιμή: Ecoceramic KRAKEN' })).toBe(true);
+    expect(sourceMatches(rule({}), { subject: 'Re: MaterialsHub inquiry — Τιμή: X' })).toBe(false);
   });
 
   it('matches the WhatsApp page card when it is not the first words', () => {
     const wa = rule({ channel: 'whatsapp', match_field: 'body', match_mode: 'contains', pattern: 'Σας γράφω για τη σελίδα', mail_account_id: null });
     const text = 'Γεια σας! Σας γράφω για τη σελίδα «Yurtbay Quasar Πλακάκια 60×120 — Τιμή από €20/τ.μ.»:\nhttps://materialshub.gr/el/proionta/plakakia/yurtbay-quasar';
-    expect(firstMatchingRule([wa], { body: text })?.id).toBe('r');
-    expect(firstMatchingRule([wa], { body: 'Καλησπέρα' })).toBeNull();
+    expect(firstMatchingSource([wa], { body: text })?.flow_id).toBe('r');
+    expect(firstMatchingSource([wa], { body: 'Καλησπέρα' })).toBeNull();
   });
 });
 

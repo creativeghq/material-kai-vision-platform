@@ -6,8 +6,8 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
 import { gmailAccessToken, gmailFetch, gmailHeader, sendPreparedGmail, type PreparedGmailSend } from '../_shared/gmail-client.ts';
 import { parseAddress, parseGmailPayload, type GmailPart } from '../_shared/mail-mime.ts';
-import { loadLeadCaptureRules, reportInquiry } from '../_shared/crm/captureLead.ts';
-import { firstMatchingRule, htmlToText, leadFromEmail, type LeadCaptureRule } from '../_shared/crm/leadCapture.ts';
+import { loadInquirySources, reportInquiry } from '../_shared/crm/captureLead.ts';
+import { firstMatchingSource, htmlToText, leadFromEmail, type InquirySource } from '../_shared/crm/leadCapture.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { AUTO_REPLY_GMAIL_HEADERS, isAutoReplyFromHeaderList } from '../_shared/mail-auto-reply.ts';
 
@@ -181,9 +181,9 @@ async function deliverScheduled(db: Db): Promise<{ sent: number; failed: number;
 const SYNC_ACCOUNTS = 20;
 const SYNC_MESSAGES = 25;
 
-/** SHARED mailboxes emit `mail.received`; a personal one is read only for lead capture rule matches. */
+/** SHARED mailboxes emit `mail.received`; a personal one is read only for its Inquiry Received flows' matches. */
 async function syncHistory(db: Db): Promise<{ accounts: number; events: number; inquiries: number; failed: number }> {
-  const emailRules = await loadLeadCaptureRules(db, { channel: 'email' });
+  const emailRules = await loadInquirySources(db, { channel: 'email' });
   const ruleAccountIds = [...new Set(emailRules.map((r) => r.mail_account_id).filter((v): v is string => !!v))];
   const { data: accounts, error } = await db.from('mail_accounts')
     .select('id, user_id, workspace_id, email, display_name, status, history_id, is_shared')
@@ -195,7 +195,7 @@ async function syncHistory(db: Db): Promise<{ accounts: number; events: number; 
   let inquiries = 0;
   let failed = 0;
   for (const account of accounts ?? []) {
-    const rules = emailRules.filter((r) => r.mail_account_id === account.id);
+    const rules = emailRules.filter((r) => r.mail_account_id === account.id && (account.is_shared || r.created_by === account.user_id));
     try {
       const token = await gmailAccessToken(db, account);
       if (!account.history_id) {
@@ -275,21 +275,21 @@ function addedMessages(history: Record<string, unknown>): AddedMessage[] {
 }
 
 async function captureFromGmail(
-  db: Db, token: string, rules: LeadCaptureRule[], m: AddedMessage, subject: string,
+  db: Db, token: string, rules: InquirySource[], m: AddedMessage, subject: string,
   from: { name: string | null; address: string | null },
 ): Promise<boolean> {
-  let rule = firstMatchingRule(rules, { subject });
+  let rule = firstMatchingSource(rules, { subject });
   if (!rule && !rules.some((r) => r.match_field === 'body')) return false;
   const full = await gmailFetch(token, `/messages/${m.id}?format=full`);
   const parsed = parseGmailPayload((full.payload ?? {}) as GmailPart);
   const bodyText = parsed.text ?? (parsed.html ? htmlToText(parsed.html) : '');
-  rule = rule ?? firstMatchingRule(rules, { subject, body: bodyText });
+  rule = rule ?? firstMatchingSource(rules, { subject, body: bodyText });
   if (!rule) return false;
   const fields = leadFromEmail({
     subject, html: parsed.html, text: parsed.text, fromName: from.name, fromAddress: from.address, rulePattern: rule.pattern,
   });
   const receivedAt = full.internalDate ? new Date(Number(full.internalDate)).toISOString() : new Date().toISOString();
-  await reportInquiry(db, rule, `gmail:${m.threadId}`, fields, receivedAt);
+  await reportInquiry(rule, `gmail:${m.threadId}`, fields, receivedAt);
   return true;
 }
 
