@@ -552,7 +552,7 @@ export const BackgroundAgentsTable: React.FC<{ rows: HarnessBackgroundAgent[]; s
     {rows.length === 0 ? (
       <HubEmptyState
         title="No background agents"
-        action={<Button asChild size="sm" variant="outline"><Link to="/admin/ai-configs?tab=background-agents">Create one</Link></Button>}
+        action={<Button asChild size="sm" variant="outline"><Link to="/admin/agent-ops?tab=background-agents">Create one</Link></Button>}
       />
     ) : (
       <Table>

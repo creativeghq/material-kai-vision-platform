@@ -121,6 +121,7 @@ const PlatformOverviewPage = lazy(() => import('./components/Admin/HQ/SimpleHqPa
 const IngestionQualityPage = lazy(() => import('./components/Admin/HQ/SimpleHqPages').then(m => ({ default: m.IngestionQualityPage })));
 const PushNotificationsPage = lazy(() => import('./pages/Operator/PushNotificationsPage'));
 const AgentOpsPage = lazy(() => import('./components/Admin/HQ/AgentOpsPage'));
+const UsersPage = lazy(() => import('./components/Admin/HQ/UsersPage'));
 const AsyncJobQueueMonitor = lazy(() => import('./components/Admin/AsyncJobQueueMonitor').then(m => ({ default: m.AsyncJobQueueMonitor })));
 const PDFDocumentDetails = lazy(() => import('./pages/Admin/PDFDocumentDetails').then(m => ({ default: m.PDFDocumentDetails })));
 const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
@@ -138,7 +139,6 @@ const SupplierPortalPage = lazy(() => import('./pages/SupplierPortalPage'));
 // Social Media route (/social-media/accounts) is registered by the `social-media` module via buildModuleRoutes().
 const MarketTrendsPage = lazy(() => import('./pages/MarketTrendsPage'));
 const MaterialComparePage = lazy(() => import('./pages/MaterialComparePage'));
-const AIDataRedirect = lazy(() => import('./pages/Admin/AIDataRedirect'));
 const PublicMoodBoardPage = lazy(() => import('./pages/PublicMoodBoardPage'));
 const SheetSharePage = lazy(() => import('./pages/SheetSharePage'));
 const PublicGuidePage = lazy(() => import('./pages/Guides/PublicGuidePage'));
@@ -664,12 +664,6 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Legacy alias — was accessible to any authenticated user; redirected
-                    to admin-gated path so non-admins can no longer view ops data. */}
-                <Route
-                  path="/analytics"
-                  element={<Navigate to="/admin" replace />}
-                />
                 <Route
                   path="/admin"
                   element={
@@ -743,6 +737,18 @@ const App = () => (
                   }
                 />
                 <Route
+                  path="/admin/users"
+                  element={
+                    <AuthGuard>
+                      <AdminGuard>
+                        <AdminLayout>
+                          <UsersPage />
+                        </AdminLayout>
+                      </AdminGuard>
+                    </AuthGuard>
+                  }
+                />
+                <Route
                   path="/admin/platform"
                   element={
                     <AuthGuard>
@@ -791,11 +797,6 @@ const App = () => (
                   }
                 />
                 <Route path="/admin/operations" element={<OperationsRedirect />} />
-                {/* Legacy route redirect */}
-                <Route
-                  path="/admin/analytics"
-                  element={<Navigate to="/admin" replace />}
-                />
 
                 <Route
                   path="/admin/knowledge-base"
@@ -845,17 +846,6 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* Redirect old routes to new routes */}
-                <Route path="/admin/agent-configs" element={<Navigate to="/admin/ai-configs" replace />} />
-                <Route path="/tasks" element={<Navigate to="/admin" replace />} />
-                {/* Relocated into AI Configurations tabs — keep deep-links alive. */}
-                <Route path="/admin/prompt-templates" element={<Navigate to="/admin/ai-configs?tab=prompts" replace />} />
-                <Route path="/admin/extraction-prompts" element={<Navigate to="/admin/ai-configs?tab=prompts" replace />} />
-                <Route path="/admin/material-analysis" element={<Navigate to="/admin/ai-configs" replace />} />
-                {/* Retired: misnamed "training" panel. Factory approvals moved to Operations. */}
-                <Route path="/admin/training-models" element={<Navigate to="/admin/approvals" replace />} />
-                {/* Folded into Operations → Performance tab. */}
-                <Route path="/admin/performance" element={<Navigate to="/admin/async-queue-monitor" replace />} />
                 <Route
                   path="/admin/logs"
                   element={
@@ -882,8 +872,6 @@ const App = () => (
                   }
                 />
 
-                {/* Relocated into AI Configurations → API Gateway tab. */}
-                <Route path="/admin/api-gateway" element={<Navigate to="/admin/modules?tab=api-keys" replace />} />
 
                 {/* Material Search moved under Discover → Products ("Smart search" mode). The
                     standalone /search + legacy /search-hub now redirect there; the universal
@@ -927,41 +915,6 @@ const App = () => (
                       <Layout>
                         <MaterialComparePage />
                       </Layout>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/duplicate-detection"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <AIDataRedirect />
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                {/* Relocated into AI Configurations → AI Data / 3D Debugging tabs. */}
-                <Route path="/admin/batch-categorization" element={<Navigate to="/admin/materials-data?tab=ai-review&view=categorization" replace />} />
-                <Route path="/admin/3d-suggestions" element={<Navigate to="/admin/ai-configs" replace />} />
-                <Route path="/admin/3d-model-debugging" element={<Navigate to="/admin/ai-configs" replace />} />
-                <Route path="/admin/ai-data" element={<Navigate to="/admin/materials-data?tab=ai-review" replace />} />
-                <Route
-                  path="/admin/metadata"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <AIDataRedirect />
-                      </AdminGuard>
-                    </AuthGuard>
-                  }
-                />
-                <Route
-                  path="/admin/relevancy"
-                  element={
-                    <AuthGuard>
-                      <AdminGuard>
-                        <AIDataRedirect />
-                      </AdminGuard>
                     </AuthGuard>
                   }
                 />
@@ -1088,9 +1041,7 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route path="/admin/flows" element={<Navigate to="/flows" replace />} />
-                {/* Relocated into AI Configurations → Background Agents tab. */}
-                <Route path="/admin/background-agents" element={<Navigate to="/admin/ai-configs?tab=background-agents" replace />} />
+                <Route path="/admin/background-agents" element={<Navigate to="/admin/agent-ops?tab=background-agents" replace />} />
                 <Route path="/admin/supplier-claims" element={<Navigate to="/admin/approvals?tab=supplier-claims" replace />} />
                 {/*
                   * Master catalog (#324). NOT behind AdminGuard: a confirmed manufacturer
@@ -1108,7 +1059,6 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route path="/admin/catalog-master" element={<Navigate to="/catalog-master" replace />} />
                 {/* Page monitoring (#331). Workspace-scoped, not admin-only: watching a
                     supplier's terms page is the job of whoever deals with that supplier.
                     Every action is workspace-verified server-side in `page-watches`. */}
@@ -1134,7 +1084,6 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                <Route path="/admin/freight-quotes" element={<Navigate to="/admin/approvals?tab=freight-quotes" replace />} />
                 {/* Supplier portal (claimed suppliers; RPC-gated, not admin) */}
                 <Route
                   path="/supplier-portal"
@@ -1281,7 +1230,6 @@ const App = () => (
                   }
                 />
 
-                <Route path="/admin/plans" element={<Navigate to="/admin/modules?tab=plans" replace />} />
 
                 {/* Admin: Generic per-module Settings page (renders SecretsManagerCard for the slug).
                     Every module that declares secrets in platform_secrets gets this page automatically.

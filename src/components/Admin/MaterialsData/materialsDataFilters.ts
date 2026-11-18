@@ -1,8 +1,8 @@
-/** Filter definitions for the four Materials Data tabs. */
+/** Filter definitions for the Materials Data tabs. */
 import { CalendarDays, Database, FileText } from 'lucide-react';
 import { NONE_VALUE, type FilterField, type FilterGroupDef, type FilterOption } from '@/components/core/filters';
 
-export type MaterialsTabKind = 'products' | 'images' | 'chunks' | 'embeddings';
+export type MaterialsTabKind = 'products' | 'images' | 'chunks';
 
 /** `source_type` vocabulary written by the three ingest paths. */
 const SOURCE_TYPE_OPTIONS: FilterOption[] = [
@@ -17,14 +17,12 @@ const SEARCH_COLUMNS: Record<MaterialsTabKind, string[]> = {
   products: ['name', 'description', 'sku', 'external_sku'],
   images: ['caption', 'contextual_name', 'product_name', 'ocr_text'],
   chunks: ['content'],
-  embeddings: ['content'],
 };
 
 const SEARCH_PLACEHOLDER: Record<MaterialsTabKind, string> = {
   products: 'Search name / SKU…',
   images: 'Search caption / OCR text…',
   chunks: 'Search chunk content…',
-  embeddings: 'Search source text…',
 };
 
 /**
@@ -124,14 +122,9 @@ function attributeFields(kind: MaterialsTabKind): FilterField[] {
         },
         { key: 'chunk_type', type: 'text', label: 'Chunk Type', description: 'Substring match on the classifier verdict.', column: 'chunk_type' },
         { key: 'has_text_embedding', type: 'bool', label: 'Text Embedding', column: 'has_text_embedding', trueLabel: 'Present', falseLabel: 'Missing' },
+        { key: 'embedding_model', type: 'text', label: 'Embedding Model', description: 'Substring match on the model that produced the vector.', column: 'embedding_model' },
+        { key: 'embedding_dimension', type: 'range', label: 'Embedding Dimensions', column: 'embedding_dimension', min: 0, max: 2048, step: 128 },
         { key: 'quality_score', type: 'range', label: 'Quality Score', column: 'quality_score', min: 0, max: 1, step: 0.05 },
-      ];
-
-    case 'embeddings':
-      return [
-        { key: 'embedding_model', type: 'text', label: 'Model', description: 'Substring match on the model that produced the vector.', column: 'embedding_model' },
-        { key: 'embedding_dimension', type: 'range', label: 'Dimensions', column: 'embedding_dimension', min: 0, max: 2048, step: 128 },
-        { key: 'chunk_type', type: 'text', label: 'Chunk Type', column: 'chunk_type' },
       ];
   }
 }
@@ -140,7 +133,6 @@ const DATE_COLUMN_LABEL: Record<MaterialsTabKind, string> = {
   products: 'Created',
   images: 'Extracted',
   chunks: 'Created',
-  embeddings: 'Generated',
 };
 
 export function buildMaterialsDataFilters(
@@ -173,7 +165,7 @@ export function buildMaterialsDataFilters(
     },
     {
       key: 'attributes',
-      label: kind === 'embeddings' ? 'Vector' : 'Attributes',
+      label: 'Attributes',
       icon: Database,
       fields: attributeFields(kind),
     },

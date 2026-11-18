@@ -111,25 +111,6 @@ export interface BackgroundJob {
   } | null;
 }
 
-// XML Import Job from data_import_jobs table
-export interface XMLImportJob {
-  id: string;
-  workspace_id: string;
-  import_type: string;
-  source_name: string | null;
-  source_url: string | null;
-  status: string;
-  total_products: number;
-  processed_products: number;
-  failed_products: number;
-  category: string | null;
-  created_at: string;
-  started_at: string | null;
-  completed_at: string | null;
-  error_message: string | null;
-  metadata: any;
-}
-
 export interface JobCheckpoint {
   id: string;
   job_id: string;
@@ -153,7 +134,6 @@ export interface JobTypeMetrics {
 }
 
 export interface QueueMetrics {
-  xml_import: JobTypeMetrics;
   all_jobs: JobTypeMetrics;
   total_documents: number;
   total_products_created: number;

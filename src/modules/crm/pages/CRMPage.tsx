@@ -1,84 +1,47 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { inboxComposeEmailUrl } from '@/pages/Inbox/composeLink';
-import { Users, Building2, Trash2, Mail, CreditCard, Key, Tags, Plus, Kanban, UserPlus } from 'lucide-react';
+import { Users, Building2, Trash2, Tags, Plus, Kanban, UserPlus } from 'lucide-react';
 
 import {
   Card, CardContent, CardDescription, CardHeader, CardTitle,
 } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
-import { Input } from '@/components/core/ui/input';
 import { Badge } from '@/components/core/ui/badge';
-import { statusTone } from '@/utils/statusTone';
 import { leadScoreTint } from '@/modules/crm/services/leadScoring';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/core/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/core/ui/select';
-import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
-} from '@/components/core/ui/dialog';
-import { Label } from '@/components/core/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 import { GlobalAdminHeader } from '@/components/Admin/GlobalAdminHeader';
 import { WorkspaceQuotaBadge } from '@/components/core/WorkspaceQuotaBadge';
 import { AdminStatCard } from '@/components/Admin/AdminStatCard';
-import { usersAPI, contactsAPI, companiesAPI, type CrmListFilters } from '@/services/crm.service';
+import { contactsAPI, companiesAPI, type CrmListFilters } from '@/services/crm.service';
 import { crmCategoriesService, isHandAssignableKind, type CrmCategorySummary } from '@/services/crmCategoriesService';
-import { humanizeLabel } from '@/utils/humanize';
 import { CategoriesPanel } from './CategoriesPage';
 import { AddPartyModal, type PartyRelationship } from '../components/AddPartyModal';
 import { CrmBulkBar, type BulkSelectAction } from '../components/CrmBulkBar';
-import { TablePagination, paginate, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
-import { FilterBar, optionsFromRows, scopedFilterValue, useFilters, useFilterValues, type FilterOption, type FilterValues } from '@/components/core/filters';
-import { CRM_TAB, CRM_COMPANY_FILTER_KEY, CRM_CONTACT_FILTER_KEY, CRM_USER_FILTER_KEY } from '@/modules/crm/routes';
-import { buildCompanyFilters, buildContactFilters, buildUserFilters, categoryFacetOptions } from './crmFilters';
+import { TablePagination, clampPage, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
+import { FilterBar, optionsFromRows, scopedFilterValue, useFilterValues, type FilterOption, type FilterValues } from '@/components/core/filters';
+import { CRM_TAB, CRM_COMPANY_FILTER_KEY, CRM_CONTACT_FILTER_KEY } from '@/modules/crm/routes';
+import { buildCompanyFilters, buildContactFilters, categoryFacetOptions } from './crmFilters';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { PipelineBoard } from '@/components/business/crm/PipelineBoard';
 import { LeadsPanel } from '../components/LeadsPanel';
 import {
-  LIFECYCLE_STAGE_OPTIONS, PROFESSIONAL_TYPE_OPTIONS, STATUS_OPTIONS,
-  professionalTypeLabel, roleLabel, type Option,
+  LIFECYCLE_STAGE_OPTIONS, STATUS_OPTIONS, professionalTypeLabel, type Option,
 } from '../crmConstants';
-import {
-  HubCellEmpty, HubCellLink, HubEmptyState, HubSortButton, useHubTable, type HubTableField,
-} from '@/components/core/hub';
+import { HubCellEmpty, HubCellLink, HubEmptyState } from '@/components/core/hub';
 
-// Pipeline renders FIRST, but 'users' stays the landing tab: bare `/crm` is the main nav
-// target, and defaulting to a module-gated tab would show an upsell as the front door of a
-// free module. Deep link with ?tab=pipeline.
+// Pipeline renders FIRST, but contacts is the landing tab: bare `/crm` is the main nav target,
+// and defaulting to a module-gated tab would show an upsell as the front door of a free module.
 const TAB_VALUES = [
-  CRM_TAB.pipeline, CRM_TAB.leads, CRM_TAB.users, CRM_TAB.contacts, CRM_TAB.companies, CRM_TAB.categories,
+  CRM_TAB.pipeline, CRM_TAB.leads, CRM_TAB.contacts, CRM_TAB.companies, CRM_TAB.categories,
 ] as const;
 type TabValue = typeof TAB_VALUES[number];
-
-interface UserWithAuth {
-  id: string;
-  user_id: string;
-  email: string;
-  role_id?: string;
-  subscription_tier?: string;
-  status?: string;
-  professional_type?: string;
-  credits?: number;
-  created_at: string;
-  roles?: { id: string; name: string; level: number };
-}
-
-const USER_FIELDS: HubTableField<UserWithAuth>[] = [
-  { id: 'email', sortValue: (u) => u.email },
-  { id: 'tier', sortValue: (u) => (u.roles?.name ? roleLabel(u.roles.name) : null) },
-  { id: 'type', sortValue: (u) => professionalTypeLabel(u.professional_type) || null },
-  { id: 'subscription', sortValue: (u) => u.subscription_tier },
-  { id: 'credits', sortValue: (u) => u.credits ?? 0 },
-  { id: 'status', sortValue: (u) => u.status },
-];
 
 interface Contact {
   id: string;
@@ -95,8 +58,6 @@ interface Contact {
   notes?: string;
   created_at: string;
 }
-
-interface Role { id: string; name: string; level: number }
 
 /** Toggle a value's presence in a Set (returns a new Set). */
 function toggle<T>(set: Set<T>, value: T): Set<T> {
@@ -137,9 +98,7 @@ export const CRMManagement: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
   const { activeWorkspaceId, workspaceRole, isPlatformOperator } = useWorkspace();
-  // Platform user administration is the OPERATOR's surface; `users` is also the default tab.
-  const canAdminUsers = !!isPlatformOperator;
-  const defaultTab: TabValue = canAdminUsers ? CRM_TAB.users : CRM_TAB.contacts;
+  const defaultTab: TabValue = CRM_TAB.contacts;
   // Reps and above create/move cards; a `client` is read-only. RLS on crm_deals is the real
   // boundary (admin OR the deal's owner) — this only decides whether to offer the controls,
   // and offering them to someone RLS will reject is a worse experience than hiding them.
@@ -155,44 +114,35 @@ export const CRMManagement: React.FC = () => {
   // did nothing. Same reason FinancePage drives its tab off `?tab=` directly.
   const activeTab: TabValue = (() => {
     const t = searchParams.get('tab');
-    const v = (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : defaultTab;
-    return v === CRM_TAB.users && !canAdminUsers ? defaultTab : v;
+    return (TAB_VALUES as readonly string[]).includes(t || '') ? (t as TabValue) : defaultTab;
   })();
+  // Platform accounts moved to Admin → Users; an old `?tab=users` link still lands there.
+  const legacyUsersTab = searchParams.get('tab') === 'users';
   const handleTabChange = (val: string) => {
     const next = (TAB_VALUES as readonly string[]).includes(val) ? (val as TabValue) : defaultTab;
-    setUsersPage(1); setContactsPage(1); setCompaniesPage(1);
+    setContactsPage(1); setCompaniesPage(1);
     const params = new URLSearchParams(searchParams);
     if (next === defaultTab) params.delete('tab'); else params.set('tab', next);
     setSearchParams(params, { replace: true });
   };
 
-  // Per-tab loading flags. A single shared flag caused the Users tab to flash
-  // "No users found" because the faster contacts/companies loaders cleared it
-  // while the slower users edge-function call was still in flight. Init true so
-  // the first paint shows "Loading…" rather than an empty state.
-  const [loadingUsers, setLoadingUsers] = useState(true);
+  // Per-tab loading flags, initialised true so the first paint shows "Loading…" not an empty state.
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [loadingCompanies, setLoadingCompanies] = useState(true);
-  const [users, setUsers] = useState<UserWithAuth[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [companies, setCompanies] = useState<any[]>([]);
   // Total row counts for the CURRENT filter set, straight off the API's exact count.
   // `contacts`/`companies` now hold one page only, so they can't be counted locally.
   const [contactsTotal, setContactsTotal] = useState(0);
   const [companiesTotal, setCompaniesTotal] = useState(0);
-  const [roles, setRoles] = useState<Role[]>([]);
   const [categories, setCategories] = useState<CrmCategorySummary[]>([]);
-  const [userStats, setUserStats] = useState({ total: 0, active: 0, inactive: 0 });
-  const [usersUnreadable, setUsersUnreadable] = useState(false);
 
-  // Users are client-paginated (single edge-function payload). Contacts + companies are
-  // SERVER-paged: the page number feeds the request's offset.
-  const [usersPage, setUsersPage] = useState(1);
+  // Contacts + companies are SERVER-paged: the page number feeds the request's offset.
   const [contactsPage, setContactsPage] = useState(1);
   const [companiesPage, setCompaniesPage] = useState(1);
 
   // Per-tab filter values. Each tab owns its own bag, so a term typed for contacts no
-  // longer leaks into the users list — and each bag is mirrored into its own URL param, so a
+  // longer leaks into the companies list — and each bag is mirrored into its own URL param, so a
   // filtered list is shareable AND addressable. The dashboard's Customers block links straight
   // to `?tab=companies` filtered to clients; without the URL half that link would open the
   // companies tab showing all 44 and look exactly like it had worked.
@@ -219,8 +169,7 @@ export const CRMManagement: React.FC = () => {
   // "Assign company" action, and the companies "Business activity" facet).
   const [companyLookup, setCompanyLookup] = useState<Array<{ id: string; name: string; profession: string | null }>>([]);
 
-  // Per-tab selection (users keyed by user_id; contacts/companies by id)
-  const [selUsers, setSelUsers] = useState<Set<string>>(new Set());
+  // Per-tab selection, keyed by id.
   const [selContacts, setSelContacts] = useState<Set<string>>(new Set());
   const [selCompanies, setSelCompanies] = useState<Set<string>>(new Set());
   const [showAddParty, setShowAddParty] = useState(false);
@@ -236,47 +185,9 @@ export const CRMManagement: React.FC = () => {
   }, [searchParams, setSearchParams]);
   const [bulkBusy, setBulkBusy] = useState(false);
 
-  // Add-user modal
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserDisplayName, setNewUserDisplayName] = useState('');
-  const [creatingUser, setCreatingUser] = useState(false);
-
-  const loadRoles = async () => {
-    try {
-      const { data, error } = await supabase.from('roles').select('id, name, level').order('level', { ascending: true });
-      if (error) throw error;
-      setRoles(data || []);
-    } catch (error: any) { console.error('Error loading roles:', error); }
-  };
-
   const loadCategories = async () => {
     try { setCategories(await crmCategoriesService.list(activeWorkspaceId)); }
     catch (error: any) { console.error('Error loading categories:', error); }
-  };
-
-  const loadUsers = async () => {
-    try {
-      setLoadingUsers(true);
-      const response = await usersAPI.listUsers();
-      setUsers(response.data || []);
-      setUserStats({
-        total: response.data?.length || 0,
-        active: response.data?.filter((u) => u.status === 'active').length || 0,
-        inactive: response.data?.filter((u) => u.status === 'inactive').length || 0,
-      });
-    } catch (error: any) {
-      // Being refused the platform user list is a PERMISSION STATE, not a failure — it must
-      // neither toast an internal role name at someone with nothing to fix, nor report itself
-      // as `Total Users 0`, which reads as a fact about the platform. The tiles are withheld.
-      if (error?.status === 401 || error?.status === 403) {
-        setUsers([]);
-        setUsersUnreadable(true);
-        return;
-      }
-      toast({ title: 'Error', description: `Failed to load users: ${error.message}`, variant: 'destructive' });
-    } finally { setLoadingUsers(false); }
   };
 
   // The `ids` allowlists sent to the server, one per tab. `undefined` = no membership
@@ -307,7 +218,7 @@ export const CRMManagement: React.FC = () => {
     ids: companyIdsFilter,
   }), [companySearch, companyValues.profession, companyValues.kind, companyIdsFilter]);
 
-  // Load through the crm-api edge function (same path as users/companies) rather than a
+  // Load through the crm-api edge function (same path as companies) rather than a
   // direct supabase query. The direct query is bound by the `is_workspace_member` RLS on
   // crm_contacts, so a global operator on the /crm surface who isn't an active
   // member of the tenant workspace that owns the contacts sees an empty table. The API
@@ -349,8 +260,7 @@ export const CRMManagement: React.FC = () => {
   };
 
   useEffect(() => {
-    loadRoles(); loadCompanyLookup();
-    if (canAdminUsers) loadUsers(); else setLoadingUsers(false);
+    loadCompanyLookup();
   }, []);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { loadCategories(); }, [activeWorkspaceId]);
@@ -395,8 +305,6 @@ export const CRMManagement: React.FC = () => {
   }, [companyValues.industry]);
 
   // ── option lists ──────────────────────────────────────────────────────────
-  const roleOptions: Option[] = useMemo(() => roles.map((r) => ({ value: r.id, label: roleLabel(r.name) })), [roles]);
-
   // Membership facets — see `categoryFacetOptions`. Industries get their own company field, so
   // they are excluded from the generic company "category" one: otherwise the same nine options
   // are listed twice in the same modal.
@@ -424,13 +332,6 @@ export const CRMManagement: React.FC = () => {
       .filter((c) => c.is_active && isHandAssignableKind(c.kind))
       .map((c) => ({ value: c.id, label: c.name })),
     [categories]);
-  // A workspace's own categories hold contacts and companies only — never platform users.
-  const userAssignableCategoryOptions: Option[] = useMemo(
-    () => categories
-      .filter((c) => c.is_active && !c.workspace_id && isHandAssignableKind(c.kind))
-      .map((c) => ({ value: c.id, label: c.name })),
-    [categories]);
-
   // Sourced from the bounded lookup, not the table feed — the companies table now holds
   // one page, so deriving the picker from it would list only 20 names.
   const companyNameOptions: Option[] = useMemo(() =>
@@ -442,13 +343,7 @@ export const CRMManagement: React.FC = () => {
   const companyProfessionOptions: FilterOption[] = useMemo(
     () => optionsFromRows(companyLookup, (c) => c.profession ?? ''),
     [companyLookup]);
-  const subscriptionOptions: Option[] = useMemo(() =>
-    [...new Set(users.map((u) => u.subscription_tier).filter(Boolean))].sort().map((s) => ({ value: s as string, label: s as string })),
-    [users]);
-
   // ── filter groups ─────────────────────────────────────────────────────────
-  const userGroups = useMemo(
-    () => buildUserFilters({ roleOptions, subscriptionOptions }), [roleOptions, subscriptionOptions]);
   const contactGroups = useMemo(
     () => buildContactFilters({ categoryOptions: contactCategoryOptions, companyNameOptions }),
     [contactCategoryOptions, companyNameOptions]);
@@ -495,12 +390,6 @@ export const CRMManagement: React.FC = () => {
   }, [activeTab, companyValues, contactValues, categories, companyLookup]);
 
   // ── filtered lists ────────────────────────────────────────────────────────
-  // Users are the only client-side tab, so they get the full hook (matching + preview).
-  const {
-    values: userValues, setValues: setUserValues,
-    filtered: filteredUsers, previewCount: userPreviewCount,
-  } = useFilters(users, userGroups, { urlKey: CRM_USER_FILTER_KEY });
-
   // The attached business: prefer the primary junction company, then any junction
   // company, falling back to the legacy free-text `company` field.
   const contactCompanyName = (c: Contact): string => {
@@ -513,37 +402,15 @@ export const CRMManagement: React.FC = () => {
   // — `contacts` / `companies` already hold exactly the rows for the current page.
 
   // ── pagination ────────────────────────────────────────────────────────────
-  // Users only: reset to page 1 whenever their client-side result set changes. The
-  // contacts/companies reset lands in their filter onChange, so it commits with the change
-  // and doesn't cost an extra fetch.
-  useEffect(() => { setUsersPage(1); }, [userValues]);
-
   // A delete or a reload can shrink the list under the current page — clamp instead of
   // stranding the user on an empty table.
-  useEffect(() => { setUsersPage((p) => clampPage(p, filteredUsers.length)); }, [filteredUsers.length]);
   useEffect(() => { setContactsPage((p) => clampPage(p, contactsTotal)); }, [contactsTotal]);
   useEffect(() => { setCompaniesPage((p) => clampPage(p, companiesTotal)); }, [companiesTotal]);
-
-  const userTable = useHubTable(filteredUsers, USER_FIELDS);
-  const sortedUsers = userTable.rows;
-  const pagedUsers = useMemo(() => paginate(sortedUsers, usersPage), [sortedUsers, usersPage]);
-  const userSortHead = (id: string, label: string, align?: 'right') => (
-    <HubSortButton
-      align={align}
-      active={userTable.sort?.columnId === id ? userTable.sort.direction : undefined}
-      onClick={() => userTable.toggleSort(id)}
-    >
-      {label}
-    </HubSortButton>
-  );
-  const userAriaSort = (id: string) =>
-    userTable.sort?.columnId === id ? (userTable.sort.direction === 'asc' ? 'ascending' : 'descending') : undefined;
 
   // ── selection helpers ─────────────────────────────────────────────────────
   // Contacts/companies "select all" covers the CURRENT PAGE only — the other pages were
   // never fetched, so a whole-result-set select would be selecting rows nobody has seen
   // (and bulk delete would act on them).
-  const allUsersSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selUsers.has(u.user_id));
   const allContactsSelected = contacts.length > 0 && contacts.every((c) => selContacts.has(c.id));
   const allCompaniesSelected = companies.length > 0 && companies.every((c) => selCompanies.has(c.id));
 
@@ -551,7 +418,7 @@ export const CRMManagement: React.FC = () => {
   const runBulk = async (ids: string[], op: (id: string) => Promise<unknown>, verb: string, after: () => Promise<void>, clear: () => void) => {
     setBulkBusy(true);
     try {
-      // Sequential on purpose: parallel user deletes (each cascades a workspace) exhaust the lock table.
+      // Sequential on purpose: parallel deletes cascade and exhaust the lock table.
       const failures: string[] = [];
       let ok = 0;
       for (const id of ids) {
@@ -569,12 +436,6 @@ export const CRMManagement: React.FC = () => {
     } finally { setBulkBusy(false); }
   };
 
-  const applyUserBulk = async (action: string, value: string) => {
-    const ids = [...selUsers];
-    if (action === 'category') return runBulk(ids, (uid) => crmCategoriesService.addMember(value, { user_id: uid }), 'Added to category', loadCategories, () => setSelUsers(new Set()));
-    const patch = action === 'role' ? { role_id: value } : action === 'status' ? { status: value } : { professional_type: value };
-    return runBulk(ids, (uid) => usersAPI.updateUser(uid, patch), 'Updated', loadUsers, () => setSelUsers(new Set()));
-  };
   const applyContactBulk = async (action: string, value: string) => {
     const ids = [...selContacts];
     if (action === 'category') return runBulk(ids, (id) => crmCategoriesService.addMember(value, { crm_contact_id: id }), 'Added to category', loadCategories, () => setSelContacts(new Set()));
@@ -586,13 +447,6 @@ export const CRMManagement: React.FC = () => {
   const applyCompanyBulk = async (_action: string, value: string) =>
     runBulk([...selCompanies], (id) => crmCategoriesService.addMember(value, { crm_company_id: id }), 'Added to category', loadCategories, () => setSelCompanies(new Set()));
 
-  const userBulkActions: BulkSelectAction[] = [
-    // Account TIER — global, platform-wide. Team roles are per-workspace (Profile → Team).
-    { key: 'role', label: 'Set account tier', placeholder: 'Pick a tier', options: roleOptions },
-    { key: 'status', label: 'Set status', placeholder: 'Pick a status', options: STATUS_OPTIONS },
-    { key: 'profession', label: 'Professional Type', placeholder: 'Pick a type', options: PROFESSIONAL_TYPE_OPTIONS },
-    { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: userAssignableCategoryOptions },
-  ];
   /*
    * No "Professional type" on contacts or companies. `profession` on those two tables is the
    * FISCAL activity: `partyFromCrm` copies it onto the myDATA counterpart and the invoice PDF
@@ -613,11 +467,6 @@ export const CRMManagement: React.FC = () => {
     { key: 'category', label: 'Add to category', placeholder: 'Pick a category', options: assignableCategoryOptions },
   ];
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
-    try { await usersAPI.deleteUser(userId); toast({ title: 'Success', description: 'User deleted' }); loadUsers(); }
-    catch (e) { toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to delete user', variant: 'destructive' }); }
-  };
   const handleDeleteContact = async (contactId: string) => {
     if (!window.confirm('Are you sure you want to delete this contact?')) return;
     try { setLoadingContacts(true); await contactsAPI.deleteContact(contactId); toast({ title: 'Success', description: 'Contact deleted' }); await loadContacts(); }
@@ -630,49 +479,18 @@ export const CRMManagement: React.FC = () => {
     catch (e) { toast({ title: 'Error', description: e instanceof Error ? e.message : 'Failed to delete company', variant: 'destructive' }); }
   };
 
-  const handleAddUser = () => { setNewUserEmail(''); setNewUserPassword(''); setNewUserDisplayName(''); setShowAddUserModal(true); };
-  const handleCreateUser = async () => {
-    if (!newUserEmail || !newUserPassword) { toast({ title: 'Validation Error', description: 'Email and password are required', variant: 'destructive' }); return; }
-    try {
-      setCreatingUser(true);
-      const { error } = await supabase.auth.signUp({ email: newUserEmail, password: newUserPassword, options: { data: { display_name: newUserDisplayName } } });
-      if (error) throw error;
-      toast({ title: 'Success', description: 'User created. They will receive a confirmation email.' });
-      setShowAddUserModal(false); await loadUsers();
-    } catch (error: any) { toast({ title: 'Error', description: error.message || 'Failed to create user', variant: 'destructive' }); }
-    finally { setCreatingUser(false); }
-  };
-  // Assign a platform user's account role inline from the Users tab (this is the
-  // home for role/permission management — not the per-user CRM detail entry).
-  const handleRoleChange = async (userId: string, roleId: string) => {
-    const prevUsers = users;
-    const nextRole = roles.find((r) => r.id === roleId);
-    setUsers((list) => list.map((u) => (u.user_id === userId ? { ...u, role_id: roleId, roles: nextRole } : u)));
-    try {
-      await usersAPI.updateUser(userId, { role_id: roleId });
-      toast({ title: 'Role updated', description: nextRole ? `Set to ${nextRole.name}` : undefined });
-    } catch (error: any) {
-      setUsers(prevUsers);
-      toast({ title: 'Failed to update role', description: error?.message, variant: 'destructive' });
-    }
-  };
-
-  const handleResetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth?reset=true` });
-      if (error) throw error;
-      toast({ title: 'Success', description: 'Password reset email sent' });
-    } catch (error: any) { toast({ title: 'Error', description: error.message || 'Failed to send reset email', variant: 'destructive' }); }
-  };
-
   // Contacts/companies filters drive a server query, so each change also drops back to
   // page 1 — otherwise a narrower result set leaves the user on an out-of-range offset.
   const onContactFilters = (v: FilterValues) => { setContactsPage(1); setContactValues(v); };
   const onCompanyFilters = (v: FilterValues) => { setCompaniesPage(1); setCompanyValues(v); };
 
+  if (legacyUsersTab) {
+    return <Navigate to={isPlatformOperator ? '/admin/users' : '/crm'} replace />;
+  }
+
   return (
     <div className="min-h-screen">
-      <GlobalAdminHeader title="CRM Management" description="Manage users and customer contacts" badge="Admin" />
+      <GlobalAdminHeader title="CRM Management" description="Manage customer contacts, companies and deals" badge="Admin" />
       <AddPartyModal
         open={showAddParty}
         onOpenChange={setShowAddParty}
@@ -685,12 +503,6 @@ export const CRMManagement: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {canAdminUsers && !usersUnreadable && (
-            <>
-              <AdminStatCard title="Total Users" value={userStats.total} icon={Users} description="Registered users" variant="glass" />
-              <AdminStatCard title="Active Users" value={userStats.active} icon={Users} description="Currently active" variant="glass" />
-            </>
-          )}
           {/* Totals come from the API's exact count — the arrays hold one page now. */}
           <AdminStatCard title="Total Contacts" value={contactsTotal} icon={Building2} description="CRM contacts" variant="glass" />
           <AdminStatCard title="Total Companies" value={companiesTotal} icon={Building2} description="CRM companies" variant="glass" />
@@ -700,7 +512,6 @@ export const CRMManagement: React.FC = () => {
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
             <TabsTrigger value="pipeline"><Kanban className="h-4 w-4 mr-2" />Pipeline</TabsTrigger>
             <TabsTrigger value="leads"><UserPlus className="h-4 w-4 mr-2" />Leads</TabsTrigger>
-            {canAdminUsers && <TabsTrigger value="users"><Users className="h-4 w-4 mr-2" />Users</TabsTrigger>}
             <TabsTrigger value="contacts"><Building2 className="h-4 w-4 mr-2" />Contacts</TabsTrigger>
             <TabsTrigger value="companies"><Building2 className="h-4 w-4 mr-2" />Companies</TabsTrigger>
             <TabsTrigger value="categories"><Tags className="h-4 w-4 mr-2" />Categories</TabsTrigger>
@@ -722,115 +533,6 @@ export const CRMManagement: React.FC = () => {
               </Card>
             </ModuleTabGate>
           </TabsContent>
-
-          {/* Users Tab */}
-          {canAdminUsers && (
-          <TabsContent value="users" className="space-y-4 mt-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>User Management</CardTitle>
-                <CardDescription>Manage platform users, roles, and subscriptions</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <FilterBar
-                    groups={userGroups} values={userValues} onChange={setUserValues}
-                    previewCount={userPreviewCount}
-                    title="Filter users" searchPlaceholder="Search by email…" className="flex-1"
-                  />
-                  <Button size="sm" onClick={handleAddUser}>
-                    <Plus className="h-4 w-4 mr-2" /> Add user
-                  </Button>
-                </div>
-                {selUsers.size > 0 && (
-                  <CrmBulkBar
-                    count={selUsers.size} actions={userBulkActions} busy={bulkBusy}
-                    onApply={applyUserBulk}
-                    onDelete={() => runBulk([...selUsers], (uid) => usersAPI.deleteUser(uid), 'Deleted', loadUsers, () => setSelUsers(new Set()))}
-                    onClear={() => setSelUsers(new Set())}
-                  />
-                )}
-                <div className="rounded-md border border-hairline">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="w-10">
-                          <Checkbox checked={allUsersSelected} onCheckedChange={(v) =>
-                            setSelUsers(v ? new Set(filteredUsers.map((u) => u.user_id)) : new Set())} aria-label="Select all" />
-                        </TableHead>
-                        <TableHead aria-sort={userAriaSort('email')}>{userSortHead('email', 'Email')}</TableHead>
-                        {/* The GLOBAL account tier, not a team role. Team roles (Sales, HR,
-                            Warehouse, Marketing, Accountant…) are per-workspace and live in
-                            Profile → Team; setting one here would make it true in every workspace
-                            the user belongs to. */}
-                        <TableHead aria-sort={userAriaSort('tier')}>{userSortHead('tier', 'Account tier')}</TableHead>
-                        <TableHead aria-sort={userAriaSort('type')} className="hidden lg:table-cell">{userSortHead('type', 'Type')}</TableHead>
-                        <TableHead aria-sort={userAriaSort('subscription')} className="hidden md:table-cell">
-                          {userSortHead('subscription', 'Subscription')}
-                        </TableHead>
-                        <TableHead aria-sort={userAriaSort('credits')} className="hidden text-right sm:table-cell">
-                          {userSortHead('credits', 'Credits', 'right')}
-                        </TableHead>
-                        <TableHead aria-sort={userAriaSort('status')}>{userSortHead('status', 'Status')}</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {loadingUsers ? (
-                        <TableRow><TableCell colSpan={8} className="text-center py-4">Loading...</TableCell></TableRow>
-                      ) : filteredUsers.length === 0 ? (
-                        <TableRow className="hover:bg-transparent"><TableCell colSpan={8} className="p-0">
-                          <HubEmptyState
-                            variant={Object.keys(userValues).length ? 'filtered' : 'empty'}
-                            icon={Users}
-                            title={Object.keys(userValues).length ? 'No users match your filters' : 'No users yet'}
-                            description={Object.keys(userValues).length
-                              ? 'Widen the filter to see the rest of the account list.'
-                              : 'Platform accounts appear here once somebody signs up or is invited.'}
-                            action={Object.keys(userValues).length
-                              ? <Button size="sm" variant="outline" onClick={() => setUserValues({})}>Clear filters</Button>
-                              : undefined}
-                          />
-                        </TableCell></TableRow>
-                      ) : pagedUsers.map((user) => (
-                        <TableRow key={user.id} data-state={selUsers.has(user.user_id) ? 'selected' : undefined}>
-                          <TableCell>
-                            <Checkbox checked={selUsers.has(user.user_id)} onCheckedChange={() => setSelUsers((s) => toggle(s, user.user_id))} aria-label="Select row" />
-                          </TableCell>
-                          <TableCell className="max-w-[20rem] font-medium">
-                            <HubCellLink to={`/admin/crm/users/${user.user_id}`} className="inline-flex max-w-full items-center gap-2">
-                              <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
-                              <span className="block min-w-0 max-w-[16rem] truncate" title={user.email}>{user.email}</span>
-                            </HubCellLink>
-                          </TableCell>
-                          <TableCell>
-                            <Select value={user.role_id || ''} onValueChange={(v) => handleRoleChange(user.user_id, v)}>
-                              <SelectTrigger className="h-8 w-[150px]"><SelectValue placeholder="No role" /></SelectTrigger>
-                              <SelectContent>
-                                {roles.map((r) => <SelectItem key={r.id} value={r.id}>{roleLabel(r.name)}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="hidden text-sm text-muted-foreground lg:table-cell">{professionalTypeLabel(user.professional_type) || <HubCellEmpty />}</TableCell>
-                          <TableCell className="hidden md:table-cell"><span className="text-xs text-muted-foreground capitalize">{humanizeLabel(user.subscription_tier)}</span></TableCell>
-                          <TableCell className="hidden sm:table-cell"><div className="flex items-center justify-end gap-2 tabular-nums"><CreditCard className="h-4 w-4 text-muted-foreground" />{user.credits || 0}</div></TableCell>
-                          <TableCell><span className={`text-xs capitalize ${statusTone(user.status)}`}>{humanizeLabel(user.status)}</span></TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => handleResetPassword(user.email)} title="Reset password"><Key className="h-4 w-4 text-blue-500" /></Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteUser(user.user_id)} title="Delete user"><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                  <TablePagination page={usersPage} total={filteredUsers.length} onPageChange={setUsersPage} label="users" />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-          )}
 
           <TabsContent value="leads" className="space-y-4 mt-6">
             <LeadsPanel workspaceId={activeWorkspaceId} />
@@ -1027,34 +729,6 @@ export const CRMManagement: React.FC = () => {
           </TabsContent>
         </Tabs>
 
-        {/* Add User Modal */}
-        <Dialog open={showAddUserModal} onOpenChange={setShowAddUserModal}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Add New User</DialogTitle>
-              <DialogDescription>Create a new user account. They will receive a confirmation email.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="new-email">Email *</Label>
-                <Input id="new-email" type="email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} placeholder="user@example.com" className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="new-password">Password *</Label>
-                <Input id="new-password" type="password" value={newUserPassword} onChange={(e) => setNewUserPassword(e.target.value)} placeholder="Minimum 6 characters" className="mt-1" />
-              </div>
-              <div>
-                <Label htmlFor="new-displayName">Display Name</Label>
-                <Input id="new-displayName" value={newUserDisplayName} onChange={(e) => setNewUserDisplayName(e.target.value)} placeholder="John Doe" className="mt-1" />
-              </div>
-              <p className="text-sm text-muted-foreground">After creating the user, you can edit their role, subscription, and other details from their profile page.</p>
-              <div className="flex justify-end gap-2 pt-4">
-                <Button variant="outline" onClick={() => setShowAddUserModal(false)} disabled={creatingUser}>Cancel</Button>
-                <Button onClick={handleCreateUser} disabled={creatingUser}>{creatingUser ? 'Creating...' : 'Create User'}</Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
       </div>
     </div>
   );

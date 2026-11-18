@@ -6,6 +6,7 @@ import { AdminGuard } from '@/components/core/AdminGuard';
 import { WorkspaceAdminGuard } from '@/components/core/WorkspaceAdminGuard';
 import { EntitlementGuard } from '@/components/core/EntitlementGuard';
 import { Layout } from '@/components/core/Layout';
+import { AdminLayout } from '@/components/Admin/HQ/AdminShell';
 import { PageErrorBoundary } from '@/components/core/ErrorBoundary';
 import { PageLoader } from '@/components/core/PageLoader';
 
@@ -49,9 +50,9 @@ export function buildModuleRoutes(): React.ReactElement[] {
           <ModuleGate slug={mod.manifest.slug}>
             {requireAdmin ? (
               <AdminGuard>
-                <Layout>
+                <AdminLayout>
                   <Component />
-                </Layout>
+                </AdminLayout>
               </AdminGuard>
             ) : route.openToRecipient ? (
               <Layout>

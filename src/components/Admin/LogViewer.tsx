@@ -26,6 +26,7 @@ import {
 } from '@/components/core/filters';
 import { TablePagination, TABLE_PAGE_SIZE } from '@/components/core/ui/table-pagination';
 import { formatDate, toLocalISODate } from '@/utils/datetime';
+import { DataFields } from '@/components/shared/DataFields';
 type LogLevel = 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
 interface LogEntry {
@@ -487,9 +488,7 @@ export function LogViewer() {
               {selectedLog.context && Object.keys(selectedLog.context).length > 0 && (
                 <div>
                   <span className="block text-sm font-medium text-muted-foreground">Context</span>
-                  <pre className="text-xs mt-1 p-3 bg-muted text-foreground rounded border border-border overflow-x-auto">
-                    {JSON.stringify(selectedLog.context, null, 2)}
-                  </pre>
+                  <DataFields data={selectedLog.context} raw className="text-xs mt-1 p-3 bg-surface-sunken rounded-sm border border-hairline overflow-auto" />
                 </div>
               )}
             </div>

@@ -58,8 +58,9 @@ import {
   AccordionTrigger,
 } from '@/components/core/ui/accordion';
 import { PageHeader } from '@/components/shared/PageHeader';
-import type { ProductProgress, BackgroundJob, XMLImportJob, JobTypeMetrics, QueueMetrics } from './types';
-import { PRODUCT_STAGES, getPipelineForJobType } from './constants';
+import type { ProductProgress, BackgroundJob, JobTypeMetrics, QueueMetrics } from './types';
+import { PDF_JOB_TYPES, PRODUCT_STAGES, getPipelineForJobType, isPdfJobType } from './constants';
+import { DataFields } from '@/components/shared/DataFields';
 import { LiveTimer } from './components/LiveTimer';
 import { getStatusBadge } from './components/StatusBadge';
 import { PipelineErrorsPanel } from './components/PipelineErrorsPanel';
@@ -92,10 +93,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const [cancellingJob, setCancellingJob] = useState<string | null>(null);
   const [clearingQueue, setClearingQueue] = useState(false);
   const [deletingJob, setDeletingJob] = useState<string | null>(null);
-  const [selectedTab, setSelectedTab] = useState<'all' | 'xml_import'>('all');
-  // Each tab keeps its own page so switching tabs doesn't lose your place in the others.
   const [allPage, setAllPage] = useState(1);
-  const [xmlPage, setXmlPage] = useState(1);
   const [failedPage, setFailedPage] = useState(1);
   const [showDeleteJobModal, setShowDeleteJobModal] = useState(false);
   const [deleteJobId, setDeleteJobId] = useState('');
@@ -285,7 +283,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       let history: Array<Record<string, unknown>> = [];
       let usedFullStatus = false;
 
-      if (job.job_type === 'product_discovery_upload') {
+      if (isPdfJobType(job.job_type)) {
         try {
           const fullStatus = await mivaaApi.getJobFullStatus(job.id);
           if (fullStatus.success && fullStatus.data) {
@@ -362,7 +360,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       });
 
       // Fetch product progress for PDF processing jobs
-      if (job.job_type === 'product_discovery_upload') {
+      if (isPdfJobType(job.job_type)) {
         await fetchProductProgress(job.id);
       }
     } catch (error) {
@@ -372,41 +370,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     }
   };
 
-  // 🆕 Normalize XML import job to BackgroundJob format
-  const normalizeXMLJob = (xmlJob: XMLImportJob): BackgroundJob => {
-    // Calculate progress percentage
-    const progress = xmlJob.total_products > 0
-      ? Math.round((xmlJob.processed_products / xmlJob.total_products) * 100)
-      : 0;
-
-    return {
-      id: xmlJob.id,
-      workspace_id: xmlJob.workspace_id,
-      document_id: null,
-      job_type: 'xml_import',
-      status: xmlJob.status as any, // Map status
-      progress: progress,
-      created_at: xmlJob.created_at,
-      started_at: xmlJob.started_at,
-      completed_at: xmlJob.completed_at,
-      failed_at: null,
-      interrupted_at: null,
-      updated_at: xmlJob.completed_at ?? xmlJob.started_at ?? xmlJob.created_at,
-      last_heartbeat: null,
-      error: xmlJob.error_message,
-      metadata: {
-        source_name: xmlJob.source_name || 'XML Import',
-        import_type: xmlJob.import_type,
-        total_products: xmlJob.total_products,
-        processed_products: xmlJob.processed_products,
-        failed_products: xmlJob.failed_products,
-        category: xmlJob.category,
-        source_url: xmlJob.source_url,
-        ...xmlJob.metadata,
-      },
-    };
-  };
-
   const fetchQueueData = useCallback(async () => {
     try {
       setError(null);
@@ -414,7 +377,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       // The two sources are INDEPENDENT, so they run concurrently. Awaiting them in sequence
       // costs the sum of both latencies on every tick of the 10-second `setInterval` below, on a
       // screen admins leave open all day.
-      const [bgJobsRes, xmlJobsRes] = await Promise.all([
+      const [bgJobsRes] = await Promise.all([
         supabase
           .from('background_jobs')
           // `count: 'exact'` is the disclosure, not an optimisation: every headline number on this
@@ -423,40 +386,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           // recent 500 as if it were the whole queue, and a truncated count on an operations
           // dashboard is worse than an error because it looks authoritative. (#365 AD-8)
           .select('*', { count: 'exact' })
-          .in('job_type', ['product_discovery_upload', 'image_embedding_regeneration'])
+          .in('job_type', [...PDF_JOB_TYPES, 'image_embedding_regeneration'])
           .order('created_at', { ascending: false })
           // Both job sources are merged and filtered per-tab client-side, so server-side paging
           // isn't available here; the cap is raised instead so pagination isn't paging a truncation.
           .limit(JOB_FETCH_CAP),
-        // XML import jobs from data_import_jobs
-        supabase
-          .from('data_import_jobs')
-          .select('*', { count: 'exact' })
-          .order('created_at', { ascending: false })
-          .limit(JOB_FETCH_CAP),
       ]);
 
       const { data: bgJobsData, error: bgJobsError, count: bgJobsCount } = bgJobsRes;
-      const { data: xmlJobsData, error: xmlJobsError, count: xmlJobsCount } = xmlJobsRes;
 
       // How many rows exist versus how many these metrics were computed over.
-      const fetchedTotal = (bgJobsData?.length || 0) + (xmlJobsData?.length || 0);
-      const serverTotal =
-        bgJobsCount === null || bgJobsCount === undefined ||
-        xmlJobsCount === null || xmlJobsCount === undefined
-          ? null
-          : bgJobsCount + xmlJobsCount;
+      const fetchedTotal = bgJobsData?.length || 0;
+      const serverTotal = bgJobsCount ?? null;
       setJobCoverage({ fetched: fetchedTotal, total: serverTotal });
 
       if (bgJobsError) throw bgJobsError;
 
-      if (xmlJobsError) {
-        console.warn('⚠️ Failed to fetch XML import jobs:', xmlJobsError);
-      }
-
-      // 🆕 Normalize XML jobs and combine with background jobs
-      const normalizedXMLJobs = (xmlJobsData || []).map(normalizeXMLJob);
-      const allJobs = [...(bgJobsData || []), ...normalizedXMLJobs];
+      const allJobs: BackgroundJob[] = [...(bgJobsData || [])];
 
       // Sort by created_at descending
       allJobs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -517,7 +463,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       // 🆕 Calculate metrics from combined jobs (background_jobs + data_import_jobs)
       const calculateMetrics = (): QueueMetrics => {
         // Calculate metrics for each job type
-        const xmlMetrics = calculateJobTypeMetrics(allJobs, 'xml_import');
         const allMetrics = calculateJobTypeMetrics(allJobs); // All jobs combined
 
         // Calculate totals from metadata
@@ -526,7 +471,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             job.metadata?.result?.products_discovered ||
             job.metadata?.products_discovered ||
             job.metadata?.products_created ||
-            job.metadata?.processed_products || // XML jobs
             job.metadata?.processed ||
             0
           );
@@ -543,7 +487,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         const totalDocuments = new Set(allJobs.map((j) => j.document_id).filter(Boolean)).size;
 
         return {
-          xml_import: xmlMetrics,
           all_jobs: allMetrics,
           total_documents: totalDocuments,
           total_products_created: totalProducts,
@@ -566,18 +509,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   const { values: filterValues, setValues: setFilterValues, filtered: scopedJobs, previewCount } =
     useFilters<BackgroundJob>(jobs, filterGroups);
 
-  /** Rows of one job-type tab, within the modal-narrowed set — also drives the tab badges. */
-  const jobsOfType = useCallback((list: BackgroundJob[], type: typeof selectedTab): BackgroundJob[] => {
-    if (type === 'all') return list;
-    return list.filter(job => job.job_type === type);
-  }, []);
-
-  // 🆕 Filter jobs by selected tab. Memoized because the render calls getFilteredJobs()
-  // several times per pass (list body, empty check, pagination total, bulk-action guards).
-  const filteredJobs = useMemo<BackgroundJob[]>(
-    () => jobsOfType(scopedJobs, selectedTab),
-    [scopedJobs, selectedTab, jobsOfType],
-  );
+  const filteredJobs = scopedJobs;
 
   const getFilteredJobs = (): BackgroundJob[] => filteredJobs;
 
@@ -586,12 +518,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
   // Realtime refreshes and deletions shrink these lists constantly; clamping at render
   // keeps a now-out-of-range page from showing an empty table with no way back.
   const allPageSafe = clampPage(allPage, filteredJobs.length);
-  const xmlPageSafe = clampPage(xmlPage, filteredJobs.length);
   const failedPageSafe = clampPage(failedPage, failedJobs.length);
 
   // A narrowed result set is a different list in every tab — restart them all at page 1.
   useEffect(() => {
-    setAllPage(1); setXmlPage(1); setFailedPage(1);
+    setAllPage(1); setFailedPage(1);
   }, [filterValues]);
 
   useEffect(() => {
@@ -606,21 +537,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           event: '*',
           schema: 'public',
           table: 'background_jobs',
-        },
-        () => {
-          fetchQueueData();
-        },
-      )
-      .subscribe();
-
-    const importSubscription = supabase
-      .channel('data_import_jobs_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'data_import_jobs',
         },
         () => {
           fetchQueueData();
@@ -651,7 +567,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
     return () => {
       jobsSubscription.unsubscribe();
-      importSubscription.unsubscribe();
       webhookSubscription.unsubscribe();
       if (interval) clearInterval(interval);
     };
@@ -719,7 +634,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         });
 
         // 🚀 PROACTIVE PRODUCT REFRESH
-        const isPdfJob = typedJobData.job_type === 'product_discovery_upload';
+        const isPdfJob = isPdfJobType(typedJobData.job_type);
 
         const shouldFetchProducts = isPdfJob && (
           (typedJobData.status === 'processing' && (productsDiscoveredCount > 0 || jobCheckpoints.some(cp => cp.stage === 'products_detected'))) ||
@@ -987,81 +902,6 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       cancelInFlight.current.delete(jobId);
     }
   };
-
-  /**
-   * Auto-cleanup completed jobs older than 30 days
-   * This only removes the job record and checkpoints, NOT all related data
-   * (products, chunks, images, etc. are preserved)
-   */
-  const cleanupOldCompletedJobs = async (daysOld: number = 30): Promise<number> => {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-    const cutoffISOString = cutoffDate.toISOString();
-
-    try {
-      // Get IDs of old completed jobs
-      const { data: oldJobs, error: fetchError } = await supabase
-        .from('background_jobs')
-        .select('id')
-        .eq('status', 'completed')
-        .lt('completed_at', cutoffISOString);
-
-      if (fetchError) {
-        console.error('Error fetching old jobs:', fetchError);
-        return 0;
-      }
-
-      if (!oldJobs || oldJobs.length === 0) {
-        return 0;
-      }
-
-      const jobIds = oldJobs.map(j => j.id);
-
-      // Delete product_processing_status for these jobs.
-      //
-      // Checked (#389): supabase-js resolves on an RLS denial, so a refused delete here
-      // followed by a successful job delete below leaves ORPHANED status rows pointing
-      // at jobs that no longer exist — a reaper that silently stops clearing half the
-      // mess is the shape `ops.test_artifacts_accumulating` exists to catch.
-      const { error: statusDeleteError } = await supabase
-        .from('product_processing_status')
-        .delete()
-        .in('job_id', jobIds);
-      if (statusDeleteError) throw statusDeleteError;
-
-      // Stage history travels with background_jobs, no separate cleanup.
-
-      // Delete the job records (but NOT the related products, chunks, images, etc.)
-      const { error: deleteError } = await supabase
-        .from('background_jobs')
-        .delete()
-        .in('id', jobIds);
-
-      if (deleteError) {
-        console.error('Error deleting old jobs:', deleteError);
-        return 0;
-      }
-
-      return jobIds.length;
-    } catch (error) {
-      console.error('Error in cleanupOldCompletedJobs:', error);
-      return 0;
-    }
-  };
-
-  // Auto-cleanup old completed jobs on component mount (runs once)
-  useEffect(() => {
-    const runCleanup = async () => {
-      const cleanedCount = await cleanupOldCompletedJobs(30);
-      if (cleanedCount > 0) {
-        // Refresh the job list if any were cleaned
-        await fetchQueueData();
-      }
-    };
-    runCleanup();
-    // Only run once on mount - no dependencies
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleClearQueue = async () => {
     // Include ALL jobs that can be cleared: pending, failed, interrupted, AND processing
@@ -1513,31 +1353,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         searchPlaceholder="Search filename, source, job id…"
       />
 
-      {/* 🆕 Job Type Tabs */}
-      <Tabs
-        value={selectedTab}
-        onValueChange={(value) => {
-          setSelectedTab(value as any);
-          // The tab IS the job-type filter, so the row set changes completely — start at page 1.
-          setAllPage(1);
-          setXmlPage(1);
-        }}
-        className="space-y-4"
-      >
-        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-          {/* Badges count the modal-narrowed set so a tab never promises rows the filter hides. */}
-          <TabsTrigger value="all" className="flex items-center gap-2">
-            All Jobs
-            <Badge variant="secondary" className="ml-1">{scopedJobs.length}</Badge>
-          </TabsTrigger>
-          <TabsTrigger value="xml_import" className="flex items-center gap-2">
-            XML Import
-            <Badge variant="secondary" className="ml-1">{jobsOfType(scopedJobs, 'xml_import').length}</Badge>
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Tab Content - All Jobs */}
-        <TabsContent value="all" className="space-y-4">
+      <div className="space-y-4">
           <Card className="dashboard-card border-white/10">
             <CardHeader>
               <div className="flex items-center justify-between">
@@ -1800,222 +1616,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-
-        {/* Tab Content - XML Import */}
-        <TabsContent value="xml_import" className="space-y-4">
-          <Card className="dashboard-card border-white/10">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-primary" />
-                    XML Import Jobs
-                  </CardTitle>
-                  <CardDescription>
-                    {metrics.xml_import.total} total jobs | Avg processing time:{' '}
-                    {formatTime(metrics.xml_import.avg_processing_time)}
-                  </CardDescription>
-                </div>
-
-                {/* Control Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleClearQueue}
-                    disabled={clearingQueue || getFilteredJobs().filter(j => j.status === 'pending' || j.status === 'failed').length === 0}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Cancel all pending and failed jobs"
-                  >
-                    {clearingQueue ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Clearing...
-                      </>
-                    ) : (
-                      <>
-                        <XCircle className="w-3.5 h-3.5 inline mr-1.5" />
-                        Clear Queue
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setAutoRefresh(!autoRefresh)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 shadow-sm ${
-                      autoRefresh
-                        ? 'bg-green-600 hover:bg-green-700 text-white'
-                        : 'bg-white/10 text-foreground hover:bg-white/15 border border-white/10'
-                    }`}
-                  >
-                    {autoRefresh ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Auto-refresh ON
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
-                        Auto-refresh OFF
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={fetchQueueData}
-                    className="px-3 py-1.5 bg-white/10 text-foreground hover:bg-white/15 border border-white/10 rounded-md text-sm font-medium transition-all duration-200"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
-                    Refresh Now
-                  </button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Status Breakdown */}
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-yellow-600" />
-                    <p className="text-xs text-muted-foreground">Pending</p>
-                  </div>
-                  <div className="text-2xl font-bold text-yellow-400">
-                    {metrics.xml_import.pending}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                    <p className="text-xs text-muted-foreground">Processing</p>
-                  </div>
-                  <div className="text-2xl font-bold text-blue-400">
-                    {metrics.xml_import.processing}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <p className="text-xs text-muted-foreground">Completed</p>
-                  </div>
-                  <div className="text-2xl font-bold text-green-400">
-                    {metrics.xml_import.completed}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="h-4 w-4 text-red-600" />
-                    <p className="text-xs text-muted-foreground">Failed</p>
-                  </div>
-                  <div className="text-2xl font-bold text-red-400">
-                    {metrics.xml_import.failed}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                    <p className="text-xs text-muted-foreground">Interrupted</p>
-                  </div>
-                  <div className="text-2xl font-bold text-orange-400">
-                    {metrics.xml_import.interrupted}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="h-4 w-4 text-gray-600" />
-                    <p className="text-xs text-muted-foreground">Cancelled</p>
-                  </div>
-                  <div className="text-2xl font-bold text-gray-400">
-                    {metrics.xml_import.cancelled}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-purple-600" />
-                    <p className="text-xs text-muted-foreground">Retrying</p>
-                  </div>
-                  <div className="text-2xl font-bold text-purple-400">
-                    {metrics.xml_import.retrying}
-                  </div>
-                </div>
-                <div className="dashboard-card">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Activity className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
-                    <p className="text-xs text-muted-foreground">Total</p>
-                  </div>
-                  <div className="text-2xl font-bold">
-                    {metrics.xml_import.total}
-                  </div>
-                </div>
-              </div>
-
-              {/* Recent Jobs List */}
-              <div className="mt-6">
-                <h4 className="font-semibold mb-3 text-foreground">Recent Jobs</h4>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {getFilteredJobs().length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No jobs in queue</p>
-                  ) : (
-                    paginate(getFilteredJobs(), xmlPageSafe).map((job) => (
-                      <div
-                        key={job.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
-                      >
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={onEnterOrSpace(() => fetchJobDetails(job))}
-                          className="flex-1 cursor-pointer"
-                          onClick={() => fetchJobDetails(job)}
-                        >
-                          <div className="text-sm font-medium text-foreground group-hover:text-primary transition">
-                            {job.metadata?.source_name || job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2">
-                            <span>{formatDate(job.created_at)}</span>
-                            <span>•</span>
-                            <span>Progress: {job.progress}%</span>
-                            <span>•</span>
-                            <span className="font-medium">
-                              <LiveTimer job={job} />
-                            </span>
-                          </div>
-                          {job.metadata?.stage && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Stage: {(job.metadata as any)?.sub_stage || job.metadata.stage}
-                              {(job.metadata as any)?.sub_stage && (
-                                <span className="ml-1 text-muted-foreground">({job.metadata.stage})</span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(job.status, job)}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleDeleteJob(job.id);
-                            }}
-                            disabled={deletingJob === job.id}
-                            className="p-1 rounded hover:bg-red-500/20 disabled:opacity-50"
-                            title="Delete job"
-                          >
-                            <Trash2 className={`w-4 h-4 text-red-600 hover:text-red-300 transition ${deletingJob === job.id ? 'animate-spin' : ''}`} />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-                <TablePagination
-                  page={xmlPageSafe}
-                  total={getFilteredJobs().length}
-                  onPageChange={setXmlPage}
-                  label="jobs"
-                />
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      </div>
 
       {/* Error Logs */}
       {failedJobs.length > 0 && (
@@ -3312,10 +2913,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                           <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
                                           Technical Metadata
                                         </summary>
-                                        <div className="mt-2 bg-white/5 border border-white/10 rounded-md p-3 text-xs font-mono">
-                                          <pre className="whitespace-pre-wrap text-muted-foreground">
-                                            {JSON.stringify(product.metadata, null, 2)}
-                                          </pre>
+                                        <div className="mt-2 rounded-sm border border-hairline bg-surface-sunken p-3 text-xs">
+                                          <DataFields data={product.metadata} />
                                         </div>
                                       </details>
                                     )}

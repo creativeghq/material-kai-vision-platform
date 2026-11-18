@@ -5,16 +5,15 @@
 
 import React, { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Database, Link2, Copy, Tags } from 'lucide-react';
+import { Database, Link2, Copy } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MetadataManagement } from '@/components/Admin/MetadataManagement';
 import { FieldRoleAudit } from '@/components/Admin/FieldRoleAudit';
 import { RelevancyManagement } from '@/components/Admin/RelevancyManagement';
 import { DuplicateDetectionPage } from './DuplicateDetectionPage';
-import { BatchCategorizationPage } from './BatchCategorizationPage';
 
-const TAB_VALUES = ['metadata', 'relevancy', 'duplicates', 'categorization', 'field-roles'] as const;
+const TAB_VALUES = ['metadata', 'relevancy', 'duplicates', 'field-roles'] as const;
 type TabValue = typeof TAB_VALUES[number];
 
 interface AIDataPageProps {
@@ -66,9 +65,6 @@ const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false, tabParam }) =
             <TabsTrigger value="duplicates" className="flex items-center gap-2">
               <Copy className="h-4 w-4" /> Duplicates
             </TabsTrigger>
-            <TabsTrigger value="categorization" className="flex items-center gap-2">
-              <Tags className="h-4 w-4" /> Categorization
-            </TabsTrigger>
             <TabsTrigger value="field-roles" className="flex items-center gap-2">
               <Database className="h-4 w-4" /> Field Roles
             </TabsTrigger>
@@ -82,10 +78,6 @@ const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false, tabParam }) =
           </TabsContent>
           <TabsContent value="duplicates" className="mt-6">
             <DuplicateDetectionPage />
-          </TabsContent>
-          {/* Bulk AI categorization — relocated from /admin/batch-categorization */}
-          <TabsContent value="categorization" className="mt-6">
-            <BatchCategorizationPage embedded />
           </TabsContent>
           {/* #347 phase 4.5 — audit and override, never a gate. */}
           <TabsContent value="field-roles" className="mt-6">

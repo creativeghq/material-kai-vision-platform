@@ -312,11 +312,11 @@ const ModulesPage: React.FC = () => {
     <div>
       <PageHeader
         icon={Package}
-        title="Platform"
+        title="Modules & Plans"
         subtitle="What the platform sells and how it is reached: modules and who subscribes to them, plan tiers and limits, platform secrets, and partner API keys."
-        breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Platform' }]}
+        breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Modules & Plans' }]}
       >
-        <HubTabNav items={PLATFORM_TABS} activeId={active} onSelect={select} aria-label="Platform sections" />
+        <HubTabNav items={PLATFORM_TABS} activeId={active} onSelect={select} aria-label="Modules & Plans sections" />
       </PageHeader>
 
       <Tabs value={active} onValueChange={select} className="p-3 sm:p-6">

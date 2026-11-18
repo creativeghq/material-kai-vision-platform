@@ -17,34 +17,38 @@ import { SystemAreasTab } from './SystemAreasTab';
 import { flowService } from '@/services/flows';
 import type { Flow } from '@/services/flows';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export const FlowsManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState('my-flows');
   const [loading, setLoading] = useState(true);
   const [flows, setFlows] = useState<Flow[]>([]);
   const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<{ total: number; active: number; runs30d: number | null; successRate: number | null }>({
     total: 0,
     active: 0,
-    runsToday: 0,
-    successRate: 0,
+    runs30d: null,
+    successRate: null,
   });
   const { toast } = useToast();
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const allFlows = await flowService.listFlows();
+      const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+      const [allFlows, finished, failed] = await Promise.all([
+        flowService.listFlows(),
+        supabase.from('flow_runs').select('id', { count: 'exact', head: true }).gte('created_at', since).in('status', ['completed', 'failed']),
+        supabase.from('flow_runs').select('id', { count: 'exact', head: true }).gte('created_at', since).eq('status', 'failed'),
+      ]);
       setFlows(allFlows);
 
-      const activeFlows = allFlows.filter(f => f.status === 'active').length;
-      const totalRuns = allFlows.reduce((sum, f) => sum + f.run_count, 0);
-
+      const runs = finished.error || failed.error ? null : finished.count ?? 0;
       setStats({
         total: allFlows.length,
-        active: activeFlows,
-        runsToday: totalRuns,
-        successRate: totalRuns > 0 ? 95 : 0,
+        active: allFlows.filter(f => f.status === 'active').length,
+        runs30d: runs,
+        successRate: runs ? Math.round(((runs - (failed.count ?? 0)) / runs) * 1000) / 10 : null,
       });
     } catch (error) {
       console.error('Error loading flows:', error);
@@ -76,14 +80,14 @@ export const FlowsManagement: React.FC = () => {
       color: 'text-green-500',
     },
     {
-      title: 'Total Runs',
-      value: stats.runsToday,
+      title: 'Runs (30 Days)',
+      value: stats.runs30d ?? '—',
       icon: Clock,
       color: 'text-amber-500',
     },
     {
       title: 'Success Rate',
-      value: stats.successRate > 0 ? `${stats.successRate}%` : '—',
+      value: stats.successRate == null ? '—' : `${stats.successRate}%`,
       icon: CheckCircle2,
       color: 'text-emerald-500',
     },

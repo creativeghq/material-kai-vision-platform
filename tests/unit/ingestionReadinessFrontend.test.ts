@@ -65,8 +65,10 @@ describe('B18 — job controls do what they say', () => {
     expect(s).toMatch(/prev\.failure_summary/);
   });
 
-  it('the active-jobs banner watches product_discovery_upload, the job type a PDF upload creates', () => {
-    expect(src('src/components/Admin/DataImportHub.tsx')).toMatch(/\.eq\('job_type', 'product_discovery_upload'\)/);
+  it('the active-jobs banner watches every PDF job type the backend runs', () => {
+    expect(src('src/components/Admin/DataImportHub.tsx')).toMatch(/\.in\('job_type', \[\.\.\.PDF_JOB_TYPES\]\)/);
+    expect(src('src/components/Admin/AsyncJobQueueMonitor/constants.ts'))
+      .toMatch(/PDF_JOB_TYPES = \['product_discovery_upload', 'pdf_processing'\]/);
   });
 
   it('a failed stage is not a completed one, and a partial job is not a clean success', () => {
@@ -227,7 +229,6 @@ describe('writers', () => {
     for (const f of [
       'src/components/Admin/MaterialsData/MaterialsDataPage.tsx',
       'src/components/Admin/MetadataManagement.tsx',
-      'src/pages/Admin/BatchCategorizationPage.tsx',
     ]) {
       expect(src(f), f).not.toMatch(/from\('products'\)\s*\.select\('\*'/);
     }

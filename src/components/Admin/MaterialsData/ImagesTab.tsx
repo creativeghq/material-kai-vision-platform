@@ -21,6 +21,7 @@ import { ImageEmbeddingsInspector } from './ImageEmbeddingsInspector';
 import { SourceDocumentLink } from './SourceDocumentLink';
 
 import { onEnterOrSpace } from '@/utils/a11y';
+import { DataFields } from '@/components/shared/DataFields';
 
 interface ImagesTabProps {
   workspaceId: string;
@@ -806,7 +807,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
                       {Object.entries(selectedImage.visual_features).map(([key, value]: [string, any]) => (
                         <div key={key}>
                           <span className="text-xs text-muted-foreground capitalize">{key.replace(/_/g, ' ')}:</span>
-                          <p className="text-xs break-words">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                          <DataFields data={value} className="text-xs" />
                         </div>
                       ))}
                     </CardContent>
@@ -823,7 +824,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
                       {Object.entries(selectedImage.image_analysis_results).map(([key, value]: [string, any]) => (
                         <div key={key}>
                           <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
-                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                          <DataFields data={value} className="text-xs bg-surface-sunken p-2 rounded-sm" />
                         </div>
                       ))}
                     </CardContent>
@@ -875,7 +876,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
                       {Object.entries(selectedImage.visual_metadata).map(([key, value]: [string, any]) => (
                         <div key={key}>
                           <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
-                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                          <DataFields data={value} className="text-xs bg-surface-sunken p-2 rounded-sm" />
                         </div>
                       ))}
                     </CardContent>
@@ -892,7 +893,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
                       {Object.entries(selectedImage.multimodal_metadata).map(([key, value]: [string, any]) => (
                         <div key={key}>
                           <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
-                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                          <DataFields data={value} className="text-xs bg-surface-sunken p-2 rounded-sm" />
                         </div>
                       ))}
                     </CardContent>
@@ -909,7 +910,7 @@ export const ImagesTab: React.FC<ImagesTabProps> = ({ workspaceId, jobIdFilter})
                       {Object.entries(selectedImage.extracted_metadata).map(([key, value]: [string, any]) => (
                         <div key={key}>
                           <span className="text-xs text-muted-foreground capitalize block mb-1">{key.replace(/_/g, ' ')}:</span>
-                          <p className="text-xs break-words bg-muted p-2 rounded">{typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value)}</p>
+                          <DataFields data={value} className="text-xs bg-surface-sunken p-2 rounded-sm" />
                         </div>
                       ))}
                     </CardContent>

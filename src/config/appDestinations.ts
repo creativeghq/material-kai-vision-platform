@@ -119,7 +119,7 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
   {
     id: 'background-tasks',
     breadcrumb: 'Admin → Background Tasks',
-    route: '/admin/ai-configs?tab=background-agents',
+    route: '/admin/agent-ops?tab=background-agents',
     aliases: ['Admin → Background Agents'],
   },
   { id: 'admin-flows', breadcrumb: 'Admin → Flows', route: '/flows' },

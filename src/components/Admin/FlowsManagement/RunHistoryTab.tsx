@@ -19,6 +19,7 @@ import { flowService } from '@/services/flows';
 import type { Flow, FlowRun, FlowRunStep, FlowRunStatus } from '@/services/flows';
 import { useToast } from '@/hooks/use-toast';
 import { buildFlowRunFilters } from './flowRunFilters';
+import { DataFields } from '@/components/shared/DataFields';
 
 const statusConfig: Record<FlowRunStatus, { icon: React.ElementType; color: string; label: string }> = {
   pending: { icon: Clock, color: 'text-gray-500', label: 'Pending' },
@@ -255,9 +256,7 @@ export function RunHistoryTab() {
                     {run.trigger_event_data && Object.keys(run.trigger_event_data).length > 0 && (
                       <div className="mt-3 pt-3 border-t">
                         <p className="text-xs font-medium text-muted-foreground mb-1">Trigger Data</p>
-                        <pre className="text-xs bg-muted rounded p-2 overflow-x-auto max-h-32">
-                          {JSON.stringify(run.trigger_event_data, null, 2)}
-                        </pre>
+                        <DataFields data={run.trigger_event_data} raw className="text-xs bg-surface-sunken rounded-sm p-2 overflow-auto max-h-48" />
                       </div>
                     )}
                   </div>

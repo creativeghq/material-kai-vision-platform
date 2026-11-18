@@ -13,6 +13,7 @@ import { edgeError } from '@/utils/edgeError';
 import { useToast } from '@/hooks/use-toast';
 import ScheduleImportModal from './ScheduleImportModal';
 import { XMLImportJobCard, XMLImportJob } from './XMLImportJobCard';
+import { PDF_JOB_TYPES } from '../AsyncJobQueueMonitor/constants';
 
 interface ImportJob {
   id: string;
@@ -112,7 +113,7 @@ const ImportHistoryTab: React.FC = () => {
           .from('background_jobs')
           .select('*')
           .eq('workspace_id', workspaceId)
-          .in('job_type', ['pdf_processing', 'product_discovery_upload'])
+          .in('job_type', [...PDF_JOB_TYPES])
           .order('created_at', { ascending: false })
           .limit(25),
       ]);

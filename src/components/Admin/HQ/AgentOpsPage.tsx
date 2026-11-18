@@ -15,9 +15,11 @@ import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { formatDate, timeAgo } from '@/utils/datetime';
+import { DataFields } from '@/components/shared/DataFields';
 
 import { ConversationTraceSheet } from '../AgentHarness/ConversationTraceSheet';
 import { failTone, fmtInt, fmtMs, fmtPct, fmtUsd, ratio } from '../AgentHarness/harnessFormat';
+import { BackgroundAgentsPage } from '../BackgroundAgents/BackgroundAgentsPage';
 import { CronJobsPanel } from '../CronJobsPanel';
 import { refreshAdminAttention } from './adminAttention';
 import {
@@ -162,6 +164,7 @@ const AgentOpsPage: React.FC = () => {
             )),
           },
           { id: 'agents', label: 'Agents', render: body(() => <AgentsTab agents={data!.agents} days={days} />) },
+          { id: 'background-agents', label: 'Background Agents', render: () => <BackgroundAgentsPage /> },
           { id: 'processes', label: 'Processes', render: body(() => <ProcessesTab desk={data!} onTrace={(id) => setParam('trace', id)} />) },
         ]}
       />
@@ -375,48 +378,6 @@ const ProcessesTab: React.FC<{ desk: OpsDesk; onTrace: (id: string) => void }> =
       </CardContent>
     </Card>
 
-    <Card>
-      <CardHeader className="flex flex-row items-start justify-between space-y-0">
-        <div>
-          <CardTitle>Background Agent Runs</CardTitle>
-          <CardDescription>The latest 50 runs in this window.</CardDescription>
-        </div>
-        <Button asChild variant="ghost" size="sm"><Link to="/admin/ai-configs?tab=background-agents">Configure</Link></Button>
-      </CardHeader>
-      <CardContent className="p-0">
-        {desk.runs.length === 0 ? (
-          <HubEmptyState title="No background agent ran in this window" description="Widen the window to see earlier runs." />
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Agent</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Trigger</TableHead>
-                <TableHead>Started</TableHead>
-                <TableHead className="text-right">Duration</TableHead>
-                <TableHead>Error</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {desk.runs.map((r) => (
-                <TableRow key={r.id}>
-                  <TableCell className="text-sm font-medium">{r.agent}</TableCell>
-                  <TableCell>
-                    <Badge variant={r.status === 'completed' ? 'success' : r.status === 'failed' ? 'error' : r.status === 'cancelled' ? 'neutral' : 'info'} className="capitalize">{r.status}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm capitalize text-muted-foreground">{r.triggered_by ?? '—'}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">{timeAgo(r.created_at)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtMs(r.duration_ms)}</TableCell>
-                  <TableCell className="max-w-[320px] text-xs text-muted-foreground"><span className="line-clamp-2">{r.error ?? '—'}</span></TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        )}
-      </CardContent>
-    </Card>
-
     <CronJobsPanel />
 
     <p className="text-xs text-muted-foreground">
@@ -526,9 +487,7 @@ const CaseSheet: React.FC<{
               {!detail.safe_fix_available && c.source_kind === 'integrity_check' && (
                 <p className="mb-2 text-xs text-muted-foreground">No unattended heal is enabled for this check, so Stark can diagnose it but not change data.</p>
               )}
-              <pre className="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-sm border border-hairline bg-surface-sunken p-2 text-[11px] leading-relaxed">
-                {JSON.stringify(detail.evidence, null, 2)}
-              </pre>
+              <DataFields data={detail.evidence} raw className="max-h-[32rem] overflow-auto rounded-sm border border-hairline bg-surface-sunken p-2 text-xs" />
             </section>
           </div>
         )}

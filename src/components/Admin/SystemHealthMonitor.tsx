@@ -9,6 +9,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
@@ -28,7 +29,6 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { CronJobsPanel } from '@/components/Admin/CronJobsPanel';
 import { WebhooksPanel } from '@/components/Admin/WebhooksPanel';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
@@ -221,7 +221,7 @@ export const SystemHealthMonitor: React.FC = () => {
       ] = await Promise.all([
         fetch(`${apiUrl}/health/detailed`).catch(() => null),
         fetch(`${apiUrl}/health${forceRefresh ? '?force_refresh=true' : ''}`).catch(() => null),
-        supabase.from('materials_catalog').select('id', { count: 'exact', head: true }).then(({ error }) => !error).catch(() => false),
+        supabase.from('modules').select('id', { count: 'exact', head: true }).then(({ error }) => !error).catch(() => false),
         supabase.functions.invoke('health-check').then(({ data }) => data).catch(() => null),
         // Third-party provider uptime from real usage outcomes (catches 402/outage
         // that reachability pings miss — e.g. DataForSEO balance depleted).
@@ -1115,9 +1115,11 @@ export const SystemHealthMonitor: React.FC = () => {
         </CardContent>
       </Card>
 
-      <CronJobsPanel />
-
       <WebhooksPanel />
+
+      <p className="text-xs text-muted-foreground">
+        Cron jobs are listed with the other background processes in <Link to="/admin/agent-ops?tab=processes" className="text-primary hover:underline">Agent Ops → Processes</Link>.
+      </p>
 
       <p className="text-xs text-muted-foreground text-center">
         Last updated: {formatDate(health.timestamp, { withTime: true })} • Auto-refreshes every 30s

@@ -1,14 +1,14 @@
 /**
- * Filter definitions for the two Background Agents surfaces.
+ * Filter definitions for the Background Agents run list.
  *
  * Status stays a counted tab strip on both pages — it is primary navigation and the
  * live counts are the point. Everything secondary (which agent, which tool, how long,
  * how expensive, when) moves in here so the toolbar stops growing a Select per dimension.
  */
-import { Bot, CalendarDays, Coins, MessageSquare, Wrench } from 'lucide-react';
+import { Bot, CalendarDays, Coins } from 'lucide-react';
 import { optionsFromRows, type FilterGroupDef } from '@/components/core/filters';
 import { humanizeLabel } from '@/utils/humanize';
-import type { AgentRun, BackgroundAgent, ChatToolCall } from '@/services/backgroundAgents';
+import type { AgentRun, BackgroundAgent } from '@/services/backgroundAgents';
 
 /** Round the observed max up so the slider end isn't pinned to a single real row. */
 function bounds(rows: any[], pick: (r: any) => any, fallbackMax: number): { min: number; max: number } {
@@ -103,72 +103,6 @@ export function buildAgentRunFilters(runs: AgentRun[], agents: BackgroundAgent[]
         { key: 'created_at', type: 'dateRange', label: 'Created', accessor: (r) => r.created_at },
         { key: 'started_at', type: 'dateRange', label: 'Last Run', accessor: (r) => r.started_at ?? r.created_at },
       ],
-    },
-  ];
-}
-
-export function buildChatToolCallFilters(calls: ChatToolCall[]): FilterGroupDef[] {
-  const duration = bounds(calls, (c) => c.duration_ms, 10_000);
-  const results = bounds(calls, (c) => c.result_count, 50);
-
-  return [
-    {
-      key: 'general', label: 'General', icon: Wrench,
-      fields: [
-        {
-          key: 'q', type: 'text', label: 'Search',
-          placeholder: 'Search tool name, args, error message…',
-          accessor: (c) => [c.tool_name, JSON.stringify(c.tool_args ?? {}), c.error_message],
-        },
-        {
-          key: 'tool', type: 'multi', label: 'Tool',
-          options: optionsFromRows(calls, (c) => c.tool_name),
-          accessor: (c) => c.tool_name,
-        },
-        {
-          key: 'success', type: 'bool', label: 'Outcome',
-          trueLabel: 'Successful', falseLabel: 'Failed',
-          accessor: (c) => !!c.success,
-        },
-        {
-          key: 'zero_result', type: 'bool', label: 'Zero Result',
-          description: 'Tool ran cleanly but returned nothing — usually a retrieval gap, not a bug.',
-          trueLabel: 'Zero result only', falseLabel: 'Returned results',
-          accessor: (c) => !!c.zero_result,
-        },
-      ],
-    },
-    {
-      key: 'origin', label: 'Origin', icon: MessageSquare,
-      fields: [
-        {
-          key: 'agent_id', type: 'multi', label: 'Chat Agent',
-          options: optionsFromRows(calls, (c) => c.agent_id),
-          accessor: (c) => c.agent_id,
-        },
-        {
-          key: 'user', type: 'multi', label: 'User',
-          options: optionsFromRows(calls, (c) => c.user_email ?? c.user_name ?? undefined),
-          accessor: (c) => c.user_email ?? c.user_name ?? undefined,
-        },
-      ],
-    },
-    {
-      key: 'execution', label: 'Execution', icon: Coins,
-      fields: [
-        {
-          key: 'duration_ms', type: 'range', label: 'Duration', unit: 'ms',
-          min: duration.min, max: duration.max, accessor: (c) => c.duration_ms,
-        },
-        {
-          key: 'result_count', type: 'range', label: 'Results Returned',
-          min: results.min, max: results.max, accessor: (c) => c.result_count,
-        },
-      ],
-    },
-    {
-      key: 'dates', label: 'Dates', icon: CalendarDays,
-      fields: [{ key: 'created_at', type: 'dateRange', label: 'Called At', accessor: (c) => c.created_at }],
     },
   ];
 }

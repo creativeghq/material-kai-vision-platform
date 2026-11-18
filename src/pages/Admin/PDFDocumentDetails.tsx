@@ -39,6 +39,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { DocumentFactoriesCrmLinker } from '@/components/Admin/DocumentFactoriesCrmLinker';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { formatDate } from '@/utils/datetime';
+import { DataFields } from '@/components/shared/DataFields';
 
 const LIST_CAP = 1000;
 const BREADCRUMBS_BASE = [
@@ -617,11 +618,7 @@ export const PDFDocumentDetails: React.FC = () => {
             </CardHeader>
             <CardContent>
               {metadataKeys > 0 ? (
-                <div className="bg-muted rounded-lg p-4">
-                  <pre className="text-xs overflow-x-auto">
-                    {JSON.stringify(document.metadata, null, 2)}
-                  </pre>
-                </div>
+                <DataFields data={document.metadata} raw className="bg-surface-sunken rounded-sm p-4 text-xs overflow-auto" />
               ) : (
                 <p className="text-sm text-muted-foreground">This document has no stored metadata.</p>
               )}

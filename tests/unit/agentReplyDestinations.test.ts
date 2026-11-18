@@ -46,6 +46,7 @@ const TABBED_PAGES: Record<string, string> = {
   '/quotes': 'src/modules/quotes/pages/QuotesPage.tsx',
   '/finance': 'src/modules/finance/routes.ts',
   '/admin/materials-data': 'src/components/Admin/MaterialsData/MaterialsDataPage.tsx',
+  '/admin/agent-ops': 'src/components/Admin/HQ/AgentOpsPage.tsx',
 };
 
 function tabValues(file: string): Set<string> {
@@ -56,6 +57,7 @@ function tabValues(file: string): Set<string> {
     ...[...src.matchAll(/^\s{2}\w+:\s*'([a-z_]+)',$/gm)].map((m) => m[1]),
     // …and one built from a section registry declares them as each row's `value`.
     ...[...src.matchAll(/\bvalue: '([a-z0-9-]+)'/g)].map((m) => m[1]),
+    ...[...src.matchAll(/\{\s*id: '([a-z0-9-]+)', label:/g)].map((m) => m[1]),
   ]);
 }
 

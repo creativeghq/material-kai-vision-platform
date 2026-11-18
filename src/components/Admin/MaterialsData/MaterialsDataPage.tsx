@@ -1,23 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Link2, Sparkles } from 'lucide-react';
+import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Sparkles, Tags } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { AdminStatCard } from '../AdminStatCard';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
 import { ImagesTab } from './ImagesTab';
+import MaterialCategoriesTab from '@/components/Admin/DataImport/MaterialCategoriesTab';
 import { mivaaApi } from '@/services/mivaaApiClient';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
-import { EmbeddingsTab } from './EmbeddingsTab';
-import { RelationsTab } from './RelationsTab';
 import { supabase } from '@/integrations/supabase/client';
 import AIDataPage from '@/pages/Admin/AIDataPage';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const TAB_VALUES = ['products', 'chunks', 'images', 'embeddings', 'relations', 'ai-review'] as const;
+const TAB_VALUES = ['products', 'chunks', 'images', 'categories', 'ai-review'] as const;
 type TabValue = typeof TAB_VALUES[number];
 const isTab = (v: string | null): v is TabValue => (TAB_VALUES as readonly string[]).includes(v ?? '');
 
@@ -132,7 +131,7 @@ export const MaterialsDataPage: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={Package} title="Materials Data" subtitle="Products, chunks, images and embeddings from every ingestion source, and the AI review of them." />
+      <PageHeader icon={Package} title="Materials Data" subtitle="Products, chunks and images from every ingestion source, the category taxonomy, and the AI review of them." />
 
       <div className="p-3 sm:p-6 space-y-6">
         {/* Stats Cards */}
@@ -182,13 +181,9 @@ export const MaterialsDataPage: React.FC = () => {
               <ImageIcon className="h-4 w-4 mr-2" />
               Images
             </TabsTrigger>
-            <TabsTrigger value="embeddings">
-              <Database className="h-4 w-4 mr-2" />
-              Embeddings
-            </TabsTrigger>
-            <TabsTrigger value="relations">
-              <Link2 className="h-4 w-4 mr-2" />
-              Relations
+            <TabsTrigger value="categories">
+              <Tags className="h-4 w-4 mr-2" />
+              Categories
             </TabsTrigger>
             <TabsTrigger value="ai-review">
               <Sparkles className="h-4 w-4 mr-2" />
@@ -208,12 +203,8 @@ export const MaterialsDataPage: React.FC = () => {
             <ImagesTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
-          <TabsContent value="embeddings" className="mt-6">
-            <EmbeddingsTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
-          </TabsContent>
-
-          <TabsContent value="relations" className="mt-6">
-            <RelationsTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
+          <TabsContent value="categories" className="mt-6">
+            <MaterialCategoriesTab />
           </TabsContent>
 
           <TabsContent value="ai-review" className="mt-6">

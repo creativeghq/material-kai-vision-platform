@@ -8,8 +8,8 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { Upload, FileText, FileType, ExternalLink, AlertCircle, Tags, Download, FileSpreadsheet } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Upload, FileText, FileType, ExternalLink, AlertCircle, Download, FileSpreadsheet } from 'lucide-react';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { CatalogExportTab } from '@/components/Admin/DataImport/CatalogExportTab';
@@ -18,7 +18,7 @@ import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import XMLImportTab from './DataImport/XMLImportTab';
 import ImportHistoryTab from './DataImport/ImportHistoryTab';
-import MaterialCategoriesTab from './DataImport/MaterialCategoriesTab';
+import { PDF_JOB_TYPES, PRODUCT_STAGES } from './AsyncJobQueueMonitor/constants';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
 import { supabase } from '@/integrations/supabase/client';
@@ -38,7 +38,7 @@ const DataImportHub: React.FC = () => {
   useEffect(() => {
     checkActiveJobs();
     // Set active tab from URL parameter if present
-    if (tabParam && ['pdf', 'xml', 'history', 'categories', 'csv', 'export'].includes(tabParam)) {
+    if (tabParam && ['pdf', 'xml', 'history', 'csv', 'export'].includes(tabParam)) {
       setActiveTab(tabParam);
     }
   }, [tabParam, activeWorkspaceId]);
@@ -51,7 +51,7 @@ const DataImportHub: React.FC = () => {
         .from('background_jobs')
         .select('*')
         .eq('workspace_id', activeWorkspaceId)
-        .eq('job_type', 'product_discovery_upload')
+        .in('job_type', [...PDF_JOB_TYPES])
         .in('status', ['pending', 'processing'])
         .order('created_at', { ascending: false });
 
@@ -70,6 +70,8 @@ const DataImportHub: React.FC = () => {
     // Redirect to async queue monitor
     navigate(`/admin/async-queue-monitor?jobId=${newJobId}`);
   };
+
+  if (tabParam === 'categories') return <Navigate to="/admin/materials-data?tab=categories" replace />;
 
   return (
     <div className="min-h-screen">
@@ -98,10 +100,6 @@ const DataImportHub: React.FC = () => {
                 <TabsTrigger value="history">
                   <Upload className="h-4 w-4 mr-2" />
                   Import History
-                </TabsTrigger>
-                <TabsTrigger value="categories">
-                  <Tags className="h-4 w-4 mr-2" />
-                  Categories
                 </TabsTrigger>
                 <TabsTrigger value="csv">
                   <FileSpreadsheet className="h-4 w-4 mr-2" />
@@ -193,7 +191,7 @@ const DataImportHub: React.FC = () => {
                         After uploading a PDF, you'll be redirected to the <strong>Async Queue Monitor</strong> where you can:
                       </p>
                       <ul className="text-sm mt-2 space-y-1 list-disc list-inside">
-                        <li>Monitor all 14 processing stages in real-time</li>
+                        <li>Monitor all {PRODUCT_STAGES.length} processing stages in real-time</li>
                         <li>View detailed metrics (products, chunks, images, embeddings)</li>
                         <li>Track progress with live updates every 3 seconds</li>
                         <li>Cancel or delete jobs as needed</li>
@@ -211,9 +209,6 @@ const DataImportHub: React.FC = () => {
                 <ImportHistoryTab />
               </TabsContent>
 
-              <TabsContent value="categories" className="mt-6">
-                <MaterialCategoriesTab />
-              </TabsContent>
               <TabsContent value="csv" className="mt-6">
                 <CsvImportTab />
               </TabsContent>

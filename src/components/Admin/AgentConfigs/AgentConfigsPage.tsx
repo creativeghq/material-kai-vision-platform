@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { formatDate as formatDateValue } from '@/utils/datetime';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Bot, Plus, History, FileText, Trash2, AlertTriangle, DollarSign, ListChecks, Boxes, RefreshCw, MessageSquare, Brain } from 'lucide-react';
+import { Bot, Plus, History, FileText, Trash2, AlertTriangle, DollarSign, ListChecks, RefreshCw, MessageSquare, Brain } from 'lucide-react';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -31,13 +31,13 @@ import { AIModelPricingTab } from './AIModelPricingTab';
 import { ChatStartersTab } from './ChatStartersTab';
 import { WritingRulesTab } from './WritingRulesTab';
 import { PromptFormDialog, SYSTEM_PROMPT_TYPES, type PromptRow } from './PromptFormDialog';
-import { BackgroundAgentsPage } from '@/components/Admin/BackgroundAgents/BackgroundAgentsPage';
 
-const TAB_VALUES = ['prompts', 'starters', 'writing-rules', 'pricing', 'background-agents'] as const;
+const TAB_VALUES = ['prompts', 'starters', 'writing-rules', 'pricing'] as const;
 
 const MOVED_TABS: Record<string, string> = {
   'ai-data': '/admin/materials-data?tab=ai-review',
   'api-gateway': '/admin/modules?tab=api-keys',
+  'background-agents': '/admin/agent-ops?tab=background-agents',
 };
 
 type Prompt = PromptRow;
@@ -116,7 +116,9 @@ export const AgentConfigsPage: React.FC = () => {
     if (!requestedTab || (TAB_VALUES as readonly string[]).includes(requestedTab)) return;
     const moved = MOVED_TABS[requestedTab];
     if (moved) {
-      navigate(moved, { replace: true });
+      const rest = new URLSearchParams(searchParams);
+      rest.delete('tab');
+      navigate(rest.size ? `${moved}&${rest.toString()}` : moved, { replace: true });
       return;
     }
     const params = new URLSearchParams(searchParams);
@@ -239,7 +241,7 @@ export const AgentConfigsPage: React.FC = () => {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background">
-        <PageHeader icon={Brain} title="AI Configurations" subtitle="Prompts, chat starters, writing rules, model pricing and background agents. Prompt changes are tracked and versioned." />
+        <PageHeader icon={Brain} title="AI Configurations" subtitle="Prompts, chat starters, writing rules and model pricing. Prompt changes are tracked and versioned." />
 
         <div className="p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -259,10 +261,6 @@ export const AgentConfigsPage: React.FC = () => {
             <TabsTrigger value="pricing" className="flex items-center gap-2">
               <DollarSign className="h-4 w-4" />
               Model Pricing
-            </TabsTrigger>
-            <TabsTrigger value="background-agents" className="flex items-center gap-2">
-              <Boxes className="h-4 w-4" />
-              Background Agents
             </TabsTrigger>
           </TabsList>
 
@@ -528,10 +526,6 @@ export const AgentConfigsPage: React.FC = () => {
 
           <TabsContent value="pricing">
             <AIModelPricingTab />
-          </TabsContent>
-
-          <TabsContent value="background-agents">
-            <BackgroundAgentsPage />
           </TabsContent>
         </Tabs>
         </div>

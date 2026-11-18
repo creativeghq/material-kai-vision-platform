@@ -411,7 +411,7 @@ const AgentHarnessDashboard: React.FC = () => {
                 <Panel
                   title="Background Agents"
                   description="Scheduled and event-driven agents, runs in this window."
-                  actions={<Button asChild size="sm" variant="ghost"><Link to="/admin/ai-configs?tab=background-agents">Configure</Link></Button>}
+                  actions={<Button asChild size="sm" variant="ghost"><Link to="/admin/agent-ops?tab=background-agents">Configure</Link></Button>}
                 >
                   <BackgroundAgentsTable rows={data.background.agents} stuck={data.background.stuck} />
                 </Panel>

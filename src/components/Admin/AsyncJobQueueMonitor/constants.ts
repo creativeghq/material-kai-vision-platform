@@ -44,6 +44,12 @@ export const XML_IMPORT_PIPELINE_FLOW = [
   { id: 'completed', name: 'Completed', icon: CheckCircle, checkpoint: 'completed' },
 ];
 
+/** Job types the backend treats as PDF processing (MIVAA job_recovery_service.MIVAA_PDF_JOB_TYPES). */
+export const PDF_JOB_TYPES = ['product_discovery_upload', 'pdf_processing'] as const;
+
+export const isPdfJobType = (jobType: string | null | undefined): boolean =>
+  (PDF_JOB_TYPES as readonly string[]).includes(jobType ?? '');
+
 // Helper function to get pipeline stages based on job type
 export const getPipelineForJobType = (jobType: string) => {
   switch (jobType) {

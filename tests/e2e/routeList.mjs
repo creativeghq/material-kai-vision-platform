@@ -9,16 +9,16 @@ export const ROUTE_LIST = [
   '/', '/profile', '/moodboard', '/agent-hub', '/compare',
   '/blueprints', '/projects', '/portal', '/market-trends',
   '/billing/subscriptions', '/billing/credits',
-  '/apps', '/search-hub', '/tasks', '/requests', '/templates', '/shared', '/settings',
+  '/apps', '/search-hub', '/requests', '/templates', '/shared', '/settings',
   // Previously white-screened / capability- & entitlement-gated
   '/finance', '/quotes', '/discover', '/crm', '/sales', '/pos', '/network',
   '/inbox', '/trip-expenses',
   '/supplier-portal',
   // Admin (operator-only)
   '/admin', '/admin/agents', '/admin/system-health', '/admin/search', '/admin/billing',
-  '/admin/platform', '/admin/approvals', '/admin/ingestion-quality', '/push-notifications',
+  '/admin/platform', '/admin/users', '/admin/approvals', '/admin/ingestion-quality', '/push-notifications',
   '/admin/operations', '/admin/modules', '/admin/background-agents',
   '/admin/data-health', '/admin/knowledge-base', '/admin/materials-data',
-  '/admin/flows', '/admin/data-import', '/admin/plans',
+  '/flows', '/admin/data-import', '/admin/agent-ops', '/admin/ai-configs', '/admin/logs',
   '/admin/monitoring', '/admin/supplier-claims',
 ];

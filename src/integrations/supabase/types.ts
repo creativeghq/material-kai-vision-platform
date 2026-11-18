@@ -8036,56 +8036,6 @@ export type Database = {
         }
         Relationships: []
       }
-      extraction_config: {
-        Row: {
-          chunk_overlap: number | null
-          chunk_size: number | null
-          created_at: string | null
-          default_categories: string[] | null
-          discovery_model: string | null
-          enable_prompt_enhancement: boolean | null
-          enabled_categories: string[] | null
-          id: string
-          quality_threshold: number | null
-          updated_at: string | null
-          workspace_id: string
-        }
-        Insert: {
-          chunk_overlap?: number | null
-          chunk_size?: number | null
-          created_at?: string | null
-          default_categories?: string[] | null
-          discovery_model?: string | null
-          enable_prompt_enhancement?: boolean | null
-          enabled_categories?: string[] | null
-          id?: string
-          quality_threshold?: number | null
-          updated_at?: string | null
-          workspace_id: string
-        }
-        Update: {
-          chunk_overlap?: number | null
-          chunk_size?: number | null
-          created_at?: string | null
-          default_categories?: string[] | null
-          discovery_model?: string | null
-          enable_prompt_enhancement?: boolean | null
-          enabled_categories?: string[] | null
-          id?: string
-          quality_threshold?: number | null
-          updated_at?: string | null
-          workspace_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "extraction_config_workspace_id_fkey"
-            columns: ["workspace_id"]
-            isOneToOne: true
-            referencedRelation: "workspaces"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       facet_canonical_values: {
         Row: {
           alias_count: number

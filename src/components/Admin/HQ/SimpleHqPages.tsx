@@ -20,7 +20,7 @@ export const SearchAnalyticsPage: React.FC = () => (
 
 export const PlatformOverviewPage: React.FC = () => (
   <div>
-    <PageHeader icon={Globe} title="Platform Overview" subtitle="Workspaces, users, content and growth across the platform." />
+    <PageHeader icon={Globe} title="Platform Overview" subtitle="Every workspace on the platform, plus quotes, sign-ups, AI spend and catalogue growth." />
     <Body><PlatformOverviewTab /></Body>
   </div>
 );

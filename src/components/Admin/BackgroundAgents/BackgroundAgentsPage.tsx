@@ -10,7 +10,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   Bot, RefreshCw, CheckCircle, XCircle, Clock, Loader2,
   ChevronDown, ChevronRight, XCircle as CancelIcon, Eye,
-  AlertTriangle, Link2, MessageSquare, Pencil,
+  AlertTriangle, Link2, Pencil,
 } from 'lucide-react';
 import { Button }  from '@/components/core/ui/button';
 import { Badge }   from '@/components/core/ui/badge';
@@ -18,11 +18,10 @@ import { Switch }  from '@/components/core/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { FilterBar, applyFilters, useFilters } from '@/components/core/filters';
 import { AgentLogsViewer }     from './AgentLogsViewer';
 import { AgentRunHistoryDrawer } from './AgentRunHistoryDrawer';
-import { ChatActivityTab }     from './ChatActivityTab';
 import { EditBackgroundAgentDialog } from './EditBackgroundAgentDialog';
 import { buildAgentRunFilters } from './backgroundAgentFilters';
 import {
@@ -36,6 +35,7 @@ import { statusTone } from '@/utils/statusTone';
 import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
+import { DataFields } from '@/components/shared/DataFields';
 
 const STATUS_ICON: Record<string, React.ReactNode> = {
   completed:  <CheckCircle className="h-4 w-4 text-green-500"                 />,
@@ -261,21 +261,7 @@ export function BackgroundAgentsPage() {
   }, [scoped, allAlerts]);
 
   return (
-    <div className="px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
-      {/* Top-level mode selector — Background runs vs Chat agent activity */}
-      <Tabs defaultValue="background" className="space-y-4 sm:space-y-6">
-        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="background" className="flex items-center gap-2">
-            <Bot className="h-4 w-4" />
-            Background Tasks
-          </TabsTrigger>
-          <TabsTrigger value="chat" className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4" />
-            Chat Activity
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="background" className="space-y-4 sm:space-y-6 mt-0">
+    <div className="space-y-4 sm:space-y-6">
 
       {/* Header */}
       <SectionHeader
@@ -626,9 +612,7 @@ export function BackgroundAgentsPage() {
                             {(run.output_data as any).report}
                           </div>
                         ) : (
-                          <pre className="text-xs bg-background rounded border p-3 overflow-auto max-h-40">
-                            {JSON.stringify(run.output_data, null, 2)}
-                          </pre>
+                          <DataFields data={run.output_data} raw className="text-xs bg-background rounded-sm border border-hairline p-3 overflow-auto max-h-64" />
                         )}
                       </div>
                     )}
@@ -661,13 +645,6 @@ export function BackgroundAgentsPage() {
         onClose={() => setHistoryAgent(null)}
       />
 
-        </TabsContent>
-
-        {/* Chat Activity Tab — tool calls executed inline by agent-chat */}
-        <TabsContent value="chat" className="mt-0">
-          <ChatActivityTab />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
