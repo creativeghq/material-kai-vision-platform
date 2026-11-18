@@ -106,6 +106,8 @@ jobs:
       capabilities: ${{ steps.filter.outputs.capabilities }}
       changed_functions: ${{ steps.changed-functions.outputs.list }}
       changed_functions_count: ${{ steps.changed-functions.outputs.count }}
+      integration_by_tests: ${{ steps.suites.outputs.by_tests }}
+      integration_by_functions: ${{ steps.suites.outputs.by_functions }}
     steps:
       - name: 📥 Checkout (full history for diff)
         uses: actions/checkout@v4
@@ -239,33 +241,16 @@ jobs:
             echo "ℹ️  Diffing $BASE..${{ github.sha }} (last DEPLOYED functions commit, not HEAD~1)"
             DIFF=$(git diff --name-only "$BASE" "${{ github.sha }}" || true)
 
-            # _shared changed — every dependent must redeploy. Walking the import graph is more
-            # work than it saves; redeploy all.
-            #
-            # The question is asked HERE, against the functions marker, and that placement is the
-            # whole fix. It used to read paths-filter's `shared` output, which is measured against
-            # the FRONTEND marker — and the two diverge the moment one area deploys and the other
-            # does not. On 2026-08-23 the frontend promoted while deploy-functions was cancelled,
-            # so a module added in the superseded commit sat BEHIND the frontend base and the
-            # question answered "no". The directory scan below still catches every function whose
-            # own files changed; a function that merely IMPORTS the new module has an untouched
-            # directory, so it would never ship. Nothing goes red — the importer keeps running old
-            # code, and the only symptom is that whatever the new module does silently does not
-            # happen.
+            # Asked against the FUNCTIONS marker: a _shared module added while deploy-functions was
+            # cancelled must still reach every function that imports it. The import graph decides
+            # who that is (matches `deno info` exactly on all functions, 2026-11-18); a failed
+            # walk deploys ALL, never nothing.
             if printf '%s\n' "$DIFF" | grep -q '^supabase/functions/_shared/'; then
               SHARED=true
-              echo "ℹ️  supabase/functions/_shared/** changed since the last functions deploy — deploying ALL"
+            fi
+            if ! FUNCS=$(printf '%s\n' "$DIFF" | node scripts/affected-edge-functions.mjs); then
+              echo "⚠️  import-graph walk failed — deploying ALL functions"
               FUNCS="$ALL"
-            else
-              # sed, not `grep -oP '\K'`. PCRE is a build option AND refuses to run outside a
-              # unibyte/UTF-8 locale, so the identical command that works on the runner dies with
-              # "grep: -P supports only unibyte and UTF-8 locales" on the machine of anyone
-              # reproducing this by hand — and an extraction that comes back empty deploys
-              # nothing while printing a cheerful "0 functions".
-              FUNCS=$(printf '%s\n' "$DIFF" \
-                      | sed -n 's|^supabase/functions/\([^/][^/]*\)/.*|\1|p' \
-                      | grep -v '^_shared$' \
-                      | sort -u || true)
             fi
           fi
 
@@ -292,6 +277,30 @@ jobs:
           else
             echo "functions_changed=true" >> "$GITHUB_OUTPUT"
           fi
+
+      # Live suites run only when what they exercise moved: their own code (vs the frontend marker,
+      # as paths-filter's `tests`), or a function this push deploys. SQL-only suites run nightly.
+      - name: 🧪 Select integration suites
+        id: suites
+        env:
+          FUNCS: ${{ steps.changed-functions.outputs.list }}
+          CAPABILITIES: ${{ steps.filter.outputs.capabilities }}
+          BASE: ${{ steps.base.outputs.frontend_base }}
+        run: |
+          set -euo pipefail
+          if [ -z "$BASE" ]; then
+            echo "by_tests=tests/integration" >> "$GITHUB_OUTPUT"
+            echo "by_functions=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git diff --name-only "$BASE" "${{ github.sha }}" \
+            | node scripts/select-integration-suites.mjs "$FUNCS" > "$RUNNER_TEMP/suites.txt"
+          BY_TESTS=$(sed -n 1p "$RUNNER_TEMP/suites.txt")
+          BY_FUNCTIONS=$(sed -n 2p "$RUNNER_TEMP/suites.txt")
+          echo "by_tests=$BY_TESTS" >> "$GITHUB_OUTPUT"
+          echo "by_functions=$BY_FUNCTIONS" >> "$GITHUB_OUTPUT"
+          echo "🧪 by test changes: ${BY_TESTS:-none}"
+          echo "🧪 by deployed functions: ${BY_FUNCTIONS:-none}"
 
       - name: 📋 Summary
         run: |
@@ -1081,7 +1090,7 @@ jobs:
   # the capability table that sync-capability-matrix writes to live SQL.
   integration-tests:
     needs: [changes, deploy-functions, sync-capability-matrix]
-    if: ${{ always() && (needs.deploy-functions.result == 'success' || needs.changes.outputs.tests == 'true' || needs.changes.outputs.capabilities == 'true') }}
+    if: ${{ always() && (needs.changes.outputs.integration_by_tests != '' || (needs.deploy-functions.result == 'success' && needs.changes.outputs.integration_by_functions != '')) }}
     runs-on: ubuntu-latest
     concurrency:
       group: live-check-integration-tests
@@ -1116,7 +1125,11 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
-        run: npm run test:integration
+          BY_TESTS: ${{ needs.changes.outputs.integration_by_tests }}
+          BY_FUNCTIONS: ${{ needs.deploy-functions.result == 'success' && needs.changes.outputs.integration_by_functions || '' }}
+        run: |
+          echo "🧪 suites: $BY_TESTS $BY_FUNCTIONS"
+          npx vitest run $BY_TESTS $BY_FUNCTIONS
 
   # ── The markers that say what is live ────────────────────────────────────────
   #

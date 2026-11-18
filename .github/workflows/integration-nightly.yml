@@ -1,0 +1,37 @@
+name: 🔗 Integration Nightly
+
+# Every live suite, once a day. A push runs only the suites its change can affect (deploy.yml
+# `Select integration suites`); migrations are applied via MCP with no push, so this is what
+# exercises the SQL-only suites against the live schema.
+
+on:
+  schedule:
+    - cron: '30 3 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: live-check-integration-tests
+      cancel-in-progress: false
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - name: 🔗 Live integration tests (all suites)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+            echo "❌ Missing integration secrets — the suites would SKIP and report green."
+            exit 1
+          fi
+          npm run test:integration
