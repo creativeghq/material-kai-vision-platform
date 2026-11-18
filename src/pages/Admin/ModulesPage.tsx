@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Package, ArrowRight, AlertCircle, Database, KeyRound, Key, Layers, CreditCard, Users } from 'lucide-react';
+import { Package, ArrowRight, Database, KeyRound, Key, Layers, CreditCard, Users } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
@@ -82,7 +82,12 @@ const ModulesCatalogPanel: React.FC = () => {
     [],
   );
 
-  const orphanedRows = rows.filter((row) => !registeredSlugs.has(row.slug));
+  // A DB row is the catalog record; a src/modules folder only adds routes and nav. Rows with
+  // no folder (Inbox, Deals, Signals, …) are live, gated modules and are listed like any other.
+  const catalogOnlyRows = useMemo(
+    () => rows.filter((row) => !registeredSlugs.has(row.slug)).sort((a, b) => a.name.localeCompare(b.name)),
+    [rows, registeredSlugs],
+  );
 
   // Group sub-modules (manifest.parent set) UNDER their parent instead of as loose tiles —
   // same derivation the tenant storefront uses (`groupByParent`).
@@ -124,26 +129,7 @@ const ModulesCatalogPanel: React.FC = () => {
         <p className="text-sm text-muted-foreground">
           Enabling a module publishes it to the catalog — every workspace owner can then activate or purchase it from Profile → Modules. Toggles take effect immediately.
         </p>
-        {orphanedRows.length > 0 && (
-          <Card className="border-yellow-500/30 bg-yellow-500/5">
-            <CardHeader>
-              <div className="flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
-                <div>
-                  <CardTitle>Unregistered Modules in Database</CardTitle>
-                  <CardDescription>
-                    {orphanedRows.length} module row{orphanedRows.length === 1 ? '' : 's'} in the database
-                    {' '}have no matching folder under <code>src/modules/</code>:
-                    {' '}
-                    {orphanedRows.map((r) => r.slug).join(', ')}
-                  </CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-          </Card>
-        )}
-
-        {registeredModules.length === 0 && !isLoading && (
+        {registeredModules.length === 0 && catalogOnlyRows.length === 0 && !isLoading && (
           <Card>
             <CardContent className="py-12 text-center">
               <Package className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
@@ -271,13 +257,73 @@ const ModulesCatalogPanel: React.FC = () => {
               </Card>
             );
           })}
+          {catalogOnlyRows.map((row) => {
+            const bill = billing.get(row.slug);
+            const addonPrice = bill?.is_addon ? formatAddonPrice(bill.addon_price_cents, bill.addon_currency, bill.billing_interval) : null;
+            return (
+              <Card key={row.slug} className="dashboard-card">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4 text-primary" />
+                      <CardTitle>{row.name}</CardTitle>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      {bill?.is_addon && (
+                        <Badge variant="outline" className="gap-1">
+                          <CreditCard className="h-3 w-3" />{addonPrice ?? 'Add-on'}
+                        </Badge>
+                      )}
+                      {row.price_tier && (
+                        <Badge variant={TIER_VARIANT[row.price_tier] ?? 'secondary'}>{row.price_tier}</Badge>
+                      )}
+                    </div>
+                  </div>
+                  <CardDescription>{row.description ?? '—'}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between pt-2 border-t border-hairline">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{row.enabled ? 'Published' : 'Unpublished'}</span>
+                      <Switch
+                        checked={row.enabled}
+                        disabled={updating === row.slug}
+                        onCheckedChange={(next) => handleToggle(row.slug, next)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {row.enabled && (
+                        <Button size="sm" variant="ghost" className="gap-1" title="Add-on billing"
+                          onClick={() => setBillingSlug(row.slug)}>
+                          <CreditCard className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {row.enabled && (
+                        <Button asChild size="sm" variant="ghost" className="gap-1" title="Module settings (API keys)">
+                          <Link to={`/admin/modules/${row.slug}/settings`}>
+                            <KeyRound className="h-3 w-3" />
+                          </Link>
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <span className="capitalize">{row.category ?? '—'}</span>
+                    <span>·</span>
+                    <span>v{row.version ?? '—'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       </div>
 
       {billingSlug && (
         <ModuleBillingDialog
           slug={billingSlug}
-          name={registeredModules.find((m) => m.manifest.slug === billingSlug)?.manifest.name ?? billingSlug}
+          name={registeredModules.find((m) => m.manifest.slug === billingSlug)?.manifest.name
+            ?? rows.find((r) => r.slug === billingSlug)?.name ?? billingSlug}
           open={!!billingSlug}
           onOpenChange={(o) => { if (!o) setBillingSlug(null); }}
           onSaved={() => { void loadBilling(); }}

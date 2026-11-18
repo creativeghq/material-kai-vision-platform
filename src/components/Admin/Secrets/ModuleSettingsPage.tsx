@@ -12,7 +12,7 @@ import {
   TabsTrigger,
 } from '@/components/core/ui/tabs';
 import { SecretsManagerCard } from './SecretsManagerCard';
-import { registeredModules } from '@/modules/_core';
+import { registeredModules, useEnabledModules } from '@/modules/_core';
 
 /**
  * Generic Settings page mounted at /admin/modules/<slug>/settings for every module.
@@ -30,6 +30,8 @@ const ModuleSettingsPage: React.FC = () => {
 
   const slug = paramSlug ?? '';
   const mod = registeredModules.find(m => m.manifest.slug === slug);
+  const { rows } = useEnabledModules();
+  const row = rows.find(r => r.slug === slug);
   const panels = mod?.settingsPanels ?? [];
 
   // Some modules have a richer dedicated page (e.g. their own admin route),
@@ -69,6 +71,16 @@ const ModuleSettingsPage: React.FC = () => {
               <dt className="text-muted-foreground">Settings</dt><dd>{panels.length + 1} {panels.length ? 'tabs' : 'tab'}</dd>
             </dl>
           </>
+        ) : row ? (
+          <>
+            <p className="text-muted-foreground">{row.description ?? '—'}</p>
+            <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-1.5 text-xs">
+              <dt className="text-muted-foreground">Slug</dt><dd className="font-mono">{row.slug}</dd>
+              <dt className="text-muted-foreground">Category</dt><dd className="capitalize">{row.category ?? '—'}</dd>
+              <dt className="text-muted-foreground">Tier</dt><dd>{row.price_tier ? <Badge variant="neutral" className="capitalize">{row.price_tier}</Badge> : '—'}</dd>
+              <dt className="text-muted-foreground">Version</dt><dd className="tabular-nums">{row.version ?? '—'}</dd>
+            </dl>
+          </>
         ) : (
           <p className="text-muted-foreground">No module is registered under <span className="font-mono">{slug}</span>.</p>
         )}
@@ -79,13 +91,13 @@ const ModuleSettingsPage: React.FC = () => {
   return (
     <HubRecordPage
       icon={SettingsIcon}
-      title={`${mod?.manifest.name ?? slug} — Settings`}
+      title={`${mod?.manifest.name ?? row?.name ?? slug} — Settings`}
       subtitle={
         panels.length > 0
           ? 'API credentials and feature-level configuration for this module.'
           : 'API keys and credentials for this module. Environment variables take priority over values stored here.'
       }
-      breadcrumbs={[{ label: 'Modules & Plans', to: '/admin/modules' }, { label: mod?.manifest.name ?? slug }]}
+      breadcrumbs={[{ label: 'Modules & Plans', to: '/admin/modules' }, { label: mod?.manifest.name ?? row?.name ?? slug }]}
       actions={dedicatedPagePath && (
         <Button asChild variant="outline" size="sm" className="gap-2">
           <Link to={dedicatedPagePath}>
@@ -103,7 +115,7 @@ const ModuleSettingsPage: React.FC = () => {
           <>
             <SecretsManagerCard
               scope={{ mode: 'module', moduleSlug: slug }}
-              title={`${mod?.manifest.name ?? slug} API credentials`}
+              title={`${mod?.manifest.name ?? row?.name ?? slug} API credentials`}
               description="These secrets are used by the module's edge functions. Environment vars on the function set in deployment always win; values here are the fallback an admin can edit without a redeploy."
             />
             <div className="text-xs text-muted-foreground">
@@ -139,7 +151,7 @@ const ModuleSettingsPage: React.FC = () => {
             <TabsContent value="keys">
               <SecretsManagerCard
                 scope={{ mode: 'module', moduleSlug: slug }}
-                title={`${mod?.manifest.name ?? slug} API credentials`}
+                title={`${mod?.manifest.name ?? row?.name ?? slug} API credentials`}
                 description="These secrets are used by the module's edge functions. Environment vars on the function set in deployment always win; values here are the fallback an admin can edit without a redeploy."
               />
               <div className="text-xs text-muted-foreground mt-3">
