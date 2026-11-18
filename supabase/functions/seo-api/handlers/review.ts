@@ -134,9 +134,7 @@ export async function reviewArticle(
           }],
           output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
         }, { task: 'seo_review', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 180_000 });
-        priced.push(await tokenCredits(supabase, DEFAULT_CLAUDE_MODEL, {
-          inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-        }));
+        priced.push(await tokenCredits(supabase, DEFAULT_CLAUDE_MODEL, res.usage ?? {}));
         // A refusal or a truncated / unparseable reply is a failed section, never a reply to salvage.
         if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
           failures.push(`section ${res.stop_reason}`);
@@ -200,9 +198,7 @@ async function consistencyPass(
       }],
       output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_consistency', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 180_000 });
-    actual = await tokenCredits(supabase, CONSISTENCY_MODEL, {
-      inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-    });
+    actual = await tokenCredits(supabase, CONSISTENCY_MODEL, res.usage ?? {});
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
       return { ...none, credits: await settleStage(supabase, wallet, ceiling, actual, { failed: res.stop_reason }), failed: `consistency ${res.stop_reason}` };
     }

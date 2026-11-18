@@ -3,7 +3,7 @@
 import { getToolPrompt } from './prompt-utils.ts';
 import { GEMINI_TEXT } from './gemini-models.ts';
 import { reserveCredits, refundCredits, settleCredits } from './credit-reserve.ts';
-import { resolveTokenPrice, tokenCostUsd } from './ai-logger.ts';
+import { normalizeUsage, resolveTokenPrice, tokenCostUsd, type UsageLike } from './ai-logger.ts';
 import { callClaudeMessages, transcribeAudioWithGemini } from './ai-client.ts';
 import { ingestSupplierDocument, INVOICE_MIME } from './finance/invoice-extraction.ts';
 import { INBOX_DOCUMENT_KINDS, type InboxDocumentKind } from './inboxDocumentKinds.generated.ts';
@@ -183,10 +183,10 @@ export async function settleAgainstUsage(
   db: Db,
   args: {
     userId: string; workspaceId: string; ceiling: number; model: string; task: string;
-    usage: { inputTokens: number; outputTokens: number }; meta: Record<string, unknown>;
+    usage: UsageLike; meta: Record<string, unknown>;
   },
 ): Promise<void> {
-  const { inputTokens, outputTokens } = args.usage;
+  const { inputTokens, outputTokens, cache } = normalizeUsage(args.usage);
   if (inputTokens === 0 && outputTokens === 0) {
     await refundCredits(db, args.userId, args.workspaceId, args.ceiling, args.task, { reason: 'no_usage', ...args.meta });
     return;
@@ -197,7 +197,7 @@ export async function settleAgainstUsage(
     await refundCredits(db, args.userId, args.workspaceId, args.ceiling, args.task, { reason: 'unpriced_model', ...args.meta });
     return;
   }
-  const rawCost = tokenCostUsd(price, inputTokens, outputTokens);
+  const rawCost = tokenCostUsd(price, inputTokens, outputTokens, cache);
   const credits = Math.round(rawCost * price.markup * 100 * 100) / 100;
   await settleCredits(db, args.userId, args.workspaceId, args.ceiling, credits, args.task, args.meta);
 }
@@ -347,7 +347,7 @@ async function classifyOne(
   await settleAgainstUsage(db, {
     userId: ctx.userId, workspaceId: ctx.workspaceId, ceiling: CLASSIFICATION_CEILING,
     model: CLASSIFICATION_MODEL, task: CLASSIFICATION_TASK,
-    usage: { inputTokens: res.usage?.input_tokens ?? 0, outputTokens: res.usage?.output_tokens ?? 0 },
+    usage: res.usage ?? {},
     meta: ctx.meta,
   });
 

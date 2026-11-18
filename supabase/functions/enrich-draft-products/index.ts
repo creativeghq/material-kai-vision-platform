@@ -11,7 +11,7 @@ import { scrapeToMarkdown } from '../_shared/tools/material-scrape-tools.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { wrapUntrusted } from '../_shared/untrusted.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../_shared/credit-reserve.ts';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, usageCostUsd } from '../_shared/ai-logger.ts';
 import { acceptClaims, type RegistryField } from '../_shared/draft-enrichment.ts';
 
 const OP = 'draft_enrichment';
@@ -253,7 +253,7 @@ Deno.serve(withApiLogging('enrich-draft-products', async (req) => {
       // rather than refunding work that happened.
       const price = await resolveTokenPrice(supabase, EXTRACTION_MODEL);
       const actual = price
-        ? Math.round(((res.usage.inputTokens / 1e6) * price.input + (res.usage.outputTokens / 1e6) * price.output) * price.markup * 100 * 100) / 100
+        ? Math.round(usageCostUsd(price, res.usage) * price.markup * 100 * 100) / 100
         : EXTRACTION_CEILING;
       const verdict = acceptClaims(res.output, page, fields, identity);
       const confidence = Number(res.output.source_confidence ?? 0);

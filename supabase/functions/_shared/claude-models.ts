@@ -80,6 +80,29 @@ export function shapeClaudeRequest<T extends Record<string, unknown>>(body: T): 
   return out as T;
 }
 
+const hasCacheMarker = (node: unknown): boolean =>
+  Array.isArray(node)
+    ? node.some(hasCacheMarker)
+    : !!node && typeof node === 'object' &&
+      ('cache_control' in node || Object.values(node).some(hasCacheMarker));
+
+/** Twin of mivaa `mark_stable_prefix`. Not in `shapeClaudeRequest`: raw-fetch callers price `input_tokens` alone. */
+export function markStablePrefix<T extends Record<string, unknown>>(body: T): T {
+  const out: Record<string, unknown> = { ...body };
+  if ('cache_control' in out || hasCacheMarker([out.system, out.tools, out.messages])) return out as T;
+  const marker = { type: 'ephemeral' };
+  const system = out.system;
+  const tools = out.tools;
+  if (typeof system === 'string' && system.trim()) {
+    out.system = [{ type: 'text', text: system, cache_control: marker }];
+  } else if (Array.isArray(system) && system.length && (system.at(-1) as { text?: unknown })?.text) {
+    out.system = [...system.slice(0, -1), { ...(system.at(-1) as object), cache_control: marker }];
+  } else if (Array.isArray(tools) && tools.length && typeof tools.at(-1) === 'object') {
+    out.tools = [...tools.slice(0, -1), { ...(tools.at(-1) as object), cache_control: marker }];
+  }
+  return out as T;
+}
+
 /**
  * `bindTools` options forcing `name`, or `auto` where forcing is a 400 — pair it with
  * `toolInstruction` in the prompt, and keep treating a reply with no tool call as a failure.

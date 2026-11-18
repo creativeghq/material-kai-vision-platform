@@ -6,7 +6,7 @@ import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
 import { debitExternalServiceCredits, getServicePricing } from '../_shared/credit-utils.ts';
-import { resolveTokenPrice, tokenCostParts } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, tokenCostParts, type CacheTokens } from '../_shared/ai-logger.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
 // Prompts come from the database. `PromptNotConfigured` ("add the row") stays distinct from
 // `PromptStoreUnavailable` ("the DB is down") so the caller can tell the operator which it is.
@@ -115,7 +115,7 @@ interface CallPrice {
  */
 async function priceCall(
   admin: any, model: string, inTok: number, outTok: number,
-  surchargeService: string | null, units: number,
+  surchargeService: string | null, units: number, cache: CacheTokens = {},
 ): Promise<CallPrice | null> {
   const price = await resolveTokenPrice(admin, model);
   if (!price) return null;
@@ -123,7 +123,7 @@ async function priceCall(
   if (surchargeService && !svc) {
     console.error(`[company-enrich] no price row for service '${surchargeService}' — surcharge not billed`);
   }
-  const { input: inputCost, output: outputCost } = tokenCostParts(price, inTok, outTok);
+  const { input: inputCost, output: outputCost } = tokenCostParts(price, inTok, outTok, cache);
   const surcharge = (svc?.cost_per_unit ?? 0) * units;
   const rawCost = inputCost + outputCost + surcharge;
   const billedCost = rawCost * price.markup;
@@ -270,6 +270,7 @@ async function enrichViaWebSearch(
   });
 
   let inTok = 0, outTok = 0;
+  const cache = { read: 0, write: 0 };
 
   // Stays on the basic web_search variant: web_search_20260209 (dynamic filtering) needs
   // Opus 4.6+ or Sonnet 4.6+, and this path is deliberately Haiku. Bumping the tool without
@@ -281,6 +282,8 @@ async function enrichViaWebSearch(
     messages: [{ role: 'user', content: researchQuery }],
   }, 'company_enrich_web_search');
   inTok += research?.usage?.input_tokens ?? 0;
+  cache.read += research?.usage?.cache_read_input_tokens ?? 0;
+  cache.write += research?.usage?.cache_creation_input_tokens ?? 0;
   outTok += research?.usage?.output_tokens ?? 0;
   const researchText = (research.content as any[])
     ?.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
@@ -299,6 +302,8 @@ async function enrichViaWebSearch(
       }],
     }, 'company_enrich_web_search');
     inTok += extract?.usage?.input_tokens ?? 0;
+    cache.read += extract?.usage?.cache_read_input_tokens ?? 0;
+    cache.write += extract?.usage?.cache_creation_input_tokens ?? 0;
     outTok += extract?.usage?.output_tokens ?? 0;
     const toolUse = (extract.content as any[])?.find((b) => b.type === 'tool_use');
     fields = (toolUse?.input as Partial<EnrichFields>) ?? {};
@@ -310,7 +315,7 @@ async function enrichViaWebSearch(
 
   // Cost log + debit — rates from ai_model_pricing, never from a constant here. 4 web searches.
   try {
-    const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 4);
+    const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 4, cache);
     if (!p) console.error('[company-enrich] no price row for claude-haiku-5-5 — the reserved ceiling is kept');
     await bill.debit(p?.credits ?? null, 'company_enrich_web_search', `Business info web search (${name})`,
       { name, country: countryName });
@@ -529,6 +534,7 @@ async function findCompetitorsViaWebSearch(
     const researchQuery = competitorResearchQuery(prompts.competitorResearch, seed);
 
     let inTok = 0, outTok = 0;
+  const cache = { read: 0, write: 0 };
     const research = await anthropic({
       model: 'claude-haiku-5-5',
       max_tokens: 2560,
@@ -536,6 +542,8 @@ async function findCompetitorsViaWebSearch(
       messages: [{ role: 'user', content: researchQuery }],
     }, 'find_competitors_web_search');
     inTok += research?.usage?.input_tokens ?? 0;
+    cache.read += research?.usage?.cache_read_input_tokens ?? 0;
+    cache.write += research?.usage?.cache_creation_input_tokens ?? 0;
     outTok += research?.usage?.output_tokens ?? 0;
     const researchText = (research.content as any[])
       ?.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
@@ -553,6 +561,8 @@ async function findCompetitorsViaWebSearch(
         }],
       }, 'find_competitors_web_search');
       inTok += extract?.usage?.input_tokens ?? 0;
+      cache.read += extract?.usage?.cache_read_input_tokens ?? 0;
+      cache.write += extract?.usage?.cache_creation_input_tokens ?? 0;
       outTok += extract?.usage?.output_tokens ?? 0;
       const toolUse = (extract.content as any[])?.find((b) => b.type === 'tool_use');
       list = Array.isArray(toolUse?.input?.competitors) ? toolUse.input.competitors : [];
@@ -562,7 +572,7 @@ async function findCompetitorsViaWebSearch(
 
     // Cost log + debit (2 Haiku calls + 5 web searches). Rates from ai_model_pricing.
     try {
-      const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 5);
+      const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 5, cache);
       if (!p) console.error('[company-enrich] no price row for claude-haiku-5-5 — the reserved ceiling is kept');
       await bill.debit(p?.credits ?? null, 'find_competitors_web_search',
         `Competitor discovery (${seed.name ?? seed.industry ?? 'company'})`,
@@ -853,6 +863,7 @@ async function identifyViaWebSearch(
   ].filter(Boolean).join('\n');
 
   let inTok = 0, outTok = 0;
+  const cache = { read: 0, write: 0 };
 
   const research = await anthropic({
     model: 'claude-haiku-5-5',
@@ -864,6 +875,8 @@ async function identifyViaWebSearch(
     }],
   }, 'counterparty_identify_web_search');
   inTok += research?.usage?.input_tokens ?? 0;
+  cache.read += research?.usage?.cache_read_input_tokens ?? 0;
+  cache.write += research?.usage?.cache_creation_input_tokens ?? 0;
   outTok += research?.usage?.output_tokens ?? 0;
   const researchText = (research.content as any[])
     ?.filter((b) => b.type === 'text').map((b) => b.text).join('\n') || '';
@@ -881,6 +894,8 @@ async function identifyViaWebSearch(
       }],
     }, 'counterparty_identify_web_search');
     inTok += extract?.usage?.input_tokens ?? 0;
+    cache.read += extract?.usage?.cache_read_input_tokens ?? 0;
+    cache.write += extract?.usage?.cache_creation_input_tokens ?? 0;
     outTok += extract?.usage?.output_tokens ?? 0;
     const toolUse = (extract.content as any[])?.find((b) => b.type === 'tool_use');
     result = (toolUse?.input as IdentifiedCounterparty) ?? null;
@@ -891,7 +906,7 @@ async function identifyViaWebSearch(
   }
 
   try {
-    const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 4);
+    const p = await priceCall(admin, 'claude-haiku-5-5', inTok, outTok, 'anthropic-web-search', 4, cache);
     if (!p) console.error('[company-enrich] no price row for claude-haiku-5-5 — the reserved ceiling is kept');
     await bill.debit(p?.credits ?? null, 'counterparty_identify_web_search',
       `Counterparty identification (${seed.displayName})`,

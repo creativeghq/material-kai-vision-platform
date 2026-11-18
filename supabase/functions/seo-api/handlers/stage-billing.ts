@@ -7,7 +7,7 @@
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { settleCredits } from '../../_shared/credit-reserve.ts';
-import { creditsForTokens } from '../../_shared/ai-logger.ts';
+import { creditsForTokens, normalizeUsage, type UsageLike } from '../../_shared/ai-logger.ts';
 import { getServicePricing } from '../../_shared/credit-utils.ts';
 import { CREDITS_PER_USD, MARKUP_MULTIPLIER } from '../../_shared/pricing-constants.ts';
 
@@ -81,9 +81,10 @@ export async function settleStage(
 export async function tokenCredits(
   supabase: DbClient,
   model: string,
-  usage: { inputTokens?: number; outputTokens?: number },
+  usage: UsageLike,
 ): Promise<number | null> {
-  const priced = await creditsForTokens(supabase, model, usage.inputTokens ?? 0, usage.outputTokens ?? 0);
+  const n = normalizeUsage(usage);
+  const priced = await creditsForTokens(supabase, model, n.inputTokens, n.outputTokens, n.cache);
   return priced ? priced.credits : null;
 }
 

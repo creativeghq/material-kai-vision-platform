@@ -2,7 +2,7 @@
 /** Running one AI assessment — the shared body behind every entry point and every subject. */
 import type { DbClient } from './supabase-client.ts';
 import { callClaudeMessages } from './ai-client.ts';
-import { creditsForTokens } from './ai-logger.ts';
+import { creditsForTokens, normalizeUsage } from './ai-logger.ts';
 import { loadPrompt, renderPromptTemplate } from './prompt-utils.ts';
 import { reserveCredits, refundCredits, settleCredits } from './credit-reserve.ts';
 import {
@@ -304,7 +304,8 @@ export async function runAssessment(
     // Actual cost, through the one token-price derivation. `null` means the model has no
     // ai_model_pricing row — a gap in the price table, NOT a free call — so the reserved ceiling
     // stands rather than being settled down to a number nobody verified.
-    const priced = await creditsForTokens(supabase, ASSESSMENT_MODEL, inTok, outTok);
+    const { cache } = normalizeUsage(res.usage);
+    const priced = await creditsForTokens(supabase, ASSESSMENT_MODEL, inTok, outTok, cache);
     const credits = priced ? priced.credits : ASSESSMENT_CREDIT_CEILING;
 
     const { data: recorded, error: recErr } = await supabase.rpc('record_assessment', {

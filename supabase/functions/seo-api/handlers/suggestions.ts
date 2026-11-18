@@ -187,9 +187,7 @@ export async function handleSuggestions(req: Request, body: any): Promise<Respon
       }],
       output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_suggestions', userId, workspaceId: workspaceId ?? null, timeoutMs: 130_000 });
-    const actual = await tokenCredits(supabase, SUGGESTION_MODEL, {
-      inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-    });
+    const actual = await tokenCredits(supabase, SUGGESTION_MODEL, res.usage ?? {});
     // A refusal or a truncated reply is a failed run, never a reply to salvage.
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
       throw new Error(res.stop_reason === 'refusal'

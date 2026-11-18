@@ -59,11 +59,7 @@ export async function photosFittingTopic(
       }],
       output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_photo_topic_fit', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 60_000 });
-    const usage: PhotoUsage = {
-      model: PHOTO_TOPIC_MODEL,
-      inputTokens: Number(res.usage?.input_tokens ?? 0),
-      outputTokens: Number(res.usage?.output_tokens ?? 0),
-    };
+    const usage: PhotoUsage = { ...(res.usage ?? {}), model: PHOTO_TOPIC_MODEL };
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
       return { fits: new Set(), usage, failed: `photo topic check ${res.stop_reason}` };
     }

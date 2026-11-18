@@ -15,32 +15,75 @@ export interface TokenPrice {
   longThreshold?: number;
   longInput?: number;
   longOutput?: number;
+  cacheRead?: number;
+  cacheWrite?: number;
 }
 
-/**
- * USD for one call, split by side. The rate card is picked by the length of the whole prompt,
- * so pass `cachedPromptTokens` where the provider reported cache reads/writes separately.
- */
-export type TokenRates = Pick<TokenPrice, 'input' | 'output' | 'longThreshold' | 'longInput' | 'longOutput'>;
+export interface CacheTokens {
+  read?: number;
+  write?: number;
+}
+
+const DEFAULT_CACHE_READ = 0.10;
+const DEFAULT_CACHE_WRITE = 1.25;
+
+export interface UsageLike {
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+  cache_creation_input_tokens?: number | null;
+  inputTokens?: number | null;
+  outputTokens?: number | null;
+  uncachedInputTokens?: number | null;
+  cacheReadTokens?: number | null;
+  cacheWriteTokens?: number | null;
+}
+
+export function normalizeUsage(u: UsageLike | null | undefined): { inputTokens: number; outputTokens: number; cache: CacheTokens } {
+  const n = (v: number | null | undefined) => Math.max(0, Number(v ?? 0) || 0);
+  const read = n(u?.cache_read_input_tokens ?? u?.cacheReadTokens);
+  const write = n(u?.cache_creation_input_tokens ?? u?.cacheWriteTokens);
+  const inputTokens = u?.input_tokens != null
+    ? n(u.input_tokens) // raw API: already excludes cache tokens
+    : u?.uncachedInputTokens != null
+      ? n(u.uncachedInputTokens)
+      : Math.max(0, n(u?.inputTokens) - (u?.cacheReadTokens != null || u?.cacheWriteTokens != null ? read + write : 0));
+  return { inputTokens, outputTokens: n(u?.output_tokens ?? u?.outputTokens), cache: { read, write } };
+}
+
+export function usageCostUsd(price: TokenRates, usage: UsageLike | null | undefined): number {
+  const { inputTokens, outputTokens, cache } = normalizeUsage(usage);
+  return tokenCostUsd(price, inputTokens, outputTokens, cache);
+}
+
+/** USD for one call. Twin of mivaa `ai_pricing.calculate_cost`: `inputTokens` EXCLUDES cache tokens. */
+export type TokenRates = Pick<
+  TokenPrice, 'input' | 'output' | 'longThreshold' | 'longInput' | 'longOutput' | 'cacheRead' | 'cacheWrite'
+>;
 
 export function tokenCostParts(
   price: TokenRates,
   inputTokens: number,
   outputTokens: number,
-  cachedPromptTokens = 0,
+  cache: CacheTokens = {},
 ): { input: number; output: number } {
-  const promptTokens = Math.max(0, inputTokens) + Math.max(0, cachedPromptTokens);
-  const long = !!price.longThreshold && promptTokens > price.longThreshold;
+  const uncached = Math.max(0, inputTokens);
+  const read = Math.max(0, cache.read ?? 0);
+  const write = Math.max(0, cache.write ?? 0);
+  const long = !!price.longThreshold && uncached + read + write > price.longThreshold;
   const inRate = long ? (price.longInput || price.input) : price.input;
   const outRate = long ? (price.longOutput || price.output) : price.output;
+  const inputUnits = uncached
+    + read * (price.cacheRead ?? DEFAULT_CACHE_READ)
+    + write * (price.cacheWrite ?? DEFAULT_CACHE_WRITE);
   return {
-    input: (Math.max(0, inputTokens) / 1_000_000) * inRate,
+    input: (inputUnits / 1_000_000) * inRate,
     output: (Math.max(0, outputTokens) / 1_000_000) * outRate,
   };
 }
 
-export function tokenCostUsd(price: TokenRates, inputTokens: number, outputTokens: number, cachedPromptTokens = 0): number {
-  const { input, output } = tokenCostParts(price, inputTokens, outputTokens, cachedPromptTokens);
+export function tokenCostUsd(price: TokenRates, inputTokens: number, outputTokens: number, cache: CacheTokens = {}): number {
+  const { input, output } = tokenCostParts(price, inputTokens, outputTokens, cache);
   return input + output;
 }
 const DEFAULT_MARKUP = 1.5;
@@ -56,7 +99,7 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
       try {
         const { data, error } = await supabase
           .from('ai_model_pricing')
-          .select('model_key, input_price_per_million, output_price_per_million, markup_multiplier, long_context_threshold_tokens, long_context_input_price_per_million, long_context_output_price_per_million')
+          .select('model_key, input_price_per_million, output_price_per_million, markup_multiplier, long_context_threshold_tokens, long_context_input_price_per_million, long_context_output_price_per_million, cache_read_multiplier, cache_write_multiplier')
           .eq('billing_type', 'token_based')
           .eq('is_active', true);
         if (error || !data) return _dbPriceCache?.data || {};
@@ -70,6 +113,8 @@ async function getDbTokenPricing(supabase: DbClient): Promise<Record<string, Tok
             longThreshold: Number(r.long_context_threshold_tokens) || undefined,
             longInput: Number(r.long_context_input_price_per_million) || undefined,
             longOutput: Number(r.long_context_output_price_per_million) || undefined,
+            cacheRead: Number(r.cache_read_multiplier) || undefined,
+            cacheWrite: Number(r.cache_write_multiplier) || undefined,
           };
         }
         _dbPriceCache = { data: map, expiresAt: Date.now() + DB_PRICE_TTL_MS };
@@ -123,10 +168,11 @@ export async function creditsForTokens(
   model: string,
   inputTokens: number,
   outputTokens: number,
+  cache: CacheTokens = {},
 ): Promise<{ credits: number; rawUsd: number; billedUsd: number; markup: number } | null> {
   const price = await resolveTokenPrice(supabase, model);
   if (!price) return null;
-  const rawUsd = tokenCostUsd(price, inputTokens, outputTokens);
+  const rawUsd = tokenCostUsd(price, inputTokens, outputTokens, cache);
   const billedUsd = rawUsd * price.markup;
   return {
     // CREDITS_PER_USD is 100 and lives in pricing-constants; expressed here as the same

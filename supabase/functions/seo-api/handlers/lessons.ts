@@ -84,9 +84,7 @@ export async function extractLessons(
       }],
       output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_lessons', userId: a.user_id, workspaceId: a.workspace_id, timeoutMs: 120_000 });
-    actual = await tokenCredits(supabase, LESSON_MODEL, {
-      inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-    });
+    actual = await tokenCredits(supabase, LESSON_MODEL, res.usage ?? {});
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
       report.credits = await settleStage(supabase, wallet, ceiling, actual, { failed: res.stop_reason });
       return { ...report, failed: `lessons ${res.stop_reason}` };

@@ -282,9 +282,7 @@ async function editCall(
       messages: [{ role: 'user', content }],
       output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_grammar', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 120_000 });
-    const credits = await tokenCredits(supabase, GRAMMAR_MODEL, {
-      inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-    });
+    const credits = await tokenCredits(supabase, GRAMMAR_MODEL, res.usage ?? {});
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
       return { edits: [], credits, failed: res.stop_reason };
     }

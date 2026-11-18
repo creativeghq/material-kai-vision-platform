@@ -12,6 +12,8 @@ export interface NextStep {
 export interface NextStepsUsage {
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens: number;
+  cacheWriteTokens: number;
   totalTokens: number;
   modelName: string;
 }
@@ -63,7 +65,7 @@ interface AnthropicBlock { type: string; name?: string; input?: unknown }
 interface AnthropicResponse {
   content?: AnthropicBlock[];
   stop_reason?: string;
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number };
 }
 
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
@@ -161,7 +163,10 @@ export async function proposeNextSteps(
     usage = {
       inputTokens: Number(response.usage?.input_tokens ?? 0),
       outputTokens: Number(response.usage?.output_tokens ?? 0),
-      totalTokens: Number(response.usage?.input_tokens ?? 0) + Number(response.usage?.output_tokens ?? 0),
+      cacheReadTokens: Number(response.usage?.cache_read_input_tokens ?? 0),
+      cacheWriteTokens: Number(response.usage?.cache_creation_input_tokens ?? 0),
+      totalTokens: Number(response.usage?.input_tokens ?? 0) + Number(response.usage?.output_tokens ?? 0)
+        + Number(response.usage?.cache_read_input_tokens ?? 0) + Number(response.usage?.cache_creation_input_tokens ?? 0),
       modelName: MODEL,
     };
   } catch (e) {

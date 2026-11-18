@@ -192,9 +192,7 @@ export async function handleUpdateArticle(req: Request, body: any): Promise<Resp
         }],
         output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
       }, { task: 'seo_update', userId, workspaceId: workspaceId ?? null, timeoutMs: 130_000 });
-      actual = await tokenCredits(supabase, UPDATE_MODEL, {
-        inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-      });
+      actual = await tokenCredits(supabase, UPDATE_MODEL, res.usage ?? {});
       if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
         throw new Error(res.stop_reason === 'refusal'
           ? 'The model declined to review this article — nothing was charged.'

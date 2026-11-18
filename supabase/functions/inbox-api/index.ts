@@ -89,7 +89,7 @@ import { vatPctForCat } from '../_shared/vatVocabulary.generated.ts';
 import { CRM_VAT_COLUMN, normalizeVat } from '../_shared/crm/vatNormalize.generated.ts';
 import { describeAttachmentForAssistant, enrichInboundAttachments } from '../_shared/inbox-attachment-intelligence.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../_shared/credit-reserve.ts';
-import { resolveTokenPrice, tokenCostUsd } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, usageCostUsd, type UsageLike } from '../_shared/ai-logger.ts';
 import { tool } from 'npm:ai@6';
 import { z } from 'npm:zod@3';
 import { getAgentSystemPrompt, loadPrompt } from '../_shared/prompt-utils.ts';
@@ -4377,7 +4377,7 @@ async function handleJwtAction(
       }
 
       // Settle against what MIVAA actually spent. An unpriced model releases the reservation.
-      const usage = (result.usage ?? {}) as { input_tokens?: number; output_tokens?: number };
+      const usage = (result.usage ?? {}) as UsageLike;
       const modelUsed = String(result.model ?? 'claude-haiku-5-5');
       const inTok = Number(usage.input_tokens ?? 0);
       const outTok = Number(usage.output_tokens ?? 0);
@@ -4388,7 +4388,7 @@ async function handleJwtAction(
         if (!price) {
           await refundCredits(db, userId, workspaceId, SPREADSHEET_CEILING, opType, { reason: 'unpriced_model' });
         } else {
-          const raw = tokenCostUsd(price, inTok, outTok);
+          const raw = usageCostUsd(price, usage);
           const credits = Math.round(raw * price.markup * 100 * 100) / 100;
           await settleCredits(db, userId, workspaceId, SPREADSHEET_CEILING, credits, opType, { thread_id: threadId, message_id: chosen.messageId });
         }

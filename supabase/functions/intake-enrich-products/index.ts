@@ -23,7 +23,7 @@ import { scrapeToMarkdown } from '../_shared/tools/material-scrape-tools.ts';
 import { generateStructuredWithClaude, z } from '../_shared/ai-client.ts';
 import { wrapUntrusted } from '../_shared/untrusted.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../_shared/credit-reserve.ts';
-import { resolveTokenPrice } from '../_shared/ai-logger.ts';
+import { resolveTokenPrice, usageCostUsd } from '../_shared/ai-logger.ts';
 
 const OP = 'intake_enrichment';
 const MAX_BATCH = 10;
@@ -189,7 +189,7 @@ Deno.serve(withApiLogging('intake-enrich-products', async (req) => {
       reply = res.output as typeof reply;
       const price = await resolveTokenPrice(supabase, EXTRACTION_MODEL);
       const actual = price
-        ? Math.round(((res.usage.inputTokens / 1e6) * price.input + (res.usage.outputTokens / 1e6) * price.output) * price.markup * 100 * 100) / 100
+        ? Math.round(usageCostUsd(price, res.usage) * price.markup * 100 * 100) / 100
         : 0;
       await settleCredits(supabase, userId, workspaceId, EXTRACTION_CEILING, actual, OP, { product_id: p.product_id });
     } catch (e) {

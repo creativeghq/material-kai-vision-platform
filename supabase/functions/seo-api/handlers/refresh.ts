@@ -203,9 +203,7 @@ async function runRefresh(req: Request, body: any, userId: string): Promise<Resp
       }],
       output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_refresh', userId, workspaceId: workspaceId ?? null, timeoutMs: 130_000 });
-    const actual = await tokenCredits(supabase, REFRESH_MODEL, {
-      inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-    });
+    const actual = await tokenCredits(supabase, REFRESH_MODEL, res.usage ?? {});
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
       throw new Error(res.stop_reason === 'refusal'
         ? 'The model declined to refresh this article — nothing was charged.'

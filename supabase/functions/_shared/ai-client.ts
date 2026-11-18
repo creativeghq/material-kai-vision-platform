@@ -37,6 +37,7 @@ _syncEnvIntoPolyfill();
 
 // ── Imports ──
 import { generateText, generateImage, experimental_generateVideo as generateVideo, Output, stepCountIs } from 'npm:ai@6';
+import type { LanguageModelUsage, SystemModelMessage } from 'npm:ai@6';
 import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
 // Pinned to a MAJOR, like the two providers above. The bare `npm:@ai-sdk/klingai` this
@@ -57,7 +58,7 @@ import { z, type ZodType } from 'npm:zod@3';
 import { createClient } from '@supabase/supabase-js';
 import { MARKUP_MULTIPLIER as _MARKUP } from './pricing-constants.ts';
 import { resolveTokenPrice, resolveUnitPrice, tokenCostParts } from './ai-logger.ts';
-import { CLAUDE_OPUS, aiSdkClaudeOptions, shapeClaudeRequest } from './claude-models.ts';
+import { CLAUDE_OPUS, aiSdkClaudeOptions, markStablePrefix, shapeClaudeRequest } from './claude-models.ts';
 import { GEMINI_TEXT, geminiThinkingConfig } from './gemini-models.ts';
 import { fetchImageGuarded, readCapped } from './fetch-image.ts';
 import { resolveSecret } from './secrets.ts';
@@ -123,6 +124,8 @@ async function _logTrackedCall(opts: {
   model: string;
   inputTokens: number;
   outputTokens: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
   latencyMs: number;
   errorMessage?: string;
   userId?: string;
@@ -131,13 +134,14 @@ async function _logTrackedCall(opts: {
   const _log = _logClient();
   if (!_log) return;
   try {
+    const cache = { read: opts.cacheReadTokens ?? 0, write: opts.cacheWriteTokens ?? 0 };
     const price = await resolveTokenPrice(_log, opts.model);
     if (!price) {
       // Explicit marker rather than a silent 0 — an unpriced model is a gap in
       // ai_model_pricing, not a free call. `ops.silent_zero` can then see it.
       console.warn(`[ai-client] no price row for model "${opts.model}" — cost logged as null`);
     }
-    const parts = price ? tokenCostParts(price, opts.inputTokens, opts.outputTokens) : null;
+    const parts = price ? tokenCostParts(price, opts.inputTokens, opts.outputTokens, cache) : null;
     const rawCost = parts ? parts.input + parts.output : null;
     const markup = price?.markup ?? _MARKUP;
     const billedCost = rawCost === null ? null : rawCost * markup;
@@ -179,6 +183,8 @@ async function _logTrackedCall(opts: {
         success: !opts.errorMessage,
         error: opts.errorMessage ?? null,
         latency_ms: opts.latencyMs,
+        cache_read_input_tokens: cache.read,
+        cache_creation_input_tokens: cache.write,
       },
     });
   } catch (e) {
@@ -350,6 +356,9 @@ export interface AIGenerateResult<T = string> {
     inputTokens: number;
     outputTokens: number;
     totalTokens: number;
+    uncachedInputTokens?: number;
+    cacheReadTokens?: number;
+    cacheWriteTokens?: number;
   };
   /** Model used */
   model: string;
@@ -606,6 +615,25 @@ function _describeStructuredFailure(err: unknown): {
   return { error: err, message, inputTokens, outputTokens };
 }
 
+/** AI SDK usage → the logger's fields. The SDK's `inputTokens` INCLUDES cache reads/writes. */
+function claudeUsage(usage: LanguageModelUsage | undefined) {
+  const read = usage?.inputTokenDetails?.cacheReadTokens ?? 0;
+  const write = usage?.inputTokenDetails?.cacheWriteTokens ?? 0;
+  const total = usage?.inputTokens ?? 0;
+  return {
+    inputTokens: usage?.inputTokenDetails?.noCacheTokens ?? Math.max(0, total - read - write),
+    outputTokens: usage?.outputTokens ?? 0,
+    cacheReadTokens: read,
+    cacheWriteTokens: write,
+    promptTokens: total,
+  };
+}
+
+function cachedSystem(system: string | undefined): SystemModelMessage | undefined {
+  if (!system) return undefined;
+  return { role: 'system', content: system, providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } } };
+}
+
 // ── Claude: Text generation ──
 export async function generateWithClaude(
   prompt: string,
@@ -618,15 +646,14 @@ export async function generateWithClaude(
     const result = await generateText({
       model: anthropic(modelId),
       providerOptions: aiSdkClaudeOptions(modelId),
-      system: config?.systemPrompt,
+      system: cachedSystem(config?.systemPrompt),
       prompt,
       temperature: config?.temperature ?? 0.7,
       maxOutputTokens: config?.maxTokens ?? 4096,
     });
 
-    const usage = await result.usage;
-    const inputTokens = usage?.inputTokens ?? 0;
-    const outputTokens = usage?.outputTokens ?? 0;
+    const u = claudeUsage(await result.usage);
+    const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } = u;
 
     void _logTrackedCall({
       task: config?.task ?? 'claude_text_generation',
@@ -635,6 +662,8 @@ export async function generateWithClaude(
       model: modelId,
       inputTokens,
       outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
       latencyMs: Date.now() - _start,
     });
 
@@ -642,9 +671,12 @@ export async function generateWithClaude(
       output: result.text,
       text: result.text,
       usage: {
-        inputTokens,
+        inputTokens: u.promptTokens,
         outputTokens,
-        totalTokens: inputTokens + outputTokens,
+        totalTokens: u.promptTokens + outputTokens,
+        uncachedInputTokens: inputTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
       },
       model: modelId,
       finishReason: await result.finishReason,
@@ -685,7 +717,7 @@ export async function generateWithClaudeTools(
     const result = await generateText({
       model: anthropic(modelId),
       providerOptions: aiSdkClaudeOptions(modelId),
-      system: config.systemPrompt,
+      system: cachedSystem(config.systemPrompt),
       prompt,
       temperature: config.temperature ?? 0.4,
       maxOutputTokens: config.maxTokens ?? 1024,
@@ -693,9 +725,8 @@ export async function generateWithClaudeTools(
       stopWhen: stepCountIs(config.maxSteps ?? 6),
     });
 
-    const usage = await result.usage;
-    const inputTokens = usage?.inputTokens ?? 0;
-    const outputTokens = usage?.outputTokens ?? 0;
+    const u = claudeUsage(await result.usage);
+    const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } = u;
 
     void _logTrackedCall({
       task: config.task ?? 'claude_tool_generation',
@@ -704,13 +735,18 @@ export async function generateWithClaudeTools(
       model: modelId,
       inputTokens,
       outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
       latencyMs: Date.now() - _start,
     });
 
     return {
       output: result.text,
       text: result.text,
-      usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens },
+      usage: {
+        inputTokens: u.promptTokens, outputTokens, totalTokens: u.promptTokens + outputTokens,
+        uncachedInputTokens: inputTokens, cacheReadTokens, cacheWriteTokens,
+      },
       model: modelId,
     };
   } catch (err) {
@@ -741,16 +777,15 @@ export async function generateStructuredWithClaude<T>(
     const result = await generateText({
       model: anthropic(modelId),
       providerOptions: aiSdkClaudeOptions(modelId),
-      system: config?.systemPrompt,
+      system: cachedSystem(config?.systemPrompt),
       prompt,
       temperature: config?.temperature ?? 0.3,
       maxOutputTokens: config?.maxTokens ?? 4096,
       output: Output.object({ schema }),
     });
 
-    const usage = await result.usage;
-    const inputTokens = usage?.inputTokens ?? 0;
-    const outputTokens = usage?.outputTokens ?? 0;
+    const u = claudeUsage(await result.usage);
+    const { inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens } = u;
 
     void _logTrackedCall({
       task: config?.task ?? 'claude_structured_generation',
@@ -759,6 +794,8 @@ export async function generateStructuredWithClaude<T>(
       model: modelId,
       inputTokens,
       outputTokens,
+      cacheReadTokens,
+      cacheWriteTokens,
       latencyMs: Date.now() - _start,
     });
 
@@ -766,9 +803,12 @@ export async function generateStructuredWithClaude<T>(
       output: result.output as T,
       text: result.text,
       usage: {
-        inputTokens,
+        inputTokens: u.promptTokens,
         outputTokens,
-        totalTokens: inputTokens + outputTokens,
+        totalTokens: u.promptTokens + outputTokens,
+        uncachedInputTokens: inputTokens,
+        cacheReadTokens,
+        cacheWriteTokens,
       },
       model: modelId,
     };
@@ -906,7 +946,12 @@ export interface ClaudeMessagesResponse {
   // it is keyed-unknown rather than `unknown` (which blocks every property read) or `any`
   // (which would silently accept a typo at every call site).
   content?: Array<{ type: string; text?: string; name?: string; input?: Record<string, unknown> }>;
-  usage?: { input_tokens?: number; output_tokens?: number };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    cache_read_input_tokens?: number;
+    cache_creation_input_tokens?: number;
+  };
 }
 
 export async function callClaudeMessages(
@@ -965,7 +1010,7 @@ export async function callClaudeMessages(
         'x-api-key': apiKey!,
         'anthropic-version': '2023-06-01',
       },
-      body: JSON.stringify(shapeClaudeRequest({ ...body, model: modelId })),
+      body: JSON.stringify(markStablePrefix(shapeClaudeRequest({ ...body, model: modelId }))),
       signal: AbortSignal.timeout(config.timeoutMs ?? 60_000),
     });
   } catch (e) {
@@ -986,6 +1031,8 @@ export async function callClaudeMessages(
     model: modelId,
     inputTokens: Number(response.usage?.input_tokens ?? 0),
     outputTokens: Number(response.usage?.output_tokens ?? 0),
+    cacheReadTokens: Number(response.usage?.cache_read_input_tokens ?? 0),
+    cacheWriteTokens: Number(response.usage?.cache_creation_input_tokens ?? 0),
     latencyMs: Date.now() - _start,
   });
   return response;

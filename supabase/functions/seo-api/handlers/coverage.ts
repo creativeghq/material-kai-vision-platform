@@ -98,9 +98,7 @@ export async function checkCoverage(
       }],
       output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
     }, { task: 'seo_coverage', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 120_000 });
-    actual = await tokenCredits(supabase, COVERAGE_MODEL, {
-      inputTokens: Number(res.usage?.input_tokens ?? 0), outputTokens: Number(res.usage?.output_tokens ?? 0),
-    });
+    actual = await tokenCredits(supabase, COVERAGE_MODEL, res.usage ?? {});
     // A refusal or a truncated reply is a failed check, never a reply to salvage.
     if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
       const credits = await settleStage(supabase, wallet, ceiling, actual, { failed: res.stop_reason });

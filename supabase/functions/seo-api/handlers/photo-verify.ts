@@ -2,6 +2,7 @@
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
 import { callClaudeMessages } from '../../_shared/ai-client.ts';
+import type { UsageLike } from '../../_shared/ai-logger.ts';
 import { getToolPrompt } from '../../_shared/prompt-utils.ts';
 import { fetchImageGuardedOrNull } from '../../_shared/fetch-image.ts';
 import { PHOTO_CHECK_VERSION, type PageImage, type PhotoSeen } from '../../_shared/page-images.ts';
@@ -30,7 +31,7 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-export interface PhotoUsage { model: string; inputTokens: number; outputTokens: number }
+export type PhotoUsage = { model: string } & UsageLike;
 
 function toBase64(bytes: Uint8Array): string {
   let s = '';
@@ -67,11 +68,7 @@ export async function verifyPhoto(
     output_config: { effort: 'low', format: { type: 'json_schema', schema: SCHEMA } },
   }, { task: 'seo_photo_verify', userId: who.userId, workspaceId: who.workspaceId, timeoutMs: 30_000 });
 
-  const usage: PhotoUsage = {
-    model: PHOTO_VERIFY_MODEL,
-    inputTokens: Number(res.usage?.input_tokens ?? 0),
-    outputTokens: Number(res.usage?.output_tokens ?? 0),
-  };
+  const usage: PhotoUsage = { ...(res.usage ?? {}), model: PHOTO_VERIFY_MODEL };
   // A refusal or an unparseable reply is a failed check, never a description to salvage.
   if (res.stop_reason === 'refusal') return { seen: null, usage };
   try {
