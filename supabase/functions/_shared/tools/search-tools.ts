@@ -243,7 +243,7 @@ async function pinNamedProducts(data: any, query: string, workspaceId: string): 
     console.warn('catalog name match failed', error.message);
     return data;
   }
-  if (!Array.isArray(named) || named.length === 0) return data;
+  if (!Array.isArray(named) || named.length === 0) return dropIfNameNotCatalogued(data, query, workspaceId);
   // deno-lint-ignore no-explicit-any
   const existing: any[] = Array.isArray(data.results) ? data.results : [];
   // deno-lint-ignore no-explicit-any
@@ -266,6 +266,32 @@ async function pinNamedProducts(data: any, query: string, workspaceId: string): 
   data.results = pinned;
   data.dropped_neighbours = existing.filter((r) => !namedIds.has(idOf(r))).length;
   data.name_matches = named.map((n) => ({ name: n.name, factory: n.factory }));
+  return data;
+}
+
+// deno-lint-ignore no-explicit-any
+async function dropIfNameNotCatalogued(data: any, query: string, workspaceId: string): Promise<any> {
+  const { data: missing, error } = await supabase.rpc('catalog_names_not_held', {
+    p_workspace_id: workspaceId,
+    p_query: query,
+  });
+  if (error) {
+    console.warn('catalog_names_not_held failed', error.message);
+    return data;
+  }
+  if (!Array.isArray(missing) || missing.length === 0) return data;
+  let dropped = 0;
+  for (const key of RERANKABLE_KEYS) {
+    if (Array.isArray(data[key])) {
+      dropped += data[key].length;
+      data[key] = [];
+    }
+  }
+  data.dropped_neighbours = dropped;
+  data.not_in_catalogue = missing;
+  data.guidance = `"${missing.join('", "')}" appears in supplier price lists but in no catalogue product, so the ` +
+    'catalogue holds no match and the nearest-looking tiles were withheld. Say it is not catalogued yet; ' +
+    'for its price use knowledge_base_search with categorySlug="pricing". Do not offer other tiles as if they were it.';
   return data;
 }
 
@@ -431,7 +457,7 @@ export const createSearchTool = (workspaceId: string, onChunk?: (chunk: any) => 
             0,
           );
           const colourMatches = await coloursNearHexes(search_spec?.color_hex, workspaceId);
-          if (hitCount === 0 && colourMatches.length === 0) {
+          if (hitCount === 0 && colourMatches.length === 0 && !ranked?.not_in_catalogue) {
             Object.assign(ranked ?? {}, await describeEmptyResult('products', workspaceId));
           }
           if (colourMatches.length) Object.assign(ranked ?? {}, { colour_hex_matches: colourMatches });
@@ -648,7 +674,10 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
         try {
           // Ask only for corpora that hold something. See nonEmptyCorpora: searching the two
           // empty ones cost 13 of every 15 seconds and returned nothing, by construction.
-          const liveTypes = [...(await nonEmptyCorpora(workspaceId, searchTypes))];
+          const scopedToDocs = Boolean(categorySlug || categoryId || priceDocType);
+          const docTypes = searchTypes.filter((t: string) => t !== 'products');
+          const wantedTypes = scopedToDocs && docTypes.length > 0 ? docTypes : searchTypes;
+          const liveTypes = [...(await nonEmptyCorpora(workspaceId, wantedTypes))];
           if (liveTypes.length === 0) {
             // Every requested corpus is empty — there is no query to run. Answer from the same
             // derivation the zero-result path uses, so the agent gets one consistent story.
@@ -774,10 +803,9 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
           }
 
 
-          // Rank articles and products against the query. These come back ordered by raw
-          // vector similarity per source; the agent reads them top-down and its answer is
-          // shaped by whatever is first.
-          if (results.articles.length > 1) {
+          // Rank articles and products against the query and resolve prices, concurrently.
+          const rerankArticles = async () => {
+            if (results.articles.length < 2) return;
             const ranked = await rerankResults(query, results.articles, (a, i) => ({
               id: String(a.docId ?? `idx-${i}`),
               name: String(a.documentTitle ?? a.heading ?? ''),
@@ -786,8 +814,9 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
               relevanceScore: typeof a.relevanceScore === 'number' ? a.relevanceScore : undefined,
             }), { supabase, task: 'kb_search_rerank' });
             results.articles = ranked.items;
-          }
-          if (results.products.length > 1) {
+          };
+          const rerankProducts = async () => {
+            if (results.products.length < 2) return;
             const ranked = await rerankResults(query, results.products, (pr, i) => ({
               id: String(pr.name ?? `idx-${i}`),
               name: String(pr.name ?? ''),
@@ -795,8 +824,7 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
               relevanceScore: typeof pr.relevanceScore === 'number' ? pr.relevanceScore : undefined,
             }), { supabase, task: 'kb_search_rerank' });
             results.products = ranked.items;
-          }
-
+          };
           // Track agent mentions for returned KB docs (fire-and-forget)
           if (results.articles.length > 0) {
             const titles = [...new Set(results.articles.map((a: any) => a.documentTitle).filter(Boolean))];
@@ -834,19 +862,16 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
           // A supplier price question is answered from the structured price store, in SQL, not
           // from document text: the agent only presents the numbers. Admin only, like the pricing
           // category itself.
-          if (isAdmin && (categorySlug === 'pricing' || /(price|prices|pricing|cost|discount)|τιμ|έκπτωση|κόστος|€/i.test(query))) {
-            try {
-              const { data: priced, error: pricedErr } = await supabase.rpc('resolve_purchase_prices', {
-                p_workspace_id: workspaceId,
-                p_query: query,
-                p_limit: 6,
-              });
-              if (!pricedErr) {
-                const { data: lines } = await supabase.rpc('price_supplier_hints', { p_workspace_id: workspaceId, p_query: query });
-                if (lines && lines.length > 0) {
-                  (results as Record<string, unknown>).supplier_product_lines = lines;
-                  (results as Record<string, unknown>).supplier_product_lines_note = supplierLinesNote(lines, priced ?? []);
-                }
+          const resolvePrices = async () => {
+            const priceQuestion = categorySlug === 'pricing' || /(price|prices|pricing|cost|discount)|τιμ|έκπτωση|κόστος|€/i.test(query);
+            if (isAdmin && priceQuestion) try {
+              const [{ data: priced, error: pricedErr }, { data: lines }] = await Promise.all([
+                supabase.rpc('resolve_purchase_prices', { p_workspace_id: workspaceId, p_query: query, p_limit: 10 }),
+                supabase.rpc('price_supplier_hints', { p_workspace_id: workspaceId, p_query: query }),
+              ]);
+              if (!pricedErr && lines && lines.length > 0) {
+                (results as Record<string, unknown>).supplier_product_lines = lines;
+                (results as Record<string, unknown>).supplier_product_lines_note = supplierLinesNote(lines, priced ?? []);
               }
               if (pricedErr) {
                 console.warn('[knowledge_base_search] resolve_purchase_prices failed:', pricedErr.message);
@@ -863,7 +888,8 @@ export const createKnowledgeBaseSearchTool = (workspaceId: string, isAdmin = fal
             } catch (e) {
               console.warn('[knowledge_base_search] resolve_purchase_prices threw:', e);
             }
-          }
+          };
+          await Promise.all([rerankArticles(), rerankProducts(), resolvePrices()]);
 
           // Same reason as material_search: an empty KB and an unlucky query look identical,
           // and only one of them is worth rewording. 677 published docs sat behind a search the
