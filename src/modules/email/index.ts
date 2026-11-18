@@ -1,4 +1,3 @@
-import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { AtSign, LayoutTemplate } from 'lucide-react';
 import manifest from './manifest.json';
@@ -24,8 +23,6 @@ const definition: ModuleDefinition = {
     // its own sending domain, which the operator cannot do on their behalf.
     { path: '/emails', component: EmailManagementPage, requireWorkspaceAdmin: true },
     { path: '/emails/templates/:id/edit', component: EmailTemplateBuilderPage, requireWorkspaceAdmin: true },
-    { path: '/admin/emails', component: legacyAdminRedirect('/emails') },
-    { path: '/admin/email-templates/:id/edit', component: legacyAdminRedirect('/emails/templates/:id/edit') },
   ],
   navItems: [],
   // Default sender settings (`email_settings` table). Was previously hidden

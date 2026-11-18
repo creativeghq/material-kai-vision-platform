@@ -1535,8 +1535,7 @@ const SupplierCreditNoteTable: React.FC<{ rows: SupplierCreditNote[]; waiting?: 
   </>
 );
 const PaymentsTable: React.FC<{ rows: PaymentWithAllocation[]; categoryName: (id: any) => string; financeBase: string } & DocEmptyProps> = ({ rows, categoryName, financeBase, ...empty }) => {
-  // Deep-link the party name to its CRM record. One address — CRM is workspace work and lives
-  // at /crm; the `/admin/crm` twin this used to branch on is now only a redirect.
+  // Deep-link the party name to its CRM record; CRM is workspace work and lives only at /crm.
   const crmBase = '/crm';
   return (
   <div className="table-scroll">

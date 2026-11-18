@@ -6,12 +6,16 @@ import { AdminGuard } from '@/components/core/AdminGuard';
 import { WorkspaceAdminGuard } from '@/components/core/WorkspaceAdminGuard';
 import { EntitlementGuard } from '@/components/core/EntitlementGuard';
 import { Layout } from '@/components/core/Layout';
-import { AdminLayout } from '@/components/Admin/HQ/AdminShell';
+import { lazyWithRetry } from '@/utils/lazyWithRetry';
 import { PageErrorBoundary } from '@/components/core/ErrorBoundary';
 import { PageLoader } from '@/components/core/PageLoader';
 
 import { registeredModules } from './registry';
 import { useModule } from './useEnabledModules';
+
+// Lazy on purpose: AdminShell → Layout → Sidebar → modules/_core is a cycle back to this file,
+// and a static import made pages evaluating that cycle first render blank.
+const AdminLayout = lazyWithRetry(() => import('@/components/Admin/HQ/AdminShell').then((m) => ({ default: m.AdminLayout })));
 
 const ModuleGate: React.FC<{ slug: string; children: React.ReactNode }> = ({ slug, children }) => {
   const { enabled, isLoading } = useModule(slug);

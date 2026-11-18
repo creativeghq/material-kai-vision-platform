@@ -1,4 +1,3 @@
-import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { Webhook } from 'lucide-react';
 import manifest from './manifest.json';
@@ -21,7 +20,6 @@ const definition: ModuleDefinition = {
     // its OWN sender. Behind AdminGuard only the platform operator could open this, so a customer
     // who bought the module could not set it up at all.
     { path: '/messaging', component: MessagingManagementPage, requireWorkspaceAdmin: true },
-    { path: '/admin/messaging', component: legacyAdminRedirect('/messaging') },
   ],
   navItems: [],
   // Operator-side setup for the shared Zernio account. The register-webhook button also exists on

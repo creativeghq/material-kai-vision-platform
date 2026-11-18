@@ -304,7 +304,7 @@ const UsersPage: React.FC = () => {
                         <Checkbox checked={selected.has(user.user_id)} onCheckedChange={() => setSelected((s) => toggle(s, user.user_id))} aria-label="Select row" />
                       </TableCell>
                       <TableCell className="max-w-[20rem] font-medium">
-                        <HubCellLink to={`/admin/crm/users/${user.user_id}`} className="inline-flex max-w-full items-center gap-2">
+                        <HubCellLink to={`/admin/users/${user.user_id}`} className="inline-flex max-w-full items-center gap-2">
                           <Mail className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <span className="block min-w-0 max-w-[16rem] truncate" title={user.email}>{user.email}</span>
                         </HubCellLink>

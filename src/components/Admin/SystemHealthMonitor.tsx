@@ -221,7 +221,7 @@ export const SystemHealthMonitor: React.FC = () => {
       ] = await Promise.all([
         fetch(`${apiUrl}/health/detailed`).catch(() => null),
         fetch(`${apiUrl}/health${forceRefresh ? '?force_refresh=true' : ''}`).catch(() => null),
-        supabase.from('modules').select('id', { count: 'exact', head: true }).then(({ error }) => !error).catch(() => false),
+        supabase.from('modules').select('slug', { count: 'exact', head: true }).then(({ error }) => !error).catch(() => false),
         supabase.functions.invoke('health-check').then(({ data }) => data).catch(() => null),
         // Third-party provider uptime from real usage outcomes (catches 402/outage
         // that reachability pings miss — e.g. DataForSEO balance depleted).

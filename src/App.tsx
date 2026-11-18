@@ -442,10 +442,8 @@ const App = () => (
                     </AuthGuard>
                   }
                 />
-                {/* CRM record pages — capability-gated (crm.view) so sales reps and staff can
-                    open a customer and its Account overview. THE only address for them: the old
-                    `/admin/crm/*` twin rendered these same components behind AdminGuard, which
-                    bounced exactly those users, and now only redirects here. */}
+                {/* CRM record pages — capability-gated (crm.view), never AdminGuard, so sales reps
+                    and staff can open a customer. This is the only address for them. */}
                 <Route
                   path="/crm/deals/:id"
                   element={
@@ -950,9 +948,6 @@ const App = () => (
                     </PageErrorBoundary>
                   }
                 />
-                {/* The `crm` module registers the legacy `/admin/crm/*` redirects into these
-                    routes, plus `/admin/crm/users/:id` — the global account tier, which is
-                    operator tooling and stays admin-gated. See src/modules/crm/index.ts. */}
                 <Route
                   path="/billing/subscriptions"
                   element={

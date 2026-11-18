@@ -117,24 +117,17 @@ describe('the route table itself', () => {
    * into that prefix was bounced off a customer record they can open one URL over, and nothing
    * anywhere reported it: the route resolved, the guard did its job, the page simply refused.
    */
-  it('links CRM at /crm — the /admin/crm twin is redirects only (except operator users/:id)', () => {
-    // The redirect registry and the redirect component must name the old prefix; that is their job.
-    const ALLOWED = ['src/modules/crm/index.ts', 'src/modules/crm/pages/CrmLegacyRedirect.tsx'];
+  it('links CRM at /crm and platform accounts at /admin/users — /admin/crm is retired', () => {
     const offenders: string[] = [];
     for (const file of sourceFiles) {
-      if (ALLOWED.includes(rel(file))) continue;
       blankedSource(file).split('\n').forEach((line, i) => {
-        // `/admin/crm/users` is the one surface that legitimately stays under /admin.
-        const hits = line.split('/admin/crm').length - 1;
-        const users = line.split('/admin/crm/users').length - 1;
-        if (hits > users) offenders.push(`${rel(file)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+        if (line.includes('/admin/crm')) offenders.push(`${rel(file)}:${i + 1}: ${line.trim().slice(0, 120)}`);
       });
     }
     expect(
       offenders,
-      'CRM record pages live at /crm/... (capability crm.view). Link there directly — the ' +
-      '/admin/crm paths are redirects kept for links that outlived the move, not addresses to ' +
-      'write new links against.' + '\n' + offenders.join('\n'),
+      'CRM record pages live at /crm/... (capability crm.view); a platform account is ' +
+      '/admin/users/:id. The /admin/crm prefix no longer exists, so a link there 404s.\n' + offenders.join('\n'),
     ).toEqual([]);
   });
 

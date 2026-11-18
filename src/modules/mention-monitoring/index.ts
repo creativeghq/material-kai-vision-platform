@@ -1,4 +1,3 @@
-import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
@@ -16,7 +15,6 @@ const definition: ModuleDefinition = {
       component: MentionMonitoringDashboard as any,
       requireWorkspaceAdmin: true,
     },
-    { path: '/admin/mention-monitoring', component: legacyAdminRedirect('/mention-monitoring') },
   ],
   navItems: [],
 };

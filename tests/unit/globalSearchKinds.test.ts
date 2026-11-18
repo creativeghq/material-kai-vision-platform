@@ -116,7 +116,7 @@ describe('global search kind catalogue', () => {
       GlobalSearchKind,
       { caps?: Capability[]; module?: string; wsManager?: boolean }
     > = {
-      // `/u/:id` is public; `/admin/crm/users/:id` is operator-only and the route function only
+      // `/u/:id` is public; `/admin/users/:id` is operator-only and the route function only
       // returns it for an operator. Server-side, search_workspace_people self-guards.
       person: {},
       company: { caps: ['crm.view'], module: 'crm' },

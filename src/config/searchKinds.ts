@@ -102,7 +102,7 @@ export const GLOBAL_SEARCH_KINDS: readonly GlobalSearchKindSpec[] = [
     // teammates if you are a workspace member, any account if you are a platform operator), and
     // both destinations below are reachable by anyone signed in.
     route: (hit, ctx) =>
-      ctx.isPlatformOperator ? `/admin/crm/users/${hit.id}` : `/u/${hit.id}`,
+      ctx.isPlatformOperator ? `/admin/users/${hit.id}` : `/u/${hit.id}`,
   },
   {
     kind: 'company',

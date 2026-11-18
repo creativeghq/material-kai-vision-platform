@@ -490,9 +490,7 @@ interface DetailProps {
  */
 const PartyAccount: React.FC<DetailProps> = ({ party, aging, onClose, statementsEnabled, financeBase }) => {
   const { toast } = useToast();
-  // `/crm/companies/:id` — the one CRM address, reachable by anyone with crm.view. The branch
-  // that used to pick an `/admin/crm` twin here keyed off a finance base that never existed, and
-  // the twin itself is now a redirect.
+  // `/crm/companies/:id` — the one CRM address, reachable by anyone with crm.view.
   const crmBase = '/crm';
   const crmHref = party ? `${crmBase}/${party.party_type === 'company' ? 'companies' : 'contacts'}/${party.party_id}` : '';
   const [tab, setTab] = useState<'invoices' | 'bills' | 'orders' | 'payments' | 'ledger'>('invoices');

@@ -1,4 +1,3 @@
-import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
@@ -21,9 +20,6 @@ const definition: ModuleDefinition = {
     { path: '/catalogs', component: CatalogsListPage, requireWorkspaceAdmin: true },
     { path: '/catalogs/sources', component: CatalogSourcesPage, requireWorkspaceAdmin: true },
     { path: '/catalogs/:id', component: CatalogBuilderPage, requireWorkspaceAdmin: true },
-    { path: '/admin/catalogs', component: legacyAdminRedirect('/catalogs') },
-    { path: '/admin/catalogs/sources', component: legacyAdminRedirect('/catalogs/sources') },
-    { path: '/admin/catalogs/:id', component: legacyAdminRedirect('/catalogs/:id') },
   ],
   navItems: [],
 };

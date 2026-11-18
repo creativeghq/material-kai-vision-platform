@@ -7,6 +7,7 @@ import { strippedSource } from '../helpers/sourceIndex';
 import { PAGE_FOR, routeExists, tabsFor } from '../helpers/routeTargets';
 
 const STORED_ALIASES: Record<string, string[]> = {
+  '/admin/ai-configs': ['background-agents', 'ai-data', 'api-gateway'],
   '/profile': ['appointments', 'calendar', 'inbox'],
   '/admin/operations': ['catalog', 'catalogs', 'factory-onboarding', 'system-health', 'search-analytics', 'services-billing', 'platform-overview', 'push'],
 };

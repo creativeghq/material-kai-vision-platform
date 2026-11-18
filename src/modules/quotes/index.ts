@@ -1,8 +1,8 @@
-import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { Image as ImageIcon } from 'lucide-react';
 import manifest from './manifest.json';
 import type { ModuleDefinition, ModuleManifest } from '../_core';
+import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 
 const QuotesPage = lazy(() => import('./pages/QuotesPage').then(m => ({ default: m.QuotesPage })));
 const QuoteDetailRoute = lazy(() =>
@@ -47,12 +47,6 @@ const definition: ModuleDefinition = {
     { path: '/quotes/settings/status-tags', component: StatusTagsManagementPage, requireWorkspaceAdmin: true },
     { path: '/quotes/settings/upsells', component: UpsellsManagementPage, requireWorkspaceAdmin: true },
     { path: '/quotes/settings/timeline-steps', component: TimelineStepsManagementPage, requireWorkspaceAdmin: true },
-    { path: '/admin/quote-requests', component: legacyAdminRedirect('/quotes/requests/manage') },
-    { path: '/admin/quotes/:id', component: legacyAdminRedirect('/quotes/:id') },
-    { path: '/admin/status-tags', component: legacyAdminRedirect('/quotes/settings/status-tags') },
-    { path: '/admin/upsells', component: legacyAdminRedirect('/quotes/settings/upsells') },
-    { path: '/admin/timeline-steps', component: legacyAdminRedirect('/quotes/settings/timeline-steps') },
-    { path: '/admin/quote-settings', component: legacyAdminRedirect('/quotes/settings') },
   ],
   navItems: [],
   // Module Settings page (/admin/modules/quotes/settings) auto-mounts these

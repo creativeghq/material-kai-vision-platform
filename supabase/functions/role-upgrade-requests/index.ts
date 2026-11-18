@@ -333,7 +333,7 @@ Deno.serve(withApiLogging('role-upgrade-requests', async (req: Request) => {
         return rn === 'admin' || rn === 'super_admin' || rn === 'owner';
       });
 
-      const actionUrl = `${PUBLIC_APP_URL}/admin/crm/users/${user.id}`;
+      const actionUrl = `${PUBLIC_APP_URL}/admin/users/${user.id}`;
       const requestedRoleLabel = body.requested_role.charAt(0).toUpperCase() + body.requested_role.slice(1);
 
       for (const admin of adminRows) {

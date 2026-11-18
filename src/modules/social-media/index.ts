@@ -1,4 +1,3 @@
-import { legacyAdminRedirect } from '@/modules/_core/legacyAdminRedirect';
 import { lazyWithRetry as lazy } from '@/utils/lazyWithRetry';
 import { Webhook } from 'lucide-react';
 import manifest from './manifest.json';
@@ -26,7 +25,6 @@ const definition: ModuleDefinition = {
     // Reviews are workspace-scoped like the accounts, but NOT admin-only: answering a review is
     // day-to-day work for whoever runs the desk, not a configuration change.
     { path: '/social-media/reviews', component: ReviewsPage },
-    { path: '/admin/social-media/accounts', component: legacyAdminRedirect('/social-media/accounts') },
   ],
   navItems: [],
   // The Keys tab is auto-mounted by ModuleSettingsPage (ZERNIO_* are scoped here via
