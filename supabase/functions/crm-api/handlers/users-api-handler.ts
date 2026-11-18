@@ -449,18 +449,27 @@ export async function handleUsers(req: Request): Promise<Response> {
         );
       }
 
-      // 0. Remove workspaces this user SOLELY owns (their personal consumer/reseller
-      //    workspace + any solo tenant). MUST run BEFORE the auth delete: workspace_members
-      //    CASCADE-vanish when the auth user is removed, so the "sole owner" check would find
-      //    nothing afterward. workspaces.created_by is SET NULL (not CASCADE), so without this
-      //    step the tenant — and its "(reseller)" CRM mirror — would be orphaned. Shared or
-      //    parent-of-children workspaces are left intact by the RPC.
+      // Operator-only (route gate). Refused until subscriptions are cancelled and credits are zero.
+      const { data: blockers, error: blockErr } = await supabase.rpc('user_delete_blockers', { p_user_id: targetUserId });
+      if (blockErr) {
+        return new Response(JSON.stringify({ error: `Could not check the account before deleting: ${blockErr.message}` }), { status: 500, headers: corsHeaders });
+      }
+      if (Array.isArray(blockers) && blockers.length > 0) {
+        return new Response(
+          JSON.stringify({ error: `Cancel the subscription and bring credits to zero first — this account still has ${blockers.join(' and ')}.` }),
+          { status: 409, headers: corsHeaders },
+        );
+      }
+
+      // Solo workspaces go BEFORE the auth delete: memberships cascade away with the user.
       const { data: removedWs, error: soloWsError } = await supabase.rpc('delete_user_solo_workspaces', {
         p_user_id: targetUserId,
       });
       if (soloWsError) {
-        console.error(`[crm-users-api] solo-workspace cleanup failed for ${targetUserId}:`, soloWsError.message);
-        // Non-fatal: proceed with the auth delete; storage-orphan-cleanup-cron is the backstop.
+        return new Response(
+          JSON.stringify({ error: `Account not deleted: ${soloWsError.message}` }),
+          { status: 409, headers: corsHeaders },
+        );
       }
 
       // 1. Delete the auth user. Foreign keys on auth.users now CASCADE all of the user's
