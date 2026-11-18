@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { AlertTriangle, Loader2, Infinity as InfinityIcon } from 'lucide-react';
 import { Input } from '@/components/core/ui/input';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/core/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
@@ -90,15 +91,14 @@ export const PlansPanel: React.FC = () => {
                 <CardDescription className="text-xs">The lowest plan that includes each module. A plan also includes everything below it.</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="table-scroll">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-muted-foreground">
-                    <tr className="border-b border-border/60">
-                      <th className="px-4 py-2 text-left">Module</th>
-                      {PLAN_TIERS.map((t) => <th key={t} className="px-4 py-2 text-center capitalize">{t}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Module</TableHead>
+                      {PLAN_TIERS.map((t) => <TableHead key={t} className="text-center capitalize">{t}</TableHead>)}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {modules.map((m) => {
                       const dep = MODULE_DEPENDENCIES[m.slug];
                       return (
@@ -110,30 +110,29 @@ export const PlansPanel: React.FC = () => {
                           value={m.price_tier ?? ''}
                           onValueChange={(t) => setTier(m.slug, t as (typeof PLAN_TIERS)[number])}
                         >
-                          <tr className="border-b border-border/30">
-                            <td className="px-4 py-2">
+                          <TableRow>
+                            <TableCell>
                               <div className="font-medium">{m.name}</div>
                               <div className="text-[11px] text-muted-foreground">
                                 {m.category}{!m.enabled ? ' · disabled' : ''}{dep ? ` · needs ${dep.join(', ')}` : ''}
                               </div>
-                            </td>
+                            </TableCell>
                             {PLAN_TIERS.map((t) => (
-                              <td key={t} className="px-4 py-2">
+                              <TableCell key={t}>
                                 <RadioGroupItem
                                   value={t}
                                   disabled={busy === `mod:${m.slug}`}
                                   aria-label={`${m.name} on ${t}`}
                                   className="mx-auto"
                                 />
-                              </td>
+                              </TableCell>
                             ))}
-                          </tr>
+                          </TableRow>
                         </RadioGroup>
                       );
                     })}
-                  </tbody>
-                </table>
-                </div>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
 
@@ -144,23 +143,22 @@ export const PlansPanel: React.FC = () => {
                 <CardDescription className="text-xs">Usage caps per plan. Leave blank or enter <code>-1</code> for unlimited (∞).</CardDescription>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="table-scroll">
-                <table className="w-full text-sm">
-                  <thead className="text-xs text-muted-foreground">
-                    <tr className="border-b border-border/60">
-                      <th className="px-4 py-2 text-left">Limit</th>
-                      {plans.map((p) => <th key={p.id} className="px-4 py-2 text-center capitalize">{p.name}{p.price != null ? ` · €${p.price}` : ''}</th>)}
-                    </tr>
-                  </thead>
-                  <tbody>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Limit</TableHead>
+                      {plans.map((p) => <TableHead key={p.id} className="text-center capitalize">{p.name}{p.price != null ? ` · €${p.price}` : ''}</TableHead>)}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                     {QUOTA_KEYS.map((q) => (
-                      <tr key={q.key} className="border-b border-border/30">
-                        <td className="px-4 py-2 font-medium">{q.label}</td>
+                      <TableRow key={q.key}>
+                        <TableCell className="font-medium">{q.label}</TableCell>
                         {plans.map((p) => {
                           const v = Number((p.features as any)?.[q.key] ?? -1);
                           const unlimited = v < 0;
                           return (
-                            <td key={p.id} className="px-4 py-2 text-center">
+                            <TableCell key={p.id} className="text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <Input
                                   className="h-8 w-20 text-center text-xs"
@@ -171,18 +169,17 @@ export const PlansPanel: React.FC = () => {
                                 />
                                 {unlimited && <InfinityIcon className="h-3.5 w-3.5 text-muted-foreground" />}
                               </div>
-                            </td>
+                            </TableCell>
                           );
                         })}
-                      </tr>
+                      </TableRow>
                     ))}
-                  </tbody>
-                </table>
-                </div>
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
             <p className="text-xs text-muted-foreground">
-              Modules are enabled/disabled platform-wide in <Link to="/admin/modules" className="text-primary">Platform → Modules</Link>.
+              Modules are enabled/disabled platform-wide in <Link to="/admin/modules" className="text-primary">Modules &amp; Plans → Modules</Link>.
               A workspace&apos;s plan = its owner&apos;s active subscription; the operator (root) always has everything.
             </p>
           </>

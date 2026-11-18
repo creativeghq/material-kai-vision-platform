@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { logger } from '@/services/logger.service';
 import { TempFileCleanupModal } from '../TempFileCleanupModal';
 import { DocumentHealthPanel } from './DocumentHealthPanel';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { EmbeddingBackfillCard } from './EmbeddingBackfillCard';
 import {
   RefreshCw,
@@ -43,6 +44,19 @@ import {
   Play,
   PauseCircle,
   ListChecks,
+  Rocket,
+  Link2,
+  Globe,
+  Search,
+  Flame,
+  Cog,
+  Ruler,
+  PenLine,
+  Brain,
+  Palette,
+  Factory,
+  BarChart3,
+  ClipboardList,
 } from 'lucide-react';
 import {
   Dialog,
@@ -633,7 +647,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
           return checkpoints;
         });
 
-        // 🚀 PROACTIVE PRODUCT REFRESH
+        // Proactive product refresh
         const isPdfJob = isPdfJobType(typedJobData.job_type);
 
         const shouldFetchProducts = isPdfJob && (
@@ -717,7 +731,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         .single()
         .then(({ data, error }) => {
           if (error) {
-            console.error('❌ Failed to fetch job:', error);
+            console.error('Failed to fetch job:', error);
             return;
           }
           if (data) {
@@ -1242,9 +1256,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       <div className="min-h-screen">
         <PageHeader icon={ListChecks} title="Job Queue" subtitle="Processing jobs, their stages and progress, and document health." />
         <div className="p-6">
-          <Alert className="bg-red-500/10 border-red-500/20">
-            <AlertTriangle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-300">
+          <Alert className="bg-[hsl(var(--error-bg))] border-[hsl(var(--error)/0.25)]">
+            <AlertTriangle className="h-4 w-4 text-[hsl(var(--error))]" />
+            <AlertDescription className="text-[hsl(var(--error))]">
               Error: {error}
             </AlertDescription>
           </Alert>
@@ -1257,8 +1271,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
     return (
       <div className="min-h-screen">
         <PageHeader icon={ListChecks} title="Job Queue" subtitle="Processing jobs, their stages and progress, and document health." />
-        <div className="p-6">
-          <p className="text-muted-foreground">No queue data available</p>
+        <div className="p-3 sm:p-6">
+          <HubEmptyState
+            icon={ListChecks}
+            title="Queue data could not be loaded"
+            description="The job metrics did not answer. Refresh to try again."
+            action={<Button variant="outline" size="sm" onClick={() => void fetchQueueData()}>Refresh</Button>}
+          />
         </div>
       </div>
     );
@@ -1274,9 +1293,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       <div className="p-3 sm:p-6 space-y-6">
         {/* Info Banner when coming from data-import */}
         {fromDataImport && (
-          <Alert className="border-blue-500/30 bg-blue-500/10">
-            <Activity className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-300">
+          <Alert className="border-[hsl(var(--info)/0.25)] bg-[hsl(var(--info-bg))]">
+            <Activity className="h-4 w-4 text-[hsl(var(--info))]" />
+            <AlertDescription className="text-[hsl(var(--info))]">
               <p className="font-semibold">PDF Upload Successful!</p>
               <p className="text-sm mt-1">
                 Your PDF has been queued for processing. The job details modal will open automatically.
@@ -1292,8 +1311,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         {/* The tiles below are reduced client-side over the fetched page, not over the queue.
             Say so whenever those two differ. (#365 AD-8) */}
         {jobCoverage.total !== null && jobCoverage.total > jobCoverage.fetched && (
-          <Alert className="border-yellow-500/30 bg-yellow-500/10">
-            <AlertTriangle className="h-4 w-4 text-yellow-600" />
+          <Alert className="border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))]">
+            <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))]" />
             <AlertDescription className="text-sm">
               <span className="font-semibold">
                 Counts cover the {jobCoverage.fetched.toLocaleString()} most recent jobs of{' '}
@@ -1354,7 +1373,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
       />
 
       <div className="space-y-4">
-          <Card className="dashboard-card border-white/10">
+          <Card className="dashboard-card border-hairline">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
@@ -1369,68 +1388,37 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 </div>
 
                 {/* Control Buttons */}
-                <div className="flex items-center gap-2">
-                  <button
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={handleClearQueue}
                     disabled={clearingQueue || jobs.filter(j => j.status === 'pending' || j.status === 'failed').length === 0}
-                    className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-[hsl(var(--error))]"
                     title="Cancel all pending and failed jobs"
                   >
                     {clearingQueue ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Clearing...
-                      </>
+                      <><RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" />Clearing...</>
                     ) : (
-                      <>
-                        <XCircle className="w-3.5 h-3.5 inline mr-1.5" />
-                        Clear Queue ({jobs.filter(j => j.status === 'pending' || j.status === 'failed').length})
-                      </>
+                      <><XCircle className="w-3.5 h-3.5 mr-1.5" />Clear Queue ({jobs.filter(j => j.status === 'pending' || j.status === 'failed').length})</>
                     )}
-                  </button>
-                  <button
-                    onClick={() => setShowDeleteJobModal(true)}
-                    className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm"
-                    title="Delete a specific job by ID"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 inline mr-1.5" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowDeleteJobModal(true)} title="Delete a specific job by ID">
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
                     Delete Job by ID
-                  </button>
-                  <button
-                    onClick={() => setShowTempCleanupModal(true)}
-                    className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm font-medium transition-all duration-200 shadow-sm"
-                    title="Clean up temporary files to free disk space"
-                  >
-                    <Trash2 className="w-3.5 h-3.5 inline mr-1.5" />
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => setShowTempCleanupModal(true)} title="Clean up temporary files to free disk space">
+                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
                     Cleanup Temp Files
-                  </button>
-                  <button
-                    onClick={() => setAutoRefresh(!autoRefresh)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${
-                      autoRefresh
-                        ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm'
-                        : 'bg-white/10 text-foreground hover:bg-white/15 border border-white/10'
-                    }`}
-                  >
-                    {autoRefresh ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5 animate-spin" />
-                        Auto-refresh ON
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
-                        Auto-refresh OFF
-                      </>
-                    )}
-                  </button>
-                  <button
-                    onClick={fetchQueueData}
-                    className="px-3 py-1.5 bg-white/10 text-foreground hover:bg-white/15 border border-white/10 rounded-md text-sm font-medium transition-all duration-200"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5 inline mr-1.5" />
+                  </Button>
+                  <Button variant={autoRefresh ? 'secondary' : 'outline'} size="sm" onClick={() => setAutoRefresh(!autoRefresh)} aria-pressed={autoRefresh}>
+                    <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${autoRefresh ? 'animate-spin' : ''}`} />
+                    {autoRefresh ? 'Auto-refresh On' : 'Auto-refresh Off'}
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={fetchQueueData}>
+                    <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
                     Refresh Now
-                  </button>
+                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -1439,46 +1427,46 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                 <div className="dashboard-card">
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-yellow-600" />
+                    <Clock className="h-4 w-4 text-[hsl(var(--warning))]" />
                     <p className="text-xs text-muted-foreground">Pending</p>
                   </div>
-                  <div className="text-2xl font-bold text-yellow-400">
+                  <div className="text-2xl font-bold text-[hsl(var(--warning))]">
                     {metrics.all_jobs.pending}
                   </div>
                 </div>
                 <div className="dashboard-card">
                   <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+                    <RefreshCw className="h-4 w-4 text-[hsl(var(--info))] animate-spin" />
                     <p className="text-xs text-muted-foreground">Processing</p>
                   </div>
-                  <div className="text-2xl font-bold text-blue-400">
+                  <div className="text-2xl font-bold text-[hsl(var(--info))]">
                     {metrics.all_jobs.processing}
                   </div>
                 </div>
                 <div className="dashboard-card">
                   <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <CheckCircle className="h-4 w-4 text-[hsl(var(--success))]" />
                     <p className="text-xs text-muted-foreground">Completed</p>
                   </div>
-                  <div className="text-2xl font-bold text-green-400">
+                  <div className="text-2xl font-bold text-[hsl(var(--success))]">
                     {metrics.all_jobs.completed}
                   </div>
                 </div>
                 <div className="dashboard-card">
                   <div className="flex items-center gap-2 mb-2">
-                    <XCircle className="h-4 w-4 text-red-600" />
+                    <XCircle className="h-4 w-4 text-[hsl(var(--error))]" />
                     <p className="text-xs text-muted-foreground">Failed</p>
                   </div>
-                  <div className="text-2xl font-bold text-red-400">
+                  <div className="text-2xl font-bold text-[hsl(var(--error))]">
                     {metrics.all_jobs.failed}
                   </div>
                 </div>
                 <div className="dashboard-card">
                   <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
+                    <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))]" />
                     <p className="text-xs text-muted-foreground">Interrupted</p>
                   </div>
-                  <div className="text-2xl font-bold text-orange-400">
+                  <div className="text-2xl font-bold text-[hsl(var(--warning))]">
                     {metrics.all_jobs.interrupted}
                   </div>
                 </div>
@@ -1487,16 +1475,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     <XCircle className="h-4 w-4 text-gray-600" />
                     <p className="text-xs text-muted-foreground">Cancelled</p>
                   </div>
-                  <div className="text-2xl font-bold text-gray-400">
+                  <div className="text-2xl font-bold text-muted-foreground">
                     {metrics.all_jobs.cancelled}
                   </div>
                 </div>
                 <div className="dashboard-card">
                   <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-4 w-4 text-purple-600" />
+                    <RefreshCw className="h-4 w-4 text-[hsl(var(--info))]" />
                     <p className="text-xs text-muted-foreground">Retrying</p>
                   </div>
-                  <div className="text-2xl font-bold text-purple-400">
+                  <div className="text-2xl font-bold text-[hsl(var(--info))]">
                     {metrics.all_jobs.retrying}
                   </div>
                 </div>
@@ -1516,12 +1504,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 <h4 className="font-semibold mb-3 text-foreground">Recent Jobs</h4>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {getFilteredJobs().length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No jobs in queue</p>
+                    Object.keys(filterValues).some((k) => filterValues[k] != null && filterValues[k] !== '')
+                      ? <HubEmptyState variant="filtered" title="No jobs match these filters" action={<Button variant="outline" size="sm" onClick={() => setFilterValues({})}>Clear filters</Button>} />
+                      : <HubEmptyState title="No jobs in the queue" description="Jobs appear here when a PDF, XML or web import starts. Start one from Data Import." />
                   ) : (
                     paginate(getFilteredJobs(), allPageSafe).map((job) => (
                       <div
                         key={job.id}
-                        className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition group"
+                        className="flex items-center justify-between p-4 bg-surface-sunken rounded-lg border border-hairline hover:bg-hairline transition group"
                       >
                         <div
                           role="button"
@@ -1544,7 +1534,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             {job.total_ai_cost_usd !== undefined && job.total_ai_cost_usd > 0 && (
                               <>
                                 <span>•</span>
-                                <span className="font-semibold text-emerald-600">${job.total_ai_cost_usd.toFixed(4)}</span>
+                                <span className="font-semibold text-[hsl(var(--success))]">${job.total_ai_cost_usd.toFixed(4)}</span>
                               </>
                             )}
                           </div>
@@ -1559,7 +1549,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           {job.metadata?.retry_count && job.metadata.retry_count > 0 && (
-                            <Badge className="bg-orange-500/15 text-orange-300 border-orange-500/30">
+                            <Badge variant="warning">
                               Retry {job.metadata.retry_count}
                             </Badge>
                           )}
@@ -1571,7 +1561,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 handleCancelJob(job.id);
                               }}
                               disabled={cancellingJob === job.id}
-                              className="p-1.5 bg-red-500/15 hover:bg-red-500/25 text-red-400 rounded transition-colors disabled:opacity-50"
+                              className="p-1.5 bg-[hsl(var(--error-bg))] hover:bg-[hsl(var(--error)/0.15)] text-[hsl(var(--error))] rounded transition-colors disabled:opacity-50"
                               title="Cancel job"
                             >
                               {cancellingJob === job.id ? (
@@ -1588,7 +1578,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 handleDeleteJob(job.id);
                               }}
                               disabled={deletingJob === job.id}
-                              className="p-1.5 bg-white/10 hover:bg-white/15 text-foreground rounded transition-colors disabled:opacity-50"
+                              className="p-1.5 bg-hairline hover:bg-surface-hover text-foreground rounded transition-colors disabled:opacity-50"
                               title="Delete job"
                             >
                               {deletingJob === job.id ? (
@@ -1620,13 +1610,13 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
       {/* Error Logs */}
       {failedJobs.length > 0 && (
-        <Card className="border-red-500/30 bg-red-500/10 backdrop-blur-sm">
+        <Card className="border-[hsl(var(--error)/0.25)] bg-[hsl(var(--error-bg))] backdrop-blur-sm">
           <CardHeader>
-            <CardTitle className="text-red-400 flex items-center gap-2">
+            <CardTitle className="text-[hsl(var(--error))] flex items-center gap-2">
               <AlertTriangle className="h-4 w-4" />
               Failed Jobs
             </CardTitle>
-            <CardDescription className="text-red-400/70">
+            <CardDescription className="text-[hsl(var(--error))]">
               Jobs that failed after all retry attempts
             </CardDescription>
           </CardHeader>
@@ -1636,14 +1626,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 .map((job) => (
                   <div
                     key={job.id}
-                    className="p-4 bg-red-500/10 rounded-lg border border-red-500/20"
+                    className="p-4 bg-[hsl(var(--error-bg))] rounded-lg border border-[hsl(var(--error)/0.25)]"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <div className="text-sm font-medium text-red-300">
+                        <div className="text-sm font-medium text-[hsl(var(--error))]">
                           {job.metadata?.filename || job.document_id?.slice(0, 8) || 'Unknown'}
                         </div>
-                        <div className="text-xs text-red-400/80 mt-1">
+                        <div className="text-xs text-[hsl(var(--error))] mt-1">
                           {job.error || 'Unknown error'}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
@@ -1651,7 +1641,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         </div>
                       </div>
                       {job.metadata?.retry_count && (
-                        <Badge className="bg-red-500/20 text-red-300 border-red-500/30">
+                        <Badge variant="error">
                           {job.metadata.retry_count} retries
                         </Badge>
                       )}
@@ -1706,16 +1696,16 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 {selectedJob?.metadata?.vision_model && (
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-foreground">AI Vision:</span>
-                    <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/30 text-[10px] py-0 px-1.5 h-auto font-bold uppercase tracking-tighter">
+                    <Badge variant="info" className="text-[10px] py-0 px-1.5 h-auto font-bold">
                       {selectedJob.metadata.vision_model}
                     </Badge>
                   </div>
                 )}
                 {selectedJob && (
-                  <div className="flex items-center gap-4 mt-1 pt-1 border-t border-white/10">
+                  <div className="flex items-center gap-4 mt-1 pt-1 border-t border-hairline">
                     <div className="flex items-center gap-2">
                       <Clock className="h-3 w-3 text-muted-foreground" />
-                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">Queue Wait:</span>
+                      <span className="text-[11px] font-semibold text-muted-foreground">Queue Wait:</span>
                       <span className="text-[11px] font-bold text-foreground">
                         {(() => {
                           // Terminal jobs without started_at — processed instantly
@@ -1737,9 +1727,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       </span>
                     </div>
                     <div className="flex items-center gap-2 border-l pl-4">
-                      <Activity className={`h-3 w-3 ${selectedJob.status === 'failed' ? 'text-red-400' : selectedJob.status === 'processing' ? 'text-primary' : 'text-muted-foreground'}`} />
-                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">Total Processing:</span>
-                      <span className={`text-[11px] font-bold ${selectedJob.status === 'failed' ? 'text-red-400' : 'text-foreground'}`}>
+                      <Activity className={`h-3 w-3 ${selectedJob.status === 'failed' ? 'text-[hsl(var(--error))]' : selectedJob.status === 'processing' ? 'text-primary' : 'text-muted-foreground'}`} />
+                      <span className="text-[11px] font-semibold text-muted-foreground">Total Processing:</span>
+                      <span className={`text-[11px] font-bold ${selectedJob.status === 'failed' ? 'text-[hsl(var(--error))]' : 'text-foreground'}`}>
                         {(() => {
                           if (selectedJob.status === 'processing' || selectedJob.status === 'retrying') {
                             return <LiveTimer job={selectedJob} />;
@@ -1772,14 +1762,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     {(selectedJob.total_ai_cost_usd !== undefined || selectedJob.total_credits_used !== undefined) && (
                       <>
                         <div className="flex items-center gap-2 border-l pl-4">
-                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">AI Cost:</span>
-                          <span className="text-[11px] font-bold text-emerald-600">
+                          <span className="text-[11px] font-semibold text-muted-foreground">AI Cost:</span>
+                          <span className="text-[11px] font-bold text-[hsl(var(--success))]">
                             ${(selectedJob.total_ai_cost_usd || 0).toFixed(4)}
                           </span>
                         </div>
                         <div className="flex items-center gap-2 border-l pl-4">
-                          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-tight">Credits:</span>
-                          <span className="text-[11px] font-bold text-blue-600">
+                          <span className="text-[11px] font-semibold text-muted-foreground">Credits:</span>
+                          <span className="text-[11px] font-bold text-[hsl(var(--info))]">
                             {(selectedJob.total_credits_used || 0).toFixed(2)}
                           </span>
                         </div>
@@ -1824,11 +1814,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     ? currentStage.replace(/_/g, ' ')
                     : 'pipeline execution';
                   return (
-                    <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/20">
-                      <XCircle className="h-4 w-4 text-red-400 shrink-0" />
-                      <p className="text-sm text-red-400 font-medium">
+                    <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-[hsl(var(--error-bg))] border border-[hsl(var(--error)/0.25)]">
+                      <XCircle className="h-4 w-4 text-[hsl(var(--error))] shrink-0" />
+                      <p className="text-sm text-[hsl(var(--error))] font-medium">
                         Failed at stage: <span className="font-bold">{failStage}</span>
-                        {selectedJob.error && <span className="ml-1 text-red-400/80">— {selectedJob.error.slice(0, 120)}{selectedJob.error.length > 120 ? '...' : ''}</span>}
+                        {selectedJob.error && <span className="ml-1 text-[hsl(var(--error))]">— {selectedJob.error.slice(0, 120)}{selectedJob.error.length > 120 ? '...' : ''}</span>}
                       </p>
                     </div>
                   );
@@ -1838,18 +1828,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   const bannerOutcome = jobOutcome(selectedJob, jobCheckpoints);
                   if (bannerOutcome.completedWithFailures) {
                     return (
-                      <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-                        <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-300 shrink-0" />
-                        <p className="text-sm text-amber-800 dark:text-amber-300 font-medium">
+                      <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-[hsl(var(--warning-bg))] border border-[hsl(var(--warning)/0.25)]">
+                        <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))] shrink-0" />
+                        <p className="text-sm text-[hsl(var(--warning))] font-medium">
                           {describeFailures(bannerOutcome)} — {productsDiscovered} products discovered, {chunksCreated} chunks created
                         </p>
                       </div>
                     );
                   }
                   return (
-                    <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-green-500/10 border border-green-500/20">
-                      <CheckCircle className="h-4 w-4 text-green-400 shrink-0" />
-                      <p className="text-sm text-green-400 font-medium">
+                    <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-[hsl(var(--success-bg))] border border-[hsl(var(--success)/0.25)]">
+                      <CheckCircle className="h-4 w-4 text-[hsl(var(--success))] shrink-0" />
+                      <p className="text-sm text-[hsl(var(--success))] font-medium">
                         Pipeline completed successfully — {productsDiscovered} products discovered, {chunksCreated} chunks created
                       </p>
                     </div>
@@ -1858,9 +1848,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                 if (selectedJob.status === 'pending' || selectedJob.status === 'initialized') {
                   return (
-                    <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                      <Clock className="h-4 w-4 text-yellow-400 shrink-0 animate-pulse" />
-                      <p className="text-sm text-yellow-400 font-medium">
+                    <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-[hsl(var(--warning-bg))] border border-[hsl(var(--warning)/0.25)]">
+                      <Clock className="h-4 w-4 text-[hsl(var(--warning))] shrink-0 animate-pulse" />
+                      <p className="text-sm text-[hsl(var(--warning))] font-medium">
                         Waiting in queue — job will start processing shortly
                       </p>
                     </div>
@@ -1967,8 +1957,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   //   activityIdle but processAlive → blue + muted info badge (silent post-processing, normal)
                   //   neither → blue (active and emitting)
                   const tone = processDead
-                    ? { bg: 'bg-orange-500/10 border border-orange-500/20', icon: 'text-orange-400', text: 'text-orange-400' }
-                    : { bg: 'bg-blue-500/10 border border-blue-500/20',     icon: 'text-blue-400',   text: 'text-blue-400' };
+                    ? { bg: 'bg-[hsl(var(--warning-bg))] border border-[hsl(var(--warning)/0.25)]', icon: 'text-[hsl(var(--warning))]', text: 'text-[hsl(var(--warning))]' }
+                    : { bg: 'bg-[hsl(var(--info-bg))] border border-[hsl(var(--info)/0.25)]',     icon: 'text-[hsl(var(--info))]',   text: 'text-[hsl(var(--info))]' };
 
                   return (
                     <div className={`mt-3 flex items-center gap-2 px-3 py-2 rounded-lg ${tone.bg}`}>
@@ -1981,7 +1971,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       </p>
                       <div className="ml-auto flex items-center gap-1.5">
                         {processDead ? (
-                          <Badge variant="outline" className="bg-orange-500/15 text-orange-300 border-orange-500/30 text-[10px]">
+                          <Badge variant="warning" className="text-[10px]">
                             {neverBeat
                               ? `No heartbeat ever · last change ${fallbackStaleMin}m ago`
                               : `Heartbeat stale ${heartbeatStaleMin}m — process may be dead`}
@@ -1990,7 +1980,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           // Not "alive" — the heartbeat may well be stale. It says the SERVER is
                           // deliberately not treating this as stuck, which is the thing an operator
                           // about to press Cancel needs to know.
-                          <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-[10px]">
+                          <Badge variant="info" className="text-[10px]">
                             Long stage declared{slowOp?.operation ? ` (${slowOp.operation})` : ''} · not treated as stuck
                           </Badge>
                         ) : neverBeat ? (
@@ -1998,12 +1988,12 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             No heartbeat reported yet
                           </Badge>
                         ) : (
-                          <Badge variant="outline" className="bg-emerald-500/10 text-emerald-300 border-emerald-500/20 text-[10px]">
+                          <Badge variant="success" className="text-[10px]">
                             Heartbeat {heartbeatStaleMin === 0 ? '<1m' : `${heartbeatStaleMin}m`} ago · alive
                           </Badge>
                         )}
                         {activityIdle && !processDead && (
-                          <Badge variant="outline" className="bg-blue-500/10 text-blue-300 border-blue-500/20 text-[10px]">
+                          <Badge variant="info" className="text-[10px]">
                             Last event {activityStaleMin}m ago · silent stage
                           </Badge>
                         )}
@@ -2014,7 +2004,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                 // Interrupted / Cancelled
                 return (
-                  <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10">
+                  <div className="mt-3 flex items-center gap-2 px-3 py-2 rounded-lg bg-surface-sunken border border-hairline">
                     <AlertTriangle className="h-4 w-4 text-muted-foreground shrink-0" />
                     <p className="text-sm text-muted-foreground font-medium">
                       Job {selectedJob.status}{currentStage ? ` at stage: ${currentStage.replace(/_/g, ' ')}` : ''}
@@ -2038,9 +2028,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 const maxSec = slowOp.expected_max_seconds ?? null;
                 const overBudget = elapsedSec !== null && maxSec !== null && elapsedSec > maxSec;
                 return (
-                  <Alert className={`mt-3 ${overBudget ? 'bg-orange-500/10 border-orange-500/30' : 'bg-blue-500/10 border-blue-500/20'}`}>
+                  <Alert className={`mt-3 ${overBudget ? 'bg-[hsl(var(--warning-bg))] border-[hsl(var(--warning)/0.25)]' : 'bg-[hsl(var(--info-bg))] border-[hsl(var(--info)/0.25)]'}`}>
                     <Activity className="h-4 w-4" />
-                    <AlertDescription className={overBudget ? 'text-orange-200' : 'text-blue-200'}>
+                    <AlertDescription className={overBudget ? 'text-[hsl(var(--warning))]' : 'text-[hsl(var(--info))]'}>
                       <div className="flex items-center justify-between gap-2">
                         <span className="font-medium text-sm">
                           Long-running stage active: <code className="text-xs">{slowOp.operation ?? 'unknown'}</code>
@@ -2077,8 +2067,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 };
                 const info = reasonLabels[reason] ?? { label: `Completed with reason: ${reason}`, tone: 'info' as const };
                 const toneClass = info.tone === 'warn'
-                  ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-200'
-                  : 'bg-blue-500/10 border-blue-500/20 text-blue-200';
+                  ? 'bg-[hsl(var(--warning-bg))] border-[hsl(var(--warning)/0.25)] text-[hsl(var(--warning))]'
+                  : 'bg-[hsl(var(--info-bg))] border-[hsl(var(--info)/0.25)] text-[hsl(var(--info))]';
                 return (
                   <Alert className={`mt-3 ${toneClass}`}>
                     <AlertTriangle className="h-4 w-4" />
@@ -2089,9 +2079,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
               {/* Failure Diagnostics */}
               {selectedJob?.status === 'failed' && (
-                <Alert variant="destructive" className="mt-4 bg-red-500/10 border-red-500/20">
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <AlertDescription className="text-red-300">
+                <Alert variant="destructive" className="mt-4 bg-[hsl(var(--error-bg))] border-[hsl(var(--error)/0.25)]">
+                  <AlertTriangle className="h-4 w-4 text-[hsl(var(--error))]" />
+                  <AlertDescription className="text-[hsl(var(--error))]">
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center justify-between">
                         <span className="font-bold">Extraction Failed</span>
@@ -2102,7 +2092,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <p className="text-sm font-medium mt-1">
                         {selectedJob.error || 'An unexpected error occurred during processing.'}
                       </p>
-                      <div className="mt-2 flex items-center gap-4 text-[10px] uppercase font-bold tracking-tight text-red-400">
+                      <div className="mt-2 flex items-center gap-4 text-[10px] font-bold text-[hsl(var(--error))]">
                         <div className="flex items-center gap-1">
                           <Activity className="h-3 w-3" />
                           Stage: {((selectedJob.metadata as any)?.sub_stage || selectedJob.metadata?.stage || 'initializing').replace(/_/g, ' ')}
@@ -2128,8 +2118,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
               {/* Pipeline Actions — shown for failed, interrupted, completed, and initialized jobs */}
               {selectedJob && ['failed', 'interrupted', 'completed', 'initialized', 'cancelled'].includes(selectedJob.status) && (
-                <div className="mt-4 p-3 rounded-lg border border-white/10 bg-white/5">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Pipeline Actions</div>
+                <div className="mt-4 p-3 rounded-lg border border-hairline bg-surface-sunken">
+                  <div className="text-[11px] font-bold text-muted-foreground mb-2">Pipeline Actions</div>
                   <div className="flex flex-wrap gap-2">
                     {/* Reset — only for failed/interrupted */}
                     {['failed', 'interrupted'].includes(selectedJob.status) && (
@@ -2225,7 +2215,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     <div className="mt-3 text-xs space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {Object.entries(pipelineValidationResult.stages_complete || {}).map(([k, v]) => (
-                          <span key={k} className="px-2 py-0.5 bg-white/10 border border-white/10 rounded font-mono">
+                          <span key={k} className="px-2 py-0.5 bg-hairline border border-hairline rounded font-mono">
                             {k}: <strong>{String(v)}</strong>
                           </span>
                         ))}
@@ -2233,7 +2223,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       {pipelineValidationResult.issues?.length > 0 && (
                         <div className="space-y-1">
                           {pipelineValidationResult.issues.map((issue: string, i: number) => (
-                            <div key={i} className="flex items-start gap-1.5 text-amber-400">
+                            <div key={i} className="flex items-start gap-1.5 text-[hsl(var(--warning))]">
                               <AlertTriangle className="h-3 w-3 mt-0.5 shrink-0" />
                               <span>{issue}</span>
                             </div>
@@ -2257,9 +2247,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
               {/* Interrupted Job Actions */}
               {selectedJob?.status === 'interrupted' && (
-                <Alert className="mt-4 bg-amber-500/10 border-amber-500/20">
-                  <PauseCircle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-300">
+                <Alert className="mt-4 bg-[hsl(var(--warning-bg))] border-[hsl(var(--warning)/0.25)]">
+                  <PauseCircle className="h-4 w-4 text-[hsl(var(--warning))]" />
+                  <AlertDescription className="text-[hsl(var(--warning))]">
                     <div className="flex flex-col gap-3">
                       <div className="flex items-center justify-between">
                         <span className="font-bold">Job Interrupted</span>
@@ -2270,7 +2260,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       <p className="text-sm font-medium">
                         {selectedJob.error || 'This job was interrupted and can be resumed or marked as failed.'}
                       </p>
-                      <div className="flex items-center gap-4 text-[10px] uppercase font-bold tracking-tight text-amber-400 mb-2">
+                      <div className="flex items-center gap-4 text-[10px] font-bold text-[hsl(var(--warning))] mb-2">
                         <div className="flex items-center gap-1">
                           <Activity className="h-3 w-3" />
                           Stage: {((selectedJob.metadata as any)?.sub_stage || selectedJob.metadata?.stage || 'initializing').replace(/_/g, ' ')}
@@ -2283,10 +2273,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           Progress: {selectedJob.progress || 0}%
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 pt-2 border-t border-amber-200">
+                      <div className="flex items-center gap-3 pt-2 border-t border-[hsl(var(--warning)/0.25)]">
                         <Button
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => handleContinueJob(selectedJob.id)}
                         >
                           <Play className="h-4 w-4 mr-2" />
@@ -2305,7 +2294,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                             navigator.clipboard.writeText(selectedJob.id);
                             toast.success('Job ID copied to clipboard');
                           }}
-                          className="ml-auto text-[10px] uppercase font-bold tracking-tight hover:underline flex items-center gap-1 text-amber-400"
+                          className="ml-auto text-[10px] font-bold hover:underline flex items-center gap-1 text-[hsl(var(--warning))]"
                         >
                           <Copy className="h-3 w-3" />
                           Copy Job ID
@@ -2354,23 +2343,22 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   const jobType = selectedJob?.job_type || 'product_discovery_upload';
                   const jobSpecificPipeline = getPipelineForJobType(jobType);
 
-                  // Map pipeline to display format with icons as emojis
                   const pipelineStages = jobSpecificPipeline.map(stage => ({
                     id: stage.id,
                     name: stage.name,
                     checkpoint: stage.checkpoint,
-                    icon: stage.id === 'initialized' ? '🚀' :
-                          stage.id === 'completed' ? '✅' :
-                          stage.id.includes('image') ? '🖼️' :
-                          stage.id.includes('product') ? '📦' :
-                          stage.id.includes('chunk') ? '📄' :
-                          stage.id.includes('clip') ? '⚡' :
-                          stage.id.includes('embed') ? '🔗' :
-                          stage.id.includes('download') ? '⬇️' :
-                          stage.id.includes('scrape') ? '🌐' :
-                          stage.id.includes('discover') ? '🔍' :
-                          stage.id.includes('warmup') ? '🔥' :
-                          '⚙️',
+                    icon: stage.id === 'initialized' ? Rocket :
+                          stage.id === 'completed' ? CheckCircle :
+                          stage.id.includes('image') ? ImageIcon :
+                          stage.id.includes('product') ? Package :
+                          stage.id.includes('chunk') ? FileText :
+                          stage.id.includes('clip') ? Zap :
+                          stage.id.includes('embed') ? Link2 :
+                          stage.id.includes('download') ? Download :
+                          stage.id.includes('scrape') ? Globe :
+                          stage.id.includes('discover') ? Search :
+                          stage.id.includes('warmup') ? Flame :
+                          Cog,
                   }));
 
                   // Get completed checkpoints. A stage counts as completed only
@@ -2443,23 +2431,23 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     productProgress.filter(p => p.status === 'completed').length || 0;
 
                   return (
-                    <Card className={`border-2 ${isJobCompleted && outcome.completedWithFailures ? 'border-amber-500/30 bg-amber-500/5' : isJobCompleted ? 'border-green-500/30 bg-green-500/5' : isJobFailed ? 'border-red-500/30 bg-red-500/5' : 'border-primary/20 bg-primary/5'}`}>
+                    <Card className={`border-2 ${isJobCompleted && outcome.completedWithFailures ? 'border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))]' : isJobCompleted ? 'border-[hsl(var(--success)/0.25)] bg-[hsl(var(--success-bg))]' : isJobFailed ? 'border-[hsl(var(--error)/0.25)] bg-[hsl(var(--error-bg))]' : 'border-primary/20 bg-primary/5'}`}>
                       <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
                           <CardTitle className="flex items-center gap-2">
                             {isJobCompleted && outcome.completedWithFailures ? (
                               <>
-                                <AlertTriangle className="h-4 w-4 text-amber-800 dark:text-amber-300" />
+                                <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))]" />
                                 Completed with failures
                               </>
                             ) : isJobCompleted ? (
                               <>
-                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <CheckCircle className="h-4 w-4 text-[hsl(var(--success))]" />
                                 Pipeline Complete
                               </>
                             ) : isJobFailed ? (
                               <>
-                                <XCircle className="h-4 w-4 text-red-600" />
+                                <XCircle className="h-4 w-4 text-[hsl(var(--error))]" />
                                 Pipeline Failed
                               </>
                             ) : (
@@ -2469,7 +2457,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               </>
                             )}
                           </CardTitle>
-                          <Badge className={isJobCompleted ? 'bg-green-500/15 text-green-400 border-green-500/30' : isJobFailed ? 'bg-red-500/15 text-red-400 border-red-500/30' : 'bg-blue-500/15 text-blue-400 border-blue-500/30'}>
+                          <Badge className={isJobCompleted ? 'bg-[hsl(var(--success-bg))] text-[hsl(var(--success))] border-[hsl(var(--success)/0.25)]' : isJobFailed ? 'bg-[hsl(var(--error-bg))] text-[hsl(var(--error))] border-[hsl(var(--error)/0.25)]' : 'bg-[hsl(var(--info-bg))] text-[hsl(var(--info))] border-[hsl(var(--info)/0.25)]'}>
                             {isJobCompleted ? '100% Complete' : isJobFailed ? 'Failed' : `${selectedJob?.progress || 0}%`}
                           </Badge>
                         </div>
@@ -2486,7 +2474,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         </CardDescription>
                         {/* Progress bar */}
                         {!isJobCompleted && !isJobFailed && (selectedJob?.progress || 0) > 0 && (
-                          <div className="mt-2 h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+                          <div className="mt-2 h-1.5 w-full bg-hairline rounded-full overflow-hidden">
                             <div
                               className="h-full bg-primary rounded-full transition-all duration-500"
                               style={{ width: `${selectedJob?.progress || 0}%` }}
@@ -2523,30 +2511,30 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 <React.Fragment key={stage.id}>
                                   <div className={`flex flex-col items-center flex-1 ${isPending ? 'opacity-40' : ''}`}>
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg mb-1 ${
-                                      isComplete ? 'bg-green-500/20' :
-                                      isFailedStage ? 'bg-red-500/20 ring-2 ring-red-500/40 ring-offset-1 ring-offset-background' :
-                                      isCurrent ? 'bg-blue-500/20 ring-2 ring-blue-500/40 ring-offset-1 ring-offset-background' :
-                                      'bg-white/10'
+                                      isComplete ? 'bg-[hsl(var(--success-bg))]' :
+                                      isFailedStage ? 'bg-[hsl(var(--error-bg))] ring-2 ring-[hsl(var(--error)/0.4)] ring-offset-1 ring-offset-background' :
+                                      isCurrent ? 'bg-[hsl(var(--info-bg))] ring-2 ring-[hsl(var(--info)/0.4)] ring-offset-1 ring-offset-background' :
+                                      'bg-hairline'
                                     }`}>
                                       {isCurrent ? (
-                                        <RefreshCw className="h-5 w-5 text-blue-400 animate-spin" />
+                                        <RefreshCw className="h-5 w-5 text-[hsl(var(--info))] animate-spin" />
                                       ) : isFailedStage ? (
-                                        <XCircle className="h-5 w-5 text-red-400" />
+                                        <XCircle className="h-5 w-5 text-[hsl(var(--error))]" />
                                       ) : (
-                                        <span>{stage.icon}</span>
+                                        <stage.icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                                       )}
                                     </div>
                                     <span className={`text-[10px] font-medium text-center leading-tight ${
-                                      isComplete ? 'text-green-400' :
-                                      isFailedStage ? 'text-red-400' :
-                                      isCurrent ? 'text-blue-400' :
+                                      isComplete ? 'text-[hsl(var(--success))]' :
+                                      isFailedStage ? 'text-[hsl(var(--error))]' :
+                                      isCurrent ? 'text-[hsl(var(--info))]' :
                                       'text-muted-foreground'
                                     }`}>
                                       {stage.name}
                                     </span>
                                   </div>
                                   {index < pipelineStages.length - 1 && (
-                                    <div className={`h-0.5 flex-1 max-w-8 ${isComplete ? 'bg-green-500/40' : isFailedStage ? 'bg-red-500/40' : 'bg-white/10'}`} />
+                                    <div className={`h-0.5 flex-1 max-w-8 ${isComplete ? 'bg-[hsl(var(--success)/0.4)]' : isFailedStage ? 'bg-[hsl(var(--error)/0.4)]' : 'bg-hairline'}`} />
                                   )}
                                 </React.Fragment>
                               );
@@ -2554,43 +2542,43 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                           </div>
 
                           {/* Summary Metrics */}
-                          <div className="grid grid-cols-5 gap-3 pt-4 border-t border-white/10">
+                          <div className="grid grid-cols-5 gap-3 pt-4 border-t border-hairline">
                             <div className="text-center">
                               <div className="text-2xl font-bold text-primary">{productsDiscovered}</div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Products Found</div>
+                              <div className="text-[10px] text-muted-foreground">Products Found</div>
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-foreground">{pagesAnalyzed}</div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Pages Analyzed</div>
+                              <div className="text-[10px] text-muted-foreground">Pages Analyzed</div>
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-foreground">{chunksCreated}</div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Text Chunks</div>
+                              <div className="text-[10px] text-muted-foreground">Text Chunks</div>
                             </div>
                             <div className="text-center">
                               <div className="text-2xl font-bold text-foreground">{imagesProcessed}</div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Images</div>
+                              <div className="text-[10px] text-muted-foreground">Images</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-green-600">{productsCreated}</div>
-                              <div className="text-[10px] text-muted-foreground uppercase">Products Created</div>
+                              <div className="text-2xl font-bold text-[hsl(var(--success))]">{productsCreated}</div>
+                              <div className="text-[10px] text-muted-foreground">Products Created</div>
                             </div>
                           </div>
 
                           {/* AI Models Used */}
                           {jobCheckpoints.length > 0 && (
-                            <div className="flex flex-wrap gap-2 pt-3 border-t border-white/10">
-                              <span className="text-[10px] text-muted-foreground uppercase font-medium">AI Models:</span>
+                            <div className="flex flex-wrap gap-2 pt-3 border-t border-hairline">
+                              <span className="text-[10px] text-muted-foreground font-medium">AI Models:</span>
                               {completedCheckpoints.includes('warmup_complete') && (
                                 <>
-                                  <Badge variant="outline" className="text-[9px] bg-purple-500/10 border-purple-500/20 text-purple-400">SigLIP Vision</Badge>
-                                  <Badge variant="outline" className="text-[9px] bg-blue-500/15 border-blue-500/30 text-blue-400">PaddleOCR-VL (Layout + OCR)</Badge>
+                                  <Badge variant="info" className="text-[9px]">SigLIP Vision</Badge>
+                                  <Badge variant="info" className="text-[9px]">PaddleOCR-VL (Layout + OCR)</Badge>
                                 </>
                               )}
                               {completedCheckpoints.includes('products_detected') && (
-                                <Badge variant="outline" className="text-[9px] bg-green-500/15 border-green-500/30 text-green-400">Claude Vision</Badge>
+                                <Badge variant="success" className="text-[9px]">Claude Vision</Badge>
                               )}
-                              <Badge variant="outline" className="text-[9px] bg-indigo-500/15 border-indigo-500/30 text-indigo-400">Voyage Embeddings</Badge>
+                              <Badge variant="info" className="text-[9px]">Voyage Embeddings</Badge>
                             </div>
                           )}
                         </div>
@@ -2601,7 +2589,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                 {/* Product Processing Pipeline */}
                 <Card>
-                  <CardHeader className="pb-3 border-b bg-white/5">
+                  <CardHeader className="pb-3 border-b bg-surface-sunken">
                     <div className="flex items-center justify-between">
                       <CardTitle className="flex items-center gap-2">
                         <Package className="h-4 w-4 text-primary" />
@@ -2627,19 +2615,19 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 <div className="flex items-center gap-3 flex-1">
                                   {/* Status Icon */}
                                   {isFailed ? (
-                                    <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
-                                      <XCircle className="h-5 w-5 text-red-600" />
+                                    <div className="w-8 h-8 rounded-full bg-[hsl(var(--error-bg))] flex items-center justify-center">
+                                      <XCircle className="h-5 w-5 text-[hsl(var(--error))]" />
                                     </div>
                                   ) : isProcessing ? (
-                                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                                      <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
+                                    <div className="w-8 h-8 rounded-full bg-[hsl(var(--info-bg))] flex items-center justify-center">
+                                      <RefreshCw className="h-5 w-5 text-[hsl(var(--info))] animate-spin" />
                                     </div>
                                   ) : isCompleted ? (
-                                    <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                    <div className="w-8 h-8 rounded-full bg-[hsl(var(--success-bg))] flex items-center justify-center">
+                                      <CheckCircle className="h-5 w-5 text-[hsl(var(--success))]" />
                                     </div>
                                   ) : (
-                                    <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                                    <div className="w-8 h-8 rounded-full bg-hairline flex items-center justify-center">
                                       <Clock className="h-5 w-5 text-muted-foreground" />
                                     </div>
                                   )}
@@ -2652,11 +2640,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                     </div>
                                     <div className="text-[11px] text-muted-foreground mt-1 flex items-center gap-2">
                                       {product.product_id ? (
-                                        <span className="bg-white/10 px-1.5 py-0.5 rounded text-muted-foreground">
+                                        <span className="bg-hairline px-1.5 py-0.5 rounded text-muted-foreground">
                                           ID: {product.product_id.slice(0, 8)}
                                         </span>
                                       ) : (
-                                        <span className="bg-amber-500/15 px-1.5 py-0.5 rounded text-amber-400">
+                                        <span className="bg-[hsl(var(--warning-bg))] px-1.5 py-0.5 rounded text-[hsl(var(--warning))]">
                                           Awaiting Creation
                                         </span>
                                       )}
@@ -2673,18 +2661,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                       Shown inline in the trigger so the expensive
                                       products bubble up visually without expanding. */}
                                   {product.product_id && productCosts[product.product_id] !== undefined && productCosts[product.product_id] > 0 && (
-                                    <Badge
-                                      variant="outline"
-                                      className="ml-auto shadow-none bg-amber-500/10 text-amber-400 border-amber-500/20"
-                                      title="Total AI cost for this product (sum of billed_cost_usd from ai_usage_logs)"
-                                    >
+                                    <Badge variant="warning" className="ml-auto shadow-none" title="Total AI cost for this product (sum of billed_cost_usd from ai_usage_logs)">
                                       ${productCosts[product.product_id].toFixed(4)}
                                     </Badge>
                                   )}
 
                                   {/* Status word */}
                                   <span
-                                    className={`${product.product_id && productCosts[product.product_id] ? 'ml-2' : 'ml-auto'} text-xs uppercase ${statusTone(product.status)}`}
+                                    className={`${product.product_id && productCosts[product.product_id] ? 'ml-2' : 'ml-auto'} text-xs ${statusTone(product.status)}`}
                                   >
                                     {product.status.toUpperCase()}
                                   </span>
@@ -2694,18 +2678,18 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                 <div className="space-y-4 pl-11">
                                   {/* Error Message */}
                                   {product.error_message && (
-                                    <div className="bg-red-500/10 border border-red-500/20 rounded-md p-3 flex gap-3">
-                                      <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                                    <div className="bg-[hsl(var(--error-bg))] border border-[hsl(var(--error)/0.25)] rounded-md p-3 flex gap-3">
+                                      <AlertCircle className="h-5 w-5 text-[hsl(var(--error))] shrink-0 mt-0.5" />
                                       <div>
-                                        <h5 className="text-xs font-semibold text-red-300">Processing Error</h5>
-                                        <p className="text-xs text-red-400 mt-0.5">{product.error_message}</p>
+                                        <h5 className="text-xs font-semibold text-[hsl(var(--error))]">Processing Error</h5>
+                                        <p className="text-xs text-[hsl(var(--error))] mt-0.5">{product.error_message}</p>
                                       </div>
                                     </div>
                                   )}
 
                                   {/* Timing Information */}
                                   {(product.started_at || product.completed_at) && (
-                                    <div className="bg-white/5 border border-white/10 rounded-md p-3">
+                                    <div className="bg-surface-sunken border border-hairline rounded-md p-3">
                                       <div className="grid grid-cols-2 gap-3 text-xs">
                                         {product.started_at && (
                                           <div>
@@ -2747,7 +2731,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                                   {/* Product Pipeline Stages */}
                                   <div className="space-y-3">
-                                    <h5 className="text-xs font-semibold text-foreground uppercase tracking-wide">Processing Pipeline</h5>
+                                    <h5 className="text-xs font-semibold text-foreground">Processing Pipeline</h5>
 
                                     {/* Stage Flow with Details */}
                                     <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
@@ -2781,15 +2765,15 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                           <div
                                             key={stage.id}
                                             className={`flex flex-col items-center text-center p-3 rounded-lg border transition-all duration-200 ${
-                                              isStageCompleted ? 'bg-green-500/10 border-green-500/20 text-green-400' :
-                                              isCurrentStage ? 'bg-blue-500/10 border-blue-500/20 text-blue-400 ring-2 ring-blue-500/30' :
-                                              'bg-white/5 border-white/10 text-muted-foreground'
+                                              isStageCompleted ? 'bg-[hsl(var(--success-bg))] border-[hsl(var(--success)/0.25)] text-[hsl(var(--success))]' :
+                                              isCurrentStage ? 'bg-[hsl(var(--info-bg))] border-[hsl(var(--info)/0.25)] text-[hsl(var(--info))] ring-2 ring-[hsl(var(--info)/0.4)]' :
+                                              'bg-surface-sunken border-hairline text-muted-foreground'
                                             }`}
                                           >
                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center mb-2 ${
-                                              isStageCompleted ? 'bg-green-500/20' :
-                                              isCurrentStage ? 'bg-blue-500/20 animate-pulse' :
-                                              'bg-white/10'
+                                              isStageCompleted ? 'bg-[hsl(var(--success-bg))]' :
+                                              isCurrentStage ? 'bg-[hsl(var(--info-bg))] animate-pulse' :
+                                              'bg-hairline'
                                             }`}>
                                               {isCurrentStage ? (
                                                 <RefreshCw className="h-4 w-4 animate-spin" />
@@ -2797,9 +2781,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                                 <StageIcon className="h-4 w-4" />
                                               )}
                                             </div>
-                                            <span className="text-[10px] font-bold uppercase tracking-tight leading-tight">{stage.name}</span>
+                                            <span className="text-[10px] font-bold leading-tight">{stage.name}</span>
                                             {stageMetric && isStageCompleted && (
-                                              <span className="text-[11px] font-semibold text-green-400 mt-1">{stageMetric}</span>
+                                              <span className="text-[11px] font-semibold text-[hsl(var(--success))] mt-1">{stageMetric}</span>
                                             )}
                                             {!stageMetric && (
                                               <span className="text-[9px] text-muted-foreground mt-1 leading-tight">{stage.description}</span>
@@ -2814,8 +2798,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                       <div className="mt-4 grid grid-cols-2 md:grid-cols-5 gap-3">
                                         {/* Chunks Created */}
                                         {product.metrics.chunks_created !== undefined && (
-                                          <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Text Chunks</div>
+                                          <div className="bg-surface-sunken border border-hairline rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1">Text Chunks</div>
                                             <div className="text-lg font-bold text-foreground">{product.metrics.chunks_created}</div>
                                             <div className="text-[9px] text-muted-foreground mt-0.5">Semantic segments</div>
                                           </div>
@@ -2823,8 +2807,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                                         {/* Images Processed */}
                                         {product.metrics.images_processed !== undefined && (
-                                          <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Images</div>
+                                          <div className="bg-surface-sunken border border-hairline rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1">Images</div>
                                             <div className="text-lg font-bold text-foreground">{product.metrics.images_processed}</div>
                                             <div className="text-[9px] text-muted-foreground mt-0.5">Vision classified</div>
                                           </div>
@@ -2832,8 +2816,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                                         {/* Relationships Created */}
                                         {product.metrics.relationships_created !== undefined && (
-                                          <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Relations</div>
+                                          <div className="bg-surface-sunken border border-hairline rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1">Relations</div>
                                             <div className="text-lg font-bold text-foreground">{product.metrics.relationships_created}</div>
                                             <div className="text-[9px] text-muted-foreground mt-0.5">Entity links</div>
                                           </div>
@@ -2841,8 +2825,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                                         {/* Processing Time */}
                                         {product.metrics.processing_time_ms !== undefined && (
-                                          <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Time</div>
+                                          <div className="bg-surface-sunken border border-hairline rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1">Time</div>
                                             <div className="text-lg font-bold text-foreground">
                                               {(() => {
                                                 const ms = product.metrics.processing_time_ms;
@@ -2857,9 +2841,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                                         {/* AI Cost (summed from ai_usage_logs.billed_cost_usd) */}
                                         {product.product_id && productCosts[product.product_id] !== undefined && (
-                                          <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">AI Cost</div>
-                                            <div className="text-lg font-bold text-amber-400">
+                                          <div className="bg-surface-sunken border border-hairline rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1">AI Cost</div>
+                                            <div className="text-lg font-bold text-[hsl(var(--warning))]">
                                               ${productCosts[product.product_id].toFixed(4)}
                                             </div>
                                             <div className="text-[9px] text-muted-foreground mt-0.5">
@@ -2870,8 +2854,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                                         {/* Product DB Link */}
                                         {product.metrics.product_db_id && (
-                                          <div className="bg-white/5 border border-white/10 rounded-lg p-3">
-                                            <div className="text-[10px] text-muted-foreground mb-1 uppercase tracking-wide">Product</div>
+                                          <div className="bg-surface-sunken border border-hairline rounded-lg p-3">
+                                            <div className="text-[10px] text-muted-foreground mb-1">Product</div>
                                             <button
                                               onClick={() => {
                                                 navigate(`/admin/materials-data?productId=${product.metrics.product_db_id}`);
@@ -2891,14 +2875,14 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                                     {/* AI Models Used */}
                                     {product.metadata?.models_used && (
-                                      <div className="mt-4 bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-100 rounded-lg p-3">
-                                        <h6 className="text-[10px] font-semibold text-purple-300 uppercase tracking-wide mb-2 flex items-center gap-1">
+                                      <div className="mt-4 bg-surface-sunken border border-hairline rounded-sm p-3">
+                                        <h6 className="text-[11px] font-semibold text-foreground mb-2 flex items-center gap-1">
                                           <Zap className="h-3 w-3" />
                                           AI Models Used
                                         </h6>
                                         <div className="flex flex-wrap gap-2">
                                           {Object.entries(product.metadata.models_used).map(([model, usage]) => (
-                                            <Badge key={model} variant="outline" className="bg-purple-500/15 text-purple-400 border-purple-500/30 text-[9px]">
+                                            <Badge variant="info" key={model} className="text-[9px]">
                                               {model}: {String(usage)}
                                             </Badge>
                                           ))}
@@ -2909,7 +2893,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                                     {/* Technical Details */}
                                     {product.metadata && Object.keys(product.metadata).length > 0 && (
                                       <details className="mt-4 group">
-                                        <summary className="cursor-pointer text-[10px] font-semibold text-muted-foreground uppercase tracking-wide hover:text-primary transition-colors flex items-center gap-1">
+                                        <summary className="cursor-pointer text-[10px] font-semibold text-muted-foreground hover:text-primary transition-colors flex items-center gap-1">
                                           <ChevronRight className="h-3 w-3 group-open:rotate-90 transition-transform" />
                                           Technical Metadata
                                         </summary>
@@ -2960,37 +2944,37 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </Badge>
                 </div>
 
-                <div className="border border-white/10 rounded-xl overflow-hidden bg-white/5">
-                  <div className="divide-y divide-white/5 max-h-[600px] overflow-y-auto">
+                <div className="border border-hairline rounded-sm overflow-hidden bg-surface-sunken">
+                  <div className="divide-y divide-hairline max-h-[600px] overflow-y-auto">
                     {jobCheckpoints.length > 0 ? (
                       [...jobCheckpoints].reverse().map((cp, idx) => {
                         // Get stage-specific icon and color
                         const getStageStyle = (stage: string) => {
                           // Warmup stages
-                          if (stage.includes('warmup')) return { bg: 'bg-amber-500/10', border: 'border-amber-500/20', text: 'text-amber-400', icon: '🔥' };
+                          if (stage.includes('warmup')) return { bg: 'bg-[hsl(var(--warning-bg))]', border: 'border-[hsl(var(--warning)/0.25)]', text: 'text-[hsl(var(--warning))]', icon: Flame };
                           // Initialization
-                          if (stage === 'initialized') return { bg: 'bg-blue-500/10', border: 'border-blue-500/20', text: 'text-blue-400', icon: '🚀' };
+                          if (stage === 'initialized') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: Rocket };
                           // Discovery
-                          if (stage === 'products_detected') return { bg: 'bg-purple-500/10', border: 'border-purple-500/20', text: 'text-purple-400', icon: '🔍' };
+                          if (stage === 'products_detected') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: Search };
                           // Stage 1.5 - Doc-level layout precompute
-                          if (stage === 'stage_1_5_layout_precompute') return { bg: 'bg-sky-500/10', border: 'border-sky-500/20', text: 'text-sky-400', icon: '📐' };
+                          if (stage === 'stage_1_5_layout_precompute') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: Ruler };
                           // Stage 1 - PDF Extraction
-                          if (stage === 'pdf_extracted' || stage === 'pdf_pages_numbered') return { bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', text: 'text-cyan-400', icon: '📄' };
+                          if (stage === 'pdf_extracted' || stage === 'pdf_pages_numbered') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: FileText };
                           // Stage 2 - Chunking & Text Embeddings
-                          if (stage === 'chunks_created') return { bg: 'bg-indigo-500/10', border: 'border-indigo-500/20', text: 'text-indigo-400', icon: '📝' };
-                          if (stage === 'text_embeddings_generated') return { bg: 'bg-violet-500/10', border: 'border-violet-500/20', text: 'text-violet-400', icon: '🧠' };
+                          if (stage === 'chunks_created') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: PenLine };
+                          if (stage === 'text_embeddings_generated') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: Brain };
                           // Stage 3 - Images & SLIG Embeddings
-                          if (stage === 'images_extracted') return { bg: 'bg-pink-500/10', border: 'border-pink-500/20', text: 'text-pink-400', icon: '🖼️' };
-                          if (stage === 'image_embeddings_generated') return { bg: 'bg-rose-500/10', border: 'border-rose-500/20', text: 'text-rose-400', icon: '🎨' };
+                          if (stage === 'images_extracted') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: ImageIcon };
+                          if (stage === 'image_embeddings_generated') return { bg: 'bg-[hsl(var(--info-bg))]', border: 'border-[hsl(var(--info)/0.25)]', text: 'text-[hsl(var(--info))]', icon: Palette };
                           // Stage 4 - Product Creation
-                          if (stage === 'products_created') return { bg: 'bg-teal-500/10', border: 'border-teal-500/20', text: 'text-teal-400', icon: '🏭' };
+                          if (stage === 'products_created') return { bg: 'bg-[hsl(var(--success-bg))]', border: 'border-[hsl(var(--success)/0.25)]', text: 'text-[hsl(var(--success))]', icon: Factory };
                           // Stage 5 - Relationships
-                          if (stage === 'relationships_created') return { bg: 'bg-orange-500/10', border: 'border-orange-500/20', text: 'text-orange-400', icon: '🔗' };
+                          if (stage === 'relationships_created') return { bg: 'bg-[hsl(var(--warning-bg))]', border: 'border-[hsl(var(--warning)/0.25)]', text: 'text-[hsl(var(--warning))]', icon: Link2 };
                           // Other metadata stages
-                          if (stage === 'metadata_extracted' || stage === 'document_entities_created') return { bg: 'bg-lime-500/10', border: 'border-lime-500/20', text: 'text-lime-400', icon: '📊' };
+                          if (stage === 'metadata_extracted' || stage === 'document_entities_created') return { bg: 'bg-[hsl(var(--success-bg))]', border: 'border-[hsl(var(--success)/0.25)]', text: 'text-[hsl(var(--success))]', icon: BarChart3 };
                           // Completion
-                          if (stage === 'completed') return { bg: 'bg-green-500/10', border: 'border-green-500/20', text: 'text-green-400', icon: '✅' };
-                          return { bg: 'bg-white/5', border: 'border-white/10', text: 'text-foreground', icon: '📋' };
+                          if (stage === 'completed') return { bg: 'bg-[hsl(var(--success-bg))]', border: 'border-[hsl(var(--success)/0.25)]', text: 'text-[hsl(var(--success))]', icon: CheckCircle };
+                          return { bg: 'bg-surface-sunken', border: 'border-hairline', text: 'text-foreground', icon: ClipboardList };
                         };
                         const style = getStageStyle(cp.stage);
 
@@ -3202,11 +3186,11 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                         const details = getCheckpointDetails();
 
                         return (
-                          <div key={cp.id || idx} className={`px-4 py-4 hover:bg-white/5 transition-colors ${style.bg}`}>
+                          <div key={cp.id || idx} className={`px-4 py-4 hover:bg-surface-sunken transition-colors ${style.bg}`}>
                             <div className="flex items-start gap-4">
                               {/* Timestamp and Icon */}
                               <div className="flex flex-col items-center gap-1">
-                                <span className="text-2xl">{style.icon}</span>
+                                <style.icon className={`h-5 w-5 ${style.text}`} aria-hidden="true" />
                                 <span className="text-[10px] font-mono text-muted-foreground">
                                   {new Date(cp.created_at).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                                 </span>
@@ -3215,7 +3199,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               {/* Main Content */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-2">
-                                  <Badge variant="outline" className={`text-[10px] ${style.bg} ${style.text} ${style.border} font-bold uppercase py-0.5`}>
+                                  <Badge variant="outline" className={`text-[10px] ${style.bg} ${style.text} ${style.border} font-bold py-0.5`}>
                                     {cp.stage.replace(/_/g, ' ')}
                                   </Badge>
                                   <span className="text-xs font-medium text-foreground">{details.title}</span>
@@ -3237,8 +3221,8 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                               </div>
 
                               {/* Status Badge */}
-                              <Badge className="bg-green-500/15 text-green-400 border-green-500/30 text-[9px] h-5 shrink-0">
-                                ✓ OK
+                              <Badge variant="success" className="text-[9px] h-5 shrink-0">
+                                OK
                               </Badge>
                             </div>
                           </div>
@@ -3277,9 +3261,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
             </Tabs>
 
             {/* Shared Processing Metrics Footer */}
-            <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
+            <div className="mt-8 pt-6 border-t border-hairline space-y-4">
               <div className="flex items-center justify-between px-1">
-                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Processing Success Metrics</h4>
+                <h4 className="text-xs font-bold text-muted-foreground">Processing Success Metrics</h4>
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => {
@@ -3319,20 +3303,20 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                       navigator.clipboard.writeText(JSON.stringify(data, null, 2));
                       toast.success('Enhanced Diagnostic JSON copied to clipboard');
                     }}
-                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-muted-foreground transition-colors"
+                    className="flex items-center gap-1.5 px-2 py-1 rounded bg-hairline hover:bg-white/20 text-muted-foreground transition-colors"
                   >
                     <Download className="h-3 w-3" />
-                    <span className="text-[10px] font-bold uppercase tracking-tight">Export Result</span>
+                    <span className="text-[10px] font-bold">Export Result</span>
                   </button>
                   <div className="flex items-center gap-2">
                     <span className={`w-2 h-2 rounded-full ${
-                      selectedJob?.status === 'processing' || selectedJob?.status === 'retrying' ? 'bg-blue-500 animate-pulse' :
-                      selectedJob?.status === 'failed' ? 'bg-red-500' :
-                      selectedJob?.status === 'completed' ? 'bg-green-500' :
-                      selectedJob?.status === 'pending' || selectedJob?.status === 'initialized' ? 'bg-yellow-500 animate-pulse' :
+                      selectedJob?.status === 'processing' || selectedJob?.status === 'retrying' ? 'bg-[hsl(var(--info))] animate-pulse' :
+                      selectedJob?.status === 'failed' ? 'bg-[hsl(var(--error))]' :
+                      selectedJob?.status === 'completed' ? 'bg-[hsl(var(--success))]' :
+                      selectedJob?.status === 'pending' || selectedJob?.status === 'initialized' ? 'bg-[hsl(var(--warning))] animate-pulse' :
                       'bg-muted-foreground'
                     }`}></span>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tighter">
+                    <span className="text-[10px] font-bold text-muted-foreground">
                       {selectedJob?.status === 'processing' || selectedJob?.status === 'retrying' ? 'Live — Processing' :
                        selectedJob?.status === 'failed' ? 'Failed' :
                        selectedJob?.status === 'completed' ? 'Completed' :
@@ -3346,7 +3330,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 <Card className="bg-primary/5 border-none shadow-none">
                   <CardContent className="p-4">
-                    <div className="text-[10px] font-bold text-primary uppercase tracking-wider mb-1">Products</div>
+                    <div className="text-[10px] font-bold text-primary mb-1">Products</div>
                     <div className="text-2xl font-black text-foreground">
                       {selectedJob?.metadata?.result?.products_discovered || selectedJob?.metadata?.products_discovered || productProgress.length || 0}
                     </div>
@@ -3354,9 +3338,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-blue-500/10 border-none shadow-none">
+                <Card className="bg-[hsl(var(--info-bg))] border-none shadow-none">
                   <CardContent className="p-4">
-                    <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">Chunks</div>
+                    <div className="text-[10px] font-bold text-[hsl(var(--info))] mb-1">Chunks</div>
                     <div className="text-2xl font-black text-foreground">
                       {selectedJob?.metadata?.chunks_created || 0}
                     </div>
@@ -3364,9 +3348,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-purple-500/10 border-none shadow-none">
+                <Card className="bg-[hsl(var(--info-bg))] border-none shadow-none">
                   <CardContent className="p-4">
-                    <div className="text-[10px] font-bold text-purple-400 uppercase tracking-wider mb-1">Knowledge</div>
+                    <div className="text-[10px] font-bold text-[hsl(var(--info))] mb-1">Knowledge</div>
                     <div className="text-2xl font-black text-foreground">
                       {selectedJob?.metadata?.result?.total_entities || 0}
                     </div>
@@ -3374,9 +3358,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-indigo-500/10 border-none shadow-none">
+                <Card className="bg-[hsl(var(--info-bg))] border-none shadow-none">
                   <CardContent className="p-4">
-                    <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-1">Relational</div>
+                    <div className="text-[10px] font-bold text-[hsl(var(--info))] mb-1">Relational</div>
                     <div className="text-2xl font-black text-foreground">
                       {selectedJob?.metadata?.result?.total_relations || 0}
                     </div>
@@ -3384,9 +3368,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-orange-500/10 border-none shadow-none">
+                <Card className="bg-[hsl(var(--warning-bg))] border-none shadow-none">
                   <CardContent className="p-4">
-                    <div className="text-[10px] font-bold text-orange-400 uppercase tracking-wider mb-1">Throughput</div>
+                    <div className="text-[10px] font-bold text-[hsl(var(--warning))] mb-1">Throughput</div>
                     <div className="text-2xl font-black text-foreground">
                       {(() => {
                         const start = selectedJob?.started_at ? new Date(selectedJob.started_at).getTime() : 0;
@@ -3400,9 +3384,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-green-500/10 border-none shadow-none">
+                <Card className="bg-[hsl(var(--success-bg))] border-none shadow-none">
                   <CardContent className="p-4">
-                    <div className="text-[10px] font-bold text-green-400 uppercase tracking-wider mb-1">Quality</div>
+                    <div className="text-[10px] font-bold text-[hsl(var(--success))] mb-1">Quality</div>
                     <div className="text-2xl font-black text-foreground">
                       {/* Was `: '94%'` — a literal, rendered as a measured quality score for every
                           job that never produced one. A constructed value presented as a
@@ -3425,9 +3409,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                 if (spend === null) {
                   return (
-                    <div className="mt-6 pt-6 border-t border-white/10">
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2">
-                        <Zap className="h-4 w-4 text-amber-500" />
+                    <div className="mt-6 pt-6 border-t border-hairline">
+                      <h4 className="text-xs font-bold text-muted-foreground flex items-center gap-2 mb-2">
+                        <Zap className="h-4 w-4 text-[hsl(var(--warning))]" />
                         AI Model Cost &amp; Usage
                       </h4>
                       <p className="text-sm text-muted-foreground">Loading recorded spend…</p>
@@ -3437,9 +3421,9 @@ export const AsyncJobQueueMonitor: React.FC = () => {
 
                 if (spend.length === 0) {
                   return (
-                    <div className="mt-6 pt-6 border-t border-white/10">
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2 mb-2">
-                        <Zap className="h-4 w-4 text-amber-500" />
+                    <div className="mt-6 pt-6 border-t border-hairline">
+                      <h4 className="text-xs font-bold text-muted-foreground flex items-center gap-2 mb-2">
+                        <Zap className="h-4 w-4 text-[hsl(var(--warning))]" />
                         AI Model Cost &amp; Usage
                       </h4>
                       <p className="text-sm text-muted-foreground">
@@ -3458,49 +3442,49 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 const totalCalls = spend.reduce((sum, m) => sum + m.calls, 0);
 
                 return (
-                  <div className="mt-6 pt-6 border-t border-white/10">
+                  <div className="mt-6 pt-6 border-t border-hairline">
                     <div className="flex items-center justify-between mb-4">
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                        <Zap className="h-4 w-4 text-amber-500" />
+                      <h4 className="text-xs font-bold text-muted-foreground flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-[hsl(var(--warning))]" />
                         AI Model Cost &amp; Usage <span className="normal-case font-normal">(recorded)</span>
                       </h4>
                       <div className="flex items-center gap-3">
-                        <Badge variant="outline" className="bg-green-500/15 text-green-400 border-green-500/30">
+                        <Badge variant="success">
                           Total: ${totalCost.toFixed(4)}
                         </Badge>
-                        <Badge variant="outline" className="bg-blue-500/15 text-blue-400 border-blue-500/30">
+                        <Badge variant="info">
                           {formatNumber(totalCalls)} calls
                         </Badge>
                       </div>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
-                      <Card className="bg-amber-500/10 border-amber-500/20">
+                      <Card className="bg-[hsl(var(--warning-bg))] border-[hsl(var(--warning)/0.25)]">
                         <CardContent className="p-3">
-                          <div className="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Billed Cost</div>
-                          <div className="text-xl font-black text-amber-300">${totalCost.toFixed(4)}</div>
-                          <div className="text-[9px] text-amber-400/70">USD, from ai_usage_logs</div>
+                          <div className="text-[10px] font-bold text-[hsl(var(--warning))]">Billed Cost</div>
+                          <div className="text-xl font-black text-[hsl(var(--warning))]">${totalCost.toFixed(4)}</div>
+                          <div className="text-[9px] text-[hsl(var(--warning))]">USD, from ai_usage_logs</div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-blue-500/10 border-blue-500/20">
+                      <Card className="bg-[hsl(var(--info-bg))] border-[hsl(var(--info)/0.25)]">
                         <CardContent className="p-3">
-                          <div className="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Total Tokens</div>
-                          <div className="text-xl font-black text-blue-300">{(totalTokens / 1000).toFixed(1)}K</div>
-                          <div className="text-[9px] text-blue-400/70">input + output</div>
+                          <div className="text-[10px] font-bold text-[hsl(var(--info))]">Total Tokens</div>
+                          <div className="text-xl font-black text-[hsl(var(--info))]">{(totalTokens / 1000).toFixed(1)}K</div>
+                          <div className="text-[9px] text-[hsl(var(--info))]">input + output</div>
                         </CardContent>
                       </Card>
-                      <Card className="bg-green-500/10 border-green-500/20">
+                      <Card className="bg-[hsl(var(--success-bg))] border-[hsl(var(--success)/0.25)]">
                         <CardContent className="p-3">
-                          <div className="text-[10px] font-bold text-green-400 uppercase tracking-wider">Calls</div>
-                          <div className="text-xl font-black text-green-300">{formatNumber(totalCalls)}</div>
-                          <div className="text-[9px] text-green-400/70">logged operations</div>
+                          <div className="text-[10px] font-bold text-[hsl(var(--success))]">Calls</div>
+                          <div className="text-xl font-black text-[hsl(var(--success))]">{formatNumber(totalCalls)}</div>
+                          <div className="text-[9px] text-[hsl(var(--success))]">logged operations</div>
                         </CardContent>
                       </Card>
                     </div>
 
                     <div className="space-y-2">
                       {spend.map((m) => (
-                        <div key={m.model_name} className="bg-white/5 rounded-lg p-3 border border-white/10">
+                        <div key={m.model_name} className="bg-surface-sunken rounded-lg p-3 border border-hairline">
                           <div className="flex items-center justify-between">
                             <div>
                               <div className="font-semibold text-sm text-foreground">{m.model_name}</div>
@@ -3535,7 +3519,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Trash2 className="h-5 w-5 text-orange-600" />
+              <Trash2 className="h-5 w-5 text-[hsl(var(--warning))]" />
               Delete Job by ID
             </DialogTitle>
             <DialogDescription>
@@ -3553,24 +3537,21 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                 value={deleteJobId}
                 onChange={(e) => setDeleteJobId(e.target.value)}
                 placeholder="Enter job ID..."
-                className="w-full mt-1 px-3 py-2 border rounded-md"
+                className="w-full mt-1 px-3 py-2 border border-hairline rounded-sm bg-background"
               />
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setShowDeleteJobModal(false)}
-                className="px-4 py-2 text-sm font-medium text-foreground bg-white/10 border border-white/10 rounded-md hover:bg-white/15"
-              >
+              <Button variant="outline" onClick={() => setShowDeleteJobModal(false)}>
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="destructive"
                 onClick={handleDeleteJobById}
                 disabled={!deleteJobId.trim() || deletingJob === deleteJobId}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {deletingJob === deleteJobId ? (
                   <>
-                    <RefreshCw className="w-4 w-4 animate-spin" />
+                    <RefreshCw className="w-4 h-4 animate-spin" />
                     Deleting...
                   </>
                 ) : (
@@ -3579,7 +3560,7 @@ export const AsyncJobQueueMonitor: React.FC = () => {
                     Delete Job
                   </>
                 )}
-              </button>
+              </Button>
             </div>
           </div>
         </DialogContent>

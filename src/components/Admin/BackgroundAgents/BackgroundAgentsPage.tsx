@@ -18,7 +18,8 @@ import { Switch }  from '@/components/core/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
-import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { HubSegmented } from '@/components/core/hub/HubSegmented';
+import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
 import { FilterBar, applyFilters, useFilters } from '@/components/core/filters';
 import { AgentLogsViewer }     from './AgentLogsViewer';
 import { AgentRunHistoryDrawer } from './AgentRunHistoryDrawer';
@@ -32,7 +33,6 @@ import {
 import type { AgentRun, AgentTypeCatalogEntry, BackgroundAgent } from '@/services/backgroundAgents';
 import { useToast } from '@/hooks/use-toast';
 import { statusTone } from '@/utils/statusTone';
-import { SectionHeader } from '@/components/shared/SectionHeader';
 import { formatDate } from '@/utils/datetime';
 import { formatNumber } from '@/utils/decimal';
 import { DataFields } from '@/components/shared/DataFields';
@@ -45,7 +45,7 @@ const STATUS_ICON: Record<string, React.ReactNode> = {
   cancelled:  <XCircle     className="h-4 w-4 text-gray-400"                  />,
 };
 
-type StatusFilter = 'all' | 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'stuck';
+type StatusFilter = 'all' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'stuck';
 
 function relTime(iso: string | null): string {
   if (!iso) return '—';
@@ -195,6 +195,7 @@ export function BackgroundAgentsPage() {
   // are computed over the modal-narrowed set and the two can never disagree.
   const filtered = useMemo(() => {
     if (statusFilter === 'stuck') return scoped.filter(isStuck);
+    if (statusFilter === 'processing') return scoped.filter(r => r.status === 'processing' || r.status === 'pending');
     if (statusFilter !== 'all') return scoped.filter(r => r.status === statusFilter);
     return scoped;
   }, [scoped, statusFilter]);
@@ -263,18 +264,13 @@ export function BackgroundAgentsPage() {
   return (
     <div className="space-y-4 sm:space-y-6">
 
-      {/* Header */}
-      <SectionHeader
-        icon={Bot}
-        title="Background Tasks"
-        subtitle="Monitor AI tasks dispatched from JARVIS chat and other triggers"
-        actions={
-          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-        }
-      />
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">Scheduled and event-driven agents, and every run they made.</p>
+        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
 
 
       <Card>
@@ -344,35 +340,28 @@ export function BackgroundAgentsPage() {
         </CardContent>
       </Card>
 
-      {/* Stats bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-6 gap-3">
-        {([
-          { label: 'Total Runs', value: stats.total,     color: 'text-foreground' },
-          { label: 'Running',    value: stats.running,   color: 'text-blue-600'   },
-          { label: 'Completed',  value: stats.completed, color: 'text-green-600'  },
-          { label: 'Failed',     value: stats.failed,    color: 'text-red-600'    },
-          { label: 'Cancelled',  value: stats.cancelled, color: 'text-gray-500'   },
-          { label: 'Stuck',      value: stats.stuck,     color: 'text-yellow-500' },
-        ] as const).map(s => (
-          <div key={s.label} className="border rounded-lg p-3 text-center">
-            <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-            <p className="text-xs text-muted-foreground">{s.label}</p>
-          </div>
-        ))}
-      </div>
+      <HubStatGrid>
+        <HubStatTile label="Total Runs" value={formatNumber(stats.total)} onClick={() => setStatusFilter('all')} />
+        <HubStatTile label="Running" value={formatNumber(stats.running)} onClick={() => setStatusFilter('processing')} />
+        <HubStatTile label="Failed" value={formatNumber(stats.failed)} category="Includes open alerts" onClick={() => setStatusFilter('failed')} />
+        <HubStatTile label="Stuck" value={formatNumber(stats.stuck)} onClick={() => setStatusFilter('stuck')} />
+      </HubStatGrid>
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <Tabs value={statusFilter} onValueChange={v => setStatusFilter(v as StatusFilter)}>
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
-            <TabsTrigger value="processing">Running ({stats.running})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({stats.completed})</TabsTrigger>
-            <TabsTrigger value="failed">Failed ({stats.failed})</TabsTrigger>
-            <TabsTrigger value="cancelled">Cancelled ({stats.cancelled})</TabsTrigger>
-            <TabsTrigger value="stuck">Stuck ({stats.stuck})</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <HubSegmented
+          aria-label="Run status"
+          value={statusFilter}
+          onChange={setStatusFilter}
+          options={[
+            { value: 'all', label: `All (${stats.total})` },
+            { value: 'processing', label: `Running (${stats.running})` },
+            { value: 'completed', label: `Completed (${stats.completed})` },
+            { value: 'failed', label: `Failed (${stats.failed})` },
+            { value: 'cancelled', label: `Cancelled (${stats.cancelled})` },
+            { value: 'stuck', label: `Stuck (${stats.stuck})` },
+          ] as const satisfies readonly { value: StatusFilter; label: string }[]}
+        />
 
         <FilterBar
           groups={filterGroups}
@@ -557,7 +546,7 @@ export function BackgroundAgentsPage() {
                   <div className="px-4 pb-4 space-y-3 border-t bg-muted/20">
                     {run.input_data?.task_prompt && (
                       <div className="pt-3">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Task</p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">Task</p>
                         <p className="text-sm whitespace-pre-wrap">{run.input_data.task_prompt as string}</p>
                       </div>
                     )}
@@ -599,14 +588,14 @@ export function BackgroundAgentsPage() {
                     </div>
 
                     {run.error_message && (
-                      <div className="text-xs text-red-500 bg-red-50 dark:bg-red-950/30 rounded p-2">
+                      <div className="text-xs text-[hsl(var(--error))] bg-[hsl(var(--error-bg))] rounded-sm p-2">
                         {run.error_message}
                       </div>
                     )}
 
                     {run.output_data && Object.keys(run.output_data).length > 0 && (
                       <div>
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Output</p>
+                        <p className="text-xs font-semibold text-muted-foreground mb-1">Output</p>
                         {typeof (run.output_data as any).report === 'string' ? (
                           <div className="text-sm whitespace-pre-wrap bg-background rounded border p-3 max-h-64 overflow-y-auto">
                             {(run.output_data as any).report}
@@ -618,7 +607,7 @@ export function BackgroundAgentsPage() {
                     )}
 
                     <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">
+                      <p className="text-xs font-semibold text-muted-foreground mb-1">
                         Logs {isLive && <span className="text-blue-500 ml-1">● live</span>}
                       </p>
                       <AgentLogsViewer runId={run.id} live={isLive} />

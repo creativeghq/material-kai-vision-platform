@@ -5,16 +5,23 @@
 
 import React, { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Database, Link2, Copy } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Database } from 'lucide-react';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
+import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { MetadataManagement } from '@/components/Admin/MetadataManagement';
 import { FieldRoleAudit } from '@/components/Admin/FieldRoleAudit';
 import { RelevancyManagement } from '@/components/Admin/RelevancyManagement';
 import { DuplicateDetectionPage } from './DuplicateDetectionPage';
 
-const TAB_VALUES = ['metadata', 'relevancy', 'duplicates', 'field-roles'] as const;
-type TabValue = typeof TAB_VALUES[number];
+const VIEWS = [
+  { value: 'metadata', label: 'Metadata' },
+  { value: 'relevancy', label: 'Relevancy' },
+  { value: 'duplicates', label: 'Duplicates' },
+  { value: 'field-roles', label: 'Field Roles' },
+] as const;
+const TAB_VALUES = VIEWS.map((v) => v.value);
+type TabValue = typeof VIEWS[number]['value'];
 
 interface AIDataPageProps {
   /** Hide the page header when mounted inside another page's tab. */
@@ -55,20 +62,7 @@ const AIDataPage: React.FC<AIDataPageProps> = ({ embedded = false, tabParam }) =
 
       <div className={embedded ? 'space-y-6' : 'p-3 sm:p-6 space-y-6'}>
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="metadata" className="flex items-center gap-2">
-              <Database className="h-4 w-4" /> Metadata
-            </TabsTrigger>
-            <TabsTrigger value="relevancy" className="flex items-center gap-2">
-              <Link2 className="h-4 w-4" /> Relevancy
-            </TabsTrigger>
-            <TabsTrigger value="duplicates" className="flex items-center gap-2">
-              <Copy className="h-4 w-4" /> Duplicates
-            </TabsTrigger>
-            <TabsTrigger value="field-roles" className="flex items-center gap-2">
-              <Database className="h-4 w-4" /> Field Roles
-            </TabsTrigger>
-          </TabsList>
+          <HubSegmented options={VIEWS} value={activeTab} onChange={handleTabChange} aria-label="AI Review view" />
 
           <TabsContent value="metadata" className="mt-6">
             <MetadataManagement />

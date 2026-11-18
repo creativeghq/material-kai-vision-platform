@@ -1,66 +1,35 @@
-/** Flow-builder edge-function picker ↔ endpoint catalogue parity. */
+/** Flow-builder edge-function picker ↔ what flow-engine will actually invoke. */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { FLOW_RUNNABLE_EDGE_FUNCTIONS } from '@/config/flowEdgeFunctions';
+
 const ROOT = process.cwd();
-const CATALOGUE = join(ROOT, 'scripts/edge-endpoints.json');
-const PICKER = join(
-  ROOT,
-  'src/components/Admin/FlowsManagement/panels/configs/entitySearchService.ts',
-);
+const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
 
-/** Names in the generated catalogue that builds the public OpenAPI spec. */
-function catalogueNames(): string[] {
-  const entries = JSON.parse(readFileSync(CATALOGUE, 'utf8')) as { name: string }[];
-  return entries.map((e) => e.name).sort();
-}
+describe('flow edge-function picker ↔ engine allowlist', () => {
+  const names = FLOW_RUNNABLE_EDGE_FUNCTIONS.map((f) => f.name);
 
-/**
- * Names in the picker's EDGE_FUNCTIONS array. Parsed from source rather than imported
- * because the module pulls in the Supabase client and half the service layer, which a unit
- * test has no business booting.
- */
-function pickerNames(): string[] {
-  const src = readFileSync(PICKER, 'utf8');
-  const start = src.indexOf('const EDGE_FUNCTIONS');
-  expect(start, 'EDGE_FUNCTIONS declaration not found — was it renamed?').toBeGreaterThan(-1);
-  const end = src.indexOf('];', start);
-  const block = src.slice(start, end);
-  return [...block.matchAll(/\{\s*id:\s*'([^']+)'/g)].map((m) => m[1]).sort();
-}
-
-describe('flow edge-function picker ↔ endpoint catalogue', () => {
-  const catalogue = catalogueNames();
-  const picker = pickerNames();
-
-  it('parses both sides (guards against an empty read)', () => {
-    expect(catalogue.length, 'edge-endpoints.json parsed empty').toBeGreaterThan(50);
-    expect(picker.length, 'EDGE_FUNCTIONS parsed empty').toBeGreaterThan(50);
+  it('every runnable function is a catalogued endpoint', () => {
+    const catalogue = (JSON.parse(read('scripts/edge-endpoints.json')) as { name: string }[]).map((e) => e.name);
+    const unknown = names.filter((n) => !catalogue.includes(n));
+    expect(unknown, `not in scripts/edge-endpoints.json: ${unknown.join(', ')}`).toEqual([]);
   });
 
-  it('every catalogued function is offered in the picker', () => {
-    const missing = catalogue.filter((n) => !picker.includes(n));
-    expect(
-      missing,
-      `Edge function(s) missing from the flow picker: ${missing.join(', ')}. ` +
-        `Regenerate EDGE_FUNCTIONS from scripts/edge-endpoints.json — a flow author ` +
-        `cannot select what the dropdown does not list.`,
-    ).toEqual([]);
+  it('the picker offers the allowlist and nothing else', () => {
+    const src = read('src/components/Admin/FlowsManagement/panels/configs/entitySearchService.ts');
+    expect(src).toMatch(/const EDGE_FUNCTIONS: EntityResult\[\] = FLOW_RUNNABLE_EDGE_FUNCTIONS\.map\(/);
+    expect(src, 'a hand-listed edge function reappeared in the picker').not.toMatch(/\{\s*id:\s*'[a-z0-9-]+',\s*label:/);
   });
 
-  it('the picker offers no function that is not in the catalogue', () => {
-    const phantom = picker.filter((n) => !catalogue.includes(n));
-    expect(
-      phantom,
-      `Flow picker offers function(s) with no catalogue entry: ${phantom.join(', ')}. ` +
-        `Selecting one builds a flow node that calls a function we do not document ` +
-        `(and may not deploy).`,
-    ).toEqual([]);
+  it('flow-engine enforces the same list and keeps no copy of its own', () => {
+    const engine = read('supabase/functions/flow-engine/index.ts');
+    expect(engine).toMatch(/FLOW_RUNNABLE_EDGE_FUNCTION_NAMES\.has\(fnName\)/);
+    expect(engine).not.toMatch(/RUN_EDGE_FUNCTION_ALLOWED\s*=\s*new Set/);
   });
 
-  it('picker entries are unique', () => {
-    const dupes = picker.filter((n, i) => picker.indexOf(n) !== i);
-    expect(dupes, `duplicate picker entries: ${dupes.join(', ')}`).toEqual([]);
+  it('entries are unique', () => {
+    expect(new Set(names).size).toBe(names.length);
   });
 });

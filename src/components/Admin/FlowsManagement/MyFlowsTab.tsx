@@ -1,492 +1,148 @@
-import React, { useState } from 'react';
-import { format } from 'date-fns';
+import React, { useMemo, useState } from 'react';
 import {
-  Plus,
-  Copy,
-  Trash2,
-  Play,
-  PlayCircle,
-  Pause,
-  Pencil,
-  MoreHorizontal,
-  Zap,
-  Globe,
-  Clock,
-  UserPlus,
-  Tag,
-  BellRing,
-  FileText,
-  Image,
-  Hand,
-  LogIn,
-  CheckCircle2,
-  XCircle,
-  ClipboardCheck,
-  MessageSquarePlus,
-  MessageSquareReply,
-  FileCheck,
-  Package,
-  Send,
-  Bell,
-  Search,
-  Box,
-  Orbit,
-  SearchCheck,
-  Sunrise,
-  ScanEye,
-  PackagePlus,
-  LayoutGrid,
-  ImagePlus,
-  Share2,
-  Lock,
-  Unlock,
-  Inbox,
-  CalendarOff,
-  CalendarCheck,
-  ShoppingCart,
-  Star,
-  Boxes,
-  Factory,
-  DollarSign,
-  BookOpen,
-  FilePlus2,
-  Megaphone,
-  MailX,
-  Mail,
-  MailWarning,
-  MailOpen,
-  MousePointerClick,
-  TrendingDown,
-  AtSign,
-  Briefcase,
-  Building2,
-  Ship,
-  Truck,
-  Home,
-  Undo2,
-  Landmark,
-  CreditCard,
-  ShieldAlert,
-  BatteryLow,
-  UserMinus,
-  Timer,
-  Wrench,
-  AlarmClock,
-  ShieldCheck,
-  Coins, ReceiptText, MessagesSquare, PhoneOff, Link2, Unlink,
-  EyeOff, SlidersHorizontal, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck, CalendarClock, FileMinus, ClipboardList} from 'lucide-react';
+  Plus, Copy, Trash2, Play, PlayCircle, Pause, Pencil, MoreHorizontal, Zap, Globe, Lock, Unlock,
+  Building2, EyeOff, SlidersHorizontal, GitBranch, CalendarDays,
+} from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { Label } from '@/components/core/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/core/ui/dialog';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/core/ui/alert-dialog';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/core/ui/dropdown-menu';
-import { flowService } from '@/services/flows';
-import type { Flow, FlowStatus, TriggerType } from '@/services/flows';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
+import { FilterBar, optionsFromRows, useFilters, type FilterGroupDef } from '@/components/core/filters';
+import { flowService, RUNNABLE_FLOW_STATUSES } from '@/services/flows';
+import type { ActionNodeData, Flow, FlowRunStats, FlowStatus } from '@/services/flows';
 import { useToast } from '@/hooks/use-toast';
+import { formatDate } from '@/utils/datetime';
+import { formatNumber } from '@/utils/decimal';
+import { humanizeLabel } from '@/utils/humanize';
+import { triggerIcons } from './nodes/TriggerNode';
+import { actionPaletteItems, triggerLabel } from './utils/paletteItems';
+import { runOutcomeToast } from './utils/runOutcome';
 
 interface MyFlowsTabProps {
   flows: Flow[];
   loading: boolean;
+  stats: Map<string, FlowRunStats>;
   onRefresh: () => void;
   onOpenBuilder: (flowId: string) => void;
 }
 
-const triggerIcons: Record<TriggerType, React.ElementType> = {
-  manual: Hand,
-  scheduled: Clock,
-  webhook: Globe,
-  user_signup: UserPlus,
-  user_login: LogIn,
-  quote_requested: FileText,
-  quote_approved: CheckCircle2,
-  deal_stage_changed: CheckCircle2,
-  deal_won: CheckCircle2,
-  deal_lost: CheckCircle2,
-  quote_rejected: XCircle,
-  contract_signed: ClipboardCheck,
-  search_executed: Search,
-  model_3d_created: Box,
-  vr_world_created: Orbit,
-  agent_search_completed: SearchCheck,
-  daily_brief: Sunrise,
-  product_added_to_quote: PackagePlus,
-  moodboard_created: LayoutGrid,
-  moodboard_item_added: ImagePlus,
-  moodboard_shared: Share2,
-  moodboard_commented: ImagePlus,
-  moodboard_quote_requested: FileText,
-  moodboard_dormancy_warning: Clock,
-  moodboard_dormancy_reminder: Clock,
-  hire_me_received: UserPlus,
-  profile_followed: UserPlus,
-  profile_published: UserPlus,
-  material_reviewed: CheckCircle2,
-  review_submitted: CheckCircle2,
-  preferred_factory_added: Package,
-  quote_pdf_generated: FileCheck,
-  factory_approved: CheckCircle2,
-  factory_rejected: XCircle,
-  appointment_booked: Clock,
-  appointment_confirmed: CheckCircle2,
-  appointment_cancelled: XCircle,
-  svbrdf_extraction_complete: ScanEye,
-  virtual_staging_completed: Image,
-  vr_world_failed: XCircle,
-  video_generation_completed: CheckCircle2,
-  video_generation_failed: XCircle,
-  background_agent_failed: XCircle,
-  role_upgrade_request_submitted: UserPlus,
-  role_upgrade_approved: CheckCircle2,
-  role_upgrade_rejected: XCircle,
-  stripe_payment_succeeded: CheckCircle2,
-  stripe_payment_failed: XCircle,
-  project_invitation_sent: Share2,
-  project_invitation_resent: Share2,
-  workspace_invitation_sent: UserPlus,
-  inventory_low_stock: Package,
-  freight_quote_requested: Ship,
-  order_dispatched: Truck,
-  'inbox.message_received': Inbox,
-  'inbox.thread_assigned': UserPlus,
-  'inbox.thread_labeled': Tag,
-  'inbox.follow_up_due': BellRing,
-  'mail.received': Mail,
-  'inbox.order_intake_ready': ShoppingCart,
-  review_received: Star,
-  marketplace_want_match: Package,
-  expense_card_submitted: ClipboardCheck,
-  finance_document_requested: ClipboardCheck,
-  invoice_issued: FileText,
-  receipt_issued: FileCheck,
-  credit_note_issued: FileMinus,
-  delivery_note_issued: Truck,
-  sales_order_confirmed: ClipboardCheck,
-  purchase_order_confirmed: ClipboardList,
-  payment_received: CheckCircle2,
-  payment_reversed: Undo2,
-  payment_sent: CheckCircle2,
-  ingestion_audit_failed: ShieldAlert,
-  ingestion_review_waiting: ShieldAlert,
-  field_registry_review_due: ShieldAlert,
-  'expense.booked': ReceiptText,
-  'expense.settled_outside': BadgeCheck,
-  'credit_note.received': Undo2,
-  'plan.due_tomorrow': CalendarClock,
-  'vat.return_ready': Landmark,
-  'purchase_order.sent': Send,
-  'purchase_order.received': Package,
-  material_alert: Bell,
-  finance_follow_up: Bell,
-  invoice_paid: CheckCircle2,
-  fiscal_document_rejected: ShieldAlert,
-  fiscal_credits_low: BatteryLow,
-  bank_payment_unmatched: Landmark,
-  card_spend_threshold: CreditCard,
-  expense_card_reviewed: CheckCircle2,
-  expense_card_requested: FileText,
-  pricing_change_requested: ClipboardCheck,
-  pricing_change_decided: CheckCircle2,
-  module_access_requested: Package,
-  workspace_access_requested: Package,
-  self_hosting_requested: Package,
-  hr_late_checkin: Clock,
-  'hr.applicant_stage_changed': UserPlus,
-  'hr.employee_added': UserPlus,
-  'hr.absence_requested': CalendarOff,
-  'hr.absence_reviewed': CalendarCheck,
-  'hr.departure_recorded': UserMinus,
-  'hr.overtime_recorded': Timer,
-  'hr.ergani_filing_failed': Landmark,
-  order_created: ShoppingCart,
-  order_status_changed: Package,
-  payment_proof_submitted: Landmark,
-  customer_credit_releasable: Coins,
-  order_awaiting_invoice: ReceiptText,
-  document_published: BookOpen,
-  doc_suggestion_submitted: FilePlus2,
-  campaign_sent: Megaphone,
-  email_sender_not_configured: MailWarning,
-  email_bounced: MailX,
-  email_complained: MailWarning,
-  social_post_published: Share2,
-  social_comment_received: MessagesSquare,
-  whatsapp_number_status_changed: PhoneOff,
-  whatsapp_template_status_changed: FileCheck,
-  social_account_connected: Link2,
-  social_account_disconnected: Unlink,
-  social_post_failed: XCircle,
-  client_view_feedback_received: ClipboardCheck,
-  project_task_overdue: CalendarClock,
-  project_created: FolderPlus,
-  project_task_completed: CheckCircle2,
-  project_member_added: UserPlus,
-  project_task_commented: MessageSquareReply,
-  project_milestone_reached: Flag,
-  project_snag_raised: AlertTriangle,
-  project_expense_approved: BadgeCheck,
-  project_delivery_issued: Truck,
-  project_asset_registered: Wrench,
-  project_status_changed: FolderKanban,
-  project_request_raised: MessageSquarePlus,
-  project_request_answered: MessageSquareReply,
-  crm_contact_created: UserPlus,
-  inquiry_received: UserPlus,
-  crm_company_created: Building2,
-  email_opened: MailOpen,
-  email_clicked: MousePointerClick,
-  catalog_sent_to_customers: Send,
-  quote_sent: Send,
-  price_alert_triggered: TrendingDown,
-  mention_alert_triggered: AtSign,
-  job_alert_triggered: Briefcase,
-  rfq_lines_requested: Send,
-  rfq_lines_priced: CheckCircle2,
-  upstream_order_created: ShoppingCart,
-  supplier_po_received: ShoppingCart,
-  catalog_master_updated: Boxes,
-  supplier_price_changed: DollarSign,
-  supplier_claim_requested: Factory,
-  marketplace_application_submitted: Factory,
-  marketplace_application_reviewed: Factory,
-  'realestate.buyer_matches_found': Home,
-  'realestate.listing_published': Home,
-  'realestate.new_listing_for_buyer': Home,
-  'seo.ranking_movement': Search,
-  'seo.backlink_movement': Search,
-  'seo.site_health_changed': Search,
-  'seo.report_ready': Search,
-  'seo.article_refresh_due': Search,
-  'seo.refresh_ready': Search,
-  page_watch_changed: FileText,
-  'asset.service_due': Wrench,
-  'asset.service_overdue': AlarmClock,
-  'asset.warranty_expiring': ShieldCheck,
-  'signal.matched': Briefcase,
+const STATUS_TONE: Record<FlowStatus, 'success' | 'neutral' | 'warning'> = {
+  active: 'success', draft: 'neutral', paused: 'warning', archived: 'neutral',
 };
 
-const triggerLabels: Record<TriggerType, string> = {
-  manual: 'Manual',
-  scheduled: 'Scheduled',
-  webhook: 'Webhook',
-  user_signup: 'User Signup',
-  user_login: 'User Login',
-  quote_requested: 'Quote Requested',
-  quote_approved: 'Quote Approved',
-  deal_stage_changed: 'Deal Stage Changed',
-  deal_won: 'Deal Won',
-  deal_lost: 'Deal Lost',
-  quote_rejected: 'Quote Rejected',
-  contract_signed: 'Contract Signed',
-  search_executed: 'Search Executed',
-  model_3d_created: '3D Model Created',
-  vr_world_created: 'VR World Created',
-  agent_search_completed: 'Agent Search Done',
-  daily_brief: 'Daily Brief',
-  product_added_to_quote: 'Product → Quote',
-  moodboard_created: 'Moodboard Created',
-  moodboard_item_added: 'Moodboard Item Added',
-  moodboard_shared: 'Moodboard Shared',
-  moodboard_commented: 'Moodboard Commented',
-  moodboard_quote_requested: 'Moodboard Quote Requested',
-  moodboard_dormancy_warning: 'Moodboard Dormancy Warning',
-  moodboard_dormancy_reminder: 'Moodboard Dormancy Reminder',
-  hire_me_received: 'Hire Me Received',
-  profile_followed: 'Profile Followed',
-  profile_published: 'Profile Published',
-  material_reviewed: 'Material Reviewed',
-  review_submitted: 'Profile Review Received',
-  preferred_factory_added: 'Preferred Brand Added',
-  quote_pdf_generated: 'Quote PDF Ready',
-  factory_approved: 'Brand Approved',
-  factory_rejected: 'Brand Rejected',
-  appointment_booked: 'Appointment Booked',
-  appointment_confirmed: 'Appointment Confirmed',
-  appointment_cancelled: 'Appointment Cancelled',
-  svbrdf_extraction_complete: 'SVBRDF Extracted',
-  virtual_staging_completed: 'Virtual Staging Done',
-  vr_world_failed: 'VR World Failed',
-  video_generation_completed: 'Video Generated',
-  video_generation_failed: 'Video Failed',
-  background_agent_failed: 'Agent Failed',
-  role_upgrade_request_submitted: 'Role Upgrade Requested',
-  role_upgrade_approved: 'Role Upgrade Approved',
-  role_upgrade_rejected: 'Role Upgrade Rejected',
-  stripe_payment_succeeded: 'Payment Succeeded',
-  stripe_payment_failed: 'Payment Failed',
-  project_invitation_sent: 'Project Invite Sent',
-  project_invitation_resent: 'Project Invite Resent',
-  workspace_invitation_sent: 'Team Invite Sent',
-  inventory_low_stock: 'Low Stock',
-  freight_quote_requested: 'Freight Quote Requested',
-  order_dispatched: 'Order Dispatched',
-  'inbox.message_received': 'Inbox Message Received',
-  'inbox.thread_assigned': 'Inbox Thread Assigned',
-  'inbox.thread_labeled': 'Inbox Thread Labeled',
-  'inbox.follow_up_due': 'Inbox Follow-Up Due',
-  'mail.received': 'Email Received (Shared Gmail)',
-  'inbox.order_intake_ready': 'Inbox Order Ready to Approve',
-  review_received: 'Review Received',
-  marketplace_want_match: 'Surplus Match',
-  expense_card_submitted: 'Expense Card Submitted',
-  finance_document_requested: 'Finance Document Requested',
-  invoice_issued: 'Invoice Issued',
-  receipt_issued: 'Receipt Issued',
-  credit_note_issued: 'Credit Note Issued',
-  delivery_note_issued: 'Delivery Note Issued',
-  sales_order_confirmed: 'Sales Order Confirmed',
-  purchase_order_confirmed: 'Purchase Order Confirmed',
-  payment_received: 'Payment Received',
-  payment_reversed: 'Payment Reversed',
-  payment_sent: 'Payment Sent',
-  ingestion_audit_failed: 'Ingestion Audit Needs Attention',
-  ingestion_review_waiting: 'Catalogue Waiting for Review',
-  field_registry_review_due: 'Field Registry Review Due',
-  'expense.booked': 'Expense Booked',
-  'expense.settled_outside': 'Expense Settled Outside the Books',
-  'credit_note.received': 'Supplier Credit Note Received',
-  'plan.due_tomorrow': 'Planned Payment Due Tomorrow',
-  'vat.return_ready': 'VAT Return Ready',
-  'purchase_order.sent': 'Purchase Order Sent',
-  'purchase_order.received': 'Purchase Order Received',
-  material_alert: 'Saved-Search Material Alert',
-  finance_follow_up: 'Finance Follow-Up Due',
-  invoice_paid: 'Invoice Paid (Card)',
-  fiscal_document_rejected: 'myDATA Document Rejected',
-  fiscal_credits_low: 'Provider Credits Low',
-  bank_payment_unmatched: 'Unmatched Bank Payment',
-  card_spend_threshold: 'Large Card Spend',
-  expense_card_reviewed: 'Expense Card Reviewed',
-  expense_card_requested: 'Expense Card Requested',
-  pricing_change_requested: 'Discount Approval Requested',
-  module_access_requested: 'Module Activation Requested',
-  workspace_access_requested: 'Support Access Requested',
-  self_hosting_requested: 'Self-Hosting Requested',
-  pricing_change_decided: 'Discount Approval Decided',
-  hr_late_checkin: 'HR — Late Check-in',
-  'hr.applicant_stage_changed': 'HR — Applicant Stage Changed',
-  'hr.employee_added': 'HR — Employee Added',
-  'hr.absence_requested': 'HR — Absence Requested',
-  'hr.absence_reviewed': 'HR — Absence Reviewed',
-  'hr.departure_recorded': 'HR — Departure Recorded',
-  'hr.overtime_recorded': 'HR — Overtime Recorded',
-  'hr.ergani_filing_failed': 'HR — Ergani Filing Failed',
-  order_created: 'Order Created',
-  order_status_changed: 'Order Status Changed',
-  payment_proof_submitted: 'Payment Proof Submitted',
-  customer_credit_releasable: 'Customer Credit Can Be Released',
-  order_awaiting_invoice: 'Order Not Invoiced',
-  document_published: 'Document Published',
-  doc_suggestion_submitted: 'Doc Edit Proposed',
-  campaign_sent: 'Campaign Sent',
-  email_sender_not_configured: 'Email Sender Not Configured',
-  email_bounced: 'Email Bounced',
-  email_complained: 'Spam Complaint',
-  social_post_published: 'Social Post Published',
-  social_comment_received: 'Social Comment Received',
-  whatsapp_number_status_changed: 'WhatsApp Number Status Changed',
-  whatsapp_template_status_changed: 'WhatsApp Template Status Changed',
-  social_account_connected: 'Social Account Connected',
-  social_account_disconnected: 'Social Account Disconnected',
-  social_post_failed: 'Social Post Failed',
-  client_view_feedback_received: 'Client View Feedback',
-  project_task_overdue: 'Task Overdue',
-  project_created: 'Project Created',
-  project_task_completed: 'Task Completed',
-  project_member_added: 'Added to Project',
-  project_task_commented: 'Task Commented',
-  project_milestone_reached: 'Milestone Reached',
-  project_snag_raised: 'Snag Raised',
-  project_expense_approved: 'Expense Approved',
-  project_delivery_issued: 'Delivery Issued',
-  project_asset_registered: 'Equipment Registered',
-  project_status_changed: 'Project Status Changed',
-  project_request_raised: 'Project Request Raised',
-  project_request_answered: 'Project Request Answered',
-  crm_contact_created: 'Contact Created',
-  inquiry_received: 'Inquiry Received',
-  crm_company_created: 'Company Created',
-  email_opened: 'Email Opened',
-  email_clicked: 'Email Link Clicked',
-  catalog_sent_to_customers: 'Catalog Sent',
-  quote_sent: 'Quote Sent',
-  price_alert_triggered: 'Price Alert',
-  mention_alert_triggered: 'Mention Alert',
-  job_alert_triggered: 'Job Alert',
-  rfq_lines_requested: 'RFQ Lines Requested (upstream)',
-  rfq_lines_priced: 'RFQ Lines Priced (supplier)',
-  upstream_order_created: 'Reseller Order Created (Supplier)',
-  supplier_po_received: 'Supplier PO Received (In-App)',
-  catalog_master_updated: 'Manufacturer Updated Product Data',
-  supplier_price_changed: 'Manufacturer Changed a Price',
-  supplier_claim_requested: 'Manufacturer Claim Requested',
-  marketplace_application_submitted: 'Marketplace Application Submitted',
-  marketplace_application_reviewed: 'Marketplace Application Reviewed',
-  'realestate.buyer_matches_found': 'Buyer Matches Found',
-  'realestate.listing_published': 'Listing Published',
-  'realestate.new_listing_for_buyer': 'New Listing for Buyer',
-  'seo.ranking_movement': 'SEO Rankings Moved',
-  'seo.backlink_movement': 'SEO Backlinks Moved',
-  'seo.site_health_changed': 'SEO Site Health Changed',
-  'seo.report_ready': 'SEO Report Ready',
-  'seo.article_refresh_due': 'SEO Article Due for Refresh',
-  'seo.refresh_ready': 'SEO Refresh Ready',
-  page_watch_changed: 'Watched Page Changed',
-  'asset.service_due': 'Service Due',
-  'asset.service_overdue': 'Service Overdue',
-  'asset.warranty_expiring': 'Warranty Expiring',
-  'signal.matched': 'Signal Matched',
-};
+const SORTS = [
+  { value: 'updated', label: 'Recently Updated' },
+  { value: 'name', label: 'Name' },
+  { value: 'last_run', label: 'Last Run' },
+  { value: 'failures', label: 'Most Failures (7 Days)' },
+] as const;
+type SortKey = (typeof SORTS)[number]['value'];
 
-const statusColors: Record<FlowStatus, string> = {
-  draft: 'text-gray-500',
-  active: 'text-emerald-500',
-  paused: 'text-amber-500',
-  archived: 'text-red-500',
-};
+const actionLabel = new Map(actionPaletteItems.map((i) => [(i.defaultData as ActionNodeData).actionType as string, i.label]));
 
-export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
-  flows,
-  loading,
-  onRefresh,
-  onOpenBuilder,
-}) => {
+/** What a flow does and to whom, read off its action nodes: "In-App Notification → trigger user id". */
+function actionSummary(flow: Flow): { channels: string[]; recipients: string[] } {
+  const channels = new Set<string>();
+  const recipients = new Set<string>();
+  for (const n of flow.graph_definition?.nodes ?? []) {
+    if (n.type !== 'actionNode') continue;
+    const d = n.data as ActionNodeData;
+    channels.add(actionLabel.get(d.actionType) ?? humanizeLabel(d.actionType));
+    const cfg = (d.config ?? {}) as Record<string, unknown>;
+    for (const k of ['to', 'user_id', 'role', 'roles', 'recipient']) {
+      const v = cfg[k];
+      const vals = Array.isArray(v) ? v : [v];
+      for (const x of vals) {
+        if (typeof x !== 'string' || !x.trim()) continue;
+        const tpl = x.match(/^\{\{\s*([^}]+?)\s*\}\}$/);
+        recipients.add(tpl ? humanizeLabel(tpl[1].replace(/^trigger\.data\./, '').replace(/\./g, ' ')) : x);
+      }
+    }
+  }
+  return { channels: [...channels], recipients: [...recipients] };
+}
+
+export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({ flows, loading, stats, onRefresh, onOpenBuilder }) => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [creating, setCreating] = useState(false);
   const [runningId, setRunningId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Flow | null>(null);
   const [newFlow, setNewFlow] = useState({ name: '', description: '' });
+  const [sort, setSort] = useState<SortKey>('updated');
   const { toast } = useToast();
+
+  const statOf = (f: Flow) => stats.get(f.id);
+
+  const groups = useMemo<FilterGroupDef[]>(() => [
+    {
+      key: 'general', label: 'General', icon: GitBranch,
+      fields: [
+        { key: 'q', type: 'text', label: 'Search', placeholder: 'Search name or description…', accessor: (f: Flow) => [f.name, f.description] },
+        {
+          key: 'status', type: 'multi', label: 'Status',
+          options: (['active', 'draft', 'paused', 'archived'] as FlowStatus[]).map((s) => ({ value: s, label: humanizeLabel(s) })),
+          accessor: (f: Flow) => f.status,
+        },
+        {
+          key: 'trigger_type', type: 'multi', label: 'Trigger', searchable: true,
+          options: optionsFromRows(flows, (f) => f.trigger_type, triggerLabel),
+          accessor: (f: Flow) => f.trigger_type,
+        },
+        {
+          key: 'scope', type: 'select', label: 'Scope',
+          options: [{ value: 'global', label: 'Global' }, { value: 'workspace', label: 'Workspace' }],
+          accessor: (f: Flow) => (f.is_global ? 'global' : 'workspace'),
+        },
+        { key: 'failing', type: 'bool', label: 'Failed in the Last 7 Days', trueLabel: 'Failing', falseLabel: 'Not failing', accessor: (f: Flow) => (statOf(f)?.failed7d ?? 0) > 0 },
+        { key: 'is_locked', type: 'bool', label: 'Locked', trueLabel: 'Locked', falseLabel: 'Unlocked', accessor: (f: Flow) => !!f.is_locked },
+        { key: 'tenant_configurable', type: 'bool', label: 'Workspace-Configurable', trueLabel: 'Yes', falseLabel: 'No', accessor: (f: Flow) => !!f.tenant_configurable },
+      ],
+    },
+    {
+      key: 'dates', label: 'Dates', icon: CalendarDays,
+      fields: [{ key: 'updated_at', type: 'dateRange', label: 'Updated', accessor: (f: Flow) => f.updated_at }],
+    },
+    // statOf reads `stats`, so it is a dependency in effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [flows, stats]);
+
+  const { values, setValues, filtered, previewCount, activeCount, reset } = useFilters<Flow>(flows, groups);
+
+  const sorted = useMemo(() => {
+    const rows = [...filtered];
+    const lastRun = (f: Flow) => statOf(f)?.lastRunAt ?? '';
+    if (sort === 'name') rows.sort((a, b) => a.name.localeCompare(b.name));
+    else if (sort === 'last_run') rows.sort((a, b) => lastRun(b).localeCompare(lastRun(a)));
+    else if (sort === 'failures') rows.sort((a, b) => (statOf(b)?.failed7d ?? 0) - (statOf(a)?.failed7d ?? 0));
+    else rows.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    return rows;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtered, sort, stats]);
+
+  const fail = (title: string, error: unknown) =>
+    toast({ title, description: error instanceof Error ? error.message : undefined, variant: 'destructive' });
 
   const handleRunNow = async (flow: Flow) => {
     try {
       setRunningId(flow.id);
-      const run = await flowService.executeFlow(flow.id, {});
-      toast({
-        title: run.status === 'failed' ? 'Flow run failed' : 'Flow ran',
-        description: `"${flow.name}" — ${run.status}`,
-        variant: run.status === 'failed' ? 'destructive' : undefined,
-      });
+      toast(runOutcomeToast(flow.name, await flowService.executeFlow(flow.id, {})));
       onRefresh();
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to run flow',
-        variant: 'destructive',
-      });
+      fail(`"${flow.name}" did not run`, error);
     } finally {
       setRunningId(null);
     }
@@ -495,65 +151,30 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
   const handleToggleLock = async (flow: Flow) => {
     try {
       await flowService.setFlowLocked(flow.id, !flow.is_locked);
-      toast({
-        title: flow.is_locked ? 'Unlocked' : 'Locked',
-        description: flow.is_locked
-          ? `"${flow.name}" can now be deleted.`
-          : `"${flow.name}" is protected from deletion.`,
-      });
+      toast({ title: flow.is_locked ? 'Unlocked' : 'Locked', description: flow.is_locked ? `"${flow.name}" can now be deleted.` : `"${flow.name}" is protected from deletion.` });
       onRefresh();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update lock',
-        variant: 'destructive',
-      });
-    }
+    } catch (error) { fail('Could not change the lock', error); }
   };
 
-  // Operator "Global action" toggle. Global flows fire for ALL workspaces; turning it
-  // off scopes a flow to its own workspace_id (tenant flows are created off, via the agent).
+  // A global flow fires in every workspace; a workspace-scoped one only in its own workspace_id.
   const handleToggleGlobal = async (flow: Flow) => {
     const nextGlobal = !flow.is_global;
     if (!nextGlobal && !flow.workspace_id) {
-      toast({
-        title: 'Cannot scope this flow',
-        description: 'This flow has no workspace, so turning off "Global action" would stop it from ever firing. Leave it global.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Cannot scope this flow', description: 'This flow has no workspace, so turning off "Global action" would stop it from ever firing. Leave it global.', variant: 'destructive' });
       return;
     }
     try {
       await flowService.updateFlow(flow.id, { is_global: nextGlobal });
-      toast({
-        title: nextGlobal ? 'Now a global action' : 'Now workspace-scoped',
-        description: nextGlobal
-          ? `"${flow.name}" will run for all workspaces.`
-          : `"${flow.name}" will run only for its own workspace.`,
-      });
+      toast({ title: nextGlobal ? 'Now a global action' : 'Now workspace-scoped', description: nextGlobal ? `"${flow.name}" will run for all workspaces.` : `"${flow.name}" will run only for its own workspace.` });
       onRefresh();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update scope',
-        variant: 'destructive',
-      });
-    }
+    } catch (error) { fail('Could not change the scope', error); }
   };
 
-  // Operator "Workspace-configurable" toggle. A global flow runs inside every workspace, so it
-  // raises THEIR bells and sends THEIR members email — but is invisible on every tenant surface,
-  // which left an owner no way to stop it. Turning this on lists the flow under Automations →
-  // Platform defaults for every workspace, where an owner may switch it off or silence one of its
-  // channels. It never exposes the graph and never lets a tenant edit it.
+  // Lists the global flow under Automations → Platform defaults, where an owner may switch it off.
   const handleToggleTenantConfigurable = async (flow: Flow) => {
     const next = !flow.tenant_configurable;
     if (next && !flow.is_global) {
-      toast({
-        title: 'Not a platform default',
-        description: 'Only a global flow runs inside other workspaces, so only a global flow has anything for an owner to switch off.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Not a platform default', description: 'Only a global flow runs inside other workspaces, so only a global flow has anything for an owner to switch off.', variant: 'destructive' });
       return;
     }
     try {
@@ -565,68 +186,45 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
           : `"${flow.name}" is hidden from tenants again. Existing per-workspace settings are kept but stop applying.`,
       });
       onRefresh();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update tenant visibility',
-        variant: 'destructive',
-      });
-    }
+    } catch (error) { fail('Could not change workspace visibility', error); }
   };
 
   const handleCreate = async () => {
     if (!newFlow.name.trim()) {
-      toast({ title: 'Error', description: 'Flow name is required', variant: 'destructive' });
+      toast({ title: 'A flow needs a name', variant: 'destructive' });
       return;
     }
-
     try {
       setCreating(true);
-      await flowService.createFlow({
-        name: newFlow.name.trim(),
-        description: newFlow.description.trim() || undefined,
-      });
-      toast({ title: 'Success', description: 'Flow created successfully' });
+      const created = await flowService.createFlow({ name: newFlow.name.trim(), description: newFlow.description.trim() || undefined });
       setShowCreateDialog(false);
       setNewFlow({ name: '', description: '' });
       onRefresh();
+      onOpenBuilder(created.id);
     } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to create flow',
-        variant: 'destructive',
-      });
+      fail('Could not create the flow', error);
     } finally {
       setCreating(false);
     }
   };
 
-  const handleDelete = async (flow: Flow) => {
+  const confirmDelete = async () => {
+    const flow = pendingDelete;
+    setPendingDelete(null);
+    if (!flow) return;
     try {
       await flowService.deleteFlow(flow.id);
       toast({ title: 'Deleted', description: `"${flow.name}" has been deleted` });
       onRefresh();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to delete flow',
-        variant: 'destructive',
-      });
-    }
+    } catch (error) { fail('Could not delete the flow', error); }
   };
 
   const handleDuplicate = async (flow: Flow) => {
     try {
       await flowService.duplicateFlow(flow.id, `${flow.name} (Copy)`);
-      toast({ title: 'Duplicated', description: `"${flow.name}" has been duplicated` });
+      toast({ title: 'Duplicated', description: `"${flow.name} (Copy)" keeps the same trigger and schedule.` });
       onRefresh();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to duplicate flow',
-        variant: 'destructive',
-      });
-    }
+    } catch (error) { fail('Could not duplicate the flow', error); }
   };
 
   const handleToggleStatus = async (flow: Flow) => {
@@ -639,13 +237,7 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
         toast({ title: 'Activated', description: `"${flow.name}" is now active` });
       }
       onRefresh();
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update flow status',
-        variant: 'destructive',
-      });
-    }
+    } catch (error) { fail('Could not change the status', error); }
   };
 
   if (loading) {
@@ -658,241 +250,154 @@ export const MyFlowsTab: React.FC<MyFlowsTabProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          {flows.length} flow{flows.length !== 1 ? 's' : ''} total
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <FilterBar groups={groups} values={values} onChange={setValues} previewCount={previewCount} title="Filter flows" searchPlaceholder="Search name or description…" />
+          <Select value={sort} onValueChange={(v) => setSort(v as SortKey)}>
+            <SelectTrigger className="h-9 w-[200px]" aria-label="Sort flows"><SelectValue /></SelectTrigger>
+            <SelectContent>{SORTS.map((s) => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {sorted.length === flows.length ? `${formatNumber(flows.length)} flows` : `${formatNumber(sorted.length)} of ${formatNumber(flows.length)} flows`}
+          </span>
+        </div>
         <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
           <Plus className="h-4 w-4" />
           Create flow
         </Button>
       </div>
 
-      {/* Empty state */}
-      {flows.length === 0 && (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Zap className="h-12 w-12 text-muted-foreground/50 mb-4" />
-            <h3 className="text-lg font-medium mb-1">No flows yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              Create your first automation flow to get started
-            </p>
-            <Button onClick={() => setShowCreateDialog(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create flow
-            </Button>
-          </CardContent>
-        </Card>
+      {flows.length === 0 ? (
+        <HubEmptyState icon={Zap} title="No flows yet" description="Create a flow, then add its trigger and actions in the builder."
+          action={<Button size="sm" onClick={() => setShowCreateDialog(true)}><Plus className="h-4 w-4 mr-1" />Create flow</Button>} />
+      ) : sorted.length === 0 ? (
+        <HubEmptyState variant="filtered" title="No flows match these filters" action={activeCount > 0 ? <Button size="sm" variant="outline" onClick={reset}>Clear filters</Button> : undefined} />
+      ) : (
+        <div className="grid gap-3">
+          {sorted.map((flow) => {
+            const TriggerIcon = triggerIcons[flow.trigger_type] || Zap;
+            const st = statOf(flow);
+            const runnable = RUNNABLE_FLOW_STATUSES.has(flow.status);
+            const { channels, recipients } = actionSummary(flow);
+            return (
+              <Card key={flow.id}>
+                <CardContent className="p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
+                      <div className="rounded-sm bg-primary/10 p-2"><TriggerIcon className="h-5 w-5 text-primary" /></div>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <h4 className="truncate font-medium">{flow.name}</h4>
+                          <Badge variant={STATUS_TONE[flow.status]}>{humanizeLabel(flow.status)}</Badge>
+                          {flow.is_global ? <Badge variant="info"><Globe className="h-3 w-3 mr-1" />Global</Badge> : <Badge variant="neutral"><Building2 className="h-3 w-3 mr-1" />Workspace</Badge>}
+                          {flow.is_global && flow.tenant_configurable && <Badge variant="neutral"><SlidersHorizontal className="h-3 w-3 mr-1" />Workspace-Configurable</Badge>}
+                          {flow.is_locked && <Badge variant="neutral"><Lock className="h-3 w-3 mr-1" />Locked</Badge>}
+                          {(st?.failed7d ?? 0) > 0 && <Badge variant="error">{st!.failed7d} Failed in 7 Days</Badge>}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                          <span>Trigger: {triggerLabel(flow.trigger_type)}</span>
+                          <span className="tabular-nums">{formatNumber(st?.runs30d ?? 0)} runs in 30 days</span>
+                          <span>Last run: {st?.lastRunAt ? formatDate(st.lastRunAt, { withTime: true }) : '—'}</span>
+                        </div>
+                        {channels.length > 0 && (
+                          <p className="text-xs text-muted-foreground">
+                            Does: {channels.join(' · ')}{recipients.length > 0 && <> → {recipients.slice(0, 3).join(', ')}{recipients.length > 3 ? ` +${recipients.length - 3}` : ''}</>}
+                          </p>
+                        )}
+                        {flow.description && <p className="truncate text-xs text-muted-foreground">{flow.description}</p>}
+                        {(st?.failed7d ?? 0) > 0 && st?.lastError && (
+                          <p className="line-clamp-2 text-xs text-[hsl(var(--error))]">Last failure {formatDate(st.lastFailureAt!, { withTime: true })}: {st.lastError}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button size="sm" variant="outline" onClick={() => void handleRunNow(flow)} disabled={runningId === flow.id || !runnable}
+                        title={runnable ? undefined : `A ${flow.status} flow cannot run. Activate it first.`} className="gap-1">
+                        {runningId === flow.id
+                          ? <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                          : <PlayCircle className="h-3.5 w-3.5" />}
+                        Run Now
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => onOpenBuilder(flow.id)} className="gap-1">
+                        <Pencil className="h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button size="sm" variant="ghost" aria-label={`More actions for ${flow.name}`}><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => void handleToggleStatus(flow)}>
+                            {flow.status === 'active' ? <><Pause className="h-4 w-4 mr-2" />Pause</> : <><Play className="h-4 w-4 mr-2" />Activate</>}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => void handleDuplicate(flow)}><Copy className="h-4 w-4 mr-2" />Duplicate</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => void handleToggleGlobal(flow)}>
+                            {flow.is_global ? <><Building2 className="h-4 w-4 mr-2" />Make workspace-only</> : <><Globe className="h-4 w-4 mr-2" />Make global action</>}
+                          </DropdownMenuItem>
+                          {flow.is_global && (
+                            <DropdownMenuItem onClick={() => void handleToggleTenantConfigurable(flow)}>
+                              {flow.tenant_configurable
+                                ? <><EyeOff className="h-4 w-4 mr-2" />Hide from workspace owners</>
+                                : <><SlidersHorizontal className="h-4 w-4 mr-2" />Let workspaces switch this off</>}
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuItem onClick={() => void handleToggleLock(flow)}>
+                            {flow.is_locked ? <><Unlock className="h-4 w-4 mr-2" />Unlock (allow delete)</> : <><Lock className="h-4 w-4 mr-2" />Lock (prevent delete)</>}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => setPendingDelete(flow)} disabled={flow.is_locked} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {flow.is_locked ? 'Delete (locked)' : 'Delete'}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       )}
 
-      {/* Flows list */}
-      <div className="grid gap-3">
-        {flows.map((flow) => {
-          const TriggerIcon = triggerIcons[flow.trigger_type] || Zap;
-          return (
-            <Card key={flow.id} className="hover:border-primary/30 transition-colors">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className="p-2 rounded-lg bg-primary/10">
-                      <TriggerIcon className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="font-medium truncate">{flow.name}</h4>
-                        <span className={`text-xs capitalize ${statusColors[flow.status]}`}>
-                          {flow.status}
-                        </span>
-                        {flow.is_locked && (
-                          <span className="text-xs inline-flex items-center gap-1 text-amber-500">
-                            <Lock className="h-3 w-3" />
-                            Locked
-                          </span>
-                        )}
-                        {flow.is_global && flow.tenant_configurable && (
-                          <span className="text-xs inline-flex items-center gap-1 text-teal-700 dark:text-teal-300">
-                            <SlidersHorizontal className="h-3 w-3" />
-                            Tenant-configurable
-                          </span>
-                        )}
-                        {flow.is_global ? (
-                          <span className="text-xs inline-flex items-center gap-1 text-blue-500">
-                            <Globe className="h-3 w-3" />
-                            Global
-                          </span>
-                        ) : (
-                          <span className="text-xs inline-flex items-center gap-1 text-violet-500">
-                            <Building2 className="h-3 w-3" />
-                            Workspace
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                        <span>Trigger: {triggerLabels[flow.trigger_type] || flow.trigger_type}</span>
-                        <span>{flow.graph_definition.nodes.length} nodes</span>
-                        <span>{flow.run_count} runs</span>
-                        {flow.last_run_at && (
-                          <span>Last run: {format(new Date(flow.last_run_at), 'MMM d, HH:mm')}</span>
-                        )}
-                      </div>
-                      {flow.description && (
-                        <p className="text-xs text-muted-foreground mt-1 truncate">
-                          {flow.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 ml-4">
-                    <Button
-                      size="sm"
-                      onClick={() => handleRunNow(flow)}
-                      disabled={runningId === flow.id}
-                      className="gap-1"
-                    >
-                      {runningId === flow.id ? (
-                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      ) : (
-                        <PlayCircle className="h-3.5 w-3.5" />
-                      )}
-                      Run Now
-                    </Button>
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => onOpenBuilder(flow.id)}
-                      className="gap-1"
-                    >
-                      <Pencil className="h-3.5 w-3.5" />
-                      Edit
-                    </Button>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button size="sm" variant="ghost">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleToggleStatus(flow)}>
-                          {flow.status === 'active' ? (
-                            <>
-                              <Pause className="h-4 w-4 mr-2" />
-                              Pause
-                            </>
-                          ) : (
-                            <>
-                              <Play className="h-4 w-4 mr-2" />
-                              Activate
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDuplicate(flow)}>
-                          <Copy className="h-4 w-4 mr-2" />
-                          Duplicate
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleGlobal(flow)}>
-                          {flow.is_global ? (
-                            <>
-                              <Building2 className="h-4 w-4 mr-2" />
-                              Make workspace-only
-                            </>
-                          ) : (
-                            <>
-                              <Globe className="h-4 w-4 mr-2" />
-                              Make global action
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        {flow.is_global && (
-                          <DropdownMenuItem onClick={() => handleToggleTenantConfigurable(flow)}>
-                            {flow.tenant_configurable ? (
-                              <>
-                                <EyeOff className="h-4 w-4 mr-2" />
-                                Hide from workspace owners
-                              </>
-                            ) : (
-                              <>
-                                <SlidersHorizontal className="h-4 w-4 mr-2" />
-                                Let workspaces switch this off
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                        )}
-                        <DropdownMenuItem onClick={() => handleToggleLock(flow)}>
-                          {flow.is_locked ? (
-                            <>
-                              <Unlock className="h-4 w-4 mr-2" />
-                              Unlock (allow delete)
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="h-4 w-4 mr-2" />
-                              Lock (prevent delete)
-                            </>
-                          )}
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => handleDelete(flow)}
-                          disabled={flow.is_locked}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {flow.is_locked ? 'Delete (locked)' : 'Delete'}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Create Flow Dialog */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New Flow</DialogTitle>
-            <DialogDescription>
-              Give your flow a name, then use the builder to add triggers, conditions, and actions.
-            </DialogDescription>
+            <DialogDescription>Name the flow; the builder opens next so you can add its trigger and actions.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="flow-name">Name</Label>
-              <Input
-                id="flow-name"
-                placeholder="e.g., Welcome Email on Signup"
-                value={newFlow.name}
-                onChange={(e) => setNewFlow({ ...newFlow, name: e.target.value })}
-              />
+              <Input id="flow-name" placeholder="e.g., Welcome Email on Signup" value={newFlow.name} onChange={(e) => setNewFlow({ ...newFlow, name: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="flow-description">Description (optional)</Label>
-              <Textarea
-                id="flow-description"
-                placeholder="What does this flow do?"
-                value={newFlow.description}
-                onChange={(e) => setNewFlow({ ...newFlow, description: e.target.value })}
-                rows={2}
-              />
+              <Textarea id="flow-description" placeholder="What does this flow do?" value={newFlow.description} onChange={(e) => setNewFlow({ ...newFlow, description: e.target.value })} rows={2} />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate} disabled={creating}>
-              {creating ? 'Creating...' : 'Create Flow'}
-            </Button>
+            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button>
+            <Button onClick={() => void handleCreate()} disabled={creating}>{creating ? 'Creating…' : 'Create flow'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!pendingDelete} onOpenChange={(o) => { if (!o) setPendingDelete(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{pendingDelete?.name}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The flow, its builder graph and its whole run history are removed. This cannot be undone; pause it instead to keep the history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmDelete()} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

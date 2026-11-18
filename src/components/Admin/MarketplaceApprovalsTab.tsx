@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Store, Check, X, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
+import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { useToast } from '@/hooks/use-toast';
 import { marketplaceService, type MarketplaceApplication } from '@/services/marketplaceService';
 import { formatDate } from '@/utils/datetime';
@@ -56,9 +58,7 @@ export const MarketplaceApprovalsTab: React.FC = () => {
         <CardTitle className="flex items-center gap-2 text-base">
           <Store className="h-4 w-4" /> Marketplace Applications
           {pending.length > 0 && (
-            <span className="ml-2 rounded-full bg-amber-500/15 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">
-              {pending.length} pending
-            </span>
+            <Badge variant="warning" className="ml-2">{pending.length} pending</Badge>
           )}
         </CardTitle>
         <p className="text-xs text-muted-foreground">
@@ -70,7 +70,7 @@ export const MarketplaceApprovalsTab: React.FC = () => {
         {loading ? (
           <div className="p-8 flex items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
         ) : rows.length === 0 ? (
-          <p className="px-6 py-8 text-center text-sm text-muted-foreground">No applications yet.</p>
+          <HubEmptyState title="No marketplace applications" description="Workspaces applying to sell on a marketplace appear here for review." />
         ) : (
           <div className="divide-y divide-border/50">
             {[...pending, ...decided].map((r) => (

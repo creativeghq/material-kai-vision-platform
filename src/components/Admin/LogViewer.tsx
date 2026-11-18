@@ -11,6 +11,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { CalendarDays, Download, RefreshCw, Trash2, Clock, AlertCircle, Database, ListFilter, FileText } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -226,10 +228,10 @@ export function LogViewer() {
   const getLevelBadge = (level: string) => {
     const tone: Record<string, string> = {
       DEBUG: 'text-muted-foreground',
-      INFO: 'text-blue-500 dark:text-blue-400',
-      WARNING: 'text-amber-600 dark:text-amber-400',
-      ERROR: 'text-red-500 dark:text-red-400',
-      CRITICAL: 'text-red-600 dark:text-red-400',
+      INFO: 'text-[hsl(var(--info))]',
+      WARNING: 'text-[hsl(var(--warning))]',
+      ERROR: 'text-[hsl(var(--error))]',
+      CRITICAL: 'text-[hsl(var(--error))]',
     };
     return (
       <span className={`text-xs font-medium ${tone[level] || 'text-muted-foreground'}`}>
@@ -348,7 +350,7 @@ export function LogViewer() {
             />
 
             {/* Logs Table */}
-            <div className="border rounded-lg overflow-hidden">
+            <div className="border border-hairline rounded-sm overflow-hidden">
               <div>
                 {logs.length === 0 ? (
                   <div className="p-8 text-center text-muted-foreground">
@@ -358,30 +360,32 @@ export function LogViewer() {
                         <p className="font-medium">Loading logs...</p>
                       </>
                     ) : (
-                      <>
-                        <Database className="h-12 w-12 mx-auto mb-4 text-muted-foreground/60" />
-                        <p className="font-medium">No logs available</p>
-                        <p className="text-sm">Logs will appear here as your backend processes run</p>
-                      </>
+                      <HubEmptyState
+                        variant="filtered"
+                        icon={Database}
+                        title="No logs match these filters"
+                        description="Widen the time window or clear a filter; backend processes write here as they run."
+                        action={<Button variant="outline" size="sm" onClick={() => setValues({ timestamp: defaultWindow() })}>Reset filters</Button>}
+                      />
                     )}
                   </div>
                 ) : (
                   <>
-                    <div className="table-scroll max-h-[600px] overflow-y-auto">
-                    <table className="w-full">
-                      <thead className="sticky top-0 bg-muted/50 border-b border-border/50">
-                        <tr>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Time</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Level</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Logger</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Message</th>
-                          <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground uppercase">Details</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border">
+                    <div className="max-h-[600px] overflow-y-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Level</TableHead>
+                          <TableHead>Logger</TableHead>
+                          <TableHead>Message</TableHead>
+                          <TableHead>Details</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
                         {logs.map((log) => (
-                          <tr key={log.id} className="hover:bg-muted/50 transition-colors">
-                            <td className="px-4 py-3 whitespace-nowrap">
+                          <TableRow key={log.id}>
+                            <TableCell className="whitespace-nowrap">
                               <div className="flex flex-col gap-1">
                                 <span className="text-xs font-mono text-foreground">
                                   {formatTime(log.timestamp)}
@@ -391,16 +395,16 @@ export function LogViewer() {
                                   {getRelativeTime(log.timestamp)}
                                 </span>
                               </div>
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap">
                               {getLevelBadge(log.level)}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
+                            </TableCell>
+                            <TableCell className="text-sm">
                               <Badge variant="outline" className="text-xs">
                                 {log.logger_name}
                               </Badge>
-                            </td>
-                            <td className="px-4 py-3 text-sm max-w-md">
+                            </TableCell>
+                            <TableCell className="text-sm max-w-md">
                               <div className="truncate" title={log.message}>
                                 {log.message}
                               </div>
@@ -410,8 +414,8 @@ export function LogViewer() {
                                   {log.context.exception.message}
                                 </div>
                               )}
-                            </td>
-                            <td className="px-4 py-3">
+                            </TableCell>
+                            <TableCell>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -419,11 +423,11 @@ export function LogViewer() {
                               >
                                 View
                               </Button>
-                            </td>
-                          </tr>
+                            </TableCell>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
                     </div>
 
                     <TablePagination

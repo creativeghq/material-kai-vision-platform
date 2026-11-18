@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Package, ArrowRight, AlertCircle, KeyRound, Key, Layers, CreditCard, Users } from 'lucide-react';
+import { Package, ArrowRight, AlertCircle, Database, KeyRound, Key, Layers, CreditCard, Users } from 'lucide-react';
 
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/core/ui/badge';
@@ -186,7 +186,7 @@ const ModulesCatalogPanel: React.FC = () => {
                   <CardDescription>{manifest.description}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                  <div className="flex items-center justify-between pt-2 border-t border-hairline">
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">
                         {isRegistered ? (enabled ? 'Published' : 'Unpublished') : 'Not in DB'}
@@ -222,15 +222,15 @@ const ModulesCatalogPanel: React.FC = () => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
-                    <span className="uppercase tracking-wide">{manifest.category}</span>
+                    <span className="capitalize">{manifest.category}</span>
                     <span>·</span>
                     <span>v{manifest.version}</span>
                   </div>
 
                   {/* Sub-modules / add-ons grouped under their parent (payments-*, real-estate-*, …). */}
                   {children.length > 0 && (
-                    <div className="mt-3 border-t border-white/10 pt-3">
-                      <div className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">Add-ons</div>
+                    <div className="mt-3 border-t border-hairline pt-3">
+                      <div className="mb-1.5 text-[11px] font-semibold text-muted-foreground">Add-Ons</div>
                       <div className="space-y-1.5">
                         {children.map((child) => {
                           const cEnabled = enabledMap.get(child.manifest.slug) ?? false;
@@ -238,7 +238,7 @@ const ModulesCatalogPanel: React.FC = () => {
                           const cBill = billing.get(child.manifest.slug);
                           const cPrice = cBill?.is_addon ? formatAddonPrice(cBill.addon_price_cents, cBill.addon_currency, cBill.billing_interval) : null;
                           return (
-                            <div key={child.manifest.slug} className="flex items-center gap-2 rounded-md bg-white/5 px-2.5 py-1.5">
+                            <div key={child.manifest.slug} className="flex items-center gap-2 rounded-sm bg-surface-sunken px-2.5 py-1.5">
                               <Package className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                               <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-1.5">
@@ -311,7 +311,7 @@ const ModulesPage: React.FC = () => {
   return (
     <div>
       <PageHeader
-        icon={Package}
+        icon={Database}
         title="Modules & Plans"
         subtitle="What the platform sells and how it is reached: modules and who subscribes to them, plan tiers and limits, platform secrets, and partner API keys."
         breadcrumbs={[{ label: 'Admin', to: '/admin' }, { label: 'Modules & Plans' }]}

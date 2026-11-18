@@ -1,6 +1,6 @@
 import {
-  Activity,
   BookOpen,
+  Boxes,
   Brain,
   ClipboardCheck,
   Database,
@@ -50,8 +50,8 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'Agents',
     items: [
       { id: 'agents', label: 'Agent Harness', path: '/admin/agents', icon: Radio, description: 'Turns, models, tools, evals, failures and conversations.' },
-      { id: 'agent-ops', label: 'Agent Ops', path: '/admin/agent-ops', icon: ShieldAlert, description: 'Cases JARVIS hands to Stark and Veritas, the agents report and every background process.', count: (a) => a.ops.escalated },
-      { id: 'ai-configs', label: 'AI Configurations', path: '/admin/ai-configs', icon: Brain, description: 'Prompts, chat starters, writing rules, pricing and background agents.' },
+      { id: 'agent-ops', label: 'Agent Ops', path: '/admin/agent-ops', icon: ShieldAlert, description: 'Cases JARVIS hands to Stark and Veritas, background agents and every background process.', count: (a) => a.ops.escalated },
+      { id: 'ai-configs', label: 'AI Configurations', path: '/admin/ai-configs', icon: Brain, description: 'Prompts, chat starters, writing rules and model pricing.' },
       { id: 'flows', label: 'Flows', path: '/flows', icon: Workflow, description: 'Platform notification and automation flows.' },
     ],
   },
@@ -82,7 +82,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     label: 'Platform',
     items: [
       { id: 'modules', label: 'Modules & Plans', path: '/admin/modules', icon: Database, description: 'Modules, subscribers, plans and keys.' },
-      { id: 'master-catalog', label: 'Master Catalog', path: '/catalog-master', icon: Activity, description: 'Manufacturer master records.' },
+      { id: 'master-catalog', label: 'Master Catalog', path: '/catalog-master', icon: Boxes, description: 'Manufacturer master records.' },
     ],
   },
 ];

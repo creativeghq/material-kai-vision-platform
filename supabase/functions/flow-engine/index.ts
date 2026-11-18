@@ -26,6 +26,7 @@ import { resolveWorkspaceEmailSender } from '../_shared/email-sender.ts';
 import { assertSafeUrl } from '../_shared/ssrf-guard.ts';
 import { ensureZernioSecrets, sendCommentPrivateReply, sendSocialCommentReply } from '../_shared/zernio.ts';
 import { assertSameWorkspace } from '../_shared/same-workspace.ts';
+import { FLOW_RUNNABLE_EDGE_FUNCTION_NAMES } from '../_shared/flowEdgeFunctions.generated.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -1259,11 +1260,11 @@ async function executeAction(
        * including the ones that treat a service-role bearer as an admin caller. That is a
        * privilege-escalation primitive, not an integration point.
        */
-      if (!RUN_EDGE_FUNCTION_ALLOWED.has(fnName)) {
+      if (!FLOW_RUNNABLE_EDGE_FUNCTION_NAMES.has(fnName)) {
         throw new Error(
           `run_edge_function: "${fnName}" is not allowlisted. This action invokes with the `
-          + 'service role, so the callable set is listed in code (RUN_EDGE_FUNCTION_ALLOWED in '
-          + 'flow-engine) rather than chosen in a flow config.',
+          + 'service role, so the callable set is listed in code (src/config/flowEdgeFunctions.ts) '
+          + 'rather than chosen in a flow config.',
         );
       }
       const { data, error } = await supabase.functions.invoke(fnName, { body: payload });
@@ -1638,14 +1639,16 @@ async function executeFlowGraph(
   const { nodes, edges } = graph;
   const context: ExecutionContext = { trigger: { data: triggerData } };
 
-  // Find the trigger node
+  // A flow with no trigger node is on-demand (Run Now): it starts at every node nothing feeds.
+  const walkStart = Date.now();
   const triggerNode = nodes.find((n) => n.type === 'triggerNode');
-  if (!triggerNode) throw new Error('No trigger node found in flow');
+  const startIds = triggerNode
+    ? [triggerNode.id]
+    : nodes.filter((n) => !edges.some((e) => e.target === n.id)).map((n) => n.id);
+  if (startIds.length === 0) throw new Error('This flow has no nodes to run');
 
-  // BFS queue
-  const queue: Array<{ nodeId: string; incomingBranch: string | null }> = [
-    { nodeId: triggerNode.id, incomingBranch: null },
-  ];
+  const queue: Array<{ nodeId: string; incomingBranch: string | null }> =
+    startIds.map((nodeId) => ({ nodeId, incomingBranch: null }));
   const visited = new Set<string>();
   let executionOrder = 0;
   // A node failure must NOT abort independent (sibling) branches — e.g. a best-effort
@@ -1729,7 +1732,7 @@ async function executeFlowGraph(
               node_type: 'action',
               node_label: `${child.data.label} [#${i}]`,
               node_config: child.data.config,
-              status: 'completed',
+              status: res.output?.skipped === true ? 'skipped' : 'completed',
               output_data: res.output,
               execution_order: executionOrder++,
               started_at: new Date(iterStart).toISOString(),
@@ -1770,11 +1773,11 @@ async function executeFlowGraph(
       // Store output in context
       context[nodeId] = output;
 
-      // Update step as completed
+      // An action that returns `skipped` did nothing; recording it as completed hid that.
       await supabase
         .from('flow_run_steps')
         .update({
-          status: 'completed',
+          status: output?.skipped === true ? 'skipped' : 'completed',
           output_data: output,
           branch_taken: branch || null,
           completed_at: new Date().toISOString(),
@@ -1835,6 +1838,7 @@ async function executeFlowGraph(
         error_message: pendingError.message,
         error_node_id: pendingErrorNodeId,
         completed_at: new Date().toISOString(),
+        duration_ms: Date.now() - walkStart,
       })
       .eq('id', runId);
     pendingError.__runAlreadyFailed = true;
@@ -1855,24 +1859,6 @@ async function executeFlowGraph(
  * when something genuinely needs it.
  */
 const LOG_EVENT_ALLOWED_TABLES = new Set<string>([]);
-
-/**
- * Edge functions `run_edge_function` may invoke (#357 AE-2).
- *
- * Read out of `graph_definition` across every flow in the database — these two are the entire
- * live usage. The action invokes under the service role, so an unrestricted name lets a stored
- * config call anything that trusts a service-role bearer.
- */
-const RUN_EDGE_FUNCTION_ALLOWED = new Set<string>([
-  'real-estate-listing-social',
-  'finance-digest-aggregate',
-  // The seeded "Invoice Issued" / "Receipt Issued" flows. It renders the document, attaches the
-  // PDF and links AADE's verification page — everything the generic `send_email` node could not,
-  // which is why those flows used to mail a bare "your invoice has been issued" with nothing in it.
-  'finance-send-invoice-email',
-  // The seeded credit note / delivery note / order "… → Email" flows.
-  'finance-send-document-email',
-]);
 
 const MAX_FLOW_RUNS_PER_MINUTE = 120;
 

@@ -1,4 +1,5 @@
-export { flowService } from './flowService';
+export { flowService, RUNNABLE_FLOW_STATUSES } from './flowService';
+export type { FlowRunStats, FlowRunResult } from './flowService';
 export type {
   FlowStatus,
   FlowRunStatus,

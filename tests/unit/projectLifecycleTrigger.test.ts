@@ -55,7 +55,6 @@ const EMITTERS: Record<(typeof LIFECYCLE_TRIGGERS)[number], string | null> = {
 const TYPES = 'src/services/flows/types.ts';
 const PALETTE = 'src/components/Admin/FlowsManagement/utils/paletteItems.ts';
 const TRIGGER_NODE = 'src/components/Admin/FlowsManagement/nodes/TriggerNode.tsx';
-const MY_FLOWS = 'src/components/Admin/FlowsManagement/MyFlowsTab.tsx';
 const WEBHOOKS = 'supabase/functions/_shared/webhook-events.ts';
 const EMITTER = 'src/modules/projects/services/projectsService.ts';
 
@@ -73,10 +72,10 @@ describe.each(LIFECYCLE_TRIGGERS)('%s is wired everywhere', (trigger) => {
     expect(read(PALETTE)).toMatch(new RegExp(`subType: '${trigger}'`));
   });
 
-  it('has an icon in both maps and a label in the flow list', () => {
+  it('has an icon and a label (My Flows reuses the canvas icons and the palette label)', () => {
     expect(read(TRIGGER_NODE), 'no icon on the canvas node').toMatch(new RegExp(`${trigger}:\\s*\\w+,`));
-    expect(read(MY_FLOWS), 'no icon in My Flows').toMatch(new RegExp(`${trigger}:\\s*\\w+,`));
-    expect(read(MY_FLOWS), 'My Flows would show the raw event name').toMatch(new RegExp(`${trigger}: '`));
+    expect(read(PALETTE), 'no palette item, so triggerLabel() shows the raw event name')
+      .toContain(`triggerType: '${trigger}'`);
   });
 
   it('is an outbound webhook event too', () => {

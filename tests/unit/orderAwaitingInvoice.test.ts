@@ -38,8 +38,8 @@ describe('the un-invoiced sale is derived once and told once', () => {
     expect(src('src', 'services', 'flows', 'types.ts')).toContain("'order_awaiting_invoice'");
     expect(src('src', 'components', 'Admin', 'FlowsManagement', 'utils', 'paletteItems.ts'))
       .toContain("subType: 'order_awaiting_invoice'");
-    // Both icon maps, or the flow list renders a hole where every other trigger has a glyph.
-    for (const f of ['MyFlowsTab.tsx', join('nodes', 'TriggerNode.tsx')]) {
+    // The canvas icon map, which My Flows reuses, or the trigger renders with no glyph.
+    for (const f of [join('nodes', 'TriggerNode.tsx')]) {
       expect(
         src('src', 'components', 'Admin', 'FlowsManagement', f),
         `${f} has no icon for order_awaiting_invoice.`,

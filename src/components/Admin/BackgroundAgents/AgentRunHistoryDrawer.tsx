@@ -143,7 +143,7 @@ export function AgentRunHistoryDrawer({ agent, open, onClose }: AgentRunHistoryD
 
                   {/* Error */}
                   {run.error_message && (
-                    <div className="text-xs text-red-500 bg-red-50 rounded p-2">
+                    <div className="text-xs text-[hsl(var(--error))] bg-[hsl(var(--error-bg))] rounded-sm p-2">
                       {run.error_message}
                     </div>
                   )}

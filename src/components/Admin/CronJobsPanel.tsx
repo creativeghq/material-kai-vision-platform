@@ -116,7 +116,7 @@ const StatusBadge: React.FC<{
   if (invocationStatus != null && invocationStatus >= 400) {
     return (
       <span
-        className="text-xs inline-flex items-center text-red-500 dark:text-red-400"
+        className="text-xs inline-flex items-center text-[hsl(var(--error))]"
         title={`pg_cron reported "${status}" because the request was enqueued. ${targetFunction ?? 'The function'} actually returned ${invocationStatus}.`}
       >
         <XCircle className="h-3 w-3 mr-1" />
@@ -138,7 +138,7 @@ const StatusBadge: React.FC<{
       );
     }
     return (
-      <span className="text-xs inline-flex items-center text-emerald-600 dark:text-emerald-400">
+      <span className="text-xs inline-flex items-center text-[hsl(var(--success))]">
         <CheckCircle2 className="h-3 w-3 mr-1" />
         Success
       </span>
@@ -146,14 +146,14 @@ const StatusBadge: React.FC<{
   }
   if (status === 'failed') {
     return (
-      <span className="text-xs inline-flex items-center text-red-500 dark:text-red-400">
+      <span className="text-xs inline-flex items-center text-[hsl(var(--error))]">
         <XCircle className="h-3 w-3 mr-1" />
         Failed
       </span>
     );
   }
   return (
-    <span className="text-xs inline-flex items-center capitalize text-amber-600 dark:text-amber-400">
+    <span className="text-xs inline-flex items-center capitalize text-[hsl(var(--warning))]">
       <Clock className="h-3 w-3 mr-1" />
       {status}
     </span>
@@ -263,13 +263,13 @@ export const CronJobsPanel: React.FC = () => {
               <Calendar className="h-4 w-4" />
               Cron Jobs
               {totalFailures24h > 0 && (
-                <Badge variant="destructive">
+                <Badge variant="error">
                   <AlertTriangle className="h-3 w-3 mr-1" />
                   {totalFailures24h} failure{totalFailures24h === 1 ? '' : 's'} in 24h
                 </Badge>
               )}
               {inactive > 0 && (
-                <Badge variant="outline" className="border-yellow-500 text-yellow-500">
+                <Badge variant="warning">
                   {inactive} inactive
                 </Badge>
               )}
@@ -406,7 +406,7 @@ export const CronJobsPanel: React.FC = () => {
                     </TableCell>
                     <TableCell className="hidden text-right sm:table-cell">
                       {j.active ? (
-                        <span className="text-xs text-emerald-600 dark:text-emerald-400">on</span>
+                        <span className="text-xs text-[hsl(var(--success))]">on</span>
                       ) : (
                         <span className="text-xs text-muted-foreground">off</span>
                       )}

@@ -6,8 +6,7 @@ import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
-import { SectionHeader } from '@/components/shared/SectionHeader';
-import { PageHeader } from '@/components/shared/PageHeader';
+import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { MIVAA_API_URL } from '@/config/mivaa';
 import { supabase } from '@/integrations/supabase/client';
 import { formatNumber } from '@/utils/decimal';
@@ -17,6 +16,15 @@ import { ChannelsCostPanel } from '../OperationsDashboard/ChannelsCostPanel';
 import { EXT_SERVICE_COLORS, EXT_SERVICE_LABELS } from '../OperationsDashboard/constants';
 import { InboxAIPanel } from '../OperationsDashboard/InboxAIPanel';
 import type { ExternalServiceUsageData, ResendEmailStats } from '../OperationsDashboard/types';
+import { HqTabbedPage } from './HqTabbedPage';
+
+const PERIODS = [
+  { value: '1h', label: '1h' },
+  { value: '24h', label: '24h' },
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+] as const;
+type Period = (typeof PERIODS)[number]['value'];
 
 const SERVICE_KEYS = [
   'whatsapp-service', 'whatsapp-template',
@@ -48,7 +56,8 @@ const billingLabel = (p: ServicePrice): string => {
 
 const ServicesBillingPage: React.FC = () => {
   const [extServiceData, setExtServiceData] = useState<ExternalServiceUsageData | null>(null);
-  const [extServicePeriod, setExtServicePeriod] = useState('7d');
+  const [extServicePeriod, setExtServicePeriod] = useState<Period>('7d');
+  const [emailPeriod, setEmailPeriod] = useState<Period>('7d');
   const [extServiceLoading, setExtServiceLoading] = useState(false);
   const [svcAllTimeTotals, setSvcAllTimeTotals] = useState<Record<string, { operations: number; cost_usd: number }>>({});
   const [svcUsageCapped, setSvcUsageCapped] = useState(false);
@@ -120,8 +129,8 @@ const ServicesBillingPage: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    fetchResendEmailStats(extServicePeriod);
-  }, [extServicePeriod, fetchResendEmailStats]);
+    fetchResendEmailStats(emailPeriod);
+  }, [emailPeriod, fetchResendEmailStats]);
 
   // Fetch all-time totals per external service from ai_usage_logs
   useEffect(() => {
@@ -158,29 +167,20 @@ const ServicesBillingPage: React.FC = () => {
   }, []);
 
   return (
-    <div>
-      <PageHeader
-        icon={Wallet}
-        title="Services & Billing"
-        subtitle="What each channel and third-party service costs, what we bill for it, and how email is delivering."
-      />
-      <div className="space-y-4 p-3 sm:p-6">
+    <HqTabbedPage
+      icon={Wallet}
+      title="Services & Billing"
+      subtitle="What each channel and third-party service costs, what we bill for it, and how email is delivering."
+      tabs={[
+        { id: 'channels', label: 'Channels', render: () => (<>
       <ChannelsCostPanel />
-
-      {/* Then the ledgers behind that summary — what Meta charged, what we billed, and who
-          is on hold. All three were written on a schedule and rendered nowhere. */}
       <ChannelsBillingDetail />
-
-      {/* Directly under Channels, because it reads the conversations those channels bring
-          in — the operator sees what the channels cost, then what reading them costs, in
-          the order the money is actually spent. */}
-      <InboxAIPanel />
-
-      <SectionHeader
-        title="3rd Party Services"
-        subtitle="Usage and cost of the external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl and Zernio (WhatsApp and social). For AI model costs see AI Configurations."
-      />
-
+        </>) },
+        { id: 'inbox-ai', label: 'Inbox AI', render: () => <InboxAIPanel /> },
+        { id: 'services', label: 'API Services', render: () => (<>
+      <p className="text-sm text-muted-foreground">
+        Usage and cost of the external APIs: Resend (email), Apollo, Hunter.io, ZeroBounce, Firecrawl and Zernio (WhatsApp and social). For AI model costs see AI Configurations.
+      </p>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -222,7 +222,7 @@ const ServicesBillingPage: React.FC = () => {
                   <TableRow key={svc.model_key}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
-                        <Globe className="h-4 w-4 text-blue-600" />
+                        <Globe className="h-4 w-4 text-muted-foreground" />
                         {svc.model_name}
                       </div>
                     </TableCell>
@@ -258,7 +258,11 @@ const ServicesBillingPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Resend Email Delivery Section */}
+        </>) },
+        { id: 'email', label: 'Email Delivery', render: () => (<>
+      <div className="flex justify-end">
+        <HubSegmented options={PERIODS} value={emailPeriod} onChange={setEmailPeriod} aria-label="Email window" />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -266,7 +270,7 @@ const ServicesBillingPage: React.FC = () => {
             Email Delivery — Resend
           </CardTitle>
           <CardDescription>
-            Live delivery metrics from <code>email_logs</code> for the selected period.
+            Live delivery metrics from <code>email_logs</code> for the selected window.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -286,12 +290,12 @@ const ServicesBillingPage: React.FC = () => {
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Delivery Rate</p>
-                <p className="text-2xl font-bold text-green-600">{resendEmailStats.deliveryRate.toFixed(1)}%</p>
+                <p className="text-2xl font-bold text-[hsl(var(--success))]">{resendEmailStats.deliveryRate.toFixed(1)}%</p>
                 <p className="text-xs text-muted-foreground">{formatNumber(resendEmailStats.delivered)} delivered</p>
               </div>
               <div className="space-y-1">
                 <p className="text-xs text-muted-foreground font-medium">Bounce Rate</p>
-                <p className={`text-2xl font-bold ${resendEmailStats.bounceRate > 5 ? 'text-red-600' : 'text-foreground'}`}>
+                <p className={`text-2xl font-bold ${resendEmailStats.bounceRate > 5 ? 'text-[hsl(var(--error))]' : 'text-foreground'}`}>
                   {resendEmailStats.bounceRate.toFixed(1)}%
                 </p>
                 <p className="text-xs text-muted-foreground">{formatNumber(resendEmailStats.bounced)} bounced</p>
@@ -311,29 +315,13 @@ const ServicesBillingPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Live Usage Section */}
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-foreground">Live Usage</h3>
-        <div className="flex items-center gap-2">
-          {(['1h', '24h', '7d', '30d'] as const).map((period) => (
-            <Button
-              key={period}
-              variant={extServicePeriod === period ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setExtServicePeriod(period)}
-            >
-              {period}
-            </Button>
-          ))}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => fetchExtServiceUsage(extServicePeriod)}
-            disabled={extServiceLoading}
-          >
-            <RefreshCw className={`h-4 w-4 ${extServiceLoading ? 'animate-spin' : ''}`} />
-          </Button>
-        </div>
+        </>) },
+        { id: 'usage', label: 'Live Usage', render: () => (<>
+      <div className="flex items-center justify-end gap-2">
+        <HubSegmented options={PERIODS} value={extServicePeriod} onChange={setExtServicePeriod} aria-label="Usage window" />
+        <Button variant="ghost" size="sm" aria-label="Refresh usage" onClick={() => fetchExtServiceUsage(extServicePeriod)} disabled={extServiceLoading}>
+          <RefreshCw className={`h-4 w-4 ${extServiceLoading ? 'animate-spin' : ''}`} />
+        </Button>
       </div>
 
       {extServiceLoading && !extServiceData ? (
@@ -511,7 +499,7 @@ const ServicesBillingPage: React.FC = () => {
                     <TableRow key={svc.service}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <Globe className="h-4 w-4 text-blue-600" />
+                          <Globe className="h-4 w-4 text-muted-foreground" />
                           <span>{EXT_SERVICE_LABELS[svc.service] || svc.service}</span>
                           <Badge variant="outline" className="text-xs">{svc.service}</Badge>
                         </div>
@@ -533,8 +521,9 @@ const ServicesBillingPage: React.FC = () => {
           </Card>
         </>
       )}
-      </div>
-    </div>
+        </>) },
+      ]}
+    />
   );
 };
 

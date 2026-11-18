@@ -270,7 +270,6 @@ describe('page_watch_changed is registered everywhere a trigger must be', () => 
   // trigger ends up emitting into a flow nobody can wire.
   const MIRRORS = [
     'src/services/flows/types.ts',
-    'src/components/Admin/FlowsManagement/MyFlowsTab.tsx',
     'src/components/Admin/FlowsManagement/nodes/TriggerNode.tsx',
     'src/components/Admin/FlowsManagement/utils/paletteItems.ts',
   ];

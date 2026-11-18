@@ -7,6 +7,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, FileText } from 'lucide-react';
+import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { edgeError } from '@/utils/edgeError';
@@ -228,11 +230,12 @@ const ImportHistoryTab: React.FC = () => {
 
   if (jobs.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        <FileText className="h-16 w-16 mx-auto mb-4 opacity-50" />
-        <p className="text-lg">No import history yet</p>
-        <p className="text-sm mt-2">Import jobs will appear here once you start importing data</p>
-      </div>
+      <HubEmptyState
+        icon={FileText}
+        title="No import history yet"
+        description="PDF and XML import jobs appear here once you start one."
+        action={<Button size="sm" variant="outline" onClick={() => navigate('/admin/data-import')}>Start an import</Button>}
+      />
     );
   }
 

@@ -36,6 +36,10 @@ const EXEMPT: Record<string, { engine?: string; palette?: string }> = {
     palette: 'Legacy alias kept so old flows keep running; new flows use send_whatsapp, which is '
       + 'what the palette offers. Executable, deliberately unofferable.',
   },
+  log_event: {
+    palette: 'LOG_EVENT_ALLOWED_TABLES is empty, so every log_event node throws. Offered again only '
+      + 'when a table is allowlisted in flow-engine.',
+  },
 };
 
 describe('the ActionType union is read, not assumed', () => {

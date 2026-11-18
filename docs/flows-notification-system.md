@@ -214,7 +214,7 @@ until an operator wires one in the builder.
 - `send_price_alert` — module-gated (`price-monitoring-notifications`) bell + audit row.
 - `send_push` — resolve the user's `push_subscriptions` -> `notification-dispatcher`.
 - `log_event` — insert an audit/dedup-marker row (`{table, row}`).
-- `run_edge_function` — invoke any edge function with a JSON payload.
+- `run_edge_function` — invoke an edge function with a JSON payload. Only the names in `src/config/flowEdgeFunctions.ts` (mirrored to Deno by `vocab:mirror`) run; the builder's picker offers exactly that list.
 - `send_quote`, `build_quote`, `approve_quote`, `send_agent_message`,
   `create_moodboard`, `add_to_moodboard`, `http_request`, CRM writes
   (`assign_user`, `add_tag`, `add_note`, `update_contact`, `update_product`),
@@ -443,8 +443,7 @@ transition clean in **any** order:
    (the union + a `*TriggerConfig` interface + a `TriggerConfigMap` entry), then
    update the **exhaustive `Record<TriggerType, …>` maps** — TypeScript fails the
    build if you miss one, which is the safety net:
-   - `MyFlowsTab.tsx` — **two** maps: `triggerIcons` AND `triggerLabels`.
-   - `nodes/TriggerNode.tsx` — `triggerIcons`.
+   - `nodes/TriggerNode.tsx` — `triggerIcons` (My Flows reuses it, and its labels come from `triggerLabel()` in `utils/paletteItems.ts`).
    - `utils/paletteItems.ts` — add a trigger palette item so it's draggable in the builder.
    - `panels/configs/TriggerConfigForm.tsx` — **only if** the trigger needs a custom
      config form. Payload-only events (the common case) need nothing here; they fall

@@ -20,16 +20,15 @@ import { Badge } from '@/components/core/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { SectionHeader } from '@/components/shared/SectionHeader';
+import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { formatNumber } from '@/utils/decimal';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/core/ui/select';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
+
+const TIME_RANGES = [
+  { value: '7d', label: '7d' },
+  { value: '30d', label: '30d' },
+  { value: '90d', label: '90d' },
+] as const;
 
 interface PerformanceStats {
   total_searches: number;
@@ -286,26 +285,9 @@ export const SearchAnalyticsDashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <SectionHeader
-        title="Search Analytics"
-        subtitle="What people search for, how fast it answers, and what the cache saves"
-        actions={
-          <>
-            <Select value={timeRange} onValueChange={(value: any) => setTimeRange(value)}>
-              <SelectTrigger className="w-32">
-                <Calendar className="h-4 w-4 mr-2" />
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="7d">Last 7 Days</SelectItem>
-                <SelectItem value="30d">Last 30 Days</SelectItem>
-                <SelectItem value="90d">Last 90 Days</SelectItem>
-              </SelectContent>
-            </Select>
-          </>
-        }
-      />
+      <div className="flex justify-end">
+        <HubSegmented options={TIME_RANGES} value={timeRange} onChange={setTimeRange} aria-label="Time window" />
+      </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">

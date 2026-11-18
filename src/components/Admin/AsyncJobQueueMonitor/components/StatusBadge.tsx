@@ -1,6 +1,9 @@
 import React from 'react';
+import { AlertTriangle, Ban, CheckCircle2, Hourglass, Loader2, RotateCw, XCircle, type LucideIcon } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { BackgroundJob } from '../types';
+
+type BadgeVariant = 'warning' | 'info' | 'success' | 'error' | 'neutral';
 
 export const hasRecentHeartbeat = (job: BackgroundJob): boolean => {
   if (!job.last_heartbeat) return false;
@@ -11,23 +14,23 @@ export const hasRecentHeartbeat = (job: BackgroundJob): boolean => {
 };
 
 export const getStatusBadge = (status: string, job?: BackgroundJob) => {
-  const statusConfig: Record<string, { color: string; icon: string }> = {
-    pending: { color: 'bg-yellow-100 text-yellow-800', icon: '⏳' },
-    processing: { color: 'bg-blue-100 text-blue-800', icon: '⚙️' },
-    completed: { color: 'bg-green-100 text-green-800', icon: '✅' },
-    failed: { color: 'bg-red-100 text-red-800', icon: '❌' },
-    cancelled: { color: 'bg-gray-100 text-gray-800', icon: '🚫' },
-    interrupted: { color: 'bg-orange-100 text-orange-800', icon: '⚠️' },
-    retrying: { color: 'bg-purple-100 text-purple-800', icon: '🔄' },
+  const statusConfig: Record<string, { variant: BadgeVariant; Icon: LucideIcon }> = {
+    pending: { variant: 'warning', Icon: Hourglass },
+    processing: { variant: 'info', Icon: Loader2 },
+    completed: { variant: 'success', Icon: CheckCircle2 },
+    failed: { variant: 'error', Icon: XCircle },
+    cancelled: { variant: 'neutral', Icon: Ban },
+    interrupted: { variant: 'warning', Icon: AlertTriangle },
+    retrying: { variant: 'info', Icon: RotateCw },
   };
-  const config = statusConfig[status] || statusConfig.pending;
+  const { variant, Icon } = statusConfig[status] || statusConfig.pending;
 
   const isActivelyProcessing = job && (status === 'processing' || status === 'retrying') && hasRecentHeartbeat(job);
 
   return (
-    <Badge className={`${config.color} ${isActivelyProcessing ? 'animate-pulse' : ''}`}>
-      {config.icon} {status}
-      {isActivelyProcessing && <span className="ml-1 inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>}
+    <Badge variant={variant} className="capitalize">
+      <Icon className={`h-3 w-3 ${isActivelyProcessing ? 'animate-spin' : ''}`} aria-hidden="true" />
+      {status}
     </Badge>
   );
 };

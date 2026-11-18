@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Building2, Check, X, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Textarea } from '@/components/core/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
@@ -109,11 +110,8 @@ export const FactoryRegistrationsTab: React.FC = () => {
     }
   };
 
-  const statusColor = (s: string) => {
-    if (s === 'pending') return 'text-amber-600 dark:text-amber-400';
-    if (s === 'approved') return 'text-emerald-600 dark:text-emerald-400';
-    return 'text-destructive';
-  };
+  const statusVariant = (s: string): 'warning' | 'success' | 'error' =>
+    s === 'pending' ? 'warning' : s === 'approved' ? 'success' : 'error';
 
   if (loading) {
     return (
@@ -139,7 +137,7 @@ export const FactoryRegistrationsTab: React.FC = () => {
       </div>
 
       {requests.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No registration requests yet.</p>
+        <HubEmptyState title="No brand registrations" description="Requests from manufacturers to list their brand appear here for review." />
       ) : (
         <div className="space-y-3">
           {requests.map((req) => (
@@ -150,9 +148,7 @@ export const FactoryRegistrationsTab: React.FC = () => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm">{req.company_name}</p>
                       <span className="text-xs capitalize text-muted-foreground">{req.professional_type}</span>
-                      <span className={`text-xs font-medium capitalize ${statusColor(req.status)}`}>
-                        {req.status}
-                      </span>
+                      <Badge variant={statusVariant(req.status)} className="capitalize">{req.status}</Badge>
                     </div>
                     <p className="text-xs text-muted-foreground mt-1">
                       Claims: <span className="font-medium text-foreground">{req.factory_claimed_name}</span>
@@ -167,7 +163,8 @@ export const FactoryRegistrationsTab: React.FC = () => {
                       <>
                         <Button
                           size="sm"
-                          className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                          variant="secondary"
+                          className="h-8"
                           onClick={() => approve(req)}
                           disabled={processingId === req.id}
                         >

@@ -767,12 +767,12 @@ const DigestPanel: React.FC<DigestPanelProps> = ({ settings, onPatch, onSave, sa
             <div className="font-medium text-foreground">Composed from the platform pieces</div>
             <p className="mt-0.5 text-muted-foreground leading-snug">
               Layout lives in the <strong>finance.digest</strong> email template (edit in Email → Templates).
-              Schedule lives in the <strong>Finance digest</strong> flow (edit cron in Flows).
+              Schedule lives in the <strong>Finance digest</strong> platform flow (Automations → Platform defaults).
               Per-workspace recipients, frequency, hour and on/off live here.
             </p>
             <div className="mt-2 flex gap-2">
-              <Link to="/flows" className="inline-flex items-center gap-1 text-primary hover:underline">
-                Open flow editor <ExternalLink className="h-3 w-3" />
+              <Link to="/automations" className="inline-flex items-center gap-1 text-primary hover:underline">
+                Open Automations <ExternalLink className="h-3 w-3" />
               </Link>
               <span className="text-muted-foreground">·</span>
               <Link to="/emails" className="inline-flex items-center gap-1 text-primary hover:underline">

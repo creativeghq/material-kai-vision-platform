@@ -1,173 +1,103 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Workflow,
-  Play,
-  Clock,
-  CheckCircle2,
-  Settings,
-  LayoutGrid,
-} from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Card, CardContent } from '@/components/core/ui/card';
-import { PageHeader } from '@/components/shared/PageHeader';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Workflow } from 'lucide-react';
+import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
+import { HqTabbedPage } from '@/components/Admin/HQ/HqTabbedPage';
 import { MyFlowsTab } from './MyFlowsTab';
 import { FlowBuilderTab } from './FlowBuilderTab';
 import { RunHistoryTab } from './RunHistoryTab';
 import { SystemAreasTab } from './SystemAreasTab';
+import { useFlowBuilder } from './hooks/useFlowBuilder';
 import { flowService } from '@/services/flows';
-import type { Flow } from '@/services/flows';
+import type { Flow, FlowRunStats } from '@/services/flows';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { formatNumber } from '@/utils/decimal';
 
+/** Operator Flows: the global (platform-default) automations. Tenants manage theirs at /automations. */
 export const FlowsManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('my-flows');
+  const [params, setParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [flows, setFlows] = useState<Flow[]>([]);
-  const [selectedFlowId, setSelectedFlowId] = useState<string | null>(null);
-  const [stats, setStats] = useState<{ total: number; active: number; runs30d: number | null; successRate: number | null }>({
-    total: 0,
-    active: 0,
-    runs30d: null,
-    successRate: null,
-  });
+  const [stats, setStats] = useState<Map<string, FlowRunStats>>(new Map());
+  const [statsError, setStatsError] = useState(false);
   const { toast } = useToast();
+  const selectedFlowId = params.get('flow');
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
-      const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
-      const [allFlows, finished, failed] = await Promise.all([
+      const [allFlows, runStats] = await Promise.all([
         flowService.listFlows(),
-        supabase.from('flow_runs').select('id', { count: 'exact', head: true }).gte('created_at', since).in('status', ['completed', 'failed']),
-        supabase.from('flow_runs').select('id', { count: 'exact', head: true }).gte('created_at', since).eq('status', 'failed'),
+        flowService.getFlowRunStats().catch(() => null),
       ]);
       setFlows(allFlows);
-
-      const runs = finished.error || failed.error ? null : finished.count ?? 0;
-      setStats({
-        total: allFlows.length,
-        active: allFlows.filter(f => f.status === 'active').length,
-        runs30d: runs,
-        successRate: runs ? Math.round(((runs - (failed.count ?? 0)) / runs) * 1000) / 10 : null,
-      });
+      setStats(runStats ?? new Map());
+      setStatsError(runStats === null);
     } catch (error) {
-      console.error('Error loading flows:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load flows data',
-        variant: 'destructive',
-      });
+      toast({ title: 'Could not load flows', description: error instanceof Error ? error.message : undefined, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
   }, [toast]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { void loadData(); }, [loadData]);
 
-  const statCards = [
-    {
-      title: 'Total Flows',
-      value: stats.total,
-      icon: Workflow,
-      color: 'text-blue-500',
-    },
-    {
-      title: 'Active',
-      value: stats.active,
-      icon: Play,
-      color: 'text-green-500',
-    },
-    {
-      title: 'Runs (30 Days)',
-      value: stats.runs30d ?? '—',
-      icon: Clock,
-      color: 'text-amber-500',
-    },
-    {
-      title: 'Success Rate',
-      value: stats.successRate == null ? '—' : `${stats.successRate}%`,
-      icon: CheckCircle2,
-      color: 'text-emerald-500',
-    },
-  ];
+  const openBuilder = useCallback((flowId: string | null) => {
+    const builder = useFlowBuilder.getState();
+    if (builder.isDirty && builder.flowId && builder.flowId !== flowId
+      && !window.confirm(`"${builder.flowName}" has unsaved changes. Leave without saving?`)) return;
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('tab', 'builder');
+      if (flowId) next.set('flow', flowId); else next.delete('flow');
+      return next;
+    });
+  }, [setParams]);
+
+  const totals = useMemo(() => {
+    let runs = 0;
+    let failed = 0;
+    let failing = 0;
+    for (const s of stats.values()) {
+      runs += s.runs30d;
+      failed += s.failed7d;
+      if (s.failed7d > 0) failing++;
+    }
+    return { active: flows.filter((f) => f.status === 'active').length, runs, failed, failing };
+  }, [flows, stats]);
+
+  const unknown = statsError ? '—' : null;
 
   return (
-    <div className="min-h-screen">
-      <PageHeader icon={Workflow} title="Flows" subtitle="Visual workflow automations with triggers, conditions and actions." />
-
-      <div className="p-3 sm:p-6 space-y-6">
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {statCards.map((card) => (
-            <Card key={card.title}>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{card.title}</p>
-                    <p className="text-2xl font-bold mt-1">{card.value}</p>
-                  </div>
-                  <card.icon className={`h-8 w-8 ${card.color} opacity-80`} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-            <TabsTrigger value="my-flows" className="gap-2">
-              <Workflow className="h-4 w-4" />
-              My Flows
-            </TabsTrigger>
-            <TabsTrigger value="builder" className="gap-2">
-              <Settings className="h-4 w-4" />
-              Flow Builder
-            </TabsTrigger>
-            <TabsTrigger value="areas" className="gap-2">
-              <LayoutGrid className="h-4 w-4" />
-              System Areas
-            </TabsTrigger>
-            <TabsTrigger value="history" className="gap-2">
-              <Clock className="h-4 w-4" />
-              Run History
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="my-flows">
-            <MyFlowsTab
-              flows={flows}
-              loading={loading}
-              onRefresh={loadData}
-              onOpenBuilder={(flowId) => {
-                setSelectedFlowId(flowId);
-                setActiveTab('builder');
-              }}
-            />
-          </TabsContent>
-
-          <TabsContent value="builder">
-            <FlowBuilderTab flowId={selectedFlowId} />
-          </TabsContent>
-
-          <TabsContent value="areas">
-            <SystemAreasTab
-              flows={flows}
-              onRefresh={loadData}
-              onOpenBuilder={(flowId) => {
-                setSelectedFlowId(flowId);
-                setActiveTab('builder');
-              }}
-            />
-          </TabsContent>
-
-          <TabsContent value="history">
-            <RunHistoryTab />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+    <HqTabbedPage
+      icon={Workflow}
+      title="Flows"
+      subtitle="Platform notification and automation flows: what triggers them, what they do, and whether they are working. Workspaces manage their own under Automations."
+      tabs={[
+        {
+          id: 'my-flows',
+          label: 'My Flows',
+          count: totals.failing || undefined,
+          render: () => (
+            <>
+              <HubStatGrid>
+                <HubStatTile label="Flows" value={formatNumber(flows.length)} category={`${formatNumber(totals.active)} active`} />
+                <HubStatTile label="Runs (30 Days)" value={unknown ?? formatNumber(totals.runs)} category={statsError ? 'Run history could not be read' : 'Real runs, tests excluded'} />
+                <HubStatTile label="Failed Runs (7 Days)" value={unknown ?? formatNumber(totals.failed)} category="Runs that ended failed" />
+                <HubStatTile label="Flows Failing" value={unknown ?? formatNumber(totals.failing)} category="At least one failure in 7 days" />
+              </HubStatGrid>
+              <MyFlowsTab flows={flows} loading={loading} stats={stats} onRefresh={() => void loadData()} onOpenBuilder={openBuilder} />
+            </>
+          ),
+        },
+        {
+          id: 'builder',
+          label: 'Flow Builder',
+          render: () => <FlowBuilderTab flowId={selectedFlowId} flows={flows} onSelectFlow={openBuilder} onSaved={() => void loadData()} />,
+        },
+        { id: 'areas', label: 'System Areas', render: () => <SystemAreasTab flows={flows} onRefresh={() => void loadData()} onOpenBuilder={openBuilder} /> },
+        { id: 'history', label: 'Run History', render: () => <RunHistoryTab flows={flows} /> },
+      ]}
+    />
   );
 };

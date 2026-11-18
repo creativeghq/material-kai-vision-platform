@@ -1,53 +1,29 @@
 import { useState, useCallback } from 'react';
 import { flowService } from '@/services/flows';
-import type { FlowRun } from '@/services/flows';
+import type { FlowRunResult } from '@/services/flows';
 
-interface UseFlowExecutionReturn {
-  executing: boolean;
-  testing: boolean;
-  lastRun: FlowRun | null;
-  executeFlow: (flowId: string, triggerData?: Record<string, unknown>) => Promise<FlowRun | null>;
-  testFlow: (flowId: string, sampleData?: Record<string, unknown>) => Promise<FlowRun | null>;
-}
-
-export function useFlowExecution(): UseFlowExecutionReturn {
+/** Run / test a flow; errors propagate so the caller can show the engine's own message. */
+export function useFlowExecution() {
   const [executing, setExecuting] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [lastRun, setLastRun] = useState<FlowRun | null>(null);
 
-  const executeFlow = useCallback(async (
-    flowId: string,
-    triggerData: Record<string, unknown> = {},
-  ): Promise<FlowRun | null> => {
+  const executeFlow = useCallback(async (flowId: string, triggerData: Record<string, unknown> = {}): Promise<FlowRunResult> => {
     setExecuting(true);
     try {
-      const run = await flowService.executeFlow(flowId, triggerData);
-      setLastRun(run);
-      return run;
-    } catch (error) {
-      console.error('Flow execution failed:', error);
-      return null;
+      return await flowService.executeFlow(flowId, triggerData);
     } finally {
       setExecuting(false);
     }
   }, []);
 
-  const testFlow = useCallback(async (
-    flowId: string,
-    sampleData: Record<string, unknown> = {},
-  ): Promise<FlowRun | null> => {
+  const testFlow = useCallback(async (flowId: string, sampleData: Record<string, unknown> = {}): Promise<FlowRunResult> => {
     setTesting(true);
     try {
-      const run = await flowService.testFlow(flowId, sampleData);
-      setLastRun(run);
-      return run;
-    } catch (error) {
-      console.error('Flow test failed:', error);
-      return null;
+      return await flowService.testFlow(flowId, sampleData);
     } finally {
       setTesting(false);
     }
   }, []);
 
-  return { executing, testing, lastRun, executeFlow, testFlow };
+  return { executing, testing, executeFlow, testFlow };
 }

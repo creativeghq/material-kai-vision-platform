@@ -9,7 +9,8 @@ import { Badge } from '@/components/core/ui/badge';
 import { Label } from '@/components/core/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/core/ui/tooltip';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
+import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import {
   HubEmptyState,
@@ -32,7 +33,13 @@ import { ChatStartersTab } from './ChatStartersTab';
 import { WritingRulesTab } from './WritingRulesTab';
 import { PromptFormDialog, SYSTEM_PROMPT_TYPES, type PromptRow } from './PromptFormDialog';
 
-const TAB_VALUES = ['prompts', 'starters', 'writing-rules', 'pricing'] as const;
+const CONFIG_TABS: HubTabItem[] = [
+  { id: 'prompts', label: 'Prompts', icon: Bot },
+  { id: 'starters', label: 'Chat Starters', icon: MessageSquare },
+  { id: 'writing-rules', label: 'Writing Rules', icon: ListChecks },
+  { id: 'pricing', label: 'Model Pricing', icon: DollarSign },
+];
+const TAB_VALUES = CONFIG_TABS.map((t) => t.id);
 
 const MOVED_TABS: Record<string, string> = {
   'ai-data': '/admin/materials-data?tab=ai-review',
@@ -241,28 +248,12 @@ export const AgentConfigsPage: React.FC = () => {
   return (
     <TooltipProvider>
       <div className="min-h-screen bg-background">
-        <PageHeader icon={Brain} title="AI Configurations" subtitle="Prompts, chat starters, writing rules and model pricing. Prompt changes are tracked and versioned." />
+        <PageHeader icon={Brain} title="AI Configurations" subtitle="Prompts, chat starters, writing rules and model pricing. Prompt changes are tracked and versioned.">
+          <HubTabNav items={CONFIG_TABS} activeId={activeTab} onSelect={handleTabChange} aria-label="AI Configurations sections" />
+        </PageHeader>
 
         <div className="p-3 sm:p-6">
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0 mb-6">
-            <TabsTrigger value="prompts" className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
-              Prompts
-            </TabsTrigger>
-            <TabsTrigger value="starters" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Chat Starters
-            </TabsTrigger>
-            <TabsTrigger value="writing-rules" className="flex items-center gap-2">
-              <ListChecks className="h-4 w-4" />
-              Writing Rules
-            </TabsTrigger>
-            <TabsTrigger value="pricing" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Model Pricing
-            </TabsTrigger>
-          </TabsList>
 
           <TabsContent value="prompts">
             <Card>

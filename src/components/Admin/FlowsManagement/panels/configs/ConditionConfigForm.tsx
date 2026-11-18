@@ -19,6 +19,9 @@ import type {
   ComparisonOperator,
 } from '@/services/flows/types';
 
+/** flow-engine waits inline and refuses longer (#552 tracks resumable delays). */
+const MAX_INLINE_DELAY_SECONDS = 25;
+
 interface ConditionConfigFormProps {
   data: ConditionNodeData;
   onChange: (config: Record<string, unknown>) => void;
@@ -225,29 +228,29 @@ export function ConditionConfigForm({ data, onChange }: ConditionConfigFormProps
               <Input
                 type="number"
                 min={1}
-                value={cfg.duration || 5}
-                onChange={(e) => onChange({ ...cfg, duration: parseInt(e.target.value) || 1 })}
+                max={MAX_INLINE_DELAY_SECONDS}
+                value={cfg.unit === 'seconds' ? cfg.duration || 10 : MAX_INLINE_DELAY_SECONDS}
+                onChange={(e) => onChange({
+                  ...cfg,
+                  unit: 'seconds',
+                  duration: Math.min(Math.max(parseInt(e.target.value) || 1, 1), MAX_INLINE_DELAY_SECONDS),
+                })}
                 className="h-8 text-sm"
               />
             </div>
             <div className="space-y-1.5 flex-1">
               <Label className="text-xs">Unit</Label>
-              <Select
-                value={cfg.unit || 'minutes'}
-                onValueChange={(val) => onChange({ ...cfg, unit: val })}
-              >
-                <SelectTrigger className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="seconds">Seconds</SelectItem>
-                  <SelectItem value="minutes">Minutes</SelectItem>
-                  <SelectItem value="hours">Hours</SelectItem>
-                  <SelectItem value="days">Days</SelectItem>
-                </SelectContent>
-              </Select>
+              <p className="h-8 text-sm leading-8">Seconds</p>
             </div>
           </div>
+          <p className="text-[11px] text-muted-foreground">
+            A run waits inside one engine call, so the longest delay is {MAX_INLINE_DELAY_SECONDS} seconds. Longer waits that resume later are not built yet.
+          </p>
+          {cfg.unit && cfg.unit !== 'seconds' && (
+            <p className="text-[11px] text-[hsl(var(--error))]">
+              This node asks for {cfg.duration} {cfg.unit}, which the engine refuses. Set it in seconds to make the flow run.
+            </p>
+          )}
         </div>
       );
     }

@@ -10,8 +10,8 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, FileText, FileType, ExternalLink, AlertCircle, Download, FileSpreadsheet } from 'lucide-react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
+import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
 import { CatalogExportTab } from '@/components/Admin/DataImport/CatalogExportTab';
 import { CsvImportTab } from '@/components/Admin/DataImport/CsvImportTab';
 import { Button } from '@/components/core/ui/button';
@@ -24,24 +24,32 @@ import { PDFUploadSection } from '@/components/features/pdf/PDFUploadSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 
+const IMPORT_TABS: HubTabItem[] = [
+  { id: 'pdf', label: 'PDF Processing', icon: FileType },
+  { id: 'xml', label: 'XML Import', icon: FileText },
+  { id: 'history', label: 'Import History', icon: Upload },
+  { id: 'csv', label: 'CSV Import', icon: FileSpreadsheet },
+  { id: 'export', label: 'Export', icon: Download },
+];
 
 const DataImportHub: React.FC = () => {
   const navigate = useNavigate();
   const { activeWorkspaceId } = useWorkspace();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
-  const [activeTab, setActiveTab] = useState(tabParam || 'pdf');
+  const activeTab = IMPORT_TABS.some((t) => t.id === tabParam) ? tabParam! : 'pdf';
+  const selectTab = (id: string) => {
+    const next = new URLSearchParams(searchParams);
+    if (id === 'pdf') next.delete('tab');
+    else next.set('tab', id);
+    setSearchParams(next, { replace: true });
+  };
   const [activeJobs, setActiveJobs] = useState<any[]>([]);
   const [checkingJobs, setCheckingJobs] = useState(true);
 
-  // Check for active PDF processing jobs on mount and handle tab parameter
   useEffect(() => {
     checkActiveJobs();
-    // Set active tab from URL parameter if present
-    if (tabParam && ['pdf', 'xml', 'history', 'csv', 'export'].includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
-  }, [tabParam, activeWorkspaceId]);
+  }, [activeWorkspaceId]);
 
   const checkActiveJobs = async () => {
     if (!activeWorkspaceId) return;
@@ -75,43 +83,13 @@ const DataImportHub: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={Upload} title="Data Import" subtitle="Import products from PDF catalogues, XML feeds, CSV files or manual entry." />
+      <PageHeader icon={Upload} title="Data Import" subtitle="Import products from PDF catalogues, XML feeds, CSV files or manual entry.">
+        <HubTabNav items={IMPORT_TABS} activeId={activeTab} onSelect={selectTab} aria-label="Data Import sections" />
+      </PageHeader>
 
-      {/* Main Content */}
       <div className="p-3 sm:p-6 space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>Import Sources</CardTitle>
-            <CardDescription>
-              Choose your import method and configure field mappings
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-                <TabsTrigger value="pdf">
-                  <FileType className="h-4 w-4 mr-2" />
-                  PDF Processing
-                </TabsTrigger>
-                <TabsTrigger value="xml">
-                  <FileText className="h-4 w-4 mr-2" />
-                  XML Import
-                </TabsTrigger>
-                <TabsTrigger value="history">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Import History
-                </TabsTrigger>
-                <TabsTrigger value="csv">
-                  <FileSpreadsheet className="h-4 w-4 mr-2" />
-                  CSV Import
-                </TabsTrigger>
-                <TabsTrigger value="export">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="pdf" className="mt-6">
+            <Tabs value={activeTab} onValueChange={selectTab} className="w-full">
+              <TabsContent value="pdf" className="mt-0">
                 <div className="space-y-6">
                   {/* Active Jobs Warning */}
                   {activeJobs.length > 0 && (
@@ -201,23 +179,21 @@ const DataImportHub: React.FC = () => {
                 </div>
               </TabsContent>
 
-              <TabsContent value="xml" className="mt-6">
+              <TabsContent value="xml" className="mt-0">
                 <XMLImportTab />
               </TabsContent>
 
-              <TabsContent value="history" className="mt-6">
+              <TabsContent value="history" className="mt-0">
                 <ImportHistoryTab />
               </TabsContent>
 
-              <TabsContent value="csv" className="mt-6">
+              <TabsContent value="csv" className="mt-0">
                 <CsvImportTab />
               </TabsContent>
-              <TabsContent value="export" className="mt-6">
+              <TabsContent value="export" className="mt-0">
                 <CatalogExportTab />
               </TabsContent>
             </Tabs>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

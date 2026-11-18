@@ -26,6 +26,18 @@ import {
   Clock,
   Zap,
   TrendingUp,
+  Brain,
+  Palette,
+  FileText,
+  Rocket,
+  Search,
+  Target,
+  Server,
+  Triangle,
+  ShieldCheck,
+  Mail,
+  Cog,
+  Inbox,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -169,16 +181,6 @@ interface ProviderHealth {
   last_error: string | null;
 }
 
-
-const CATEGORY_STYLES: Record<string, { bg: string; border: string; text: string }> = {
-  messaging: { bg: 'from-blue-50 to-blue-100', border: 'border-blue-200', text: 'text-blue-900' },
-  b2b: { bg: 'from-purple-50 to-purple-100', border: 'border-purple-200', text: 'text-purple-900' },
-  scraping: { bg: 'from-orange-50 to-orange-100', border: 'border-orange-200', text: 'text-orange-900' },
-  vr: { bg: 'from-teal-50 to-teal-100', border: 'border-teal-200', text: 'text-teal-900' },
-  payments: { bg: 'from-indigo-50 to-indigo-100', border: 'border-indigo-200', text: 'text-indigo-900' },
-  social: { bg: 'from-pink-50 to-pink-100', border: 'border-pink-200', text: 'text-pink-900' },
-  marketplace: { bg: 'from-emerald-50 to-emerald-100', border: 'border-emerald-200', text: 'text-emerald-900' },
-};
 
 export const SystemHealthMonitor: React.FC = () => {
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -383,11 +385,11 @@ export const SystemHealthMonitor: React.FC = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'healthy':
-        return <Badge className="bg-green-500"><CheckCircle2 className="h-3 w-3 mr-1" />Healthy</Badge>;
+        return <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Healthy</Badge>;
       case 'degraded':
-        return <Badge className="bg-yellow-500"><AlertTriangle className="h-3 w-3 mr-1" />Degraded</Badge>;
+        return <Badge variant="warning"><AlertTriangle className="h-3 w-3 mr-1" />Degraded</Badge>;
       case 'unhealthy':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Unhealthy</Badge>;
+        return <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Unhealthy</Badge>;
       default:
         // Not measured. Deliberately NOT green and NOT red — an operator has to be able to tell
         // "this is fine" from "nobody looked". (#365 AD-3)
@@ -398,11 +400,11 @@ export const SystemHealthMonitor: React.FC = () => {
   const getCircuitBreakerBadge = (state: string) => {
     switch (state) {
       case 'closed':
-        return <Badge className="bg-green-500">Closed (Normal)</Badge>;
+        return <Badge variant="success">Closed (Normal)</Badge>;
       case 'open':
-        return <Badge variant="destructive">Open (Failing)</Badge>;
+        return <Badge variant="error">Open (Failing)</Badge>;
       case 'half_open':
-        return <Badge className="bg-yellow-500">Half-Open (Testing)</Badge>;
+        return <Badge variant="warning">Half-Open (Testing)</Badge>;
       default:
         return <Badge variant="outline"><MinusCircle className="h-3 w-3 mr-1" />Not measured</Badge>;
     }
@@ -466,10 +468,10 @@ export const SystemHealthMonitor: React.FC = () => {
           keeps showing its last measurement forever while every refresh behind it fails — the
           most misleading state a health surface can be in. (#365 AD-5) */}
       {refreshError && (
-        <Card className="border-yellow-500/50">
+        <Card className="border-[hsl(var(--warning)/0.25)]">
           <CardContent className="pt-4">
             <div className="flex items-start gap-3">
-              <AlertTriangle className="h-4 w-4 text-yellow-600 mt-0.5 shrink-0" />
+              <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))] mt-0.5 shrink-0" />
               <div className="text-sm">
                 <p className="font-medium">These readings are stale — the last refresh failed.</p>
                 <p className="text-muted-foreground">
@@ -545,9 +547,9 @@ export const SystemHealthMonitor: React.FC = () => {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Status</span>
               {health.database.healthy ? (
-                <Badge className="bg-green-500">Connected</Badge>
+                <Badge variant="success">Connected</Badge>
               ) : (
-                <Badge variant="destructive">Disconnected</Badge>
+                <Badge variant="error">Disconnected</Badge>
               )}
             </div>
             <div className="flex items-center justify-between">
@@ -620,9 +622,9 @@ export const SystemHealthMonitor: React.FC = () => {
               {!health.detailed_available ? (
                 <Badge variant="outline">Not measured</Badge>
               ) : health.job_monitor.monitor_running ? (
-                <Badge className="bg-green-500">Active</Badge>
+                <Badge variant="success">Active</Badge>
               ) : (
-                <Badge variant="destructive">Stopped</Badge>
+                <Badge variant="error">Stopped</Badge>
               )}
             </div>
             <div className="flex items-center justify-between">
@@ -665,7 +667,7 @@ export const SystemHealthMonitor: React.FC = () => {
                 <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-muted-foreground">Slow Queries</span>
-                    <span className={`text-sm font-medium ${health.query_metrics.slow_query_percentage > 10 ? 'text-yellow-600' : ''}`}>
+                    <span className={`text-sm font-medium ${health.query_metrics.slow_query_percentage > 10 ? 'text-[hsl(var(--warning))]' : ''}`}>
                       {health.query_metrics.slow_queries} ({health.query_metrics.slow_query_percentage.toFixed(1)}%)
                     </span>
                   </div>
@@ -691,7 +693,7 @@ export const SystemHealthMonitor: React.FC = () => {
             </div>
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Failure Count</span>
-              <span className={`text-sm font-medium ${health.detailed_available && health.circuit_breaker.failure_count > 0 ? 'text-yellow-600' : 'text-muted-foreground'}`}>
+              <span className={`text-sm font-medium ${health.detailed_available && health.circuit_breaker.failure_count > 0 ? 'text-[hsl(var(--warning))]' : 'text-muted-foreground'}`}>
                 {health.detailed_available ? health.circuit_breaker.failure_count : '—'}
               </span>
             </div>
@@ -731,15 +733,15 @@ export const SystemHealthMonitor: React.FC = () => {
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
                 {([
-                  { key: 'turnstile', label: 'Turnstile', icon: '🛡️', check: cloudflare.turnstile },
-                  { key: 'email_routing', label: 'Email Routing (MX)', icon: '📬', check: cloudflare.email_routing },
-                  { key: 'workers', label: 'Inbound Worker', icon: '⚙️', check: cloudflare.workers },
-                  { key: 'inbound_spool', label: 'Inbound Retry Queue', icon: '📥', check: cloudflare.inbound_spool },
-                ] as const).map(({ key, label, icon, check }) => (
-                  <div key={key} className="flex flex-col gap-2 rounded-lg border p-3">
+                  { key: 'turnstile', label: 'Turnstile', icon: ShieldCheck, check: cloudflare.turnstile },
+                  { key: 'email_routing', label: 'Email Routing (MX)', icon: Mail, check: cloudflare.email_routing },
+                  { key: 'workers', label: 'Inbound Worker', icon: Cog, check: cloudflare.workers },
+                  { key: 'inbound_spool', label: 'Inbound Retry Queue', icon: Inbox, check: cloudflare.inbound_spool },
+                ] as const).map(({ key, label, icon: Icon, check }) => (
+                  <div key={key} className="flex flex-col gap-2 rounded-sm border border-hairline bg-card p-3">
                     <div className="flex items-center justify-between gap-2">
                       <span className="flex items-center gap-2 text-sm font-medium">
-                        <span className="text-lg">{icon}</span>{label}
+                        <Icon className="h-4 w-4 text-muted-foreground" aria-hidden="true" />{label}
                       </span>
                       {getStatusBadge(check?.status ?? 'unknown')}
                     </div>
@@ -757,7 +759,7 @@ export const SystemHealthMonitor: React.FC = () => {
               {/* Delivery outcomes. The Worker has no fetch handler, so this — what came out of it
                   — is the only direct evidence it ran at all. Kept out of the status above on
                   purpose: quiet is not the same as broken, and the MX check separates them. */}
-              <div className="rounded-lg border p-3">
+              <div className="rounded-sm border p-3">
                 <p className="text-sm font-medium mb-1">Inbound delivery</p>
                 {!cloudflare.inbound_delivery ? (
                   <p className="text-xs text-muted-foreground">
@@ -821,44 +823,44 @@ export const SystemHealthMonitor: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {/* Claude (Anthropic) — real API key check */}
-              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-orange-50 to-orange-100 border border-orange-200 rounded-lg">
+              <div className="flex flex-col gap-2 p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🧠</span>
-                    <span className="text-sm font-medium text-orange-900">Claude</span>
+                    <Brain className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="text-sm font-medium text-foreground">Claude</span>
                   </div>
                   {health.ai_services.claude?.status === 'healthy' ? (
-                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                    <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                   ) : health.ai_services.claude?.error === 'API key not configured' ? (
                     <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                   ) : (
-                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                    <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-orange-700">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {health.ai_services.claude?.latency_ms != null && (
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.claude.latency_ms}ms</span>
                   )}
                   {health.ai_services.claude?.error && health.ai_services.claude.error !== 'API key not configured' && (
-                    <span className="text-red-600 truncate" title={health.ai_services.claude.error}>{health.ai_services.claude.error}</span>
+                    <span className="text-[hsl(var(--error))] truncate" title={health.ai_services.claude.error}>{health.ai_services.claude.error}</span>
                   )}
                 </div>
               </div>
 
               {/* SLIG (SigLIP2 visual embeddings) — Modal /health probe */}
-              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg">
+              <div className="flex flex-col gap-2 p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🎨</span>
-                    <span className="text-sm font-medium text-yellow-900">SLIG (Modal)</span>
+                    <Palette className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="text-sm font-medium text-foreground">SLIG (Modal)</span>
                   </div>
                   {health.ai_services.slig?.status === 'healthy' ? (
-                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                    <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                   ) : (
-                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                    <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-yellow-700">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {health.ai_services.slig?.latency_ms != null && (
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.slig.latency_ms}ms</span>
                   )}
@@ -866,25 +868,25 @@ export const SystemHealthMonitor: React.FC = () => {
                     <span className="truncate">{health.ai_services.slig.message}</span>
                   )}
                   {health.ai_services.slig?.error && health.ai_services.slig.error !== 'API key not configured' && (
-                    <span className="text-red-600 truncate" title={health.ai_services.slig.error}>{health.ai_services.slig.error}</span>
+                    <span className="text-[hsl(var(--error))] truncate" title={health.ai_services.slig.error}>{health.ai_services.slig.error}</span>
                   )}
                 </div>
               </div>
 
               {/* PaddleOCR-VL (structural layout + OCR backbone) — Modal /health probe */}
-              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-yellow-50 to-yellow-100 border border-yellow-200 rounded-lg">
+              <div className="flex flex-col gap-2 p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">📄</span>
-                    <span className="text-sm font-medium text-yellow-900">PaddleOCR-VL (Modal)</span>
+                    <FileText className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="text-sm font-medium text-foreground">PaddleOCR-VL (Modal)</span>
                   </div>
                   {health.ai_services.paddleocr?.status === 'healthy' ? (
-                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                    <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                   ) : (
-                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                    <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-yellow-700">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {health.ai_services.paddleocr?.latency_ms != null && (
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.paddleocr.latency_ms}ms</span>
                   )}
@@ -892,89 +894,89 @@ export const SystemHealthMonitor: React.FC = () => {
                     <span className="truncate">{health.ai_services.paddleocr.message}</span>
                   )}
                   {health.ai_services.paddleocr?.error && health.ai_services.paddleocr.error !== 'API key not configured' && (
-                    <span className="text-red-600 truncate" title={health.ai_services.paddleocr.error}>{health.ai_services.paddleocr.error}</span>
+                    <span className="text-[hsl(var(--error))] truncate" title={health.ai_services.paddleocr.error}>{health.ai_services.paddleocr.error}</span>
                   )}
                 </div>
               </div>
 
               {/* Voyage AI — real embeddings check */}
-              <div className="flex flex-col gap-2 p-3 bg-gradient-to-br from-cyan-50 to-cyan-100 border border-cyan-200 rounded-lg">
+              <div className="flex flex-col gap-2 p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-lg">🚀</span>
-                    <span className="text-sm font-medium text-cyan-900">Voyage AI</span>
+                    <Rocket className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                    <span className="text-sm font-medium text-foreground">Voyage AI</span>
                   </div>
                   {health.ai_services.voyage_ai?.status === 'healthy' ? (
-                    <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                    <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                   ) : health.ai_services.voyage_ai?.error === 'API key not configured' ? (
                     <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                   ) : (
-                    <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                    <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-cyan-700">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   {health.ai_services.voyage_ai?.latency_ms != null && (
                     <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{health.ai_services.voyage_ai.latency_ms}ms</span>
                   )}
                   {health.ai_services.voyage_ai?.error && health.ai_services.voyage_ai.error !== 'API key not configured' && (
-                    <span className="text-red-600 truncate" title={health.ai_services.voyage_ai.error}>{health.ai_services.voyage_ai.error}</span>
+                    <span className="text-[hsl(var(--error))] truncate" title={health.ai_services.voyage_ai.error}>{health.ai_services.voyage_ai.error}</span>
                   )}
                 </div>
               </div>
 
               {/* Embeddings */}
-              <div className="flex items-center justify-between p-3 bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🔍</span>
-                  <span className="text-sm font-medium text-purple-900">Embeddings</span>
+                  <Search className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-sm font-medium text-foreground">Embeddings</span>
                 </div>
                 {health.ai_services.embeddings?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : health.ai_services.embeddings?.error === 'API key not configured' ? (
                   <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                 ) : (
-                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                  <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
 
               {/* AI Services */}
-              <div className="flex items-center justify-between p-3 bg-gradient-to-br from-indigo-50 to-indigo-100 border border-indigo-200 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🎯</span>
-                  <span className="text-sm font-medium text-indigo-900">AI Services</span>
+                  <Target className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-sm font-medium text-foreground">AI Services</span>
                 </div>
                 {health.ai_services.ai_services?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : health.ai_services.ai_services?.error === 'API key not configured' ? (
                   <Badge variant="secondary"><MinusCircle className="h-3 w-3 mr-1" />Via Backend</Badge>
                 ) : (
-                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                  <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
 
               {/* Supabase */}
-              <div className="flex items-center justify-between p-3 bg-gradient-to-br from-emerald-50 to-emerald-100 border border-emerald-200 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🗄️</span>
-                  <span className="text-sm font-medium text-emerald-900">Supabase</span>
+                  <Server className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-sm font-medium text-foreground">Supabase</span>
                 </div>
                 {health.ai_services.supabase?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : (
-                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                  <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
 
               {/* Vercel */}
-              <div className="flex items-center justify-between p-3 bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 rounded-lg">
+              <div className="flex items-center justify-between p-3 bg-card border border-hairline rounded-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">▲</span>
-                  <span className="text-sm font-medium text-slate-900">Vercel</span>
+                  <Triangle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-sm font-medium text-foreground">Vercel</span>
                 </div>
                 {health.ai_services.vercel?.status === 'healthy' ? (
-                  <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
+                  <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : (
-                  <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
+                  <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
                 )}
               </div>
             </div>
@@ -1005,28 +1007,23 @@ export const SystemHealthMonitor: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {providers.map((p) => {
-                const tone = p.status === 'unhealthy'
-                  ? { border: 'border-red-300', bg: 'from-red-50 to-red-100', text: 'text-red-900' }
-                  : p.status === 'degraded'
-                  ? { border: 'border-yellow-300', bg: 'from-yellow-50 to-yellow-100', text: 'text-yellow-900' }
-                  : { border: 'border-green-200', bg: 'from-green-50 to-green-100', text: 'text-green-900' };
                 return (
-                  <div key={p.provider} className={`flex flex-col gap-1 p-3 bg-gradient-to-br ${tone.bg} border ${tone.border} rounded-lg`}>
+                  <div key={p.provider} className="flex flex-col gap-1 p-3 bg-card border border-hairline rounded-sm">
                     <div className="flex items-center justify-between">
-                      <span className={`text-sm font-medium ${tone.text}`}>{p.provider}</span>
+                      <span className="text-sm font-medium text-foreground">{p.provider}</span>
                       {p.status === 'healthy' ? (
-                        <Badge className="bg-green-500 hover:bg-green-600"><CheckCircle2 className="h-3 w-3 mr-1" />Healthy</Badge>
+                        <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Healthy</Badge>
                       ) : p.status === 'degraded' ? (
-                        <Badge className="bg-yellow-500 hover:bg-yellow-600 text-black"><AlertTriangle className="h-3 w-3 mr-1" />Degraded</Badge>
+                        <Badge variant="warning"><AlertTriangle className="h-3 w-3 mr-1" />Degraded</Badge>
                       ) : (
-                        <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Down</Badge>
+                        <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Down</Badge>
                       )}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {p.calls} calls · {p.failed} failed ({Math.round((p.failure_rate || 0) * 100)}%)
                     </div>
                     {p.status !== 'healthy' && p.last_error && (
-                      <div className="text-xs text-red-700 break-words line-clamp-2" title={p.last_error}>
+                      <div className="text-xs text-[hsl(var(--error))] break-words line-clamp-2" title={p.last_error}>
                         {p.last_error.split('\n')[0].slice(0, 120)}
                       </div>
                     )}
@@ -1051,24 +1048,17 @@ export const SystemHealthMonitor: React.FC = () => {
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {externalServices.map((svc) => {
-                const styles = CATEGORY_STYLES[svc.category] || CATEGORY_STYLES.b2b;
                 return (
-                  <div
-                    key={svc.name}
-                    className={`flex flex-col gap-2 p-3 bg-gradient-to-br ${styles.bg} border ${styles.border} rounded-lg`}
-                  >
+                  <div key={svc.name} className="flex flex-col gap-2 p-3 bg-card border border-hairline rounded-sm">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{svc.icon}</span>
-                        <span className={`text-sm font-medium ${styles.text}`}>{svc.name}</span>
-                      </div>
+                      <span className="text-sm font-medium text-foreground">{svc.name}</span>
                       {svc.status === 'healthy' ? (
-                        <Badge className="bg-green-500 hover:bg-green-600">
+                        <Badge variant="success">
                           <CheckCircle2 className="h-3 w-3 mr-1" />
                           Active
                         </Badge>
                       ) : (
-                        <Badge variant="destructive">
+                        <Badge variant="error">
                           <XCircle className="h-3 w-3 mr-1" />
                           Offline
                         </Badge>
@@ -1122,7 +1112,7 @@ export const SystemHealthMonitor: React.FC = () => {
       </p>
 
       <p className="text-xs text-muted-foreground text-center">
-        Last updated: {formatDate(health.timestamp, { withTime: true })} • Auto-refreshes every 30s
+        Last updated: {formatDate(health.timestamp, { withTime: true })} • Auto-refreshes every 5 minutes
       </p>
     </div>
   );

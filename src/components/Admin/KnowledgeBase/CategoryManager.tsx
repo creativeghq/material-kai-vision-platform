@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, ExternalLink, Lock, ListFilter, FolderTree } from 'lucide-react';
+import { Plus, Edit, Trash2, ExternalLink, Lock, ListFilter, FolderTree, Bot, Globe, KeyRound } from 'lucide-react';
+import { Badge } from '@/components/core/ui/badge';
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -34,9 +35,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { HubEmptyState } from '@/components/core/hub';
 
 const ACCESS_LEVEL_CONFIG = {
-  admin: { label: 'Admin Only', emoji: '🔒', className: 'bg-red-100 text-red-800 border-red-200' },
-  agent: { label: 'Agent', emoji: '🤖', className: 'bg-blue-100 text-blue-800 border-blue-200' },
-  public: { label: 'Public + Agent', emoji: '🌍', className: 'bg-green-100 text-green-800 border-green-200' },
+  admin: { label: 'Admin Only', icon: Lock, variant: 'error' },
+  agent: { label: 'Agent', icon: Bot, variant: 'info' },
+  public: { label: 'Public + Agent', icon: Globe, variant: 'success' },
 } as const;
 
 interface CategoryManagerProps {
@@ -303,12 +304,13 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ onViewDocument
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-col gap-1">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${accessConfig.className}`}>
-                            {accessConfig.emoji} {accessConfig.label}
-                          </span>
+                          <Badge variant={accessConfig.variant} className="w-fit gap-1">
+                            <accessConfig.icon className="h-3 w-3" aria-hidden="true" />
+                            {accessConfig.label}
+                          </Badge>
                           {category.access_level === 'agent' && category.trigger_keyword && (
                             <span className="text-xs text-muted-foreground">
-                              🔑 keyword: <code className="bg-muted px-1 rounded">{category.trigger_keyword}</code>
+                              <KeyRound className="mr-1 inline h-3 w-3" aria-hidden="true" />Keyword: <code className="bg-muted px-1 rounded">{category.trigger_keyword}</code>
                             </span>
                           )}
                         </div>
@@ -444,9 +446,9 @@ export const CategoryManager: React.FC<CategoryManagerProps> = ({ onViewDocument
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">🔒 Admin Only — restricted to admin panel</SelectItem>
-                  <SelectItem value="agent">🤖 Agent — admin panel + JARVIS agent search</SelectItem>
-                  <SelectItem value="public">🌍 Public — public pages + agent (always)</SelectItem>
+                  <SelectItem value="admin">Admin Only — restricted to admin panel</SelectItem>
+                  <SelectItem value="agent">Agent — admin panel + JARVIS agent search</SelectItem>
+                  <SelectItem value="public">Public — public pages + agent (always)</SelectItem>
                 </SelectContent>
               </Select>
             </div>

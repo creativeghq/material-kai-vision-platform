@@ -11,6 +11,7 @@ import {
 } from '@/components/core/ui/card';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TablePagination, paginate } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
 import {
@@ -95,7 +96,7 @@ const StatusBadge: React.FC<{ status: string | null }> = ({ status }) => {
   if (!status) return <span className="text-xs text-muted-foreground">Never fired</span>;
   if (status === 'completed' || status === 'success' || status === 'succeeded') {
     return (
-      <span className="inline-flex items-center text-xs text-emerald-600 dark:text-emerald-400">
+      <span className="inline-flex items-center text-xs text-[hsl(var(--success))]">
         <CheckCircle2 className="h-3 w-3 mr-1" />
         Success
       </span>
@@ -103,14 +104,14 @@ const StatusBadge: React.FC<{ status: string | null }> = ({ status }) => {
   }
   if (status === 'failed') {
     return (
-      <span className="inline-flex items-center text-xs text-red-500 dark:text-red-400">
+      <span className="inline-flex items-center text-xs text-[hsl(var(--error))]">
         <XCircle className="h-3 w-3 mr-1" />
         Failed
       </span>
     );
   }
   return (
-    <span className="inline-flex items-center text-xs text-amber-600 dark:text-amber-400">
+    <span className="inline-flex items-center text-xs text-[hsl(var(--warning))]">
       <Clock className="h-3 w-3 mr-1" />
       {status}
     </span>
@@ -183,14 +184,14 @@ export const WebhooksPanel: React.FC = () => {
               <Webhook className="h-4 w-4" />
               Webhooks
               {(inboundFailures24h + outboundFailures24h) > 0 && (
-                <Badge variant="destructive">
+                <Badge variant="error">
                   <AlertTriangle className="h-3 w-3 mr-1" />
                   {inboundFailures24h + outboundFailures24h} failure
                   {inboundFailures24h + outboundFailures24h === 1 ? '' : 's'} in 24h
                 </Badge>
               )}
               {pausedInbound > 0 && (
-                <Badge variant="outline" className="border-yellow-500 text-yellow-500">
+                <Badge variant="warning">
                   {pausedInbound} paused
                 </Badge>
               )}
@@ -220,7 +221,7 @@ export const WebhooksPanel: React.FC = () => {
 
         {/* ── Inbound flow webhooks ─────────────────────────── */}
         <div>
-          <div className="px-6 pb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="px-6 pb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <ArrowDownToLine className="h-3.5 w-3.5" />
             Inbound — flows triggered by an external POST
           </div>
@@ -232,66 +233,64 @@ export const WebhooksPanel: React.FC = () => {
               then POST to <code className="text-xs">/functions/v1/flow-webhook?flow_id=&lt;id&gt;</code> to see it here.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-6 py-3 font-medium">Flow</th>
-                    <th className="px-3 py-3 font-medium">Flow Status</th>
-                    <th className="px-3 py-3 font-medium">Last Fired</th>
-                    <th className="px-3 py-3 font-medium">Result</th>
-                    <th className="px-3 py-3 font-medium">Duration</th>
-                    <th className="px-3 py-3 font-medium text-right">24h</th>
-                    <th className="px-3 py-3 font-medium text-right">24h fail</th>
-                    <th className="px-6 py-3 font-medium text-right">Total</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Flow</TableHead>
+                    <TableHead>Flow Status</TableHead>
+                    <TableHead>Last Fired</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead className="text-right">24h</TableHead>
+                    <TableHead className="text-right">24h fail</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {inbound.map((r) => (
-                    <tr
+                    <TableRow
                       key={r.flow_id}
-                      className="border-b border-border/40 hover:bg-muted/30 cursor-pointer"
+                      className="cursor-pointer"
                       // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                       // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
                       // row is invalid ARIA and yields a focus stop with no name.
                       onClick={() => openHistory(r.flow_id, r.flow_name)}
                     >
-                      <td className="px-6 py-3 font-medium">
+                      <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={(e) => { e.stopPropagation(); openHistory(r.flow_id, r.flow_name); }} className="text-left hover:underline rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-ring">{r.flow_name}</button>
                           <History className="h-3 w-3 text-muted-foreground" />
                         </div>
-                      </td>
-                      <td className="px-3 py-3">
+                      </TableCell>
+                      <TableCell>
                         {r.status === 'active' ? (
-                          <span className="text-xs text-emerald-600 dark:text-emerald-400">Active</span>
+                          <span className="text-xs text-[hsl(var(--success))]">Active</span>
                         ) : (
                           <span className="text-xs text-muted-foreground capitalize">{r.status}</span>
                         )}
-                      </td>
-                      <td className="px-3 py-3 text-muted-foreground">{formatRelative(r.last_run_at)}</td>
-                      <td className="px-3 py-3"><StatusBadge status={r.last_run_status} /></td>
-                      <td className="px-3 py-3 text-muted-foreground">{formatDuration(r.last_run_duration_ms)}</td>
-                      <td className="px-3 py-3 text-right">{r.runs_24h}</td>
-                      <td className="px-3 py-3 text-right">
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{formatRelative(r.last_run_at)}</TableCell>
+                      <TableCell><StatusBadge status={r.last_run_status} /></TableCell>
+                      <TableCell className="text-muted-foreground">{formatDuration(r.last_run_duration_ms)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{r.runs_24h}</TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {r.failures_24h > 0 ? (
                           <span className="text-destructive font-semibold">{r.failures_24h}</span>
                         ) : (
                           <span className="text-muted-foreground">0</span>
                         )}
-                      </td>
-                      <td className="px-6 py-3 text-right text-muted-foreground">{r.total_runs}</td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground tabular-nums">{r.total_runs}</TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+            </Table>
           )}
         </div>
 
         {/* ── Outbound webhook endpoints ────────────────────── */}
         <div>
-          <div className="px-6 pb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="px-6 pb-2 flex items-center gap-2 text-xs font-semibold text-muted-foreground">
             <ArrowUpFromLine className="h-3.5 w-3.5" />
             Outbound — platform delivers to a configured endpoint
           </div>
@@ -302,50 +301,48 @@ export const WebhooksPanel: React.FC = () => {
               No outbound webhook endpoints configured.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-6 py-3 font-medium">Endpoint</th>
-                    <th className="px-3 py-3 font-medium">URL</th>
-                    <th className="px-3 py-3 font-medium">Last Call</th>
-                    <th className="px-3 py-3 font-medium">Result</th>
-                    <th className="px-3 py-3 font-medium text-right">24h</th>
-                    <th className="px-3 py-3 font-medium text-right">24h fail</th>
-                    <th className="px-3 py-3 font-medium text-right">Pending</th>
-                    <th className="px-6 py-3 font-medium text-right">Active</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Endpoint</TableHead>
+                    <TableHead>URL</TableHead>
+                    <TableHead>Last Call</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead className="text-right">24h</TableHead>
+                    <TableHead className="text-right">24h fail</TableHead>
+                    <TableHead className="text-right">Pending</TableHead>
+                    <TableHead className="text-right">Active</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {outbound.map((r) => (
-                    <tr key={r.endpoint_id} className="border-b border-border/40 hover:bg-muted/30">
-                      <td className="px-6 py-3 font-medium">{r.name}</td>
-                      <td className="px-3 py-3 font-mono text-xs text-muted-foreground max-w-[260px] truncate" title={r.url}>
+                    <TableRow key={r.endpoint_id}>
+                      <TableCell className="font-medium">{r.name}</TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground max-w-[260px] truncate" title={r.url}>
                         {r.url}
-                      </td>
-                      <td className="px-3 py-3 text-muted-foreground">{formatRelative(r.last_call_at)}</td>
-                      <td className="px-3 py-3"><StatusBadge status={r.last_call_status} /></td>
-                      <td className="px-3 py-3 text-right">{r.calls_24h}</td>
-                      <td className="px-3 py-3 text-right">
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{formatRelative(r.last_call_at)}</TableCell>
+                      <TableCell><StatusBadge status={r.last_call_status} /></TableCell>
+                      <TableCell className="text-right tabular-nums">{r.calls_24h}</TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {r.failures_24h > 0 ? (
                           <span className="text-destructive font-semibold">{r.failures_24h}</span>
                         ) : (
                           <span className="text-muted-foreground">0</span>
                         )}
-                      </td>
-                      <td className="px-3 py-3 text-right text-muted-foreground">{r.pending}</td>
-                      <td className="px-6 py-3 text-right">
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground tabular-nums">{r.pending}</TableCell>
+                      <TableCell className="text-right tabular-nums">
                         {r.is_active ? (
-                          <span className="text-xs text-emerald-600 dark:text-emerald-400">on</span>
+                          <span className="text-xs text-[hsl(var(--success))]">on</span>
                         ) : (
                           <span className="text-xs text-muted-foreground">off</span>
                         )}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
-            </div>
+                </TableBody>
+            </Table>
           )}
         </div>
       </CardContent>
@@ -364,37 +361,37 @@ export const WebhooksPanel: React.FC = () => {
           ) : history.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted-foreground">No runs recorded yet.</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="py-2 pr-3 font-medium">Fired</th>
-                    <th className="py-2 pr-3 font-medium">Result</th>
-                    <th className="py-2 pr-3 font-medium">Duration</th>
-                    <th className="py-2 font-medium">Payload / Error</th>
-                  </tr>
-                </thead>
-                <tbody>
+            <div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Fired</TableHead>
+                    <TableHead>Result</TableHead>
+                    <TableHead>Duration</TableHead>
+                    <TableHead>Payload / Error</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
                   {paginate(history, historyPage).map((r) => (
-                    <tr key={r.run_id} className="border-b border-border/40 align-top">
-                      <td className="py-2 pr-3 whitespace-nowrap text-muted-foreground">
+                    <TableRow key={r.run_id} className="align-top">
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
                         {formatDate(r.started_at, { withTime: true })}
-                      </td>
-                      <td className="py-2 pr-3"><StatusBadge status={r.status} /></td>
-                      <td className="py-2 pr-3 text-muted-foreground whitespace-nowrap">
+                      </TableCell>
+                      <TableCell><StatusBadge status={r.status} /></TableCell>
+                      <TableCell className="text-muted-foreground whitespace-nowrap">
                         {formatDuration(r.duration_ms)}
-                      </td>
-                      <td className="py-2 text-xs font-mono break-all text-muted-foreground">
+                      </TableCell>
+                      <TableCell className="text-xs font-mono break-all text-muted-foreground">
                         {r.error_message
                           ? r.error_message
                           : r.trigger_event_data
                           ? JSON.stringify(r.trigger_event_data).slice(0, 200)
                           : '—'}
-                      </td>
-                    </tr>
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
               <TablePagination
                 page={historyPage}
                 total={history.length}

@@ -13,7 +13,6 @@ import { SupportAccessGate } from '@/components/core/Team/SupportAccessGate';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthGuard } from '@/components/core/AuthGuard';
 import { AdminGuard } from './components/core/AdminGuard';
-import { WorkspaceAdminGuard } from '@/components/core/WorkspaceAdminGuard';
 import { CapabilityGuard } from './components/core/CapabilityGuard';
 import { PRODUCT_BROWSE_ANY } from './auth/capabilities';
 import { EntitlementGuard } from './components/core/EntitlementGuard';
@@ -131,7 +130,7 @@ const DataImportHub = lazy(() => import('./components/Admin/DataImportHub'));
 // SystemSettingsPage lazy import.)
 // QuoteRequestsAdmin + QuoteDetailPage live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
 // StatusTagsManagement, UpsellsManagement, TimelineStepsManagement live in `src/modules/quotes/pages/` — registered through buildModuleRoutes().
-const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
+const FlowsManagement = lazy(() => import('./components/Admin/FlowsManagement/FlowsManagement').then(m => ({ default: m.FlowsManagement })));
 const MasterCatalogPage = lazy(() => import('./pages/Admin/MasterCatalogPage'));
 const PageWatchesPage = lazy(() => import('./pages/PageWatchesPage'));
 const SignalsPage = lazy(() => import('./pages/SignalsPage'));
@@ -1028,11 +1027,11 @@ const App = () => (
                   path="/flows"
                   element={
                     <AuthGuard>
-                      <WorkspaceAdminGuard>
-                        <Layout>
+                      <AdminGuard>
+                        <AdminLayout>
                           <FlowsManagement />
-                        </Layout>
-                      </WorkspaceAdminGuard>
+                        </AdminLayout>
+                      </AdminGuard>
                     </AuthGuard>
                   }
                 />

@@ -613,8 +613,8 @@ export const paletteItems: NodePaletteItem[] = [
 
   // ── Delay ──
   { type: 'conditionNode', category: 'condition', subType: 'delay', group: 'Delay',
-    label: 'Delay Timer', description: 'Wait before continuing', icon: 'Timer', color: 'amber',
-    defaultData: { label: 'Delay Timer', category: 'condition', conditionType: 'delay', config: { duration: 5, unit: 'minutes' } } as ConditionNodeData },
+    label: 'Delay Timer', description: 'Wait up to 25 seconds before continuing', icon: 'Timer', color: 'amber',
+    defaultData: { label: 'Delay Timer', category: 'condition', conditionType: 'delay', config: { duration: 10, unit: 'seconds' } } as ConditionNodeData },
 
   // ════════════════════════════════════════════════════
   //  ACTIONS
@@ -710,10 +710,6 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'actionNode', category: 'action', subType: 'comment_private_reply', group: 'Social',
     label: 'Reply by DM', description: 'Answer the comment that triggered this privately, by direct message (once per comment)', icon: 'MessageSquareReply', color: 'blue',
     defaultData: { label: 'Reply by DM', category: 'action', actionType: 'comment_private_reply', config: { thread_id: '{{trigger.data.thread_id}}', comment_id: '{{trigger.data.comment_id}}', message: '' } } as ActionNodeData },
-
-  { type: 'actionNode', category: 'action', subType: 'log_event', group: 'Data',
-    label: 'Log Event', description: 'Write an audit / dedup-marker row', icon: 'ScrollText', color: 'blue',
-    defaultData: { label: 'Log Event', category: 'action', actionType: 'log_event', config: { table: '', row: '{}' } } as ActionNodeData },
 
   // ── Developer ──
   { type: 'actionNode', category: 'action', subType: 'http_request', group: 'Developer',

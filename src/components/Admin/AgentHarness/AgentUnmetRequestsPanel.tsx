@@ -55,7 +55,7 @@ function severity(row: AuditRow): number {
 }
 
 const VERDICT: Record<number, { label: string; variant: 'error' | 'warning' | 'info' | 'neutral'; hint: string }> = {
-  [-1]: { label: 'Rated 👎', variant: 'error', hint: 'The user marked a reply in this conversation as unhelpful.' },
+  [-1]: { label: 'Rated Unhelpful', variant: 'error', hint: 'The user marked a reply in this conversation as unhelpful.' },
   0: { label: 'No reply', variant: 'error', hint: 'The turn produced nothing at all.' },
   1: { label: 'No tool, hedged', variant: 'error', hint: 'Called nothing and said it could not — the strongest signal of a missing capability.' },
   2: { label: 'Hedged', variant: 'warning', hint: 'Used a tool but still told the user it could not do something.' },
@@ -118,7 +118,7 @@ export const AgentUnmetRequestsPanel: React.FC<{ onOpenConversation?: (id: strin
         <div>
           <CardTitle>What the assistant could not do</CardTitle>
           <CardDescription>
-            Conversations rated 👎, where no tool ran, or where the reply hedged. Derived by{' '}
+            Conversations rated unhelpful, where no tool ran, or where the reply hedged. Derived by{' '}
             <code className="text-xs">agent_conversation_audit</code> — the question is verbatim,
             the signals are the RPC&apos;s, and a 👍 clears a conversation.
           </CardDescription>

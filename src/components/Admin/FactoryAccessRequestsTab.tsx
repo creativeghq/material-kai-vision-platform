@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { KeyRound, Check, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Textarea } from '@/components/core/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { factoryAccessService, type FactoryAccessRequest } from '@/services/factoryAccessService';
@@ -40,10 +41,8 @@ export const FactoryAccessRequestsTab: React.FC = () => {
     } finally { setProcessingId(null); }
   };
 
-  const statusColor = (s: string) =>
-    s === 'pending' ? 'text-amber-600 dark:text-amber-400'
-    : s === 'approved' ? 'text-emerald-600 dark:text-emerald-400'
-    : 'text-destructive';
+  const statusVariant = (s: string): 'warning' | 'success' | 'error' =>
+    s === 'pending' ? 'warning' : s === 'approved' ? 'success' : 'error';
 
   if (loading) return <div className="flex justify-center py-12"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
 
@@ -61,7 +60,7 @@ export const FactoryAccessRequestsTab: React.FC = () => {
       </div>
 
       {requests.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No brand-access requests yet.</p>
+        <HubEmptyState title="No brand-access requests" description="Requests to manage an existing brand appear here for review." />
       ) : (
         <div className="space-y-3">
           {requests.map((req) => (
@@ -72,7 +71,7 @@ export const FactoryAccessRequestsTab: React.FC = () => {
                     <p className="font-semibold text-sm">{req.requester_workspace_name || req.requester_workspace_id.slice(0, 8)}</p>
                     <span className="text-xs text-muted-foreground">→</span>
                     <p className="text-sm">{req.factory_name || req.factory_user_id.slice(0, 8)}</p>
-                    <span className={`text-xs font-medium capitalize ${statusColor(req.status)}`}>{req.status}</span>
+                    <Badge variant={statusVariant(req.status)} className="capitalize">{req.status}</Badge>
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Requested {formatDate(req.created_at)}</p>
                   {req.message && <p className="text-sm text-muted-foreground mt-2 italic">“{req.message}”</p>}
@@ -81,7 +80,7 @@ export const FactoryAccessRequestsTab: React.FC = () => {
                 <div className="flex items-center gap-2 shrink-0">
                   {req.status === 'pending' && (
                     <>
-                      <Button size="sm" className="h-8 bg-green-600 hover:bg-green-700 text-white" onClick={() => decide(req, 'approved')} disabled={processingId === req.id}>
+                      <Button size="sm" variant="secondary" className="h-8" onClick={() => decide(req, 'approved')} disabled={processingId === req.id}>
                         {processingId === req.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}<span className="ml-1.5">Approve</span>
                       </Button>
                       <Button size="sm" variant="outline" className="h-8 text-destructive hover:text-destructive hover:border-destructive/50" onClick={() => setRejectingId(req.id)} disabled={processingId === req.id}>

@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
-import { Package, Grid3X3, Image as ImageIcon, Database, Filter, Sparkles, Tags } from 'lucide-react';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
+import { Package, Grid3X3, Image as ImageIcon, Filter, Sparkles, Tags } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { AdminStatCard } from '../AdminStatCard';
+import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
+import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
+import { formatNumber } from '@/utils/decimal';
 import { ProductsTab } from './ProductsTab';
 import { ChunksTab } from './ChunksTab';
 import { ImagesTab } from './ImagesTab';
@@ -16,9 +18,15 @@ import AIDataPage from '@/pages/Admin/AIDataPage';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const TAB_VALUES = ['products', 'chunks', 'images', 'categories', 'ai-review'] as const;
-type TabValue = typeof TAB_VALUES[number];
-const isTab = (v: string | null): v is TabValue => (TAB_VALUES as readonly string[]).includes(v ?? '');
+const MATERIALS_TABS: HubTabItem[] = [
+  { id: 'products', label: 'Products', icon: Package },
+  { id: 'chunks', label: 'Chunks', icon: Grid3X3 },
+  { id: 'images', label: 'Images', icon: ImageIcon },
+  { id: 'categories', label: 'Categories', icon: Tags },
+  { id: 'ai-review', label: 'AI Review', icon: Sparkles },
+];
+type TabValue = string;
+const isTab = (v: string | null): v is TabValue => MATERIALS_TABS.some((t) => t.id === v);
 
 export const MaterialsDataPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -131,32 +139,17 @@ export const MaterialsDataPage: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={Package} title="Materials Data" subtitle="Products, chunks and images from every ingestion source, the category taxonomy, and the AI review of them." />
+      <PageHeader icon={Package} title="Materials Data" subtitle="Products, chunks and images from every ingestion source, the category taxonomy, and the AI review of them.">
+        <HubTabNav items={MATERIALS_TABS} activeId={activeTab} onSelect={handleTabChange} aria-label="Materials Data sections" />
+      </PageHeader>
 
       <div className="p-3 sm:p-6 space-y-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <AdminStatCard
-            title="Products"
-            value={stats.products}
-            icon={Package}
-          />
-          <AdminStatCard
-            title="Chunks"
-            value={stats.chunks}
-            icon={Grid3X3}
-          />
-          <AdminStatCard
-            title="Images"
-            value={stats.images}
-            icon={ImageIcon}
-          />
-          <AdminStatCard
-            title="Embeddings"
-            value={stats.embeddings}
-            icon={Database}
-          />
-        </div>
+        <HubStatGrid>
+          <HubStatTile label="Products" value={formatNumber(stats.products)} />
+          <HubStatTile label="Chunks" value={formatNumber(stats.chunks)} />
+          <HubStatTile label="Images" value={formatNumber(stats.images)} />
+          <HubStatTile label="Embeddings" value={formatNumber(stats.embeddings)} />
+        </HubStatGrid>
 
         {appliedJobId && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -168,46 +161,24 @@ export const MaterialsDataPage: React.FC = () => {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="w-full h-auto flex-wrap justify-start gap-2 p-2">
-            <TabsTrigger value="products">
-              <Package className="h-4 w-4 mr-2" />
-              Products
-            </TabsTrigger>
-            <TabsTrigger value="chunks">
-              <Grid3X3 className="h-4 w-4 mr-2" />
-              Chunks
-            </TabsTrigger>
-            <TabsTrigger value="images">
-              <ImageIcon className="h-4 w-4 mr-2" />
-              Images
-            </TabsTrigger>
-            <TabsTrigger value="categories">
-              <Tags className="h-4 w-4 mr-2" />
-              Categories
-            </TabsTrigger>
-            <TabsTrigger value="ai-review">
-              <Sparkles className="h-4 w-4 mr-2" />
-              AI Review
-            </TabsTrigger>
-          </TabsList>
 
-          <TabsContent value="products" className="mt-6">
+          <TabsContent value="products" className="mt-0">
             <ProductsTab workspaceId={workspaceId} jobIdFilter={appliedJobId} productIdFilter={productIdFilter} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
-          <TabsContent value="chunks" className="mt-6">
+          <TabsContent value="chunks" className="mt-0">
             <ChunksTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
-          <TabsContent value="images" className="mt-6">
+          <TabsContent value="images" className="mt-0">
             <ImagesTab workspaceId={workspaceId} jobIdFilter={appliedJobId} onStatsUpdate={() => { void loadStats(workspaceId); }} />
           </TabsContent>
 
-          <TabsContent value="categories" className="mt-6">
+          <TabsContent value="categories" className="mt-0">
             <MaterialCategoriesTab />
           </TabsContent>
 
-          <TabsContent value="ai-review" className="mt-6">
+          <TabsContent value="ai-review" className="mt-0">
             <AIDataPage embedded tabParam="view" />
           </TabsContent>
         </Tabs>

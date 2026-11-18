@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FC, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { RefreshCw, ShieldCheck, AlertTriangle, Wrench, EyeOff, Loader2 } from 'lucide-react';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
@@ -6,7 +7,8 @@ import { Button } from '@/components/core/ui/button';
 import { Switch } from '@/components/core/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
 import { TablePagination, paginate, clampPage } from '@/components/core/ui/table-pagination';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
+import { HubTabNav } from '@/components/core/hub/HubTabNav';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { Badge } from '@/components/core/ui/badge';
@@ -85,8 +87,20 @@ const SortHead: FC<{
   );
 };
 
+const DATA_HEALTH_TABS = ['findings', 'checks', 'runs', 'taric'];
+
 export default function DataHealthPage() {
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = DATA_HEALTH_TABS.includes(searchParams.get('tab') ?? '') ? searchParams.get('tab')! : 'findings';
+  const selectTab = (id: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id === 'findings') next.delete('tab');
+      else next.set('tab', id);
+      return next;
+    }, { replace: true });
+  };
   const [checks, setChecks] = useState<IntegrityCheck[]>([]);
   const [findings, setFindings] = useState<IntegrityFinding[]>([]);
   const [runs, setRuns] = useState<IntegrityRun[]>([]);
@@ -193,8 +207,20 @@ export default function DataHealthPage() {
 
   return (
     <>
-      <PageHeader icon={ShieldCheck} title="Data Health" subtitle="Continuous integrity checks across the platform — drift the database can't prevent on its own." actions={openCritical > 0 ? <Badge variant="error">{openCritical} critical</Badge> : undefined} />
-      <div className="p-4 sm:p-6 space-y-4">
+      <PageHeader icon={ShieldCheck} title="Data Health" subtitle="Continuous integrity checks across the platform — drift the database can't prevent on its own." actions={openCritical > 0 ? <Badge variant="error">{openCritical} critical</Badge> : undefined}>
+        <HubTabNav
+          items={[
+            { id: 'findings', label: 'Findings', count: findings.length },
+            { id: 'checks', label: 'Checks', count: checks.length },
+            { id: 'runs', label: 'Runs' },
+            { id: 'taric', label: 'TARIC Reference' },
+          ]}
+          activeId={activeTab}
+          onSelect={selectTab}
+          aria-label="Data Health sections"
+        />
+      </PageHeader>
+      <div className="p-3 sm:p-6 space-y-4">
         {/* Summary + run controls */}
         <Card className="dashboard-card">
           <CardHeader className="flex flex-row items-start justify-between gap-4">
@@ -224,21 +250,12 @@ export default function DataHealthPage() {
           </CardHeader>
         </Card>
 
-        {/* Reference data whose staleness IS one of the checks above — the fix belongs next to
-            the finding, not in a settings screen the operator has to go hunting for. */}
-        <TaricReferencePanel />
-
-        {/* The nomenclature above is the vocabulary; these rules are how a product gets mapped
-            into it. Both are admin-global reference data, and both are things whose staleness
-            shows up as a finding on this page. */}
-        <TaricRulesPanel />
-
-        <Tabs defaultValue="findings">
-          <TabsList>
-            <TabsTrigger value="findings">Findings{findings.length > 0 ? ` (${findings.length})` : ''}</TabsTrigger>
-            <TabsTrigger value="checks">Checks ({checks.length})</TabsTrigger>
-            <TabsTrigger value="runs">Runs</TabsTrigger>
-          </TabsList>
+        <Tabs value={activeTab} onValueChange={selectTab}>
+          {/* TARIC data is here because its staleness is itself a finding on this page. */}
+          <TabsContent value="taric" className="space-y-4">
+            <TaricReferencePanel />
+            <TaricRulesPanel />
+          </TabsContent>
 
           {/* ── Findings ── */}
           <TabsContent value="findings">
@@ -247,7 +264,7 @@ export default function DataHealthPage() {
                 {loading ? (
                   <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin mx-auto" /></div>
                 ) : findings.length === 0 ? (
-                  <div className="p-8 text-center text-sm text-muted-foreground">No open findings. Everything checks out. ✓</div>
+                  <HubEmptyState title="No open findings" description="Every enabled check passed on its last run." />
                 ) : (
                   <>
                   <HubToolbar

@@ -40,9 +40,32 @@ interface FlowBuilderState {
 
   // Graph operations
   loadGraph: (flowId: string, flowName: string, graph: FlowGraphDefinition, version: number) => void;
-  saveGraph: () => Promise<void>;
+  saveGraph: (viewport?: FlowGraphDefinition['viewport']) => Promise<void>;
   validateGraph: () => ValidationResult;
   resetBuilder: () => void;
+}
+
+/** The persisted shape of the canvas — one serialiser for save and for validation. */
+function toGraph(nodes: Node<FlowNodeData>[], edges: Edge[], viewport?: FlowGraphDefinition['viewport']): FlowGraphDefinition {
+  return {
+    nodes: nodes.map((n) => ({
+      id: n.id,
+      type: n.type as 'triggerNode' | 'conditionNode' | 'actionNode',
+      position: n.position,
+      data: n.data,
+    })),
+    edges: edges.map((e) => ({
+      id: e.id,
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle ?? undefined,
+      targetHandle: e.targetHandle ?? undefined,
+      label: typeof e.label === 'string' ? e.label : undefined,
+      animated: e.animated,
+      type: e.type,
+    })),
+    viewport: viewport ?? { x: 0, y: 0, zoom: 1 },
+  };
 }
 
 let nodeIdCounter = 0;
@@ -143,37 +166,14 @@ export const useFlowBuilder = create<FlowBuilderState>((set, get) => ({
     });
   },
 
-  saveGraph: async () => {
+  saveGraph: async (viewport) => {
     const { flowId, nodes, edges, flowVersion } = get();
     if (!flowId) return;
 
     set({ isSaving: true });
     try {
-      const graph: FlowGraphDefinition = {
-        nodes: nodes.map((n) => ({
-          id: n.id,
-          type: n.type as 'triggerNode' | 'conditionNode' | 'actionNode',
-          position: n.position,
-          data: n.data,
-        })),
-        edges: edges.map((e) => ({
-          id: e.id,
-          source: e.source,
-          target: e.target,
-          sourceHandle: e.sourceHandle ?? undefined,
-          targetHandle: e.targetHandle ?? undefined,
-          label: typeof e.label === 'string' ? e.label : undefined,
-          animated: e.animated,
-          type: e.type,
-        })),
-        viewport: { x: 0, y: 0, zoom: 1 },
-      };
-
-      const updated = await flowService.saveGraph(flowId, graph, flowVersion);
-      set({
-        flowVersion: updated.version,
-        isDirty: false,
-      });
+      const updated = await flowService.saveGraph(flowId, toGraph(nodes, edges, viewport), flowVersion);
+      set({ flowVersion: updated.version, isDirty: false });
     } finally {
       set({ isSaving: false });
     }
@@ -181,22 +181,7 @@ export const useFlowBuilder = create<FlowBuilderState>((set, get) => ({
 
   validateGraph: () => {
     const { nodes, edges } = get();
-    return validateGraph({
-      nodes: nodes.map((n) => ({
-        id: n.id,
-        type: n.type as 'triggerNode' | 'conditionNode' | 'actionNode',
-        position: n.position,
-        data: n.data,
-      })),
-      edges: edges.map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        sourceHandle: e.sourceHandle ?? undefined,
-        targetHandle: e.targetHandle ?? undefined,
-      })),
-      viewport: { x: 0, y: 0, zoom: 1 },
-    });
+    return validateGraph(toGraph(nodes, edges));
   },
 
   resetBuilder: () => {

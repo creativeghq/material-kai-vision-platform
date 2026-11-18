@@ -30,11 +30,11 @@ const sourceLabel: Record<PipelineError['source'], string> = {
 const severityClass = (s: PipelineError['severity']): string => {
   switch (s) {
     case 'error':
-      return 'border-red-500/40 bg-red-500/10 text-red-300';
+      return 'border-[hsl(var(--error)/0.25)] bg-[hsl(var(--error-bg))] text-[hsl(var(--error))]';
     case 'warning':
-      return 'border-yellow-500/40 bg-yellow-500/10 text-yellow-300';
+      return 'border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning))]';
     default:
-      return 'border-blue-500/40 bg-blue-500/10 text-blue-300';
+      return 'border-[hsl(var(--info)/0.25)] bg-[hsl(var(--info-bg))] text-[hsl(var(--info))]';
   }
 };
 
@@ -90,21 +90,21 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
     summaryChips.push({
       label: 'Products Failed',
       value: failureSummary.products_failed,
-      tone: 'border-red-500/40 bg-red-500/10 text-red-300',
+      tone: 'border-[hsl(var(--error)/0.25)] bg-[hsl(var(--error-bg))] text-[hsl(var(--error))]',
     });
   }
   if (failureSummary.ocr_failures > 0) {
     summaryChips.push({
       label: 'OCR failures',
       value: failureSummary.ocr_failures,
-      tone: 'border-orange-500/40 bg-orange-500/10 text-orange-300',
+      tone: 'border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning))]',
     });
   }
   if (failureSummary.ocr_retries_succeeded > 0) {
     summaryChips.push({
       label: 'OCR recovered after retry',
       value: failureSummary.ocr_retries_succeeded,
-      tone: 'border-yellow-500/40 bg-yellow-500/10 text-yellow-300',
+      tone: 'border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning))]',
     });
   }
   if (failureSummary.recovery_attempts > 0) {
@@ -115,8 +115,8 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
       value: failureSummary.recovery_attempts,
       tone:
         failureSummary.recovery_exhausted > 0
-          ? 'border-red-500/40 bg-red-500/10 text-red-300'
-          : 'border-blue-500/40 bg-blue-500/10 text-blue-300',
+          ? 'border-[hsl(var(--error)/0.25)] bg-[hsl(var(--error-bg))] text-[hsl(var(--error))]'
+          : 'border-[hsl(var(--info)/0.25)] bg-[hsl(var(--info-bg))] text-[hsl(var(--info))]',
     });
   }
 
@@ -125,11 +125,11 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
   );
 
   return (
-    <Card className="dashboard-card border-red-500/30">
+    <Card className="dashboard-card border-[hsl(var(--error)/0.25)]">
       <CardContent className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-red-400" />
+            <AlertTriangle className="h-4 w-4 text-[hsl(var(--error))]" />
             <h3 className="font-semibold text-foreground">Pipeline Errors</h3>
             <span className="text-xs text-muted-foreground">
               ({errors.length} {errors.length === 1 ? 'event' : 'events'})
@@ -157,7 +157,7 @@ export function PipelineErrorsPanel({ jobId, failureSummary }: Props) {
             </Badge>
           ))}
           {stageBreakdown.length > 0 && (
-            <Badge variant="outline" className="border-white/20 font-mono text-xs">
+            <Badge variant="outline" className="border-hairline font-mono text-xs">
               Stages: {stageBreakdown.map(([s, n]) => `${s}=${n}`).join(' · ')}
             </Badge>
           )}

@@ -10,6 +10,7 @@ const ROOT = join(__dirname, '..', '..');
 const src = stripComments(
   readFileSync(join(ROOT, 'supabase/functions/flow-engine/index.ts'), 'utf8').replace(/\r\n/g, '\n'),
 );
+const edgeList = readFileSync(join(ROOT, 'src/config/flowEdgeFunctions.ts'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('#357 AE-3 — the chain has a bound, not just each flow', () => {
   it('there is a workspace-level cap alongside the per-flow one', () => {
@@ -90,9 +91,9 @@ describe('#357 AE-2 — the service-role primitives are allowlisted', () => {
   });
 
   it('run_edge_function checks its target before invoking', () => {
-    expect(src).toContain('RUN_EDGE_FUNCTION_ALLOWED');
+    expect(src).toContain('FLOW_RUNNABLE_EDGE_FUNCTION_NAMES');
     const action = src.slice(src.indexOf("case 'run_edge_function'"));
-    const check = action.indexOf('RUN_EDGE_FUNCTION_ALLOWED.has(fnName)');
+    const check = action.indexOf('FLOW_RUNNABLE_EDGE_FUNCTION_NAMES.has(fnName)');
     const invoke = action.indexOf('functions.invoke(fnName');
     expect(check).toBeGreaterThan(-1);
     expect(check < invoke, 'run_edge_function invokes before it checks the name').toBe(true);
@@ -102,13 +103,15 @@ describe('#357 AE-2 — the service-role primitives are allowlisted', () => {
     // A list read out of the flow graph, a settings table or an env var would be editable by the
     // same person the allowlist exists to constrain.
     expect(src).toMatch(/const LOG_EVENT_ALLOWED_TABLES = new Set<string>\(\[/);
-    expect(src).toMatch(/const RUN_EDGE_FUNCTION_ALLOWED = new Set<string>\(\[/);
+    // The edge-function list is a literal in a mirrored source file the builder reads too.
+    expect(src).toMatch(/import \{ FLOW_RUNNABLE_EDGE_FUNCTION_NAMES \} from '\.\.\/_shared\/flowEdgeFunctions\.generated\.ts'/);
+    expect(edgeList).toMatch(/export const FLOW_RUNNABLE_EDGE_FUNCTIONS = \[\n\s*\{ name: '/);
   });
 
   it('the callable set still covers what live flows actually use', () => {
     // Read out of `graph_definition` across every flow in the database. If these two go, two
     // seeded flows start failing at the action rather than at review time.
-    expect(src).toContain("'real-estate-listing-social'");
-    expect(src).toContain("'finance-digest-aggregate'");
+    expect(edgeList).toContain("'real-estate-listing-social'");
+    expect(edgeList).toContain("'finance-digest-aggregate'");
   });
 });

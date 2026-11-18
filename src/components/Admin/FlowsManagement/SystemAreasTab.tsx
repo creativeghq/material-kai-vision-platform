@@ -12,6 +12,8 @@ import {
 import { flowService } from '@/services/flows';
 import type { Flow, FlowAreaRegistryEntry } from '@/services/flows';
 import { useToast } from '@/hooks/use-toast';
+import { humanizeLabel } from '@/utils/humanize';
+import { triggerLabel } from './utils/paletteItems';
 
 interface SystemAreasTabProps {
   flows: Flow[];
@@ -118,12 +120,12 @@ export const SystemAreasTab: React.FC<SystemAreasTabProps> = ({ flows, onOpenBui
           {areas.length} platform areas · each should point to a flow so its notification is always delivered.
         </p>
         {emptyRequired > 0 ? (
-          <Badge variant="outline" className="gap-1 bg-red-500/10 text-red-500">
+          <Badge variant="error" className="gap-1">
             <AlertTriangle className="h-3.5 w-3.5" />
             {emptyRequired} required area{emptyRequired !== 1 ? 's' : ''} empty
           </Badge>
         ) : (
-          <Badge variant="outline" className="gap-1 bg-emerald-500/10 text-emerald-500">
+          <Badge variant="success" className="gap-1">
             <CheckCircle2 className="h-3.5 w-3.5" />
             All required areas covered
           </Badge>
@@ -133,8 +135,8 @@ export const SystemAreasTab: React.FC<SystemAreasTabProps> = ({ flows, onOpenBui
       {grouped.map(([category, rows]) => (
         <Card key={category}>
           <CardContent className="p-0">
-            <div className="px-4 py-2 border-b text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              {category}
+            <div className="px-4 py-2 border-b border-hairline bg-surface-sunken text-xs font-semibold text-muted-foreground">
+              {humanizeLabel(category)}
             </div>
             <div className="divide-y">
               {rows.map((area) => {
@@ -146,22 +148,16 @@ export const SystemAreasTab: React.FC<SystemAreasTabProps> = ({ flows, onOpenBui
                       <div className="flex items-center gap-2">
                         <span className="font-medium truncate">{area.title}</span>
                         {isEmpty ? (
-                          <span className="text-xs inline-flex items-center gap-1 text-red-500">
-                            <AlertTriangle className="h-3 w-3" />
-                            Empty
-                          </span>
+                          <Badge variant="error"><AlertTriangle className="h-3 w-3 mr-1" />Empty</Badge>
                         ) : (
-                          <span className="text-xs inline-flex items-center gap-1 text-emerald-500">
-                            <Link2 className="h-3 w-3" />
-                            Linked
-                          </span>
+                          <Badge variant="success"><Link2 className="h-3 w-3 mr-1" />Linked</Badge>
                         )}
                       </div>
                       {area.description && (
                         <p className="text-xs text-muted-foreground mt-0.5 truncate">{area.description}</p>
                       )}
-                      <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5">
-                        trigger: {area.trigger_type}
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Trigger: {triggerLabel(area.trigger_type)}
                       </p>
                     </div>
 

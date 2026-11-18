@@ -60,12 +60,12 @@ export const EmbeddingBackfillCard: React.FC = () => {
           <Database className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
           <p className="text-sm font-semibold">Embedding Coverage</p>
           {!loading && allClear && (
-            <span className="flex items-center gap-1 text-xs text-emerald-400">
+            <span className="flex items-center gap-1 text-xs text-[hsl(var(--success))]">
               <CheckCircle2 className="h-3.5 w-3.5" /> All embedded
             </span>
           )}
           {!loading && backlog && backlog.stuck > 0 && (
-            <span className="flex items-center gap-1 text-xs text-red-400">
+            <span className="flex items-center gap-1 text-xs text-[hsl(var(--error))]">
               <AlertTriangle className="h-3.5 w-3.5" /> {backlog.stuck} stuck
             </span>
           )}
@@ -88,7 +88,7 @@ export const EmbeddingBackfillCard: React.FC = () => {
             const v = backlog[f.key] || 0;
             return (
               <div key={f.key}>
-                <p className={`text-xl font-bold leading-none ${v > 0 ? 'text-amber-400' : ''}`}>{v}</p>
+                <p className={`text-xl font-bold leading-none ${v > 0 ? 'text-[hsl(var(--warning))]' : ''}`}>{v}</p>
                 <p className="text-xs text-muted-foreground mt-1">{f.label}</p>
               </div>
             );

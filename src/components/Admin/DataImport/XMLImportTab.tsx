@@ -10,7 +10,8 @@ import { Upload, FileText, AlertCircle, CheckCircle, Loader2, Link } from 'lucid
 import { Button } from '@/components/core/ui/button';
 import { Alert, AlertDescription } from '@/components/core/ui/alert';
 import { Input } from '@/components/core/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
+import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import {
   Select,
   SelectContent,
@@ -236,18 +237,16 @@ const XMLImportTab: React.FC = () => {
         </p>
       </div>
 
-      {/* Source Type Tabs */}
       <Tabs value={sourceType} onValueChange={(v) => setSourceType(v as 'file' | 'url')} className="w-full">
-        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="file" className="flex items-center gap-2">
-            <Upload className="h-4 w-4" />
-            Upload File
-          </TabsTrigger>
-          <TabsTrigger value="url" className="flex items-center gap-2">
-            <Link className="h-4 w-4" />
-            Remote URL
-          </TabsTrigger>
-        </TabsList>
+        <HubSegmented
+          options={[
+            { value: 'file', label: <span className="inline-flex items-center gap-1.5"><Upload className="h-3.5 w-3.5" aria-hidden="true" />Upload File</span> },
+            { value: 'url', label: <span className="inline-flex items-center gap-1.5"><Link className="h-3.5 w-3.5" aria-hidden="true" />Remote URL</span> },
+          ]}
+          value={sourceType}
+          onChange={setSourceType}
+          aria-label="XML source"
+        />
 
         {/* File Upload Tab */}
         <TabsContent value="file" className="mt-4">

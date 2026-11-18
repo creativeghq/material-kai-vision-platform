@@ -47,13 +47,13 @@ interface Props {
 
 // Pretty name + color per extraction source
 const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
-  ai_text_extraction:    { label: 'AI Text (Stage 0)',     color: 'bg-purple-100 text-purple-800 border-purple-200' },
-  chunk_regex:           { label: 'Chunk Regex',           color: 'bg-blue-100 text-blue-800 border-blue-200' },
-  vision_rollup:         { label: 'Image Vision Rollup',   color: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
-  pymupdf_text_dict:     { label: 'PyMuPDF Tier A',        color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  claude_spec_vision:    { label: 'Claude Spec Vision',    color: 'bg-amber-100 text-amber-800 border-amber-200' },
-  claude_opus_vision:    { label: 'Claude Opus Tier B',    color: 'bg-amber-100 text-amber-800 border-amber-200' },
-  catalog_legend:        { label: 'Catalog Legend Tier C', color: 'bg-pink-100 text-pink-800 border-pink-200' },
+  ai_text_extraction:    { label: 'AI Text (Stage 0)',     color: 'bg-[hsl(var(--info-bg))] text-[hsl(var(--info))] border-[hsl(var(--info)/0.25)]' },
+  chunk_regex:           { label: 'Chunk Regex',           color: 'bg-[hsl(var(--info-bg))] text-[hsl(var(--info))] border-[hsl(var(--info)/0.25)]' },
+  vision_rollup:         { label: 'Image Vision Rollup',   color: 'bg-[hsl(var(--info-bg))] text-[hsl(var(--info))] border-[hsl(var(--info)/0.25)]' },
+  pymupdf_text_dict:     { label: 'PyMuPDF Tier A',        color: 'bg-[hsl(var(--success-bg))] text-[hsl(var(--success))] border-[hsl(var(--success)/0.25)]' },
+  claude_spec_vision:    { label: 'Claude Spec Vision',    color: 'bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning))] border-[hsl(var(--warning)/0.25)]' },
+  claude_opus_vision:    { label: 'Claude Opus Tier B',    color: 'bg-[hsl(var(--warning-bg))] text-[hsl(var(--warning))] border-[hsl(var(--warning)/0.25)]' },
+  catalog_legend:        { label: 'Catalog Legend Tier C', color: 'bg-[hsl(var(--info-bg))] text-[hsl(var(--info))] border-[hsl(var(--info)/0.25)]' },
   unknown:               { label: 'Unknown',               color: 'bg-slate-100 text-slate-800 border-slate-200' },
 };
 
@@ -131,16 +131,16 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
 
   const avgPct = Math.round(data.average_coverage_pct);
   const healthColor =
-    avgPct >= 75 ? 'text-emerald-600' :
-    avgPct >= 50 ? 'text-amber-600' :
-    'text-red-600';
+    avgPct >= 75 ? 'text-[hsl(var(--success))]' :
+    avgPct >= 50 ? 'text-[hsl(var(--warning))]' :
+    'text-[hsl(var(--error))]';
 
   return (
     <div className="space-y-6">
       {/* Header summary — big number + action buttons */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+          <p className="text-xs font-semibold text-muted-foreground">
             Average Product Coverage
           </p>
           <p className={`text-4xl font-bold ${healthColor} mt-1`}>
@@ -170,13 +170,13 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
 
       {/* Issues — when present, surfaced at the top */}
       {data.issues.length > 0 && (
-        <Alert className="border-amber-200 bg-amber-50">
-          <AlertTriangle className="h-4 w-4 text-amber-600" />
+        <Alert className="border-[hsl(var(--warning)/0.25)] bg-[hsl(var(--warning-bg))]">
+          <AlertTriangle className="h-4 w-4 text-[hsl(var(--warning))]" />
           <AlertDescription>
-            <p className="font-semibold text-amber-800 mb-1">
+            <p className="font-semibold text-[hsl(var(--warning))] mb-1">
               {data.issues.length} issue{data.issues.length === 1 ? '' : 's'} detected
             </p>
-            <ul className="list-disc list-inside space-y-0.5 text-xs text-amber-900">
+            <ul className="list-disc list-inside space-y-0.5 text-xs text-[hsl(var(--warning))]">
               {data.issues.map((issue, i) => (
                 <li key={i}>{issue}</li>
               ))}
@@ -190,7 +190,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-semibold flex items-center gap-2">
-              <FileText className="h-4 w-4 text-blue-600" />
+              <FileText className="h-4 w-4 text-[hsl(var(--info))]" />
               Layer 1 — Catalog Layout
             </CardTitle>
           </CardHeader>
@@ -198,13 +198,13 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
             <div className="flex items-center gap-2">
               {data.catalog_layout_analyzed ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs text-emerald-700 font-semibold">Analyzed</span>
+                  <CheckCircle2 className="h-4 w-4 text-[hsl(var(--success))]" />
+                  <span className="text-xs text-[hsl(var(--success))] font-semibold">Analyzed</span>
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <span className="text-xs text-red-700 font-semibold">Not run</span>
+                  <AlertTriangle className="h-4 w-4 text-[hsl(var(--error))]" />
+                  <span className="text-xs text-[hsl(var(--error))] font-semibold">Not run</span>
                 </>
               )}
             </div>
@@ -234,7 +234,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-semibold flex items-center gap-2">
-              <Award className="h-4 w-4 text-purple-600" />
+              <Award className="h-4 w-4 text-[hsl(var(--info))]" />
               Layer 2 — Catalog Legends
             </CardTitle>
           </CardHeader>
@@ -242,13 +242,13 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
             <div className="flex items-center gap-2">
               {data.legends_extracted ? (
                 <>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span className="text-xs text-emerald-700 font-semibold">Extracted</span>
+                  <CheckCircle2 className="h-4 w-4 text-[hsl(var(--success))]" />
+                  <span className="text-xs text-[hsl(var(--success))] font-semibold">Extracted</span>
                 </>
               ) : (
                 <>
-                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                  <span className="text-xs text-red-700 font-semibold">Not run</span>
+                  <AlertTriangle className="h-4 w-4 text-[hsl(var(--error))]" />
+                  <span className="text-xs text-[hsl(var(--error))] font-semibold">Not run</span>
                 </>
               )}
             </div>
@@ -257,11 +257,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
                 <p className="text-xs text-muted-foreground mb-1">Legend types found</p>
                 <div className="flex flex-wrap gap-1">
                   {data.legend_types_found.map(t => (
-                    <Badge
-                      key={t}
-                      variant="outline"
-                      className="text-[10px] capitalize bg-purple-50 border-purple-200 text-purple-800"
-                    >
+                    <Badge variant="info" key={t} className="text-[10px] capitalize">
                       {t}
                     </Badge>
                   ))}
@@ -275,11 +271,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
                 </p>
                 <div className="flex flex-wrap gap-1">
                   {data.global_certifications.slice(0, 6).map(c => (
-                    <Badge
-                      key={c}
-                      variant="outline"
-                      className="text-[10px] bg-emerald-50 border-emerald-200 text-emerald-800"
-                    >
+                    <Badge variant="success" key={c} className="text-[10px]">
                       {c}
                     </Badge>
                   ))}
@@ -299,7 +291,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="font-semibold flex items-center gap-2">
-            <Package className="h-4 w-4 text-blue-600" />
+            <Package className="h-4 w-4 text-[hsl(var(--info))]" />
             Products by Coverage Bucket
           </CardTitle>
         </CardHeader>
@@ -310,10 +302,10 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
               const total = data.total_products || 1;
               const pct = Math.round((count / total) * 100);
               const barColor =
-                bucket === '75-100%' ? 'bg-emerald-500' :
-                bucket === '50-75%' ? 'bg-blue-500' :
-                bucket === '25-50%' ? 'bg-amber-500' :
-                'bg-red-500';
+                bucket === '75-100%' ? 'bg-[hsl(var(--success))]' :
+                bucket === '50-75%' ? 'bg-[hsl(var(--info))]' :
+                bucket === '25-50%' ? 'bg-[hsl(var(--warning))]' :
+                'bg-[hsl(var(--error))]';
               return (
                 <div key={bucket} className="flex items-center gap-3">
                   <span className="text-xs font-semibold w-16 text-muted-foreground">{bucket}</span>
@@ -338,7 +330,7 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-semibold flex items-center gap-2">
-              <Eye className="h-4 w-4 text-blue-600" />
+              <Eye className="h-4 w-4 text-[hsl(var(--info))]" />
               Per-Product Extraction Detail
               <Badge variant="outline" className="ml-2 text-[10px]">
                 showing {data.products_sample.length} of {data.total_products}
@@ -357,11 +349,11 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
                       </p>
                     </div>
                     {p.missing_critical.length === 0 ? (
-                      <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      <span className="text-[10px] text-[hsl(var(--success))]">
                         All critical fields present
                       </span>
                     ) : (
-                      <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                      <span className="text-[10px] text-[hsl(var(--warning))]">
                         {p.missing_critical.length} missing
                       </span>
                     )}
@@ -388,14 +380,14 @@ export const DocumentHealthPanel: React.FC<Props> = ({ documentId }) => {
                   {/* Missing critical fields */}
                   {p.missing_critical.length > 0 && (
                     <div>
-                      <p className="text-[10px] text-muted-foreground uppercase tracking-wide mb-1">
+                      <p className="text-[10px] text-muted-foreground mb-1">
                         Missing critical fields
                       </p>
                       <div className="flex flex-wrap gap-1">
                         {p.missing_critical.map(f => (
                           <code
                             key={f}
-                            className="text-[10px] bg-red-50 text-red-700 border border-red-200 rounded px-1.5 py-0.5"
+                            className="text-[10px] bg-[hsl(var(--error-bg))] text-[hsl(var(--error))] border border-[hsl(var(--error)/0.25)] rounded px-1.5 py-0.5"
                           >
                             {f}
                           </code>

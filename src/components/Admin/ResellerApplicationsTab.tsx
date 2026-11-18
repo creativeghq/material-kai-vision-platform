@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Store, Check, X, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { Textarea } from '@/components/core/ui/textarea';
@@ -13,13 +14,12 @@ import {
   type ResellerApplicationStatus,
 } from '@/services/resellerApplicationsService';
 
-const statusColor = (s: ResellerApplicationStatus) => {
+const statusVariant = (s: ResellerApplicationStatus): 'warning' | 'info' | 'error' | 'success' => {
   switch (s) {
-    case 'pending': return 'bg-amber-500/10 text-amber-700 border-amber-500/30';
-    case 'aade_verified': return 'bg-blue-500/10 text-blue-700 border-blue-500/30';
-    case 'aade_failed': return 'bg-orange-500/10 text-orange-700 border-orange-500/30';
-    case 'approved': return 'bg-green-500/10 text-green-700 border-green-500/30';
-    default: return 'bg-destructive/10 text-destructive border-destructive/30';
+    case 'pending': return 'warning';
+    case 'aade_verified': return 'info';
+    case 'approved': return 'success';
+    default: return 'error';
   }
 };
 
@@ -137,7 +137,7 @@ export const ResellerApplicationsTab: React.FC = () => {
       </p>
 
       {apps.length === 0 ? (
-        <p className="text-sm text-muted-foreground py-8 text-center">No reseller applications yet.</p>
+        <HubEmptyState title="No reseller applications" description="Applications to become a reseller appear here once a workspace submits one." />
       ) : (
         <div className="space-y-3">
           {apps.map((app) => {
@@ -149,11 +149,9 @@ export const ResellerApplicationsTab: React.FC = () => {
                     <div className="flex items-center gap-2 flex-wrap">
                       <p className="font-semibold text-sm">ΑΦΜ {app.vat_number}</p>
                       <Badge variant="outline" className="text-xs">{app.country_code}</Badge>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${statusColor(app.status)}`}>
-                        {statusLabel(app.status)}
-                      </span>
-                      {app.aade_valid === true && <ShieldCheck className="h-4 w-4 text-green-600" />}
-                      {app.aade_valid === false && <ShieldAlert className="h-4 w-4 text-orange-600" />}
+                      <Badge variant={statusVariant(app.status)}>{statusLabel(app.status)}</Badge>
+                      {app.aade_valid === true && <ShieldCheck className="h-4 w-4 text-[hsl(var(--success))]" aria-label="ΑΑΔΕ valid" />}
+                      {app.aade_valid === false && <ShieldAlert className="h-4 w-4 text-[hsl(var(--warning))]" aria-label="ΑΑΔΕ invalid" />}
                     </div>
                     {businessName(app) && (
                       <p className="text-xs text-muted-foreground mt-1">
@@ -198,7 +196,8 @@ export const ResellerApplicationsTab: React.FC = () => {
                           />
                           <Button
                             size="sm"
-                            className="h-8 bg-green-600 hover:bg-green-700 text-white"
+                            variant="secondary"
+                            className="h-8"
                             onClick={() => approve(app)}
                             disabled={busyId === app.id}
                           >

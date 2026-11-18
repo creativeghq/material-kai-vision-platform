@@ -1,17 +1,12 @@
-import React, { useState, useEffect } from 'react';
-import {
-  Search,
-  FileText,
-  FolderTree,
-  Link2,
-  BarChart3,
-  Brain,
-  ExternalLink,
-  BookOpen,
-} from 'lucide-react';
+import React, { useCallback, useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Search, FileText, FolderTree, Link2, ExternalLink, BookOpen } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
+import { HubStatGrid, HubStatTile } from '@/components/core/hub/HubStatTile';
+import { HubTabNav, type HubTabItem } from '@/components/core/hub/HubTabNav';
+import { formatNumber } from '@/utils/decimal';
 import { useToast } from '@/hooks/use-toast';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,8 +17,25 @@ import { CategoryManager } from './CategoryManager';
 import { ProductAttachments } from './ProductAttachments';
 import { SearchInterface } from './SearchInterface';
 
+const KB_TABS: HubTabItem[] = [
+  { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'search', label: 'Search', icon: Search },
+  { id: 'categories', label: 'Categories', icon: FolderTree },
+  { id: 'attachments', label: 'Product Links', icon: Link2 },
+];
+
 export const KnowledgeBaseManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('documents');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+  const activeTab = KB_TABS.some((t) => t.id === tabParam) ? tabParam! : 'documents';
+  const setActiveTab = useCallback((id: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (id === 'documents') next.delete('tab');
+      else next.set('tab', id);
+      return next;
+    }, { replace: true });
+  }, [setSearchParams]);
   const [isLoading, setIsLoading] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
@@ -112,100 +124,33 @@ export const KnowledgeBaseManagement: React.FC = () => {
 
   return (
     <div className="min-h-screen">
-      <PageHeader icon={BookOpen} title="Knowledge Base" subtitle="Documentation with AI embeddings, semantic search and product attachments." />
+      <PageHeader
+        icon={BookOpen}
+        title="Knowledge Base"
+        subtitle="Documentation with AI embeddings, semantic search and product attachments."
+        actions={(
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => window.open('/knowledge-base', '_blank')}>
+            <ExternalLink className="h-4 w-4" />
+            View Public KB
+          </Button>
+        )}
+      >
+        <HubTabNav items={KB_TABS} activeId={activeTab} onSelect={setActiveTab} aria-label="Knowledge Base sections" />
+      </PageHeader>
 
       <div className="p-3 sm:p-6 space-y-6">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
-                <Brain className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Documents</p>
-                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalDocs}</p>
-              </div>
-            </div>
-          </div>
+        <HubStatGrid>
+          <HubStatTile label="Total Documents" value={isLoading ? '—' : formatNumber(stats.totalDocs)} />
+          <HubStatTile label="Categories" value={isLoading ? '—' : formatNumber(stats.totalCategories)} />
+          <HubStatTile label="Product Links" value={isLoading ? '—' : formatNumber(stats.totalAttachments)} />
+          <HubStatTile
+            label="Agent Searches (30 Days)"
+            value={isLoading || !stats.kbSearches ? '—' : formatNumber(stats.kbSearches.searches)}
+            category={isLoading ? undefined : stats.kbSearches ? `${formatNumber(stats.kbSearches.zero_result)} found nothing` : 'Not available: kb_search_analytics is operator-only'}
+          />
+        </HubStatGrid>
 
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
-                <FolderTree className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Categories</p>
-                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalCategories}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
-                <Link2 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Product Links</p>
-                <p className="text-lg font-semibold">{isLoading ? '—' : stats.totalAttachments}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="dashboard-card rounded-2xl border-0 shadow-sm p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 rounded-xl bg-primary/10">
-                <BarChart3 className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Agent Searches (30d)</p>
-                <p className="text-lg font-semibold">
-                  {isLoading ? '—' : (stats.kbSearches ? stats.kbSearches.searches : (
-                    <span className="text-sm font-normal text-muted-foreground" title="kb_search_analytics is operator-only">
-                      not available
-                    </span>
-                  ))}
-                </p>
-                {!isLoading && stats.kbSearches && (
-                  <p className="text-xs text-muted-foreground">{stats.kbSearches.zero_result} found nothing</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Main Content - Tabs without Card wrapper to match platform design */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="flex items-center justify-between mb-6">
-            <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-              <TabsTrigger value="documents" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                Documents
-              </TabsTrigger>
-              <TabsTrigger value="search" className="flex items-center gap-2">
-                <Search className="h-4 w-4" />
-                Search
-              </TabsTrigger>
-              <TabsTrigger value="categories" className="flex items-center gap-2">
-                <FolderTree className="h-4 w-4" />
-                Categories
-              </TabsTrigger>
-              <TabsTrigger value="attachments" className="flex items-center gap-2">
-                <Link2 className="h-4 w-4" />
-                Product Links
-              </TabsTrigger>
-            </TabsList>
-            <Button
-              variant="outline"
-              className="gap-2"
-              onClick={() => window.open('/knowledge-base', '_blank')}
-            >
-              <ExternalLink className="h-4 w-4" />
-              View public KB
-            </Button>
-          </div>
-
           <TabsContent value="documents" className="space-y-4">
             <DocumentList
               onEdit={handleEditDocument}

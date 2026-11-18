@@ -153,7 +153,7 @@ export default function NotificationsPage() {
                 icon={Bell}
                 title="No notifications yet"
                 description="Automations decide what reaches you here."
-                action={<Button variant="outline" onClick={() => navigate('/flows')}>Open Automations</Button>}
+                action={<Button variant="outline" onClick={() => navigate('/automations')}>Open Automations</Button>}
               />
             )
           ) : (

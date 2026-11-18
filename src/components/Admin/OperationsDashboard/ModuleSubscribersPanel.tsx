@@ -150,8 +150,8 @@ export const ModuleSubscribersPanel: React.FC = () => {
                     )}
                   </CardTitle>
                   <div className="flex items-center gap-4 text-sm">
-                    <span><strong className="text-green-600">{m.active_count}</strong> active</span>
-                    <span><strong className="text-amber-600">{m.canceling_count}</strong> canceling</span>
+                    <span><strong className="text-green-700 dark:text-green-400">{m.active_count}</strong> active</span>
+                    <span><strong className="text-amber-800 dark:text-amber-300">{m.canceling_count}</strong> canceling</span>
                     <span><strong>{m.entitled_count}</strong> entitled</span>
                     <span className="font-semibold">{money(m.mrr_cents, m.addon_currency)} MRR</span>
                   </div>

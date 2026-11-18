@@ -22,7 +22,7 @@ import {
   Wrench, AlarmClock, ShieldCheck, Coins, ReceiptText, MessagesSquare, PhoneOff, Link2, Unlink, FolderKanban, FolderPlus, Flag, AlertTriangle, BadgeCheck, CalendarClock, FileMinus, ClipboardList} from 'lucide-react';
 import type { TriggerNodeData, TriggerType } from '@/services/flows/types';
 
-const triggerIcons: Record<TriggerType, React.ElementType> = {
+export const triggerIcons: Record<TriggerType, React.ElementType> = {
   manual: Hand,
   scheduled: Clock,
   webhook: Globe,

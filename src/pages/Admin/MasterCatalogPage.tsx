@@ -10,6 +10,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/core/ui/dialog';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { AdminShell } from '@/components/Admin/HQ/AdminShell';
 import { useToast } from '@/hooks/use-toast';
 import { formatDate } from '@/utils/datetime';
 import {
@@ -25,7 +26,13 @@ import {
  *    them into the operator catalog's cost. That accept is the ONLY route from a supplier's
  *    published price to a real cost anywhere on the platform.
  */
-export default function MasterCatalogPage() {
+/** Manufacturers use this page too; only the platform operator sees it inside the HQ rail. */
+export default function MasterCatalogRoute() {
+  const { isPlatformOperator } = useWorkspace();
+  return isPlatformOperator ? <AdminShell><MasterCatalogPage /></AdminShell> : <MasterCatalogPage />;
+}
+
+function MasterCatalogPage() {
   const { activeWorkspaceId, isRootWorkspace } = useWorkspace();
   const { toast } = useToast();
   // The price-change notification links here with ?product=<master id>. Landing on the page

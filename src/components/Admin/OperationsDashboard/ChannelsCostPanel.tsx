@@ -208,7 +208,7 @@ export const ChannelsCostPanel: React.FC = () => {
             { label: 'Net', value: money(net), note: 'after the unattributed ladder' },
           ].map(s => (
             <div key={s.label} className="rounded-sm border border-hairline bg-surface-sunken p-3">
-              <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{s.label}</p>
+              <p className="text-[11px] font-semibold text-muted-foreground">{s.label}</p>
               <p className="mt-1 text-lg font-semibold tabular-nums">{s.value}</p>
               <p className="text-xs text-muted-foreground">{s.note}</p>
             </div>

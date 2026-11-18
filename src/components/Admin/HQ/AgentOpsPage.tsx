@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ExternalLink, Loader2, Play, RefreshCw, ShieldCheck } from 'lucide-react';
+import { ExternalLink, Loader2, Play, RefreshCw, ShieldAlert } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -142,10 +142,10 @@ const AgentOpsPage: React.FC = () => {
   return (
     <>
       <HqTabbedPage
-        icon={ShieldCheck}
+        icon={ShieldAlert}
         title="Agent Ops"
         subtitle="What looks broken, and the agents working it: JARVIS hands each case to Stark, who investigates and fixes what is safe to fix, then to Veritas, who verifies the answer."
-        actions={headerActions}
+        actions={params.get('tab') === 'background-agents' ? undefined : headerActions}
         tabs={[
           {
             id: 'cases', label: 'Cases', count: counts.escalated + counts.open + counts.inReview,

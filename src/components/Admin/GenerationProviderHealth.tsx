@@ -113,8 +113,8 @@ function summarise(provider: string, rows: ModelRow[]): ProviderSummary {
 /** Status renders as a plain coloured word — never a pill. See the design system. */
 const TONE_CLASS: Record<ProviderSummary['verdict']['tone'], string> = {
   critical: 'text-destructive',
-  warning:  'text-amber-600 dark:text-amber-400',
-  ok:       'text-emerald-600 dark:text-emerald-400',
+  warning:  'text-[hsl(var(--warning))]',
+  ok:       'text-[hsl(var(--success))]',
   unknown:  'text-muted-foreground',
 };
 

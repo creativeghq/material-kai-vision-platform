@@ -365,12 +365,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
       <DialogContent className="w-[95vw] max-w-6xl max-h-[90vh] p-0 gap-0">
         {/* Header */}
         <div
-          className="px-3 sm:px-6 py-3 sm:py-4 rounded-t-lg"
-          style={{
-            background: 'var(--glass-bg)',
-            backdropFilter: 'var(--glass-blur)',
-            border: '1px solid var(--glass-border)',
-          }}
+          className="px-3 sm:px-6 py-3 sm:py-4 rounded-t-sm border-b border-hairline bg-surface-sunken"
         >
           <DialogHeader>
             <DialogTitle className="font-bold flex items-center gap-2">
@@ -392,11 +387,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
         <div className="flex h-[calc(90vh-120px)]">
           {/* Left Sidebar - Settings */}
           <div
-            className="w-80 p-6 space-y-6 overflow-y-auto border-r"
-            style={{
-              background: 'var(--glass-bg)',
-              backdropFilter: 'var(--glass-blur)',
-            }}
+            className="w-80 p-6 space-y-6 overflow-y-auto border-r border-hairline bg-surface-sunken"
           >
             <div className="space-y-5">
               <h3 className="font-semibold text-lg">Document Settings</h3>
@@ -500,9 +491,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="draft">📝 Draft</SelectItem>
-                        <SelectItem value="published">✅ Published</SelectItem>
-                        <SelectItem value="archived">📦 Archived</SelectItem>
+                        <SelectItem value="draft">Draft</SelectItem>
+                        <SelectItem value="published">Published</SelectItem>
+                        <SelectItem value="archived">Archived</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormField>
@@ -520,8 +511,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1">⭐ Featured (informational)</SelectItem>
-                        <SelectItem value="2">📄 Secondary (brand / product / low-value)</SelectItem>
+                        <SelectItem value="1">Featured (Informational)</SelectItem>
+                        <SelectItem value="2">Secondary (Brand / Product / Low-Value)</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormField>
@@ -542,8 +533,8 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="public">🌍 Public</SelectItem>
-                      <SelectItem value="private">🔒 Private</SelectItem>
+                      <SelectItem value="public">Public</SelectItem>
+                      <SelectItem value="private">Private</SelectItem>
                     </SelectContent>
                   </Select>
                 </FormField>
@@ -633,9 +624,9 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="auto">⚙️ Auto (follow category) — {derivedLocked ? 'locked' : 'unlocked'}</SelectItem>
-                        <SelectItem value="locked">🔒 Locked</SelectItem>
-                        <SelectItem value="unlocked">🔓 Unlocked</SelectItem>
+                        <SelectItem value="auto">Auto (follow category) — {derivedLocked ? 'locked' : 'unlocked'}</SelectItem>
+                        <SelectItem value="locked">Locked</SelectItem>
+                        <SelectItem value="unlocked">Unlocked</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormField>
@@ -921,11 +912,7 @@ export const DocumentEditor: React.FC<DocumentEditorProps> = ({
 
             {/* Footer Actions */}
             <div
-              className="px-3 sm:px-6 py-3 sm:py-4 border-t flex justify-end gap-2"
-              style={{
-                background: 'var(--glass-bg)',
-                backdropFilter: 'var(--glass-blur)',
-              }}
+              className="px-3 sm:px-6 py-3 sm:py-4 border-t border-hairline bg-surface-sunken flex justify-end gap-2"
             >
               <Button variant="outline" onClick={onClose}>
                 Cancel

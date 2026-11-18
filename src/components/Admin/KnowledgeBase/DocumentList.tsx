@@ -606,16 +606,16 @@ export const DocumentList: React.FC<DocumentListProps> = ({
             </span>
             <div className="flex-1" />
             <Select disabled={bulkBusy} onValueChange={(v) => handleBulkUpdate({ visibility: v as 'public' | 'private' })}>
-              <SelectTrigger className="w-[170px] h-8 rounded-full">
+              <SelectTrigger className="w-[170px] h-8">
                 <SelectValue placeholder="Set visibility…" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="public">🌍 Public</SelectItem>
-                <SelectItem value="private">🔒 Private</SelectItem>
+                <SelectItem value="public">Public</SelectItem>
+                <SelectItem value="private">Private</SelectItem>
               </SelectContent>
             </Select>
             <Select disabled={bulkBusy} onValueChange={(v) => handleBulkUpdate({ status: v as 'draft' | 'published' | 'archived' })}>
-              <SelectTrigger className="w-[150px] h-8 rounded-full">
+              <SelectTrigger className="w-[150px] h-8">
                 <SelectValue placeholder="Set status…" />
               </SelectTrigger>
               <SelectContent>
