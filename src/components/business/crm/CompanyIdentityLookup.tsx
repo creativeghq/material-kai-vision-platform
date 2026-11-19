@@ -66,12 +66,15 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
   const patch = (p: Partial<CompanyIdentityDraft>) => onChange({ ...value, ...p });
   // Opened by a lookup that could not answer; always open for a country no registry covers.
   const [manualOpen, setManualOpen] = useState(false);
+  // Why the registry could not fill this in. Kept on screen: a toast is gone before it is read.
+  const [lookupNote, setLookupNote] = useState<string | null>(null);
   const noRegistry = !providerFor(value.countryCode.trim().toUpperCase());
-  const showManual = !value.verified && (noRegistry || manualOpen);
+  const showManual = !value.verified && (value.countryCode !== 'EL' || manualOpen || !!lookupNote);
   const countryName = VAT_COUNTRY_OPTIONS.find((o) => o.code === value.countryCode)?.name ?? value.countryCode;
 
   // "GB 123 4567 89" typed into the VAT box: the prefix IS the country, so switch to it.
   const onVatInput = (raw: string) => {
+    setLookupNote(null);
     const m = /^([A-Za-z]{2})[\s.-]*([A-Za-z]?\d.*)$/.exec(raw.trim());
     const cc = m ? toVatPrefix(m[1]) : '';
     if (m && cc !== value.countryCode && VAT_COUNTRY_OPTIONS.some((o) => o.code === cc)) {
@@ -143,26 +146,15 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
 
       if (res.skippedReason === 'unsupported_country' || res.skippedReason === 'bad_input') {
         // A real answer, not a fallthrough: this country has no registry we can ask.
-        setManualOpen(true);
-        toast({ title: 'No registry lookup', description: res.message });
+        setLookupNote(res.message || 'No registry can check this number.');
         return;
       }
       if (res.valid === null) {
-        setManualOpen(true);
-        toast({
-          title: `${provider?.label ?? 'Registry'} unavailable`,
-          description: res.message || 'Could not reach the registry. Try again or fill manually.',
-          variant: 'destructive',
-        });
+        setLookupNote(`${provider?.label ?? 'The registry'} is unavailable right now.`);
         return;
       }
       if (res.valid === false) {
-        setManualOpen(true);
-        toast({
-          title: 'VAT not recognised',
-          description: res.message || `${provider?.label ?? 'The registry'} does not recognise this number.`,
-          variant: 'destructive',
-        });
+        setLookupNote(`${provider?.label ?? 'The registry'} does not recognise ${value.countryCode}${vat}.`);
         return;
       }
 
@@ -224,6 +216,7 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
             value={value.countryCode}
             onChange={(v) => {
               const cc = v || 'EL';
+              setLookupNote(null);
               const typedAddress = !value.verified && value.fields.country_code;
               patch(typedAddress
                 ? { countryCode: cc, fields: { ...value.fields, country_code: cc, country: VAT_COUNTRY_OPTIONS.find((o) => o.code === cc)?.name ?? cc } }
@@ -270,7 +263,12 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
             No registry covers {countryName}. Fill in the billing address below, or search the web by name to prefill it.
           </p>
         )}
-        {!noRegistry && !value.verified && !manualOpen && (
+        {lookupNote && !value.verified && (
+          <p className="rounded-md border border-amber-500/30 bg-amber-500/[0.06] p-2 text-xs text-amber-800 dark:text-amber-300">
+            {lookupNote} You can still add them: type the name and billing address below — the VAT number is kept as entered.
+          </p>
+        )}
+        {!showManual && !value.verified && (
           <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => setManualOpen(true)}>
             Enter the address manually
           </button>
