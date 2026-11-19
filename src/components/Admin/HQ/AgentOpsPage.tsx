@@ -146,7 +146,7 @@ const AgentOpsPage: React.FC = () => {
         icon={ShieldAlert}
         title="Agent Ops"
         subtitle="What looks broken, and the agents working it: JARVIS hands each case to Stark, who investigates and fixes what is safe to fix, then to Veritas, who verifies the answer."
-        actions={params.get('tab') === 'background-agents' ? undefined : headerActions}
+        actions={params.get('tab') === 'background-agents' || params.get('tab') === 'servers' ? undefined : headerActions}
         tabs={[
           {
             id: 'cases', label: 'Cases', count: counts.escalated + counts.open + counts.inReview,
@@ -166,6 +166,7 @@ const AgentOpsPage: React.FC = () => {
           },
           { id: 'agents', label: 'Agents', render: body(() => <AgentsTab agents={data!.agents} days={days} />) },
           { id: 'background-agents', label: 'Background Agents', render: () => <BackgroundAgentsPage /> },
+          { id: 'servers', label: 'Servers', render: () => <ServerMaintenanceCard /> },
           { id: 'processes', label: 'Processes', render: body(() => <ProcessesTab desk={data!} onTrace={(id) => setParam('trace', id)} />) },
         ]}
       />
@@ -378,8 +379,6 @@ const ProcessesTab: React.FC<{ desk: OpsDesk; onTrace: (id: string) => void }> =
         )}
       </CardContent>
     </Card>
-
-    <ServerMaintenanceCard />
 
     <CronJobsPanel />
 

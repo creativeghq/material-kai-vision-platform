@@ -122,6 +122,12 @@ export const APP_DESTINATIONS: readonly AppDestination[] = [
     route: '/admin/agent-ops?tab=background-agents',
     aliases: ['Admin → Background Agents'],
   },
+  {
+    id: 'server-maintenance',
+    breadcrumb: 'Admin → Agent Ops → Servers',
+    route: '/admin/agent-ops?tab=servers',
+    aliases: ['Agent Ops → Servers', 'Admin → Server Maintenance'],
+  },
   { id: 'admin-flows', breadcrumb: 'Admin → Flows', route: '/flows' },
   { id: 'admin-knowledge-base', breadcrumb: 'Admin → Knowledge Base', route: '/admin/knowledge-base' },
   { id: 'admin-writing-rules', breadcrumb: 'Admin → Writing Rules', route: '/admin/ai-configs?tab=writing-rules' },

@@ -13,7 +13,7 @@ const { ToolMessage } = await import('npm:@langchain/core@1.2.9/messages') as {
 
 import { serviceClient } from '../supabase-client.ts';
 import { wrapUntrusted } from '../untrusted.ts';
-import { guardedFetch } from '../ssrf-guard.ts';
+import { notifyServerMaintenance, probeServer as probeServerWith } from '../server-maintenance.ts';
 import { loadPrompt } from '../prompt-utils.ts';
 import { CLAUDE_SONNET, langchainThinking } from '../claude-models.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
@@ -105,23 +105,22 @@ function sharedTools(caseId: string, role: Role): InnerTool[] {
   ];
 }
 
-/** Our own server's fixed health URL, set by the operator; never a URL from a request. */
-async function probeServer(server: string) {
-  const { data: s } = await svc().from('server_maintenance_servers').select('server, public_health_url').eq('server', server).maybeSingle();
-  if (!s || !String(s.public_health_url).startsWith('https://')) return { ok: false, error: `No server ${server}.` };
-  const started = Date.now();
-  try {
-    const res = await guardedFetch(s.public_health_url, { signal: AbortSignal.timeout(15000) });
-    const text = (await res.text()).slice(0, 2000);
-    let status: unknown = null;
-    try { status = (JSON.parse(text) as { status?: unknown }).status ?? null; } catch { status = null; }
-    return {
-      ok: res.status === 200, server, url: s.public_health_url, http_status: res.status, ms: Date.now() - started,
-      server_header: res.headers.get('server'), health_status: status, probed_at: new Date().toISOString(),
-    };
-  } catch (e) {
-    return { ok: false, server, url: s.public_health_url, error: e instanceof Error ? e.message : String(e), ms: Date.now() - started };
-  }
+const probeServer = (server: string) => probeServerWith(svc(), server);
+
+/** A server case Veritas just ruled on rings the operator's bell with the outcome. */
+async function notifyServerReview(caseId: string) {
+  const { data: c } = await svc().from('ops_cases')
+    .select('id, source_kind, source_key, title, status, verdict, diagnosis, proposed_fix, verdict_note').eq('id', caseId).maybeSingle();
+  if (c?.source_kind !== 'server') return;
+  const done = c.status === 'resolved';
+  const needsYou = c.status === 'escalated';
+  const head = done ? 'resolved' : needsYou ? 'needs you' : `back with Stark (Veritas ${c.verdict ?? 'reviewed'})`;
+  const detail = needsYou && c.proposed_fix ? `What to do: ${c.proposed_fix}` : (c.diagnosis ?? c.verdict_note ?? '');
+  await notifyServerMaintenance(svc(), {
+    server: String(c.source_key).split(':')[0], stage: 'review', verdict: c.verdict ?? 'reviewed',
+    title: `Stark and Veritas reviewed: ${c.title} (${head})`,
+    body: String(detail).slice(0, 500), level: done ? 'info' : 'warning', actionUrl: `/admin/agent-ops?case=${c.id}`,
+  });
 }
 
 function starkTools(caseId: string, ctx: Ctx): InnerTool[] {
@@ -363,7 +362,9 @@ export const createAskVeritasTool = (userId: string, workspaceId: string, conver
       return JSON.stringify({ success: false, error: `Case is ${c?.status ?? 'missing'}; Veritas only reviews a case Stark has reported on.` });
     }
     try {
-      return JSON.stringify(await runSubAgent('veritas', case_id, 'Verify Stark\'s answer on this case.', ctx, veritasTools(case_id, ctx), 6));
+      const result = await runSubAgent('veritas', case_id, 'Verify Stark\'s answer on this case.', ctx, veritasTools(case_id, ctx), 6);
+      if (result.success) await notifyServerReview(case_id);
+      return JSON.stringify(result);
     } catch (e) {
       return JSON.stringify({ success: false, error: e instanceof Error ? e.message : String(e) });
     }

@@ -2161,6 +2161,8 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'fiscal_document_rejected', 'fiscal_credits_low',
   // #590 — asserts a platform server's maintenance verdict; only server-maintenance-report / ops-desk may say so.
   'server_maintenance_completed',
+  // #590 — asserts a platform server's maintenance verdict; only server-maintenance-report / ops-desk may say so.
+  'server_maintenance_completed',
   'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',
   'material_alert', 'inventory_low_stock', 'freight_quote_requested', 'order_dispatched', 'marketplace_want_match',
   'purchase_order.sent', 'quote_pdf_generated',
@@ -2213,17 +2215,15 @@ async function handleResumeWaits(supabase: DbClient): Promise<Response> {
       const { count } = await supabase.from('flow_run_waits').select('id', { count: 'exact', head: true })
         .eq('flow_run_id', run.id).eq('status', 'waiting');
       const done = walk.waits === 0 && (count ?? 0) === 0;
-      const { error: settleErr } = await supabase.from('flow_runs').update(done
+      await supabase.from('flow_runs').update(done
         ? { status: 'completed', completed_at: new Date().toISOString(), duration_ms: Date.now() - new Date(run.started_at).getTime() }
         : { status: 'waiting' }).eq('id', run.id);
-      if (settleErr) console.error('[flow-engine] resumed run could not be settled', run.id, settleErr.message);
-      results.push({ wait_id: w.id, outcome: settleErr ? `settle_failed: ${settleErr.message}` : done ? 'completed' : 'waiting' });
+      results.push({ wait_id: w.id, outcome: done ? 'completed' : 'waiting' });
     } catch (e) {
       if (!(e as { __runAlreadyFailed?: boolean }).__runAlreadyFailed) {
-        const { error: failErr } = await supabase.from('flow_runs').update({
+        await supabase.from('flow_runs').update({
           status: 'failed', error_message: e instanceof Error ? e.message : String(e), completed_at: new Date().toISOString(),
         }).eq('id', run.id);
-        if (failErr) console.error('[flow-engine] resumed run failure could not be recorded', run.id, failErr.message);
       }
       results.push({ wait_id: w.id, outcome: 'failed' });
     }

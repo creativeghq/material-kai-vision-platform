@@ -156,6 +156,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'background_agent_failed', group: 'AI & 3D',
     label: 'Agent Failed', description: 'A background agent run failed', icon: 'XCircle', color: 'emerald',
     defaultData: { label: 'Agent Failed', category: 'trigger', triggerType: 'background_agent_failed', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'server_maintenance_completed', group: 'Monitoring',
+    label: 'Server Maintenance Finished', description: 'A platform server finished its weekly maintenance, or Stark and Veritas finished reviewing a problem with it', icon: 'ShieldCheck', color: 'emerald',
+    defaultData: { label: 'Server Maintenance Finished', category: 'trigger', triggerType: 'server_maintenance_completed', config: {} } as TriggerNodeData },
 
   // ── Account & Billing ──
   { type: 'triggerNode', category: 'trigger', subType: 'role_upgrade_request_submitted', group: 'Account & Billing',
