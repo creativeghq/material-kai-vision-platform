@@ -2472,6 +2472,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
           "profile_contact",
           "link_preview",
           "enrich_attachments",
+          "record_classifier_outcome",
           "get_attachment",
           "ask_spreadsheet",
           "pin_message",
@@ -2845,6 +2846,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "url": {
         "type": "string",
         "description": "Max 2048 characters. https only; redirects are followed but every hop is re-validated (string (https url))"
+      },
+      "classifier": {
+        "type": "string",
+        "description": "inbox_document_kind | inbox_conversation_intent"
+      },
+      "human_verdict": {
+        "type": "string",
+        "description": "A document kind or an intent from the same vocabulary the classifier uses"
       },
       "attachment_index": {
         "type": "integer",

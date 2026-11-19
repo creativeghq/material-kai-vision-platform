@@ -4012,8 +4012,8 @@ async function handleJwtAction(
       if (classifier === 'inbox_document_kind') {
         if (!(INBOX_DOCUMENT_KINDS as readonly string[]).includes(human)) throw new HttpError(400, 'Unknown document kind');
         const messageId = String(payload.message_id || '');
-        const index = Number(payload.attachment_index);
-        if (!messageId || !Number.isInteger(index) || index < 0) throw new HttpError(400, 'message_id and attachment_index are required');
+        const index = Number(payload.attachment_index ?? 0);
+        if (!messageId || !Number.isInteger(index) || index < 0) throw new HttpError(400, 'message_id is required');
         const { data: msg } = await db.from('inbox_messages')
           .select('id, attachments').eq('id', messageId).eq('thread_id', threadId).is('deleted_at', null).maybeSingle();
         const list = Array.isArray((msg as { attachments?: unknown } | null)?.attachments)
