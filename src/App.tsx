@@ -991,20 +991,15 @@ const App = () => (
                     are registered by the `email` module via buildModuleRoutes().
                     Messaging route (/messaging) is registered by the
                     `messaging` module via buildModuleRoutes(). */}
-                {/* Automations belong to the workspace that runs them: `flows` carries a
-                    workspace_id and its RLS already scopes a tenant to their OWN non-global,
-                    non-locked rows, so the seeded `system-default` flows stay invisible to them
-                    and editable only by a global admin. Behind AdminGuard the page was operator-
-                    only, which meant a tenant could neither see nor pause an automation that was
-                    emailing their customers. */}
+                {/* Operator's platform-default flows (Apps → Operator Hub). Tenants edit theirs at /automations. */}
                 <Route
                   path="/flows"
                   element={
                     <AuthGuard>
                       <AdminGuard>
-                        <AdminLayout>
+                        <Layout>
                           <FlowsManagement />
-                        </AdminLayout>
+                        </Layout>
                       </AdminGuard>
                     </AuthGuard>
                   }

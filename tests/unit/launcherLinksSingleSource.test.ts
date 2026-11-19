@@ -152,7 +152,7 @@ describe('matchAppForLocation', () => {
   it('a later parameter is configuration: absent is fine, present-and-different is not', () => {
     expect(at('/agent-hub?capability=image-studio&generation_mode=image-edit')).toBe('image-studio');
     expect(at('/agent-hub?capability=image-studio&quickstart=generation:Re-light%20a%20room')).toBe('image-studio');
-    expect(at('/profile?tab=social-accounts&section=whatsapp')).toBe('whatsapp');
+    expect(at('/profile?tab=social-accounts&section=whatsapp')).toBe('messaging');
     expect(at('/profile?tab=social-accounts&section=linkedin')).toBeNull();
   });
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useUrlTab } from '@/hooks/useUrlTab';
 import { UserCircle, ClipboardCheck, CalendarDays, FolderOpen, Plus, Loader2, Circle, CheckCircle2, Download, Clock, LogIn, LogOut } from 'lucide-react';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { useToast } from '@/hooks/use-toast';
@@ -20,7 +21,10 @@ import { HrStat, EmptyState } from '../components/_shared';
 import { statusTone } from '@/utils/statusTone';
 import { formatDate } from '@/utils/datetime';
 
+const SELF_TABS = ['clock', 'profile', 'onboarding', 'timeoff', 'documents'] as const;
+
 export default function EmployeeSelfServicePage() {
+  const [activeTab, setActiveTab] = useUrlTab(SELF_TABS, 'clock');
   const { activeWorkspaceId, activeWorkspace, loading: wsLoading } = useWorkspace();
   const { toast } = useToast();
   const ws = activeWorkspaceId;
@@ -91,7 +95,7 @@ export default function EmployeeSelfServicePage() {
     <div className="min-h-screen">
       <PageHeader icon={UserCircle} title="My HR" subtitle={activeWorkspace?.name ? `Your record at ${activeWorkspace.name}` : 'Your employee self-service'} />
       <div className="p-3 sm:p-6">
-        <Tabs defaultValue="clock">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
             <TabsTrigger value="clock"><Clock className="h-4 w-4 mr-2" />Clock</TabsTrigger>
             <TabsTrigger value="profile"><UserCircle className="h-4 w-4 mr-2" />Profile</TabsTrigger>

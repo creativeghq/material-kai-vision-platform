@@ -39,6 +39,9 @@ import {
   Bell,
   Mail,
   Radio,
+  LayoutDashboard,
+  Plug,
+  BookText,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -65,16 +68,13 @@ export interface Hub {
 /** Order here is the order Hubs render in the launcher rail and Profile → Modules. */
 export const HUBS: readonly Hub[] = [
   { id: 'marketing', label: 'Marketing Hub', icon: Megaphone, description: 'Campaigns, automations, social & SEO — powered by the Agent.' },
-  // "supplier analytics" left this description with #350: that app was /factory-analytics, which is
-  // gone, and per-supplier analytics now live on the CRM company record — inside CRM, not as a tile.
-  // "services" never had an app at all. Describe the tiles this hub actually holds.
   { id: 'sales', label: 'Sales Hub', icon: Briefcase, description: 'CRM, quotes, appointments, properties & market demand.' },
   { id: 'projects', label: 'Projects Hub', icon: FolderKanban, description: 'Jobs, tasks, schedules, site work, costs and blueprints.' },
   { id: 'finance', label: 'Finance Hub', icon: Wallet, description: 'Invoices, payments, reporting & warehouse.' },
   { id: 'service', label: 'Service Hub', icon: Headset, description: 'Customer conversations, reviews & knowledge base.' },
   { id: 'studio', label: 'Studio Hub', icon: Palette, description: 'Moodboards, renders, room planning & client presentations.' },
   { id: 'people', label: 'People Hub', icon: Users, description: 'Employees, absences & HR documents.' },
-  { id: 'operator', label: 'Operator Hub', icon: Radio, description: 'Platform-wide push, email and WhatsApp to users and customers.' },
+  { id: 'operator', label: 'Operator Hub', icon: Radio, description: 'Headquarters, platform flows, and push, email and WhatsApp to users and customers.' },
 ];
 
 export interface SidebarNavItem {
@@ -137,38 +137,21 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   { id: 'dashboard', label: 'Dashboard', path: '/', icon: Home },
   { id: 'shared', label: 'Shared with Me', path: '/shared', icon: Share2, surface: 'app', description: 'Projects, properties and moodboards someone has given you access to.' },
   { id: 'agent-hub', label: 'Agent Hub', path: '/agent-hub', icon: MessageSquare },
-  // Material Search no longer has its own top-bar entry — it moved under Discover → Products
-  // (the "Smart search" mode) so browsing and searching materials live in one place, and the
-  // universal Mac-style Spotlight (⌘K, top bar) is the always-available quick-search entry point.
-  // Reachable by anyone who works with the catalog (marketplace buyers + clients building
-  // moodboards/quotes). The marketplace-only tabs (Profiles/Brand/Marketplace) self-gate inside.
   { id: 'discover', label: 'Discover', path: '/discover', icon: Users, requireAnyCapability: PRODUCT_BROWSE_ANY },
 
   // ── App Launcher (surface:'app'): entitle-able business modules, off the top bar,
   //    grouped into Hubs via the `hub` field. ──
   // Multi-tenant inbox (directional messaging + WhatsApp channel + agent takeover P2).
   { id: 'inbox', label: 'Inbox', path: '/inbox', icon: Inbox, requireCapability: 'inbox.use', moduleSlug: 'inbox', surface: 'app', pinTopBar: true, hub: 'service', description: 'Shared inbox for customer conversations.' },
-  // WhatsApp + Reviews — agent-driven comms/reputation (Hermes), same launcher pattern; the send /
-  // public reply are confirm-gated inside the tools. All-users via agent.use + their module.
-  { id: 'messaging', label: 'WhatsApp', path: '/agent-hub?capability=messaging', icon: MessageCircle, requireCapability: 'agent.use', moduleSlug: 'messaging', surface: 'app', hub: 'service', description: 'Message customers on WhatsApp — in the AI studio.' },
-  { id: 'reviews', label: 'Reviews', path: '/agent-hub?capability=reviews', icon: Star, requireCapability: 'agent.use', moduleSlug: 'reviews', surface: 'app', hub: 'service', description: 'Read reviews about you and reply — in the AI studio.' },
+  { id: 'messaging', label: 'WhatsApp', path: '/profile?tab=social-accounts&section=whatsapp', icon: MessageCircle, moduleSlug: 'messaging', surface: 'app', hub: 'service', description: 'Your number, templates, campaigns and the message log.' },
+  { id: 'reviews', label: 'Reviews', path: '/profile?tab=reviews', icon: Star, moduleSlug: 'reviews', surface: 'app', hub: 'service', description: 'Reviews about you, and your replies.' },
   { id: 'projects', label: 'Projects', path: '/projects', icon: FolderKanban, moduleSlug: 'projects', surface: 'app', hub: 'projects', description: 'Run jobs end to end: tasks, schedule, site, costs, visits and team.' },
-  // MoodBoards moved off the lean top bar into Studio Hub — it's creative
-  // delivery work, grouped alongside Projects and client presentations.
   { id: 'moodboard', label: 'MoodBoards', path: '/moodboard', icon: Palette, surface: 'app', hub: 'studio', description: 'Curate materials and design inspiration.' },
   // Interior Design is agent-first (the Vision agent + generation toolkit on the canvas), so the
   // Studio Hub entry deep-links into the Agent Hub with Vision pre-selected rather than a static page.
   { id: 'interior', label: 'Interior Design', path: '/agent-hub?capability=interior', icon: Sofa, surface: 'app', hub: 'studio', description: 'Design, render & stage rooms with the AI studio.' },
-  // Room Planner (#321 M3 / #259). Built, tested, and reachable from NOTHING until now — the route
-  // existed in App.tsx and no surface linked it, so the only way in was typing the URL. Gated like
-  // MoodBoards (no module, no extra capability): it draws the workspace's own catalogue on a plan,
-  // and `room_layouts` is workspace-scoped by RLS.
   { id: 'room-planner', label: 'Room Planner', path: '/room-planner', icon: Ruler, surface: 'app', hub: 'studio', description: 'Arrange catalog products on a floor plan, at their real size.' },
   { id: 'surface-visualizer', label: 'Surface Visualizer', path: '/visualizer', icon: Grid3x3, surface: 'app', hub: 'studio', description: 'A tile, stone or floor on a room photo, at its real size — drawn in the browser.' },
-  // Blueprints. Previously reachable ONLY from a button on the Projects list page — the nav comment
-  // claimed they "live under Projects", which was true of the page and not of any menu. Gated like
-  // MoodBoards and Room Planner (no module, no extra capability): `blueprints` is workspace-scoped
-  // by RLS and the editor draws the workspace's own catalogue.
   { id: 'blueprints', label: 'Blueprints', path: '/blueprints', icon: DraftingCompass, surface: 'app', hub: 'projects', description: 'Reusable room and scope templates that price a project in one click.' },
   { id: 'installation-guides', label: 'Installation Guides', path: '/guides', icon: BookOpen, moduleSlug: 'installation-guides', surface: 'app', hub: 'projects', description: 'Upload a supplier manual and watch it put together, step by step, in 3D.' },
   // Catalogs — agent-driven builder (Pepper); the create/extract tools self-gate to admin/owner.
@@ -183,10 +166,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Business-workspace surfaces — gated through the capability layer, so end-users
   // (project clients / referral members) never see CRM or Finance.
   { id: 'crm', label: 'CRM', path: '/crm', icon: Contact, requireCapability: 'crm.view', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'Contacts, companies, and leads.' },
-  // Price Monitoring — agent-driven capability, exposed in the launcher like Interior/Social/SEO:
-  // the tile opens the studio primed on the price-monitoring toolkit (track a product, pull prices).
-  // All-users via agent.use + module gate; the tracked-products page is /price-monitoring.
-  // Appointments — agent-driven scheduling over CRM Meetings (self-reminders); page is the Calendar tab.
   { id: 'appointments', label: 'Appointments', path: '/agent-hub?capability=appointments', icon: CalendarClock, requireCapability: 'agent.use', moduleSlug: 'crm', surface: 'app', hub: 'sales', description: 'List & schedule appointments with reminders — in the AI studio.' },
   // Deals & Pipeline. Lives on /crm?tab=pipeline (one deal object across CRM and Real Estate,
   // segmented by deal type), but it is a paid add-on of its own and a daily sales surface, so it
@@ -196,6 +175,9 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Real Estate module: appears only when the workspace is entitled to 'real-estate' AND the
   // persona holds realestate.view (owner/admin at P0; P1 adds the scoped realestate_agent persona).
   { id: 'real-estate', label: 'Real Estate', path: '/properties', icon: Building2, requireCapability: 'realestate.view', moduleSlug: 'real-estate', surface: 'app', hub: 'sales', description: 'List, manage and publish properties.' },
+  // Registry modules given a hub. Commerce Core is granted by any channel module; each channel is a chip.
+  { id: 'commerce', label: 'Sales Channels', path: '/commerce', icon: Plug, moduleSlug: 'commerce-core', surface: 'app', hub: 'sales', description: 'Shopify, WooCommerce and Skroutz: connections, inbound orders and the documents issued for them.' },
+  { id: 'docs', label: 'Docs', path: '/docs', icon: BookText, moduleSlug: 'docs', surface: 'app', hub: 'service', description: 'Internal team documentation the agent can search.' },
   { id: 'finance', label: 'Finance', path: '/finance', icon: Wallet, requireCapability: 'finance.manage', moduleSlug: 'sales-finance', surface: 'app', hub: 'finance', description: 'Invoices, payments, and reports.' },
   // Warehouse: inventory extracted from the Finance tab into its own paid add-on (module slug stays
   // 'stock' internally). Appears only when the workspace is entitled AND the persona holds warehouse.manage.
@@ -211,8 +193,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // admin gate would have hidden it from the staff who actually confirm and ship, while showing it
   // to the admin of every buyer-only workspace on the platform — wrong on both sides.
   { id: 'supplier-portal', label: 'Supplier Portal', path: '/supplier-portal', icon: Store, requireSupplierWorkspace: true, surface: 'app', hub: 'finance', description: 'Purchase orders sent to you as a claimed supplier — confirm and mark shipped.' },
-  // Page Monitoring (#331) — watch a page you do NOT control and report the diff. Shipped with NO
-  // surface linking it at all; the route existed and the only way in was typing the URL.
   { id: 'page-monitoring', label: 'Page Monitoring', path: '/monitoring/pages', icon: FileSearch, surface: 'app', hub: 'finance', description: 'Watch a page you do not control — a supplier price list, a competitor spec — and see what changed.' },
   // Signals (#462): one page, one entry per module, so each kind appears only where it is held.
   { id: 'signals-hiring', label: 'Hiring Signals', path: '/signals?tab=explore&kind=hiring', icon: UserPlus, requireCapability: 'crm.view', moduleSlug: 'signals-hiring', surface: 'app', hub: 'marketing', description: 'Companies that start hiring for a role or skill, from their own job boards.' },
@@ -237,14 +217,6 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // every surface" pattern. moduleSlug gates them into the launcher (active if entitled, else an
   // "available to add" upsell card).
   { id: 'social', label: 'Social Media', path: '/agent-hub?capability=social-post', icon: Share2, requireCapability: 'agent.use', moduleSlug: 'social-media', surface: 'app', hub: 'marketing', description: 'Publish & schedule social posts with the AI studio.' },
-  // WhatsApp sits under Social Media because that is how an operator thinks about it — both are
-  // channels you publish on, both run on the same Zernio account. The Service-hub `messaging` tile
-  // is the AGENT deep-link and stays as it is; this one opens the management surface, which now
-  // lives beside the social accounts on the profile rather than on its own admin-shaped page.
-  { id: 'whatsapp', label: 'WhatsApp', path: '/profile?tab=social-accounts&section=whatsapp', icon: MessageCircle, moduleSlug: 'messaging', surface: 'app', hub: 'marketing', description: 'Your number, templates, campaigns and the message log.' },
-  // SEO & Content — one tile for the whole seo-toolkit; the launcher center lists research/audits +
-  // article writing as sections (Content Writer merged in here, no longer a separate tile). Mention
-  // Monitoring is nested under Social Media (see LAUNCHER_SECTIONS) to keep the Marketing list lean.
   { id: 'seo', label: 'SEO & Content', path: '/agent-hub?capability=seo-research', icon: TrendingUp, requireCapability: 'agent.use', moduleSlug: 'seo-toolkit', surface: 'app', hub: 'marketing', description: 'Keyword research, audits & SEO article writing — in the AI studio.' },
   // Mention Monitoring. The dashboard has always existed; the launcher only ever offered the AGENT
   // deep-link, nested under Social Media, so the page itself was unreachable from the menu.
@@ -297,6 +269,10 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
     launcherOrder: 10,
     description: 'Connect a website and open its SEO dashboard — articles, keywords, audits and Search Console.',
   },
+  // Operator Hub. Headquarters' chips are DERIVED from ADMIN_NAV (launcher-sections.ts), so every
+  // HQ area is in this menu without a second list.
+  { id: 'operator-hq', label: 'Headquarters', path: '/admin', icon: LayoutDashboard, requirePlatform: true, surface: 'app', hub: 'operator', launcherOrder: -10, description: 'Agents, data pipeline, operations and platform settings.' },
+  { id: 'operator-flows', label: 'Platform Flows', path: '/flows', icon: Workflow, requirePlatform: true, surface: 'app', hub: 'operator', description: 'The default notification and automation flows every workspace receives.' },
   { id: 'push-notifications', label: 'Push Notifications', path: '/push-notifications', icon: Bell, requirePlatform: true, surface: 'app', hub: 'operator', description: 'Broadcast a push notification to platform users.' },
   { id: 'operator-emails', label: 'Emails', path: '/emails', icon: Mail, requirePlatform: true, surface: 'app', hub: 'operator', description: 'Platform email: sending domains, templates, campaigns and the delivery log.' },
   { id: 'operator-whatsapp', label: 'WhatsApp Campaigns', path: '/messaging', icon: MessageCircle, requirePlatform: true, surface: 'app', hub: 'operator', description: 'Platform WhatsApp: channels, templates, campaigns and opt-outs.' },
@@ -392,7 +368,6 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'real-estate',
   // Comms
   'messaging',
-  'whatsapp',
   'reviews',
   // Documents & people
   'contracts',
@@ -417,7 +392,11 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'signals-hiring',
   'signals-technographics',
   'signals-intent',
+  'operator-hq',
+  'operator-flows',
   'push-notifications',
+  'commerce',
+  'docs',
   'operator-emails',
   'operator-whatsapp',
 ];

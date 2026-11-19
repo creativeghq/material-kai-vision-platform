@@ -14,9 +14,9 @@ import {
   Calculator, Flame, Thermometer, Grid3x3, BookOpen,
   Radar, Search, PenTool, Activity,
   Wand2, Lightbulb, ListChecks, PauseCircle, Workflow,
-  Share2, Globe, Coins, CreditCard, ScanLine, Star, MessagesSquare,
+  Share2, Globe, Coins, CreditCard, ScanLine, MessagesSquare,
   Link2, FileSearch, Layers, BadgeCheck, Bot,
-  LayoutDashboard,
+  Bell, Inbox,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { HubId } from './nav-items';
@@ -27,6 +27,8 @@ import { filterUrl } from '@/components/core/filters/filterUrl';
 // Finance's rail IS its launcher list — one declaration, two surfaces. See the `finance:` entry.
 import { FINANCE_SECTIONS, FINANCE_SECTION_GROUPS } from '@/modules/finance/sections';
 import { financeTabUrl } from '@/modules/finance/routes';
+import { ADMIN_NAV } from '@/components/Admin/HQ/adminNav';
+import { QUOTES_TAB } from '@/modules/quotes/routes';
 
 export interface LauncherSection {
   label: string;
@@ -162,6 +164,7 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   // real agent + calculator capabilities that were invisible in the menu: the purchase-sheet builder
   // (agent) and the three estimators (real pages under /tools). Surface them here.
   projects: [
+    { label: 'My Tasks', to: '/projects/my-tasks', icon: ListChecks },
     { label: 'Purchase Sheet', to: '/agent-hub?capability=project', icon: ClipboardList },
     { label: 'Project Estimator', to: '/tools/project-plan', icon: Calculator },
     { label: 'Heat-Pump Sizer', to: '/tools/heat-pump', icon: Flame },
@@ -178,7 +181,12 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
   ],
   // Quotes (nav id 'quotes', route /quotes). The list is the Open target; Price Monitoring is nested
   // here as an agent deep-link (folded in from a standalone tile to keep the Sales list lean).
+  // QuotesPage's own gates: Customer Requests for a workspace admin, the network tabs on network.manage.
   quotes: [
+    { label: 'Customer Requests', to: `/quotes?tab=${QUOTES_TAB.customerRequests}`, icon: Inbox, requireWorkspaceAdmin: true },
+    { label: 'Network Requests', to: `/quotes?tab=${QUOTES_TAB.requests}`, icon: ArrowLeftRight, requireAnyCapability: ['network.manage'] },
+    { label: 'Quote Settings', to: `/quotes?tab=${QUOTES_TAB.settings}`, icon: Settings, requireAnyCapability: ['network.manage'] },
+    { label: 'Tracked Prices', to: '/price-monitoring', icon: TrendingUp, moduleSlug: 'price-monitoring', requireWorkspaceAdmin: true },
     { label: 'Price Monitoring', to: '/agent-hub?capability=price-monitoring', icon: TrendingUp },
   ],
   // Mention Monitoring now has its own Marketing tile pointing at the DASHBOARD; this is the agent
@@ -219,11 +227,49 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Edit an image', to: '/agent-hub?capability=image-studio&generation_mode=image-edit&quickstart=generation:Edit%20a%20photo', icon: Wand2 },
     { label: 'Re-light an image', to: '/agent-hub?capability=image-studio&quickstart=generation:Re-light%20a%20room', icon: Lightbulb },
   ],
-  // Automations (nav id 'automations', route /automations). The page has no URL tabs and creating a
-  // flow is an agent flow (not a page modal), so this surfaces the real `flows-toolkit` quick-starts.
+  // Automations: the page IS the editor (list + visual builder). The agent chips are the other way in.
   automations: [
-    { label: 'My Flows', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:My%20Flows', icon: ListChecks },
+    { label: 'Your Automations', to: '/automations', icon: Workflow },
+    { label: 'Platform Notifications', to: '/automations#platform-defaults', icon: Bell },
+    { label: 'My Flows (Agent)', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:My%20Flows', icon: ListChecks },
     { label: 'Pause a flow', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Pause%20a%20flow', icon: PauseCircle },
+  ],
+  // Headquarters: DERIVED from ADMIN_NAV, grouped as the HQ sidebar groups it. Overview is "Open".
+  'operator-hq': ADMIN_NAV.flatMap((g) => g.items
+    .filter((d) => d.id !== 'overview')
+    .map((d) => ({ label: d.label, to: d.path, icon: d.icon, ...(g.label ? { group: g.label } : {}) }))),
+  'operator-flows': [
+    { label: 'Flow Builder', to: '/flows?tab=builder', icon: Workflow },
+    { label: 'System Areas', to: '/flows?tab=areas', icon: Layers },
+    { label: 'Run History', to: '/flows?tab=history', icon: Activity },
+  ],
+  // EmailManagementPage rail; Analytics is the landing pane.
+  'operator-emails': [
+    { label: 'Delivery Log', to: '/emails?tab=logs', icon: ListChecks },
+    { label: 'Domains', to: '/emails?tab=domains', icon: Globe },
+    { label: 'Templates', to: '/emails?tab=templates', icon: LayoutTemplate },
+    { label: 'Actions', to: '/emails?tab=actions', icon: Workflow },
+    { label: 'Campaigns', to: '/emails?tab=campaigns', icon: Send },
+  ],
+  // MessagingManagementPage rail; Channels is the landing pane.
+  'operator-whatsapp': [
+    { label: 'Templates', to: '/messaging?tab=templates', icon: LayoutTemplate },
+    { label: 'Campaigns', to: '/messaging?tab=campaigns', icon: Send },
+    { label: 'Message Log', to: '/messaging?tab=logs', icon: ListChecks },
+    { label: 'Analytics', to: '/messaging?tab=analytics', icon: BarChart3 },
+    { label: 'Opt-Outs', to: '/messaging?tab=optouts', icon: UserMinus },
+  ],
+  // EmployeeSelfServicePage rail; Clock is the landing pane.
+  'my-hr': [
+    { label: 'Profile', to: '/my-hr?tab=profile', icon: Users },
+    { label: 'Onboarding', to: '/my-hr?tab=onboarding', icon: ClipboardCheck },
+    { label: 'Time Off', to: '/my-hr?tab=timeoff', icon: CalendarDays },
+    { label: 'Documents', to: '/my-hr?tab=documents', icon: FolderOpen },
+  ],
+  // Catalogs tile opens the agent builder; the list and its sources are pages (workspace admin).
+  catalogs: [
+    { label: 'All Catalogs', to: '/catalogs', icon: BookOpen, requireWorkspaceAdmin: true },
+    { label: 'Catalog Sources', to: '/catalogs/sources', icon: Boxes, requireWorkspaceAdmin: true },
   ],
   // Templates (#322). The library filters on ?type=, whose values are the LIVE_TEMPLATE_TYPES keys
   // in src/services/templates/schema.ts — not a tab list. Keep these in step with that array.
@@ -252,6 +298,35 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Discovery', to: '/market-trends?tab=discovery', icon: Search },
     { label: 'Buyers', to: '/market-trends?tab=buyers', icon: Users },
     { label: 'Activity', to: '/market-trends?tab=activity', icon: Activity },
+  ],
+  // Sales Channels: one chip per channel, each behind its own channel module.
+  commerce: [
+    { label: 'Shopify', to: '/commerce?platform=shopify', icon: Store, moduleSlug: 'commerce-shopify' },
+    { label: 'WooCommerce', to: '/commerce?platform=woocommerce', icon: Store, moduleSlug: 'commerce-woocommerce' },
+    { label: 'Skroutz', to: '/commerce?platform=skroutz', icon: Store, moduleSlug: 'commerce-skroutz' },
+  ],
+  // Service Hub: every tile opens its page; these are the page's own views, then the agent.
+  inbox: [
+    { label: 'WhatsApp', to: filterUrl('/inbox', 'f', { source: 'whatsapp' }), icon: MessagesSquare },
+    { label: 'Email', to: filterUrl('/inbox', 'f', { source: 'email' }), icon: Send },
+    { label: 'Social DMs', to: filterUrl('/inbox', 'f', { source: 'social_dm' }), icon: Share2 },
+    { label: 'Social Comments', to: filterUrl('/inbox', 'f', { source: 'social_comments' }), icon: MessagesSquare },
+    { label: 'Lead Forms', to: filterUrl('/inbox', 'f', { source: 'lead_form' }), icon: ClipboardList },
+    { label: 'Profile Enquiries', to: filterUrl('/inbox', 'f', { source: 'public_profile' }), icon: Contact },
+  ],
+  // SocialHubPanel offers the WhatsApp sections to a workspace manager only.
+  messaging: [
+    { label: 'Get a Number', to: '/profile?tab=social-accounts&section=wa-numbers', icon: UserPlus, requireWorkspaceAdmin: true },
+    { label: 'Templates', to: '/profile?tab=social-accounts&section=wa-templates', icon: LayoutTemplate, requireWorkspaceAdmin: true },
+    { label: 'Forms', to: '/profile?tab=social-accounts&section=wa-forms', icon: ClipboardList, requireWorkspaceAdmin: true },
+    { label: 'Campaigns', to: '/profile?tab=social-accounts&section=wa-campaigns', icon: Send, requireWorkspaceAdmin: true },
+    { label: 'Message Log', to: '/profile?tab=social-accounts&section=wa-logs', icon: ListChecks, requireWorkspaceAdmin: true },
+    { label: 'Analytics', to: '/profile?tab=social-accounts&section=wa-analytics', icon: BarChart3, requireWorkspaceAdmin: true },
+    { label: 'Opt-Outs', to: '/profile?tab=social-accounts&section=wa-optouts', icon: UserMinus, requireWorkspaceAdmin: true },
+    { label: 'Message with the agent', to: '/agent-hub?capability=messaging', icon: Bot, requireAnyCapability: ['agent.use'] },
+  ],
+  reviews: [
+    { label: 'Reply with the agent', to: '/agent-hub?capability=reviews', icon: Bot, requireAnyCapability: ['agent.use'] },
   ],
   // Docs (module registry entry; its launcher id is the module SLUG, not a SIDEBAR_NAV_ITEMS id).
   // The page is a list + editor with no URL tabs, so the useful inner link is the create verb —
@@ -297,7 +372,8 @@ export const LAUNCHER_ACTIONS: Record<string, LauncherSection[]> = {
   // an agent deep-link into the flows-toolkit "Create a flow" quick-start, which opens a real
   // guided form (name / trigger / action) and then runs manage_flows. Wired, not inert.
   automations: [
-    { label: 'New automation', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Create%20a%20flow', icon: Workflow },
+    { label: 'New automation', to: '/automations?new=automation', icon: Workflow },
+    { label: 'Create with AI', to: '/agent-hub?capability=flow&quickstart=flows-toolkit:Create%20a%20flow', icon: Workflow },
   ],
   docs: [
     { label: 'New doc', to: '/docs?new=doc', icon: FilePlus },
@@ -336,12 +412,10 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
   // profile enquiries, which are now Inbox threads tagged `Public profile` rather than a
   // separate screen, so this points at that filtered view of the one Inbox.
   service: [
-    { label: 'Reviews about you', to: '/profile?tab=reviews', icon: Star },
     { label: 'My Appointments', to: '/profile?tab=schedule&section=appointments', icon: CalendarDays },
-    { label: 'Profile Enquiries', to: filterUrl('/inbox', 'f', { source: 'public_profile' }), icon: MessagesSquare },
+    { label: 'Knowledge Base', to: '/knowledge-base', icon: BookOpen },
   ],
   projects: [
-    { label: 'My Tasks', to: '/projects/my-tasks', icon: ListChecks },
     { label: 'Project Templates', to: '/templates?type=project', icon: LayoutTemplate },
   ],
   studio: [
@@ -355,9 +429,10 @@ export const LAUNCHER_HUB_SHORTCUTS: Record<HubId, LauncherSection[]> = {
     { label: 'My Documents', to: '/profile?tab=documents', icon: FolderOpen },
     { label: 'My Calendar', to: '/profile?tab=schedule&section=calendar', icon: CalendarDays },
   ],
+  // Catalogue import runs in the agent (the Data Import page left the HQ menu for that reason).
   operator: [
-    { label: 'Headquarters', to: '/admin', icon: LayoutDashboard },
-    { label: 'Approvals', to: '/admin/approvals', icon: ClipboardCheck },
+    { label: 'Ingest a Catalogue', to: '/agent-hub?quickstart=catalog-ingestion:Ingest%20a%20catalogue', icon: Bot },
+    { label: 'Ingestion Status', to: '/agent-hub?quickstart=catalog-ingestion:Ingestion%20Status', icon: Activity },
   ],
 };
 

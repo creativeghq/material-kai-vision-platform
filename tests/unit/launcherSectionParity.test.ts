@@ -7,6 +7,7 @@ import { LAUNCHER_SECTIONS } from '@/config/launcher-sections';
 import { groupSections, gateLinks, type LinkGate } from '@/config/launcher-links';
 import { FINANCE_SECTIONS, FINANCE_SECTION_GROUPS, financeRailRows } from '@/modules/finance/sections';
 import { FINANCE_TAB, financeTabUrl } from '@/modules/finance/routes';
+import { ADMIN_NAV } from '@/components/Admin/HQ/adminNav';
 
 const ROOT = process.cwd();
 const read = (p: string) => readFileSync(join(ROOT, p), 'utf8');
@@ -159,6 +160,9 @@ const RAIL_PAGES: Record<string, string> = {
   'real-estate': 'src/modules/real-estate/pages/RealEstatePage.tsx',
   stock: 'src/modules/stock/pages/StockPage.tsx',
   'email-marketing': 'src/modules/email-marketing/pages/EmailMarketingPage.tsx',
+  'operator-emails': 'src/modules/email/pages/EmailManagementPage.tsx',
+  'operator-whatsapp': 'src/modules/messaging/pages/MessagingManagementPage.tsx',
+  'my-hr': 'src/modules/hr/pages/EmployeeSelfServicePage.tsx',
 };
 
 /**
@@ -171,6 +175,9 @@ const NOT_A_CHIP: Record<string, Record<string, string>> = {
   'real-estate': { overview: 'the landing pane — "Open Real Estate" already goes there' },
   stock: { overview: 'the landing pane — "Open Warehouse" already goes there' },
   'email-marketing': {},
+  'operator-emails': { analytics: 'the landing pane — "Open Emails" already goes there' },
+  'operator-whatsapp': { channels: 'the landing pane — "Open WhatsApp Campaigns" already goes there' },
+  'my-hr': { clock: 'the landing pane — "Open My HR" already goes there' },
 };
 
 /** The triggers of a page's FIRST TabsList — its section rail, not a nested tab strip. */
@@ -219,5 +226,13 @@ describe('every tabbed app offers its whole rail', () => {
         .filter((t): t is string => t !== null && !rail.has(t));
       expect(stale, `${appId}: chips for tabs the rail no longer has — ${stale.join(', ')}`).toEqual([]);
     }
+  });
+});
+
+describe('Headquarters’ chips are the HQ menu', () => {
+  it('every HQ destination except Overview is a chip, under its HQ group', () => {
+    const chips = LAUNCHER_SECTIONS['operator-hq'];
+    const expected = ADMIN_NAV.flatMap((g) => g.items.filter((d) => d.id !== 'overview').map((d) => `${g.label ?? ''}|${d.label}|${d.path}`));
+    expect(chips.map((c) => `${c.group ?? ''}|${c.label}|${c.to}`)).toEqual(expected);
   });
 });

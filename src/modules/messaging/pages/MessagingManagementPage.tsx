@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useUrlTab } from '@/hooks/useUrlTab';
 import { MessageCircle, Send, FileText, BarChart3, Settings, Users, TestTube, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
@@ -20,8 +21,10 @@ import { messagingService } from '../services';
 import { useToast } from '@/hooks/use-toast';
 import { formatNumber } from '@/utils/decimal';
 
+const MESSAGING_TABS = ['channels', 'templates', 'campaigns', 'logs', 'analytics', 'optouts'] as const;
+
 export const MessagingManagement: React.FC = () => {
-  const [activeTab, setActiveTab] = useState('channels');
+  const [activeTab, setActiveTab] = useUrlTab(MESSAGING_TABS, 'channels');
   const [loading, setLoading] = useState(true);
   const [analytics, setAnalytics] = useState({
     totalSent: 0,

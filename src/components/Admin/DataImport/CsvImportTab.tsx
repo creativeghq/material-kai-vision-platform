@@ -7,17 +7,11 @@ import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { parseCsv } from '@/utils/csv';
+import {
+  CATALOGUE_CSV_BATCH as BATCH, CATALOGUE_CSV_COLUMNS as COLUMNS, catalogueCsvRow, type CatalogueCsvResult,
+} from '@/config/catalogueCsvImport';
 
-const COLUMNS = [
-  'name', 'sku', 'description', 'category', 'barcode', 'country_of_origin',
-  'warranty', 'product_url',
-] as const;
-
-const BATCH = 500;
-
-type Result = { created: number; updated: number; skipped: number; unkeyed: number };
-
-const ISO2 = /^[A-Za-z]{2}$/;
+type Result = CatalogueCsvResult;
 
 
 export function CsvImportTab() {
@@ -53,14 +47,7 @@ export function CsvImportTab() {
     const total: Result = { created: 0, updated: 0, skipped: 0, unkeyed: 0 };
     try {
       for (let i = 0; i < rows.length; i += BATCH) {
-        const slice = rows.slice(i, i + BATCH).map((r) => {
-          const row: Record<string, string> = {};
-          for (const c of COLUMNS) if (r[c] !== undefined) row[c] = r[c];
-          const cc = (row.country_of_origin ?? '').trim();
-          if (cc && ISO2.test(cc)) row.country_of_origin = cc.toUpperCase();
-          else if (cc) delete row.country_of_origin;
-          return row;
-        });
+        const slice = rows.slice(i, i + BATCH).map(catalogueCsvRow);
         const { data, error } = await supabase.rpc('import_catalogue_rows', {
           p_workspace_id: activeWorkspaceId,
           p_rows: slice,

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { useUrlTab } from '@/hooks/useUrlTab';
 import { Mail, Send, Database, BarChart3, Settings, TestTube, Zap, Megaphone, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { Button } from '@/components/core/ui/button';
@@ -21,7 +22,10 @@ import { EmailSettingsModal } from '../components/EmailSettingsModal';
 import { formatNumber } from '@/utils/decimal';
 import { toLocalISODate, todayLocalISO } from '@/utils/datetime';
 
+const EMAIL_TABS = ['analytics', 'logs', 'domains', 'templates', 'actions', 'campaigns'] as const;
+
 export const EmailManagement: React.FC = () => {
+  const [activeTab, setActiveTab] = useUrlTab(EMAIL_TABS, 'analytics');
   const [analytics, setAnalytics] = useState({
     totalSent: 0,
     totalDelivered: 0,
@@ -190,7 +194,7 @@ export const EmailManagement: React.FC = () => {
         </div>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="analytics" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
             <TabsTrigger value="analytics">
               <BarChart3 className="h-4 w-4 mr-2" />

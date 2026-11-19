@@ -4199,10 +4199,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'catalog-ingestion',
     capability: 'workspace.manage',
     name: 'Catalogue Ingestion',
-    description: 'Ingest a supplier PDF: discover the products, review the list before anything is created, embed once after review, and see what the pipeline corrected on its own.',
+    description: 'Every catalogue import: a supplier PDF (discover, review, embed once), an XML feed (detect fields, preview, import, schedule), a CSV sheet, and catalogue exports.',
     icon: 'Wrench',
     adminOnly: true,
-    tool_ids: ['ingest_catalog', 'ingestion_report'],
+    tool_ids: ['ingest_catalog', 'ingestion_report', 'import_catalog_data'],
     quick_starts: [
       {
         label: 'Ingest a catalogue', description: 'Attach the PDF; it stops after discovery for your review', icon: 'Wrench',
@@ -4243,6 +4243,33 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'document', label: 'Catalogue (file name, optional)', kind: 'text', placeholder: 'keros_actual' },
         ],
+      },
+      {
+        label: 'Import an XML feed', description: 'Attach the XML or give its link; it maps the fields and asks before importing', icon: 'Wrench',
+        prompt: 'Import the attached XML product feed. Detect its fields and show me the mapping and one preview product before importing.',
+        done: 'Reading the feed now.',
+        promptTemplate: 'Import the XML product feed {{source}} into category {{category}}. Detect its fields and show me the mapping and one preview product before importing.',
+        form: [
+          { key: 'source', label: 'Feed Link (or leave empty and attach the file)', kind: 'text', placeholder: 'https://supplier.example/feed.xml' },
+          { key: 'category', label: 'Material Category Key', kind: 'text', required: true, placeholder: 'tiles' },
+        ],
+      },
+      {
+        label: 'Import a CSV sheet', description: 'Attach the CSV; it counts the rows and asks before writing', icon: 'Wrench',
+        prompt: 'Import the attached CSV product sheet into the catalogue.',
+        done: 'Reading the sheet now.',
+      },
+      {
+        label: 'Export the catalogue', description: 'A CSV download link to every product (ask for JSON or XML in chat)', icon: 'Wrench',
+        prompt: 'Export the catalogue as CSV and give me the download link.',
+        done: 'Here is the export.',
+        run: { tool: 'import_catalog_data', fixedArgs: { action: 'export', format: 'csv' } },
+      },
+      {
+        label: 'Import History', description: 'Recent XML and CSV imports and their status', icon: 'Wrench',
+        prompt: 'Show my recent catalogue imports.',
+        done: 'Here are the recent imports.',
+        run: { tool: 'import_catalog_data', fixedArgs: { action: 'history' } },
       },
     ],
   },

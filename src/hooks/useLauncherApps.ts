@@ -165,9 +165,8 @@ export function useLauncherApps(): LauncherApi {
     // unhubbed twin in "More". Path equality could never catch it, because the two paths differ on
     // purpose. The SIDEBAR_NAV_ITEMS tile wins: it is the one carrying the hub + capability gate.
     const navSlugs = new Set(activeFromNav.map((a) => a.moduleSlug).filter(Boolean));
-    // Registry modules that expose a workspace nav item but aren't in SIDEBAR_NAV_ITEMS.
     const activeFromModules: LauncherApp[] = moduleEntries
-      .filter((e) => !navPaths.has(e.path) && !navSlugs.has(e.slug))
+      .filter((e) => !navPaths.has(e.path) && !navPaths.has(e.path.split('?')[0]) && !navSlugs.has(e.slug))
       .map((e) => ({
         id: e.slug, moduleSlug: e.slug, label: e.label, icon: e.icon, path: e.path,
         description: e.description || catalog.get(e.slug)?.summary || undefined, active: true,

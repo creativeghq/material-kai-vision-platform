@@ -14,13 +14,13 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
-  Upload,
   Wallet,
-  Workflow,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
-import { approvalsTotal, type AdminAttention } from './adminAttention';
+import type { AdminAttention } from './adminAttention';
+
+const approvalsTotal = (a: AdminAttention): number => Object.values(a.approvals).reduce((s, n) => s + n, 0);
 
 export interface AdminDestination {
   id: string;
@@ -50,13 +50,11 @@ export const ADMIN_NAV: AdminNavGroup[] = [
       { id: 'agents', label: 'Agent Harness', path: '/admin/agents', icon: Radio, description: 'Turns, models, tools, evals, failures and conversations.' },
       { id: 'agent-ops', label: 'Agent Ops', path: '/admin/agent-ops', icon: ShieldAlert, description: 'Cases JARVIS hands to Stark and Veritas, background agents and every background process.', count: (a) => a.ops.escalated },
       { id: 'ai-configs', label: 'AI Configurations', path: '/admin/ai-configs', icon: Brain, description: 'Prompts, chat starters, writing rules and model pricing.' },
-      { id: 'flows', label: 'Flows', path: '/flows', icon: Workflow, description: 'Platform notification and automation flows.' },
     ],
   },
   {
     label: 'Data & Pipeline',
     items: [
-      { id: 'data-import', label: 'Data Import', path: '/admin/data-import', icon: Upload, description: 'PDF, XML and CSV imports.' },
       { id: 'jobs', label: 'Job Queue', path: '/admin/async-queue-monitor', icon: ListChecks, description: 'Processing jobs, stages and document health.', count: (a) => a.jobs.failed_24h + a.jobs.stale },
       { id: 'ingestion-quality', label: 'Ingestion Quality', path: '/admin/ingestion-quality', icon: FileSearch, description: 'Post-ingestion audits of every catalogue.', count: (a) => a.ingestion.needs_review },
       { id: 'materials', label: 'Materials Data', path: '/admin/materials-data', icon: Package, description: 'Products, chunks, images, categories and the AI review.' },

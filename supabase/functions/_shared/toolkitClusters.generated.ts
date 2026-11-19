@@ -262,6 +262,6 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'catalog-ingestion': {
     adminOnly: true,
     capability: ['workspace.manage'],
-    tool_ids: ['ingest_catalog', 'ingestion_report'],
+    tool_ids: ['ingest_catalog', 'ingestion_report', 'import_catalog_data'],
   },
 };

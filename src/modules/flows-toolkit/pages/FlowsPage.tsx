@@ -1,7 +1,7 @@
 /** Automations — the workspace-owner surface for the Flows toolkit. */
 
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Workflow, Play, Pause, Trash2, Sparkles, Clock, Zap, Plus, Pencil, ArrowLeft, AlertTriangle, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
@@ -51,8 +51,18 @@ export default function FlowsPage() {
   const [flows, setFlows] = useState<WorkspaceFlow[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  // null = list view; a string = the flow id open in the builder.
-  const [builderFlowId, setBuilderFlowId] = useState<string | null>(null);
+  // ?flow=<id> = the builder open on that flow; absent = list view. In the URL so a menu can link it.
+  const [params, setParams] = useSearchParams();
+  const location = useLocation();
+  const builderFlowId = params.get('flow');
+  const setBuilderFlowId = useCallback((id: string | null) => {
+    setParams((prev) => {
+      const p = new URLSearchParams(prev);
+      if (id) p.set('flow', id); else p.delete('flow');
+      p.delete('new');
+      return p;
+    });
+  }, [setParams]);
   // flow_id → last run { status, error_message } so we can surface WHY a flow failed.
   const [lastRuns, setLastRuns] = useState<Record<string, { status: string; error: string | null }>>({});
   const [runStats, setRunStats] = useState<Map<string, FlowRunStats>>(new Map());
@@ -129,7 +139,6 @@ export default function FlowsPage() {
     void load();
   };
 
-  // New automation → create an empty workspace flow, then open the builder on it.
   const createNew = async () => {
     if (!activeWorkspaceId) return;
     const name = (window.prompt('Name your automation', 'New automation') || '').trim();
@@ -141,6 +150,20 @@ export default function FlowsPage() {
       toast({ title: 'Could not create', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
     }
   };
+
+  const newHandled = useRef(false);
+  useEffect(() => {
+    if (newHandled.current || params.get('new') !== 'automation' || !canManage || !activeWorkspaceId) return;
+    newHandled.current = true;
+    setBuilderFlowId(null);
+    void createNew();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, canManage, activeWorkspaceId]);
+
+  useEffect(() => {
+    if (loading || builderFlowId || location.hash !== '#platform-defaults') return;
+    document.getElementById('platform-defaults')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [loading, builderFlowId, location.hash]);
 
   const closeBuilder = () => { setBuilderFlowId(null); setRefreshTick((n) => n + 1); void load(); };
 
@@ -319,11 +342,13 @@ export default function FlowsPage() {
         {/* Notifications this workspace gets from the platform's own seeded flows. Rendered even
             when the list above is empty — an owner drowning in inbox email arrives here looking
             for the off switch, and "No automations yet" was the whole page before. */}
-        <PlatformDefaultsSection
-          canEdit={canManage}
-          onOpenFlow={(id) => setBuilderFlowId(id)}
-          refreshTick={refreshTick}
-        />
+        <div id="platform-defaults" className="scroll-mt-20">
+          <PlatformDefaultsSection
+            canEdit={canManage}
+            onOpenFlow={(id) => setBuilderFlowId(id)}
+            refreshTick={refreshTick}
+          />
+        </div>
       </div>
     </div>
   );

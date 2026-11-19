@@ -357,11 +357,23 @@ const seoCardFromSavedResult = (saved: any): SEOGenericCardData | undefined =>
 
 // Chunk types that were emitted but rendered as plain text. Routed
 // through one generic AgentResultCard (title + structured payload).
+/** Catalogue data files the composer accepts besides PDFs. Their MIME is fixed by extension (Windows reports CSV as Excel). */
+const DATA_FILE_RE = /\.(xml|csv)$/i;
+function withDataFileMime(name: string, dataUrl: string): string {
+  const ext = /\.(xml|csv)$/i.exec(name)?.[1]?.toLowerCase();
+  if (!ext) return dataUrl;
+  const comma = dataUrl.indexOf(',');
+  return `data:${ext === 'csv' ? 'text/csv' : 'application/xml'};base64${dataUrl.slice(comma)}`;
+}
+
 const AGENT_RESULT_TITLES: Record<string, string> = {
   // The capability ledger. Renders through the generic structured card below.
   workspace_capabilities: 'What this workspace can do',
   ingestion_report: 'Ingestion Corrections',
   ingestion_job: 'Catalogue Ingestion',
+  catalog_import_result: 'Catalogue Import',
+  catalog_export_ready: 'Catalogue Export',
+  catalog_import_history: 'Import History',
   ingestion_review: 'Discovered Products',
   // Construction. All five carry a `run:` quick-start — a deterministic call with NO model turn,
   // so nothing narrates the answer. They shipped emitting only `tool_progress`, which meant the
@@ -4543,7 +4555,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           new Promise<{ name: string; dataUrl: string }>((resolve, reject) => {
             const reader = new FileReader();
             reader.onload = (ev) => {
-              if (ev.target?.result) resolve({ name: file.name, dataUrl: ev.target.result as string });
+              if (ev.target?.result) resolve({ name: file.name, dataUrl: withDataFileMime(file.name, ev.target.result as string) });
               else reject(new Error('Failed to read file'));
             };
             reader.onerror = () => reject(new Error('FileReader error'));
@@ -4569,7 +4581,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       setAttachedDocuments((prev) => [...prev, ...docs].slice(0, AGENT_MAX_DOCUMENTS));
       toast({ title: docs.length > 1 ? `${docs.length} documents attached` : 'Document attached', description: docs.map((d) => d.name).join(', ') });
     }).catch(() => {
-      toast({ title: 'Attach failed', description: 'The PDF could not be read. Please try again.', variant: 'destructive' });
+      toast({ title: 'Attach failed', description: 'The file could not be read. Please try again.', variant: 'destructive' });
     });
     // The whole array, not just its length: the byte check reads every attached data URL.
   }, [attachedDocuments, toast]);
@@ -4585,7 +4597,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // otherwise it's a document to READ (quote/invoice/spec) — Claude reads it directly.
     const pdfs = fileArray.filter((f) => f.type === 'application/pdf');
     const images = fileArray.filter((f) => f.type.startsWith('image/'));
+    // XML / CSV feeds are data for import_catalog_data, never read as a PDF.
+    const dataFiles = fileArray.filter((f) => DATA_FILE_RE.test(f.name));
     if (images.length > 0) attachImageFiles(images);
+    if (dataFiles.length > 0) attachDocumentFiles(dataFiles);
     if (pdfs.length > 0) {
       const catalogContext = (activeToolkits || []).includes('catalogs');
       if (catalogContext) {
@@ -7167,7 +7182,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*,application/pdf"
+              accept="image/*,application/pdf,.xml,.csv,text/xml,application/xml,text/csv"
               multiple
               className="hidden"
               onChange={handleImageUpload}

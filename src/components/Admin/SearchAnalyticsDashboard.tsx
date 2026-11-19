@@ -4,7 +4,6 @@ import {
   Search,
   Package,
   Users,
-  BarChart3,
   RefreshCw,
   Download,
   Calendar,
@@ -17,18 +16,36 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { Tabs, TabsContent } from '@/components/core/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { HubSegmented } from '@/components/core/hub/HubSegmented';
 import { formatNumber } from '@/utils/decimal';
 import { formatDate, todayLocalISO } from '@/utils/datetime';
 
-const TIME_RANGES = [
+export const SEARCH_TIME_RANGES = [
   { value: '7d', label: '7d' },
   { value: '30d', label: '30d' },
   { value: '90d', label: '90d' },
 ] as const;
+export type SearchTimeRange = (typeof SEARCH_TIME_RANGES)[number]['value'];
+
+export const SEARCH_ANALYTICS_TABS = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'performance', label: 'Performance' },
+  { id: 'cache', label: 'Cache Effectiveness' },
+  { id: 'kb', label: 'Knowledge Base' },
+] as const;
+export type SearchAnalyticsTab = (typeof SEARCH_ANALYTICS_TABS)[number]['id'];
+
+/** `get_search_stats` RETURNS TABLE, so PostgREST hands back an ARRAY of lowercase-keyed rows. */
+interface SearchStatsRow {
+  totalsearches: number;
+  uniqueusers: number;
+  avgsearchesperuser: number | null;
+  topsearchstrategy: string | null;
+  savedsearchrate: number | null;
+  moodboardconversionrate: number | null;
+}
 
 interface PerformanceStats {
   total_searches: number;
@@ -155,7 +172,7 @@ const Rate = ({ value }: { value: number | null }) =>
     ? <span className="text-muted-foreground" title="No producer writes this metric yet">—</span>
     : <>{value.toFixed(1)}%</>;
 
-export const SearchAnalyticsDashboard = () => {
+export const SearchAnalyticsDashboard = ({ tab, timeRange }: { tab: SearchAnalyticsTab; timeRange: SearchTimeRange }) => {
   const [popularSearches, setPopularSearches] = useState<PopularSearch[]>([]);
   const [stats, setStats] = useState<AnalyticsStats | null>(null);
   const [perfStats, setPerfStats] = useState<PerformanceStats | null>(null);
@@ -166,11 +183,13 @@ export const SearchAnalyticsDashboard = () => {
   const [kbStats, setKbStats] = useState<KbSearchAnalytics | null>(null);
   const [kbError, setKbError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<'7d' | '30d' | '90d'>('30d');
-  const [activeTab, setActiveTab] = useState('overview');
+  // Each failed read is NAMED on the page; a swallowed error rendered as an empty panel.
+  const [loadErrors, setLoadErrors] = useState<string[]>([]);
   const { toast } = useToast();
 
   const loadAnalytics = async () => {
+    const errors: string[] = [];
+    const note = (what: string, e: { message: string } | null) => { if (e) errors.push(`${what}: ${e.message}`); };
     try {
       setLoading(true);
 
@@ -190,16 +209,24 @@ export const SearchAnalyticsDashboard = () => {
         time_interval: interval,
       });
 
-      if (!statsError && statsData) {
-        setStats(statsData);
-      }
+      note('Totals', statsError);
+      const row = (Array.isArray(statsData) ? statsData[0] : statsData) as SearchStatsRow | undefined;
+      setStats(row ? {
+        totalSearches: Number(row.totalsearches ?? 0),
+        uniqueUsers: Number(row.uniqueusers ?? 0),
+        avgSearchesPerUser: row.avgsearchesperuser == null ? null : Number(row.avgsearchesperuser),
+        topSearchStrategy: row.topsearchstrategy ?? '—',
+        savedSearchRate: row.savedsearchrate == null ? null : Number(row.savedsearchrate),
+        moodboardConversionRate: row.moodboardconversionrate == null ? null : Number(row.moodboardconversionrate),
+      } : null);
 
       // Load per-stage performance stats
       const { data: perfData, error: perfError } = await supabase.rpc('get_search_performance_stats', {
         time_interval: interval,
       });
+      note('Performance', perfError);
       if (!perfError && perfData) {
-        setPerfStats(perfData);
+        setPerfStats(perfData as unknown as PerformanceStats);
       }
 
       // Load slowest queries
@@ -207,6 +234,7 @@ export const SearchAnalyticsDashboard = () => {
         time_interval: interval,
         max_results: 20,
       });
+      note('Slowest queries', slowError);
       if (!slowError && slowData) {
         setSlowestQueries(slowData);
       }
@@ -216,6 +244,7 @@ export const SearchAnalyticsDashboard = () => {
         time_interval: interval,
         max_results: 30,
       });
+      note('Zero-result queries', zeroError);
       if (!zeroError && zeroData) {
         setZeroResults(zeroData);
       }
@@ -234,14 +263,16 @@ export const SearchAnalyticsDashboard = () => {
 
       // Load cache stats
       const { data: cacheData, error: cacheError } = await supabase.rpc('get_query_cache_stats');
+      note('Cache', cacheError);
       if (!cacheError && cacheData) {
-        setCacheStats(cacheData);
+        setCacheStats(cacheData as unknown as CacheStats);
       }
 
       // Load top cached queries
       const { data: topCachedData, error: topCachedError } = await supabase.rpc('get_top_cached_queries', {
         max_results: 20,
       });
+      note('Top cached queries', topCachedError);
       if (!topCachedError && topCachedData) {
         setTopCached(topCachedData);
       }
@@ -253,6 +284,7 @@ export const SearchAnalyticsDashboard = () => {
         variant: 'destructive',
       });
     } finally {
+      setLoadErrors(errors);
       setLoading(false);
     }
   };
@@ -285,29 +317,14 @@ export const SearchAnalyticsDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-end">
-        <HubSegmented options={TIME_RANGES} value={timeRange} onChange={setTimeRange} aria-label="Time window" />
-      </div>
+      {loadErrors.length > 0 && (
+        <div role="alert" className="rounded-sm border border-hairline bg-card p-3 text-sm">
+          <p className="flex items-center gap-2 font-medium text-destructive"><AlertCircle className="h-4 w-4" /> Some figures could not be read</p>
+          <ul className="mt-1 list-disc pl-6 text-xs text-muted-foreground">{loadErrors.map((e) => <li key={e}>{e}</li>)}</ul>
+        </div>
+      )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="w-full h-auto flex-wrap justify-start gap-2 bg-transparent p-0">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="performance" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Performance
-          </TabsTrigger>
-          <TabsTrigger value="cache" className="flex items-center gap-2">
-            <Database className="h-4 w-4" />
-            Cache Effectiveness
-          </TabsTrigger>
-          <TabsTrigger value="kb" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Knowledge Base
-          </TabsTrigger>
-        </TabsList>
+      <Tabs value={tab} className="w-full">
 
       <TabsContent value="overview" className="space-y-6">
       {/* Stats Overview - Compact Design */}
@@ -331,8 +348,17 @@ export const SearchAnalyticsDashboard = () => {
               <Users className="h-4 w-4" style={{ color: 'hsl(var(--primary))' }} />
               <p className="text-xs text-muted-foreground">Unique Users</p>
             </div>
-            <div className="text-2xl font-bold">{formatNumber(stats.uniqueUsers)}</div>
-            <p className="text-xs text-muted-foreground mt-1">Active searchers</p>
+            {stats.totalSearches > 0 && stats.uniqueUsers === 0 ? (
+              <>
+                <div className="text-2xl font-bold text-muted-foreground">—</div>
+                <p className="text-xs text-muted-foreground mt-1">Searcher identity is not recorded</p>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">{formatNumber(stats.uniqueUsers)}</div>
+                <p className="text-xs text-muted-foreground mt-1">Active searchers</p>
+              </>
+            )}
           </div>
 
           <div className="dashboard-card">
