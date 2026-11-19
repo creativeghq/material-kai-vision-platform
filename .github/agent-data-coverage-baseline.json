@@ -109,6 +109,7 @@
     "get_workspace_capabilities",
     "get_workspace_cash_discount_pct",
     "global_search",
+    "import_catalogue_rows",
     "inbound_doc_to_supplier_bill",
     "inbound_issuers_summary",
     "increment_kb_doc_agent_mention",

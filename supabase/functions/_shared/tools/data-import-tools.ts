@@ -109,7 +109,7 @@ export const createImportCatalogDataTool = (
           .select('id, import_type, source_name, status, total_products, processed_products, failed_products, created_at, completed_at, error_message, is_scheduled, cron_schedule, next_run_at, category')
           .eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(Math.min(args.limit ?? 10, 50));
         if (error) return fail(`Import history could not be read: ${error.message}`);
-        onChunk?.({ type: 'catalog_import_history', jobs: data ?? [], timestamp: Date.now() });
+        onChunk?.({ type: 'data_import_history', jobs: data ?? [], timestamp: Date.now() });
         return JSON.stringify({ success: true, jobs: data ?? [] });
       }
 
@@ -130,7 +130,7 @@ export const createImportCatalogDataTool = (
         if (up.error) return fail(`The export was produced but could not be stored: ${up.error.message}`);
         const signed = await sb.storage.from(EXPORT_BUCKET).createSignedUrl(path, 24 * 3600, { download: true });
         if (signed.error || !signed.data?.signedUrl) return fail('The export was stored but no download link could be made.');
-        onChunk?.({ type: 'catalog_export_ready', format, products: count, capped: count >= EXPORT_LIMIT,
+        onChunk?.({ type: 'data_export_ready', format, products: count, capped: count >= EXPORT_LIMIT,
           download_url: signed.data.signedUrl, timestamp: Date.now() });
         return JSON.stringify({ success: true, format, products: count, capped: count >= EXPORT_LIMIT,
           download_url: signed.data.signedUrl, expires_in_hours: 24 });
@@ -153,9 +153,8 @@ export const createImportCatalogDataTool = (
         const db = callerDbClient(jwt, userId, workspaceId);
         const total: CatalogueCsvResult = { created: 0, updated: 0, skipped: 0, unkeyed: 0 };
         for (let i = 0; i < rows.length; i += CATALOGUE_CSV_BATCH) {
-          const { data, error } = await db.rpc('import_catalogue_rows', {
-            p_workspace_id: workspaceId, p_rows: rows.slice(i, i + CATALOGUE_CSV_BATCH).map(catalogueCsvRow),
-          });
+          const batch = rows.slice(i, i + CATALOGUE_CSV_BATCH).map(catalogueCsvRow);
+          const { data, error } = await db.rpc('import_catalogue_rows', { p_workspace_id: workspaceId, p_rows: batch });
           if (error) {
             return JSON.stringify({ success: false, partial: true, ...total,
               error: `Stopped partway after ${total.created + total.updated} products were written: ${error.message}` });
@@ -164,7 +163,7 @@ export const createImportCatalogDataTool = (
           total.created += got?.created ?? 0; total.updated += got?.updated ?? 0;
           total.skipped += got?.skipped ?? 0; total.unkeyed += got?.unkeyed ?? 0;
         }
-        onChunk?.({ type: 'catalog_import_result', kind: 'csv', ...total, timestamp: Date.now() });
+        onChunk?.({ type: 'data_import_result', kind: 'csv', ...total, timestamp: Date.now() });
         return JSON.stringify({ success: true, ...total });
       }
 
@@ -201,7 +200,7 @@ export const createImportCatalogDataTool = (
           row_path: (job.metadata as any)?.row_path ?? undefined, mapping_template_id: job.mapping_template_id, parent_job_id: job.id,
         });
         if (!r.ok) return fail(r.error ?? 'The re-run could not start.');
-        onChunk?.({ type: 'catalog_import_result', kind: 'xml', job_id: r.data?.job_id, status: 'started', timestamp: Date.now() });
+        onChunk?.({ type: 'data_import_result', kind: 'xml', job_id: r.data?.job_id, status: 'started', timestamp: Date.now() });
         return JSON.stringify({ success: true, job_id: r.data?.job_id });
       }
 
@@ -247,7 +246,7 @@ export const createImportCatalogDataTool = (
         }
         const r = await callEdge(jwt, 'xml-import-orchestrator', { ...body, source_name: sourceName, source_url: args.source_url });
         if (!r.ok) return fail(r.error ?? 'The import could not start.');
-        onChunk?.({ type: 'catalog_import_result', kind: 'xml', job_id: r.data?.job_id, status: 'started', source_name: sourceName, timestamp: Date.now() });
+        onChunk?.({ type: 'data_import_result', kind: 'xml', job_id: r.data?.job_id, status: 'started', source_name: sourceName, timestamp: Date.now() });
         return JSON.stringify({ success: true, job_id: r.data?.job_id, message: 'Started. Check progress with history.' });
       }
 

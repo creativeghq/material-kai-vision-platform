@@ -323,10 +323,10 @@ export const LAUNCHER_SECTIONS: Record<string, LauncherSection[]> = {
     { label: 'Message Log', to: '/profile?tab=social-accounts&section=wa-logs', icon: ListChecks, requireWorkspaceAdmin: true },
     { label: 'Analytics', to: '/profile?tab=social-accounts&section=wa-analytics', icon: BarChart3, requireWorkspaceAdmin: true },
     { label: 'Opt-Outs', to: '/profile?tab=social-accounts&section=wa-optouts', icon: UserMinus, requireWorkspaceAdmin: true },
-    { label: 'Message with the agent', to: '/agent-hub?capability=messaging', icon: Bot, requireAnyCapability: ['agent.use'] },
+    { label: 'Message with the Agent', to: '/agent-hub?capability=messaging', icon: Bot, requireAnyCapability: ['agent.use'] },
   ],
   reviews: [
-    { label: 'Reply with the agent', to: '/agent-hub?capability=reviews', icon: Bot, requireAnyCapability: ['agent.use'] },
+    { label: 'Reply with the Agent', to: '/agent-hub?capability=reviews', icon: Bot, requireAnyCapability: ['agent.use'] },
   ],
   // Docs (module registry entry; its launcher id is the module SLUG, not a SIDEBAR_NAV_ITEMS id).
   // The page is a list + editor with no URL tabs, so the useful inner link is the create verb —

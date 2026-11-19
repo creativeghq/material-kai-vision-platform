@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import { blankComments } from '../helpers/stripComments';
 import { parseCsv } from '../../src/utils/csv';
+import { CATALOGUE_CSV_BATCH, CATALOGUE_CSV_COLUMNS, catalogueCsvRow } from '../../src/config/catalogueCsvImport';
 import { toCsv } from '../../supabase/functions/_shared/serialize.ts';
 
 const read = (p: string) => blankComments(
@@ -34,23 +35,29 @@ describe('one CSV reader, not one per feature', () => {
 
 describe('a spreadsheet cannot set what a spreadsheet must not set', () => {
   const tab = read('src/components/Admin/DataImport/CsvImportTab.tsx');
+  const agent = read('supabase/functions/_shared/tools/data-import-tools.ts');
 
-  it('sends an allowlist of columns, never the parsed row', () => {
-    expect(tab).toMatch(/for \(const c of COLUMNS\)/);
-    expect(tab, 'spreading the parsed row is the mass-assignment shape')
-      .not.toMatch(/p_rows:\s*rows\b/);
+  it('both importers send the allowlisted row, never the parsed one', () => {
+    expect(catalogueCsvRow({ name: 'Tile', cost: '9', price: '12', workspace_id: 'x' })).toEqual({ name: 'Tile' });
+    expect(tab).toMatch(/\.map\(catalogueCsvRow\)/);
+    expect(agent).toMatch(/\.map\(catalogueCsvRow\)/);
+    for (const src of [tab, agent]) {
+      expect(src, 'spreading the parsed row is the mass-assignment shape').not.toMatch(/p_rows:\s*rows\b/);
+    }
   });
 
   it('never offers price or cost as an importable column', () => {
-    const cols = tab.match(/const COLUMNS = \[([\s\S]*?)\] as const;/)?.[1] ?? '';
+    expect(CATALOGUE_CSV_COLUMNS.length).toBeGreaterThan(3);
     for (const banned of ['cost', 'price', 'markup', 'workspace_id']) {
-      expect(cols.includes(banned), `${banned} must not be importable from a file`).toBe(false);
+      const hit = (CATALOGUE_CSV_COLUMNS as readonly string[]).some((c) => c.includes(banned));
+      expect(hit, `${banned} must not be importable from a file`).toBe(false);
     }
   });
 
   it('batches rather than posting an unbounded array', () => {
-    expect(tab).toMatch(/BATCH = \d+/);
+    expect(CATALOGUE_CSV_BATCH).toBeLessThanOrEqual(2000);
     expect(tab).toMatch(/i \+= BATCH/);
+    expect(agent).toMatch(/i \+= CATALOGUE_CSV_BATCH/);
   });
 });
 
@@ -94,9 +101,9 @@ describe('an import cannot be lost or silently truncated', () => {
   const exp = read('src/components/Admin/DataImport/CatalogExportTab.tsx');
 
   it('a country that is not a two-letter code is dropped, not sent into a CHECK', () => {
-    expect(tab).toMatch(/ISO2\.test\(cc\)/);
-    expect(tab, 'a 23514 mid-batch loses the batch while earlier ones are already committed')
-      .toMatch(/delete row\.country_of_origin/);
+    expect(catalogueCsvRow({ name: 'Tile', country_of_origin: 'Greece' }), 'a 23514 mid-batch loses the batch')
+      .toEqual({ name: 'Tile' });
+    expect(catalogueCsvRow({ name: 'Tile', country_of_origin: 'gr' })).toEqual({ name: 'Tile', country_of_origin: 'GR' });
   });
 
   it('a partial import reports what was already written', () => {

@@ -371,9 +371,9 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   workspace_capabilities: 'What this workspace can do',
   ingestion_report: 'Ingestion Corrections',
   ingestion_job: 'Catalogue Ingestion',
-  catalog_import_result: 'Catalogue Import',
-  catalog_export_ready: 'Catalogue Export',
-  catalog_import_history: 'Import History',
+  data_import_result: 'Catalogue Import',
+  data_export_ready: 'Catalogue Export',
+  data_import_history: 'Import History',
   ingestion_review: 'Discovered Products',
   // Construction. All five carry a `run:` quick-start — a deterministic call with NO model turn,
   // so nothing narrates the answer. They shipped emitting only `tool_progress`, which meant the
