@@ -75,6 +75,10 @@ const TASKS: Record<string, TaskSpec> = {
     module: 'signals-core',
     path: () => '/api/v1/signals/cron-corpus?resolve_limit=8&enumerate_limit=10',
   },
+  'signals-described': {
+    module: 'signals-described',
+    path: () => '/api/v1/signals/cron-described?limit=20',
+  },
 };
 
 const json = (body: unknown, status = 200) =>

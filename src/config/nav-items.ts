@@ -42,6 +42,7 @@ import {
   LayoutDashboard,
   Plug,
   BookText,
+  Sparkles,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { PRODUCT_BROWSE_ANY, type Capability } from '@/auth/capabilities';
@@ -197,6 +198,7 @@ export const SIDEBAR_NAV_ITEMS: SidebarNavItem[] = [
   // Signals (#462): one page, one entry per module, so each kind appears only where it is held.
   { id: 'signals-hiring', label: 'Hiring Signals', path: '/signals?tab=explore&kind=hiring', icon: UserPlus, requireCapability: 'crm.view', moduleSlug: 'signals-hiring', surface: 'app', hub: 'marketing', description: 'Companies that start hiring for a role or skill, from their own job boards.' },
   { id: 'signals-technographics', label: 'Technology Signals', path: '/signals?tab=explore&kind=technology', icon: Layers, requireCapability: 'crm.view', moduleSlug: 'signals-technographics', surface: 'app', hub: 'marketing', description: 'Who runs which ERP, e-commerce, CAD/BIM or marketing stack.' },
+  { id: 'signals-described', label: 'Described Signals', path: '/signals?tab=saved&new=described', icon: Sparkles, requireCapability: 'crm.view', moduleSlug: 'signals-described', surface: 'app', hub: 'marketing', description: 'Describe what to watch for in plain language; AI checks new items hourly.' },
   { id: 'signals-intent', label: 'Intent Signals', path: '/signals?tab=explore&kind=intent', icon: Radar, requireCapability: 'crm.view', moduleSlug: 'signals-intent', surface: 'app', hub: 'marketing', description: 'Companies whose hiring says they are in market for a use case.' },
   // Contracts & e-signature — agent-driven (Trinity); the send-for-signature is confirm-gated.
   { id: 'contracts', label: 'Contracts', path: '/agent-hub?capability=contract', icon: FileSignature, requireCapability: 'agent.use', moduleSlug: 'contracts', surface: 'app', hub: 'finance', description: 'List contracts and send drafts for e-signature — in the AI studio.' },
@@ -392,6 +394,7 @@ export const BOTTOM_NAV_PRIORITY: readonly string[] = [
   'signals-hiring',
   'signals-technographics',
   'signals-intent',
+  'signals-described',
   'operator-hq',
   'operator-flows',
   'push-notifications',

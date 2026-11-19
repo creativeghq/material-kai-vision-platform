@@ -1,5 +1,3 @@
-/** Server maintenance (#590): the outside probe and the operator notification, shared by the report endpoint and Agent Ops. */
-
 import type { DbClient } from './supabase-client.ts';
 import { guardedFetch } from './ssrf-guard.ts';
 import { emitFlowEventToWorkspaceRoles } from './flow-events.ts';
@@ -37,7 +35,6 @@ export async function probeServer(db: DbClient, server: string): Promise<ServerP
   }
 }
 
-/** Bell for the root workspace's owners and admins, delivered by the locked system-default flow. */
 export async function notifyServerMaintenance(db: DbClient, n: {
   server: string; stage: 'run' | 'review'; verdict: string; title: string; body: string; level: 'info' | 'warning'; actionUrl?: string;
 }) {
@@ -58,7 +55,6 @@ export async function notifyServerMaintenance(db: DbClient, n: {
 
 const mb = (b: unknown) => (typeof b === 'number' ? `${Math.max(0, Math.round(b / 1048576)).toLocaleString('en')} MB` : '—');
 
-/** The bell text for one stored run, after the outside probe has confirmed (or contradicted) it. */
 export function runNotification(label: string, run: {
   verdict: string; reason: string | null; steps: Array<{ name: string; detail: string }>;
   versions_after: { kernel?: string | null; nginx?: string | null } | null;

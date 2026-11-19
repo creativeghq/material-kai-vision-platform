@@ -10463,6 +10463,18 @@
         "response": "{ok, results: [{index, family, wrote: 'transcript'|'document'|'none', status: 'ok'|'failed'|'skipped'|'already'|'none', transcript?, document?}], attachments}"
       },
       {
+        "name": "record_classifier_outcome",
+        "summary": "A thread member confirms or corrects one AI verdict: the kind of an attachment (inbox_document_kind) or what the conversation is about (inbox_conversation_intent). The verdict, its confidence, model and inputs are re-read from the stored record, never taken from the request; the row feeds classifier_calibration",
+        "params": [
+          { "name": "classifier", "required": true, "type": "string", "desc": "inbox_document_kind | inbox_conversation_intent" },
+          { "name": "thread_id", "required": true, "type": "string (uuid)" },
+          { "name": "human_verdict", "required": true, "type": "string", "desc": "A document kind or an intent from the same vocabulary the classifier uses" },
+          { "name": "message_id", "required": false, "type": "string (uuid)", "desc": "Required for inbox_document_kind" },
+          { "name": "attachment_index", "required": false, "type": "integer", "desc": "Position on the message, 0-based. Default 0" }
+        ],
+        "response": "{ok, agreed}"
+      },
+      {
         "name": "get_attachment",
         "summary": "One stored attachment of a message as base64, for members (the agent mail toolkit reads it to transcribe or book it). 10 MB cap; 409 when the file was never downloaded into storage",
         "params": [
@@ -16662,7 +16674,7 @@
     "query": [
       {
         "name": "task",
-        "type": "price-refresh | mention-refresh | mention-probe | job-refresh | job-digest | signals-corpus",
+        "type": "price-refresh | mention-refresh | mention-probe | job-refresh | job-digest | signals-corpus | signals-described",
         "required": true,
         "desc": "Which monitoring sweep to dispatch. Unknown values return 400 with the known list."
       }

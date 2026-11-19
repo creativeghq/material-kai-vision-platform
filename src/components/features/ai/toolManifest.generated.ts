@@ -615,6 +615,19 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'describe_signal',
+    file: 'supabase/functions/_shared/tools/signals-tools.ts',
+    factory: 'createDescribeSignalTool',
+    description: 'Create a signal from a plain-language description ("tile companies opening a showroom in Greece").',
+    params: [
+      { name: 'description', type: 'string', optional: false, description: 'What to watch for, in the user\'s words (10 to 1000 characters)' },
+      { name: 'name', type: 'string', optional: true, description: 'Optional name; one is drafted if omitted' },
+      { name: 'crm_only', type: 'boolean', optional: true, description: 'Only companies already in this workspace\'s CRM' },
+      { name: 'rules', type: 'string', optional: true, description: 'The rules string returned by the draft call; pass it back unchanged when saving' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'true only after the user agreed to the rules and the credit estimate' },
+    ],
+  },
+  {
     name: 'discover_platform_api',
     file: 'supabase/functions/_shared/tools/platform-api-tools.ts',
     factory: 'createDiscoverPlatformApiTool',
@@ -708,6 +721,18 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'company_id', type: 'string', optional: true, description: 'The crm company UUID to enrich.' },
       { name: 'company_query', type: 'string', optional: true, description: 'Fuzzy company name to resolve (if you don\'t have the id).' },
+    ],
+  },
+  {
+    name: 'estimate_project_plan',
+    file: 'supabase/functions/_shared/tools/calculator-tools.ts',
+    factory: 'createProjectPlanEstimateTool',
+    description: 'Price the full scope of works for a RENOVATION (e.g.',
+    params: [
+      { name: 'project_type', type: 'string', optional: true, description: 'The project_type of one template from the first call, e.g. "full_home_renovation". Omit to list the templates.' },
+      { name: 'dimensions', type: 'object', optional: true, description: 'Dimension values keyed by the template\'s dimension key, e.g. { "floor_area": 85, "n_bathrooms": 1 }. Unstated keys use the template default.' },
+      { name: 'options', type: 'array', optional: true, description: 'Single-choice selections by name, as listed under available.options in an earlier result.' },
+      { name: 'extras', type: 'array', optional: true, description: 'Optional add-ons to include, by name, as listed under available.extras in an earlier result.' },
     ],
   },
   {
@@ -1768,6 +1793,25 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'paid_on', type: 'string', optional: true, description: 'YYYY-MM-DD (defaults to today)' },
       { name: 'method', type: 'string', optional: true, description: 'bank_transfer | cash | card | check | other (default bank_transfer)' },
       { name: 'reference', type: 'string', optional: true, description: 'Bank reference / cheque number' },
+    ],
+  },
+  {
+    name: 'plan_tile_installation',
+    file: 'supabase/functions/_shared/tools/calculator-tools.ts',
+    factory: 'createTileInstallationTool',
+    description: 'Plan laying a TILED FLOOR in one rectangular room: how many tiles to buy (incl.',
+    params: [
+      { name: 'room_width_m', type: 'number', optional: false, description: 'Room width in metres (the tile length runs along it).' },
+      { name: 'room_depth_m', type: 'number', optional: false, description: 'Room depth in metres.' },
+      { name: 'tile_length_mm', type: 'number', optional: false, description: 'Tile long side in millimetres (a "60x120" tile is 1200).' },
+      { name: 'tile_width_mm', type: 'number', optional: false, description: 'Tile short side in millimetres (a "60x120" tile is 600).' },
+      { name: 'tile_thickness_mm', type: 'number', optional: true, description: 'Tile thickness in mm (default …).' },
+      { name: 'joint_mm', type: 'number', optional: true, description: 'Grout joint width in mm (default …).' },
+      { name: 'perimeter_gap_mm', type: 'number', optional: true, description: 'Movement gap at the walls in mm (default …).' },
+      { name: 'trowel_notch_mm', type: 'number', optional: true, description: 'Trowel notch in mm. Omit to use the size suggested for the tile.' },
+      { name: 'pattern', type: 'enum', enum: ['stack', 'offset_1_2', 'offset_1_3', 'diagonal', 'herringbone', 'diagonal_herringbone', 'basket_weave'], optional: true, description: 'Laying pattern, one of: …. Default stack.' },
+      { name: 'prime', type: 'boolean', optional: true, description: 'Prime the screed first (default yes).' },
+      { name: 'back_butter', type: 'boolean', optional: true, description: 'Back-butter each tile. Omit to use the suggestion for the tile size (yes from 60 cm).' },
     ],
   },
   {

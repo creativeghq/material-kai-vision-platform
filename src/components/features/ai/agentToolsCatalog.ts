@@ -118,6 +118,24 @@ const KAI_TOOLS: AgentToolEntry[] = [
       'Price a 4 m kitchen and show me what the worktop upgrades would add',
     ],
   },
+  {
+    id: 'plan_tile_installation', name: 'Tile Installation', category: 'Calculators',
+    credits: 0,
+    desc: 'Plan a tiled floor for one room: tiles to buy (cuts and spare included), spacers, adhesive and grout, plus the step-by-step laying sequence. Free, instant, no upstream API.',
+    examples: [
+      'How many 60x60 tiles, how much adhesive and grout for a 4 x 3.2 m room?',
+      'Plan a herringbone floor of 20x120 planks in a 5 x 4 m living room',
+    ],
+  },
+  {
+    id: 'estimate_project_plan', name: 'Renovation Estimate', category: 'Calculators',
+    credits: 0,
+    desc: 'Price the full scope of works for a renovation (full home, bathroom, repaint) off the live platform price lists, section by section. Free, instant, no upstream API.',
+    examples: [
+      'What would a full renovation of an 85 m² apartment with one bathroom cost?',
+      'Estimate a bathroom renovation with 5 m² of floor and 20 m² of wall tiles',
+    ],
+  },
 
   // ── Mention monitoring (all users; module-gated; per-tool credits) ─
   {
@@ -411,6 +429,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
     examples: [
       'Alert me when a company starts hiring a BIM manager',
       'Show the new matches on my signals',
+    ],
+  },
+  {
+    id: 'describe_signal', name: 'Describe a Signal', category: 'Signals',
+    moduleSlug: 'signals-described',
+    desc: 'Create a signal from a plain-language description: drafts the rules, tests them on the last 30 days, shows the credit cost, then saves on your say-so.',
+    examples: [
+      'Alert me when a tile company opens a new showroom in Greece',
+      'Watch for companies switching ERP',
     ],
   },
 
@@ -1613,7 +1640,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // finally shows the two calculators it was silently binding all along.
     id: 'calculators',
     name: 'Calculators',
-    description: 'Deterministic HVAC/energy maths — heat-pump sizing and an annual running-cost comparison across six heating methods. Free, instant, no upstream API.',
+    description: 'Deterministic home maths — heat-pump sizing, heating running costs, kitchen and renovation pricing off the live price lists, and tile-floor quantities. Free, instant, no upstream API.',
     icon: 'Calculator',
     alwaysOn: true,
     // Bound everywhere, OFFERED only where the maths belongs. Heat-pump sizing, annual
@@ -1621,7 +1648,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
     // Vision designs the room, Baxter advises on the property. On Edith's opening screen
     // — an SEO agent — they read as the app having no idea what it is for.
     starterAgents: ['erp', 'interior-designer', 'property-advisor'],
-    tool_ids: ['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost'],
+    tool_ids: [
+      'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
+    ],
     quick_starts: [
       {
         // autoFields, not a hand-written form: between them these two tools declare
@@ -1665,6 +1695,31 @@ export const TOOLKITS: ToolkitDefinition[] = [
         form: [
           { key: 'run_length_m', label: 'Base Cabinet Run (m)', kind: 'number', required: true, placeholder: '6', help: 'Add up the walls the kitchen runs along.' },
         ],
+      },
+      {
+        label: 'Plan a tiled floor',
+        description: 'Tiles, adhesive and grout for one room, with the laying steps',
+        icon: 'Grid3x3',
+        prompt: 'How many 60x60 tiles, how much adhesive and grout do I need for a 4 x 3.2 m room?',
+        done: 'I\'ve worked out the tiles and materials for that floor.',
+        run: { tool: 'plan_tile_installation' },
+        autoFields: true,
+        form: [
+          { key: 'room_width_m', label: 'Room Width (m)', kind: 'number', required: true, placeholder: '4' },
+          { key: 'room_depth_m', label: 'Room Depth (m)', kind: 'number', required: true, placeholder: '3.2' },
+          { key: 'tile_length_mm', label: 'Tile Length (mm)', kind: 'number', required: true, placeholder: '600' },
+          { key: 'tile_width_mm', label: 'Tile Width (mm)', kind: 'number', required: true, placeholder: '600' },
+        ],
+      },
+      {
+        // No form: the project types and their dimensions are rows in the starter blueprints, so
+        // the first call lists them and the user answers in chat.
+        label: 'Estimate a renovation',
+        description: 'Full scope of works, priced off the live renovation price lists',
+        icon: 'ListChecks',
+        prompt: 'What renovation projects can you price? Show me what each one needs.',
+        done: 'Here are the renovation types I can price and what each needs.',
+        run: { tool: 'estimate_project_plan' },
       },
     ],
   },
@@ -2476,6 +2531,31 @@ export const TOOLKITS: ToolkitDefinition[] = [
       },
       {
         label: 'Intent Matches', description: 'New matches on your signals', icon: 'ListChecks',
+        prompt: 'Show the new matches on my signals.',
+        done: 'Here is what your signals found lately.',
+        run: { tool: 'manage_signal', fixedArgs: { action: 'matches' } },
+      },
+    ],
+  },
+  {
+    id: 'signals-described',
+    name: 'Described Signals',
+    description: 'Describe what to watch for in plain language; an AI drafts the rules, tests them on 30 days of data and checks new items hourly.',
+    icon: 'Sparkles',
+    moduleSlug: 'signals-described',
+    capability: 'crm.view',
+    tool_ids: ['describe_signal', 'manage_signal'],
+    quick_starts: [
+      {
+        label: 'Describe a Signal', description: 'Watch for anything, in your own words', icon: 'Sparkles',
+        prompt: 'Help me set up a signal described in my own words.',
+        promptTemplate: 'Create a signal for: "{{description}}". Draft the rules, test them on the last 30 days and show me the sample and the weekly credit cost before saving.',
+        form: [
+          { key: 'description', label: 'What to watch for', kind: 'text', required: true, placeholder: 'Tile companies opening a new showroom in Greece' },
+        ],
+      },
+      {
+        label: 'Signal Matches', description: 'New matches on your signals', icon: 'ListChecks',
         prompt: 'Show the new matches on my signals.',
         done: 'Here is what your signals found lately.',
         run: { tool: 'manage_signal', fixedArgs: { action: 'matches' } },
@@ -4294,7 +4374,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
   'email-marketing': 'marketing', messaging: 'service', inbox: 'service', mail: 'service', reviews: 'service',
   'price-monitoring': 'sales',
-  'signals-hiring': 'marketing', 'signals-technographics': 'marketing', 'signals-intent': 'marketing',
+  'signals-hiring': 'marketing', 'signals-technographics': 'marketing', 'signals-intent': 'marketing', 'signals-described': 'marketing',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-pages': 'marketing', 'seo-article': 'marketing',
   // The newest SEO cluster and the only one that was missing from both maps: unmapped toolkits
@@ -4452,6 +4532,7 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   'field-registry': ['product-business'],
   'job-research': ['product-business'], 'price-monitoring': ['product-business'], crm: ['product-business'],
   'signals-hiring': ['product-business'], 'signals-technographics': ['product-business'], 'signals-intent': ['product-business'],
+  'signals-described': ['product-business'],
   // Studio / interior → Vision
   generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
   projects: ['interior-designer', 'erp'],

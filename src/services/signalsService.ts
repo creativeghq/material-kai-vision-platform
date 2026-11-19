@@ -1,21 +1,61 @@
 /** Signals (#462): saved hiring / technology / intent signals and the corpus reads behind them. */
 import { supabase } from '@/integrations/supabase/client';
+import { mivaaApi } from '@/services/mivaaApiClient';
 
-export type SignalKind = 'hiring' | 'technology' | 'intent';
+export type ListSignalKind = 'hiring' | 'technology' | 'intent';
+export type SignalKind = ListSignalKind | 'described';
+
+export const isListKind = (k: SignalKind): k is ListSignalKind => k !== 'described';
 
 export const SIGNAL_KIND_MODULE: Record<SignalKind, string> = {
   hiring: 'signals-hiring',
   technology: 'signals-technographics',
   intent: 'signals-intent',
+  described: 'signals-described',
 };
 
 export const SIGNAL_KIND_LABEL: Record<SignalKind, string> = {
   hiring: 'Hiring',
   technology: 'Technology',
   intent: 'Intent',
+  described: 'Described',
 };
 
-export const SIGNAL_FILTER_KEY: Record<SignalKind, 'keywords' | 'technology_slugs' | 'intent_keys'> = {
+export const DESCRIBED_SOURCE_LABEL: Record<string, string> = {
+  job_posting: 'Job Ads',
+  technology: 'Technology Detections',
+  page_change: 'Page Changes',
+  mention: 'Mentions',
+  price_move: 'Price Moves',
+};
+
+export interface DescribedSpec {
+  sources: string[];
+  keywords: string[];
+  must_not: string[];
+  judge_question: string;
+  positive_examples: string[];
+  negative_examples: string[];
+  min_similarity: number;
+}
+
+export interface DescribedBacktest {
+  candidates_30d: number;
+  candidates_capped: boolean;
+  embedding_used: boolean;
+  matches_in_sample: number;
+  failed_in_sample: number;
+  judged: Array<{
+    title: string; url: string | null; source: string; observed_at: string; company_domain: string | null;
+    status: 'match' | 'no_match' | 'failed'; reason?: string; evidence_quote?: string; error?: string;
+  }>;
+  estimate: {
+    items_per_week: number; credits_per_week: number; credit_per_item: number;
+    first_run_credits: number; first_run_days: number;
+  };
+}
+
+export const SIGNAL_FILTER_KEY: Record<ListSignalKind, 'keywords' | 'technology_slugs' | 'intent_keys'> = {
   hiring: 'keywords',
   technology: 'technology_slugs',
   intent: 'intent_keys',
@@ -28,6 +68,8 @@ export interface SignalFilter {
   crm_only?: boolean;
   location_contains?: string;
   evidence?: 'job_posting' | 'website_html';
+  description?: string;
+  spec?: DescribedSpec;
 }
 
 export interface SavedSignal {
@@ -40,6 +82,7 @@ export interface SavedSignal {
   notify: boolean;
   last_evaluated_at: string | null;
   last_match_count: number;
+  paused_reason: 'no_credits' | null;
   created_at: string;
 }
 
@@ -70,7 +113,7 @@ export interface CorpusCoverage {
 }
 
 export interface SignalSearchResult {
-  kind: SignalKind;
+  kind: ListSignalKind;
   status: 'ok' | 'no_data' | 'not_collected';
   results: SignalCandidate[];
   coverage: CorpusCoverage;
@@ -111,7 +154,7 @@ export const signalsService = {
     return (data ?? { technologies: [], intents: [] }) as unknown as SignalsDictionary;
   },
 
-  async search(workspaceId: string, kind: SignalKind, filter: SignalFilter, days = 30, limit = 100): Promise<SignalSearchResult> {
+  async search(workspaceId: string, kind: ListSignalKind, filter: SignalFilter, days = 30, limit = 100): Promise<SignalSearchResult> {
     const { data, error } = await supabase.rpc('signals_search' as never, {
       p_workspace_id: workspaceId, p_kind: kind, p_filter: filter, p_days: days, p_limit: limit,
     } as never);
@@ -130,7 +173,7 @@ export const signalsService = {
   async list(workspaceId: string): Promise<SavedSignal[]> {
     const { data, error } = await supabase
       .from('signals' as never)
-      .select('id, workspace_id, kind, name, filter, is_active, notify, last_evaluated_at, last_match_count, created_at')
+      .select('id, workspace_id, kind, name, filter, is_active, notify, last_evaluated_at, last_match_count, paused_reason, created_at')
       .eq('workspace_id', workspaceId)
       .order('created_at', { ascending: false });
     fail(error);
@@ -169,6 +212,22 @@ export const signalsService = {
     fail(error);
   },
 
+  async draftDescribed(description: string): Promise<{ name: string; spec: DescribedSpec }> {
+    const res = await mivaaApi.request<{ name: string; spec: DescribedSpec }>('/api/v1/signals/described/compile', {
+      method: 'POST', body: JSON.stringify({ description }),
+    });
+    if (!res.success || !res.data) throw new Error(res.error || 'Could not draft rules from that description.');
+    return res.data;
+  },
+
+  async testDescribed(description: string, spec: DescribedSpec, crmOnly: boolean): Promise<DescribedBacktest> {
+    const res = await mivaaApi.request<DescribedBacktest>('/api/v1/signals/described/backtest', {
+      method: 'POST', body: JSON.stringify({ description, spec, crm_only: crmOnly }),
+    });
+    if (!res.success || !res.data) throw new Error(res.error || 'Could not test the rules.');
+    return res.data;
+  },
+
   async dismissMatch(workspaceId: string, matchId: string, dismissed = true): Promise<void> {
     const { error } = await supabase.rpc('signal_match_dismiss' as never, {
       p_workspace_id: workspaceId, p_match_id: matchId, p_dismissed: dismissed,
@@ -179,6 +238,9 @@ export const signalsService = {
 
 export function describeSignalPayload(payload: Record<string, unknown>): { what: string; detail: string; url: string | null } {
   const s = (k: string) => (typeof payload[k] === 'string' ? (payload[k] as string) : '');
+  if (s('reason')) {
+    return { what: s('title') || '—', detail: [s('reason'), s('evidence_quote') ? `“${s('evidence_quote')}”` : ''].filter(Boolean).join(' '), url: s('url') || null };
+  }
   if (s('title')) return { what: s('title'), detail: [s('location'), s('department')].filter(Boolean).join(' · '), url: s('url') || null };
   if (s('technology_name')) {
     return { what: s('technology_name'), detail: s('evidence') === 'website_html' ? 'Seen on their website' : 'Named in a job ad', url: s('evidence_url') || null };

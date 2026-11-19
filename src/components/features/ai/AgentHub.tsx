@@ -121,6 +121,8 @@ import { InspirationCard } from './InspirationCard';
 import { HeatPumpResultCard } from './HeatPumpResultCard';
 import { HeatingCostResultCard } from './HeatingCostResultCard';
 import { KitchenCostResultCard, type KitchenCostResult } from './KitchenCostResultCard';
+import { TileInstallationResultCard, type TileInstallationResult } from './TileInstallationResultCard';
+import { ProjectPlanEstimateCard, type ProjectPlanEstimateResult } from './ProjectPlanEstimateCard';
 import { SearchSpecCard } from './SearchSpecCard';
 import { ClarifyCard, type InputRequestData } from './ClarifyCard';
 import { catalogsService } from '@/services/catalogsService';
@@ -563,6 +565,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   signals_list: 'Saved Signals',
   signal_matches_list: 'Signal Matches',
   signal_saved: 'Signal Saved',
+  signal_described_draft: 'Signal Draft',
   flows_list: 'Workspace Flows',
   flow_suggestions: 'Suggested Automations',
   tech_radar_list: 'Tech Radar',
@@ -739,6 +742,14 @@ interface Message {
     input: Record<string, unknown>;
     result: KitchenCostResult;
   }; // Fitted-kitchen estimate off the blueprint price list
+  tileInstallationData?: {
+    input: Record<string, unknown>;
+    result: TileInstallationResult;
+  };
+  projectPlanData?: {
+    input: Record<string, unknown>;
+    result: ProjectPlanEstimateResult;
+  };
   searchSpec?: {
     intent: string;
     color_keywords?: string[];
@@ -3443,6 +3454,30 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     metadata: { agentId: selectedAgent, model: selectedModel, kitchenCostData: kitchenMsg.kitchenCostData },
                   });
                 }
+              } else if (chunk.type === 'tile_installation' || chunk.type === 'project_plan_estimate') {
+                const r = chunk.result;
+                const isTile = chunk.type === 'tile_installation';
+                const data = { input: chunk.input, result: r };
+                const calcMsg: Message = {
+                  id: `msg-${isTile ? 'tileplan' : 'projectplan'}-${Date.now()}`,
+                  role: 'assistant',
+                  content: isTile
+                    ? `Tiles to buy: ${r?.quantities?.tilesToBuy ?? '—'} for ${r?.quantities?.areaM2 ?? '—'} m².`
+                    : `Estimated ${r?.title ?? 'renovation'}: ${Math.round(r?.subtotal ?? 0)} ${r?.currency || 'EUR'} excluding VAT.`,
+                  timestamp: new Date(),
+                  agentId: selectedAgent,
+                  model: selectedModel,
+                  ...(isTile ? { tileInstallationData: data } : { projectPlanData: data }),
+                };
+                setMessages(prev => [...prev, calcMsg]);
+                if (conversationId) {
+                  await saveAndLinkMessage(calcMsg.id, {
+                    conversationId,
+                    role: 'assistant',
+                    content: calcMsg.content,
+                    metadata: { agentId: selectedAgent, model: selectedModel, ...(isTile ? { tileInstallationData: data } : { projectPlanData: data }) },
+                  });
+                }
               // Handle search_spec — explainable search dimensions
               } else if (chunk.type === 'search_spec') {
                 // Attach search spec to the NEXT materialData message (store in pending state)
@@ -4712,6 +4747,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           heatPumpData: msg.metadata?.heatPumpData as any | undefined,
           heatingCostData: msg.metadata?.heatingCostData as any | undefined,
           kitchenCostData: msg.metadata?.kitchenCostData as any | undefined,
+          tileInstallationData: msg.metadata?.tileInstallationData as any | undefined,
+          projectPlanData: msg.metadata?.projectPlanData as any | undefined,
           searchSpec: msg.metadata?.searchSpec as any | undefined,
           followUps: msg.metadata?.followUps as any | undefined,
           nextSteps: msg.metadata?.nextSteps as any | undefined,
@@ -4877,6 +4914,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // got a TAB here, and this branch was missing. Two registries, and the complete-looking one
     // was the decorative one.
     if (m.kitchenCostData) return { id: m.id, kind: 'calc', title: 'Kitchen cost' };
+    if (m.tileInstallationData) return { id: m.id, kind: 'calc', title: 'Tile floor plan' };
+    if (m.projectPlanData) return { id: m.id, kind: 'calc', title: m.projectPlanData.result?.title || 'Renovation estimate' };
     if (m.sheetPdfData) return { id: m.id, kind: 'sheet', title: m.sheetPdfData.title || 'Presentation sheet' };
     if (m.sheetCanvasData) return { id: m.id, kind: 'sheet', title: m.sheetCanvasData.title || 'Presentation sheet' };
     if (m.sceneData) return { id: m.id, kind: 'scene', title: m.sceneData.name || '3D room' };
@@ -5776,6 +5815,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.heatPumpData) return <HeatPumpResultCard result={message.heatPumpData.result} />;
     if (message.heatingCostData) return <HeatingCostResultCard result={message.heatingCostData.result} />;
     if (message.kitchenCostData) return <KitchenCostResultCard result={message.kitchenCostData.result} />;
+    if (message.tileInstallationData) return <TileInstallationResultCard result={message.tileInstallationData.result} />;
+    if (message.projectPlanData) return <ProjectPlanEstimateCard result={message.projectPlanData.result} />;
     if (message.sheetPdfData) {
       return (
         <SheetPreviewCard
