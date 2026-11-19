@@ -905,7 +905,25 @@ export const createGenerationStatusTool = (workspaceId: string | null) => {
           return JSON.stringify({ success: false, error: `Could not read job status: ${error.message}` });
         }
         if (!data) {
-          return JSON.stringify({ success: false, error: 'Job not found' });
+          // generate_video tells the agent to poll here, and its jobs live in generation_videos.
+          let vq = supabase
+            .from('generation_videos')
+            .select('status, model, video_url, error_message, duration_s, created_at, completed_at')
+            .eq('id', jobId);
+          if (workspaceId) vq = vq.eq('workspace_id', workspaceId);
+          const { data: video, error: videoErr } = await vq.maybeSingle();
+          if (videoErr) return JSON.stringify({ success: false, error: `Could not read job status: ${videoErr.message}` });
+          if (!video) return JSON.stringify({ success: false, error: 'Job not found' });
+          return JSON.stringify({
+            success: true,
+            kind: 'video',
+            status: video.status,
+            model: video.model,
+            video_url: video.status === 'completed' ? video.video_url : null,
+            duration_seconds: video.duration_s,
+            error: video.status === 'failed' ? video.error_message : null,
+            elapsed_seconds: Math.floor((Date.now() - new Date(video.created_at).getTime()) / 1000),
+          });
         }
 
         // models_results is a jsonb OBJECT keyed by model label, not an array — normalise so
@@ -953,7 +971,7 @@ export const createGenerationStatusTool = (workspaceId: string | null) => {
     },
     {
       name: 'check_generation_status',
-      description: 'Check the status and progress of a 3D interior design generation job. Use this when user asks about generation progress, status, or "how is it going".',
+      description: 'Check the status and progress of a generation job — a 3D interior design generation or a video (generate_video returns its job_id). Use this when user asks about generation progress, status, or "how is it going".',
       schema: z.object({
         jobId: z.string().describe('The generation job ID (UUID) to check status for')
       })

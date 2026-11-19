@@ -392,7 +392,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'check_generation_status',
     file: 'supabase/functions/_shared/tools/generation-tools.ts',
     factory: 'createGenerationStatusTool',
-    description: 'Check the status and progress of a 3D interior design generation job.',
+    description: 'Check the status and progress of a generation job — a 3D interior design generation or a video (generate_video returns its job_id).',
     params: [
       { name: 'jobId', type: 'string', optional: false, description: 'The generation job ID (UUID) to check status for' },
     ],

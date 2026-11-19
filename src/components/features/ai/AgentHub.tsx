@@ -704,7 +704,7 @@ interface Message {
     credits_used: number;
   }; // Gemini image generation result
   videoData?: {
-    video_url: string;
+    video_url?: string;
     job_id: string;
     status: 'processing' | 'completed' | 'failed';
   }; // Veo video walkthrough
@@ -2333,7 +2333,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       const resolvedVideoType = videoType || 'walkthrough';
       const resolvedModel = videoModel === 'auto' ? undefined : videoModel;
-      const isAsyncModel = resolvedModel && ['runway-gen4-turbo'].includes(resolvedModel);
 
       // Read from the registry projection rather than a hand-kept map. The map this
       // replaced listed three models and the picker offers eleven, so choosing Wan,
@@ -2345,7 +2344,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         : 'auto-selected model';
       toast({
         title: `Generating ${resolvedVideoType.replace('_', ' ')} video…`,
-        description: `Using ${modelLabel}. ${isAsyncModel ? 'This may take 2-5 minutes.' : 'This may take 30-60 seconds.'}`,
+        description: `Using ${modelLabel}. This can take from under a minute to several minutes, depending on the model.`,
       });
 
       const res = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video-v2`, {
@@ -2365,20 +2364,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
       const result = await res.json();
       if (!result.success) throw new Error(result.error || 'Video generation failed');
+      // Still rendering on the provider: no URL yet, so this is a job to check on, not a video.
+      const stillRunning = Boolean(result.async_job) || !result.video_url;
 
-      // Add a new chat message with the video (same pattern as VR world)
       const videoMessage: Message = {
         id: `video-${Date.now()}`,
         role: 'assistant',
-        content: result.async_job
+        content: stillRunning
           ? `Your ${resolvedVideoType.replace('_', ' ')} video is being generated with ${modelLabel}. I'll notify you when it's ready. Job ID: ${result.job_id}`
           : `Your ${resolvedVideoType.replace('_', ' ')} video is ready! ${result.credits_used} credits used (${modelLabel}).`,
         timestamp: new Date(),
         agentId: 'interior-designer',
         videoData: {
-          video_url: result.video_url,
+          video_url: result.video_url ?? undefined,
           job_id: result.job_id,
-          status: 'completed' as const,
+          status: stillRunning ? 'processing' as const : 'completed' as const,
         },
       };
 
@@ -2393,7 +2393,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         });
       }
 
-      toast({ title: 'Video ready!', description: `${result.credits_used} credits used.` });
+      toast(stillRunning
+        ? { title: 'Video is rendering', description: 'It will appear here when the provider finishes.' }
+        : { title: 'Video ready!', description: `${result.credits_used} credits used.` });
     } catch (error: any) {
       console.error('Video generation error:', error);
       toast({ title: 'Video generation failed', description: error.message, variant: 'destructive' });
@@ -5950,7 +5952,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       );
     }
     if (message.geminiImageData) {
-      return message.videoData ? (
+      return message.videoData?.video_url ? (
         <video src={message.videoData.video_url} controls className="w-full rounded-xl border border-white/20 shadow-md" />
       ) : (
         <div
@@ -5969,7 +5971,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         </div>
       );
     }
-    if (message.videoData) {
+    if (message.videoData?.video_url) {
       return (
         <div className="space-y-3">
           <video
