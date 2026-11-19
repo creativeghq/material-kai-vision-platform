@@ -55,8 +55,10 @@ describe('#353 CRM-6 — company-enrich cannot write across tenants', () => {
     // `public.roles` is the GLOBAL tier, true in every workspace at once.
     // Anchored on the cache-write SELECT specifically — `crm_companies` is read several times
     // in this file, and slicing from the first one reads a different block entirely.
-    const anchor = src.indexOf("'id, created_by, workspace_id,");
-    expect(anchor, 'the cache-write select no longer names workspace_id').toBeGreaterThan(-1);
+    expect(src, 'the company columns no longer name workspace_id').toMatch(/COMPANY_COLUMNS = 'id, created_by, workspace_id,/);
+    const read = /\.select\(COMPANY_COLUMNS\)\s*\.eq\('id', companyId\)/.exec(src);
+    expect(read, 'the cache-write read of the body-supplied company id is gone').not.toBeNull();
+    const anchor = read!.index;
     const block = src.slice(anchor, src.indexOf('return jsonResponse({ ok: true', anchor));
     expect(block).toContain('userHasWorkspaceCapability');
     expect(block).toMatch(/const sameTenant = await userHasWorkspaceCapability/);
