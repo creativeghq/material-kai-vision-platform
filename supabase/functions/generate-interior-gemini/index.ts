@@ -1079,6 +1079,7 @@ VIEW OVERRIDE — the camera position above is replaced. Photograph this specifi
           model: modelLabel,
           billing_type: 'per_unit',
           units: 1,
+          success: true,
           ...(attributedSource ? { source: attributedSource } : {}),
           ...(attributedKeyId ? { embed_key_id: attributedKeyId } : {}),
         },

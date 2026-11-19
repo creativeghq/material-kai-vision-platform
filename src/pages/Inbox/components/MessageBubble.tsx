@@ -606,7 +606,7 @@ export const MessageBubble: React.FC<{
             const k = a.storage_object_path || a.url || '';
             return (
               <AttachmentView
-                key={k || i} att={a} href={urls[k] || a.url}
+                key={k || i} att={a} href={urls[k] || a.url} attachmentIndex={i}
                 messageId={m.id} threadId={m.thread_id} workspaceId={workspaceId}
                 onRepaired={onAttachmentsRepaired}
               />

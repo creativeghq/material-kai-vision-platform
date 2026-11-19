@@ -323,6 +323,7 @@ export function leaderCount(l: LlmLeader): number | null {
 }
 
 export const PLATFORM_LABEL: Record<string, string> = {
+  chat_gpt_us_rewrite: 'ChatGPT (US, Rewritten)',
   google: 'Google AI Overview',
   chat_gpt: 'ChatGPT',
 };
@@ -390,6 +391,7 @@ export interface MarketQuestion {
   last_response_at: string | null;
   captured_at: string;
   tracked: boolean;
+  translated_from?: { question: string; country_code: string; language_code: string; ai_search_volume: number | null } | null;
 }
 
 export interface MarketQuestionsFetch {

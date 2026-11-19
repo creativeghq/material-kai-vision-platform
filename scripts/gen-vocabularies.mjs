@@ -127,6 +127,10 @@ export const VOCABULARIES = [
     'supabase/functions/_shared/inboxDocumentKinds.generated.ts',
   ],
   [
+    'src/modules/messaging/inboxConversationIntents.ts',
+    'supabase/functions/_shared/inboxConversationIntents.generated.ts',
+  ],
+  [
     // A catalog card in an Inbox message: product or service, the price basis, the button label,
     // and how many one message carries. The composer offers these; inbox-api validates the pick
     // against the same list and the edge renderers label the card's button from it.

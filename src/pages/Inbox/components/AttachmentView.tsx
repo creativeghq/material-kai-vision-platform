@@ -3,7 +3,7 @@ import { formatMoney } from '@/utils/decimal';
 import { Loader2, Paperclip, Search, FileText, Wallet, Sparkles, AlertTriangle, ExternalLink, Download } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { messagingService } from '@/modules/messaging/services/messagingService';
-import { INBOX_DOCUMENT_KIND_LABELS, INBOX_DOCUMENT_KINDS_BOOKABLE_AS_EXPENSE, INBOX_DOCUMENT_KIND_LOW_CONFIDENCE } from '@/modules/messaging/inboxDocumentKinds';
+import { INBOX_DOCUMENT_KINDS, INBOX_DOCUMENT_KIND_LABELS, INBOX_DOCUMENT_KINDS_BOOKABLE_AS_EXPENSE, INBOX_DOCUMENT_KIND_LOW_CONFIDENCE } from '@/modules/messaging/inboxDocumentKinds';
 import { NewExpenseDialog } from '@/modules/finance/components/NewExpenseDialog';
 import { AttachmentActionsMenu } from './AttachmentActions';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +12,9 @@ import { Badge } from '@/components/core/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { inboxApi, type InboxAttachment } from '@/services/inboxApi';
 import { enrichmentReasonText } from '../inboxFormat';
+import { VerdictCorrection } from './VerdictCorrection';
+
+const KIND_OPTIONS = INBOX_DOCUMENT_KINDS.map((value) => ({ value, label: INBOX_DOCUMENT_KIND_LABELS[value] }));
 
 export const AttachmentLightbox: React.FC<{
   open: boolean;
@@ -150,8 +153,9 @@ export const AttachmentDocumentTag: React.FC<{
   threadId?: string;
   messageId?: string;
   workspaceId?: string;
+  attachmentIndex?: number;
   onRefreshed?: () => void;
-}> = ({ att, family, threadId, messageId, workspaceId, onRefreshed }) => {
+}> = ({ att, family, threadId, messageId, workspaceId, attachmentIndex, onRefreshed }) => {
   const [running, setRunning] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
   const { toast } = useToast();
@@ -204,6 +208,17 @@ export const AttachmentDocumentTag: React.FC<{
         </Badge>
         {facts && <span className="max-w-[280px] truncate text-muted-foreground" title={facts}>{facts}</span>}
         {bankWord && <Badge variant="neutral" className="text-[10px] py-0">{bankWord}</Badge>}
+        {threadId && messageId && typeof attachmentIndex === 'number' && (
+          <VerdictCorrection
+            current={d.kind}
+            options={KIND_OPTIONS}
+            resetKey={d.classified_at}
+            onRecord={(v) => inboxApi.recordClassifierOutcome({
+              classifier: 'inbox_document_kind', thread_id: threadId, message_id: messageId,
+              attachment_index: attachmentIndex, human_verdict: v,
+            })}
+          />
+        )}
         {bookable && workspaceId && (
           <>
             <Button size="sm" variant="outline" className="h-6 px-2 text-[11px]" onClick={() => setExpenseOpen(true)}>
@@ -265,7 +280,8 @@ export const AttachmentView: React.FC<{
   onRepaired?: () => void;
   /** Email layout: a fixed-size card with a thumbnail or icon, name and size, in a grid. */
   variant?: 'inline' | 'card';
-}> = ({ att, href, messageId, threadId, workspaceId, onRepaired, variant = 'inline' }) => {
+  attachmentIndex?: number;
+}> = ({ att, href, messageId, threadId, workspaceId, onRepaired, variant = 'inline', attachmentIndex }) => {
   const name = att.name || 'attachment';
   const ct = (att.content_type || '').toLowerCase();
   const ext = name.split('.').pop()?.toLowerCase() ?? '';
@@ -354,7 +370,7 @@ export const AttachmentView: React.FC<{
         </div>
         {kind !== 'file' && (
           <div className="px-2 pb-1.5">
-            <AttachmentDocumentTag
+            <AttachmentDocumentTag attachmentIndex={attachmentIndex}
               att={att} family={kind} threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
             />
           </div>
@@ -383,7 +399,7 @@ export const AttachmentView: React.FC<{
           />
         </button>
         </span>
-        <AttachmentDocumentTag
+        <AttachmentDocumentTag attachmentIndex={attachmentIndex}
           att={att} family="image" threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
         />
         <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="image" att={att} />
@@ -425,7 +441,7 @@ export const AttachmentView: React.FC<{
         </button>
         <AttachmentActionsMenu href={href} name={name} contentType={att.content_type} inboxMessageId={messageId} />
         </div>
-        <AttachmentDocumentTag
+        <AttachmentDocumentTag attachmentIndex={attachmentIndex}
           att={att} family="pdf" threadId={threadId} messageId={messageId} workspaceId={workspaceId} onRefreshed={onRepaired}
         />
         <AttachmentLightbox open={zoom} onOpenChange={setZoom} href={href} name={name} kind="pdf" att={att} />

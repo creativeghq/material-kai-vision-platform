@@ -504,7 +504,6 @@ export type Database = {
           snapshot_id: string | null
           started_at: string | null
           status: string
-          total_cost_usd: number
           trigger_channel: string | null
           trigger_event_type: string | null
           trigger_metadata: Json
@@ -541,7 +540,6 @@ export type Database = {
           snapshot_id?: string | null
           started_at?: string | null
           status?: string
-          total_cost_usd?: number
           trigger_channel?: string | null
           trigger_event_type?: string | null
           trigger_metadata?: Json
@@ -578,7 +576,6 @@ export type Database = {
           snapshot_id?: string | null
           started_at?: string | null
           status?: string
-          total_cost_usd?: number
           trigger_channel?: string | null
           trigger_event_type?: string | null
           trigger_metadata?: Json
@@ -1043,6 +1040,7 @@ export type Database = {
       }
       ai_usage_logs: {
         Row: {
+          agent_run_id: string | null
           billed_cost_usd: number | null
           created_at: string | null
           credits_debited: number
@@ -1064,6 +1062,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          agent_run_id?: string | null
           billed_cost_usd?: number | null
           created_at?: string | null
           credits_debited?: number
@@ -1085,6 +1084,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          agent_run_id?: string | null
           billed_cost_usd?: number | null
           created_at?: string | null
           credits_debited?: number
@@ -1106,6 +1106,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_usage_logs_image_id_fkey"
             columns: ["image_id"]

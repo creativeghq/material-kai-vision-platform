@@ -97,7 +97,7 @@ export const EmailMessageCard: React.FC<{
             {attachments.map((a, i) => {
               const k = a.storage_object_path || a.url || '';
               return (
-                <AttachmentView key={k || i} att={a} href={urls[k] || a.url} variant="card"
+                <AttachmentView key={k || i} att={a} href={urls[k] || a.url} variant="card" attachmentIndex={(m.attachments || []).indexOf(a)}
                   messageId={m.id} threadId={m.thread_id} workspaceId={workspaceId} onRepaired={onAttachmentsRepaired} />
               );
             })}

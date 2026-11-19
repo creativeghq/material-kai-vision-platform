@@ -258,6 +258,13 @@ export const AiQuestionsPanel: React.FC<{
                           <tr className="align-top">
                             <td className="max-w-[380px] px-3 py-2">
                               <p className="text-xs font-medium leading-snug text-foreground">{r.question}</p>
+                              {r.translated_from && (
+                                <p className="mt-0.5 text-[11px] text-muted-foreground" title={r.translated_from.question}>
+                                  <Badge variant="neutral" className="mr-1">Rewritten from US</Badge>
+                                  “{r.translated_from.question}”
+                                  {r.translated_from.ai_search_volume != null ? ` · US volume ${compact(r.translated_from.ai_search_volume)}` : ''}
+                                </p>
+                              )}
                               {r.answer && (
                                 <button type="button" className="mt-0.5 text-[11px] text-primary hover:underline" onClick={() => setOpenAnswer(openAnswer === key ? null : key)}>
                                   {openAnswer === key ? 'Hide answer' : 'Show answer'}
@@ -270,7 +277,7 @@ export const AiQuestionsPanel: React.FC<{
                               {r.cites_you && <Badge variant="success" className="mr-1">Cites you</Badge>}
                               {r.rival_sources.length > 0
                                 ? <span className="text-muted-foreground">{r.rival_sources.slice(0, 4).map((s) => s.domain).join(', ')}{r.rival_sources.length > 4 ? ` +${r.rival_sources.length - 4}` : ''}</span>
-                                : !r.cites_you && <span className="text-muted-foreground">No source</span>}
+                                : !r.cites_you && <span className="text-muted-foreground">{r.translated_from ? 'Not asked here yet' : 'No source'}</span>}
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">{PLATFORM_LABEL[r.platform] ?? r.platform}</td>
                             <td className="px-3 py-2 text-right">{actions(r.question, r.tracked, 'ai_market')}</td>

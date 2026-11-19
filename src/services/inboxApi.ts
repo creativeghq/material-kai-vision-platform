@@ -1,5 +1,6 @@
 import type { WhatsAppFormField, WhatsAppFormPurpose } from '@/modules/messaging/whatsappForms';
 import { supabase } from '@/integrations/supabase/client';
+import type { ClassifierOutcomeClassifier, InboxConversationIntent } from '@/modules/messaging/inboxConversationIntents';
 import { parseEdgeError } from '@/utils/edgeError';
 import type { InboxDocumentKind } from '@/modules/messaging/inboxDocumentKinds';
 import type { InboxCardKind, InboxPriceBasis } from '@/modules/messaging/inboxCardKinds';
@@ -589,6 +590,10 @@ export interface ConversationSentiment {
   suggested_tone: string;
   /** The customer's last unanswered question, verbatim. */
   open_question?: string | null;
+  /** Absent on readings made before intent existed, or when the model returned an unknown one. */
+  intent?: InboxConversationIntent;
+  intent_confidence?: number;
+  needs_human?: boolean;
   last_message_id: string;
   analysed_at: string;
   message_count: number;
@@ -725,6 +730,17 @@ export const inboxApi = {
    * photos. Member-only; the member who asks pays. `force` re-reads an attachment that already
    * carries a verdict.
    */
+  /** A person confirming or correcting one classifier verdict; the server snapshots the verdict itself. */
+  recordClassifierOutcome(input: {
+    classifier: ClassifierOutcomeClassifier;
+    thread_id: string;
+    human_verdict: string;
+    message_id?: string;
+    attachment_index?: number;
+  }) {
+    return call<{ ok: boolean; agreed: boolean }>('record_classifier_outcome', input);
+  },
+
   enrichAttachments(input: { thread_id: string; message_id: string; force?: boolean }) {
     return call<{ ok: boolean; results: InboxEnrichmentResult[]; attachments: InboxAttachment[] }>('enrich_attachments', input);
   },

@@ -130,6 +130,7 @@ async function _logTrackedCall(opts: {
   errorMessage?: string;
   userId?: string;
   workspaceId?: string;
+  agentRunId?: string;
 }): Promise<void> {
   const _log = _logClient();
   if (!_log) return;
@@ -165,6 +166,7 @@ async function _logTrackedCall(opts: {
     await _log.from('ai_usage_logs').insert({
       user_id: opts.userId ?? null,
       workspace_id: opts.workspaceId ?? null,
+      agent_run_id: opts.agentRunId ?? null,
       operation_type: opts.task,
       model_name: opts.model,
       input_tokens: opts.inputTokens,
@@ -344,6 +346,7 @@ export interface AIGenerateConfig {
    */
   userId?: string;
   workspaceId?: string;
+  agentRunId?: string;
 }
 
 export interface AIGenerateResult<T = string> {
@@ -791,6 +794,7 @@ export async function generateStructuredWithClaude<T>(
       task: config?.task ?? 'claude_structured_generation',
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      agentRunId: config?.agentRunId,
       model: modelId,
       inputTokens,
       outputTokens,
@@ -817,6 +821,7 @@ export async function generateStructuredWithClaude<T>(
       task: config?.task ?? 'claude_structured_generation',
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      agentRunId: config?.agentRunId,
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,

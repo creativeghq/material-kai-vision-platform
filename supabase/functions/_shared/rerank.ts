@@ -20,18 +20,14 @@ import type { DbClient } from './supabase-client.ts';
 export const RERANK_MODEL = 'claude-haiku-5-5';
 
 /**
- * Which reranker runs. `claude` is the default and stays the default until the gate in
- * `scripts/eval-rerank.mjs` says otherwise on 50 real queries — a trained cross-encoder
- * SHOULD beat a model reading a prompt, but "should" is not a measurement, and this is
- * the busiest AI operation on the platform.
- *
- * Read at call time, never captured at module load: the secrets bootstrap populates env
- * at handler entry, so a module-load capture reads undefined.
+ * Which reranker runs. `voyage` since the #463 gate run (scripts/eval-rerank.mjs, 27 labelled
+ * cases): MRR 0.944 vs Haiku 0.931, top-3 26 vs 25, at ~1/9 the cost. `SEARCH_RERANK_PROVIDER=claude`
+ * reverts. Read at call time: the secrets bootstrap populates env at handler entry.
  */
 export type RerankProvider = 'claude' | 'voyage';
 
 export function rerankProvider(): RerankProvider {
-  return Deno.env.get('SEARCH_RERANK_PROVIDER') === 'voyage' ? 'voyage' : 'claude';
+  return Deno.env.get('SEARCH_RERANK_PROVIDER') === 'claude' ? 'claude' : 'voyage';
 }
 
 /** How many candidates are worth sending. Beyond this the prompt cost stops paying for itself. */

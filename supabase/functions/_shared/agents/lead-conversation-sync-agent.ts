@@ -83,7 +83,7 @@ export class LeadConversationSyncAgent implements AgentRunner {
           '<conversation_data>', transcript, '</conversation_data>',
         ].join('\n');
         const res = await generateStructuredWithClaude(prompt, SyncVerdict, {
-          model, systemPrompt: system, maxTokens: 1200, task: 'lead_conversation_sync', workspaceId,
+          model, systemPrompt: system, maxTokens: 1200, task: 'lead_conversation_sync', workspaceId, agentRunId: ctx.run.id,
         });
         inputTokens += res.usage.inputTokens;
         outputTokens += res.usage.outputTokens;

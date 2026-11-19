@@ -75,6 +75,8 @@ import { isWorkspaceEntitled } from '../_shared/entitlement.ts';
 import { escapeLike, foldForSearch } from '../_shared/searchFold.ts';
 import { runAgentTurn } from '../_shared/agent-chat-once.ts';
 import { callClaudeMessages } from '../_shared/ai-client.ts';
+import { INBOX_CONVERSATION_INTENTS } from '../_shared/inboxConversationIntents.generated.ts';
+import { INBOX_DOCUMENT_KINDS } from '../_shared/inboxDocumentKinds.generated.ts';
 import { handoffSince, stripQuotedEmail, TRANSCRIPT_MESSAGE_MAX } from '../_shared/inbox-conversation.ts';
 import { escapeHtml } from '../_shared/html.ts';
 import { hasEmailMarkup, renderEmailMarkup } from '../_shared/emailMarkup.generated.ts';
@@ -3995,6 +3997,68 @@ async function handleJwtAction(
       return json({ analysed: true, cached: r.cached, sentiment: r.sentiment });
     }
 
+    case 'record_classifier_outcome': {
+      // The verdict is re-read from the stored record; the client supplies only the person's pick.
+      const threadId = String(payload.thread_id || '');
+      const classifier = String(payload.classifier || '');
+      const human = String(payload.human_verdict || '');
+      if (!threadId) throw new HttpError(400, 'thread_id is required');
+      const thread = await getThreadOrThrow(db, threadId);
+      const access = await resolveThreadAccess(db, userId, thread, operator);
+      assertThreadVisible(access);
+      if (!access.isMember) throw new HttpError(404, 'Conversation not found');
+
+      let row: Record<string, unknown>;
+      if (classifier === 'inbox_document_kind') {
+        if (!(INBOX_DOCUMENT_KINDS as readonly string[]).includes(human)) throw new HttpError(400, 'Unknown document kind');
+        const messageId = String(payload.message_id || '');
+        const index = Number(payload.attachment_index);
+        if (!messageId || !Number.isInteger(index) || index < 0) throw new HttpError(400, 'message_id and attachment_index are required');
+        const { data: msg } = await db.from('inbox_messages')
+          .select('id, attachments').eq('id', messageId).eq('thread_id', threadId).is('deleted_at', null).maybeSingle();
+        const list = Array.isArray((msg as { attachments?: unknown } | null)?.attachments)
+          ? (msg as { attachments: Array<Record<string, unknown>> }).attachments : [];
+        const att = list[index];
+        const d = (att?.document ?? null) as Record<string, unknown> | null;
+        if (!att || d?.status !== 'ok' || typeof d.kind !== 'string' || typeof d.confidence !== 'number') {
+          throw new HttpError(409, 'There is no reading of this attachment to confirm or correct');
+        }
+        row = {
+          subject_ref: `inbox_message:${messageId}:${index}`,
+          model_verdict: d.kind, model_confidence: d.confidence, model: String(d.model ?? 'unknown'),
+          verdict_at: String(d.classified_at),
+          inputs: {
+            name: att.name ?? null, content_type: att.content_type ?? null, size: att.size ?? null,
+            storage_bucket: att.storage_bucket ?? null, storage_object_path: att.storage_object_path ?? null,
+            reason: d.reason ?? null,
+          },
+        };
+      } else if (classifier === 'inbox_conversation_intent') {
+        if (!(INBOX_CONVERSATION_INTENTS as readonly string[]).includes(human)) throw new HttpError(400, 'Unknown intent');
+        const s = ((thread.metadata ?? {}) as Record<string, unknown>).sentiment as Record<string, unknown> | undefined;
+        if (!s || typeof s.intent !== 'string' || typeof s.intent_confidence !== 'number') {
+          throw new HttpError(409, 'This conversation has no intent reading to confirm or correct');
+        }
+        row = {
+          subject_ref: `inbox_thread:${threadId}`,
+          model_verdict: s.intent, model_confidence: s.intent_confidence, model: SENTIMENT_MODEL,
+          verdict_at: String(s.analysed_at),
+          inputs: {
+            last_message_id: s.last_message_id ?? null, message_count: s.message_count ?? null,
+            thread_type: thread.thread_type ?? null, summary: s.summary ?? null,
+          },
+        };
+      } else {
+        throw new HttpError(400, 'Unknown classifier');
+      }
+      const { error: outErr } = await db.from('classifier_outcomes').upsert({
+        ...row, classifier, workspace_id: thread.workspace_id, human_verdict: human,
+        decided_by: userId, decided_at: new Date().toISOString(),
+      }, { onConflict: 'classifier,subject_ref,verdict_at' });
+      if (outErr) throw new HttpError(500, `Could not record that: ${outErr.message}`);
+      return json({ ok: true, agreed: human === row.model_verdict });
+    }
+
     case 'get_thread_context': {
       // Right-rail CRM context for the customer a member is talking to:
       // the linked CRM contact + their company + recent quotes + projects. Members/operators only.
@@ -6586,6 +6650,8 @@ async function sentimentSettings(
   };
 }
 
+const SENTIMENT_MODEL = 'claude-haiku-5-5';
+
 async function readConversationSentiment(
   db: SupabaseClient,
   threadId: string,
@@ -6702,6 +6768,23 @@ async function readConversationSentiment(
           type: ['string', 'null'],
           description: "The customer's last unanswered question, verbatim, or null if none.",
         },
+        intent: {
+          type: 'string',
+          enum: [...INBOX_CONVERSATION_INTENTS],
+          description: 'What this conversation is about from our side: lead = someone new asking about '
+            + 'buying; existing_order = about an order, delivery or invoice already in place; complaint = '
+            + 'something went wrong for them; supplier = a supplier or dealer we buy from; internal = our '
+            + 'own team; other = none of these.',
+        },
+        intent_confidence: {
+          type: 'number', minimum: 0, maximum: 1,
+          description: 'How clearly the messages show that intent. Below 0.6 means you are guessing.',
+        },
+        needs_human: {
+          type: 'boolean',
+          description: 'True when only a person should answer next: a complaint, a price or delivery '
+            + 'commitment, a legal or payment question, or anything an automatic reply could get wrong.',
+        },
         ...(settings.perMessageMood
           ? {
             message_moods: {
@@ -6725,7 +6808,7 @@ async function readConversationSentiment(
           }
           : {}),
       },
-      required: ['mood', 'urgency', 'summary', 'reply_guidance', 'suggested_tone'],
+      required: ['mood', 'urgency', 'summary', 'reply_guidance', 'suggested_tone', 'intent', 'intent_confidence', 'needs_human'],
     },
   };
 
@@ -6733,7 +6816,7 @@ async function readConversationSentiment(
   try {
     const body = await callClaudeMessages({
       // Haiku: this runs on every thread open and every assistant reply.
-      model: 'claude-haiku-5-5',
+      model: SENTIMENT_MODEL,
       max_tokens: 700,
       tools: [TOOL],
       // FORCED (invariant 9): the verdict drives a stored field and a UI state.
@@ -6774,6 +6857,15 @@ The other party in this conversation is ${relationship}
    * off-by-one there paints the wrong bubble — which looks like a working feature giving a wrong
    * answer, the hardest kind to notice.
    */
+  if (!(INBOX_CONVERSATION_INTENTS as readonly string[]).includes(String(verdict.intent))
+    || !Number.isFinite(Number(verdict.intent_confidence))) {
+    delete verdict.intent;
+    delete verdict.intent_confidence;
+  } else {
+    verdict.intent_confidence = Math.min(1, Math.max(0, Number(verdict.intent_confidence)));
+  }
+  if (typeof verdict.needs_human !== 'boolean') delete verdict.needs_human;
+
   const rawMoods = Array.isArray(verdict.message_moods)
     ? verdict.message_moods as Array<{ index?: number; mood?: string }>
     : [];
