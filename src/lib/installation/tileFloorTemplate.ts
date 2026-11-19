@@ -80,9 +80,6 @@ export interface TileQuantities {
   pieces: number;
   fullTiles: number;
   cutTiles: number;
-  tilesFromLayout: number;
-  tilesToBuy: number;
-  sparePct: number;
   spacers: number;
   adhesiveKg: number;
   groutKg: number;
@@ -112,8 +109,6 @@ export const TILE_FLOOR_LIMITS = {
   maxPieces: 4000,
 } as const;
 
-export const SPARE_PCT = 5;
-const CUT_ALLOWANCE_MM = 5;
 const GROUT_DENSITY = 1.6;
 const BACK_BUTTER_KG_M2 = 1;
 
@@ -145,6 +140,17 @@ export function groutKgPerM2(lengthMm: number, widthMm: number, thicknessMm: num
   return ((lengthMm + widthMm) / (lengthMm * widthMm)) * thicknessMm * jointMm * GROUT_DENSITY;
 }
 
+/** Adhesive and grout for a floor of `areaM2`, for callers that know the area but not the room's sides. */
+export function floorMaterialsKg(
+  areaM2: number,
+  p: Pick<TileFloorParams, 'trowelNotchMm' | 'backButter' | 'tileLengthMm' | 'tileWidthMm' | 'tileThicknessMm' | 'jointMm'>,
+): { adhesiveKg: number; groutKg: number } {
+  return {
+    adhesiveKg: areaM2 * (adhesiveKgPerM2(p.trowelNotchMm) + (p.backButter ? BACK_BUTTER_KG_M2 : 0)),
+    groutKg: areaM2 * groutKgPerM2(p.tileLengthMm, p.tileWidthMm, p.tileThicknessMm, p.jointMm),
+  };
+}
+
 export const DEFAULT_TILE_FLOOR: TileFloorParams = {
   areaWidthM: 3,
   areaDepthM: 2.4,
@@ -164,22 +170,6 @@ export const DEFAULT_TILE_FLOOR: TileFloorParams = {
 };
 
 const EPS = 0.5;
-
-function tilesForCuts(cuts: Array<{ lx: number; lz: number }>, tl: number, tw: number): number {
-  const binPack = (sizes: number[], capacity: number): number => {
-    const left: number[] = [];
-    for (const size of [...sizes].sort((x, y) => y - x)) {
-      const i = left.findIndex((room) => room >= size + CUT_ALLOWANCE_MM);
-      if (i >= 0) left[i] -= size + CUT_ALLOWANCE_MM;
-      else left.push(capacity - size);
-    }
-    return left.length;
-  };
-  const alongLength = cuts.filter((c) => c.lz >= tw - EPS).map((c) => c.lx);
-  const alongWidth = cuts.filter((c) => c.lx >= tl - EPS).map((c) => c.lz);
-  const corners = cuts.length - alongLength.length - alongWidth.length;
-  return binPack(alongLength, tl) + binPack(alongWidth, tw) + corners;
-}
 
 const RUNNING: Pattern[] = ['stack', 'offset_1_2', 'offset_1_3'];
 
@@ -326,7 +316,7 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
   const empty = (): TileFloorPlan => {
     const quantities: TileQuantities = {
       areaM2: 0, tileAreaM2: 0, pieces: 0, fullTiles: 0, cutTiles: 0,
-      tilesFromLayout: 0, tilesToBuy: 0, sparePct: SPARE_PCT, spacers: 0, adhesiveKg: 0, groutKg: 0,
+      spacers: 0, adhesiveKg: 0, groutKg: 0,
     };
     return {
       params, innerWidthMm: innerW, innerDepthMm: innerD, pieces: [], spacers: [],
@@ -421,9 +411,6 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
     .filter((pc) => !pc.cut && (Math.abs(pc.cz - centreZ) <= Wd || Math.abs(pc.cx - centreX) <= Wd))
     .map((pc) => pc.index);
 
-  const quarterTurned = (((params.rotationDeg % 180) + 180) % 180) === 90;
-  const alongLength = (c: { lx: number; lz: number }) => (quarterTurned ? { lx: c.lz, lz: c.lx } : c);
-  const tilesFromLayout = full.length + (axisAligned ? tilesForCuts(cuts.map((x) => alongLength(x.visible!)), L, Wd) : cuts.length);
   const areaM2 = params.areaWidthM * params.areaDepthM;
   const tileAreaM2 = (tl * tw) / 1e6;
   const quantities: TileQuantities = {
@@ -432,12 +419,8 @@ export function buildTileFloorPlan(params: TileFloorParams): TileFloorPlan {
     pieces: pieces.length,
     fullTiles: full.length,
     cutTiles: cuts.length,
-    tilesFromLayout,
-    tilesToBuy: Math.ceil(tilesFromLayout * (1 + SPARE_PCT / 100) - 1e-9),
-    sparePct: SPARE_PCT,
     spacers: spacers.length,
-    adhesiveKg: areaM2 * (adhesiveKgPerM2(params.trowelNotchMm) + (params.backButter ? BACK_BUTTER_KG_M2 : 0)),
-    groutKg: areaM2 * groutKgPerM2(tl, tw, params.tileThicknessMm, j),
+    ...floorMaterialsKg(areaM2, params),
   };
 
   if (params.pattern === 'offset_1_2' && Math.max(tl, tw) >= 600) {

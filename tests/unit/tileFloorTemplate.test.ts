@@ -62,19 +62,11 @@ describe('tile floor layout', () => {
 });
 
 describe('tile floor quantities', () => {
-  it('never orders fewer tiles than the layout cuts from', () => {
+  it('counts the pieces it lays, and leaves the order quantity to computeCoverage', () => {
     const p = plan({ areaWidthM: 1.3, areaDepthM: 1.3 });
     expect(p.pieces).toHaveLength(9);
-    expect(p.quantities.tilesFromLayout).toBe(9);
-    expect(p.quantities.tilesToBuy).toBeGreaterThanOrEqual(9);
-  });
-
-  it('reuses an offcut from one row in the next on an offset pattern', () => {
-    const p = plan({ areaWidthM: 2, areaDepthM: 1.2, tileLengthMm: 600, tileWidthMm: 300, pattern: 'offset_1_2' });
-    const { fullTiles, cutTiles, tilesFromLayout } = p.quantities;
-    expect(cutTiles).toBeGreaterThan(0);
-    expect(tilesFromLayout).toBeLessThan(fullTiles + cutTiles);
-    expect(tilesFromLayout).toBeGreaterThan(fullTiles);
+    expect(p.quantities.fullTiles + p.quantities.cutTiles).toBe(9);
+    expect(p.quantities).not.toHaveProperty('tilesToBuy');
   });
 
   it('uses the manufacturers grout formula', () => {
@@ -142,10 +134,10 @@ describe('tile floor scene state', () => {
 });
 
 describe('tile floor rotation', () => {
-  it('orders the same tiles for a room turned a quarter as for the layout turned a quarter', () => {
+  it('lays the same pieces for a room turned a quarter as for the layout turned a quarter', () => {
     const a = plan({ areaWidthM: 3.37, areaDepthM: 2.11, tileLengthMm: 600, tileWidthMm: 300, anchor: 'corner' });
     const b = plan({ areaWidthM: 2.11, areaDepthM: 3.37, tileLengthMm: 600, tileWidthMm: 300, anchor: 'corner', rotationDeg: 90 });
     expect(b.quantities.pieces).toBe(a.quantities.pieces);
-    expect(b.quantities.tilesFromLayout).toBe(a.quantities.tilesFromLayout);
+    expect(b.quantities.cutTiles).toBe(a.quantities.cutTiles);
   });
 });

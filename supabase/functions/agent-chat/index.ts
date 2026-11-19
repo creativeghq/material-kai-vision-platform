@@ -2525,7 +2525,7 @@ async function executeAgent(
       if (config.tools.includes('calculate_heating_cost_comparison')) tools.push(calcMod.createHeatingCostComparisonTool(onChunk));
       // Takes the client: kitchen rates live in the blueprint, not in constants like the two above.
       if (config.tools.includes('calculate_kitchen_cost')) tools.push(calcMod.createKitchenCostTool(supabase, onChunk));
-      if (config.tools.includes('plan_tile_installation')) tools.push(calcMod.createTileInstallationTool(onChunk));
+      if (config.tools.includes('plan_tile_installation')) tools.push(calcMod.createTileInstallationTool(onChunk, { userId, workspaceId, jwt: userJwt }));
       if (config.tools.includes('estimate_project_plan')) tools.push(calcMod.createProjectPlanEstimateTool(supabase, onChunk));
     } catch (calcErr) {
       console.warn('⚠️ Could not register calculator tools:', calcErr);

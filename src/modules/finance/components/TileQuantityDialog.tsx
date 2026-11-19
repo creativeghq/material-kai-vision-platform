@@ -28,9 +28,10 @@ export const TileQuantityDialog: React.FC<{
   onOpenChange: (v: boolean) => void;
   productId: string;
   productName?: string;
+  format?: string | null;
   /** Applied to the line: the quantity ordered, the allowance, and what it measures. */
   onApply: (result: { quantity: number; wastagePercent: number | null; note: string }) => void;
-}> = ({ open, onOpenChange, productId, productName, onApply }) => {
+}> = ({ open, onOpenChange, productId, productName, format = null, onApply }) => {
   const [rooms, setRooms] = useState<RoomArea[]>([blankRoom()]);
   const [wastage, setWastage] = useState('10');
   const [quantity, setQuantity] = useState<TileQuantity | null>(null);
@@ -49,7 +50,7 @@ export const TileQuantityDialog: React.FC<{
     setLoading(true);
     try {
       const result = await tileQuantityService.forLine({
-        productId, requested: area, wastagePercent: pct,
+        productId, requested: area, wastagePercent: pct, format,
       });
       if (mine !== seq.current) return;
       setQuantity(result);
@@ -61,7 +62,7 @@ export const TileQuantityDialog: React.FC<{
     } finally {
       if (mine === seq.current) setLoading(false);
     }
-  }, [productId]);
+  }, [productId, format]);
 
   const canApply = !loading && !failed && quantity?.supplied != null && computedFor === inputKey;
 
@@ -201,6 +202,9 @@ export const TileQuantityDialog: React.FC<{
                 {quantity.supplied} {quantity.boxes != null ? `(${quantity.boxes} boxes)` : ''}
               </p>
               <p className="mt-0.5 text-muted-foreground">{quantity.reason}</p>
+              {quantity.box_m2_estimated && (
+                <p className="mt-0.5 text-amber-800 dark:text-amber-300">The box size is estimated, not printed by the maker — confirm it before ordering.</p>
+              )}
               {hasVisibleUplift(quantity) && quantity.pack_uplift != null && quantity.pack_uplift > 0 && (
                 <p className="mt-0.5 text-muted-foreground tabular-nums">
                   Whole-box uplift: {quantity.pack_uplift}

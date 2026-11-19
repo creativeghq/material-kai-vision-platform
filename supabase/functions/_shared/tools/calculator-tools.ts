@@ -23,8 +23,11 @@ import {
 } from '../calculators/heatPumpSizing.generated.ts';
 import { computeHeatingCostComparison, HEATING_COST_DEFAULTS, type AcType } from '../calculators/heatingCostComparison.generated.ts';
 import {
-  buildTileFloorPlan, DEFAULT_TILE_FLOOR, suggestBackButter, suggestedTrowelNotchMm, TILE_FLOOR_LIMITS,
+  buildTileFloorPlan, DEFAULT_TILE_FLOOR, floorMaterialsKg, suggestBackButter, suggestedTrowelNotchMm, TILE_FLOOR_LIMITS,
 } from '../installation/tileFloorTemplate.generated.ts';
+import { callerDbClient } from '../caller-client.ts';
+import { serviceClient } from '../supabase-client.ts';
+import { resolveProjectId } from '../assessment.ts';
 import { PATTERNS, PATTERN_LABELS, type Pattern } from '../surfacePatterns.generated.ts';
 
 type ChunkSink = ((chunk: any) => void) | undefined;
@@ -305,53 +308,176 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
   );
 };
 
-// ── Tile floor installation ───────────────────────────────────────────────
-export const createTileInstallationTool = (onChunk: ChunkSink) => {
+// ── Tile floor: quantity of a product, from typed rooms or a confirmed drawing takeoff ──
+type TileRoom = { label: string; area_m2: number; width_m: number | null; depth_m: number | null; source: string };
+type TileProduct = { id: string; name: string; size_keys: string[] | null };
+
+/** "60x120", "60 × 120 cm", "600x1200 mm" → mm, long side first. A bare pair is centimetres. */
+function parseSizeMm(text: string | null | undefined): { lengthMm: number; widthMm: number } | null {
+  const m = String(text ?? '').match(/(\d+(?:[.,]\d+)?)\s*[x×X]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm)?/);
+  if (!m) return null;
+  const f = m[3] === 'mm' ? 1 : 10;
+  const a = Number(m[1].replace(',', '.')) * f;
+  const b = Number(m[2].replace(',', '.')) * f;
+  return a > 0 && b > 0 ? { lengthMm: Math.max(a, b), widthMm: Math.min(a, b) } : null;
+}
+
+export const createTileInstallationTool = (
+  onChunk: ChunkSink,
+  ctx: { userId: string; workspaceId: string | null; jwt?: string },
+) => {
   return tool(
     async (input: {
-      room_width_m: number;
-      room_depth_m: number;
-      tile_length_mm: number;
-      tile_width_mm: number;
-      tile_thickness_mm?: number;
-      joint_mm?: number;
-      perimeter_gap_mm?: number;
-      trowel_notch_mm?: number;
+      product_id?: string;
+      product_name?: string;
+      size?: string;
+      tile_length_mm?: number;
+      tile_width_mm?: number;
+      rooms?: { label?: string; width_m?: number; depth_m?: number; area_m2?: number }[];
+      project_id?: string;
+      project_name?: string;
       pattern?: Pattern;
-      prime?: boolean;
+      joint_mm?: number;
+      wastage_percent?: number;
+      tile_thickness_mm?: number;
+      trowel_notch_mm?: number;
       back_butter?: boolean;
     }) => {
-      const longSide = Math.max(input.tile_length_mm, input.tile_width_mm);
-      const plan = buildTileFloorPlan({
-        ...DEFAULT_TILE_FLOOR,
-        areaWidthM: input.room_width_m,
-        areaDepthM: input.room_depth_m,
-        tileLengthMm: input.tile_length_mm,
-        tileWidthMm: input.tile_width_mm,
+      if (!ctx.workspaceId || !ctx.jwt) {
+        return JSON.stringify({ success: false, error: 'Tile quantities need a signed-in workspace session.' });
+      }
+      const db = callerDbClient(ctx.jwt, ctx.userId, ctx.workspaceId);
+
+      // The product and its size: the box size is recorded per size, so a multi-size series needs one named.
+      let product: TileProduct | null = null;
+      if (input.product_id || input.product_name) {
+        let q = db.from('products').select('id, name, size_keys').eq('workspace_id', ctx.workspaceId).limit(5);
+        q = input.product_id ? q.eq('id', input.product_id) : q.ilike('name', `%${(input.product_name ?? '').trim()}%`);
+        const { data: found, error: pErr } = await q;
+        if (pErr) return JSON.stringify({ success: false, error: `Product lookup failed: ${pErr.message}` });
+        if (!found?.length) return JSON.stringify({ success: false, error: `No product matches "${input.product_name ?? input.product_id}". Ask which product, or run material_search first.` });
+        if (found.length > 1 && !input.product_id) {
+          return JSON.stringify({ success: false, error: 'Several products match; ask the user which one.', candidates: found.map((p: any) => ({ id: p.id, name: p.name })) });
+        }
+        product = found[0] as TileProduct;
+      }
+      const sizes = product?.size_keys ?? [];
+      const sizeText = input.size ?? (sizes.length === 1 ? sizes[0] : null);
+      if (product && sizes.length > 1 && !input.size) {
+        return JSON.stringify({ success: false, needs_size: true, error: `${product.name} comes in several sizes; ask which one.`, sizes });
+      }
+      const tileMm = parseSizeMm(sizeText)
+        ?? (input.tile_length_mm && input.tile_width_mm
+          ? { lengthMm: Math.max(input.tile_length_mm, input.tile_width_mm), widthMm: Math.min(input.tile_length_mm, input.tile_width_mm) }
+          : null);
+      if (!tileMm) {
+        return JSON.stringify({ success: false, error: product ? `${product.name} records no size; ask for the tile size.` : 'Name a product, or give the tile size.' });
+      }
+
+      // The rooms: typed, or the areas a person confirmed on the project's drawings. Never measured here.
+      let rooms: TileRoom[] = [];
+      let roomsFrom: string;
+      const notes: string[] = [];
+      if (input.rooms?.length) {
+        const bad = input.rooms.findIndex((r) => !(r.width_m && r.depth_m) && !(r.area_m2 && r.area_m2 > 0));
+        if (bad >= 0) return JSON.stringify({ success: false, error: `${input.rooms[bad].label ?? `Room ${bad + 1}`} needs a width and depth, or a floor area.` });
+        rooms = input.rooms.map((r, i) => {
+          const sides = r.width_m && r.depth_m ? { width_m: r.width_m, depth_m: r.depth_m } : { width_m: null, depth_m: null };
+          return {
+            label: r.label?.trim() || `Room ${i + 1}`, area_m2: sides.width_m ? sides.width_m * sides.depth_m! : r.area_m2!,
+            ...sides, source: 'stated',
+          };
+        });
+        roomsFrom = 'the room sizes given';
+      } else if (input.project_id || input.project_name) {
+        const projectId = await resolveProjectId(serviceClient(), ctx.userId, ctx.workspaceId, input.project_id, input.project_name);
+        if (!projectId) return JSON.stringify({ success: false, error: `No project matching "${input.project_name ?? input.project_id}" in this workspace.` });
+        const { data: rows, error: tErr } = await db.rpc('project_takeoff_room_areas', { p_project_id: projectId });
+        if (tErr) return JSON.stringify({ success: false, error: `The drawing takeoff could not be read: ${tErr.message}` });
+        const all = (rows ?? []) as { drawing: string; label: string | null; source: 'schedule' | 'plan'; area_m2: number | null }[];
+        // A printed room schedule and the measured plan count the SAME rooms two ways: use one, never both.
+        const useSource = all.some((r) => r.source === 'schedule') ? 'schedule' : 'plan';
+        const chosen = all.filter((r) => r.source === useSource);
+        const unscaled = chosen.filter((r) => r.area_m2 == null);
+        if (all.some((r) => r.source !== useSource)) notes.push(`The drawings also carry measured room areas; the printed room schedule was used, not both.`);
+        if (unscaled.length) notes.push(`${unscaled.length} confirmed room(s) have no scale on their sheet and were left out: ${unscaled.map((r) => r.label ?? r.drawing).join(', ')}.`);
+        rooms = chosen.filter((r) => r.area_m2 != null).map((r) => ({
+          label: r.label || r.drawing, area_m2: Number(r.area_m2), width_m: null, depth_m: null, source: `drawing ${r.drawing}`,
+        }));
+        if (!rooms.length) {
+          return JSON.stringify({
+            success: false, needs_rooms: true,
+            error: 'This project has no rooms marked on its floor-plan drawing yet. Give the room sizes (or attach the plan so they can be read off it), or mark the rooms on the drawing in the project.',
+            url: `/projects/${projectId}?tab=documents`,
+          });
+        }
+        roomsFrom = 'the confirmed drawing takeoff';
+      } else {
+        return JSON.stringify({ success: false, needs_rooms: true, error: 'Give the room dimensions, or the project whose drawings have confirmed room areas.' });
+      }
+      const areaM2 = Math.round(rooms.reduce((s, r) => s + r.area_m2, 0) * 100) / 100;
+      const pattern = input.pattern ?? DEFAULT_TILE_FLOOR.pattern;
+
+      // The cutting allowance: stated, else the workspace's rate for this pattern, else the product/category default in SQL.
+      let wastage: number | null = input.wastage_percent ?? null;
+      if (wastage == null) {
+        const { data: rate } = await db.from('surface_pattern_wastage').select('percent')
+          .eq('workspace_id', ctx.workspaceId).eq('pattern', pattern).maybeSingle();
+        if (rate?.percent != null && Number.isFinite(Number(rate.percent))) wastage = Number(rate.percent);
+      }
+
+      let order: Record<string, unknown> | null = null;
+      if (product) {
+        const { data: q, error: qErr } = await db.rpc('tile_line_quantity', {
+          p_product: product.id, p_requested: areaM2, p_wastage_percent: wastage, p_format: sizeText,
+        });
+        if (qErr) return JSON.stringify({ success: false, error: `The order quantity could not be derived: ${qErr.message}` });
+        order = q as Record<string, unknown>;
+      } else {
+        notes.push('No product was named, so there is no box size: the quantity is in m² only.');
+      }
+
+      // Installation materials and steps. The tile COUNT is the order's, above — never this engine's.
+      const longSide = tileMm.lengthMm;
+      const setting = {
+        tileLengthMm: tileMm.lengthMm,
+        tileWidthMm: tileMm.widthMm,
         tileThicknessMm: input.tile_thickness_mm ?? DEFAULT_TILE_FLOOR.tileThicknessMm,
         jointMm: input.joint_mm ?? DEFAULT_TILE_FLOOR.jointMm,
-        perimeterGapMm: input.perimeter_gap_mm ?? DEFAULT_TILE_FLOOR.perimeterGapMm,
         trowelNotchMm: input.trowel_notch_mm ?? suggestedTrowelNotchMm(longSide),
-        pattern: input.pattern ?? DEFAULT_TILE_FLOOR.pattern,
-        prime: input.prime ?? DEFAULT_TILE_FLOOR.prime,
         backButter: input.back_butter ?? suggestBackButter(longSide),
-      });
+      };
+      const materials = floorMaterialsKg(areaM2, setting);
+      let spacers: number | null = 0;
+      let steps: { title: string; instruction: string; wait: string | null }[] = [];
+      const warnings = new Set<string>();
+      for (const r of rooms) {
+        if (r.width_m == null || r.depth_m == null) { spacers = null; continue; }
+        const plan = buildTileFloorPlan({ ...DEFAULT_TILE_FLOOR, ...setting, areaWidthM: r.width_m, areaDepthM: r.depth_m, pattern });
+        const errors = plan.issues.filter((i) => i.level === 'error').map((i) => i.message);
+        if (errors.length) return JSON.stringify({ success: false, error: `${r.label}: ${errors.join(' ')}` });
+        for (const w of plan.issues.filter((i) => i.level === 'warning')) warnings.add(w.message);
+        if (spacers !== null) spacers += plan.quantities.spacers;
+        if (!steps.length) steps = plan.steps.map((s) => ({ title: s.title, instruction: s.instruction, wait: s.wait ?? null }));
+      }
 
-      const errors = plan.issues.filter((i) => i.level === 'error').map((i) => i.message);
-      if (errors.length) return JSON.stringify({ success: false, error: errors.join(' '), issues: errors });
-
-      const p = plan.params;
       const result = {
-        room: { width_m: p.areaWidthM, depth_m: p.areaDepthM },
-        tile: { length_mm: p.tileLengthMm, width_mm: p.tileWidthMm, thickness_mm: p.tileThicknessMm },
-        pattern: PATTERN_LABELS[p.pattern],
-        joint_mm: p.jointMm,
-        trowel_notch_mm: p.trowelNotchMm,
-        prime: p.prime,
-        back_butter: p.backButter,
-        quantities: plan.quantities,
-        steps: plan.steps.map((s) => ({ title: s.title, instruction: s.instruction, tools: s.tools, wait: s.wait ?? null, warning: s.warning ?? null })),
-        warnings: plan.issues.filter((i) => i.level === 'warning').map((i) => i.message),
+        product: product ? { id: product.id, name: product.name, size: sizeText } : null,
+        tile: { length_mm: tileMm.lengthMm, width_mm: tileMm.widthMm },
+        pattern: PATTERN_LABELS[pattern],
+        rooms: rooms.map((r) => ({ label: r.label, area_m2: Math.round(r.area_m2 * 100) / 100, source: r.source })),
+        rooms_from: roomsFrom,
+        area_m2: areaM2,
+        wastage_percent: (order?.wastage_percent as number | null | undefined) ?? wastage,
+        order,
+        adhesive_kg: Math.round(materials.adhesiveKg * 10) / 10,
+        grout_kg: Math.round(materials.groutKg * 10) / 10,
+        spacers,
+        trowel_notch_mm: setting.trowelNotchMm,
+        joint_mm: setting.jointMm,
+        steps,
+        warnings: [...warnings],
+        notes,
       };
 
       try {
@@ -359,26 +485,38 @@ export const createTileInstallationTool = (onChunk: ChunkSink) => {
       } catch {
         /* stream may be closed */
       }
-
       return JSON.stringify({ success: true, ...result });
     },
     {
       name: 'plan_tile_installation',
       description:
-        'Plan laying a TILED FLOOR in one rectangular room: how many tiles to buy (incl. cuts and spare), spacers, adhesive and grout in kg, and the step-by-step installation with cure times. Deterministic, free, instant — no external API. '
-        + `Use when someone asks how many tiles, how much adhesive or grout, or how to lay a floor. Rooms are ${TILE_FLOOR_LIMITS.areaM.min}–${TILE_FLOOR_LIMITS.areaM.max} m per side; split a larger or L-shaped floor into rectangles and call once per rectangle. `
-        + 'Floors only — not walls. Report every entry in `warnings`. The visual 3D walkthrough lives at Tools → Tile Installation Guide (/tools/tile-installation).',
+        'How much of a TILE PRODUCT a floor needs, in whole boxes, plus adhesive, grout and the laying steps. Deterministic, free — no external API. '
+        + 'The order quantity is the platform\'s own derivation (the same one a quote line uses), so never compute tiles or boxes yourself. '
+        + 'Rooms come from EITHER `rooms` (width × depth, or a floor area) OR a project whose floor-plan drawing has rooms marked and confirmed. '
+        + 'When the user ATTACHES a floor plan: read the room dimensions or areas PRINTED on it, list them back and get the user\'s OK, then pass them as `rooms`. '
+        + 'Never estimate a size that is not printed (do not measure by eye or from the drawing\'s scale) — ask the user for that room instead. '
+        + 'To also SHOW the tile on the plan, call generate_gemini with the plan and the tile attached (its floor-plan render / 3D modes). '
+        + 'Name the product (product_name or product_id); a series with several sizes needs `size`. Report `order.reason`, `order.box_m2_estimated` and every entry in `notes` and `warnings`. '
+        + `Rooms typed as dimensions are ${TILE_FLOOR_LIMITS.areaM.min}–${TILE_FLOOR_LIMITS.areaM.max} m per side; split a larger floor into rectangles.`,
       schema: z.object({
-        room_width_m: z.number().min(TILE_FLOOR_LIMITS.areaM.min).max(TILE_FLOOR_LIMITS.areaM.max).describe('Room width in metres (the tile length runs along it).'),
-        room_depth_m: z.number().min(TILE_FLOOR_LIMITS.areaM.min).max(TILE_FLOOR_LIMITS.areaM.max).describe('Room depth in metres.'),
-        tile_length_mm: z.number().min(TILE_FLOOR_LIMITS.tileMm.min).max(TILE_FLOOR_LIMITS.tileMm.max).describe('Tile long side in millimetres (a "60x120" tile is 1200).'),
-        tile_width_mm: z.number().min(TILE_FLOOR_LIMITS.tileMm.min).max(TILE_FLOOR_LIMITS.tileMm.max).describe('Tile short side in millimetres (a "60x120" tile is 600).'),
-        tile_thickness_mm: z.number().min(TILE_FLOOR_LIMITS.thicknessMm.min).max(TILE_FLOOR_LIMITS.thicknessMm.max).optional().describe(`Tile thickness in mm (default ${DEFAULT_TILE_FLOOR.tileThicknessMm}).`),
-        joint_mm: z.number().min(TILE_FLOOR_LIMITS.jointMm.min).max(TILE_FLOOR_LIMITS.jointMm.max).optional().describe(`Grout joint width in mm (default ${DEFAULT_TILE_FLOOR.jointMm}).`),
-        perimeter_gap_mm: z.number().min(TILE_FLOOR_LIMITS.gapMm.min).max(TILE_FLOOR_LIMITS.gapMm.max).optional().describe(`Movement gap at the walls in mm (default ${DEFAULT_TILE_FLOOR.perimeterGapMm}).`),
-        trowel_notch_mm: z.number().min(TILE_FLOOR_LIMITS.notchMm.min).max(TILE_FLOOR_LIMITS.notchMm.max).optional().describe('Trowel notch in mm. Omit to use the size suggested for the tile.'),
+        product_id: z.string().optional().describe('The tile product id, when known.'),
+        product_name: z.string().optional().describe('The tile product name to match (partial is fine).'),
+        size: z.string().optional().describe('The size, e.g. "60x120" (cm). Required when the product comes in several sizes.'),
+        tile_length_mm: z.number().min(TILE_FLOOR_LIMITS.tileMm.min).max(TILE_FLOOR_LIMITS.tileMm.max).optional().describe('Only without a product: tile long side in mm.'),
+        tile_width_mm: z.number().min(TILE_FLOOR_LIMITS.tileMm.min).max(TILE_FLOOR_LIMITS.tileMm.max).optional().describe('Only without a product: tile short side in mm.'),
+        rooms: z.array(z.object({
+          label: z.string().optional().describe('Room name, e.g. "Kitchen".'),
+          width_m: z.number().min(TILE_FLOOR_LIMITS.areaM.min).max(TILE_FLOOR_LIMITS.areaM.max).optional().describe('Room width in metres.'),
+          depth_m: z.number().min(TILE_FLOOR_LIMITS.areaM.min).max(TILE_FLOOR_LIMITS.areaM.max).optional().describe('Room depth in metres.'),
+          area_m2: z.number().positive().optional().describe('Floor area in m², when the plan prints an area rather than sides.'),
+        })).optional().describe('Rooms as stated or as printed on an attached plan (confirmed by the user). Omit when using a project drawing.'),
+        project_id: z.string().optional().describe('Use the confirmed room areas on this project\'s drawings.'),
+        project_name: z.string().optional().describe('The project name, when the id is not known.'),
         pattern: z.enum(PATTERNS).optional().describe(`Laying pattern, one of: ${PATTERNS.join(' | ')}. Default stack.`),
-        prime: z.boolean().optional().describe('Prime the screed first (default yes).'),
+        joint_mm: z.number().min(TILE_FLOOR_LIMITS.jointMm.min).max(TILE_FLOOR_LIMITS.jointMm.max).optional().describe(`Grout joint width in mm (default ${DEFAULT_TILE_FLOOR.jointMm}).`),
+        wastage_percent: z.number().min(0).max(50).optional().describe('Cutting allowance %, only when the user states one; otherwise the workspace and product defaults apply.'),
+        tile_thickness_mm: z.number().min(TILE_FLOOR_LIMITS.thicknessMm.min).max(TILE_FLOOR_LIMITS.thicknessMm.max).optional().describe(`Tile thickness in mm (default ${DEFAULT_TILE_FLOOR.tileThicknessMm}).`),
+        trowel_notch_mm: z.number().min(TILE_FLOOR_LIMITS.notchMm.min).max(TILE_FLOOR_LIMITS.notchMm.max).optional().describe('Trowel notch in mm. Omit to use the size suggested for the tile.'),
         back_butter: z.boolean().optional().describe('Back-butter each tile. Omit to use the suggestion for the tile size (yes from 60 cm).'),
       }),
     },

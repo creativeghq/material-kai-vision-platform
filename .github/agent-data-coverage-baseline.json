@@ -120,6 +120,7 @@
     "list_workspace_product_suppliers",
     "price_supplier_hints",
     "product_sale_unit",
+    "project_takeoff_room_areas",
     "record_payment_fx",
     "refund_credits",
     "resolve_campaign_audience",
@@ -141,6 +142,7 @@
     "suggest_orders_for_inbound_doc",
     "suggest_payments_for_inbound_doc",
     "supplier_360",
+    "tile_line_quantity",
     "toggle_simple_flow",
     "workspace_inbound_status"
   ],
@@ -204,6 +206,11 @@
       "rpc": "my_customer_account_summary",
       "scope_arg": "",
       "reason": "customer-portal RPC keyed on auth.uid(); the customer-audience tools read invoices and quotes directly"
+    },
+    {
+      "rpc": "product_pack_coverage",
+      "scope_arg": "p_product",
+      "reason": "Read through tile_line_quantity, which the tile tool calls; a box size on its own answers nothing a tool is asked."
     },
     {
       "rpc": "search_products_fulltext",

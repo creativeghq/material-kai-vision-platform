@@ -3462,7 +3462,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   id: `msg-${isTile ? 'tileplan' : 'projectplan'}-${Date.now()}`,
                   role: 'assistant',
                   content: isTile
-                    ? `Tiles to buy: ${r?.quantities?.tilesToBuy ?? '—'} for ${r?.quantities?.areaM2 ?? '—'} m².`
+                    ? `Tile order: ${r?.order?.boxes ?? r?.order?.whole_boxes ?? '—'} boxes for ${r?.area_m2 ?? '—'} m².`
                     : `Estimated ${r?.title ?? 'renovation'}: ${Math.round(r?.subtotal ?? 0)} ${r?.currency || 'EUR'} excluding VAT.`,
                   timestamp: new Date(),
                   agentId: selectedAgent,

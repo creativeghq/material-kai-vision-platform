@@ -25,6 +25,8 @@ import {
 } from '@/lib/installation/tileFloorTemplate';
 import { formatNumber } from '@/utils/decimal';
 import { PATTERNS, PATTERN_LABELS, type Pattern } from '@/lib/surfaceRenderer/patternVocabulary';
+import { computeCoverage } from '@/lib/surfaceRenderer/coverage';
+import { normalizeFormat } from '@/lib/surfaceRenderer/patterns';
 import { ToolsShell } from './toolsShared';
 
 const TILE_COLORS = [
@@ -86,6 +88,7 @@ export default function TileInstallationPage() {
   };
   useEffect(() => () => { if (tileImage) URL.revokeObjectURL(tileImage); }, [tileImage]);
   const [prime, setPrime] = useState(DEFAULT_TILE_FLOOR.prime);
+  const [allowance, setAllowance] = useState('');
   const [backButter, setBackButter] = useState(DEFAULT_TILE_FLOOR.backButter);
   const [tileColor, setTileColor] = useState(TILE_COLORS[0].value);
   const [groutColor, setGroutColor] = useState(GROUT_COLORS[0].value);
@@ -128,6 +131,18 @@ export default function TileInstallationPage() {
   const shown = lastValid.current;
   const warnings = shown.issues.filter((i) => i.level === 'warning');
   const q = shown.quantities;
+  const allowancePct = allowance.trim() === '' ? null : Number(allowance);
+  const coverage = computeCoverage({
+    surfaceWidthCm: shown.params.areaWidthM * 100,
+    surfaceDepthCm: shown.params.areaDepthM * 100,
+    format: normalizeFormat(shown.params.tileWidthMm / 10, shown.params.tileLengthMm / 10),
+    formatAssumed: false,
+    groutCm: shown.params.jointMm / 10,
+    pattern: shown.params.pattern,
+    rotationDeg: shown.params.rotationDeg,
+    wastagePercent: allowancePct !== null && Number.isFinite(allowancePct) && allowancePct >= 0 ? allowancePct : null,
+    m2PerBox: null,
+  });
 
   const field = (k: NumericKey, label: string, step = '1') => (
     <FormField label={label}>
@@ -215,6 +230,9 @@ export default function TileInstallationPage() {
               <FormGrid>
                 {field('jointMm', 'Joint (mm)', '0.5')}
                 {field('perimeterGapMm', 'Wall gap (mm)')}
+                <FormField label="Cutting Allowance (%, optional)" hint="Extra tiles for cuts and breakage. Usually 5–10%, more for diagonal and herringbone.">
+                  <Input type="number" inputMode="decimal" min={0} step="1" value={allowance} onChange={(e) => setAllowance(e.target.value)} />
+                </FormField>
                 <FormField
                   label="Trowel Notch (mm)"
                   hint={
@@ -336,7 +354,11 @@ export default function TileInstallationPage() {
                 <CardContent className="p-0">
                   <dl className="divide-y divide-hairline text-sm">
                     <Row label="Floor Area" value={`${formatNumber(q.areaM2, { maxDecimals: 2 })} m²`} />
-                    <Row label={`Tiles to order (the layout uses ${q.tilesFromLayout}, plus ${q.sparePct}% spare)`} value={formatNumber(q.tilesToBuy)} />
+                    <Row label="Tiles Covering the Floor (edge cuts counted whole)" value={formatNumber(coverage.piecesNet)} />
+                    <Row
+                      label={coverage.piecesGross === null ? 'Tiles to Order — set a cutting allowance' : `Tiles to Order (+${coverage.wastagePercent}% cutting allowance)`}
+                      value={coverage.piecesGross === null ? '—' : `${formatNumber(coverage.piecesGross)} · ${formatNumber(coverage.m2Gross, { maxDecimals: 2 })} m²`}
+                    />
                     <Row label="Pieces on the Floor" value={`${q.fullTiles} full + ${q.cutTiles} cut`} />
                     <Row label={`Spacers (${shown.params.jointMm} mm)`} value={formatNumber(q.spacers)} />
                     <Row label={`Tile adhesive (${shown.params.trowelNotchMm} mm notch${shown.params.backButter ? ', back-buttered' : ''})`} value={`≈ ${formatNumber(q.adhesiveKg, { maxDecimals: 0 })} kg`} />
