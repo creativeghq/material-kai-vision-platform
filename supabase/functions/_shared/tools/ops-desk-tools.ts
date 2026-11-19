@@ -13,6 +13,7 @@ const { ToolMessage } = await import('npm:@langchain/core@1.2.9/messages') as {
 
 import { serviceClient } from '../supabase-client.ts';
 import { wrapUntrusted } from '../untrusted.ts';
+import { guardedFetch } from '../ssrf-guard.ts';
 import { loadPrompt } from '../prompt-utils.ts';
 import { CLAUDE_SONNET, langchainThinking } from '../claude-models.ts';
 import { reserveCredits, refundCredits, settleCredits } from '../credit-reserve.ts';
@@ -110,7 +111,7 @@ async function probeServer(server: string) {
   if (!s || !String(s.public_health_url).startsWith('https://')) return { ok: false, error: `No server ${server}.` };
   const started = Date.now();
   try {
-    const res = await fetch(s.public_health_url, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    const res = await guardedFetch(s.public_health_url, { signal: AbortSignal.timeout(15000) });
     const text = (await res.text()).slice(0, 2000);
     let status: unknown = null;
     try { status = (JSON.parse(text) as { status?: unknown }).status ?? null; } catch { status = null; }
