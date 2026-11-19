@@ -120,7 +120,6 @@ Deno.serve(withApiLogging('server-maintenance-report', async (req) => {
   const { error: syncErr } = await db.rpc('ops_sync_cases');
   if (syncErr) console.warn(`[server-maintenance-report] ops_sync_cases failed: ${syncErr.message}`);
 
-  // A resent report is ignored above, so each run rings the bell once.
   const [probe, srv, settings, openCase] = await Promise.all([
     probeServer(db, server),
     db.from('server_maintenance_servers').select('label').eq('server', server).maybeSingle(),

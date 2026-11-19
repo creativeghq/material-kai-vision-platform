@@ -2159,9 +2159,6 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'signal.matched',
   // #193 — both assert a fact about a LEGAL document / the operator's provider account.
   'fiscal_document_rejected', 'fiscal_credits_low',
-  // #590 — asserts a platform server's maintenance verdict; only server-maintenance-report / ops-desk may say so.
-  'server_maintenance_completed',
-  // #590 — asserts a platform server's maintenance verdict; only server-maintenance-report / ops-desk may say so.
   'server_maintenance_completed',
   'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',
   'material_alert', 'inventory_low_stock', 'freight_quote_requested', 'order_dispatched', 'marketplace_want_match',

@@ -107,7 +107,6 @@ function sharedTools(caseId: string, role: Role): InnerTool[] {
 
 const probeServer = (server: string) => probeServerWith(svc(), server);
 
-/** A server case Veritas just ruled on rings the operator's bell with the outcome. */
 async function notifyServerReview(caseId: string) {
   const { data: c } = await svc().from('ops_cases')
     .select('id, source_kind, source_key, title, status, verdict, diagnosis, proposed_fix, verdict_note').eq('id', caseId).maybeSingle();
