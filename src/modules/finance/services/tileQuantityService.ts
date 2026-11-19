@@ -18,12 +18,14 @@ export const tileQuantityService = {
     requested: number;
     wastagePercent?: number | null;
     allowBreakPack?: boolean | null;
+    format?: string | null;
   }): Promise<TileQuantity> {
     const { data, error } = await supabase.rpc('tile_line_quantity' as never, {
       p_product: input.productId,
       p_requested: input.requested,
       p_wastage_percent: input.wastagePercent ?? null,
       p_allow_break_pack: input.allowBreakPack ?? null,
+      p_format: input.format ?? null,
     } as never);
     if (error) throw error;
     return data as unknown as TileQuantity;

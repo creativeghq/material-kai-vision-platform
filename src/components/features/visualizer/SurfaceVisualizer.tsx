@@ -351,7 +351,7 @@ export const SurfaceVisualizer: React.FC<Props> = ({
         <TileInstallStudioDialog
           open={installOpen}
           onOpenChange={setInstallOpen}
-          design={surface && product ? { scene, surface, product, pattern, groutWidthMm, groutColorHex, rotationDeg } : null}
+          design={surface && product ? { scene, surface, product, pattern, groutWidthMm, groutColorHex, rotationDeg, wastage } : null}
         />
         {!compact && (
           <div className="mt-3 flex flex-wrap gap-2">

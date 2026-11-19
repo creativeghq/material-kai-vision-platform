@@ -14,6 +14,8 @@ import {
   type TileFloorParams,
 } from '@/lib/installation/tileFloorTemplate';
 import { solvePhotoCamera } from '@/lib/installation/photoCamera';
+import { computeCoverage, normalizeFormat, wastageFor, type WastageRates } from '@/lib/surfaceRenderer';
+import { CoveragePanel } from '@/components/features/visualizer/CoveragePanel';
 import { formatNumber } from '@/utils/decimal';
 import type { VisualizerScene, VisualizerSurface, SurfaceProduct } from '@/services/visualizerService';
 import { TileInstallationViewer, type RoomPhoto } from './TileInstallationViewer';
@@ -26,6 +28,8 @@ export interface TileInstallDesign {
   groutWidthMm: number;
   groutColorHex: string;
   rotationDeg: number;
+  /** The workspace's cutting allowance per pattern — the tile count is the visualizer's, not a second one. */
+  wastage: WastageRates;
 }
 
 interface Props {
@@ -75,6 +79,17 @@ function Studio({ design }: { design: TileInstallDesign }) {
     groutCureHours: 24,
   }), [surface.width_cm, surface.depth_cm, lengthMm, widthMm, thickness, joint, pattern, rotationDeg]);
   const plan = useMemo(() => buildTileFloorPlan(params), [params]);
+  const coverage = useMemo(() => computeCoverage({
+    surfaceWidthCm: surface.width_cm,
+    surfaceDepthCm: surface.depth_cm,
+    format: normalizeFormat(tex.tileWidthM * 100, tex.tileLengthM * 100),
+    formatAssumed: tex.formatSource === 'default',
+    groutCm: (Number(joint) || 3) / 10,
+    pattern,
+    rotationDeg,
+    wastagePercent: wastageFor(design.wastage, pattern),
+    m2PerBox: tex.packM2 ?? null,
+  }), [surface.width_cm, surface.depth_cm, tex, joint, pattern, rotationDeg, design.wastage]);
 
   const photo: RoomPhoto | null = useMemo(() => {
     const quad = surface.quad.map((p) => ({ x: p.x * scene.width_px, y: p.y * scene.height_px })) as [
@@ -120,13 +135,13 @@ function Studio({ design }: { design: TileInstallDesign }) {
             <p className="text-xs text-muted-foreground">This surface is not a floor marked on the photo, so the installation is shown in 3D only.</p>
           )}
           <dl className="divide-y divide-hairline rounded-sm border border-hairline text-sm">
-            <Row label="Pieces" value={`${q.fullTiles} full + ${q.cutTiles} cut`} />
-            <Row label={`Tiles (+${q.sparePct}% spare)`} value={formatNumber(q.tilesToBuy)} />
+            <Row label="Pieces Laid" value={`${q.fullTiles} full + ${q.cutTiles} cut`} />
             <Row label="Spacers" value={formatNumber(q.spacers)} />
             <Row label="Adhesive" value={`≈ ${formatNumber(q.adhesiveKg, { maxDecimals: 0 })} kg`} />
             <Row label="Grout" value={`≈ ${formatNumber(q.groutKg, { maxDecimals: 1 })} kg`} />
           </dl>
           <p className="text-[11px] text-muted-foreground">Adhesive and grout use typical coverage; the figures on the product's bag take precedence.</p>
+          <CoveragePanel coverage={coverage} compact />
         </div>
 
         <div className="min-w-0 space-y-3">

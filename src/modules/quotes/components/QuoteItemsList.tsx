@@ -219,7 +219,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
   // Price lookup drawer state — one instance, reused for any row the admin clicks.
   const [lookupItem, setLookupItem] = useState<QuoteItemWithProduct | null>(null);
   // #436 -- which line the room calculator is open for.
-  const [calcFor, setCalcFor] = useState<{ id: string; productId: string; name?: string } | null>(null);
+  const [calcFor, setCalcFor] = useState<{ id: string; productId: string; name?: string; size?: string | null } | null>(null);
   // Hide the per-line margin from a sales rep when sales_can_see_cost is off.
   const { isSalesRep, can } = usePermissions();
   const { toast } = useToast();
@@ -685,7 +685,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
                                   variant="ghost" size="icon" className="h-6 w-6"
                                   aria-label={`Work out the quantity for ${getProductName(item.product as any) || 'this line'}`}
                                   disabled={isUpdating}
-                                  onClick={e => { e.stopPropagation(); setCalcFor({ id: item.id, productId: item.product_id as string, name: getProductName(item.product as any) }); }}
+                                  onClick={e => { e.stopPropagation(); setCalcFor({ id: item.id, productId: item.product_id as string, name: getProductName(item.product as any), size: item.selected_size ?? null }); }}
                                 >
                                   <Calculator className="h-3 w-3" />
                                 </Button>
@@ -911,6 +911,7 @@ export const QuoteItemsList: React.FC<QuoteItemsListProps> = ({
           onOpenChange={(v) => { if (!v) setCalcFor(null); }}
           productId={calcFor.productId}
           productName={calcFor.name}
+          format={calcFor.size ?? null}
           onApply={async ({ quantity, wastagePercent, note }) => {
             const id = calcFor.id;
             setCalcFor(null);

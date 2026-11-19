@@ -79,6 +79,9 @@ export interface TileQuantity {
   wastage_percent?: number | null;
   with_wastage?: number;
   box_m2?: number | null;
+  box_m2_estimated?: boolean;
+  format?: string | null;
+  whole_boxes?: number | null;
   boxes?: number | null;
   supplied?: number;
   pallets?: number | null;

@@ -121,10 +121,10 @@ const KAI_TOOLS: AgentToolEntry[] = [
   {
     id: 'plan_tile_installation', name: 'Tile Installation', category: 'Calculators',
     credits: 0,
-    desc: 'Plan a tiled floor for one room: tiles to buy (cuts and spare included), spacers, adhesive and grout, plus the step-by-step laying sequence. Free, instant, no upstream API.',
+    desc: 'Boxes of a tile product for a floor — from room sizes or the rooms confirmed on a project’s floor plan — via the same derivation a quote line uses, plus adhesive, grout and the laying steps. Free, instant, no upstream API.',
     examples: [
-      'How many 60x60 tiles, how much adhesive and grout for a 4 x 3.2 m room?',
-      'Plan a herringbone floor of 20x120 planks in a 5 x 4 m living room',
+      'How many boxes of Ardenza 60x120 for a 4 x 3.2 m kitchen and a 2 x 5 m hall?',
+      'Tile the rooms on the Papadopoulos project floor plan with Bonn 60x60 in herringbone',
     ],
   },
   {
@@ -1697,18 +1697,24 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'Plan a tiled floor',
-        description: 'Tiles, adhesive and grout for one room, with the laying steps',
+        // No form: rooms are a list (or a project's confirmed drawing takeoff), which a form cannot hold.
+        label: 'Tile a floor',
+        description: 'Boxes of a tile for your rooms or your project’s floor plan, plus adhesive and grout',
         icon: 'Grid3x3',
-        prompt: 'How many 60x60 tiles, how much adhesive and grout do I need for a 4 x 3.2 m room?',
-        done: 'I\'ve worked out the tiles and materials for that floor.',
+        prompt: 'How many boxes of a tile do I need for my floor? I can give you the room sizes, or use the rooms marked on my project’s floor plan.',
+      },
+      {
+        label: 'Tile a project’s floor plan',
+        description: 'Boxes for the rooms marked on a project’s floor-plan drawing',
+        icon: 'Grid3x3',
+        prompt: 'Work out the tiles for the rooms on my project’s floor plan.',
+        done: 'I’ve worked out the tiles for those rooms.',
         run: { tool: 'plan_tile_installation' },
         autoFields: true,
         form: [
-          { key: 'room_width_m', label: 'Room Width (m)', kind: 'number', required: true, placeholder: '4' },
-          { key: 'room_depth_m', label: 'Room Depth (m)', kind: 'number', required: true, placeholder: '3.2' },
-          { key: 'tile_length_mm', label: 'Tile Length (mm)', kind: 'number', required: true, placeholder: '600' },
-          { key: 'tile_width_mm', label: 'Tile Width (mm)', kind: 'number', required: true, placeholder: '600' },
+          { key: 'project_name', label: 'Project', kind: 'text', required: true },
+          { key: 'product_name', label: 'Tile Product', kind: 'text', required: true },
+          { key: 'size', label: 'Size (e.g. 60x120)', kind: 'text' },
         ],
       },
       {
