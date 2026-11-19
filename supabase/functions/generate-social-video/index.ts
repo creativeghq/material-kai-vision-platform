@@ -282,12 +282,10 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     // Wan-only, forwarded to the generator, which is where they are SSRF-checked —
     // this function never fetches them itself.
     reference_image_urls,
-    // Was 'kling-3.0', which runs on the Replicate path below — and Replicate answers
-    // Was 'kling-3.0', which runs on the Replicate path below — and Replicate answers
-    // auth_failed to every call, so the DEFAULT model was the one model here that
-    // cannot currently produce anything. H3 Max is delegated, runs on fal's key, and is
-    // the right shape for a reel besides: 15s with audio, in seconds, for 25 credits.
-    model = 'h3-max-768p' as VideoModel,
+    // No default: an explicit pick is never swapped by the generator, so a defaulted model
+    // could not fall back when its provider has no key (#540). Absent → the generator's
+    // social_reel preference order decides, and the response says which model ran.
+    model,
     aspect_ratio = '9:16',
     duration_seconds = 10,
     workspace_id,
@@ -363,7 +361,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
     let replicateModel: string;
 
     // Delegate entirely to generate-interior-video-v2 (it handles the credit debit itself)
-    if (DELEGATED_MODELS.has(model)) {
+    if (!model || DELEGATED_MODELS.has(model)) {
       const veoRes = await fetch(`${supabaseUrl}/functions/v1/generate-interior-video-v2`, {
         method: 'POST',
         headers: {
@@ -380,7 +378,7 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
           // exact thing Wan was added to fix.
           duration_seconds,
           video_type: 'social_reel',
-          model,
+          ...(model ? { model } : {}),
           reference_image_urls,
           workspace_id,
         }),
@@ -389,11 +387,11 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         // Surface the downstream failure instead of letting .json() throw opaquely
         // on a non-JSON error body.
         const errText = await veoRes.text().catch(() => '');
-        throw new Error(`${model} generation failed (${veoRes.status}): ${errText.substring(0, 300)}`);
+        throw new Error(`${model ?? 'social reel'} generation failed (${veoRes.status}): ${errText.substring(0, 300)}`);
       }
       const veoResult = await veoRes.json();
       if (!veoResult.success) {
-        throw new Error(veoResult.error || `${model} generation failed`);
+        throw new Error(veoResult.error || `${model ?? 'social reel'} generation failed`);
       }
 
       // Attach it to the draft. This branch returned the URL and walked away, and it is the
@@ -436,7 +434,8 @@ Deno.serve(withApiLogging('generate-social-video', async (req) => {
         job_id: veoResult.job_id,
         post_id: attachError ? null : (post_id ?? null),
         ...(attachError ? { attach_error: `The video is ready but could not be attached to the post: ${attachError}` } : {}),
-        model_used: model,
+        model_used: veoResult.model_used ?? model ?? null,
+        ...(veoResult.substituted_from ? { substituted_from: veoResult.substituted_from } : {}),
         credits_used: veoResult.credits_used,
         status: veoResult.status,
       });

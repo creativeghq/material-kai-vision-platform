@@ -106,6 +106,7 @@ export class ProductEnrichmentAgent implements AgentRunner {
           systemPrompt,
           temperature:  0,
           task:         'background_agent_product_enrichment',
+          agentRunId:   ctx.run.id,
           userId:       agentConfig.created_by ?? undefined,
           workspaceId,
         });

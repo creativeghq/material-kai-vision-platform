@@ -90,6 +90,7 @@ export class MaterialTaggerAgent implements AgentRunner {
           systemPrompt,
           temperature:  0,
           task:         'background_agent_material_tagger',
+          agentRunId:   ctx.run.id,
           userId:       agentConfig.created_by ?? undefined,
           workspaceId,
         });

@@ -4,6 +4,7 @@ import { serviceClient } from '../_shared/supabase-client.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { withApiLogging, HttpError } from '../_shared/api-logger.ts';
 import { verifyIngestSignature } from '../_shared/ai-crawler.ts';
+import { notifyServerMaintenance, probeServer, runNotification } from '../_shared/server-maintenance.ts';
 
 const MAX_BYTES = 512 * 1024;
 const SERVER = /^[a-z0-9-]{3,40}$/;
@@ -95,7 +96,7 @@ Deno.serve(withApiLogging('server-maintenance-report', async (req) => {
   if (!verdict || !VERDICTS.has(verdict)) throw new HttpError(400, 'verdict is not a known verdict');
   if (!startedAt) throw new HttpError(400, 'started_at must be a timestamp');
 
-  const { error: insErr } = await db.from('server_maintenance_runs').upsert({
+  const run = {
     id, server, verdict,
     trigger: body.trigger === 'on_demand' ? 'on_demand' : 'scheduled',
     reason: str(body.reason, 2000),
@@ -110,10 +111,27 @@ Deno.serve(withApiLogging('server-maintenance-report', async (req) => {
     disk_used_after: int(body.disk_used_after),
     freed_bytes: int(body.freed_bytes),
     upstream_gap: gapOf(body.upstream_gap),
-  }, { onConflict: 'id', ignoreDuplicates: true });
+  };
+  const { data: inserted, error: insErr } = await db.from('server_maintenance_runs')
+    .upsert(run, { onConflict: 'id', ignoreDuplicates: true }).select('id');
   if (insErr) throw new Error(`run insert failed: ${insErr.message.slice(0, 200)}`);
+  if (!inserted?.length) return json({ stored: true, id, verdict, duplicate: true });
 
   const { error: syncErr } = await db.rpc('ops_sync_cases');
   if (syncErr) console.warn(`[server-maintenance-report] ops_sync_cases failed: ${syncErr.message}`);
-  return json({ stored: true, id, verdict });
+
+  // A resent report is ignored above, so each run rings the bell once.
+  const [probe, srv, settings, openCase] = await Promise.all([
+    probeServer(db, server),
+    db.from('server_maintenance_servers').select('label').eq('server', server).maybeSingle(),
+    db.from('ops_desk_settings').select('auto_review_server').eq('id', true).maybeSingle(),
+    db.from('ops_cases').select('id').eq('source_kind', 'server').like('source_key', `${server}:%`)
+      .not('status', 'in', '(resolved,dismissed)').order('opened_at', { ascending: false }).limit(1).maybeSingle(),
+  ]);
+  const msg = runNotification(srv.data?.label ?? server, run, probe, !!settings.data?.auto_review_server && !!openCase.data);
+  await notifyServerMaintenance(db, {
+    server, stage: 'run', verdict, ...msg,
+    actionUrl: openCase.data && msg.level === 'warning' ? `/admin/agent-ops?case=${openCase.data.id}` : undefined,
+  });
+  return json({ stored: true, id, verdict, outside_ok: probe.ok });
 }));

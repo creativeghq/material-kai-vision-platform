@@ -231,6 +231,10 @@ function evaluateComparison(
   }
 }
 
+/** Waited inside the invocation; anything longer parks and resumes from the minute cron (#552). */
+const MAX_INLINE_DELAY_MS = 25_000;
+const MAX_DELAY_MS = 365 * 86_400_000;
+
 async function executeCondition(
   node: FlowNode,
   context: ExecutionContext,
@@ -285,14 +289,14 @@ async function executeCondition(
 
     case 'delay': {
       const { duration, unit } = config as { duration: number; unit: string };
-      const ms = duration * ({ seconds: 1000, minutes: 60000, hours: 3600000, days: 86400000 }[unit] || 60000);
-      // A run lives inside one edge invocation, so a wait longer than this would silently become this.
-      const maxInlineMs = 25000;
-      if (ms > maxInlineMs) {
-        throw new Error(`A ${duration} ${unit} delay is longer than a flow can wait inside one run (${maxInlineMs / 1000} seconds). Delays that resume later are not built yet (#552).`);
+      const ms = Number(duration) * ({ seconds: 1000, minutes: 60000, hours: 3600000, days: 86400000 }[unit] || 60000);
+      if (!Number.isFinite(ms) || ms <= 0) throw new Error('A delay needs a positive duration.');
+      if (ms > MAX_DELAY_MS) throw new Error(`A ${duration} ${unit} delay is longer than a flow can wait (365 days).`);
+      if (ms <= MAX_INLINE_DELAY_MS) {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        return { output: { delayed: true, requested_ms: ms, actual_ms: ms }, branch: 'output' };
       }
-      await new Promise((resolve) => setTimeout(resolve, ms));
-      return { output: { delayed: true, requested_ms: ms, actual_ms: ms }, branch: 'output' };
+      return { output: { waiting: true, requested_ms: ms, resume_at: new Date(Date.now() + ms).toISOString() }, branch: '__wait__' };
     }
 
     case 'stop': {
@@ -1635,17 +1639,22 @@ async function executeFlowGraph(
   isTestRun: boolean,
   userId?: string,
   scope?: FlowScope,
-): Promise<void> {
+  /** Continue a parked run: the saved context, starting at the delay's next nodes. */
+  resume?: { context: ExecutionContext; startIds: string[] },
+): Promise<{ waits: number }> {
   const { nodes, edges } = graph;
-  const context: ExecutionContext = { trigger: { data: triggerData } };
+  const context: ExecutionContext = resume?.context ?? { trigger: { data: triggerData } };
+  let waits = 0;
 
   // A flow with no trigger node is on-demand (Run Now): it starts at every node nothing feeds.
   const walkStart = Date.now();
   const triggerNode = nodes.find((n) => n.type === 'triggerNode');
-  const startIds = triggerNode
-    ? [triggerNode.id]
-    : nodes.filter((n) => !edges.some((e) => e.target === n.id)).map((n) => n.id);
-  if (startIds.length === 0) throw new Error('This flow has no nodes to run');
+  const startIds = resume
+    ? resume.startIds
+    : triggerNode
+      ? [triggerNode.id]
+      : nodes.filter((n) => !edges.some((e) => e.target === n.id)).map((n) => n.id);
+  if (startIds.length === 0 && !resume) throw new Error('This flow has no nodes to run');
 
   const queue: Array<{ nodeId: string; incomingBranch: string | null }> =
     startIds.map((nodeId) => ({ nodeId, incomingBranch: null }));
@@ -1668,7 +1677,6 @@ async function executeFlowGraph(
 
     const stepStartTime = Date.now();
 
-    // Create step record
     const { data: step, error: stepError } = await supabase
       .from('flow_run_steps')
       .insert({
@@ -1751,6 +1759,27 @@ async function executeFlowGraph(
         output = result.output;
         branch = result.branch;
 
+        if (branch === '__wait__' && isTestRun) {
+          output = { ...output, waiting: false, skipped_in_test: true };
+          branch = 'output';
+        } else if (branch === '__wait__') {
+          if (!scope?.flowId) throw new Error('A delay can only park a run of a saved flow.');
+          context[nodeId] = output;
+          const nextIds = edges.filter((e) => e.source === nodeId && e.sourceHandle === 'output').map((e) => e.target);
+          const { error: waitErr } = await supabase.from('flow_run_waits').insert({
+            flow_run_id: runId, flow_id: scope.flowId, workspace_id: scope.workspaceId, node_id: nodeId,
+            next_node_ids: nextIds, resume_at: output.resume_at, context: JSON.parse(JSON.stringify(context)),
+            muted_actions: [...(scope.mutedActions ?? [])],
+          });
+          if (waitErr) throw new Error(`Could not park the run at this delay: ${waitErr.message}`);
+          await supabase.from('flow_run_steps').update({
+            status: 'waiting', output_data: output, branch_taken: 'waiting',
+            completed_at: new Date().toISOString(), duration_ms: Date.now() - stepStartTime,
+          }).eq('id', step.id);
+          waits++;
+          continue;
+        }
+
         // If filter says stop, mark as skipped and don't continue
         if (branch === '__stop__') {
           await supabase
@@ -1770,7 +1799,6 @@ async function executeFlowGraph(
         output = result.output;
       }
 
-      // Store output in context
       context[nodeId] = output;
 
       // An action that returns `skipped` did nothing; recording it as completed hid that.
@@ -1844,6 +1872,7 @@ async function executeFlowGraph(
     pendingError.__runAlreadyFailed = true;
     throw pendingError;
   }
+  return { waits };
 }
 
 // REQUEST HANDLERS
@@ -2057,17 +2086,15 @@ async function handleExecuteFlow(
 
   try {
     // Execute the graph
-    await executeFlowGraph(supabase, graph, run.id, trigger_data, isTestRun, initiatedBy, scope);
+    const walk = await executeFlowGraph(supabase, graph, run.id, trigger_data, isTestRun, initiatedBy, scope);
+    const finalStatus = walk.waits > 0 ? 'waiting' : 'completed';
 
-    // Update run as completed
     const durationMs = Date.now() - runStartTime;
     await supabase
       .from('flow_runs')
-      .update({
-        status: 'completed',
-        completed_at: new Date().toISOString(),
-        duration_ms: durationMs,
-      })
+      .update(finalStatus === 'completed'
+        ? { status: 'completed', completed_at: new Date().toISOString(), duration_ms: durationMs }
+        : { status: 'waiting' })
       .eq('id', run.id);
 
     // Return the run with steps
@@ -2081,7 +2108,7 @@ async function handleExecuteFlow(
       success: true,
       data: {
         ...run,
-        status: 'completed',
+        status: finalStatus,
         duration_ms: durationMs,
         steps: steps || [],
       },
@@ -2132,6 +2159,7 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   'signal.matched',
   // #193 — both assert a fact about a LEGAL document / the operator's provider account.
   'fiscal_document_rejected', 'fiscal_credits_low',
+  'server_maintenance_completed',
   'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',
   'material_alert', 'inventory_low_stock', 'freight_quote_requested', 'order_dispatched', 'marketplace_want_match',
   'purchase_order.sent', 'quote_pdf_generated',
@@ -2144,6 +2172,71 @@ const SERVER_ONLY_EVENTS = new Set<string>([
 ]);
 
 /** Queue this event for every active tenant endpoint that opted into its type (#330). */
+/** Resume every due parked branch once (the claim is the idempotency), then settle its run. */
+async function handleResumeWaits(supabase: DbClient): Promise<Response> {
+  const { data: waits, error } = await supabase.rpc('claim_due_flow_waits', { p_limit: 20 });
+  if (error) return jsonResponse({ success: false, error: `Could not claim waits: ${error.message}` }, 500);
+  const results: Array<{ wait_id: string; outcome: string }> = [];
+
+  for (const w of (waits ?? []) as Array<Record<string, any>>) {
+    const [{ data: run }, { data: flow }] = await Promise.all([
+      supabase.from('flow_runs').select('id, status, trigger_event_data, initiated_by, started_at').eq('id', w.flow_run_id).maybeSingle(),
+      supabase.from('flows').select('id, status, graph_definition, workspace_id, is_global, created_by').eq('id', w.flow_id).maybeSingle(),
+    ]);
+    if (!run || !flow) { results.push({ wait_id: w.id, outcome: 'run_or_flow_gone' }); continue; }
+    const parkedStep = (status: 'completed' | 'skipped') => supabase.from('flow_run_steps').update({ status })
+      .eq('flow_run_id', run.id).eq('node_id', w.node_id).eq('status', 'waiting');
+    const runnable = flow.status === 'active' || flow.status === 'draft';
+    if (!runnable || run.status === 'cancelled' || run.status === 'failed') {
+      await supabase.from('flow_run_waits').update({ status: 'cancelled' }).eq('id', w.id);
+      const { error: stepErr } = await parkedStep('skipped');
+      if (stepErr) console.error('[flow-engine] cancelled wait step could not be settled', run.id, stepErr.message);
+      if (run.status === 'waiting') {
+        await supabase.from('flow_runs').update({
+          status: 'cancelled', error_message: 'The automation was paused while this run was waiting.',
+          completed_at: new Date().toISOString(),
+        }).eq('id', run.id);
+      }
+      results.push({ wait_id: w.id, outcome: 'cancelled' });
+      continue;
+    }
+
+    await supabase.from('flow_runs').update({ status: 'running' }).eq('id', run.id);
+    const { error: stepErr } = await parkedStep('completed');
+    if (stepErr) console.error('[flow-engine] resumed wait step could not be settled', run.id, stepErr.message);
+    const scope: FlowScope = {
+      flowId: flow.id,
+      workspaceId: (flow.workspace_id as string | null) ?? null,
+      isGlobal: flow.is_global === true,
+      ownerUserId: (flow.created_by as string | null) ?? null,
+      mutedActions: Array.isArray(w.muted_actions) && w.muted_actions.length ? new Set(w.muted_actions as string[]) : undefined,
+    };
+    try {
+      const walk = await executeFlowGraph(
+        supabase, flow.graph_definition as FlowGraph, run.id, (run.trigger_event_data ?? {}) as Record<string, unknown>,
+        false, run.initiated_by ?? 'system', scope, { context: w.context as ExecutionContext, startIds: (w.next_node_ids ?? []) as string[] },
+      );
+      const { count } = await supabase.from('flow_run_waits').select('id', { count: 'exact', head: true })
+        .eq('flow_run_id', run.id).eq('status', 'waiting');
+      const done = walk.waits === 0 && (count ?? 0) === 0;
+      const { error: settleErr } = await supabase.from('flow_runs').update(done
+        ? { status: 'completed', completed_at: new Date().toISOString(), duration_ms: Date.now() - new Date(run.started_at).getTime() }
+        : { status: 'waiting' }).eq('id', run.id);
+      if (settleErr) console.error('[flow-engine] resumed run could not be settled', run.id, settleErr.message);
+      results.push({ wait_id: w.id, outcome: settleErr ? `settle_failed: ${settleErr.message}` : done ? 'completed' : 'waiting' });
+    } catch (e) {
+      if (!(e as { __runAlreadyFailed?: boolean }).__runAlreadyFailed) {
+        const { error: failErr } = await supabase.from('flow_runs').update({
+          status: 'failed', error_message: e instanceof Error ? e.message : String(e), completed_at: new Date().toISOString(),
+        }).eq('id', run.id);
+        if (failErr) console.error('[flow-engine] resumed run failure could not be recorded', run.id, failErr.message);
+      }
+      results.push({ wait_id: w.id, outcome: 'failed' });
+    }
+  }
+  return jsonResponse({ success: true, resumed: results.length, results });
+}
+
 async function enqueueTenantWebhooks(
   supabase: DbClient,
   workspaceId: string,
@@ -2324,7 +2417,7 @@ Deno.serve(withApiLogging('flow-engine', async (req) => {
     // authenticated caller, so DB-trigger notifications keep working independently of the
     // rotating service-role key the trigger sends (which can drift to a stale/placeholder
     // vault value). Every other action still requires a real authenticated caller.
-    if (!auth.success && !(action === 'trigger-event' && isCronAuthorized(req))) {
+    if (!auth.success && !((action === 'trigger-event' || action === 'resume-waits') && isCronAuthorized(req))) {
       return jsonResponse({ success: false, error: auth.error || 'Unauthorized' }, 401);
     }
 
@@ -2345,6 +2438,10 @@ Deno.serve(withApiLogging('flow-engine', async (req) => {
         // Allow both server-to-server (secret) and authenticated user calls. The workspace
         // scope is resolved authoritatively inside (never trusts a spoofable body id).
         return handleTriggerEvent(supabase, body, auth, req);
+
+      case 'resume-waits':
+        if (!callerTrusted) return jsonResponse({ success: false, error: 'Forbidden' }, 403);
+        return handleResumeWaits(supabase);
 
       default:
         return jsonResponse({ success: false, error: `Unknown action: ${action}` }, 400);

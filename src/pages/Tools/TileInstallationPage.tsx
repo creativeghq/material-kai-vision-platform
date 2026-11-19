@@ -25,8 +25,7 @@ import {
 } from '@/lib/installation/tileFloorTemplate';
 import { formatNumber } from '@/utils/decimal';
 import { PATTERNS, PATTERN_LABELS, type Pattern } from '@/lib/surfaceRenderer/patternVocabulary';
-import { useAuth } from '@/contexts/AuthContext';
-import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
+import { ToolsShell } from './toolsShared';
 
 const TILE_COLORS = [
   { label: 'Light Grey', value: '#d8d6d2' },
@@ -65,8 +64,6 @@ function toDraft(p: TileFloorParams): Draft {
 }
 
 export default function TileInstallationPage() {
-  const { user, session } = useAuth();
-  const { quota } = useToolsQuota(session?.access_token ?? null);
 
   const [draft, setDraft] = useState<Draft>(() => toDraft(DEFAULT_TILE_FLOOR));
   const [pattern, setPattern] = useState<Pattern>(DEFAULT_TILE_FLOOR.pattern);
@@ -145,7 +142,7 @@ export default function TileInstallationPage() {
   );
 
   return (
-    <ToolsShell wide headerRight={<QuotaBadge quota={quota} isAuthenticated={!!user} />}>
+    <ToolsShell wide>
       <div className="mb-8 text-center">
         <h1 className="mb-2 flex items-center justify-center gap-2 text-3xl font-semibold tracking-tight">
           <Grid3x3 className="h-6 w-6 text-primary" />

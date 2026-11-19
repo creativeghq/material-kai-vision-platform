@@ -296,7 +296,7 @@ Deno.serve(withApiLogging('background-agent-runner', async (req: Request) => {
       .update({
         status:        'completed',
         output_data:   result.output,
-        model_used:    agentConfig.model,
+        model_used:    (result.inputTokens ?? 0) + (result.outputTokens ?? 0) > 0 ? agentConfig.model : null,
         input_tokens:  result.inputTokens,
         output_tokens: result.outputTokens,
         credits_debited: result.creditsDebited,

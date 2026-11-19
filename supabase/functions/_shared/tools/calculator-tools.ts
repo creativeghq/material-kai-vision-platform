@@ -21,7 +21,7 @@ import {
   computeHeatPumpSizing,
   type ClimateZone, type EmitterType, type GlazingExposure, type InsulationLevel,
 } from '../calculators/heatPumpSizing.generated.ts';
-import { computeHeatingCostComparison, type AcType } from '../calculators/heatingCostComparison.generated.ts';
+import { computeHeatingCostComparison, HEATING_COST_DEFAULTS, type AcType } from '../calculators/heatingCostComparison.generated.ts';
 
 type ChunkSink = ((chunk: any) => void) | undefined;
 
@@ -116,11 +116,11 @@ export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
       const result = computeHeatingCostComparison({
         floorAreaM2: input.floor_area_m2,
         specificEnergyKwhM2Yr: input.specific_energy_kwh_m2_yr,
-        electricityPricePerKwh: input.electricity_price_per_kwh ?? 0.19,
-        oilPricePerLitre: input.oil_price_per_litre ?? 1.246,
-        gasPricePerKwh: input.gas_price_per_kwh ?? 0.137,
-        woodPricePerKg: input.wood_price_per_kg ?? 0.54,
-        heatPumpCop: input.heat_pump_cop ?? 4,
+        electricityPricePerKwh: input.electricity_price_per_kwh ?? HEATING_COST_DEFAULTS.electricityPricePerKwh,
+        oilPricePerLitre: input.oil_price_per_litre ?? HEATING_COST_DEFAULTS.oilPricePerLitre,
+        gasPricePerKwh: input.gas_price_per_kwh ?? HEATING_COST_DEFAULTS.gasPricePerKwh,
+        woodPricePerKg: input.wood_price_per_kg ?? HEATING_COST_DEFAULTS.woodPricePerKg,
+        heatPumpCop: input.heat_pump_cop ?? HEATING_COST_DEFAULTS.heatPumpCop,
         acType: input.ac_type ?? 'inverter',
         // Physical constants the ΠΕΑ may state differently for a given building. The web
         // calculator has always accepted these; the agent silently could not.
@@ -149,11 +149,11 @@ export const createHeatingCostComparisonTool = (onChunk: ChunkSink) => {
       schema: z.object({
         floor_area_m2: z.number().positive().describe('Heated floor area in m².'),
         specific_energy_kwh_m2_yr: z.number().positive().describe("Building energy intensity in kWh/m² per year (from the ΠΕΑ energy certificate). Typical ~40–60 well-insulated, ~70–90 partial, ~90–120 uninsulated."),
-        electricity_price_per_kwh: z.number().optional().describe('€/kWh electricity (default 0.19).'),
-        oil_price_per_litre: z.number().optional().describe('€/litre heating oil (default 1.246).'),
-        gas_price_per_kwh: z.number().optional().describe('€/kWh natural gas (default 0.137).'),
-        wood_price_per_kg: z.number().optional().describe('€/kg firewood (default 0.54).'),
-        heat_pump_cop: z.number().optional().describe('Heat-pump seasonal COP (default 4).'),
+        electricity_price_per_kwh: z.number().optional().describe(`€/kWh electricity (default ${HEATING_COST_DEFAULTS.electricityPricePerKwh}).`),
+        oil_price_per_litre: z.number().optional().describe(`€/litre heating oil (default ${HEATING_COST_DEFAULTS.oilPricePerLitre}).`),
+        gas_price_per_kwh: z.number().optional().describe(`€/kWh natural gas (default ${HEATING_COST_DEFAULTS.gasPricePerKwh}).`),
+        wood_price_per_kg: z.number().optional().describe(`€/kg firewood (default ${HEATING_COST_DEFAULTS.woodPricePerKg}).`),
+        heat_pump_cop: z.number().optional().describe(`Heat-pump seasonal COP (default ${HEATING_COST_DEFAULTS.heatPumpCop}).`),
         ac_type: z.enum(['inverter', 'simple']).optional().describe('A/C type: inverter (COP 3) or simple (COP 2). Default inverter.'),
         distribution_factor: z.number().optional().describe('Distribution/emission losses multiplier on useful demand (default 1.16286).'),
         oil_calorific_kwh_per_litre: z.number().optional().describe('Heating-oil calorific value in kWh/litre (default 10.71).'),

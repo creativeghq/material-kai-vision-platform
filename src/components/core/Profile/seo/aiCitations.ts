@@ -323,6 +323,7 @@ export function leaderCount(l: LlmLeader): number | null {
 }
 
 export const PLATFORM_LABEL: Record<string, string> = {
+  chat_gpt_us_rewrite: 'ChatGPT (US, Rewritten)',
   google: 'Google AI Overview',
   chat_gpt: 'ChatGPT',
 };
@@ -390,6 +391,7 @@ export interface MarketQuestion {
   last_response_at: string | null;
   captured_at: string;
   tracked: boolean;
+  translated_from?: { question: string; country_code: string; language_code: string; ai_search_volume: number | null } | null;
 }
 
 export interface MarketQuestionsFetch {
@@ -418,6 +420,17 @@ export interface AiQuestionsReport {
   search: { days: number; from: string; to: string; status: 'ok' | 'no_data' | 'not_connected' | string; rows: SearchQuestion[] };
   /** Absent on a payload from before the PAA source existed. */
   paa?: { status: 'ok' | 'no_data' | 'not_collected' | string; research_runs: number; rows: PaaQuestion[] };
+  enquiries?: { status: 'ok' | 'no_data' | string; rows: EnquiryQuestion[] };
+}
+
+export interface EnquiryQuestion {
+  id: string;
+  question: string;
+  enquiries: number;
+  language_code: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  tracked: boolean;
 }
 
 export interface PaaQuestion {
@@ -429,7 +442,7 @@ export interface PaaQuestion {
 }
 
 /** Where a tracked question came from; stored on its `custom_probes` entry. */
-export type AiQuestionSource = 'ai_cited' | 'ai_market' | 'gsc' | 'paa' | 'manual';
+export type AiQuestionSource = 'ai_cited' | 'ai_market' | 'gsc' | 'paa' | 'manual' | 'enquiry';
 
 /** Where a question put on a page came from; `assign_question_to_page` refuses anything else. */
 export type QuestionPageSource = AiQuestionSource | 'probe';

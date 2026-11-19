@@ -70,6 +70,7 @@ describe('outbound webhook event vocabulary (#330)', () => {
     //  - role_upgrade_*/module_access_requested describe OUR operations, not theirs.
     for (const forbidden of [
       'fiscal_credits_low',
+      'server_maintenance_completed',
       'email_opened',
       'email_clicked',
       'module_access_requested',

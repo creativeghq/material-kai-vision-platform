@@ -992,12 +992,14 @@ const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
 
 /**
  * Classify the user message → a specialist slug (or null = generalist/JARVIS).
- * Cheap Haiku call. Fully defensive: any error/timeout/ambiguity → null so the
- * turn falls back to the generalist (current behavior) and chat never breaks.
+ * The answer is a server-constrained enum + confidence (invariant 9), logged to ai_usage_logs;
+ * below `system_settings.agent_router.min_confidence` the generalist keeps the turn.
  */
-async function routeToSpecialist(supabase: any, userInput: string): Promise<{ slug: string; name: string } | null> {
+async function routeToSpecialist(
+  supabase: any, userInput: string, ids: { userId?: string; workspaceId?: string } = {},
+): Promise<{ slug: string; name: string } | null> {
   try {
-    if (!modelHaiku || !userInput || !userInput.trim()) return null;
+    if (!userInput || !userInput.trim()) return null;
     const menu = ROUTABLE_SPECIALISTS.map((s) => `- ${s.slug}: ${s.blurb}`).join('\n');
 
     let routerPrompt: string;
@@ -1018,16 +1020,30 @@ async function routeToSpecialist(supabase: any, userInput: string): Promise<{ sl
       return null;
     }
 
-    const resp = await modelHaiku.invoke([
-      { role: 'system', content: routerPrompt },
-      { role: 'user', content: userInput.slice(0, 2000) },
-    ]);
-    const c = resp?.content;
-    const raw = (typeof c === 'string' ? c : Array.isArray(c) ? c.map((p: any) => p?.text || '').join('') : '')
-      .trim().toLowerCase();
-    const hit = ROUTABLE_SPECIALISTS.find((s) => raw.includes(s.slug));
+    const { data: cfg } = await supabase.from('system_settings').select('setting_value')
+      .eq('setting_key', 'agent_router').maybeSingle();
+    const minConfidence = Number(cfg?.setting_value?.min_confidence);
+    if (!Number.isFinite(minConfidence)) {
+      console.error('[agent-chat] orchestrator routing DISABLED — system_settings.agent_router.min_confidence is missing.');
+      return null;
+    }
+
+    const { generateStructuredWithClaude } = await import('../_shared/ai-client.ts');
+    const slugs = ROUTABLE_SPECIALISTS.map((s) => s.slug) as [string, ...string[]];
+    const schema = z.object({
+      specialist: z.enum(['none', ...slugs]),
+      confidence: z.number().min(0).max(1),
+    });
+    const res = await generateStructuredWithClaude(userInput.slice(0, 2000), schema, {
+      model: CLAUDE_HAIKU, systemPrompt: routerPrompt, maxTokens: 200,
+      task: 'agent_router', userId: ids.userId, workspaceId: ids.workspaceId,
+    });
+    const { specialist, confidence } = res.output as { specialist: string; confidence: number };
+    if (specialist === 'none' || confidence < minConfidence) return null;
+    const hit = ROUTABLE_SPECIALISTS.find((s) => s.slug === specialist);
     return hit ? { slug: hit.slug, name: hit.name } : null;
-  } catch (_e) {
+  } catch (e) {
+    console.error('[agent-chat] routing failed — generalist takes the turn:', e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -1684,7 +1700,7 @@ async function executeAgent(
   // Who was ASKED for, before routing rewrites `agentId`.
   const requestedAgentId = agentId;
   if (ORCHESTRATOR_IDS.has(agentId)) {
-    const routed = await routeToSpecialist(supabase, userInput);
+    const routed = await routeToSpecialist(supabase, userInput, { userId, workspaceId });
     if (routed && AGENT_CONFIGS[routed.slug]) {
       onChunk?.({ type: 'agent_routed', to: routed.slug, name: routed.name, timestamp: Date.now() });
       console.log(`[agent-chat] routed ${requestedAgentId} → ${routed.slug} (${routed.name})`);

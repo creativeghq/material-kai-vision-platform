@@ -24,11 +24,11 @@ import {
 } from '@/components/core/ui/select';
 import {
   computeHeatingCostComparison,
+  HEATING_COST_DEFAULTS,
   type AcType,
   type HeatingMethodKey,
 } from '@/lib/calculators/heatingCostComparison';
-import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
-import { useAuth } from '@/contexts/AuthContext';
+import { ToolsShell } from './toolsShared';
 import { formatMoney, formatNumber } from '@/utils/decimal';
 
 const METHOD_ICON: Record<HeatingMethodKey, typeof Flame> = {
@@ -41,30 +41,30 @@ const METHOD_ICON: Record<HeatingMethodKey, typeof Flame> = {
 };
 
 export default function HeatingCostPage() {
-  const { user, session } = useAuth();
-  const { quota } = useToolsQuota(session?.access_token ?? null);
-
   const [area, setArea] = useState('200');
   const [specific, setSpecific] = useState('132');
-  const [elecPrice, setElecPrice] = useState('0.19');
-  const [oilPrice, setOilPrice] = useState('1.246');
-  const [gasPrice, setGasPrice] = useState('0.137');
-  const [woodPrice, setWoodPrice] = useState('0.54');
-  const [hpCop, setHpCop] = useState('4');
+  const [elecPrice, setElecPrice] = useState(String(HEATING_COST_DEFAULTS.electricityPricePerKwh));
+  const [oilPrice, setOilPrice] = useState(String(HEATING_COST_DEFAULTS.oilPricePerLitre));
+  const [gasPrice, setGasPrice] = useState(String(HEATING_COST_DEFAULTS.gasPricePerKwh));
+  const [woodPrice, setWoodPrice] = useState(String(HEATING_COST_DEFAULTS.woodPricePerKg));
+  const [hpCop, setHpCop] = useState(String(HEATING_COST_DEFAULTS.heatPumpCop));
   const [acType, setAcType] = useState<AcType>('inverter');
 
   const result = useMemo(() => {
     const a = parseFloat(area);
     const s = parseFloat(specific);
     if (!a || a <= 0 || !s || s <= 0) return null;
+    const prices = [elecPrice, oilPrice, gasPrice, woodPrice, hpCop].map((v) => parseFloat(v));
+    if (prices.some((p) => !Number.isFinite(p) || p <= 0)) return null;
+    const [electricityPricePerKwh, oilPricePerLitre, gasPricePerKwh, woodPricePerKg, heatPumpCop] = prices;
     return computeHeatingCostComparison({
       floorAreaM2: a,
       specificEnergyKwhM2Yr: s,
-      electricityPricePerKwh: parseFloat(elecPrice) || 0,
-      oilPricePerLitre: parseFloat(oilPrice) || 0,
-      gasPricePerKwh: parseFloat(gasPrice) || 0,
-      woodPricePerKg: parseFloat(woodPrice) || 0,
-      heatPumpCop: parseFloat(hpCop) || 4,
+      electricityPricePerKwh,
+      oilPricePerLitre,
+      gasPricePerKwh,
+      woodPricePerKg,
+      heatPumpCop,
       acType,
     });
   }, [area, specific, elecPrice, oilPrice, gasPrice, woodPrice, hpCop, acType]);
@@ -72,7 +72,7 @@ export default function HeatingCostPage() {
   const maxCost = result ? Math.max(...result.methods.map((m) => m.annualCostEur)) : 0;
 
   return (
-    <ToolsShell headerRight={<QuotaBadge quota={quota} isAuthenticated={!!user} />}>
+    <ToolsShell>
       <div className="text-center mb-8">
         <h1 className="text-3xl font-semibold tracking-tight mb-2 flex items-center justify-center gap-2">
           <Flame className="h-6 w-6 text-primary" />
@@ -208,7 +208,7 @@ export default function HeatingCostPage() {
           ) : (
             <Card className="dashboard-card">
               <CardContent className="p-6 text-sm text-muted-foreground text-center">
-                Enter a valid area and energy intensity to compare methods.
+                Enter the area, the energy intensity and every unit price (each above zero) to compare methods.
               </CardContent>
             </Card>
           )}

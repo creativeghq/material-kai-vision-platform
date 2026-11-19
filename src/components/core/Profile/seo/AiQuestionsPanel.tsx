@@ -40,7 +40,7 @@ const AIO_BADGE: Record<SearchQuestion['ai_overview'], { label: string; variant:
   unknown: { label: 'Not rank-checked', variant: 'info' },
 };
 
-type Tab = 'market' | 'cited' | 'search' | 'paa';
+type Tab = 'market' | 'cited' | 'search' | 'paa' | 'enquiries';
 
 const TOPICS_SOURCE: Record<string, string> = {
   set: 'chosen for this site',
@@ -58,7 +58,8 @@ export const AiQuestionsPanel: React.FC<{
   /** Normalised question → the page it is assigned to. */
   assignedPages?: ReadonlyMap<string, string>;
   onPutOnPage?: (question: string, source: AiQuestionSource) => void;
-}> = ({ report, canTrack, trackedCount, trackLimit, onTrack, onSaveTopics, assignedPages, onPutOnPage }) => {
+  onDismissEnquiry?: (id: string) => Promise<void>;
+}> = ({ report, canTrack, trackedCount, trackLimit, onTrack, onSaveTopics, assignedPages, onPutOnPage, onDismissEnquiry }) => {
   const [tab, setTab] = useState<Tab>('market');
   const [search, setSearch] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -90,6 +91,8 @@ export const AiQuestionsPanel: React.FC<{
   const paaRows = useMemo(() => report?.paa?.rows ?? [], [report]);
   const paaShown = paaRows.filter((r) => !q || r.question.toLowerCase().includes(q));
   const marketShown = marketRows.filter((r) => !q || r.question.toLowerCase().includes(q));
+  const enquiryRows = useMemo(() => report?.enquiries?.rows ?? [], [report]);
+  const enquiryShown = enquiryRows.filter((r) => !q || r.question.toLowerCase().includes(q));
   const full = trackedCount >= trackLimit;
 
   const track = async (question: string, source: AiQuestionSource) => {
@@ -161,6 +164,7 @@ export const AiQuestionsPanel: React.FC<{
               { value: 'cited', label: `AI cites you (${cited.length})` },
               { value: 'search', label: `You rank in Google (${searchRows.length})` },
               { value: 'paa', label: `People also ask (${paaRows.length})` },
+              { value: 'enquiries', label: `From your enquiries (${enquiryRows.length})` },
             ]}
           />
         </div>
@@ -258,6 +262,13 @@ export const AiQuestionsPanel: React.FC<{
                           <tr className="align-top">
                             <td className="max-w-[380px] px-3 py-2">
                               <p className="text-xs font-medium leading-snug text-foreground">{r.question}</p>
+                              {r.translated_from && (
+                                <p className="mt-0.5 text-[11px] text-muted-foreground" title={r.translated_from.question}>
+                                  <Badge variant="neutral" className="mr-1">Rewritten from US</Badge>
+                                  “{r.translated_from.question}”
+                                  {r.translated_from.ai_search_volume != null ? ` · US volume ${compact(r.translated_from.ai_search_volume)}` : ''}
+                                </p>
+                              )}
                               {r.answer && (
                                 <button type="button" className="mt-0.5 text-[11px] text-primary hover:underline" onClick={() => setOpenAnswer(openAnswer === key ? null : key)}>
                                   {openAnswer === key ? 'Hide answer' : 'Show answer'}
@@ -270,7 +281,7 @@ export const AiQuestionsPanel: React.FC<{
                               {r.cites_you && <Badge variant="success" className="mr-1">Cites you</Badge>}
                               {r.rival_sources.length > 0
                                 ? <span className="text-muted-foreground">{r.rival_sources.slice(0, 4).map((s) => s.domain).join(', ')}{r.rival_sources.length > 4 ? ` +${r.rival_sources.length - 4}` : ''}</span>
-                                : !r.cites_you && <span className="text-muted-foreground">No source</span>}
+                                : !r.cites_you && <span className="text-muted-foreground">{r.translated_from ? 'Not asked here yet' : 'No source'}</span>}
                             </td>
                             <td className="px-3 py-2 text-xs text-muted-foreground">{PLATFORM_LABEL[r.platform] ?? r.platform}</td>
                             <td className="px-3 py-2 text-right">{actions(r.question, r.tracked, 'ai_market')}</td>
@@ -461,6 +472,53 @@ export const AiQuestionsPanel: React.FC<{
                         <td className="px-3 py-2 text-right text-xs tabular-nums">{r.seen}</td>
                         <td className="px-3 py-2 text-xs text-muted-foreground">{r.last_seen ? formatDate(r.last_seen) : '—'}</td>
                         <td className="px-3 py-2 text-right">{actions(r.question, r.tracked, 'paa')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )
+        )}
+
+        {tab === 'enquiries' && (
+          enquiryRows.length === 0 ? (
+            <HubEmptyState
+              title="No enquiry questions yet"
+              description="Each new enquiry from your website form or page card is turned into the general question a buyer would ask an AI assistant, with nothing personal kept. They appear here within six hours of the enquiry."
+            />
+          ) : enquiryShown.length === 0 ? (
+            <HubEmptyState variant="filtered" title="No question matches" action={<Button size="sm" variant="outline" onClick={() => setSearch('')}>Clear filters</Button>} />
+          ) : (
+            <>
+              <p className="border-b border-hairline px-3 py-1.5 text-xs text-muted-foreground">
+                Written from your own website enquiries; only the question is kept, never who asked. Nothing is sent to an
+                AI engine until you track it.
+              </p>
+              <div className="table-scroll">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-surface-sunken text-[11px] font-semibold text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Question</th>
+                      <th className="px-3 py-2 text-right">Enquiries</th>
+                      <th className="px-3 py-2 text-left">Last Seen</th>
+                      <th className="px-3 py-2"><span className="sr-only">Action</span></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-hairline">
+                    {enquiryShown.map((r) => (
+                      <tr key={r.id} className="align-top">
+                        <td className="max-w-[420px] px-3 py-2 text-xs font-medium leading-snug text-foreground">{r.question}</td>
+                        <td className="px-3 py-2 text-right text-xs tabular-nums">{r.enquiries}</td>
+                        <td className="px-3 py-2 text-xs text-muted-foreground">{formatDate(r.last_seen_at)}</td>
+                        <td className="px-3 py-2 text-right">
+                          <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                            {onDismissEnquiry && !r.tracked && (
+                              <Button size="sm" variant="ghost" disabled={busy !== null} onClick={() => void onDismissEnquiry(r.id)}>Dismiss</Button>
+                            )}
+                            {actions(r.question, r.tracked, 'enquiry')}
+                          </div>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

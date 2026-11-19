@@ -43,7 +43,7 @@ const TABLES_TO_CLEAR = [
   'agent_usage_logs',              // Per-run token/cost usage
 
   // ── Agent Fabric runtime — runtime only; the persistent layer
-  //    (agent_definitions / agent_projects / agent_project_secrets /
+  //    (agent_projects / agent_project_secrets /
   //    agent_project_deployments / agent_project_snapshots) is PRESERVED in
   //    NEVER_CLEAR — agent_project_secrets CASCADEs from agent_projects, so the
   //    whole persistent layer must survive to keep secrets safe.
@@ -280,7 +280,7 @@ const NEVER_CLEAR = new Set<string>([
   // deployments + snapshots. agent_project_secrets CASCADEs from agent_projects,
   // so the entire persistent layer must be preserved to keep secrets safe; only
   // the runtime (agent_runs/agent_artifacts/agent_inbox_messages) is cleared.
-  'agent_definitions', 'agent_projects', 'agent_project_secrets',
+  'agent_projects', 'agent_project_secrets',
   // Accounts / credits / RBAC / admin config
   'user_credits', 'credit_transactions', 'credit_packages', 'workspaces',
   'workspace_members', 'user_profiles', 'roles', 'role_permissions',

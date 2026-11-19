@@ -33,12 +33,9 @@ import {
   type GlazingExposure,
   type InsulationLevel,
 } from '@/lib/calculators/heatPumpSizing';
-import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
-import { useAuth } from '@/contexts/AuthContext';
+import { ToolsShell } from './toolsShared';
 
 export default function HeatPumpToolPage() {
-  const { user, session } = useAuth();
-  const { quota } = useToolsQuota(session?.access_token ?? null);
 
   const [floorArea, setFloorArea] = useState('100');
   const [ceiling, setCeiling] = useState('2.7');
@@ -70,7 +67,7 @@ export default function HeatPumpToolPage() {
   }, [floorArea, ceiling, insulation, zone, emitter, glazing, includeDhw, occupants, advanced, designTemp]);
 
   return (
-    <ToolsShell headerRight={<QuotaBadge quota={quota} isAuthenticated={!!user} />}>
+    <ToolsShell>
       <div className="text-center mb-8">
         <h1 className="text-3xl font-semibold tracking-tight mb-2 flex items-center justify-center gap-2">
           <Thermometer className="h-6 w-6 text-primary" />

@@ -171,69 +171,6 @@ export type Database = {
         }
         Relationships: []
       }
-      agent_definitions: {
-        Row: {
-          aliases: string[]
-          allowed_tools: string[]
-          concurrency_key_template: string | null
-          created_at: string
-          default_config: Json
-          default_credit_cost: number
-          display_name: string | null
-          edge_function_name: string | null
-          execution_kind: string
-          id: string
-          is_orchestrator: boolean
-          max_run_cost_usd: number | null
-          max_wall_clock_seconds: number | null
-          prompt_category: string | null
-          resumable: boolean
-          sandbox_image_ref: string | null
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          aliases?: string[]
-          allowed_tools?: string[]
-          concurrency_key_template?: string | null
-          created_at?: string
-          default_config?: Json
-          default_credit_cost?: number
-          display_name?: string | null
-          edge_function_name?: string | null
-          execution_kind: string
-          id?: string
-          is_orchestrator?: boolean
-          max_run_cost_usd?: number | null
-          max_wall_clock_seconds?: number | null
-          prompt_category?: string | null
-          resumable?: boolean
-          sandbox_image_ref?: string | null
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          aliases?: string[]
-          allowed_tools?: string[]
-          concurrency_key_template?: string | null
-          created_at?: string
-          default_config?: Json
-          default_credit_cost?: number
-          display_name?: string | null
-          edge_function_name?: string | null
-          execution_kind?: string
-          id?: string
-          is_orchestrator?: boolean
-          max_run_cost_usd?: number | null
-          max_wall_clock_seconds?: number | null
-          prompt_category?: string | null
-          resumable?: boolean
-          sandbox_image_ref?: string | null
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       agent_email_inbound_log: {
         Row: {
           created_at: string
@@ -567,7 +504,6 @@ export type Database = {
           snapshot_id: string | null
           started_at: string | null
           status: string
-          total_cost_usd: number
           trigger_channel: string | null
           trigger_event_type: string | null
           trigger_metadata: Json
@@ -604,7 +540,6 @@ export type Database = {
           snapshot_id?: string | null
           started_at?: string | null
           status?: string
-          total_cost_usd?: number
           trigger_channel?: string | null
           trigger_event_type?: string | null
           trigger_metadata?: Json
@@ -641,7 +576,6 @@ export type Database = {
           snapshot_id?: string | null
           started_at?: string | null
           status?: string
-          total_cost_usd?: number
           trigger_channel?: string | null
           trigger_event_type?: string | null
           trigger_metadata?: Json
@@ -1106,6 +1040,7 @@ export type Database = {
       }
       ai_usage_logs: {
         Row: {
+          agent_run_id: string | null
           billed_cost_usd: number | null
           created_at: string | null
           credits_debited: number
@@ -1127,6 +1062,7 @@ export type Database = {
           workspace_id: string | null
         }
         Insert: {
+          agent_run_id?: string | null
           billed_cost_usd?: number | null
           created_at?: string | null
           credits_debited?: number
@@ -1148,6 +1084,7 @@ export type Database = {
           workspace_id?: string | null
         }
         Update: {
+          agent_run_id?: string | null
           billed_cost_usd?: number | null
           created_at?: string | null
           credits_debited?: number
@@ -1169,6 +1106,13 @@ export type Database = {
           workspace_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "ai_usage_logs_agent_run_id_fkey"
+            columns: ["agent_run_id"]
+            isOneToOne: false
+            referencedRelation: "agent_runs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "ai_usage_logs_image_id_fkey"
             columns: ["image_id"]
@@ -40906,6 +40850,7 @@ export type Database = {
       automation_run_status:
         | "pending"
         | "running"
+        | "waiting"
         | "completed"
         | "failed"
         | "cancelled"
@@ -40913,6 +40858,7 @@ export type Database = {
       automation_step_status:
         | "pending"
         | "running"
+        | "waiting"
         | "completed"
         | "skipped"
         | "failed"
@@ -41221,6 +41167,7 @@ export const Constants = {
       automation_run_status: [
         "pending",
         "running",
+        "waiting",
         "completed",
         "failed",
         "cancelled",
@@ -41229,6 +41176,7 @@ export const Constants = {
       automation_step_status: [
         "pending",
         "running",
+        "waiting",
         "completed",
         "skipped",
         "failed",

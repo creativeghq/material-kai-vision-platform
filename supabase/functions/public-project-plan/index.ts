@@ -1,8 +1,6 @@
-// public-project-plan — anonymous lead-gen estimator for /tools/project-plan.
-// In-repo public path for the Blueprint engine. The compute is PURE (no paid
-// upstream APIs) so it lives here, not in MIVAA. Turnstile-gated + metered against
-// the same `public_lookup_log` table the other public tools use (combined 2/day per
-// IP).
+// public-project-plan — anonymous Blueprint surface for /tools/project-plan and /tools/kitchen-cost.
+// `starters` returns the platform starters with cost folded into a sell price; `kitchen_lead`
+// files a visitor's configured kitchen as a CRM lead + Inbox thread in the operator workspace.
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse as json } from '../_shared/http.ts';
@@ -23,7 +21,6 @@ import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-const ANON_DAILY_QUOTA = 2; // combined across public tools, mirrors MIVAA
 const LEAD_DAILY_CAP = 3;   // kitchen estimates sent per IP per day (a write, not a lookup)
 
 
@@ -37,22 +34,6 @@ function clientIp(req: Request): string {
 async function verifyTurnstile(supabase: DbClient, token: string, ip: string): Promise<boolean> {
   const { ok } = await verifyTurnstileShared(supabase, token, ip);
   return ok;
-}
-
-/** Throws when the budget cannot be ANSWERED, rather than reporting zero used. */
-async function quotaUsed(supabase: DbClient, ip: string): Promise<number> {
-  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const { count, error } = await supabase
-    .from('public_lookup_log')
-    .select('id', { count: 'exact', head: true })
-    .eq('outcome', 'success')
-    .eq('ip_address', ip)
-    .gte('created_at', since);
-  if (error) {
-    console.error('[public-project-plan] quota count failed — refusing (fail closed):', error.message);
-    throw new HttpError(429, 'Too many requests. Please try again later.');
-  }
-  return count ?? 0;
 }
 
 const handler = withApiLogging('public-project-plan', async (req: Request): Promise<Response> => {
@@ -75,11 +56,12 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     const ids = (bps ?? []).map((b: any) => b.id);
     const itemsByBp: Record<string, any[]> = {};
     if (ids.length) {
-      const { data: items } = await supabase
+      const { data: items, error: itemsErr } = await supabase
         .from('blueprint_items')
         .select(ANON_BLUEPRINT_ITEM_COLUMNS)
         .in('blueprint_id', ids)
         .order('sort_order', { ascending: true });
+      if (itemsErr) throw new HttpError(500, `Could not load the starter items: ${itemsErr.message}`);
       for (const it of (items ?? []) as any[]) (itemsByBp[it.blueprint_id] ||= []).push(it);
     }
     const starters = (bps ?? []).map((b: any) => ({
@@ -87,74 +69,6 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
       items: (itemsByBp[b.id] ?? []).map(foldItemPricingForAnon),
     }));
     return json({ starters });
-  }
-
-  if (action === 'estimate') {
-    const { blueprint_id, dimensions, composition, turnstile_token } = body;
-    if (!blueprint_id) throw new HttpError(400, 'blueprint_id required');
-    const ip = clientIp(req);
-
-    // Bot check
-    if (!turnstile_token || !(await verifyTurnstile(supabase, String(turnstile_token), ip))) {
-      await supabase.from('public_lookup_log').insert({ scan_type: 'project_plan', ip_address: ip, outcome: 'captcha_failed', query_text: blueprint_id }).then(() => {}, () => {});
-      throw new HttpError(400, 'Bot check failed. Please try again.');
-    }
-
-    // Quota (combined across public tools, per IP)
-    const used = await quotaUsed(supabase, ip);
-    if (used >= ANON_DAILY_QUOTA) {
-      await supabase.from('public_lookup_log').insert({ scan_type: 'project_plan', ip_address: ip, outcome: 'rate_limited', query_text: blueprint_id }).then(() => {}, () => {});
-      return json({ success: false, error: 'quota_exceeded', used, limit: ANON_DAILY_QUOTA }, 429);
-    }
-
-    // Load the starter blueprint + items
-    const { data: bp, error: bpErr } = await supabase
-      .from('blueprints')
-      .select('id, title, source_currency, dimensions_schema, composition_schema, is_platform_starter')
-      .eq('id', blueprint_id).maybeSingle();
-    if (bpErr) throw new HttpError(400, bpErr.message);
-    if (!bp || !bp.is_platform_starter) throw new HttpError(404, 'Starter blueprint not found');
-
-    const { data: items, error: itErr } = await supabase
-      .from('blueprint_items').select('*').eq('blueprint_id', blueprint_id).order('sort_order');
-    if (itErr) throw new HttpError(400, itErr.message);
-
-    const dims: Record<string, number> = {};
-    for (const d of (bp.dimensions_schema ?? []) as { key: string; default?: number }[]) dims[d.key] = Number(d.default ?? 0);
-    for (const [k, v] of Object.entries(dimensions ?? {})) { const n = Number(v); if (!Number.isNaN(n)) dims[k] = n; }
-
-    // Compute (default inline rates only — no workspace services for anon). No visitor
-    // selection on this action, so every line falls back to its blueprint default. The zone
-    // configuration IS caller-supplied, but only as a SPEC — how many units of what kind. The
-    // rates it prices against come from the blueprint rows loaded above, never from the request.
-    const computed = computeBlueprint((items ?? []) as any[], dims, null, {
-      schema: (bp.composition_schema ?? []) as ZoneDef[],
-      config: (composition ?? null) as Composition | null,
-    });
-
-    // log success (counts toward the combined daily quota)
-    // This row IS the quota counter, so `.then(() => {}, () => {})` meant a rejected insert
-    // silently handed the caller a free lookup — an anonymous endpoint whose rate limit stops
-    // counting is a bypass, not a lost log line. Reported, never thrown: the work is already
-    // done and the visitor should still get their answer (#347 audit).
-    const { error: quotaErr } = await supabase.from('public_lookup_log').insert({
-      scan_type: 'project_plan', ip_address: ip, outcome: 'success', query_text: bp.title, cache_hit: false,
-    });
-    if (quotaErr) console.error('[public-project-plan] quota row NOT recorded — this lookup was free', quotaErr);
-
-    return json({
-      success: true,
-      result: {
-        blueprint: { id: bp.id, title: bp.title },
-        currency: bp.source_currency || 'EUR',
-        subtotal: computed.subtotal,
-        sections: computed.sections,
-        ungrouped: computed.ungrouped,
-        composition: computed.composition ?? null,
-        used: used + 1,
-        limit: ANON_DAILY_QUOTA,
-      },
-    });
   }
 
   // kitchen_lead — a visitor sends their configured kitchen in for a real quote.
@@ -165,10 +79,9 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
   // workspace has opted in the submission is REFUSED rather than dropped, because a lead that
   // vanishes silently is the worst possible failure for this surface.
   if (action === 'kitchen_lead') {
-    const { blueprint_id, dimensions, composition, selected_item_ids, contact, turnstile_token } = body ?? {};
+    const { blueprint_id, dimensions, composition, selected_item_ids, contact, turnstile_token, client_token } = body ?? {};
     const name = String(contact?.name ?? '').trim().slice(0, 120);
-    const typedEmail = String(contact?.email ?? '').trim().slice(0, 200);
-    const email = typedEmail.toLowerCase();
+    const email = String(contact?.email ?? '').trim().slice(0, 200).toLowerCase();
     const phone = String(contact?.phone ?? '').trim().slice(0, 40);
     const shape = String(contact?.shape ?? '').trim().slice(0, 160);
     const notes = String(contact?.notes ?? '').trim().slice(0, 2000);
@@ -193,7 +106,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     }
 
     // Own cap — a lead is a write, not a lookup, so it does not share the scan budget.
-    // Same fail-closed rule as quotaUsed above: an unanswerable count is not a zero.
+    // Fail closed: an unanswerable count is not a zero.
     const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const { count: leadsToday, error: leadCountErr } = await supabase
       .from('public_lookup_log')
@@ -250,35 +163,6 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
     if (!workspace) {
       await logLead('failed');
       return json({ success: false, error: 'leads_unavailable' }, 503);
-    }
-
-    // Find-or-create the CRM contact. Separate .eq() lookups rather than one .or() — a raw
-    // PostgREST filter string built from visitor input is an injection surface.
-    let contactId: string | null = null;
-    if (email) {
-      const { data } = await supabase.from('crm_contacts')
-        .select('id').eq('workspace_id', workspace.id).in('email', [...new Set([email, typedEmail])]).limit(1);
-      contactId = (data ?? [])[0]?.id ?? null;
-    }
-    if (!contactId && phone) {
-      const { data } = await supabase.from('crm_contacts')
-        .select('id').eq('workspace_id', workspace.id).eq('phone', phone).limit(1);
-      contactId = (data ?? [])[0]?.id ?? null;
-    }
-    if (!contactId) {
-      // Explicit allowlisted payload — never a spread of the request body (invariant 8).
-      const { data: created, error: cErr } = await supabase.from('crm_contacts').insert({
-        workspace_id: workspace.id,
-        name,
-        email: email || null,
-        phone: phone || null,
-        contact_type: 'private',
-        is_client: true,
-        lead_source: 'kitchen_calculator',
-        lead_status: 'new',
-      }).select('id').single();
-      if (cErr) throw new HttpError(400, `Could not record the enquiry: ${cErr.message}`);
-      contactId = created.id as string;
     }
 
     const reference = `KC-${crypto.randomUUID().replace(/-/g, '').slice(0, 6).toUpperCase()}`;
@@ -338,72 +222,72 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
       notes ? `\nNotes\n  ${notes}` : null,
     ].filter((l) => l !== null).join('\n');
 
-    const { data: thread, error: tErr } = await supabase.from('inbox_threads').insert({
-      workspace_id: workspace.id,
-      thread_type: 'customer',
-      channel: 'email',
-      subject: `Kitchen estimate ${reference} — ${name}`,
-      status: 'open',
-      last_message_at: new Date().toISOString(),
-      last_message_preview: `Kitchen estimate ${computed.subtotal.toFixed(2)} ${currency}`,
-      // Mirrors metadata.order_intake (#342): a PROPOSAL, not a quote. Nothing exists in
-      // `quotes` until a member approves it.
-      metadata: {
-        kitchen_estimate: {
-          reference,
-          blueprint_id: bp.id,
-          blueprint_title: bp.title,
-          currency,
-          dimensions: dims,
-          // The zone configuration IS the spec for everything a zone generates. The engine replays
-          // it against the blueprint's own rates on approval (create-plan-from-kitchen-estimate).
-          composition: (composition ?? null) as Composition | null,
-          subtotal: computed.subtotal,
-          // Composition lines carry synthetic keys, not blueprint_item ids — replaying them by id
-          // would match nothing and read as "the visitor deselected everything".
-          selected_item_ids: computed.sections
-            .flatMap((s) => s.tasks)
-            .filter((t) => t.selected && !derivedLineKeys.has(t.id))
-            .map((t) => t.id),
-          lines: computed.sections.map((s) => ({
-            section: s.label,
-            total: s.total,
-            tasks: s.tasks.filter((t) => t.selected).map((t) => ({
-              label: t.label, unit: t.unit, quantity: t.quantity,
-              unit_price: t.unit_price, line_total: t.line_total,
-            })),
-          })),
-          // Snapshotted beside `lines` for the same reason: the approval UI reads the estimate as
-          // it was sent. The `composition` above stays the spec that gets replayed.
-          appliances,
-          schedule: computed.composition?.schedule ?? [],
-          issues: computed.composition?.issues ?? [],
-          contact: { name, email: email || null, phone: phone || null, shape: shape || null, notes: notes || null },
-          source: 'kitchen_calculator',
-          created_at: new Date().toISOString(),
-        },
-      },
-    }).select('id').single();
-    if (tErr) throw new HttpError(400, `Could not record the enquiry: ${tErr.message}`);
+    // A per-submission token from the page makes a retry after a dropped connection replay the
+    // first lead instead of filing a second one. An old bundle without one still gets a lead.
+    const token = typeof client_token === 'string' && /^[A-Za-z0-9-]{16,64}$/.test(client_token)
+      ? client_token
+      : crypto.randomUUID();
+    const estimate = {
+      reference,
+      blueprint_id: bp.id,
+      blueprint_title: bp.title,
+      currency,
+      dimensions: dims,
+      // The zone configuration IS the spec for everything a zone generates. The engine replays
+      // it against the blueprint's own rates on approval (create-plan-from-kitchen-estimate).
+      composition: (composition ?? null) as Composition | null,
+      subtotal: computed.subtotal,
+      // Composition lines carry synthetic keys, not blueprint_item ids — replaying them by id
+      // would match nothing and read as "the visitor deselected everything".
+      selected_item_ids: computed.sections
+        .flatMap((s) => s.tasks)
+        .filter((t) => t.selected && !derivedLineKeys.has(t.id))
+        .map((t) => t.id),
+      lines: computed.sections.map((s) => ({
+        section: s.label,
+        total: s.total,
+        tasks: s.tasks.filter((t) => t.selected).map((t) => ({
+          label: t.label, unit: t.unit, quantity: t.quantity,
+          unit_price: t.unit_price, line_total: t.line_total,
+        })),
+      })),
+      // Snapshotted beside `lines` for the same reason: the approval UI reads the estimate as
+      // it was sent. The `composition` above stays the spec that gets replayed.
+      appliances,
+      schedule: computed.composition?.schedule ?? [],
+      issues: computed.composition?.issues ?? [],
+      contact: { name, email: email || null, phone: phone || null, shape: shape || null, notes: notes || null },
+      source: 'kitchen_calculator',
+      created_at: new Date().toISOString(),
+    };
 
-    const { data: participant, error: pErr } = await supabase.from('inbox_participants').insert({
-      thread_id: thread.id,
-      participant_type: 'customer',
-      contact_id: contactId,
-      workspace_id: workspace.id,
-      thread_role: 'participant',
-      status: 'active',
-    }).select('id').single();
-    if (pErr) throw new HttpError(400, `Could not record the enquiry: ${pErr.message}`);
-
-    const { error: mErr } = await supabase.from('inbox_messages').insert({
-      thread_id: thread.id,
-      sender_participant_id: participant.id,
-      body: messageBody,
-      message_type: 'text',
-      metadata: { direction: 'incoming', source: 'kitchen_calculator', reference },
+    // Lead, thread, participant and message are ONE transaction. No CRM contact is matched or
+    // created: a visitor's typed email is not proof of identity, so the lead is converted by a
+    // member through the normal duplicate search.
+    const { data: filed, error: fileErr } = await supabase.rpc('submit_public_kitchen_lead', {
+      p_workspace_id: workspace.id,
+      p_client_token: token,
+      p_reference: reference,
+      p_name: name,
+      p_email: email,
+      p_phone: phone,
+      p_request: [shape ? `Kitchen shape: ${shape}` : null, notes || null].filter(Boolean).join(' · ') || null,
+      p_estimated_value: computed.subtotal,
+      p_currency: currency,
+      p_subject: `Kitchen estimate ${reference} — ${name}`,
+      p_preview: `Kitchen estimate ${computed.subtotal.toFixed(2)} ${currency}`,
+      p_estimate: estimate,
+      p_message_body: messageBody,
     });
-    if (mErr) throw new HttpError(400, `Could not record the enquiry: ${mErr.message}`);
+    if (fileErr || !filed) {
+      await logLead('failed');
+      throw new HttpError(500, `Could not record the enquiry: ${fileErr?.message ?? 'no result'}`);
+    }
+    const result = filed as { lead_id: string; thread_id?: string; reference: string; replayed: boolean };
+    if (result.replayed) {
+      return json({ success: true, reference: result.reference, subtotal: computed.subtotal, currency });
+    }
+    const threadId = result.thread_id!;
 
     // Notify the people who answer enquiries, through Flows rather than a hardcoded insert.
     await emitFlowEventToWorkspaceRoles(
@@ -415,7 +299,7 @@ const handler = withApiLogging('public-project-plan', async (req: Request): Prom
         workspace_id: workspace.id,
         title: `New kitchen estimate — ${name}`,
         body: `${computed.subtotal.toFixed(2)} ${currency} · ${reference}`,
-        action_url: `/inbox?thread=${thread.id}`,
+        action_url: `/inbox?thread=${threadId}`,
         type: 'inbox',
       }),
     ).catch(() => {});

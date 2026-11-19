@@ -11,7 +11,7 @@ import { optionsFromRows, type FilterGroupDef } from '@/components/core/filters'
 import { humanizeLabel } from '@/utils/humanize';
 import type { Flow, FlowRun } from '@/services/flows';
 
-const STATUSES = ['pending', 'running', 'completed', 'failed', 'cancelled', 'timed_out'];
+const STATUSES = ['pending', 'running', 'waiting', 'completed', 'failed', 'cancelled', 'timed_out'];
 
 export function buildFlowRunFilters(runs: FlowRun[], flows: Flow[]): FilterGroupDef[] {
   const durations = runs.map((r) => Number(r.duration_ms ?? 0)).filter((n) => Number.isFinite(n));

@@ -161,6 +161,11 @@ export default function ProductSearchPage() {
                   )}
                 </Button>
               </div>
+            ) : quotaError || quota ? (
+              <div className="text-sm text-destructive flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                <span>Scanning is unavailable right now — the bot check could not be loaded. Please try again later.</span>
+              </div>
             ) : (
               <div className="text-sm text-muted-foreground flex items-center gap-2">
                 <Loader2 className="h-4 w-4 animate-spin" />

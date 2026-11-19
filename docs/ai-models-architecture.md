@@ -15,7 +15,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 | **Voyage AI** | voyage-4-large (index) + voyage-4 (query) | Text, aspect and understanding embeddings (1024D) — one shared 4-series space, sole text embedder |
 | **Voyage AI** | voyage-context-4 | KB sections + PDF chunks (1024D) — each chunk embedded with its document in view; same 4-series space, queried with voyage-4 (KB MRR 0.840 → 0.945, 2026-10-16) |
 | **Voyage AI** | voyage-multimodal-3.5 | Page embeddings (1024D, `page_embeddings`) — a DIFFERENT space; never query it with a voyage-4 vector |
-| **Anthropic / Voyage** | claude-haiku-4-5 (default) / rerank-3-lite (`SEARCH_RERANK_PROVIDER=voyage`) | Search reranking |
+| **Anthropic / Voyage** | rerank-3-lite (default since 2026-11-19, #463 gate) / claude-haiku-5-5 (`SEARCH_RERANK_PROVIDER=claude`, and whenever explanations are requested) | Search reranking |
 | **Google (Modal)** | SigLIP2 base (768D) (SLIG) | One visual embedding per image (768D), the pre-OCR image filter, and text→visual query vectors |
 | **PaddlePaddle (Modal)** | PaddleOCR-VL 1.6 (0.9B: PP-DocLayoutV3 RT-DETR + VLM) | Structural pass — layout + OCR + figure boxes, sole layout/OCR engine (Surya-2/YOLO/Chandra all deleted 2026-06-13) |
 | **OpenAI** | GPT-4o, GPT-5 | Optional alternative for product discovery / agents |

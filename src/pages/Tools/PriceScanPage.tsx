@@ -45,7 +45,7 @@ export default function PriceScanPage() {
   const [scanError, setScanError] = useState<string | null>(null);
   const [result, setResult] = useState<PublicPriceScanResponse | null>(null);
 
-  const creditsPerScan = quota?.credits_per_scan ?? 5;
+  const creditsPerScan = quota?.credits_per_scan ?? 2;
   const balance = quota?.credits_balance ?? null;
   const limitReached = isAuthenticated ? balance != null && balance < creditsPerScan : quota?.remaining === 0;
 
@@ -184,6 +184,11 @@ export default function PriceScanPage() {
                     </>
                   )}
                 </Button>
+              </div>
+            ) : quotaError || quota ? (
+              <div className="text-sm text-destructive flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                <span>Scanning is unavailable right now — the bot check could not be loaded. Please try again later.</span>
               </div>
             ) : (
               <div className="text-sm text-muted-foreground flex items-center gap-2">

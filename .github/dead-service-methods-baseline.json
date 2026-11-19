@@ -1,5 +1,5 @@
 {
-  "total": 120,
+  "total": 103,
   "files": {
     "src/modules/email/services/campaignService.ts": [
       "getCampaignStats",
@@ -20,9 +20,6 @@
       "voidInvoice",
       "workspaceMoneyCurrencies"
     ],
-    "src/modules/finance/services/inboundService.ts": [
-      "linkDocuments"
-    ],
     "src/modules/finance/services/ordersService.ts": [
       "deleteOrderPayment",
       "recordOrderPayment",
@@ -30,10 +27,6 @@
     ],
     "src/modules/finance/services/tripExpenseService.ts": [
       "updateReport"
-    ],
-    "src/modules/hr/services/hrService.ts": [
-      "updateOvertime",
-      "updateSeparation"
     ],
     "src/modules/messaging/services/messagingCampaignService.ts": [
       "getCampaignStats",
@@ -51,9 +44,6 @@
       "normalizePhoneNumber",
       "sendBulk",
       "validatePhoneNumber"
-    ],
-    "src/modules/projects/services/applicationsService.ts": [
-      "setRetentionTerms"
     ],
     "src/modules/quotes/services/QuotePDFService.ts": [
       "downloadPDF",
@@ -78,15 +68,6 @@
     "src/services/apiGateway/apiGatewayService.ts": [
       "deleteApiKey"
     ],
-    "src/services/apiGateway/browserApiClientFactory.ts": [
-      "invokeFunction"
-    ],
-    "src/services/apiGateway/browserApiIntegrationService.ts": [
-      "generateImageWithReplicate",
-      "getAllAvailableModels",
-      "performEnhancedSearch",
-      "recognizeMaterial"
-    ],
     "src/services/billing.service.ts": [
       "getCreditTransactions"
     ],
@@ -102,15 +83,13 @@
       "bulkLinkContacts",
       "createCheckoutSession",
       "getCredits",
-      "getPotentialMatches",
-      "getSubscription"
+      "getPotentialMatches"
     ],
     "src/services/crmActivitiesService.ts": [
       "listForTarget"
     ],
     "src/services/customerAssetsService.ts": [
-      "applyDefaults",
-      "retire"
+      "applyDefaults"
     ],
     "src/services/dataIntegrityService.ts": [
       "reopenFinding"
@@ -130,7 +109,6 @@
       "credsStatus"
     ],
     "src/services/inboxApi.ts": [
-      "markRead",
       "removeParticipant"
     ],
     "src/services/jobResearchService.ts": [
@@ -141,7 +119,6 @@
     "src/services/knowledgeBaseService.ts": [
       "createAttachment",
       "createCategory",
-      "createFromPDF",
       "getDocumentAttachments",
       "getProductDocuments"
     ],
@@ -182,9 +159,6 @@
     "src/services/product3dService.ts": [
       "modelFormatsByProduct"
     ],
-    "src/services/productConfiguratorService.ts": [
-      "listConfigurations"
-    ],
     "src/services/quoteAnalyticsService.ts": [
       "getSessionId",
       "trackDownload",
@@ -195,7 +169,6 @@
       "deleteLayout"
     ],
     "src/services/supplierClaimsService.ts": [
-      "listClaims",
       "revokeClaim",
       "workspaceNames"
     ],

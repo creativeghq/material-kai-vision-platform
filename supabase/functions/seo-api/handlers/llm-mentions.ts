@@ -5,6 +5,7 @@ import { assertEntitled, isWorkspaceEntitled } from '../../_shared/entitlement.t
 import { callDataForSEO } from '../../_shared/tools/dataforseo-dispatch.ts';
 import { SEO_MODULE } from './entitlement.ts';
 import { mergeMarketQuestions, ourSources } from './market-questions.ts';
+import { collectUsRewrites } from './market-question-rewrites.ts';
 
 const supabaseUrl = () => Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = () => Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -351,6 +352,14 @@ async function collect(
     });
   }
 
+  const rw = await collectUsRewrites(db, site, market, topics, payer, now, call);
+  rows.push({
+    ...shared, platform: 'chat_gpt_us_rewrite', target_kind: 'topic_questions', target: domain,
+    status: rw.status, note: rw.note, metrics: rw.metrics,
+    top_domains: [], top_pages: [], top_brands: [], series: [],
+  });
+  summary.push({ platform: 'chat_gpt_us_rewrite', topic_questions_status: rw.status, topic_questions: rw.metrics.stored, note: rw.note });
+
   const { error } = await db.from('website_llm_mentions').insert(rows.filter((r) => !!r.target));
   if (error) throw new Error(error.message);
   return { rows, summary };
@@ -421,8 +430,12 @@ export async function aiVisibilityRunCalls(db: Loose, siteId: string): Promise<{
   const topics = (await topicsFor(db, siteId)).length;
   const perPlatform = ['ai_llm_mentions_aggregated_metrics', 'ai_llm_mentions_historical', 'ai_llm_mentions_top_domains',
     'ai_llm_mentions_top_brands', 'ai_llm_mentions_top_pages', 'ai_llm_mentions_search'];
-  return Array.from({ length: covered }, () => [...perPlatform, ...Array(topics).fill('ai_llm_mentions_search')])
-    .flat().map((kind) => ({ kind }));
+  // The US rewrite lane: up to three English terms per topic (first eight topics), non-English markets only.
+  const rewrite = market.language_code && market.language_code !== 'en' ? Math.min(topics, 8) * 3 : 0;
+  return [
+    ...Array.from({ length: covered }, () => [...perPlatform, ...Array(topics).fill('ai_llm_mentions_search')]).flat(),
+    ...Array(rewrite).fill('ai_llm_mentions_search'),
+  ].map((kind) => ({ kind }));
 }
 
 /** Only sites whose owner scheduled AI visibility, billed to whoever switched the schedule on. */

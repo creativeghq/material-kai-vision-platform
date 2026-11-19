@@ -6,8 +6,11 @@ import { Button } from '@/components/core/ui/button';
 import { Badge } from '@/components/core/ui/badge';
 import { formatDate, formatTime } from '@/utils/datetime';
 import { inboxApi, type InboxThread, type ConversationSentiment } from '@/services/inboxApi';
+import { INBOX_CONVERSATION_INTENTS, INBOX_CONVERSATION_INTENT_LABELS } from '@/modules/messaging/inboxConversationIntents';
+import { VerdictCorrection } from './VerdictCorrection';
 
-/** What the CHANNEL knows about the person, as opposed to what our CRM knows. */
+const INTENT_OPTIONS = INBOX_CONVERSATION_INTENTS.map((value) => ({ value, label: INBOX_CONVERSATION_INTENT_LABELS[value] }));
+
 /** What the conversation reads like right now, and what to say back. */
 export const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: boolean }> = ({ thread, isMember }) => {
   const { toast } = useToast();
@@ -126,6 +129,27 @@ export const ConversationMoodPanel: React.FC<{ thread: InboxThread; isMember: bo
                 <p className="text-sm mt-1.5">{sentiment.summary}</p>
               </div>
             </div>
+
+            {sentiment.intent && (
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs text-muted-foreground">About:</span>
+                <Badge
+                  variant={typeof sentiment.intent_confidence === 'number' && sentiment.intent_confidence < 0.6 ? 'warning' : 'info'}
+                >
+                  {INBOX_CONVERSATION_INTENT_LABELS[sentiment.intent] ?? sentiment.intent}
+                  {typeof sentiment.intent_confidence === 'number' ? ` · ${Math.round(sentiment.intent_confidence * 100)}%` : ''}
+                </Badge>
+                {sentiment.needs_human && <Badge variant="warning">Needs a Person</Badge>}
+                <VerdictCorrection
+                  current={sentiment.intent}
+                  options={INTENT_OPTIONS}
+                  resetKey={sentiment.analysed_at}
+                  onRecord={(v) => inboxApi.recordClassifierOutcome({
+                    classifier: 'inbox_conversation_intent', thread_id: thread.id, human_verdict: v,
+                  })}
+                />
+              </div>
+            )}
 
             {sentiment.open_question && (
               <div className="border-l-2 border-amber pl-3 py-1">

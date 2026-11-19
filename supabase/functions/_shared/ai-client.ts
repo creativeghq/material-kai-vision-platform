@@ -130,6 +130,7 @@ async function _logTrackedCall(opts: {
   errorMessage?: string;
   userId?: string;
   workspaceId?: string;
+  agentRunId?: string;
 }): Promise<void> {
   const _log = _logClient();
   if (!_log) return;
@@ -165,6 +166,7 @@ async function _logTrackedCall(opts: {
     await _log.from('ai_usage_logs').insert({
       user_id: opts.userId ?? null,
       workspace_id: opts.workspaceId ?? null,
+      agent_run_id: opts.agentRunId ?? null,
       operation_type: opts.task,
       model_name: opts.model,
       input_tokens: opts.inputTokens,
@@ -344,6 +346,7 @@ export interface AIGenerateConfig {
    */
   userId?: string;
   workspaceId?: string;
+  agentRunId?: string;
 }
 
 export interface AIGenerateResult<T = string> {
@@ -791,6 +794,7 @@ export async function generateStructuredWithClaude<T>(
       task: config?.task ?? 'claude_structured_generation',
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      agentRunId: config?.agentRunId,
       model: modelId,
       inputTokens,
       outputTokens,
@@ -817,6 +821,7 @@ export async function generateStructuredWithClaude<T>(
       task: config?.task ?? 'claude_structured_generation',
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      agentRunId: config?.agentRunId,
       model: modelId,
       inputTokens: 0,
       outputTokens: 0,
@@ -2424,11 +2429,25 @@ export async function editImageWithGrok(
 
 export const OPENAI_IMAGE_MODEL = 'gpt-image-2.6-sunburst';
 const OPENAI_IMAGE_PRICING_MODEL_ID = 'gpt-image-2.6';
+const OPENAI_IMAGE_TOKEN_PRICING_MODEL_ID = 'gpt-image-2.6-tokens';
 
 export interface OpenAIImageResult {
   base64: string;
   mimeType: string;
   model: string;
+  /** Priced from the usage OpenAI returned; null when it returned none or the rate row is missing. */
+  cost: { rawUsd: number; markup: number } | null;
+}
+
+async function openAiImageCost(usage: unknown): Promise<OpenAIImageResult['cost']> {
+  const u = usage as { input_tokens?: unknown; output_tokens?: unknown } | null | undefined;
+  if (!u || typeof u.output_tokens !== 'number') return null;
+  const db = _logClient();
+  if (!db) return null;
+  const price = await resolveTokenPrice(db, OPENAI_IMAGE_TOKEN_PRICING_MODEL_ID);
+  if (!price) return null;
+  const parts = tokenCostParts(price, typeof u.input_tokens === 'number' ? u.input_tokens : 0, u.output_tokens);
+  return { rawUsd: parts.input + parts.output, markup: price.markup };
 }
 
 export async function generateImageWithOpenAI(
@@ -2479,7 +2498,7 @@ export async function generateImageWithOpenAI(
   }
 
   void logOpenAI(1);
-  return { base64: b64, mimeType: 'image/png', model: modelId };
+  return { base64: b64, mimeType: 'image/png', model: modelId, cost: await openAiImageCost(data.usage) };
 }
 
 /**
@@ -2544,7 +2563,7 @@ export async function editImageWithOpenAI(
   }
 
   void logOpenAI(1);
-  return { base64: b64, mimeType: 'image/png', model: modelId };
+  return { base64: b64, mimeType: 'image/png', model: modelId, cost: await openAiImageCost(data.usage) };
 }
 
 // ── Re-exports for convenience ──

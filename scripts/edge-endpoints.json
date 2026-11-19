@@ -2532,6 +2532,12 @@
           }
         ],
         "response": "{success: boolean, triggered: number, results: array}"
+      },
+      {
+        "name": "resume-waits",
+        "summary": "Resume every flow branch parked at a delay whose time has come; cron-secret only (cron_dispatch minute group).",
+        "params": [],
+        "response": "{success: boolean, resumed: number, results: {wait_id: string, outcome: string}[]}"
       }
     ],
     "request": [
@@ -13581,7 +13587,7 @@
     "name": "public-project-plan",
     "tag": "Quotes",
     "summary": "Public lead-gen Blueprint estimator (/tools/project-plan)",
-    "description": "Anonymous estimator for #242. Pure compute (no paid upstreams), runs in-repo under the service role. Turnstile-gated and metered against public_lookup_log (combined 2/day per IP, shared with the other public tools). Reads platform-starter blueprints and returns a read-only estimate from visitor dimensions using default inline rates — no save, no workspace data.",
+    "description": "Anonymous Blueprint surface for /tools/project-plan and /tools/kitchen-cost. Pure compute (no paid upstreams), runs under the service role. `starters` returns platform starters with cost folded into a sell price; `kitchen_lead` files a visitor's kitchen as a CRM lead + Inbox thread in the operator workspace (Turnstile-gated, 3/day per IP).",
     "security": [
       "public"
     ],
@@ -13597,33 +13603,8 @@
         "response": "{ starters: [...] }"
       },
       {
-        "action": "estimate",
-        "description": "Compute a read-only estimate for a starter blueprint from visitor dimensions. Turnstile-gated + counts toward the 2/day per-IP quota.",
-        "params": [
-          {
-            "name": "blueprint_id",
-            "type": "string",
-            "required": true,
-            "desc": "Platform-starter blueprint id"
-          },
-          {
-            "name": "dimensions",
-            "type": "object",
-            "required": false,
-            "desc": "Dimension values keyed by schema key"
-          },
-          {
-            "name": "turnstile_token",
-            "type": "string",
-            "required": true,
-            "desc": "Cloudflare Turnstile token"
-          }
-        ],
-        "response": "{ success, result }"
-      },
-      {
         "name": "kitchen_lead",
-        "summary": "PUBLIC — a visitor sends their configured kitchen in for a real quote. The client sends CHOICES, never money: the estimate is recomputed server-side from the blueprint, so a tampered total cannot become the recorded one. The destination workspace comes from an explicit opt-in flag and never from the request body (invariant 1); when no workspace has opted in the submission is REFUSED rather than dropped, because a lead that vanishes silently is the worst possible failure for this surface.",
+        "summary": "PUBLIC — a visitor sends their configured kitchen in for a real quote. The client sends CHOICES, never money: the estimate is recomputed server-side from the blueprint, so a tampered total cannot become the recorded one. The destination is the single root (operator) workspace, never the request body (invariant 1); with no unique root the submission is REFUSED. Lead, thread and message are written in one transaction, and `client_token` makes a retry replay the first lead.",
         "params": [
           {
             "name": "choices",
@@ -13644,7 +13625,7 @@
             "desc": "Configurator the choices belong to"
           }
         ],
-        "response": "{ok:boolean, lead_id?:string, error?:string}"
+        "response": "{ success: boolean, reference?: string, subtotal?: number, currency?: string, error?: string }"
       }
     ],
     "request": [],

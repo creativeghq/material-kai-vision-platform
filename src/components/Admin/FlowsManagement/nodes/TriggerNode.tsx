@@ -111,6 +111,7 @@ export const triggerIcons: Record<TriggerType, React.ElementType> = {
   invoice_paid: CheckCircle2,
   fiscal_document_rejected: ShieldAlert,
   fiscal_credits_low: BatteryLow,
+  server_maintenance_completed: ShieldCheck,
   bank_payment_unmatched: Landmark,
   card_spend_threshold: CreditCard,
   module_access_requested: LayoutGrid,

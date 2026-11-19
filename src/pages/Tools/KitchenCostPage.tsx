@@ -24,6 +24,7 @@ import { absorbedGroups, defaultComposition, deriveComposition, hasComposition }
 import { evaluateFormula } from '@/utils/blueprintFormula';
 import type { Composition, ZoneDef } from '@/utils/blueprintComposition';
 import { formatMoney, parseDecimalOr } from '@/utils/decimal';
+import { parseEdgeError } from '@/utils/edgeError';
 import { ToolsShell, useToolsQuota } from './toolsShared';
 
 const KITCHEN_PROJECT_TYPE = 'kitchen_cabinets';
@@ -520,6 +521,8 @@ function SendEstimateDialog({
 
   const [token, setToken] = useState<string | null>(null);
   const turnstileRef = useRef<TurnstileHandle>(null);
+  // One per submission, kept across retries, so a retry after a dropped connection cannot file a second lead.
+  const clientToken = useRef<string>(crypto.randomUUID());
 
   const submit = async () => {
     if (!name.trim() || (!email.trim() && !phone.trim())) {
@@ -544,6 +547,7 @@ function SendEstimateDialog({
         selected_item_ids: items.filter((i) => i.kind === 'task' && i.is_selected).map((i) => i.id),
         contact: { name: name.trim(), email: email.trim(), phone: phone.trim(), shape, notes: notes.trim() },
         turnstile_token: token,
+        client_token: clientToken.current,
       },
     });
     setSending(false);
@@ -551,11 +555,16 @@ function SendEstimateDialog({
     turnstileRef.current?.reset();
 
     if (fnError || data?.success === false) {
-      setError(data?.error === 'leads_unavailable'
+      const parsed = fnError ? await parseEdgeError(fnError, 'Could not send the estimate. Please try again.') : null;
+      const code = data?.error ?? parsed?.code;
+      setError(code === 'leads_unavailable'
         ? 'We cannot take estimates online right now — please call us instead.'
-        : (data?.error || fnError?.message || 'Could not send the estimate. Please try again.'));
+        : code === 'rate_limited'
+          ? 'You have sent several estimates today — please try again tomorrow or call us.'
+          : (parsed?.message ?? data?.error ?? 'Could not send the estimate. Please try again.'));
       return;
     }
+    clientToken.current = crypto.randomUUID();
     setReference(data?.reference ?? null);
   };
 

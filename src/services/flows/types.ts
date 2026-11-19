@@ -4,8 +4,8 @@ import type { B2BCompanyType } from '@/config/b2bCompanyTypes';
 // Flow Status Types
 // =====================================================
 export type FlowStatus = 'draft' | 'active' | 'paused' | 'archived';
-export type FlowRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
-export type FlowStepStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'failed';
+export type FlowRunStatus = 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
+export type FlowStepStatus = 'pending' | 'running' | 'waiting' | 'completed' | 'skipped' | 'failed';
 
 // =====================================================
 // Trigger Types
@@ -130,6 +130,8 @@ export type TriggerType =
   // e-Invoicing (#193): the OPERATOR's provider credit pool crossed a low tier. Not a tenant
   // event — when this pool empties, every tenant stops invoicing at once.
   | 'fiscal_credits_low'
+  // #590: a platform server finished its weekly maintenance (or Stark/Veritas finished reviewing it). Operator-only.
+  | 'server_maintenance_completed'
   // Banking (#315): an incoming bank transfer matched no invoice (payload-only)
   | 'bank_payment_unmatched'
   // Banking (#315): a company-card spend of ≥€100 landed (filter higher via amount)
@@ -452,6 +454,8 @@ export interface InvoicePaidTriggerConfig {}
 export interface FiscalDocumentRejectedTriggerConfig {}
 /** Payload-only. Carries `balance` + the `tier` that was crossed. */
 export interface FiscalCreditsLowTriggerConfig {}
+/** Payload-only. Carries `server`, `verdict` and `stage` ('run' | 'review'). */
+export interface ServerMaintenanceCompletedTriggerConfig {}
 export interface BankPaymentUnmatchedTriggerConfig {}
 export interface CardSpendThresholdTriggerConfig {}
 export interface ReviewSubmittedTriggerConfig {}
@@ -665,6 +669,7 @@ export type TriggerConfigMap = {
   invoice_paid: InvoicePaidTriggerConfig;
   fiscal_document_rejected: FiscalDocumentRejectedTriggerConfig;
   fiscal_credits_low: FiscalCreditsLowTriggerConfig;
+  server_maintenance_completed: ServerMaintenanceCompletedTriggerConfig;
   bank_payment_unmatched: BankPaymentUnmatchedTriggerConfig;
   card_spend_threshold: CardSpendThresholdTriggerConfig;
   module_access_requested: ModuleAccessRequestedTriggerConfig;

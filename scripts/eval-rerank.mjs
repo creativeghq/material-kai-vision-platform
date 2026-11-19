@@ -189,7 +189,6 @@ async function rankClaude(question, rows) {
     body: JSON.stringify({
       model: CLAUDE_RERANK_MODEL,
       max_tokens: 2048,
-      temperature: 0,
       system: await productionRerankPrompt(),
       // The block is DATA. Same fencing the production path uses (invariant 9).
       messages: [{
