@@ -4,6 +4,7 @@ import { loadPrompt } from '../prompt-utils.ts';
 import { gmailAccessToken, gmailFetch } from '../gmail-client.ts';
 import { parseAddress, parseGmailPayload, type GmailPart } from '../mail-mime.ts';
 import { htmlToText } from '../crm/leadCapture.ts';
+import { deriveEnquiryQuestions } from './enquiry-questions.ts';
 
 const SyncVerdict = z.object({
   summary: z.string().describe('Where the conversation stands: what they want, what we offered (prices, sizes, quantities), open questions, and the next step for us.'),
@@ -100,9 +101,14 @@ export class LeadConversationSyncAgent implements AgentRunner {
       }
     }
 
-    await log(failed.length ? 'warn' : 'info',
-      `Lead sync: ${updated.length} updated, ${unchanged} unchanged, ${failed.length} failed`, { updated, failed });
-    return { success: failed.length === 0 || updated.length > 0, output: { updated, unchanged, failed }, inputTokens, outputTokens, creditsDebited: 0 };
+    const enquiry = await deriveEnquiryQuestions(ctx, model);
+    inputTokens += enquiry.inputTokens;
+    outputTokens += enquiry.outputTokens;
+    const enquiryQuestions = { recorded: enquiry.recorded, none: enquiry.none, rejected_personal_data: enquiry.rejected, failed: enquiry.failed };
+
+    await log(failed.length || enquiry.failed.length ? 'warn' : 'info',
+      `Lead sync: ${updated.length} updated, ${unchanged} unchanged, ${failed.length} failed; enquiry questions ${enquiry.recorded} recorded`, { updated, failed, enquiryQuestions });
+    return { success: failed.length === 0 || updated.length > 0, output: { updated, unchanged, failed, enquiry_questions: enquiryQuestions }, inputTokens, outputTokens, creditsDebited: 0 };
   }
 
   private async whatsappTurns(supabase: AgentRunContext['supabase'], threadId: string): Promise<Turn[] | null> {

@@ -534,6 +534,15 @@ export const WebsiteAiVisibilityPanel: React.FC<{
       onTrack={trackQuestion}
       assignedPages={assignedPages}
       onPutOnPage={putOnPage}
+      onDismissEnquiry={async (id) => {
+        try {
+          await userWebsitesService.dismissEnquiryQuestion(id);
+        } catch (e: any) {
+          toast({ title: 'Could not dismiss it', description: e?.message, variant: 'destructive' });
+          return;
+        }
+        setQuestions(await userWebsitesService.aiQuestions(website.id, 90).catch(() => questions));
+      }}
       onSaveTopics={async (topics) => {
         try {
           await userWebsitesService.setAiQuestionTopics(website.id, topics);

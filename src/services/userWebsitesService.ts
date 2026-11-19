@@ -1790,6 +1790,11 @@ export const userWebsitesService = {
   },
 
   /** An empty list returns the site to topics derived from its tracked keywords. */
+  async dismissEnquiryQuestion(id: string): Promise<void> {
+    const { error } = await supabase.rpc('dismiss_enquiry_question' as any, { p_id: id } as any);
+    if (error) throw error;
+  },
+
   async setAiQuestionTopics(websiteId: string, topics: string[]): Promise<void> {
     const { error } = await supabase.rpc(
       'set_website_ai_question_topics' as any,

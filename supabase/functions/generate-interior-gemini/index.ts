@@ -11,8 +11,9 @@ import {
   generateWithGemini,
   generateImageWithGrok,
   editImageWithGrok,
-  generateImageWithOpenAI,
-  editImageWithOpenAI,
+  generateImageWithOpenAI as _generateImageWithOpenAI,
+  editImageWithOpenAI as _editImageWithOpenAI,
+  type OpenAIImageResult,
   IMAGE_ASPECT_RATIOS,
   type GeminiImageModel,
   type ImageAspectRatio,
@@ -392,6 +393,16 @@ async function refundCredits(
 // scene — a single isolated item on seamless white, front elevation, true-to-spec proportions,
 // so the buyer/supplier sees exactly the configured item. Driven by the structured `spec`.
 Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
+  // Every OpenAI call this request makes, priced from its returned usage; one unpriced call makes the total unknown.
+  let openAiCalls = 0;
+  let openAiCost: { rawUsd: number; markup: number } | null = { rawUsd: 0, markup: 0 };
+  const tallyOpenAi = (r: OpenAIImageResult): OpenAIImageResult => {
+    openAiCalls++;
+    openAiCost = openAiCost && r.cost ? { rawUsd: openAiCost.rawUsd + r.cost.rawUsd, markup: r.cost.markup } : null;
+    return r;
+  };
+  const generateImageWithOpenAI = async (...a: Parameters<typeof _generateImageWithOpenAI>) => tallyOpenAi(await _generateImageWithOpenAI(...a));
+  const editImageWithOpenAI = async (...a: Parameters<typeof _editImageWithOpenAI>) => tallyOpenAi(await _editImageWithOpenAI(...a));
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -1047,8 +1058,10 @@ VIEW OVERRIDE — the camera position above is replaced. Photograph this specifi
     if (!imagePricing) {
       console.warn(`[generate-interior-gemini] no ai_model_pricing row for "${pricingKey}" — cost logged as null`);
     }
-    const rawCostUsd = imagePricing ? imagePricing.cost_per_unit : null;
-    const billedCostUsd = imagePricing ? rawCostUsd! * imagePricing.markup_multiplier : null;
+    const openAiPriced = routing.provider === 'openai' && openAiCalls > 0;
+    const rawCostUsd = openAiPriced ? (openAiCost?.rawUsd ?? null) : imagePricing ? imagePricing.cost_per_unit : null;
+    const markup = openAiPriced ? (openAiCost?.markup ?? null) : imagePricing?.markup_multiplier ?? null;
+    const billedCostUsd = rawCostUsd !== null && markup !== null ? rawCostUsd * markup : null;
 
     // WHO the spend belongs to, not just who it was billed to.
     const attributedSource = isServiceCall
@@ -1073,12 +1086,12 @@ VIEW OVERRIDE — the camera position above is replaced. Photograph this specifi
         credits_debited: credits,
         raw_cost_usd: rawCostUsd,
         billed_cost_usd: billedCostUsd,
-        markup_multiplier: imagePricing?.markup_multiplier ?? null,
+        markup_multiplier: markup,
         metadata: {
           mode,
           model: modelLabel,
-          billing_type: 'per_unit',
-          units: 1,
+          billing_type: openAiPriced ? 'token_based' : 'per_unit',
+          units: openAiPriced ? openAiCalls : 1,
           success: true,
           ...(attributedSource ? { source: attributedSource } : {}),
           ...(attributedKeyId ? { embed_key_id: attributedKeyId } : {}),
