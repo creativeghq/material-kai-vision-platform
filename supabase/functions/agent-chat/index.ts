@@ -1083,6 +1083,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'document_templates',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
       // CRM roster query — "which businesses have ΚΑΔ X?" + create-from-VAT (all users; workspace-scoped)
       'search_crm_by_kad', 'create_company_from_vat', 'enrich_company_from_aade', 'manage_crm', 'manage_deal', 'customer_health',
       // Where we pay a counterparty. A cluster is the unit the picker offers, so an owner of the
@@ -1285,6 +1286,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'discover_platform_data', 'call_platform_rpc',
       // Calculators (all users; deterministic, free, no upstream API)
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
       // Image-driven post-processing tools (require an existing room image in the conversation)
       'apply_lighting_preset', 'generate_vr_world', 'generate_video',
       // Deterministic surface preview: exact product, exact format, no credits (#447).
@@ -1334,6 +1336,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // core search + calculators (all users)
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
       // AI Assessment — the real-estate subject. Baxter is the agent that would be asked "why is
       // this listing not moving", and this is the tool that answers it from the data.
       'assess_property', 'get_property_assessment', 'list_assessment_actions', 'apply_assessment_action',
@@ -1351,6 +1354,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     allowedRoles: ['viewer', 'member', 'admin', 'owner'],
     tools: [
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
       'knowledge_base_search', 'read_document_section', 'material_search', 'visual_search', 'analyze_inspiration_url',
       'create_catalog', 'attach_catalog_pdfs', 'extract_from_catalog_pdfs', 'translate_pdf_to_catalog',
       'add_material_to_catalog', 'find_image_for_material', 'adjust_catalog_pricing', 'generate_catalog_pdf', 'publish_catalog',
@@ -1401,6 +1405,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       'visual_search',
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
       'knowledge_base_search', 'read_document_section', 'material_search', 'analyze_inspiration_url',
       'seo_research_keyword', 'seo_keyword_difficulty', 'seo_keyword_suggestions', 'seo_search_intent',
       'seo_keyword_overview', 'seo_ai_keyword_volume', 'seo_serp_audit', 'seo_historical_serps', 'seo_audit_url', 'seo_score_url', 'seo_page_review', 'seo_presence_plan',
@@ -1446,6 +1451,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       'visual_search', 'analyze_inspiration_url',
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
       'knowledge_base_search', 'read_document_section', 'material_search',
       'web_search', 'web_fetch', 'web_research_validate',
       // Trinity quotes and invoices, so it must be able to FIND one by number or customer name.
@@ -1502,6 +1508,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
     tools: [
       'material_search', 'visual_search', 'analyze_inspiration_url',
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
+      'plan_tile_installation', 'estimate_project_plan',
       'knowledge_base_search', 'read_document_section',
       'web_search', 'web_fetch', 'web_research_validate',
       // Core record search (see Pepper's note): every specialist the router can pick gets it.
@@ -2511,13 +2518,15 @@ async function executeAgent(
 
   // 🌡️ Heat-pump sizer — deterministic, free, no upstream API. Self-contained
   // import (no shared module batch needed).
-  if (config.tools.includes('calculate_heat_pump_sizing') || config.tools.includes('calculate_heating_cost_comparison') || config.tools.includes('calculate_kitchen_cost')) {
+  if (['calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost', 'plan_tile_installation', 'estimate_project_plan'].some((t) => config.tools.includes(t))) {
     try {
       const calcMod = await import('../_shared/tools/calculator-tools.ts');
       if (config.tools.includes('calculate_heat_pump_sizing')) tools.push(calcMod.createHeatPumpSizingTool(onChunk));
       if (config.tools.includes('calculate_heating_cost_comparison')) tools.push(calcMod.createHeatingCostComparisonTool(onChunk));
       // Takes the client: kitchen rates live in the blueprint, not in constants like the two above.
       if (config.tools.includes('calculate_kitchen_cost')) tools.push(calcMod.createKitchenCostTool(supabase, onChunk));
+      if (config.tools.includes('plan_tile_installation')) tools.push(calcMod.createTileInstallationTool(onChunk));
+      if (config.tools.includes('estimate_project_plan')) tools.push(calcMod.createProjectPlanEstimateTool(supabase, onChunk));
     } catch (calcErr) {
       console.warn('⚠️ Could not register calculator tools:', calcErr);
     }

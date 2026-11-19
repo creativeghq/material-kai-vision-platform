@@ -22,6 +22,10 @@ import {
   type ClimateZone, type EmitterType, type GlazingExposure, type InsulationLevel,
 } from '../calculators/heatPumpSizing.generated.ts';
 import { computeHeatingCostComparison, HEATING_COST_DEFAULTS, type AcType } from '../calculators/heatingCostComparison.generated.ts';
+import {
+  buildTileFloorPlan, DEFAULT_TILE_FLOOR, suggestBackButter, suggestedTrowelNotchMm, TILE_FLOOR_LIMITS,
+} from '../installation/tileFloorTemplate.generated.ts';
+import { PATTERNS, PATTERN_LABELS, type Pattern } from '../surfacePatterns.generated.ts';
 
 type ChunkSink = ((chunk: any) => void) | undefined;
 
@@ -296,6 +300,215 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
         worktop_length_m: z.number().nonnegative().optional().describe('Worktop length, in metres. Defaults to the price list default.'),
         options: z.array(z.string()).optional().describe('Single-choice selections by name, e.g. a cabinet model ("Fenix") or a worktop ("HPL laminate"). At most one per choice group; omit to price the standard default.'),
         extras: z.array(z.string()).optional().describe('Optional add-ons to include, by name, e.g. "Le Mans corner unit — eco" or "Removal & disposal of old kitchen".'),
+      }),
+    },
+  );
+};
+
+// ── Tile floor installation ───────────────────────────────────────────────
+export const createTileInstallationTool = (onChunk: ChunkSink) => {
+  return tool(
+    async (input: {
+      room_width_m: number;
+      room_depth_m: number;
+      tile_length_mm: number;
+      tile_width_mm: number;
+      tile_thickness_mm?: number;
+      joint_mm?: number;
+      perimeter_gap_mm?: number;
+      trowel_notch_mm?: number;
+      pattern?: Pattern;
+      prime?: boolean;
+      back_butter?: boolean;
+    }) => {
+      const longSide = Math.max(input.tile_length_mm, input.tile_width_mm);
+      const plan = buildTileFloorPlan({
+        ...DEFAULT_TILE_FLOOR,
+        areaWidthM: input.room_width_m,
+        areaDepthM: input.room_depth_m,
+        tileLengthMm: input.tile_length_mm,
+        tileWidthMm: input.tile_width_mm,
+        tileThicknessMm: input.tile_thickness_mm ?? DEFAULT_TILE_FLOOR.tileThicknessMm,
+        jointMm: input.joint_mm ?? DEFAULT_TILE_FLOOR.jointMm,
+        perimeterGapMm: input.perimeter_gap_mm ?? DEFAULT_TILE_FLOOR.perimeterGapMm,
+        trowelNotchMm: input.trowel_notch_mm ?? suggestedTrowelNotchMm(longSide),
+        pattern: input.pattern ?? DEFAULT_TILE_FLOOR.pattern,
+        prime: input.prime ?? DEFAULT_TILE_FLOOR.prime,
+        backButter: input.back_butter ?? suggestBackButter(longSide),
+      });
+
+      const errors = plan.issues.filter((i) => i.level === 'error').map((i) => i.message);
+      if (errors.length) return JSON.stringify({ success: false, error: errors.join(' '), issues: errors });
+
+      const p = plan.params;
+      const result = {
+        room: { width_m: p.areaWidthM, depth_m: p.areaDepthM },
+        tile: { length_mm: p.tileLengthMm, width_mm: p.tileWidthMm, thickness_mm: p.tileThicknessMm },
+        pattern: PATTERN_LABELS[p.pattern],
+        joint_mm: p.jointMm,
+        trowel_notch_mm: p.trowelNotchMm,
+        prime: p.prime,
+        back_butter: p.backButter,
+        quantities: plan.quantities,
+        steps: plan.steps.map((s) => ({ title: s.title, instruction: s.instruction, tools: s.tools, wait: s.wait ?? null, warning: s.warning ?? null })),
+        warnings: plan.issues.filter((i) => i.level === 'warning').map((i) => i.message),
+      };
+
+      try {
+        onChunk?.({ type: 'tile_installation', input, result });
+      } catch {
+        /* stream may be closed */
+      }
+
+      return JSON.stringify({ success: true, ...result });
+    },
+    {
+      name: 'plan_tile_installation',
+      description:
+        'Plan laying a TILED FLOOR in one rectangular room: how many tiles to buy (incl. cuts and spare), spacers, adhesive and grout in kg, and the step-by-step installation with cure times. Deterministic, free, instant — no external API. '
+        + `Use when someone asks how many tiles, how much adhesive or grout, or how to lay a floor. Rooms are ${TILE_FLOOR_LIMITS.areaM.min}–${TILE_FLOOR_LIMITS.areaM.max} m per side; split a larger or L-shaped floor into rectangles and call once per rectangle. `
+        + 'Floors only — not walls. Report every entry in `warnings`. The visual 3D walkthrough lives at Tools → Tile Installation Guide (/tools/tile-installation).',
+      schema: z.object({
+        room_width_m: z.number().min(TILE_FLOOR_LIMITS.areaM.min).max(TILE_FLOOR_LIMITS.areaM.max).describe('Room width in metres (the tile length runs along it).'),
+        room_depth_m: z.number().min(TILE_FLOOR_LIMITS.areaM.min).max(TILE_FLOOR_LIMITS.areaM.max).describe('Room depth in metres.'),
+        tile_length_mm: z.number().min(TILE_FLOOR_LIMITS.tileMm.min).max(TILE_FLOOR_LIMITS.tileMm.max).describe('Tile long side in millimetres (a "60x120" tile is 1200).'),
+        tile_width_mm: z.number().min(TILE_FLOOR_LIMITS.tileMm.min).max(TILE_FLOOR_LIMITS.tileMm.max).describe('Tile short side in millimetres (a "60x120" tile is 600).'),
+        tile_thickness_mm: z.number().min(TILE_FLOOR_LIMITS.thicknessMm.min).max(TILE_FLOOR_LIMITS.thicknessMm.max).optional().describe(`Tile thickness in mm (default ${DEFAULT_TILE_FLOOR.tileThicknessMm}).`),
+        joint_mm: z.number().min(TILE_FLOOR_LIMITS.jointMm.min).max(TILE_FLOOR_LIMITS.jointMm.max).optional().describe(`Grout joint width in mm (default ${DEFAULT_TILE_FLOOR.jointMm}).`),
+        perimeter_gap_mm: z.number().min(TILE_FLOOR_LIMITS.gapMm.min).max(TILE_FLOOR_LIMITS.gapMm.max).optional().describe(`Movement gap at the walls in mm (default ${DEFAULT_TILE_FLOOR.perimeterGapMm}).`),
+        trowel_notch_mm: z.number().min(TILE_FLOOR_LIMITS.notchMm.min).max(TILE_FLOOR_LIMITS.notchMm.max).optional().describe('Trowel notch in mm. Omit to use the size suggested for the tile.'),
+        pattern: z.enum(PATTERNS).optional().describe(`Laying pattern, one of: ${PATTERNS.join(' | ')}. Default stack.`),
+        prime: z.boolean().optional().describe('Prime the screed first (default yes).'),
+        back_butter: z.boolean().optional().describe('Back-butter each tile. Omit to use the suggestion for the tile size (yes from 60 cm).'),
+      }),
+    },
+  );
+};
+
+// ── Renovation project plan ───────────────────────────────────────────────
+export const createProjectPlanEstimateTool = (supabase: any, onChunk: ChunkSink) => {
+  return tool(
+    async (input: {
+      project_type?: string;
+      dimensions?: Record<string, number>;
+      options?: string[];
+      extras?: string[];
+    }) => {
+      const { data: starters, error } = await supabase
+        .from('blueprints')
+        .select('id, title, project_type, source_currency, dimensions_schema')
+        .eq('is_platform_starter', true)
+        .eq('status', 'active')
+        .neq('project_type', KITCHEN_PROJECT_TYPE)
+        .order('title');
+      if (error) return JSON.stringify({ success: false, error: `The renovation price lists could not be read: ${error.message}` });
+      type Dim = { key: string; label?: string; unit?: string; default?: number; role?: string };
+      const list = (starters ?? []) as { id: string; title: string; project_type: string; source_currency: string | null; dimensions_schema: Dim[] | null }[];
+      const templates = list.map((s) => ({
+        project_type: s.project_type,
+        title: s.title,
+        dimensions: (s.dimensions_schema ?? []).map((d) => ({ key: d.key, label: d.label ?? d.key, unit: d.unit ?? null, default: d.default ?? 0 })),
+      }));
+
+      if (input.project_type === KITCHEN_PROJECT_TYPE) {
+        return JSON.stringify({ success: false, error: 'A fitted kitchen is priced by calculate_kitchen_cost, not by this tool.' });
+      }
+      const bp = list.find((s) => s.project_type === input.project_type);
+      if (!bp) {
+        return JSON.stringify({
+          success: true,
+          needs_project_type: true,
+          message: input.project_type
+            ? `There is no price list for "${input.project_type}". Pick one of these and call again.`
+            : 'Pick one of these project types and call again with its dimensions.',
+          templates,
+        });
+      }
+
+      const { data: items, error: itemsError } = await supabase
+        .from('blueprint_items').select('*').eq('blueprint_id', bp.id).order('sort_order');
+      if (itemsError) return JSON.stringify({ success: false, error: `The ${bp.title} price list could not be read: ${itemsError.message}` });
+      const rows = (items ?? []) as Record<string, any>[];
+      if (!rows.some((r) => r.kind === 'task')) {
+        return JSON.stringify({ success: false, error: `The ${bp.title} price list has no priced lines yet.` });
+      }
+
+      const schema = bp.dimensions_schema ?? [];
+      const dims: Record<string, number> = {};
+      const assumptions: string[] = [];
+      const ignored: string[] = [];
+      for (const d of schema) {
+        const given = input.dimensions?.[d.key];
+        if (given != null && Number.isFinite(Number(given)) && Number(given) >= 0) {
+          dims[d.key] = Number(given);
+        } else {
+          dims[d.key] = Number(d.default ?? 0);
+          if (d.role !== 'budget') assumptions.push(`${d.label ?? d.key} not stated — priced at the default ${dims[d.key]}${d.unit ? ` ${d.unit}` : ''}.`);
+        }
+      }
+      for (const k of Object.keys(input.dimensions ?? {})) if (!schema.some((d) => d.key === k)) ignored.push(k);
+
+      const { selected, unmatched } = resolveSelection(rows, { options: input.options, extras: input.extras });
+      const hasPicks = (input.options?.length ?? 0) + (input.extras?.length ?? 0) > 0;
+      const computed = computeBlueprint(rows, dims, hasPicks ? selected : null);
+      const allTasks = computed.sections.flatMap((s) => s.tasks).concat(computed.ungrouped);
+      const currency = bp.source_currency || 'EUR';
+
+      // An unselected line has line_total 0, so an alternative is priced from its own rate.
+      const priceOf = (t: { is_allowance: boolean; unit_price: number; quantity: number }) =>
+        Math.round((t.is_allowance ? t.unit_price : t.unit_price * t.quantity) * 100) / 100;
+      const options: Record<string, { label: string; total_for_this_project: number; selected: boolean }[]> = {};
+      for (const t of allTasks) {
+        if (!t.option_group) continue;
+        (options[t.option_group] ||= []).push({ label: t.label, total_for_this_project: priceOf(t), selected: t.selected });
+      }
+      const extras = allTasks
+        .filter((t) => !t.option_group && rows.find((r) => r.id === t.id)?.default_selected === false)
+        .map((t) => ({ label: t.label, total_for_this_project: priceOf(t), included: t.selected }));
+
+      const result = {
+        project_type: bp.project_type,
+        title: bp.title,
+        currency,
+        dimensions: schema.map((d) => ({ key: d.key, label: d.label ?? d.key, value: dims[d.key], unit: d.unit ?? null })),
+        subtotal: computed.subtotal,
+        sections: computed.sections
+          .filter((s) => s.tasks.some((t) => t.selected && t.line_total > 0))
+          .map((s) => ({
+            section: s.label,
+            total: s.total,
+            lines: s.tasks.filter((t) => t.selected && t.line_total > 0).map((t) => ({
+              label: t.label, quantity: t.quantity, unit: t.unit, unit_price: t.unit_price, line_total: t.line_total,
+            })),
+          })),
+        available: { options, extras },
+        unmatched,
+        ignored_dimensions: ignored,
+        assumptions,
+        price_basis: `Platform starter price list for ${bp.title}, at standard rates. Excludes VAT; your own rates will differ.`,
+      };
+
+      try {
+        onChunk?.({ type: 'project_plan_estimate', input, result });
+      } catch {
+        /* stream may be closed */
+      }
+
+      return JSON.stringify({ success: true, ...result });
+    },
+    {
+      name: 'estimate_project_plan',
+      description:
+        'Price the full scope of works for a RENOVATION (e.g. full home renovation, bathroom, repaint) off the live platform price lists, section by section. Deterministic, free, instant — no external API. '
+        + 'Call it FIRST with no project_type: the result lists every available project type with the dimensions it needs. Then call with a project_type and the dimensions the user gave — never invent one. '
+        + 'A fitted kitchen is NOT priced here; use calculate_kitchen_cost. '
+        + 'Report every entry in `assumptions` (a dimension priced at its default), `unmatched` (a choice not in the list) and `ignored_dimensions` alongside the figure. '
+        + 'Present the total as a ballpark at standard rates, excluding VAT. The editable version lives at Tools → Project Plan Estimator (/tools/project-plan).',
+      schema: z.object({
+        project_type: z.string().optional().describe('The project_type of one template from the first call, e.g. "full_home_renovation". Omit to list the templates.'),
+        dimensions: z.record(z.number()).optional().describe('Dimension values keyed by the template\'s dimension key, e.g. { "floor_area": 85, "n_bathrooms": 1 }. Unstated keys use the template default.'),
+        options: z.array(z.string()).optional().describe('Single-choice selections by name, as listed under available.options in an earlier result.'),
+        extras: z.array(z.string()).optional().describe('Optional add-ons to include, by name, as listed under available.extras in an earlier result.'),
       }),
     },
   );
