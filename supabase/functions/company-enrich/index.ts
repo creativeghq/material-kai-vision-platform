@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { GEMINI_TEXT, geminiOutputTokens, geminiThinkingConfig } from '../_shared/gemini-models.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 // Invariant 1 — tenancy comes from membership, never from the request body.
-import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, authenticatePlatformOperator, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { reserveCredits, refundCredits } from '../_shared/credit-reserve.ts';
 import { debitExternalServiceCredits, getServicePricing } from '../_shared/credit-utils.ts';
@@ -17,7 +17,9 @@ import {
   canReplace, digitsOnly, domainOf, emailDomain, gateEnrichment, isBusinessDomain,
   type FieldProvenance, type FieldSource, type MatchedBy,
 } from '../_shared/crm/identityCheck.ts';
-import { verifyWebsite } from '../_shared/crm/verifyWebsite.ts';
+import { verifyWebsite, type SiteCheck } from '../_shared/crm/verifyWebsite.ts';
+import { euCountryCode, judgeViesName } from '../_shared/crm/euVat.ts';
+import { viesLookup } from '../_shared/crm/vies.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -1100,9 +1102,33 @@ interface Verification {
   verified: { domain: string; by: MatchedBy | 'email_domain' | 'seve'; aliases?: string[] } | null;
   rejected: { field: keyof EnrichFields; value: string; reason: string }[];
   seveSlug?: string | null;
+  vat?: string;
+  euVat?: { domain: string; outcome: string; vat?: string; viesName?: string | null }[];
+}
+
+type EuVatTry =
+  | { kind: 'verified'; vat: string }
+  | { kind: 'contradicted'; vat: string; viesName: string | null }
+  | { kind: 'none'; outcome: string };
+
+async function confirmEuVat(check: SiteCheck, names: (string | null | undefined)[], until: number): Promise<EuVatTry> {
+  if (!check.vats.length) return { kind: 'none', outcome: 'no_vat_on_site' };
+  let outcome = 'vies_invalid';
+  for (const v of check.vats.slice(0, 3)) {
+    const res = await viesLookup(v, until);
+    if (res.status === 'unavailable') { outcome = 'vies_unavailable'; continue; }
+    if (res.status === 'invalid') continue;
+    const verdict = judgeViesName(res.name, v.namedOnPage, names);
+    if (verdict === 'verified') return { kind: 'verified', vat: `${v.cc}${v.number}` };
+    if (verdict === 'name_mismatch') return { kind: 'contradicted', vat: `${v.cc}${v.number}`, viesName: res.name };
+    outcome = 'vies_unnamed_and_name_not_on_page';
+  }
+  return { kind: 'none', outcome };
 }
 
 const TRUSTED_SOURCES: (FieldSource | undefined)[] = ['operator', 'aade', 'gemi', 'invoice'];
+const COMPANY_COLUMNS = 'id, created_by, workspace_id, name, commercial_title, vat_number, gemi_number, gemi_data, street, postal_code, field_sources, seve_slug, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country';
+const VERIFY_ONLY_MAX = 3;
 const VERIFY_BUDGET_MS = 30_000;
 
 /** A site counts as the company's only when it carries its ΑΦΜ, ΓΕΜΗ or invoice phone, or sits on its invoice email domain. */
@@ -1123,7 +1149,10 @@ async function verifyIdentity(
     afm: vatDigits.length >= 8 ? vatDigits : null, gemi: company?.gemi_number ?? null, phones,
     street: company?.street ?? null, postalCode: company?.postal_code ?? null,
     names: [company?.name, company?.commercial_title],
+    country: company?.country ?? null,
   };
+  const eu = euCountryCode(company?.country) !== null;
+  const euVat: NonNullable<Verification['euVat']> = [];
   const until = Date.now() + VERIFY_BUDGET_MS;
 
   let seve: SeveMatch | null = null;
@@ -1151,13 +1180,26 @@ async function verifyIdentity(
     if (!check) continue;
     if (!check.alive) { rejected.push({ field: 'website', value: c.url, reason: 'site does not load' }); continue; }
     const aliases = check.requested !== check.domain ? [check.requested] : [];
-    if (check.by) return { verified: { domain: check.domain, by: check.by, aliases }, rejected, seveSlug: seve?.slug ?? null };
+    if (check.by) return { verified: { domain: check.domain, by: check.by, aliases }, rejected, seveSlug: seve?.slug ?? null, euVat };
     if (seve && seve.matched_by !== 'postcode_name' && domainOf(seve.website) === check.requested) {
-      return { verified: { domain: check.domain, by: 'seve', aliases }, rejected, seveSlug: seve.slug };
+      return { verified: { domain: check.domain, by: 'seve', aliases }, rejected, seveSlug: seve.slug, euVat };
+    }
+    if (eu || check.vats.length) {
+      const tried = await confirmEuVat(check, keys.names, until);
+      if (tried.kind === 'verified') {
+        euVat.push({ domain: check.domain, outcome: 'verified', vat: tried.vat });
+        return { verified: { domain: check.domain, by: 'eu_vat', aliases }, rejected, seveSlug: seve?.slug ?? null, vat: tried.vat, euVat };
+      }
+      if (tried.kind === 'contradicted') {
+        euVat.push({ domain: check.domain, outcome: 'name_mismatch', vat: tried.vat, viesName: tried.viesName });
+        rejected.push({ field: 'website', value: c.url, reason: `the VAT number on this site (${tried.vat}) is registered to ${tried.viesName}` });
+        continue;
+      }
+      euVat.push({ domain: check.domain, outcome: tried.outcome });
     }
     if (c.fromEmail && check.domain === check.requested) emailSite = check.domain;
   }
-  return { verified: emailSite ? { domain: emailSite, by: 'email_domain' } : null, rejected, seveSlug: seve?.slug ?? null };
+  return { verified: emailSite ? { domain: emailSite, by: 'email_domain' } : null, rejected, seveSlug: seve?.slug ?? null, euVat };
 }
 
 /** Merge: primary wins per-field, secondary fills only the blanks. */
@@ -1169,10 +1211,56 @@ function mergeFields(primary: Partial<EnrichFields>, secondary: Partial<EnrichFi
   return out;
 }
 
+/** Re-checks a `web`-sourced website with no search or model call; never changes the website itself. */
+async function handleVerifyOnly(req: Request, body: any): Promise<Response> {
+  const auth = await authenticatePlatformOperator(req);
+  if (!auth.success) return jsonResponse({ error: auth.error || 'Unauthorized' }, auth.level === 'none' ? 403 : 401);
+  const ids = (Array.isArray(body?.company_ids) ? body.company_ids : []).map(cleanStr).filter(Boolean) as string[];
+  if (!ids.length || ids.length > VERIFY_ONLY_MAX) return jsonResponse({ error: `company_ids: 1-${VERIFY_ONLY_MAX} ids` }, 400);
+  const admin = createClient(supabaseUrl, supabaseServiceKey);
+  const { data } = await admin.from('crm_companies').select(COMPANY_COLUMNS).in('id', ids);
+  const results: Record<string, unknown>[] = [];
+  for (const company of (data ?? []) as any[]) {
+    const src = company.field_sources?.website?.src;
+    if (!company.website || src !== 'web') {
+      results.push({ id: company.id, name: company.name, outcome: 'skipped', reason: `website source is ${src ?? 'unrecorded'}` });
+      continue;
+    }
+    const v = await verifyIdentity(admin, company, null, { ...EMPTY_FIELDS }, null);
+    const stored = domainOf(company.website) ?? '';
+    const sameSite = !!v.verified && (v.verified.domain === stored || !!v.verified.aliases?.includes(stored));
+    const base = { id: company.id, name: company.name, country: company.country, website: company.website, euVat: v.euVat };
+    if (!v.verified || !sameSite) {
+      results.push({ ...base, outcome: v.verified ? 'verified_other_site' : 'unverified', verified: v.verified, rejected: v.rejected });
+      continue;
+    }
+    const now = new Date().toISOString();
+    const fieldSources: Record<string, FieldProvenance> = {
+      ...(company.field_sources ?? {}), website: { src: 'web_verified', by: v.verified.by, at: now },
+    };
+    const patch: Record<string, unknown> = {};
+    if (v.vat && !cleanStr(company.vat_number)) {
+      patch.vat_number = v.vat;
+      fieldSources.vat_number = { src: 'web_verified', by: 'eu_vat', at: now };
+    }
+    const row = { ...patch, field_sources: fieldSources, updated_at: now };
+    const { error } = await admin.from('crm_companies').update(row)
+      .eq('id', company.id).eq('workspace_id', company.workspace_id);
+    results.push({
+      ...base, outcome: error ? 'write_failed' : 'verified', by: v.verified.by, vat: v.vat ?? null,
+      vat_filled: !!patch.vat_number, error: error?.message,
+    });
+  }
+  return jsonResponse({ ok: true, results });
+}
+
 Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
+    if (new URL(req.url).searchParams.get('action') === 'verify_only') {
+      return await handleVerifyOnly(req, await req.json().catch(() => ({})));
+    }
     const auth = await authenticate(req, { requireUser: true });
     if (!auth.success || !auth.userId) return jsonResponse({ error: auth.error || 'Unauthorized' }, 401);
     const user = { id: auth.userId };
@@ -1258,7 +1346,7 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
     if (companyId) {
       const { data } = await admin
         .from('crm_companies')
-        .select('id, created_by, workspace_id, name, commercial_title, vat_number, gemi_number, gemi_data, street, postal_code, field_sources, seve_slug, website, email, phone, linkedin, facebook, twitter, description, industry, employee_count, city, state, country')
+        .select(COMPANY_COLUMNS)
         .eq('id', companyId)
         .maybeSingle();
       if (data) {
@@ -1292,6 +1380,10 @@ Deno.serve(withApiLogging('company-enrich', async (req: Request) => {
         if (existing && !canReplace(fieldSources[k]?.src, 'web_verified')) continue;
         patch[k] = v;
         fieldSources[k] = { src: 'web_verified', by: verification.verified?.by, at: now };
+      }
+      if (verification.vat && !cleanStr(company.vat_number)) {
+        patch.vat_number = verification.vat;
+        fieldSources.vat_number = { src: 'web_verified', by: 'eu_vat', at: now };
       }
       if (verification.seveSlug && company.seve_slug !== verification.seveSlug) patch.seve_slug = verification.seveSlug;
       if (Object.keys(patch).length > 0) {

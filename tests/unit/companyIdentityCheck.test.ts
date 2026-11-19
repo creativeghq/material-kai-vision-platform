@@ -12,6 +12,12 @@ import {
   type EnrichCandidate,
 } from '../../supabase/functions/_shared/crm/identityCheck';
 import { researchAliases } from '../../supabase/functions/_shared/crm/researchAliases';
+import {
+  euCountryCode,
+  extractEuVatNumbers,
+  judgeViesName,
+  nameMatches,
+} from '../../supabase/functions/_shared/crm/euVat';
 
 const src = (p: string) => blankComments(readFileSync(join(process.cwd(), p), 'utf8'));
 
@@ -203,5 +209,62 @@ describe('the writers apply the rules before they write', () => {
     expect(s).toMatch(/canReplace\(sources\.phone\?\.src, 'invoice'/);
     expect(s).toMatch(/canReplace\(sources\.email\?\.src, 'invoice'/);
     expect(s).toContain('patch.field_sources = sources');
+  });
+});
+
+describe('an EU VAT number printed on the site', () => {
+  it('reads a labelled Italian partita IVA, with or without the IT prefix, and checks its check digit', () => {
+    expect(extractEuVatNumbers('Ferrari S.p.A. - P.IVA 00159560366 - Cap. Soc.', 'Italy')).toEqual([{ cc: 'IT', number: '00159560366' }]);
+    expect(extractEuVatNumbers('Partita IVA: IT 00159560366', 'Italy')).toEqual([{ cc: 'IT', number: '00159560366' }]);
+    expect(extractEuVatNumbers('P.IVA 00159560367', 'Italy')).toEqual([]);
+  });
+
+  it('stops at the number, not at the postcode printed after it', () => {
+    expect(extractEuVatNumbers('P.IVA 00159560366 41122 Modena', 'Italy')).toEqual([{ cc: 'IT', number: '00159560366' }]);
+  });
+
+  it('reads a Spanish CIF after its label, and a prefixed number from any member state', () => {
+    expect(extractEuVatNumbers('Cerámicas S.A. — CIF: B12924528', 'Spain')).toEqual([{ cc: 'ES', number: 'B12924528' }]);
+    expect(extractEuVatNumbers('USt-IdNr.: DE 123 456 789', 'Germany')).toEqual([{ cc: 'DE', number: '123456789' }]);
+    expect(extractEuVatNumbers('VAT PL 676-261-34-54', null)).toEqual([{ cc: 'PL', number: '6762613454' }]);
+  });
+
+  it('a Spanish phone number is not a CIF, and Greece is EL to VIES', () => {
+    expect(extractEuVatNumbers('Tel. ES 964 123 456', 'Spain')).toEqual([]);
+    expect(euCountryCode('Greece')).toBe('EL');
+    expect(euCountryCode('GR')).toBe('EL');
+    expect(euCountryCode('Türkiye')).toBeNull();
+    expect(euCountryCode('Switzerland')).toBeNull();
+  });
+});
+
+describe('the name VIES returns must be this company', () => {
+  it('matches on a distinctive word, never on the legal form or the trade', () => {
+    expect(nameMatches('CERAMICHE ATLAS CONCORDE S.P.A.', ['Atlas Concorde'])).toBe(true);
+    expect(nameMatches('INDA S.P.A.', ['INDA S.p.A.'])).toBe(true);
+    expect(nameMatches('CERAMICA SANT AGOSTINO SPA', ['Ceramica Rondine S.p.A.'])).toBe(false);
+    expect(nameMatches('MUTINA SRL', ['S.p.A. Ceramiche Italia'])).toBe(false);
+  });
+
+  it('a name VIES withholds is confirmed only by the name on the same page', () => {
+    expect(judgeViesName('---', true, ['Dune Ceramica SL'])).toBe('verified');
+    expect(judgeViesName(null, false, ['Dune Ceramica SL'])).toBe('unnamed_unconfirmed');
+    expect(judgeViesName('ITALCER SPA', false, ['Vivaterra S.p.A.'])).toBe('name_mismatch');
+  });
+
+  it('the VIES call goes through the SSRF guard and a busy answer is never read as invalid', () => {
+    const s = src('supabase/functions/_shared/crm/vies.ts');
+    expect(s).toContain('await assertSafeUrl(url');
+    expect(s).toContain("MS_MAX_CONCURRENT_REQ");
+    expect(s).toContain("status: 'unavailable'");
+  });
+
+  it('the batch re-check never rewrites the website and fills only a blank VAT number', () => {
+    const s = src('supabase/functions/company-enrich/index.ts');
+    const handler = s.slice(s.indexOf('async function handleVerifyOnly('), s.indexOf("Deno.serve(withApiLogging('company-enrich'"));
+    expect(handler).toContain('authenticatePlatformOperator(req)');
+    expect(handler).not.toMatch(/patch\.website|website:\s*v\.verified/);
+    expect(handler).toContain("if (v.vat && !cleanStr(company.vat_number))");
+    expect(handler.indexOf('if (!v.verified || !sameSite)')).toBeLessThan(handler.indexOf(".update(row)"));
   });
 });

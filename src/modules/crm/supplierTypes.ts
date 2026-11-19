@@ -35,4 +35,5 @@ export const MATCH_LABEL: Record<string, string> = {
   address: 'their registered address on their site',
   email_domain: 'their invoice email domain',
   seve: 'their ΣΕΒΕ exporter-directory entry',
+  eu_vat: 'their EU VAT number on their site, confirmed by VIES',
 };

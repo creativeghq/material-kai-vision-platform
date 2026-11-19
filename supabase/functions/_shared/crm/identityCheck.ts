@@ -89,9 +89,10 @@ export function domainOf(url: string | null | undefined): string | null {
 export interface IdentityKeys {
   afm: string | null; gemi: string | null; phones: string[];
   street?: string | null; postalCode?: string | null; names?: (string | null | undefined)[];
+  country?: string | null;
 }
 
-export type MatchedBy = 'afm' | 'gemi' | 'phone' | 'address';
+export type MatchedBy = 'afm' | 'gemi' | 'phone' | 'address' | 'eu_vat';
 
 const fold = (s: string) => s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
 const STREET_NOISE = new Set(['ΟΔΟΣ', 'ΛΕΩΦΟΡΟΣ', 'ΛΕΩΦ', 'ΠΛΑΤΕΙΑ', 'ΘΕΣΗ', 'ΒΙΠΕ', 'ΒΙΟΜΗΧΑΝΙΚΗ', 'ΠΕΡΙΟΧΗ', 'ΕΘΝΙΚΗ', 'ΟΔΟΥ', 'STREET', 'AVENUE']);
@@ -154,7 +155,7 @@ export function htmlToText(html: string): string {
     .replace(/\s+/g, ' ');
 }
 
-const SUBPAGE_HINT = /(contact|epikoin|επικοιν|company|etaireia|εταιρ|about|profil|terms|oroi|όροι|privacy|aporrito|impressum|imprint)/i;
+const SUBPAGE_HINT = /(contact|contatt|kontakt|epikoin|επικοιν|company|azienda|empresa|etaireia|εταιρ|about|profil|terms|oroi|όροι|privacy|aporrito|impressum|imprint|legal|legali|aviso|mentions)/i;
 
 /** Up to `max` same-site links most likely to carry the ΑΦΜ (contact, company, terms pages). */
 export function likelyIdentityLinks(html: string, baseUrl: string, max = 3): string[] {

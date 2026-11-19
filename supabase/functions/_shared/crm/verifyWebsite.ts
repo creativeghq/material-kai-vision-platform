@@ -1,5 +1,6 @@
 import { assertSafeUrl } from '../ssrf-guard.ts';
 import { domainOf, htmlToText, likelyIdentityLinks, pageConfirmsIdentity, type IdentityKeys, type MatchedBy } from './identityCheck.ts';
+import { extractEuVatNumbers, nameMatches, type EuVat } from './euVat.ts';
 
 const MAX_BYTES = 1_500_000;
 const PAGE_TIMEOUT_MS = 8000;
@@ -45,7 +46,8 @@ async function fetchPage(url: string, until: number): Promise<{ html: string; fi
   return null;
 }
 
-export interface SiteCheck { requested: string; domain: string; alive: boolean; by: MatchedBy | null }
+export interface SiteVat extends EuVat { namedOnPage: boolean }
+export interface SiteCheck { requested: string; domain: string; alive: boolean; by: MatchedBy | null; vats: SiteVat[] }
 
 /** Loads the site (and up to three contact/company/terms pages) and looks for the company's own identifiers. */
 export async function verifyWebsite(candidate: string, keys: IdentityKeys, until: number): Promise<SiteCheck | null> {
@@ -53,13 +55,26 @@ export async function verifyWebsite(candidate: string, keys: IdentityKeys, until
   if (!requested) return null;
   const home = await fetchPage(`https://${requested}/`, until)
     ?? await fetchPage(`https://www.${requested}/`, until);
-  if (!home) return { requested, domain: requested, alive: false, by: null };
+  if (!home) return { requested, domain: requested, alive: false, by: null, vats: [] };
   const domain = domainOf(home.finalUrl) ?? requested;
-  let by = pageConfirmsIdentity(htmlToText(home.html), keys);
+  const vats: SiteVat[] = [];
+  const read = (text: string) => {
+    const named = nameMatches(text, keys.names ?? []);
+    for (const v of extractEuVatNumbers(text, keys.country)) {
+      const seen = vats.find((x) => x.cc === v.cc && x.number === v.number);
+      if (seen) seen.namedOnPage ||= named;
+      else vats.push({ ...v, namedOnPage: named });
+    }
+  };
+  const homeText = htmlToText(home.html);
+  read(homeText);
+  let by = pageConfirmsIdentity(homeText, keys);
   for (const link of by ? [] : likelyIdentityLinks(home.html, home.finalUrl)) {
     const page = await fetchPage(link, until);
-    by = page ? pageConfirmsIdentity(htmlToText(page.html), keys) : null;
+    const text = page ? htmlToText(page.html) : '';
+    if (text) read(text);
+    by = text ? pageConfirmsIdentity(text, keys) : null;
     if (by) break;
   }
-  return { requested, domain, alive: true, by };
+  return { requested, domain, alive: true, by, vats };
 }
