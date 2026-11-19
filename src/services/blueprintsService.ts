@@ -117,18 +117,6 @@ class BlueprintsService {
     return (data ?? []) as Blueprint[];
   }
 
-  /** Platform-starter blueprints only (for the picker + public tool). */
-  async listStarters(): Promise<Blueprint[]> {
-    const { data, error } = await supabase
-      .from('blueprints')
-      .select('*')
-      .eq('is_platform_starter', true)
-      .eq('status', 'active')
-      .order('title');
-    if (error) throw error;
-    return (data ?? []) as Blueprint[];
-  }
-
   async get(id: string): Promise<Blueprint | null> {
     const { data, error } = await supabase.from('blueprints').select('*').eq('id', id).maybeSingle();
     if (error) throw error;
