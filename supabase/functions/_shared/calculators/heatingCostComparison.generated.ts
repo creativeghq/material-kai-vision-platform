@@ -21,12 +21,12 @@ export interface HeatingCostInput {
   /** Building specific energy, kWh/m²·yr (sheet example: 132). User-supplied. */
   specificEnergyKwhM2Yr: number;
   // Unit prices
-  electricityPricePerKwh: number; // sheet 0.19
-  oilPricePerLitre: number; // sheet 1.246
-  gasPricePerKwh: number; // sheet 0.137
-  woodPricePerKg: number; // sheet 0.54
+  electricityPricePerKwh: number;
+  oilPricePerLitre: number;
+  gasPricePerKwh: number;
+  woodPricePerKg: number;
   // Equipment
-  heatPumpCop: number; // sheet 4
+  heatPumpCop: number;
   acType: AcType; // inverter → COP 3, simple → COP 2
   // Advanced — defaults reproduce the sheet exactly
   distributionFactor?: number; // 1.16286
