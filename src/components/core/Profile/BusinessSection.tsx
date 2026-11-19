@@ -151,6 +151,7 @@ export const BusinessSection: React.FC<BusinessSectionProps> = ({ onEntityChange
       countryCode: businessForm.country_code,
       vatNumber: businessForm.vat_number,
       companyId: businessId ?? undefined,
+      workspaceId: activeWorkspaceId,
     });
     setViesLastResult(result);
     setViesChecking(false);

@@ -431,6 +431,7 @@ export const CompanyDetailPage: React.FC = () => {
         countryCode: company.country_code,
         vatNumber: company.vat_number,
         companyId: id,
+        workspaceId: activeWorkspaceId,
       });
       if (result.skipped_reason === 'non_eu') {
         toast({ title: 'VIES skipped', description: result.message || 'VIES only validates EU VAT numbers.' });
