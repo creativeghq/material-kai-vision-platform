@@ -36,6 +36,8 @@ interface Props {
   nameLabel?: string;
   namePlaceholder?: string;
   autoFocusName?: boolean;
+  /** Focus the VAT box instead, so Enter runs the registry lookup on a seeded number. */
+  autoFocusVat?: boolean;
   /** Rendered under the verified strip — e.g. a "this VAT is already in CRM" warning. */
   children?: React.ReactNode;
 }
@@ -49,6 +51,7 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
   nameLabel = 'Company Name *',
   namePlaceholder = 'e.g. Acme Tiles S.A.',
   autoFocusName,
+  autoFocusVat,
   children,
 }) => {
   const { toast } = useToast();
@@ -179,6 +182,7 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
           />
           <Input
             value={value.vatNumber}
+            autoFocus={autoFocusVat}
             onChange={(e) => patch({ vatNumber: e.target.value })}
             placeholder={value.countryCode === 'EL' ? '9-digit ΑΦΜ' : 'VAT number'}
             disabled={disabled || busy}
