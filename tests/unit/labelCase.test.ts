@@ -49,3 +49,25 @@ describe('a name on screen is Title Case', () => {
     expect(offenders, offenders.join('\n')).toEqual([]);
   }, 300_000);
 });
+
+describe('a raw value in a Badge renders as its name', () => {
+  it.each([
+    ['accepted', 'Accepted'],
+    ['partially_paid', 'Partially Paid'],
+    ['not issued', 'Not Issued'],
+    ['waiting on another purchase', 'Waiting on Another Purchase'],
+  ])('%s -> %s', async (raw, shown) => {
+    const { displayValue } = await import('@/utils/labelCase');
+    expect(displayValue(raw)).toBe(shown);
+  });
+
+  it.each(['Cancelled at AADE', 'INV-2', 'v2', '12 days', 'kg', 'a@b.com'])('%s is left as written', async (text) => {
+    const { displayValue } = await import('@/utils/labelCase');
+    expect(displayValue(text)).toBe(text);
+  });
+
+  it('the Badge primitive applies it', () => {
+    const src = readFileSync(join(process.cwd(), 'src/components/core/ui/badge.tsx'), 'utf8');
+    expect(src).toMatch(/displayValue\(c\)/);
+  });
+});
