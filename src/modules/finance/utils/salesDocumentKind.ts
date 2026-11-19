@@ -110,6 +110,12 @@ export function mydataSaleRegimeExemption(regime: SaleRegime, supply: SupplyKind
   return null;
 }
 
+/** Intra-community is 0% only against the buyer's VAT number; without one it is taxable. */
+export function saleRegimeIsZeroRated(regime: SaleRegime, buyerHasVat: boolean): boolean {
+  if (regime === 'export' || regime === 'reverse_charge_39a') return true;
+  return regime === 'intra_community' && buyerHasVat;
+}
+
 /** Sales (1.x) and service (2.x) invoices: AADE's withholding table covers goods as well as services. */
 export function documentTakesWithholding(documentType: string): boolean {
   const family = documentType.split('.')[0];
