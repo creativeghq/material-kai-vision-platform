@@ -21,7 +21,7 @@ import {
 // Cross-alphabet dedupe key (#353 CRM-1).
 import { CRM_NAME_COLUMN, foldedName } from '@/services/crmSearch';
 // One normalised VAT key (#353 CRM-4).
-import { normalizeVat, CRM_VAT_COLUMN } from '@/components/business/crm/companyIdentity';
+import { normalizeVat, CRM_VAT_COLUMN, splitPartyQuery } from '@/components/business/crm/companyIdentity';
 
 export interface QuickCreatedCompany { id: string; name: string }
 
@@ -80,10 +80,16 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
   const wasOpen = useRef(false);
   useEffect(() => {
     if (open && !wasOpen.current) {
-      setDraft(emptyCompanyIdentity({
-        name: initialName?.trim() ?? '',
-        vatNumber: initialVat?.trim() ?? '',
-      }));
+      // A search box holding "800370260" is a VAT, not a company called "800370260".
+      const typed = splitPartyQuery(initialName);
+      const explicitVat = initialVat?.trim() ?? '';
+      setDraft(emptyCompanyIdentity(explicitVat
+        ? { name: initialName?.trim() ?? '', vatNumber: explicitVat }
+        : {
+          name: typed.name,
+          vatNumber: typed.vatNumber,
+          ...(typed.countryCode ? { countryCode: typed.countryCode } : {}),
+        }));
       setEmail('');
       setDuplicate(null);
       setSaving(false);
@@ -201,6 +207,7 @@ export const QuickAddCompanyDialog: React.FC<Props> = ({
           onSubmit={() => { if (!duplicate) void handleCreate(); }}
           disabled={saving}
           autoFocusName={!initialName && !initialVat}
+          autoFocusVat={!initialVat && !!splitPartyQuery(initialName).vatNumber}
           namePlaceholder="e.g. Acme Tiles S.A."
         >
           {duplicate && (

@@ -25,6 +25,7 @@ import {
   emptyCompanyIdentity,
   normalizeVat,
   CRM_VAT_COLUMN,
+  splitPartyQuery,
 } from '@/components/business/crm/companyIdentity';
 
 const src = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
@@ -240,4 +241,25 @@ describe('the shared control is the only way a business gets created', () => {
     const files = scanned.filter((f) => /from\('crm_companies'\)[\s\S]{0,200}?\.insert\(/.test(src(f)));
     expect(files.sort()).toEqual(Object.keys(KNOWN).sort());
   });
+});
+
+describe('splitPartyQuery — a typed ΑΦΜ seeds the VAT field, a name seeds the name', () => {
+  it.each([
+    ['800370260', 'EL', '800370260'],
+    ['800 370 260', 'EL', '800370260'],
+    ['EL800370260', 'EL', '800370260'],
+    ['gr 800.370.260', 'EL', '800370260'],
+    ['DE123456789', 'DE', '123456789'],
+    ['ATU12345678', 'AT', 'U12345678'],
+    ['NL123456789B01', 'NL', '123456789B01'],
+  ])('%s → VAT %s %s', (input, cc, vat) => {
+    expect(splitPartyQuery(input)).toEqual({ name: '', vatNumber: vat, countryCode: cc });
+  });
+
+  it.each(['Acme Tiles S.A.', 'ΚΕΡΑΜΙΚΑ ΑΕ', 'Studio 54', 'ITALIA2024', '6912345678', '12345', ''])(
+    '%s stays a name',
+    (input) => {
+      expect(splitPartyQuery(input)).toEqual({ name: input.trim(), vatNumber: '', countryCode: null });
+    },
+  );
 });
