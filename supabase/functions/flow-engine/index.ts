@@ -2184,8 +2184,13 @@ async function handleResumeWaits(supabase: DbClient): Promise<Response> {
       supabase.from('flows').select('id, status, graph_definition, workspace_id, is_global, created_by').eq('id', w.flow_id).maybeSingle(),
     ]);
     if (!run || !flow) { results.push({ wait_id: w.id, outcome: 'run_or_flow_gone' }); continue; }
-    if (flow.status !== 'active' || run.status === 'cancelled' || run.status === 'failed') {
+    const parkedStep = (status: 'completed' | 'skipped') => supabase.from('flow_run_steps').update({ status })
+      .eq('flow_run_id', run.id).eq('node_id', w.node_id).eq('status', 'waiting');
+    const runnable = flow.status === 'active' || flow.status === 'draft';
+    if (!runnable || run.status === 'cancelled' || run.status === 'failed') {
       await supabase.from('flow_run_waits').update({ status: 'cancelled' }).eq('id', w.id);
+      const { error: stepErr } = await parkedStep('skipped');
+      if (stepErr) console.error('[flow-engine] cancelled wait step could not be settled', run.id, stepErr.message);
       if (run.status === 'waiting') {
         await supabase.from('flow_runs').update({
           status: 'cancelled', error_message: 'The automation was paused while this run was waiting.',
@@ -2197,6 +2202,8 @@ async function handleResumeWaits(supabase: DbClient): Promise<Response> {
     }
 
     await supabase.from('flow_runs').update({ status: 'running' }).eq('id', run.id);
+    const { error: stepErr } = await parkedStep('completed');
+    if (stepErr) console.error('[flow-engine] resumed wait step could not be settled', run.id, stepErr.message);
     const scope: FlowScope = {
       flowId: flow.id,
       workspaceId: (flow.workspace_id as string | null) ?? null,

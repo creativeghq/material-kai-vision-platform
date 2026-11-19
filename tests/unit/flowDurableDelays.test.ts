@@ -41,9 +41,14 @@ describe('#552 — a delay longer than one invocation parks and resumes', () => 
       .toMatch(/startIds: \(w\.next_node_ids/);
   });
 
-  it('a paused flow cancels its waits instead of sending on', () => {
-    expect(resume).toMatch(/flow\.status !== 'active'/);
+  it('a paused flow cancels its waits instead of sending on; a draft resumes like it started', () => {
+    expect(resume).toMatch(/const runnable = flow\.status === 'active' \|\| flow\.status === 'draft'/);
     expect(resume).toMatch(/status: 'cancelled'/);
+  });
+
+  it('the parked delay step is settled, never left reading waiting', () => {
+    expect(resume).toMatch(/parkedStep\('skipped'\)/);
+    expect(resume).toMatch(/parkedStep\('completed'\)/);
   });
 
   it('only the cron or a secret caller may resume', () => {
