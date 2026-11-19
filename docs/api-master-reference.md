@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (186)
+## 1. Supabase Edge Functions (187)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -297,6 +297,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `monitoring-cron` | cron | Unified monitoring dispatcher — price / mention / job cron tasks and the signals corpus sweep |
 | `page-watches` | JWT / kai_* | CRUD for watched pages, mirrored to Firecrawl monitors. |
+| `server-maintenance-report` | sig | A platform server's weekly maintenance report, and its poll for an on-demand run |
 
 **Background Agents**
 

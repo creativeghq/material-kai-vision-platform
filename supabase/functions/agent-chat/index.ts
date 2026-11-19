@@ -1216,7 +1216,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // Tech Radar (Pepper's background brain — research-scored improvement ideas; internal = 0 cr)
       'review_solution', 'track_tech_radar', 'list_tech_radar', 'update_finding',
       'field_review_queue', 'field_review_apply',
-      'ops_cases', 'ask_stark', 'ask_veritas',
+      'ops_cases', 'ask_stark', 'ask_veritas', 'server_maintenance_status', 'request_server_maintenance',
       // Knowledge-graph traversal (all users; 0 cr — DB-only RPC reads over existing relational edges).
       // supplier_overview carries finance data and is admin/owner-gated at injection time.
       'product_provenance', 'product_price_history', 'projects_using_product',
@@ -3181,12 +3181,15 @@ async function executeAgent(
     if (config.tools.includes('field_review_apply')) tools.push(fieldRegistryMod.createFieldReviewApplyTool());
   }
 
-  if (isAdmin && config.tools.some((t: string) => t === 'ops_cases' || t === 'ask_stark' || t === 'ask_veritas')
+  if (isAdmin && config.tools.some((t: string) => t === 'ops_cases' || t === 'ask_stark' || t === 'ask_veritas'
+        || t === 'server_maintenance_status' || t === 'request_server_maintenance')
       && await isPlatformOperator(supabase, userId)) {
     const opsDeskMod = await import('../_shared/tools/ops-desk-tools.ts');
     if (config.tools.includes('ops_cases')) tools.push(opsDeskMod.createOpsCasesTool());
     if (config.tools.includes('ask_stark')) tools.push(opsDeskMod.createAskStarkTool(userId, workspaceId, conversation_id ?? null));
     if (config.tools.includes('ask_veritas')) tools.push(opsDeskMod.createAskVeritasTool(userId, workspaceId, conversation_id ?? null));
+    if (config.tools.includes('server_maintenance_status')) tools.push(opsDeskMod.createServerMaintenanceStatusTool());
+    if (config.tools.includes('request_server_maintenance')) tools.push(opsDeskMod.createRequestServerMaintenanceTool(onChunk));
   }
 
   // Visual search (image similarity via CLIP/SigLIP) — only when images are attached

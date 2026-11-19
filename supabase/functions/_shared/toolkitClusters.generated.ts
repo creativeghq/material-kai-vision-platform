@@ -169,7 +169,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   'ops-desk': {
     adminOnly: true,
     capability: ['workspace.manage'],
-    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas'],
+    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas', 'server_maintenance_status', 'request_server_maintenance'],
   },
   'tech-radar': {
     adminOnly: true,

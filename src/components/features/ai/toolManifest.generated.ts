@@ -1741,7 +1741,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     name: 'ops_cases',
     file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
     factory: 'createOpsCasesTool',
-    description: 'Agent Ops cases waiting on the platform: what looks broken (integrity checks, providers, jobs, background agents, agent tools), who holds each case and what round it is on.',
+    description: 'Agent Ops cases waiting on the platform: what looks broken (integrity checks, providers, jobs, background agents, agent tools, server maintenance), who holds each case and what round it is on.',
     params: [
       { name: 'include_escalated', type: 'boolean', optional: true, description: 'Also list cases already left for a person.' },
     ],
@@ -1998,6 +1998,16 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'prompt', type: 'string', optional: true, description: 'One sentence of context shown above the fields.' },
       { name: 'fields', type: 'array', optional: false, description: 'The values to collect. Keep it to the few that actually change the work.' },
       { name: 'submit_label', type: 'string', optional: true, description: 'Button text, e.g. "Run the sweep". Defaults to "Run it".' },
+    ],
+  },
+  {
+    name: 'request_server_maintenance',
+    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
+    factory: 'createRequestServerMaintenanceTool',
+    description: 'Ask a platform server to run its maintenance recipe now instead of waiting for Sunday.',
+    params: [
+      { name: 'server', type: 'string', optional: false, description: 'Server key from server_maintenance_status, e.g. mivaa-hetzner.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Do NOT set: the Approve/Decline card sets confirm:true on approval.' },
     ],
   },
   {
@@ -2749,6 +2759,13 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'country_code', type: 'string', optional: true },
       { name: 'language_code', type: 'string', optional: true },
     ],
+  },
+  {
+    name: 'server_maintenance_status',
+    file: 'supabase/functions/_shared/tools/ops-desk-tools.ts',
+    factory: 'createServerMaintenanceStatusTool',
+    description: 'The platform servers\' weekly self-maintenance: each server\'s last runs (verdict, every step, package/kernel/nginx versions before and after, disk freed, nginx.org advisories still open) plus a live probe of its public…',
+    params: [],
   },
   {
     name: 'source_product',

@@ -27,6 +27,7 @@ import {
   type OpsAgentRow, type OpsCase, type OpsCaseDetail, type OpsDesk,
 } from './agentOpsTypes';
 import { HqTabbedPage } from './HqTabbedPage';
+import { ServerMaintenanceCard } from './ServerMaintenanceCard';
 
 const rpc = supabase.rpc.bind(supabase) as unknown as (fn: string, args?: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
 
@@ -377,6 +378,8 @@ const ProcessesTab: React.FC<{ desk: OpsDesk; onTrace: (id: string) => void }> =
         )}
       </CardContent>
     </Card>
+
+    <ServerMaintenanceCard />
 
     <CronJobsPanel />
 

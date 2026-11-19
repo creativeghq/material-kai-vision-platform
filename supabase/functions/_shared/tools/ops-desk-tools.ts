@@ -91,7 +91,36 @@ function sharedTools(caseId: string, role: Role): InnerTool[] {
       input_schema: { type: 'object', properties: {} },
       run: async () => JSON.stringify(await rpcJson('ops_recheck', { p_case_id: caseId, p_actor: role })),
     },
+    {
+      name: 'server_probe',
+      description: 'For a server case: probe the server from OUTSIDE, independent of its own report. Calls its public health URL and returns the HTTP status, latency, the Server header (nginx version) and the health status MIVAA reports.',
+      input_schema: { type: 'object', properties: {} },
+      run: async () => {
+        const { data: c } = await svc().from('ops_cases').select('source_kind, source_key').eq('id', caseId).maybeSingle();
+        if (c?.source_kind !== 'server') return JSON.stringify({ error: 'Not a server case.' });
+        return JSON.stringify(await probeServer(String(c.source_key).split(':')[0]));
+      },
+    },
   ];
+}
+
+/** Our own server's fixed health URL, set by the operator; never a URL from a request. */
+async function probeServer(server: string) {
+  const { data: s } = await svc().from('server_maintenance_servers').select('server, public_health_url').eq('server', server).maybeSingle();
+  if (!s || !String(s.public_health_url).startsWith('https://')) return { ok: false, error: `No server ${server}.` };
+  const started = Date.now();
+  try {
+    const res = await fetch(s.public_health_url, { redirect: 'manual', signal: AbortSignal.timeout(15000) });
+    const text = (await res.text()).slice(0, 2000);
+    let status: unknown = null;
+    try { status = (JSON.parse(text) as { status?: unknown }).status ?? null; } catch { status = null; }
+    return {
+      ok: res.status === 200, server, url: s.public_health_url, http_status: res.status, ms: Date.now() - started,
+      server_header: res.headers.get('server'), health_status: status, probed_at: new Date().toISOString(),
+    };
+  } catch (e) {
+    return { ok: false, server, url: s.public_health_url, error: e instanceof Error ? e.message : String(e), ms: Date.now() - started };
+  }
 }
 
 function starkTools(caseId: string, ctx: Ctx): InnerTool[] {
@@ -239,9 +268,64 @@ export const createOpsCasesTool = () => tool(
   },
   {
     name: 'ops_cases',
-    description: 'Agent Ops cases waiting on the platform: what looks broken (integrity checks, providers, jobs, background agents, agent tools), who holds each case and what round it is on.',
+    description: 'Agent Ops cases waiting on the platform: what looks broken (integrity checks, providers, jobs, background agents, agent tools, server maintenance), who holds each case and what round it is on.',
     schema: z.object({
       include_escalated: z.boolean().optional().describe('Also list cases already left for a person.'),
+    }),
+  },
+);
+
+export const createServerMaintenanceStatusTool = () => tool(
+  async () => {
+    const { data: servers, error } = await svc().from('server_maintenance_servers')
+      .select('server, label, public_health_url, last_poll_at, run_requested_at');
+    if (error) return JSON.stringify({ success: false, error: error.message });
+    const out = [];
+    for (const s of servers ?? []) {
+      const { data: runs } = await svc().from('server_maintenance_runs')
+        .select('id, trigger, verdict, reason, started_at, finished_at, rebooted, versions_before, versions_after, disk_total_bytes, disk_used_before, disk_used_after, freed_bytes, upstream_gap, steps')
+        .eq('server', s.server).order('started_at', { ascending: false }).limit(3);
+      out.push({ ...s, live_probe: await probeServer(s.server), recent_runs: runs ?? [] });
+    }
+    return wrapUntrusted('server maintenance', JSON.stringify({
+      success: true, servers: out,
+      schedule: 'Every Sunday 23:00 Athens time, on the server itself; it waits for document processing to finish.',
+    }));
+  },
+  {
+    name: 'server_maintenance_status',
+    description: 'The platform servers\' weekly self-maintenance: each server\'s last runs (verdict, every step, package/kernel/nginx versions before and after, disk freed, nginx.org advisories still open) plus a live probe of its public health URL.',
+    schema: z.object({}),
+  },
+);
+
+export const createRequestServerMaintenanceTool = (onChunk?: (chunk: unknown) => void) => tool(
+  async ({ server, confirm }) => {
+    const { data: s } = await svc().from('server_maintenance_servers').select('server, label, run_requested_at').eq('server', server).maybeSingle();
+    if (!s) return JSON.stringify({ success: false, error: `No server ${server}.` });
+    if (confirm !== true) {
+      onChunk?.({
+        type: 'action_confirmation',
+        tool: 'request_server_maintenance',
+        input: { server },
+        title: `Run maintenance on ${s.label} now?`,
+        summary: 'The server waits until no document is processing, then updates every package, reboots if the update needs it (about a minute offline), verifies everything is up and cleans old logs and caches.',
+        danger: true,
+        toolkit_id: 'ops-desk',
+        timestamp: Date.now(),
+      });
+      return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Awaiting the user\'s approval. Do not retry.' });
+    }
+    const { error } = await svc().from('server_maintenance_servers').update({ run_requested_at: new Date().toISOString() }).eq('server', server);
+    if (error) return JSON.stringify({ success: false, error: error.message });
+    return JSON.stringify({ success: true, requested: true, message: 'Requested. The server checks every 15 minutes and reports to Agent Ops when the run finishes.' });
+  },
+  {
+    name: 'request_server_maintenance',
+    description: 'Ask a platform server to run its maintenance recipe now instead of waiting for Sunday. It ALWAYS asks the user to Approve/Decline first (never set confirm:true yourself).',
+    schema: z.object({
+      server: z.string().regex(/^[a-z0-9-]{3,40}$/).describe('Server key from server_maintenance_status, e.g. mivaa-hetzner.'),
+      confirm: z.boolean().optional().describe('Do NOT set: the Approve/Decline card sets confirm:true on approval.'),
     }),
   },
 );

@@ -3,7 +3,7 @@ export type CaseActor = 'system' | 'jarvis' | 'stark' | 'veritas' | 'operator';
 
 export interface OpsCase {
   id: string;
-  source_kind: 'integrity_check' | 'provider' | 'job' | 'background_agent' | 'agent_tool';
+  source_kind: 'integrity_check' | 'provider' | 'job' | 'background_agent' | 'agent_tool' | 'server';
   source_key: string;
   title: string;
   summary: string | null;
@@ -107,6 +107,7 @@ export const SOURCE_LABEL: Record<OpsCase['source_kind'], string> = {
   job: 'Job',
   background_agent: 'Background Agent',
   agent_tool: 'Agent Tool',
+  server: 'Server',
 };
 
 export const ACTOR_LABEL: Record<CaseActor, string> = {

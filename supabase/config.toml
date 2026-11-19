@@ -364,3 +364,7 @@ verify_jwt = false
 
 [functions.ai-crawler-ingest]
 verify_jwt = false
+
+# Signed per server (HMAC of timestamp.body), checked before the body is parsed (#590).
+[functions.server-maintenance-report]
+verify_jwt = false

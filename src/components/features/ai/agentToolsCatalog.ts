@@ -2903,10 +2903,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'ops-desk',
     capability: 'workspace.manage',
     name: 'Agent Ops',
-    description: 'Work the Admin → Agent Ops cases: hand what looks broken to Stark, who investigates and fixes what is safe to fix, then to Veritas, who verifies the answer. What needs a person is left on the case.',
+    description: 'Work the Admin → Agent Ops cases: hand what looks broken to Stark, who investigates and fixes what is safe to fix, then to Veritas, who verifies the answer. What needs a person is left on the case. Also reports the weekly self-maintenance of the platform servers and can request a run.',
     icon: 'ShieldCheck',
     adminOnly: true,
-    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas'],
+    tool_ids: ['ops_cases', 'ask_stark', 'ask_veritas', 'server_maintenance_status', 'request_server_maintenance'],
     quick_starts: [
       {
         label: 'Review Open Cases', description: 'Stark investigates, Veritas verifies', icon: 'ShieldCheck',
@@ -2917,6 +2917,11 @@ export const TOOLKITS: ToolkitDefinition[] = [
         label: 'What Looks Broken?', description: 'List the cases without working them', icon: 'ListChecks',
         prompt: 'List the open Agent Ops cases, worst first, without working them yet.',
         done: 'Here are the open Agent Ops cases.',
+      },
+      {
+        label: 'Server Maintenance', description: 'Last weekly run, versions and disk', icon: 'Wrench',
+        prompt: 'How did the last weekly server maintenance go? Show versions before and after, disk freed, and anything still open.',
+        done: 'Here is the latest server maintenance.',
       },
     ],
   },

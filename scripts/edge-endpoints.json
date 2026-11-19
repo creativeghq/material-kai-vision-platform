@@ -199,6 +199,53 @@
     "response": "{received:number, stored:number}"
   },
   {
+    "name": "server-maintenance-report",
+    "tag": "Monitoring Crons",
+    "summary": "A platform server's weekly maintenance report, and its poll for an on-demand run",
+    "description": "#590. The server's own systemd timer runs a fixed recipe (drain MIVAA, update packages incl. nginx from nginx.org, reboot if needed, verify, clean) and POSTs the result here; every 15 minutes it polls for a run requested from Admin → Agent Ops. SECURITY: x-kai-signature is hex HMAC-SHA256 of `${x-kai-timestamp}.${rawBody}` with that server's secret (server_maintenance_servers.secret, never client-readable), checked before the body is parsed; a timestamp more than 300s off, a missing header or an unknown server is refused (fails closed). The report is copied field by field, never spread. A stored report re-runs ops_sync_cases(), so a failed run opens its Agent Ops case at once.",
+    "security": [
+      "crawlerSignature"
+    ],
+    "methods": [
+      "POST"
+    ],
+    "query": [
+      {
+        "name": "server",
+        "type": "string",
+        "required": true,
+        "desc": "The server key, e.g. mivaa-hetzner"
+      },
+      {
+        "name": "action",
+        "type": "report | poll",
+        "required": true,
+        "desc": "report stores a run; poll returns {run_requested} and claims the request"
+      }
+    ],
+    "request": [
+      {
+        "name": "id",
+        "type": "string",
+        "required": false,
+        "desc": "report: the run uuid (a re-sent report is ignored)"
+      },
+      {
+        "name": "verdict",
+        "type": "ok | degraded | failed | critical | skipped",
+        "required": false,
+        "desc": "report: the run's verdict"
+      },
+      {
+        "name": "steps",
+        "type": "object[]",
+        "required": false,
+        "desc": "report: {name, status, detail, output, seconds, at} per step"
+      }
+    ],
+    "response": "report: {stored, id, verdict} · poll: {run_requested}"
+  },
+  {
     "name": "ai-pricing-updater",
     "tag": "Crons",
     "summary": "Weekly cron (Sunday 00:00 UTC): sync AI model prices from hardcoded reference tables",
