@@ -2532,6 +2532,12 @@
           }
         ],
         "response": "{success: boolean, triggered: number, results: array}"
+      },
+      {
+        "name": "resume-waits",
+        "summary": "Resume every flow branch parked at a delay whose time has come; cron-secret only (cron_dispatch minute group).",
+        "params": [],
+        "response": "{success: boolean, resumed: number, results: {wait_id: string, outcome: string}[]}"
       }
     ],
     "request": [

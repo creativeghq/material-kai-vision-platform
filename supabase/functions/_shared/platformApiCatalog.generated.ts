@@ -1289,7 +1289,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "enum": [
           "execute-flow",
           "test-flow",
-          "trigger-event"
+          "trigger-event",
+          "resume-waits"
         ],
         "required": true,
         "description": "Which operation to run"
