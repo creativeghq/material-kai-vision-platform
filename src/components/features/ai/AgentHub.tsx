@@ -188,17 +188,13 @@ interface AgentDefinition {
   color: string;
   requiredRole: 'viewer' | 'member' | 'admin' | 'owner';
   available: boolean;
-  /** Registered in agent_definitions but not yet runnable (sandbox execution
-   *  tier unbuilt). Shown in the picker as a disabled "Coming soon" teaser. */
+  /** Not runnable from chat. Shown in the picker as a disabled "Coming soon" teaser. */
   comingSoon?: boolean;
   defaultModel: string; // Default AI model for this agent
 }
 
-// The agent roster mirrors the `agent_definitions` table (Agent Fabric #132).
-// JARVIS (orchestrator) is the default — it auto-routes each message to the right
-// specialist. Users can also pick a specialist directly. Sandbox agents
-// (Stark/Veritas) require a container execution tier that isn't built yet, so they
-// are registered in agent_definitions but not offered in the chat picker.
+// The chat roster. JARVIS (orchestrator) is the default and auto-routes each message; tools are
+// bound by agent-chat's AGENT_CONFIGS, the one source for what an agent can do.
 const AGENT_HISTORY_SENT = 40;
 
 function boundedAgentHistory<T extends TurnMessage & { images?: unknown[]; geminiImageData?: unknown }>(input: T[]): T[] {
@@ -281,9 +277,7 @@ const AGENTS: AgentDefinition[] = [
     available: true,
     defaultModel: 'anthropic/claude-haiku-5-5',
   },
-  // Registered in agent_definitions but not runnable yet — execution_kind
-  // 'sandbox' with no edge function. Shown disabled so the full roster is
-  // visible; become selectable (available:true) once the sandbox tier ships.
+  // Stark and Veritas run as Agent Ops sub-agents (#570), not as chat agents — shown disabled.
   {
     id: 'developer',
     name: 'Stark',

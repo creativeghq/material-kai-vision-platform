@@ -171,69 +171,6 @@ export type Database = {
         }
         Relationships: []
       }
-      agent_definitions: {
-        Row: {
-          aliases: string[]
-          allowed_tools: string[]
-          concurrency_key_template: string | null
-          created_at: string
-          default_config: Json
-          default_credit_cost: number
-          display_name: string | null
-          edge_function_name: string | null
-          execution_kind: string
-          id: string
-          is_orchestrator: boolean
-          max_run_cost_usd: number | null
-          max_wall_clock_seconds: number | null
-          prompt_category: string | null
-          resumable: boolean
-          sandbox_image_ref: string | null
-          slug: string
-          updated_at: string
-        }
-        Insert: {
-          aliases?: string[]
-          allowed_tools?: string[]
-          concurrency_key_template?: string | null
-          created_at?: string
-          default_config?: Json
-          default_credit_cost?: number
-          display_name?: string | null
-          edge_function_name?: string | null
-          execution_kind: string
-          id?: string
-          is_orchestrator?: boolean
-          max_run_cost_usd?: number | null
-          max_wall_clock_seconds?: number | null
-          prompt_category?: string | null
-          resumable?: boolean
-          sandbox_image_ref?: string | null
-          slug: string
-          updated_at?: string
-        }
-        Update: {
-          aliases?: string[]
-          allowed_tools?: string[]
-          concurrency_key_template?: string | null
-          created_at?: string
-          default_config?: Json
-          default_credit_cost?: number
-          display_name?: string | null
-          edge_function_name?: string | null
-          execution_kind?: string
-          id?: string
-          is_orchestrator?: boolean
-          max_run_cost_usd?: number | null
-          max_wall_clock_seconds?: number | null
-          prompt_category?: string | null
-          resumable?: boolean
-          sandbox_image_ref?: string | null
-          slug?: string
-          updated_at?: string
-        }
-        Relationships: []
-      }
       agent_email_inbound_log: {
         Row: {
           created_at: string
