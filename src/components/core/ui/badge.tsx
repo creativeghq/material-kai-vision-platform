@@ -48,11 +48,11 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-// A tag names a status, so a raw value passed straight through renders as its name.
+// A tag whose whole text is a raw value (`accepted`) renders as its name; mixed content is untouched.
 function Badge({ className, variant, children, ...props }: BadgeProps) {
   return (
     <div className={cn(badgeVariants({ variant }), className)} {...props}>
-      {React.Children.map(children, (c) => (typeof c === 'string' ? displayValue(c) : c))}
+      {typeof children === 'string' ? displayValue(children) : children}
     </div>
   );
 }

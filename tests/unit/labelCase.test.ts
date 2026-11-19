@@ -68,6 +68,6 @@ describe('a raw value in a Badge renders as its name', () => {
 
   it('the Badge primitive applies it', () => {
     const src = readFileSync(join(process.cwd(), 'src/components/core/ui/badge.tsx'), 'utf8');
-    expect(src).toMatch(/displayValue\(c\)/);
+    expect(src).toMatch(/typeof children === 'string' \? displayValue\(children\)/);
   });
 });
