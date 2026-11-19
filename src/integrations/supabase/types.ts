@@ -40843,6 +40843,7 @@ export type Database = {
       automation_run_status:
         | "pending"
         | "running"
+        | "waiting"
         | "completed"
         | "failed"
         | "cancelled"
@@ -40850,6 +40851,7 @@ export type Database = {
       automation_step_status:
         | "pending"
         | "running"
+        | "waiting"
         | "completed"
         | "skipped"
         | "failed"
@@ -41158,6 +41160,7 @@ export const Constants = {
       automation_run_status: [
         "pending",
         "running",
+        "waiting",
         "completed",
         "failed",
         "cancelled",
@@ -41166,6 +41169,7 @@ export const Constants = {
       automation_step_status: [
         "pending",
         "running",
+        "waiting",
         "completed",
         "skipped",
         "failed",

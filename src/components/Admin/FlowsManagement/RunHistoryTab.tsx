@@ -18,10 +18,10 @@ import { triggerLabel } from './utils/paletteItems';
 type Tone = 'success' | 'warning' | 'error' | 'info' | 'neutral';
 
 const RUN_TONE: Record<FlowRunStatus, Tone> = {
-  pending: 'neutral', running: 'info', completed: 'success', failed: 'error', cancelled: 'warning', timed_out: 'error',
+  pending: 'neutral', running: 'info', waiting: 'info', completed: 'success', failed: 'error', cancelled: 'warning', timed_out: 'error',
 };
 const STEP_TONE: Record<FlowStepStatus, Tone> = {
-  pending: 'neutral', running: 'info', completed: 'success', skipped: 'warning', failed: 'error',
+  pending: 'neutral', running: 'info', waiting: 'info', completed: 'success', skipped: 'warning', failed: 'error',
 };
 
 const PAGE_SIZE = 50;

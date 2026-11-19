@@ -614,7 +614,7 @@ export const paletteItems: NodePaletteItem[] = [
   // ── Delay ──
   { type: 'conditionNode', category: 'condition', subType: 'delay', group: 'Delay',
     label: 'Delay Timer', description: 'Wait up to 25 seconds before continuing', icon: 'Timer', color: 'amber',
-    defaultData: { label: 'Delay Timer', category: 'condition', conditionType: 'delay', config: { duration: 10, unit: 'seconds' } } as ConditionNodeData },
+    defaultData: { label: 'Delay Timer', category: 'condition', conditionType: 'delay', config: { duration: 1, unit: 'days' } } as ConditionNodeData },
 
   // ════════════════════════════════════════════════════
   //  ACTIONS

@@ -4,8 +4,8 @@ import type { B2BCompanyType } from '@/config/b2bCompanyTypes';
 // Flow Status Types
 // =====================================================
 export type FlowStatus = 'draft' | 'active' | 'paused' | 'archived';
-export type FlowRunStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
-export type FlowStepStatus = 'pending' | 'running' | 'completed' | 'skipped' | 'failed';
+export type FlowRunStatus = 'pending' | 'running' | 'waiting' | 'completed' | 'failed' | 'cancelled' | 'timed_out';
+export type FlowStepStatus = 'pending' | 'running' | 'waiting' | 'completed' | 'skipped' | 'failed';
 
 // =====================================================
 // Trigger Types
