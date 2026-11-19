@@ -19,15 +19,17 @@ import { ToolsShell } from './toolsShared';
 interface Item { id: string; parent_id: string | null; sort_order: number; kind: 'section' | 'task'; label: string; unit: string | null; quantity_formula: string | null; default_quantity: number; line_kind: string; material_cost: number | null; labor_rate: number | null; margin_pct: number; is_allowance: boolean; allowance_amount: number | null; option_group: string | null; tier: string | null }
 interface Starter { id: string; title: string; description: string | null; project_type: string | null; dimensions_schema: DimensionDef[]; source_currency: string; items: Item[] }
 
-const isUnlocked = (s: Starter) => s.project_type === 'full_home_renovation';
+const isFreeTemplate = (s: Starter) => s.project_type === 'full_home_renovation';
 
 export default function ProjectPlanPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const isAuthenticated = !!user;
+  const isUnlocked = (s: Starter) => isAuthenticated || isFreeTemplate(s);
 
   const [starters, setStarters] = useState<Starter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState('');
   const [dims, setDims] = useState<Record<string, number>>({});
   const [items, setItems] = useState<ProjectPlanItem[]>([]);
@@ -40,13 +42,14 @@ export default function ProjectPlanPage() {
   useEffect(() => {
     supabase.functions.invoke('public-project-plan', { body: { action: 'starters' } })
       .then(({ data, error }) => {
-        if (error) return;
+        if (error) { setLoadError('We could not load the project templates. Please refresh to try again.'); return; }
         const list = (data?.starters ?? []) as Starter[];
-        list.sort((a, b) => (isUnlocked(a) ? 0 : 1) - (isUnlocked(b) ? 0 : 1));
+        list.sort((a, b) => (isFreeTemplate(a) ? 0 : 1) - (isFreeTemplate(b) ? 0 : 1));
         setStarters(list);
-        const preferred = list.find(isUnlocked) ?? list[0];
+        const preferred = list.find(isFreeTemplate) ?? list[0];
         if (preferred) setSelectedId(preferred.id);
       })
+      .catch(() => setLoadError('We could not load the project templates. Please refresh to try again.'))
       .finally(() => setLoading(false));
   }, []);
 
@@ -93,7 +96,6 @@ export default function ProjectPlanPage() {
       const n = cur.filter((i) => i.kind === 'section').length;
       const newSecId = crypto.randomUUID();
       const seeded = seedPlanItems([{ ...section, parent_id: null, sort_order: n }, ...tasks.map((t, idx) => ({ ...t, parent_id: section.id, sort_order: idx }))], dims);
-      // remap ids so the appended subtree is unique
       const idMap: Record<string, string> = { [section.id]: newSecId };
       for (const t of tasks) idMap[t.id] = crypto.randomUUID();
       const remapped = seeded.map((it) => ({ ...it, id: idMap[it.id] ?? it.id, parent_id: it.parent_id ? idMap[it.parent_id] ?? null : null }));
@@ -105,7 +107,6 @@ export default function ProjectPlanPage() {
   const saveAndSignUp = () => {
     if (!selected) return;
     try {
-      // carry the full edited plan so the import recreates exactly what the user built
       const exportItems = items.map((it) => ({
         id: it.id, parent_id: it.parent_id, sort_order: it.sort_order, kind: it.kind, label: it.label,
         unit: it.unit, quantity_formula: it.quantity_formula, default_quantity: it.quantity,
@@ -135,6 +136,8 @@ export default function ProjectPlanPage() {
 
       {loading ? (
         <div className="py-16 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : loadError ? (
+        <Card className="dashboard-card"><CardContent className="py-10 text-center text-sm text-destructive">{loadError}</CardContent></Card>
       ) : !selected ? (
         <Card className="dashboard-card"><CardContent className="py-10 text-center text-sm text-muted-foreground">No project types available.</CardContent></Card>
       ) : (

@@ -7,6 +7,15 @@
 export type AcType = 'inverter' | 'simple';
 export type HeatingMethodKey = 'oil' | 'gas' | 'ac' | 'heat_pump' | 'energy_fireplace' | 'non_energy_fireplace';
 
+/** Greek-market default unit prices and COP — the one copy the page and the agent tool both read. */
+export const HEATING_COST_DEFAULTS = {
+  electricityPricePerKwh: 0.19,
+  oilPricePerLitre: 1.246,
+  gasPricePerKwh: 0.137,
+  woodPricePerKg: 0.54,
+  heatPumpCop: 4,
+} as const;
+
 export interface HeatingCostInput {
   floorAreaM2: number;
   /** Building specific energy, kWh/m²·yr (sheet example: 132). User-supplied. */

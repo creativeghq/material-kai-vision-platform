@@ -74,10 +74,11 @@ describe('tender portal prices only an issued, in-date package', () => {
   });
 });
 
-describe('public estimator matches a visitor email exactly', () => {
-  it('never uses the visitor email as a LIKE pattern', () => {
-    expect(ESTIMATOR).not.toMatch(/ilike\('email'/);
-    expect(ESTIMATOR).toContain("in('email', ");
+describe('public estimator never attaches a visitor to an existing CRM record', () => {
+  it('files a lead through the one transactional RPC and reads no contact by visitor input', () => {
+    expect(ESTIMATOR).not.toContain("from('crm_contacts')");
+    expect(ESTIMATOR).toContain("rpc('submit_public_kitchen_lead'");
+    expect(ESTIMATOR).not.toMatch(/from\('inbox_(threads|participants|messages)'\)\.insert/);
   });
 });
 

@@ -32,6 +32,8 @@ import {
 } from 'lucide-react';
 
 import { useAuth } from '@/contexts/AuthContext';
+import { usePermissions } from '@/hooks/usePermissions';
+import type { Capability } from '@/auth/capabilities';
 import { Badge } from '@/components/core/ui/badge';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { QuotaBadge, ToolsShell, useToolsQuota } from './toolsShared';
@@ -44,6 +46,8 @@ interface ToolEntry {
   badge: string;
   /** Absolute route to link to. Defaults to `/tools/<slug>` for the public tools. */
   to?: string;
+  /** Capability the destination route's CapabilityGuard requires; the card is hidden without it. */
+  capability?: Capability;
 }
 
 const TOOLS: ToolEntry[] = [
@@ -163,6 +167,7 @@ const WORKSPACE_TOOLS: ToolEntry[] = [
   {
     slug: 'signals',
     to: '/signals',
+    capability: 'crm.view',
     title: 'Signals',
     description:
       'Watch the market: companies that start hiring for a role, run or adopt a technology, or show buying intent — with hourly alerts.',
@@ -237,6 +242,7 @@ function ToolCard({ tool }: { tool: ToolEntry }) {
 
 export default function ToolsHubPage() {
   const { user, session } = useAuth();
+  const { can } = usePermissions();
   const accessToken = session?.access_token ?? null;
   const { quota } = useToolsQuota(accessToken);
 
@@ -248,8 +254,8 @@ export default function ToolsHubPage() {
         </div>
         <h1 className="text-4xl font-semibold tracking-tight mb-3">Free tools</h1>
         <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-          Quick utilities for sourcing, pricing and specifying. No login needed — every tool here is
-          also available inside the KAI assistant.
+          Quick utilities for sourcing, pricing and specifying. No login needed — the search, the scans
+          and the heating and kitchen calculators also run inside the KAI assistant.
         </p>
       </div>
 
@@ -265,7 +271,7 @@ export default function ToolsHubPage() {
             Available in your workspace — these work over your product catalog.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {WORKSPACE_TOOLS.map((t) => <ToolCard key={t.slug} tool={t} />)}
+            {WORKSPACE_TOOLS.filter((t) => !t.capability || can(t.capability)).map((t) => <ToolCard key={t.slug} tool={t} />)}
           </div>
         </div>
       )}

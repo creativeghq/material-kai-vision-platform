@@ -176,13 +176,25 @@ class BlueprintsService {
   /**
    * The premade-section library: every starter blueprint's sections, for the
    * "Add section from library" pickers (project Plan tab + public estimator).
-   * Readable by anon too (starters pass the RLS select policy).
+   * Readable by anon too, so it selects named columns: anon has no grant on the cost columns,
+   * and a `select('*')` would be refused whole.
    */
   async getSectionLibrary(): Promise<Array<{ blueprintId: string; blueprintTitle: string; sections: Array<{ id: string; label: string; taskCount: number }> }>> {
-    const starters = await this.listStarters();
+    const { data: starters, error: bpError } = await supabase
+      .from('blueprints')
+      .select('id, title')
+      .eq('is_platform_starter', true)
+      .eq('status', 'active')
+      .order('title');
+    if (bpError) throw bpError;
+    const ids = (starters ?? []).map((b) => b.id);
+    const { data: allItems, error: itemsError } = ids.length
+      ? await supabase.from('blueprint_items').select('id, blueprint_id, parent_id, kind, label, sort_order').in('blueprint_id', ids).order('sort_order', { ascending: true })
+      : { data: [], error: null };
+    if (itemsError) throw itemsError;
     const out: Array<{ blueprintId: string; blueprintTitle: string; sections: Array<{ id: string; label: string; taskCount: number }> }> = [];
-    for (const bp of starters) {
-      const items = await this.listItems(bp.id);
+    for (const bp of starters ?? []) {
+      const items = (allItems ?? []).filter((i) => i.blueprint_id === bp.id);
       const sections = items.filter((i) => i.kind === 'section').map((s) => ({
         id: s.id, label: s.label, taskCount: items.filter((i) => i.parent_id === s.id).length,
       }));

@@ -674,7 +674,7 @@ export function UpsellCard({ quota, isAuthenticated }: { quota: PublicQuota; isA
               <li>· Scan as many products / brands as you need</li>
               <li>· Credits never expire</li>
             </ul>
-            <Link to="/auth?mode=signup&redirect=/billing" className="block">
+            <Link to="/auth?mode=signup&redirect=/billing/credits" className="block">
               <Button variant="outline" className="w-full gap-2">See credit packs</Button>
             </Link>
           </div>
