@@ -346,6 +346,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
         countryCode: customerAddr.country_code || 'EL',
         vatNumber: customerAddr.vat_number,
         companyId: customer.id,
+        workspaceId,
       });
       const { data } = await supabase.from('crm_companies').select('*').eq('id', customer.id).maybeSingle();
       if (data) setCustomerAddr(data);

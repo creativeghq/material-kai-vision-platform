@@ -56,7 +56,7 @@ export interface ViesValidateArgs {
    * RECEIPT the server records, which is what lets `crm-api` stamp `vat_validated` on a save
    * without believing a client that says it looked something up.
    */
-  workspaceId?: string;
+  workspaceId: string | null | undefined;
 }
 
 export async function validateVatViaVies({
