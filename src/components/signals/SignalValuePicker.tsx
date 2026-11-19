@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Input } from '@/components/core/ui/input';
 import { cn } from '@/lib/utils';
-import type { SignalKind, SignalsDictionary } from '@/services/signalsService';
+import type { ListSignalKind, SignalsDictionary } from '@/services/signalsService';
 
 interface Props {
-  kind: SignalKind;
+  kind: ListSignalKind;
   dictionary: SignalsDictionary | null;
   value: string[];
   onChange: (next: string[]) => void;

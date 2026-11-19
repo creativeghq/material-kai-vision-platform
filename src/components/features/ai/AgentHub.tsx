@@ -563,6 +563,7 @@ const AGENT_RESULT_TITLES: Record<string, string> = {
   signals_list: 'Saved Signals',
   signal_matches_list: 'Signal Matches',
   signal_saved: 'Signal Saved',
+  signal_described_draft: 'Signal Draft',
   flows_list: 'Workspace Flows',
   flow_suggestions: 'Suggested Automations',
   tech_radar_list: 'Tech Radar',

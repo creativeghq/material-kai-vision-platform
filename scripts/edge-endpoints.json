@@ -16687,7 +16687,7 @@
     "query": [
       {
         "name": "task",
-        "type": "price-refresh | mention-refresh | mention-probe | job-refresh | job-digest | signals-corpus",
+        "type": "price-refresh | mention-refresh | mention-probe | job-refresh | job-digest | signals-corpus | signals-described",
         "required": true,
         "desc": "Which monitoring sweep to dispatch. Unknown values return 400 with the known list."
       }

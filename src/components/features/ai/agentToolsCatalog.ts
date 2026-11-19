@@ -413,6 +413,15 @@ const KAI_TOOLS: AgentToolEntry[] = [
       'Show the new matches on my signals',
     ],
   },
+  {
+    id: 'describe_signal', name: 'Describe a Signal', category: 'Signals',
+    moduleSlug: 'signals-described',
+    desc: 'Create a signal from a plain-language description: drafts the rules, tests them on the last 30 days, shows the credit cost, then saves on your say-so.',
+    examples: [
+      'Alert me when a tile company opens a new showroom in Greece',
+      'Watch for companies switching ERP',
+    ],
+  },
 
   // ── Projects (all users) ──────────────────────────────────────────────
   {
@@ -2483,6 +2492,31 @@ export const TOOLKITS: ToolkitDefinition[] = [
     ],
   },
   {
+    id: 'signals-described',
+    name: 'Described Signals',
+    description: 'Describe what to watch for in plain language; an AI drafts the rules, tests them on 30 days of data and checks new items hourly.',
+    icon: 'Sparkles',
+    moduleSlug: 'signals-described',
+    capability: 'crm.view',
+    tool_ids: ['describe_signal', 'manage_signal'],
+    quick_starts: [
+      {
+        label: 'Describe a Signal', description: 'Watch for anything, in your own words', icon: 'Sparkles',
+        prompt: 'Help me set up a signal described in my own words.',
+        promptTemplate: 'Create a signal for: "{{description}}". Draft the rules, test them on the last 30 days and show me the sample and the weekly credit cost before saving.',
+        form: [
+          { key: 'description', label: 'What to watch for', kind: 'text', required: true, placeholder: 'Tile companies opening a new showroom in Greece' },
+        ],
+      },
+      {
+        label: 'Signal Matches', description: 'New matches on your signals', icon: 'ListChecks',
+        prompt: 'Show the new matches on my signals.',
+        done: 'Here is what your signals found lately.',
+        run: { tool: 'manage_signal', fixedArgs: { action: 'matches' } },
+      },
+    ],
+  },
+  {
     // Employee self-service counterpart of the `hr` toolkit below. NOT adminOnly — this is for the
     // hr.self persona (an invited employee with no hr.view/hr.manage). Every action is hard-scoped
     // server-side to the caller's own hr_employees row, so it can never read a colleague.
@@ -4294,7 +4328,7 @@ export const TOOLKIT_HUB: Record<string, HubId> = {
   mentions: 'marketing', 'job-research': 'marketing', 'flows-toolkit': 'marketing', social: 'marketing',
   'email-marketing': 'marketing', messaging: 'service', inbox: 'service', mail: 'service', reviews: 'service',
   'price-monitoring': 'sales',
-  'signals-hiring': 'marketing', 'signals-technographics': 'marketing', 'signals-intent': 'marketing',
+  'signals-hiring': 'marketing', 'signals-technographics': 'marketing', 'signals-intent': 'marketing', 'signals-described': 'marketing',
   'seo-research': 'marketing', 'seo-domain': 'marketing', 'seo-backlinks': 'marketing',
   'seo-content': 'marketing', 'seo-multi-engine': 'marketing', 'seo-composite': 'marketing', 'seo-pages': 'marketing', 'seo-article': 'marketing',
   // The newest SEO cluster and the only one that was missing from both maps: unmapped toolkits
@@ -4452,6 +4486,7 @@ export const TOOLKIT_AGENTS: Record<string, string[]> = {
   'field-registry': ['product-business'],
   'job-research': ['product-business'], 'price-monitoring': ['product-business'], crm: ['product-business'],
   'signals-hiring': ['product-business'], 'signals-technographics': ['product-business'], 'signals-intent': ['product-business'],
+  'signals-described': ['product-business'],
   // Studio / interior → Vision
   generation: ['interior-designer'], 'presentation-sheets': ['interior-designer'],
   projects: ['interior-designer', 'erp'],

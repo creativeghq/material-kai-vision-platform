@@ -9,15 +9,18 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 const { z } = await import('npm:zod@3.25.76');
 
 import { callerDbClient } from '../caller-client.ts';
+import { mivaaAuthHeaders } from '../mivaa-caller.ts';
+import { describeUpstreamError } from '../tool-result-shape.ts';
 import { moduleGate } from './module-gate.ts';
 
-type Kind = 'hiring' | 'technology' | 'intent';
+type Kind = 'hiring' | 'technology' | 'intent' | 'described';
 type Chunk = (chunk: Record<string, unknown>) => void;
 
 const KIND_MODULE: Record<Kind, string> = {
   hiring: 'signals-hiring',
   technology: 'signals-technographics',
   intent: 'signals-intent',
+  described: 'signals-described',
 };
 
 function list(value: string | undefined): string[] {
@@ -240,6 +243,7 @@ export const createManageSignalTool = (
       const db = callerDbClient(jwt, userId, workspaceId);
       if (['create', 'update'].includes(action)) {
         if (!kind) return JSON.stringify({ success: false, error: 'kind is required: hiring, technology or intent.' });
+        if ((kind as string) === 'described') return JSON.stringify({ success: false, error: 'Create a described signal with describe_signal.' });
         const denied = await moduleGate(workspaceId, KIND_MODULE[kind as Kind]);
         if (denied) return denied;
         let entries = list(values);
@@ -301,7 +305,7 @@ export const createManageSignalTool = (
       if (error) return JSON.stringify({ success: false, error: error.message });
       const rows = (data ?? []).map((s: any) => ({
         name: s.name, kind: s.kind, active: s.is_active ? 'Yes' : 'Paused',
-        watching: (s.filter?.keywords ?? s.filter?.technology_slugs ?? s.filter?.intent_keys ?? []).join(', '),
+        watching: s.filter?.description ?? (s.filter?.keywords ?? s.filter?.technology_slugs ?? s.filter?.intent_keys ?? []).join(', '),
         last_checked: s.last_evaluated_at?.slice(0, 16)?.replace('T', ' ') ?? 'Not yet', id: s.id,
       }));
       onChunk?.({ type: 'signals_list', signals: rows, timestamp: Date.now() });
@@ -320,6 +324,99 @@ export const createManageSignalTool = (
         crm_only: z.boolean().default(false),
         location: z.string().optional().describe('Hiring only: location must contain this text'),
         confirm: z.boolean().default(false).describe('Delete only — true after the user explicitly agreed'),
+      }),
+    },
+  );
+};
+
+function mivaaUrl(): string {
+  return Deno.env.get('MIVAA_GATEWAY_URL') || 'https://v1api.materialshub.gr';
+}
+
+async function callMivaa(
+  path: string, body: unknown, jwt: string | undefined, userId: string, workspaceId: string,
+): Promise<{ ok: boolean; status: number; data?: any; error?: string }> {
+  const headers = new Headers({ 'Content-Type': 'application/json', 'X-Workspace-Id': workspaceId });
+  for (const [k, v] of Object.entries(mivaaAuthHeaders(jwt, { userId, workspaceId }))) headers.set(k, v);
+  try {
+    const resp = await fetch(`${mivaaUrl()}${path}`, { method: 'POST', headers, body: JSON.stringify(body) });
+    const text = await resp.text();
+    let parsed: any = null;
+    try { parsed = JSON.parse(text); } catch { parsed = text; }
+    return { ok: resp.ok, status: resp.status, data: parsed, error: resp.ok ? undefined : describeUpstreamError(resp.status, parsed) };
+  } catch (e) {
+    return { ok: false, status: 0, error: e instanceof Error ? e.message : 'network error' };
+  }
+}
+
+export const createDescribeSignalTool = (
+  userId: string, workspaceId: string | null, jwt: string | undefined, onChunk?: Chunk,
+) => {
+  return tool(
+    async ({ description, name, crm_only = false, rules, confirm = false }) => {
+      const denied = await moduleGate(workspaceId, KIND_MODULE.described);
+      if (denied) return denied;
+      const ws = workspaceId!;
+      let spec: Record<string, unknown> | null = null;
+      let draftName = name ?? '';
+      if (confirm && !rules) {
+        return JSON.stringify({
+          success: false,
+          error: 'Nothing to save: call first with confirm=false, show the user the drafted rules and estimate, then save with confirm=true and that exact rules string.',
+        });
+      }
+      if (rules) {
+        try { spec = JSON.parse(rules); } catch { return JSON.stringify({ success: false, error: 'rules is not valid JSON; draft again without it.' }); }
+      } else {
+        const drafted = await callMivaa('/api/v1/signals/described/compile', { description }, jwt, userId, ws);
+        if (!drafted.ok) return JSON.stringify({ success: false, error: drafted.error ?? 'Could not draft rules.' });
+        spec = drafted.data?.spec ?? null;
+        draftName = draftName || drafted.data?.name || '';
+      }
+
+      if (!confirm) {
+        const test = await callMivaa('/api/v1/signals/described/backtest', { description, spec, crm_only }, jwt, userId, ws);
+        if (!test.ok) return JSON.stringify({ success: false, error: test.error ?? 'Could not test the rules.' });
+        const sample = (test.data?.judged ?? []).map((j: any) => ({
+          verdict: j.status === 'match' ? 'Match' : j.status === 'failed' ? 'Check failed' : 'No match',
+          item: j.title, why: j.reason ?? j.error ?? '—', evidence: j.evidence_quote ?? '—',
+          seen: j.observed_at?.slice(0, 10), source: j.url,
+        }));
+        const est = test.data?.estimate ?? {};
+        onChunk?.({
+          type: 'signal_described_draft', sample, name: draftName,
+          question: (spec as any)?.judge_question, sources: ((spec as any)?.sources ?? []).join(', '),
+          candidates_30d: test.data?.candidates_30d ?? 0,
+          credits_per_week: `about ${est.credits_per_week ?? 0} credits a week (${est.credit_per_item ?? 1} per AI check)`,
+          first_run: `about ${est.first_run_credits ?? 0} credits on the first runs, for items from the last ${est.first_run_days ?? 7} days`,
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({
+          success: true, needs_confirmation: true, name: draftName, rules: JSON.stringify(spec),
+          candidates_30d: test.data?.candidates_30d, sample, estimate: est,
+          note: 'Show the user the rules, the sample, the first-run cost and the weekly credit estimate. Save ONLY after they agree: call again with confirm=true and the same rules string.',
+        });
+      }
+
+      const { data: id, error } = await callerDbClient(jwt, userId, ws).rpc('signals_save', {
+        p_workspace_id: ws, p_signal_id: null, p_kind: 'described',
+        p_name: (draftName || description).slice(0, 120), p_filter: { description, crm_only, spec },
+      });
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      onChunk?.({ type: 'signal_saved', signal_id: id, kind: 'described', name: draftName || description.slice(0, 80), watching: description.slice(0, 160), timestamp: Date.now() });
+      return JSON.stringify({ success: true, signal_id: id, note: 'Checked hourly; each AI check costs 1 credit. Matches appear under Signals.' });
+    },
+    {
+      name: 'describe_signal',
+      description: 'Create a signal from a plain-language description ("tile companies opening a showroom in Greece"). '
+        + 'First call (confirm=false): drafts matching rules, tests them on the last 30 days and returns a sample plus a weekly credit estimate — show these to the user. '
+        + 'Second call (confirm=true, rules = the rules string from the first call): saves it. Each hourly AI check of a candidate costs 1 credit; drafting and testing are free.',
+      schema: z.object({
+        description: z.string().describe('What to watch for, in the user\'s words (10 to 1000 characters)'),
+        name: z.string().optional().describe('Optional name; one is drafted if omitted'),
+        crm_only: z.boolean().default(false).describe('Only companies already in this workspace\'s CRM'),
+        rules: z.string().optional().describe('The rules string returned by the draft call; pass it back unchanged when saving'),
+        confirm: z.boolean().default(false).describe('true only after the user agreed to the rules and the credit estimate'),
       }),
     },
   );

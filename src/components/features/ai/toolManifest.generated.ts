@@ -615,6 +615,19 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     ],
   },
   {
+    name: 'describe_signal',
+    file: 'supabase/functions/_shared/tools/signals-tools.ts',
+    factory: 'createDescribeSignalTool',
+    description: 'Create a signal from a plain-language description ("tile companies opening a showroom in Greece").',
+    params: [
+      { name: 'description', type: 'string', optional: false, description: 'What to watch for, in the user\'s words (10 to 1000 characters)' },
+      { name: 'name', type: 'string', optional: true, description: 'Optional name; one is drafted if omitted' },
+      { name: 'crm_only', type: 'boolean', optional: true, description: 'Only companies already in this workspace\'s CRM' },
+      { name: 'rules', type: 'string', optional: true, description: 'The rules string returned by the draft call; pass it back unchanged when saving' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'true only after the user agreed to the rules and the credit estimate' },
+    ],
+  },
+  {
     name: 'discover_platform_api',
     file: 'supabase/functions/_shared/tools/platform-api-tools.ts',
     factory: 'createDiscoverPlatformApiTool',

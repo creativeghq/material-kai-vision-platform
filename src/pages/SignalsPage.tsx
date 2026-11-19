@@ -30,13 +30,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { timeAgo } from '@/utils/datetime';
 import { safeHref } from '@/utils/safeUrl';
 import {
-  describeSignalPayload, signalsService, SIGNAL_FILTER_KEY, SIGNAL_KIND_LABEL, SIGNAL_KIND_MODULE,
-  type CorpusCoverage, type SavedSignal, type SignalCandidate, type SignalKind, type SignalMatch,
+  describeSignalPayload, isListKind, signalsService, SIGNAL_FILTER_KEY, SIGNAL_KIND_LABEL, SIGNAL_KIND_MODULE,
+  type CorpusCoverage, type ListSignalKind, type SavedSignal, type SignalCandidate, type SignalKind, type SignalMatch,
   type SignalSearchResult, type SignalsDictionary,
 } from '@/services/signalsService';
 
 type TabId = 'matches' | 'saved' | 'explore';
-const KINDS: SignalKind[] = ['hiring', 'technology', 'intent'];
+const KINDS: SignalKind[] = ['hiring', 'technology', 'intent', 'described'];
 
 function SourceLink({ url }: { url: string | null }) {
   const href = safeHref(url, '');
@@ -50,6 +50,7 @@ function SourceLink({ url }: { url: string | null }) {
 }
 
 function watching(s: SavedSignal): string {
+  if (!isListKind(s.kind)) return s.filter?.description ?? '';
   return (s.filter?.[SIGNAL_FILTER_KEY[s.kind]] ?? []).join(', ');
 }
 
@@ -63,6 +64,7 @@ export default function SignalsPage() {
     () => KINDS.filter((k) => isModuleAvailable(SIGNAL_KIND_MODULE[k])),
     [isModuleAvailable],
   );
+  const exploreKinds = useMemo(() => availableKinds.filter(isListKind), [availableKinds]);
   const tab = (['matches', 'saved', 'explore'].includes(params.get('tab') ?? '') ? params.get('tab') : 'matches') as TabId;
   const signalFilter = params.get('signal') ?? 'all';
 
@@ -75,7 +77,7 @@ export default function SignalsPage() {
   const [editor, setEditor] = useState<{ open: boolean; initial: SignalDraft | SavedSignal | null }>({ open: false, initial: null });
   const [deleting, setDeleting] = useState<SavedSignal | null>(null);
 
-  const [exploreKind, setExploreKind] = useState<SignalKind>('hiring');
+  const [exploreKind, setExploreKind] = useState<ListSignalKind>('hiring');
   const [exploreValues, setExploreValues] = useState<string[]>([]);
   const [exploreDays, setExploreDays] = useState('30');
   const [exploreCrmOnly, setExploreCrmOnly] = useState(false);
@@ -83,10 +85,19 @@ export default function SignalsPage() {
   const [exploring, setExploring] = useState(false);
 
   useEffect(() => {
-    const k = params.get('kind') as SignalKind | null;
-    if (k && availableKinds.includes(k)) setExploreKind(k);
-    else if (availableKinds.length && !availableKinds.includes(exploreKind)) setExploreKind(availableKinds[0]);
-  }, [availableKinds, params, exploreKind]);
+    const k = params.get('kind') as ListSignalKind | null;
+    if (k && exploreKinds.includes(k)) setExploreKind(k);
+    else if (exploreKinds.length && !exploreKinds.includes(exploreKind)) setExploreKind(exploreKinds[0]);
+  }, [exploreKinds, params, exploreKind]);
+
+  useEffect(() => {
+    const wanted = params.get('new') as SignalKind | null;
+    if (!wanted || !availableKinds.includes(wanted)) return;
+    setEditor({ open: true, initial: { kind: wanted, name: '', filter: {} } });
+    const next = new URLSearchParams(params);
+    next.delete('new');
+    setParams(next, { replace: true });
+  }, [availableKinds, params, setParams]);
 
   const setTab = (id: string) => {
     const next = new URLSearchParams(params);
@@ -200,7 +211,9 @@ export default function SignalsPage() {
     { id: 'kind', header: 'Kind', cell: (s) => <Badge variant="neutral">{SIGNAL_KIND_LABEL[s.kind]}</Badge> },
     { id: 'watching', header: 'Watching', hideBelow: 'md', cell: (s) => <span className="line-clamp-1 text-muted-foreground">{watching(s) || '—'}</span> },
     { id: 'status', header: 'Status', cell: (s) => (
-      <Badge variant={s.is_active ? 'success' : 'warning'}>{s.is_active ? 'Watching' : 'Paused'}</Badge>) },
+      <Badge variant={s.is_active ? 'success' : 'warning'}>
+        {s.is_active ? 'Watching' : s.paused_reason === 'no_credits' ? 'Paused: Out of Credits' : 'Paused'}
+      </Badge>) },
     { id: 'checked', header: 'Last Checked', hideBelow: 'sm', cell: (s) => (s.last_evaluated_at ? timeAgo(s.last_evaluated_at) : 'Within the hour') },
     { id: 'actions', header: '', align: 'right', cell: (s) => (
       <div className="flex justify-end gap-1">
@@ -327,7 +340,14 @@ export default function SignalsPage() {
         </TabsContent>
 
         <TabsContent value="explore">
-        {!loadError ? (
+        {!loadError && exploreKinds.length === 0 ? (
+          <Card><CardContent className="p-0">
+            <HubEmptyState icon={Radar} title="Explore searches hiring, technology and intent signals"
+              description="Described signals are drafted and tested from New Signal instead."
+              action={newSignal} />
+          </CardContent></Card>
+        ) : null}
+        {!loadError && exploreKinds.length > 0 ? (
           <div className="space-y-4">
             <Card>
               <CardHeader className="pb-3">
@@ -336,9 +356,9 @@ export default function SignalsPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex flex-wrap items-center gap-3">
-                  <Select value={exploreKind} onValueChange={(v) => { setExploreKind(v as SignalKind); setExploreValues([]); setExploreResult(null); }}>
+                  <Select value={exploreKind} onValueChange={(v) => { setExploreKind(v as ListSignalKind); setExploreValues([]); setExploreResult(null); }}>
                     <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                    <SelectContent>{availableKinds.map((k) => <SelectItem key={k} value={k}>{SIGNAL_KIND_LABEL[k]}</SelectItem>)}</SelectContent>
+                    <SelectContent>{exploreKinds.map((k) => <SelectItem key={k} value={k}>{SIGNAL_KIND_LABEL[k]}</SelectItem>)}</SelectContent>
                   </Select>
                   <Select value={exploreDays} onValueChange={setExploreDays}>
                     <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>

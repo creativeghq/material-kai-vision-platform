@@ -134,6 +134,10 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
     capability: ['crm.view'],
     tool_ids: ['find_companies_in_market', 'company_signals', 'manage_signal'],
   },
+  'signals-described': {
+    capability: ['crm.view'],
+    tool_ids: ['describe_signal', 'manage_signal'],
+  },
   'my-hr': {
     tool_ids: ['manage_my_hr'],
   },

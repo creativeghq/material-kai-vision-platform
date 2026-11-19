@@ -13,9 +13,10 @@ import {
 import { FormField, FormGrid, FormSection } from '@/components/core/ui/form-layout';
 import { useToast } from '@/hooks/use-toast';
 import { SignalValuePicker } from './SignalValuePicker';
+import { DescribedSignalFields } from './DescribedSignalFields';
 import {
-  signalsService, SIGNAL_FILTER_KEY, SIGNAL_KIND_LABEL,
-  type SavedSignal, type SignalFilter, type SignalKind, type SignalsDictionary,
+  signalsService, SIGNAL_FILTER_KEY, SIGNAL_KIND_LABEL, isListKind,
+  type DescribedSpec, type SavedSignal, type SignalFilter, type SignalKind, type SignalsDictionary,
 } from '@/services/signalsService';
 
 export interface SignalDraft {
@@ -45,13 +46,19 @@ export function SignalEditorDialog({ open, onOpenChange, workspaceId, availableK
   const [crmOnly, setCrmOnly] = useState(false);
   const [notify, setNotify] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [description, setDescription] = useState('');
+  const [spec, setSpec] = useState<DescribedSpec | null>(null);
+  const [tested, setTested] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     const k = initial?.kind && availableKinds.includes(initial.kind) ? initial.kind : (availableKinds[0] ?? 'hiring');
     setKind(k);
     setName(initial?.name ?? '');
-    setValues(initial?.filter?.[SIGNAL_FILTER_KEY[k]] ?? []);
+    setValues(isListKind(k) ? initial?.filter?.[SIGNAL_FILTER_KEY[k]] ?? [] : []);
+    setDescription(initial?.filter?.description ?? '');
+    setSpec(initial?.filter?.spec ?? null);
+    setTested(Boolean(initial?.id && initial?.filter?.spec));
     setLocation(initial?.filter?.location_contains ?? '');
     setCrmOnly(Boolean(initial?.filter?.crm_only));
     setNotify(initial?.notify ?? true);
@@ -60,6 +67,32 @@ export function SignalEditorDialog({ open, onOpenChange, workspaceId, availableK
   const changeKind = (k: SignalKind) => { setKind(k); setValues([]); };
 
   const submit = async () => {
+    if (kind === 'described') {
+      if (!spec) {
+        toast({ title: 'Draft the rules first', description: 'Press Draft Rules, check them, then save.', variant: 'destructive' });
+        return;
+      }
+      if (!tested) {
+        toast({ title: 'Test the rules first', description: 'Test on the last 30 days to see what it matches and what it will cost, then save.', variant: 'destructive' });
+        return;
+      }
+      setSaving(true);
+      try {
+        await signalsService.save(workspaceId, {
+          id: initial?.id ?? null, kind, notify,
+          filter: { description: description.trim(), crm_only: crmOnly, spec },
+          name: name.trim() || description.trim().slice(0, 80),
+        });
+        toast({ title: initial?.id ? 'Signal updated' : 'Signal saved', description: 'New items are checked every hour; each AI check costs 1 credit.' });
+        onSaved();
+        onOpenChange(false);
+      } catch (e) {
+        toast({ title: 'Could not save the signal', description: (e as Error).message, variant: 'destructive' });
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
     if (values.length === 0) {
       toast({ title: 'Nothing to watch yet', description: 'Add at least one keyword, technology or use case.', variant: 'destructive' });
       return;
@@ -87,7 +120,7 @@ export function SignalEditorDialog({ open, onOpenChange, workspaceId, availableK
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className={kind === 'described' ? 'max-w-2xl' : 'max-w-lg'}>
         <DialogHeader>
           <DialogTitle>{initial?.id ? 'Edit signal' : 'New signal'}</DialogTitle>
           <DialogDescription>A saved signal watches the company corpus and records every new match.</DialogDescription>
@@ -108,18 +141,29 @@ export function SignalEditorDialog({ open, onOpenChange, workspaceId, availableK
                 <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="ERP buyers in Greece" />
               </FormField>
             </FormGrid>
-            <FormField
-              label={kind === 'hiring' ? 'Roles, skills or keywords' : kind === 'technology' ? 'Technologies' : 'Use cases'}
-              hint={kind === 'hiring' ? 'Comma-separated. Matched against the posting title and body.' : undefined}
-            >
-              <SignalValuePicker kind={kind} dictionary={dictionary} value={values} onChange={setValues} />
-            </FormField>
+            {isListKind(kind) ? (
+              <FormField
+                label={kind === 'hiring' ? 'Roles, skills or keywords' : kind === 'technology' ? 'Technologies' : 'Use cases'}
+                hint={kind === 'hiring' ? 'Comma-separated. Matched against the posting title and body.' : undefined}
+              >
+                <SignalValuePicker kind={kind} dictionary={dictionary} value={values} onChange={setValues} />
+              </FormField>
+            ) : null}
             {kind === 'hiring' ? (
               <FormField label="Location Contains" optional>
                 <Input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="Athens" />
               </FormField>
             ) : null}
           </FormSection>
+
+          {kind === 'described' ? (
+            <DescribedSignalFields
+              description={description} onDescriptionChange={setDescription}
+              spec={spec} onSpecChange={setSpec} crmOnly={crmOnly}
+              onNameSuggested={(n) => { if (!name.trim()) setName(n); }}
+              onTestedChange={setTested}
+            />
+          ) : null}
 
           <FormSection title="Scope and Alerts">
             <label className="flex items-center gap-2 text-sm">
