@@ -2,6 +2,7 @@ import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
+import { displayValue } from '@/utils/labelCase';
 
 /**
  * TAG — a squared, low-saturation label. Not a pill, and not a solid block of
@@ -47,9 +48,12 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
+// A tag names a status, so a raw value passed straight through renders as its name.
+function Badge({ className, variant, children, ...props }: BadgeProps) {
   return (
-    <div className={cn(badgeVariants({ variant }), className)} {...props} />
+    <div className={cn(badgeVariants({ variant }), className)} {...props}>
+      {React.Children.map(children, (c) => (typeof c === 'string' ? displayValue(c) : c))}
+    </div>
   );
 }
 
