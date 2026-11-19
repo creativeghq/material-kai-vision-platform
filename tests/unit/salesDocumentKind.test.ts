@@ -9,6 +9,8 @@ import {
   buyerIsConsumer,
   salesDocumentKindFor,
   salesDocumentKindLabel,
+  saleRegimeIsZeroRated,
+  mydataSaleRegimeExemption,
 } from '../../src/modules/finance/utils/salesDocumentKind';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
@@ -204,5 +206,29 @@ describe('documentTakesWithholding', () => {
   it('offers withholding on sales and service invoices, because the table has goods codes', () => {
     for (const code of ['1.1', '1.2', '2.1', '2.3']) expect(documentTakesWithholding(code)).toBe(true);
     for (const code of ['11.1', '11.2', '9.3', '5.1']) expect(documentTakesWithholding(code)).toBe(false);
+  });
+});
+
+describe('a cross-border sale is 0% VAT, with the cause the regime implies', () => {
+  it('an export is zero-rated whether or not the buyer has a VAT number', () => {
+    expect(saleRegimeIsZeroRated('export', false)).toBe(true);
+    expect(saleRegimeIsZeroRated('export', true)).toBe(true);
+  });
+  it('intra-community is zero-rated only against the buyer VAT', () => {
+    expect(saleRegimeIsZeroRated('intra_community', true)).toBe(true);
+    expect(saleRegimeIsZeroRated('intra_community', false)).toBe(false);
+  });
+  it('a domestic sale never is', () => {
+    expect(saleRegimeIsZeroRated('domestic', true)).toBe(false);
+  });
+  it('goods carry art. 29 / art. 33; a service withholds the cause for the operator', () => {
+    expect(mydataSaleRegimeExemption('export', 'goods')).toBe(8);
+    expect(mydataSaleRegimeExemption('intra_community', 'goods')).toBe(14);
+    expect(mydataSaleRegimeExemption('export', 'services')).toBeNull();
+  });
+  it('the invoice dialog applies the rule to its lines', () => {
+    const dialog = sharedStripComments(readFileSync(join(ROOT, 'src/modules/finance/components/NewInvoiceDialog.tsx'), 'utf8'));
+    expect(dialog).toMatch(/saleRegimeIsZeroRated\(saleRegime,/);
+    expect(dialog).toMatch(/mydataSaleRegimeExemption\(saleRegime,/);
   });
 });

@@ -2,13 +2,13 @@
 // VIES → web research (rest of EU), with a live progress line and a verified strip, then the
 // company name it resolved.
 import React, { useId, useState } from 'react';
-import { Check, Loader2, ShieldCheck } from 'lucide-react';
+import { Check, Loader2, Search, ShieldCheck } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
 import { VatCountryCombobox } from '@/components/core/VatCountryCombobox';
-import { VAT_COUNTRY_OPTIONS } from '@/lib/vatCountries';
+import { VAT_COUNTRY_OPTIONS, toVatPrefix } from '@/lib/vatCountries';
 import { useToast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { lookupBusinessIdentity, providerFor } from '@/services/identity/registry';
@@ -64,6 +64,32 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
   const [statusLine, setStatusLine] = useState<string | null>(null);
 
   const patch = (p: Partial<CompanyIdentityDraft>) => onChange({ ...value, ...p });
+  // Opened by a lookup that could not answer; always open for a country no registry covers.
+  const [manualOpen, setManualOpen] = useState(false);
+  const noRegistry = !providerFor(value.countryCode.trim().toUpperCase());
+  const showManual = !value.verified && (noRegistry || manualOpen);
+  const countryName = VAT_COUNTRY_OPTIONS.find((o) => o.code === value.countryCode)?.name ?? value.countryCode;
+
+  // "GB 123 4567 89" typed into the VAT box: the prefix IS the country, so switch to it.
+  const onVatInput = (raw: string) => {
+    const m = /^([A-Za-z]{2})[\s.-]*([A-Za-z]?\d.*)$/.exec(raw.trim());
+    const cc = m ? toVatPrefix(m[1]) : '';
+    if (m && cc !== value.countryCode && VAT_COUNTRY_OPTIONS.some((o) => o.code === cc)) {
+      patch({ countryCode: cc, vatNumber: m[2] });
+      return;
+    }
+    patch({ vatNumber: raw });
+  };
+
+  const patchAddress = (p: Record<string, string>) => {
+    const fields: Record<string, any> = { ...value.fields, ...p, country_code: value.countryCode, country: countryName };
+    const line = [
+      [fields.street, fields.street_number].filter(Boolean).join(' '),
+      [fields.postal_code, fields.city].filter(Boolean).join(' '),
+      countryName,
+    ].filter(Boolean).join(', ');
+    onChange({ ...value, fields: { ...fields, address: line } });
+  };
   const setBusyBoth = (b: boolean) => { setBusy(b); onBusyChange?.(b); };
 
   /**
@@ -117,10 +143,12 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
 
       if (res.skippedReason === 'unsupported_country' || res.skippedReason === 'bad_input') {
         // A real answer, not a fallthrough: this country has no registry we can ask.
+        setManualOpen(true);
         toast({ title: 'No registry lookup', description: res.message });
         return;
       }
       if (res.valid === null) {
+        setManualOpen(true);
         toast({
           title: `${provider?.label ?? 'Registry'} unavailable`,
           description: res.message || 'Could not reach the registry. Try again or fill manually.',
@@ -129,6 +157,7 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
         return;
       }
       if (res.valid === false) {
+        setManualOpen(true);
         toast({
           title: 'VAT not recognised',
           description: res.message || `${provider?.label ?? 'The registry'} does not recognise this number.`,
@@ -169,6 +198,22 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
     }
   };
 
+  // No registry covers the country: research the business by its name instead.
+  const runWebSearch = async () => {
+    const name = value.name.trim();
+    if (!name) {
+      toast({ title: 'Enter the company name first', description: `No registry covers ${countryName}; the web search goes by name.`, variant: 'destructive' });
+      return;
+    }
+    setBusyBoth(true);
+    try {
+      await runEnrichment(value, name, countryName, value.vatNumber.trim());
+    } finally {
+      setBusyBoth(false);
+      setStatusLine(null);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* VAT research */}
@@ -177,20 +222,26 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
         <div className="flex gap-2">
           <VatCountryCombobox
             value={value.countryCode}
-            onChange={(v) => patch({ countryCode: v || 'EL' })}
+            onChange={(v) => {
+              const cc = v || 'EL';
+              const typedAddress = !value.verified && value.fields.country_code;
+              patch(typedAddress
+                ? { countryCode: cc, fields: { ...value.fields, country_code: cc, country: VAT_COUNTRY_OPTIONS.find((o) => o.code === cc)?.name ?? cc } }
+                : { countryCode: cc });
+            }}
             triggerClassName="w-32 shrink-0"
           />
           <Input
             value={value.vatNumber}
             autoFocus={autoFocusVat}
-            onChange={(e) => patch({ vatNumber: e.target.value })}
-            placeholder={value.countryCode === 'EL' ? '9-digit ΑΦΜ' : 'VAT number'}
+            onChange={(e) => onVatInput(e.target.value)}
+            placeholder={value.countryCode === 'EL' ? '9-digit ΑΦΜ' : noRegistry ? 'Tax ID (optional)' : 'VAT number'}
             disabled={disabled || busy}
-            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void runLookup(); } }}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void (noRegistry ? runWebSearch() : runLookup()); } }}
           />
-          <Button type="button" variant="outline" onClick={() => void runLookup()} disabled={disabled || busy} className="shrink-0">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />}
-            <span className="ml-1">{value.countryCode === 'EL' ? 'ΑΑΔΕ' : 'VIES'}</span>
+          <Button type="button" variant="outline" onClick={() => void (noRegistry ? runWebSearch() : runLookup())} disabled={disabled || busy} className="shrink-0">
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : noRegistry ? <Search className="h-4 w-4" /> : <ShieldCheck className="h-4 w-4" />}
+            <span className="ml-1">{noRegistry ? 'Search web' : value.countryCode === 'EL' ? 'ΑΑΔΕ' : 'VIES'}</span>
           </Button>
         </div>
         {busy && (
@@ -214,6 +265,16 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
           </div>
         )}
         {children}
+        {noRegistry && !value.verified && (
+          <p className="text-[11px] text-muted-foreground">
+            No registry covers {countryName}. Fill in the billing address below, or search the web by name to prefill it.
+          </p>
+        )}
+        {!noRegistry && !value.verified && !manualOpen && (
+          <button type="button" className="text-[11px] text-primary hover:underline" onClick={() => setManualOpen(true)}>
+            Enter the address manually
+          </button>
+        )}
       </div>
 
       {/* Name — required, prefilled from the lookup */}
@@ -229,6 +290,20 @@ export const CompanyIdentityLookup: React.FC<Props> = ({
           onKeyDown={(e) => { if (e.key === 'Enter' && onSubmit) { e.preventDefault(); onSubmit(); } }}
         />
       </div>
+
+      {showManual && (
+        <div className="space-y-2">
+          <Label className="text-xs">Billing Address · {countryName}</Label>
+          <div className="grid grid-cols-[1fr_6rem] gap-2">
+            <Input aria-label="Street" placeholder="Street" disabled={disabled} value={String(value.fields.street ?? '')} onChange={(e) => patchAddress({ street: e.target.value })} />
+            <Input aria-label="Number" placeholder="No." disabled={disabled} value={String(value.fields.street_number ?? '')} onChange={(e) => patchAddress({ street_number: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-[8rem_1fr] gap-2">
+            <Input aria-label="Postal Code" placeholder="Postal code" disabled={disabled} value={String(value.fields.postal_code ?? '')} onChange={(e) => patchAddress({ postal_code: e.target.value })} />
+            <Input aria-label="City" placeholder="City" disabled={disabled} value={String(value.fields.city ?? '')} onChange={(e) => patchAddress({ city: e.target.value })} />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

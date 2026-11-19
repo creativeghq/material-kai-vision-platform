@@ -39,8 +39,11 @@ import { vatOfRaw, round2 } from '@/modules/finance/lib/vatMath';
 import {
   buyerIsConsumer as isConsumerBuyer, supplyKindOf, mydataSalesDocumentType,
   mydataSalesDocumentReason, documentTakesWithholding, documentRequiresBusinessBuyer,
+  saleRegimeIsZeroRated, mydataSaleRegimeExemption,
 } from '@/modules/finance/utils/salesDocumentKind';
 import { saleRegimeForCountry } from '@/lib/vatCountries';
+import { vatCatRequiresExemption } from '@/modules/finance/vatVocabulary';
+import { normalizeVat } from '@/services/crm/vatNormalize';
 import { DEFAULT_TEMPLATE_ID, resolveColors, getTemplateSpec, buildInvoiceRenderData } from '@/modules/finance/invoice-templates';
 import { InvoiceDocument } from '@/modules/finance/components/InvoiceDocument';
 import { MYDATA_TYPE_FAMILY } from '@/modules/finance/components/mydataTypes';
@@ -97,6 +100,8 @@ interface LineItem {
   size: string;
   vat_category: string;            // myDATA VAT category code
   vat_exemption: string;           // myDATA VAT exemption category (1-31) when 0% VAT
+  vat_auto?: { category: string; exemption: string; cause: string };
+  vat_pinned?: boolean;
   income_classification_type: string;
   income_classification_category: string;
   // Per-line Novus taxes. Each of fees/stamp/other carries a myDATA category code
@@ -653,15 +658,13 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     })();
   }, [open, workspaceId]);
 
-  // Fetch the chosen customer's address (for preview + delivery prefill) + their open balance.
   useEffect(() => {
     if (!customer) { setCustomerAddr(null); setBuyerOutstanding(0); return; }
     (async () => {
       const table = customer.type === 'company' ? 'crm_companies' : 'crm_contacts';
       const { data } = await supabase.from(table).select('*').eq('id', customer.id).maybeSingle();
       setCustomerAddr(data ?? null);
-      // Adopt the party's commercial defaults: ΜΥΦ inclusion preference and
-      // (for 0%-VAT lines) the party's default myDATA VAT-exemption category.
+      // Adopt the party's defaults: ΜΥΦ inclusion and the default VAT-exemption category.
       if (!editInvoiceId && data && (data as any).include_in_myf === false) setIncludeInMyf(false);
       // Public-sector segment → default to B2G issuance + prefill the buyer registration id.
       if (!editInvoiceId && data && (data as any).contact_group === 'public_sector') {
@@ -1196,6 +1199,35 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
     ),
     [buyerIsConsumer, supplyKind, saleRegime],
   );
+  // Product lines carry their own 24% category, so only a per-line pass reaches them; vat_pinned = set by hand.
+  const zeroRated = !editInvoiceId && saleRegimeIsZeroRated(saleRegime, !!normalizeVat(customerAddr?.vat_number));
+  useEffect(() => {
+    setLines((prev) => {
+      let changed = false;
+      const next = prev.map((l) => {
+        if (l.vat_pinned) return l;
+        if (zeroRated) {
+          const cause = String(mydataSaleRegimeExemption(saleRegime, l.item_type === 'service' ? 'services' : 'goods') ?? '');
+          if (vatCatRequiresExemption(l.vat_category)) {
+            if (!l.vat_auto || l.vat_auto.cause === cause || l.vat_exemption !== l.vat_auto.cause) return l;
+            changed = true;
+            return { ...l, vat_exemption: cause, vat_auto: { ...l.vat_auto, cause } };
+          }
+          changed = true;
+          return {
+            ...l, vat_category: '7', vat_exemption: l.vat_exemption || cause,
+            vat_auto: { category: l.vat_category, exemption: l.vat_exemption, cause },
+          };
+        }
+        if (!l.vat_auto) return l;
+        changed = true;
+        const { vat_auto, ...rest } = l;
+        return { ...rest, vat_category: vat_auto.category, vat_exemption: vat_auto.exemption };
+      });
+      return changed ? next : prev;
+    });
+  }, [zeroRated, saleRegime, lines]);
+
   const AUTO_DOC_CODES = ['1.1', '2.1', '11.1', '11.2', '1.2', '1.3', '2.2', '2.3'];
 
   useEffect(() => {
@@ -1905,6 +1937,9 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                     {saleRegime === 'intra_community'
                       ? `The buyer is in ${customerAddr?.country_code}: an intra-community sale is ${supplyKind === 'services' ? '2.2' : '1.2'} at 0% VAT, with its exemption cause (art. 33 for goods), and needs the buyer's VAT validated in VIES. Goods collected in Greece are a domestic sale — pick 1.1.`
                       : `The buyer is outside the EU (${customerAddr?.country_code}): an export is ${supplyKind === 'services' ? '2.3' : '1.3'} at 0% VAT, with its exemption cause (art. 29 for goods).`}
+                    {zeroRated
+                      ? ` Lines are set to 0%${supplyKind === 'goods' || supplyKind === 'unknown' ? ' with that cause' : ' — pick the exemption cause on each service line'}; a rate you change by hand is kept.`
+                      : saleRegime === 'intra_community' ? ' The buyer has no VAT number on file, so the lines stay at the domestic rate.' : ''}
                   </p>
                 )}
                 {seriesOptions.length > 1 && !identityLocked && (
@@ -2048,7 +2083,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Measurement unit" /></SelectTrigger>
                         <SelectContent><SelectItem value="none">Unit…</SelectItem>{units.map((u) => <SelectItem key={u.code} value={u.code}>{u.description}</SelectItem>)}</SelectContent>
                       </Select>
-                      <Select value={gVat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGVat(val); applyGlobal('vat_category', val); }}>
+                      <Select value={gVat || 'none'} onValueChange={(v) => { const val = v === 'none' ? '' : v; setGVat(val); setLines((prev) => prev.map((l) => ({ ...l, vat_category: val, vat_pinned: true }))); }}>
                         <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="VAT category" /></SelectTrigger>
                         <SelectContent><SelectItem value="none">VAT category…</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                       </Select>
@@ -2175,7 +2210,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                         <div className="w-20"><Input className="h-8 text-right text-sm" type="text" inputMode="decimal" value={l.unit_price} onChange={(e) => update(idx, { unit_price: e.target.value })} placeholder="Price" /></div>
                         <div className="w-16"><Input className={`h-8 text-right text-sm ${discountExceedsLine(l) ? 'border-destructive text-destructive' : ''}`} type="text" inputMode="decimal" value={l.discount} onChange={(e) => update(idx, { discount: e.target.value })} placeholder="0.00" aria-invalid={discountExceedsLine(l)} title={discountExceedsLine(l) ? 'Discount is larger than quantity × price — did you mean to enter it as the Price?' : 'Discount amount (€) taken off this line'} /></div>
                         <div className="w-16">
-                          <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
+                          <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v, vat_pinned: true })}>
                             <SelectTrigger className="h-8 px-2 text-xs" title="VAT rate for this line"><SelectValue>{linePct}%</SelectValue></SelectTrigger>
                             <SelectContent><SelectItem value="none">Default ({vatRate}%)</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                           </Select>
@@ -2196,7 +2231,7 @@ export const NewInvoiceDialog: React.FC<Props> = ({ workspaceId, open, onOpenCha
                           )}
                           <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">VAT category</Label>
-                            <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v })}>
+                            <Select value={l.vat_category || 'none'} onValueChange={(v) => update(idx, { vat_category: v === 'none' ? '' : v, vat_pinned: true })}>
                               <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Default" /></SelectTrigger>
                               <SelectContent><SelectItem value="none">Default ({vatRate}%)</SelectItem>{VAT_CATEGORIES.map((v) => <SelectItem key={v.code} value={v.code}>{v.label}</SelectItem>)}</SelectContent>
                             </Select>
