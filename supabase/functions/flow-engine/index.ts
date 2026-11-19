@@ -2212,15 +2212,17 @@ async function handleResumeWaits(supabase: DbClient): Promise<Response> {
       const { count } = await supabase.from('flow_run_waits').select('id', { count: 'exact', head: true })
         .eq('flow_run_id', run.id).eq('status', 'waiting');
       const done = walk.waits === 0 && (count ?? 0) === 0;
-      await supabase.from('flow_runs').update(done
+      const { error: settleErr } = await supabase.from('flow_runs').update(done
         ? { status: 'completed', completed_at: new Date().toISOString(), duration_ms: Date.now() - new Date(run.started_at).getTime() }
         : { status: 'waiting' }).eq('id', run.id);
-      results.push({ wait_id: w.id, outcome: done ? 'completed' : 'waiting' });
+      if (settleErr) console.error('[flow-engine] resumed run could not be settled', run.id, settleErr.message);
+      results.push({ wait_id: w.id, outcome: settleErr ? `settle_failed: ${settleErr.message}` : done ? 'completed' : 'waiting' });
     } catch (e) {
       if (!(e as { __runAlreadyFailed?: boolean }).__runAlreadyFailed) {
-        await supabase.from('flow_runs').update({
+        const { error: failErr } = await supabase.from('flow_runs').update({
           status: 'failed', error_message: e instanceof Error ? e.message : String(e), completed_at: new Date().toISOString(),
         }).eq('id', run.id);
+        if (failErr) console.error('[flow-engine] resumed run failure could not be recorded', run.id, failErr.message);
       }
       results.push({ wait_id: w.id, outcome: 'failed' });
     }

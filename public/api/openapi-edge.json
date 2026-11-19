@@ -5373,7 +5373,7 @@
         ],
         "summary": "Execute, test, or event-trigger workflow automations by walking the xyflow graph.",
         "operationId": "post_flow_engine",
-        "description": "Requires Supabase JWT. Routes on body.action to execute-flow (run a saved flow with trigger data), test-flow (dry-run, no side effects), or trigger-event (auto-dispatch from DB triggers or server-to-server).\n\n**Actions** (`action` in the body):\n- `execute-flow` — Run a flow with provided trigger data; writes execution record to flow_runs. → `{success: boolean, data: {id: string, status: string, results: object}}`\n- `test-flow` — Dry-run a flow: resolves templates and evaluates conditions but does not fire actions. → `{success: boolean, data: {id: string, status: string, results: object}}`\n- `trigger-event` — Auto-dispatch flows whose trigger_type matches the event type; used by DB triggers and internal services. → `{success: boolean, triggered: number, results: array}`\n\n**Response:** `{success: boolean, data: object}`\n\n📖 [docs/flow-engine.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/flow-engine.md)",
+        "description": "Requires Supabase JWT. Routes on body.action to execute-flow (run a saved flow with trigger data), test-flow (dry-run, no side effects), or trigger-event (auto-dispatch from DB triggers or server-to-server).\n\n**Actions** (`action` in the body):\n- `execute-flow` — Run a flow with provided trigger data; writes execution record to flow_runs. → `{success: boolean, data: {id: string, status: string, results: object}}`\n- `test-flow` — Dry-run a flow: resolves templates and evaluates conditions but does not fire actions. → `{success: boolean, data: {id: string, status: string, results: object}}`\n- `trigger-event` — Auto-dispatch flows whose trigger_type matches the event type; used by DB triggers and internal services. → `{success: boolean, triggered: number, results: array}`\n- `resume-waits` — Resume every flow branch parked at a delay whose time has come; cron-secret only (cron_dispatch minute group). → `{success: boolean, resumed: number, results: {wait_id: string, outcome: string}[]}`\n\n**Response:** `{success: boolean, data: object}`\n\n📖 [docs/flow-engine.md](https://github.com/creativeghq/material-kai-vision-platform/blob/main/docs/flow-engine.md)",
         "security": [
           {
             "supabaseJwt": []
@@ -5515,6 +5515,22 @@
                       }
                     },
                     "description": "Returns: {success: boolean, triggered: number, results: array}"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "resume-waits"
+                        ],
+                        "description": "Resume every flow branch parked at a delay whose time has come; cron-secret only (cron_dispatch minute group)."
+                      }
+                    },
+                    "description": "Returns: {success: boolean, resumed: number, results: {wait_id: string, outcome: string}[]}"
                   }
                 ],
                 "discriminator": {
