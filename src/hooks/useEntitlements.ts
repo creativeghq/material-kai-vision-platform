@@ -36,8 +36,7 @@ async function fetchSnapshot(workspaceId: string): Promise<Snapshot> {
     supabase.rpc('workspace_plan_level', { p_workspace_id: workspaceId }),
   ]);
   if (access.error) {
-    // Fail OPEN on a transient error — never strip a paid surface from a paying tenant
-    // because of a network blip. (The API/route remains the real boundary.) Not cached.
+    // Fail OPEN and uncached: a network blip must never strip a paid surface (the API is the boundary).
     console.error('[useEntitlements] access fetch failed:', access.error.message || access.error);
     return { rows: [], planLevel: typeof plan.data === 'number' ? plan.data : 0, fetchedAt: 0 };
   }
@@ -95,8 +94,7 @@ export function useEntitlements(): EntitlementsApi {
   return useMemo(() => {
     const available = new Set(rows.filter((r) => r.available).map((r) => r.slug));
     const tierBySlug = new Map(rows.map((r) => [r.slug, r.tier]));
-    // While loading (or on error → empty rows), don't hide anything: callers should gate on
-    // `loading`, and an empty set must not read as "everything is locked".
+    // While loading or on error (empty rows) hide nothing: an empty set is not "everything locked".
     const ready = !loading && rows.length > 0;
     return {
       loading: loading || wsLoading,
