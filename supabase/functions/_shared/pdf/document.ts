@@ -11,6 +11,8 @@ const COLOR_LIGHT_GRAY: RGB = rgb(0.75, 0.75, 0.75);
 const COLOR_ROW_ALT: RGB = rgb(0.96, 0.96, 0.96);
 const COLOR_WHITE: RGB = rgb(1, 1, 1);
 const COLOR_BLACK: RGB = rgb(0, 0, 0);
+/** Table header bar: the brand black of the default template's side band (#1A130D). */
+const COLOR_TABLE_HEAD: RGB = rgb(26 / 255, 19 / 255, 13 / 255);
 const COLOR_OVERLAY: RGB = rgb(0, 0, 0);
 
 const A4_LONG = 841.89;
@@ -393,7 +395,7 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
 }
 
 function drawTableHeader(page: PDFPage, g: Geom, y: number, cols: ColumnSpec[], fontBold: PDFFont, pricesIncludeVat: boolean): void {
-  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.HEADER_ROW_H, width: g.TABLE_W, height: g.HEADER_ROW_H, color: COLOR_DARK });
+  page.drawRectangle({ x: g.TABLE_MARGIN, y: y - g.HEADER_ROW_H, width: g.TABLE_W, height: g.HEADER_ROW_H, color: COLOR_TABLE_HEAD });
   const ty = y - g.HEADER_ROW_H / 2 - 3;
   let x = g.TABLE_MARGIN;
   for (const col of cols) {
