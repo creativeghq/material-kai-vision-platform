@@ -109,7 +109,7 @@ export const billingService = {
     if (!session.data.session) throw new Error('Not authenticated');
 
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-api/stripe/subscriptions`,
+      `${process.env.SUPABASE_URL}/functions/v1/crm-api/stripe/subscriptions`,
       {
         headers: {
           Authorization: `Bearer ${session.data.session.access_token}`,
@@ -135,7 +135,7 @@ export const billingService = {
     if (!session.data.session) throw new Error('Not authenticated');
 
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-api/stripe/credits`,
+      `${process.env.SUPABASE_URL}/functions/v1/crm-api/stripe/credits`,
       {
         headers: {
           Authorization: `Bearer ${session.data.session.access_token}`,
@@ -161,7 +161,7 @@ export const billingService = {
     if (!session.data.session) throw new Error('Not authenticated');
 
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-api/stripe/subscriptions/create-checkout`,
+      `${process.env.SUPABASE_URL}/functions/v1/crm-api/stripe/subscriptions/create-checkout`,
       {
         method: 'POST',
         headers: {
@@ -188,7 +188,7 @@ export const billingService = {
     if (!session.data.session) throw new Error('Not authenticated');
 
     const response = await fetch(
-      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-api/stripe/credits/purchase`,
+      `${process.env.SUPABASE_URL}/functions/v1/crm-api/stripe/credits/purchase`,
       {
         method: 'POST',
         headers: {

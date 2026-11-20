@@ -12,7 +12,7 @@ on:
       - 'vite.config.*'
       - 'tsconfig.json'
       - 'index.html'
-      - 'vercel.json'
+      - 'cloudflare/app-worker/**'
       # Test-only commits must run too: without this a change to tests/** never
       # triggered the workflow, so a new or edited live suite reported green
       # having never executed.
@@ -165,16 +165,13 @@ jobs:
             frontend:
               - 'src/**'
               - 'public/**'
-              # Vercel serverless functions (sitemap.xml, kb-prerender) ship with the
-              # frontend project. Without this, editing api/* changed nothing in prod —
-              # the sitemap fix in 285a4ad silently never deployed.
-              - 'api/**'
+              # The Worker (sitemap.xml, kb-prerender) ships with the frontend.
+              - 'cloudflare/app-worker/**'
               - 'package.json'
               - 'package-lock.json'
               - 'vite.config.*'
               - 'tsconfig.json'
               - 'index.html'
-              - 'vercel.json'
             # Only what the live integration tier reads; unit and e2e files have their own jobs.
             tests:
               - 'tests/integration/**'
@@ -519,15 +516,12 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=8192
 
   # build-frontend: the slow half of the frontend deploy, run BESIDE the gates rather than
-  # behind them. It uploads nothing to Vercel — deploy-frontend, which keeps every gate,
+  # behind them. It uploads nothing to Cloudflare — deploy-frontend, which keeps every gate,
   # ships this artifact, so the release order is exactly what it was.
   build-frontend:
     needs: changes
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -543,40 +537,42 @@ jobs:
       - name: 🔧 Regenerate committed artifacts
         run: npm run gen:all
 
-      - name: 🔧 Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: 📥 Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      # The default heap ran out on 37b044bff with no code at fault; a public-repo runner has 16 GB.
-      - name: 🏗️ Build (Vercel, local)
+      # The bundle reads exactly these four (vite.config.ts `define` + import.meta.env). All
+      # four are public values; an empty one fails here rather than shipping a dead bundle.
+      - name: 🏗️ Build
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          VITE_STRIPE_PRO_PRICE_ID: ${{ vars.VITE_STRIPE_PRO_PRICE_ID }}
+          VITE_STRIPE_ENTERPRISE_PRICE_ID: ${{ vars.VITE_STRIPE_ENTERPRISE_PRICE_ID }}
+        run: |
+          set -euo pipefail
+          for v in SUPABASE_URL SUPABASE_ANON_KEY VITE_STRIPE_PRO_PRICE_ID VITE_STRIPE_ENTERPRISE_PRICE_ID; do
+            [ -n "${!v}" ] || { echo "::error::$v is empty — the bundle would ship without it"; exit 1; }
+          done
+          npm run build
 
       # This repo is public, so its artifacts are readable by any signed-in GitHub user.
       - name: 🔒 Refuse to upload a bundle that carries a secret
         env:
-          S1: ${{ secrets.VERCEL_TOKEN }}
+          S1: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           S2: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           S3: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           S4: ${{ secrets.MIVAA_CRON_SECRET }}
-          S5: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
         run: |
           set -euo pipefail
-          for v in S1 S2 S3 S4 S5; do
+          for v in S1 S2 S3 S4; do
             val="${!v}"
-            if [ -n "$val" ] && grep -rqF -- "$val" .vercel/output; then
-              echo "::error::.vercel/output contains the value of a deploy secret ($v) — not uploading"; exit 1
+            if [ -n "$val" ] && grep -rqF -- "$val" dist; then
+              echo "::error::dist contains the value of a deploy secret ($v) — not uploading"; exit 1
             fi
           done
 
       - uses: actions/upload-artifact@v4
         with:
-          name: vercel-output-${{ github.sha }}
-          path: .vercel/output
-          include-hidden-files: true
+          name: frontend-dist-${{ github.sha }}
+          path: dist
           retention-days: 1
           if-no-files-found: error
 
@@ -588,129 +584,96 @@ jobs:
           if-no-files-found: error
 
   # ────────────────────────────────────────────────────────────────────
-  # deploy-frontend: prebuilt Vercel upload (no double build).
+  # deploy-frontend: upload the prebuilt bundle as a Worker VERSION (no double build).
   # ────────────────────────────────────────────────────────────────────
   deploy-frontend:
-    # `unit-tests` was an orphan: it ran `npm test`, `npm run lint` and `lint:a11y`
-    # and NOTHING depended on it, so a red suite still shipped to production and the
-    # failure was a report rather than a gate. It gates now — and `lint`, which was split
-    # out of it, must stay listed here for the same reason.
+    # `lint` must stay listed: a lint-only failure would otherwise ship.
     needs: [changes, typecheck, unit-tests, lint, a11y, build-frontend]
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # One upload against the Vercel project at a time; newest push wins. A cancelled
-    # upload never gets aliased (--skip-domain), so there is nothing to unwind, and the
-    # `deployed/frontend` marker stays put so the next run rebuilds it.
     concurrency:
-      group: deploy-frontend-vercel
+      group: deploy-frontend-cloudflare
       cancel-in-progress: true
     environment: production
     outputs:
       url: ${{ steps.deploy.outputs.url }}
+      version_id: ${{ steps.deploy.outputs.version_id }}
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
 
-      - name: 🔧 Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: 📥 Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      # The exact bundle build-frontend made while the gates ran; this job only ships it.
       - name: 📦 Fetch the prebuilt bundle
         uses: actions/download-artifact@v4
         with:
-          name: vercel-output-${{ github.sha }}
-          path: .vercel/output
+          name: frontend-dist-${{ github.sha }}
+          path: dist
 
-      # --skip-domain is what turns fe-smoke from a post-mortem into a gate. It builds and
-      # uploads a PRODUCTION deployment (production env vars, production build) but does NOT
-      # move app.materialshub.gr onto it. Users keep getting the previous build until the
-      # `promote` job aliases this one, which only happens after the route-load smoke passes.
-      # Without this flag the deploy IS the release and every check after it is a post-mortem —
-      # which is how a null-crash on `/` and `/discover` reached ~6 users on 2026-08-01.
-      - name: 🚀 Deploy prebuilt artifact (unaliased)
+      # `versions upload` is what makes fe-smoke a gate: the version gets its own preview URL
+      # and serves NO traffic on app.materialshub.gr until `promote` deploys it, which only
+      # happens after the route-load smoke passed against that preview URL.
+      - name: 🚀 Upload a Worker version (not serving users)
         id: deploy
         run: |
           set -euo pipefail
-          URL=$(vercel deploy --prebuilt --prod --skip-domain --archive=tgz --token=${{ secrets.VERCEL_TOKEN }})
-          if [ -z "$URL" ]; then
-            echo "❌ Deployment URL not captured — cannot verify or promote"; exit 1
+          OUT=$(npx -y wrangler@4 versions upload -c cloudflare/app-worker/wrangler.jsonc --message "${{ github.sha }}" 2>&1 | tee /dev/stderr)
+          VID=$(printf '%s' "$OUT" | grep -oE 'Worker Version ID: [0-9a-f-]+' | awk '{print $4}' | tail -1)
+          URL=$(printf '%s' "$OUT" | grep -oE 'https://[a-z0-9-]+-materialshub-app\.[a-z0-9-]+\.workers\.dev' | tail -1)
+          if [ -z "$VID" ] || [ -z "$URL" ]; then
+            echo "❌ Version id or preview URL not captured — cannot verify or promote"; exit 1
           fi
+          echo "version_id=$VID" >> "$GITHUB_OUTPUT"
           echo "url=$URL" >> "$GITHUB_OUTPUT"
-          echo "🌐 Deployed (NOT yet serving users): $URL"
+          echo "🌐 Uploaded (NOT yet serving users): $URL"
 
       - name: 📋 Summary
         if: always()
         run: |
           echo "## 🚀 Frontend Deploy" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Candidate:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Candidate:** ${{ steps.deploy.outputs.url }} (${{ steps.deploy.outputs.version_id }})" >> $GITHUB_STEP_SUMMARY
           echo "- **Live only after:** fe-smoke passes → promote" >> $GITHUB_STEP_SUMMARY
 
   # ────────────────────────────────────────────────────────────────────
-  # promote: the step that actually releases. Moves app.materialshub.gr onto the candidate
+  # promote: the step that actually releases. Sends 100% of app.materialshub.gr to the version
   # deploy-frontend uploaded, and ONLY runs when the route-load smoke passed against it.
-  #
-  # If fe-smoke fails, this is skipped and the previous build keeps serving — no rollback
-  # needed, because the broken build was never live. That is the whole point of --skip-domain.
+  # If fe-smoke fails, this is skipped and the previous version keeps serving.
   # ────────────────────────────────────────────────────────────────────
   promote:
     needs: [deploy-frontend, fe-smoke]
     if: ${{ needs.deploy-frontend.result == 'success' && needs.fe-smoke.result == 'success' }}
     runs-on: ubuntu-latest
-    # Its own group, separate from deploy-frontend's — sharing one would have the two cancel
-    # each other. cancel-in-progress here is what keeps the alias monotonic: if a newer
-    # candidate is ready to promote, aliasing the older one first and the newer one second is
-    # merely wasteful, but the reverse order would leave the OLD build live behind a green tick.
+    # cancel-in-progress keeps releases monotonic: a newer candidate supersedes an older one
+    # still waiting, so the OLD build can never land after the new one behind a green tick.
     concurrency:
-      group: promote-vercel-alias
+      group: promote-cloudflare-version
       cancel-in-progress: true
     environment: production
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-      - name: 🔧 Install Vercel CLI
-        run: npm install --global vercel@latest
-      - name: 📥 Pull Vercel environment
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: 🎬 Promote the smoked candidate
+      - name: 🎬 Promote the smoked version
         run: |
           set -euo pipefail
-          URL="${{ needs.deploy-frontend.outputs.url }}"
-          if [ -z "$URL" ]; then
-            echo "❌ No candidate URL from deploy-frontend — refusing to promote"; exit 1
+          VID="${{ needs.deploy-frontend.outputs.version_id }}"
+          if [ -z "$VID" ]; then
+            echo "❌ No version id from deploy-frontend — refusing to promote"; exit 1
           fi
-          echo "Promoting $URL"
-          # `--non-interactive`, NOT `--yes`: `vercel promote --help` lists only --timeout,
-          # --cwd, --no-color and --non-interactive, so --yes would fail as an unknown option
-          # and leave the smoked build sitting unreleased.
-          vercel promote "$URL" --non-interactive --token=${{ secrets.VERCEL_TOKEN }}
+          npx -y wrangler@4 versions deploy "$VID@100%" --yes -c cloudflare/app-worker/wrangler.jsonc --message "${{ github.sha }}"
 
       - name: 🏥 Health check the live domain
         run: |
           set -euo pipefail
-          # A 200 on the DOCUMENT is not a working site, and this step used to stop there.
-          # The entry bundle imports the vendor chunks STATICALLY, so one asset 404 is a blank
-          # screen while index.html still answers 200 — which is exactly what shipped on
-          # 2026-09-11 after a deployment prune orphaned `vendor-utils-Da9XzF8z.js`. The probe
-          # fetches every asset the document references, on its PLAIN url and cache-busted, and
-          # fails on `x-vercel-mitigated` so a firewall challenge cannot read as healthy either.
-          # No bypass secret on purpose: this must see what a visitor sees.
+          # A 200 on the DOCUMENT is not a working site: the entry bundle imports the vendor
+          # chunks statically, so one asset 404 is a blank screen. The probe fetches every asset
+          # the document references, plain and cache-busted, as a visitor would.
           sleep 10
           node scripts/probe-live-frontend.mjs "https://app.materialshub.gr"
 
@@ -719,7 +682,7 @@ jobs:
         run: |
           echo "## 🎬 Promoted" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "- **Now serving:** ${{ needs.deploy-frontend.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Now serving:** ${{ needs.deploy-frontend.outputs.version_id }}" >> $GITHUB_STEP_SUMMARY
           echo "- **App:** https://app.materialshub.gr" >> $GITHUB_STEP_SUMMARY
 
   # ────────────────────────────────────────────────────────────────────
@@ -977,22 +940,9 @@ jobs:
 
   # ────────────────────────────────────────────────────────────────────────────
   # Front-end route-load smoke — drives the deployed app in a headless browser and asserts
-  # every top route renders (no white-screen / chunk-load failure / error boundary). Catches
-  # the exact class that took down /quotes /finance /discover after a deploy.
-  #
-  # NOTE it runs AFTER production is serving the new build, so it DETECTS breakage rather than
-  # preventing it. On 2026-08-01 it correctly caught an error boundary on `/` and `/discover` —
-  # but only after ~6 users had already hit it.
-  #
-  # It is now a REAL GATE: deploy-frontend uploads with --skip-domain, so this runs against a
-  # production build that no user can reach yet, and `promote` only aliases it if this passes.
-  #
-  # It targets a *.vercel.app URL, which is behind Vercel SSO (`all_except_custom_domains`) and
-  # answers 302 to an auth wall. VERCEL_AUTOMATION_BYPASS_SECRET carries the
-  # `x-vercel-protection-bypass` header past it (verified 2026-08-02: 302 without, 200 with —
-  # header alone, no `x-vercel-set-bypass-cookie`, which answers 307 and can loop).
-  # If that secret ever goes missing the suite would smoke a login page and pass on anything,
-  # so tests/e2e/vercelBypass.ts FAILS LOUDLY when the target is protected and the secret isn't set.
+  # every top route renders (no white-screen / chunk-load failure / error boundary).
+  # A REAL GATE: it runs against the uploaded version's preview URL, which no user reaches, and
+  # `promote` only deploys that version if this passes.
   fe-smoke:
     needs: [deploy-frontend, changes]
     if: ${{ always() && needs.deploy-frontend.result == 'success' }}
@@ -1061,12 +1011,9 @@ jobs:
         env:
           SMOKE_ROUTES_FILE: .smoke/selection.json
           SMOKE_RECORD_DIR: .smoke/route-assets
-          # The unaliased production candidate, NOT the live domain — this has to fail before
-          # users can reach it. It is a *.vercel.app URL and therefore behind SSO, which is what
-          # the bypass secret is for; without the secret Playwright would smoke the login page
-          # and pass on anything.
+          # The uploaded version's preview URL, NOT the live domain — this has to fail before
+          # users can reach it.
           SMOKE_BASE_URL: ${{ needs.deploy-frontend.outputs.url }}
-          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
         run: npx playwright test --reporter=line

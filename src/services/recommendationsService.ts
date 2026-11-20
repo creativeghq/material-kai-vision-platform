@@ -28,7 +28,7 @@ export class RecommendationsService {
       if (!workspaceId) return;
 
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/recommendations-api/track-interaction`,
+        `${process.env.SUPABASE_URL}/functions/v1/recommendations-api/track-interaction`,
         {
           method: 'POST',
           headers: {

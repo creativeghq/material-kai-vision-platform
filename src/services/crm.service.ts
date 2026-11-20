@@ -7,7 +7,7 @@ import type { EinvoiceReadOutcome } from '@/config/einvoiceReadOutcomes';
 
 // Get Supabase URL — lazy to avoid crash at module load time
 const getApiBase = (): string => {
-  const url = process.env.SUPABASE_URL || import.meta.env.VITE_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL;
   if (!url) throw new Error('SUPABASE_URL is not defined');
   return url.replace(/\/$/, '') + '/functions/v1';
 };

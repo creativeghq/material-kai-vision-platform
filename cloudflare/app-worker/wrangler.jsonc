@@ -1,0 +1,46 @@
+{
+  "name": "materialshub-app",
+  "main": "src/index.js",
+  "compatibility_date": "2026-11-01",
+  // Static files are served without invoking the Worker, so they are free and uncounted. The
+  // Worker runs only for paths that are not a known static file — in practice one call per page
+  // load — and decides SPA shell vs 404 itself (src/index.js), because the built-in
+  // single-page-application mode would answer a missing /assets chunk with index.html and a 200.
+  "assets": {
+    "directory": "../../dist",
+    "binding": "ASSETS",
+    "not_found_handling": "none",
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": [
+      "/*",
+      "!/assets/*",
+      "!/fonts/*",
+      "!/avatars/*",
+      "!/covers/*",
+      "!/geo/*",
+      "!/models/*",
+      "!/static/*",
+      "!/documentation/*",
+      "!/embed/*",
+      "!/api/*",
+      "!/favicon*",
+      "!/android-chrome-*",
+      "!/apple-touch-icon.png",
+      "!/appicon.png",
+      "!/mh-logo*",
+      "!/placeholder.svg",
+      "!/site.webmanifest",
+      "!/sw.js",
+      "!/robots.txt",
+      "!/llms.txt"
+    ]
+  },
+  // CI uploads a version, smokes its preview URL, then promotes it.
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [{ "pattern": "app.materialshub.gr", "custom_domain": true }],
+  "vars": {
+    "SUPABASE_URL": "https://bgbavxtjlbvgplozizxu.supabase.co"
+  }
+  // SUPABASE_ANON_KEY is a Worker secret: `wrangler secret put SUPABASE_ANON_KEY`.
+}

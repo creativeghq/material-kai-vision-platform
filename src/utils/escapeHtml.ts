@@ -1,6 +1,6 @@
 // Canonical HTML escaper for the frontend (invariant 11).
 // Byte-equivalent twin of supabase/functions/_shared/html.ts (Deno edge) and
-// api/_shared/html.js (Vercel Node functions) — three runtimes that can't share a module.
+// cloudflare/app-worker/src/html.js (the app Worker) — three runtimes that can't share a module.
 // They are held identical by tests/unit/escapeHtmlParity.test.ts, which imports all three
 // and diffs them over a shared corpus. Do not rely on convention: that is how the earlier
 // per-file copies drifted to three different strengths in the first place.

@@ -6,12 +6,12 @@ import { join, relative } from 'node:path';
 import { escapeHtml as frontendEscape } from '@/utils/escapeHtml';
 import { escapeHtml as edgeEscape } from '../../supabase/functions/_shared/html';
 // @ts-expect-error — plain ESM .js with no type declarations; runtime behaviour is the contract.
-import { escapeHtml as vercelEscape } from '../../api/_shared/html.js';
+import { escapeHtml as workerEscape } from '../../cloudflare/app-worker/src/html.js';
 
 const IMPLS: Array<[string, (s: unknown) => string]> = [
   ['src/utils/escapeHtml.ts', frontendEscape],
   ['supabase/functions/_shared/html.ts', edgeEscape],
-  ['api/_shared/html.js', vercelEscape as (s: unknown) => string],
+  ['cloudflare/app-worker/src/html.js', workerEscape as (s: unknown) => string],
 ];
 
 const CORPUS: unknown[] = [
@@ -111,7 +111,7 @@ describe('no hand-rolled HTML escaper anywhere', () => {
     return out;
   }
 
-  const files = ['supabase/functions', 'api'].flatMap((r) => walk(join(process.cwd(), r)));
+  const files = ['supabase/functions', 'cloudflare/app-worker/src'].flatMap((r) => walk(join(process.cwd(), r)));
 
   it('is actually scanning, and can still recognise both halves of the shape', () => {
     expect(files.length, 'no sources found — this guard is pointed at nothing').toBeGreaterThan(50);
@@ -147,12 +147,12 @@ describe('no hand-rolled HTML escaper anywhere', () => {
   });
 });
 
-describe('api/kb-prerender.js uses the canonical escaper', () => {
-  const src = readFileSync(join(process.cwd(), 'api/kb-prerender.js'), 'utf8');
+describe('the Worker KB prerender uses the canonical escaper', () => {
+  const src = readFileSync(join(process.cwd(), 'cloudflare/app-worker/src/kbPrerender.js'), 'utf8');
 
   it('imports escapeHtml from the shared module', () => {
     expect(src, 'kb-prerender no longer imports the canonical escaper').toMatch(
-      /import\s*\{[^}]*\bescapeHtml\b[^}]*\}\s*from\s*['"]\.\/_shared\/html\.js['"]/,
+      /import\s*\{[^}]*\bescapeHtml\b[^}]*\}\s*from\s*['"]\.\/html\.js['"]/,
     );
   });
 

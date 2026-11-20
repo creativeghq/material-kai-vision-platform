@@ -60,7 +60,7 @@ export interface ConnectionPolicyPatch {
 }
 
 export function webhookUrl(connectionId: string): string {
-  const base = (import.meta.env?.VITE_SUPABASE_URL as string | undefined) ?? '';
+  const base = (process.env.SUPABASE_URL as string | undefined) ?? '';
   return `${base.replace(/\/$/, '')}/functions/v1/store-orders-webhook?connection=${encodeURIComponent(connectionId)}`;
 }
 

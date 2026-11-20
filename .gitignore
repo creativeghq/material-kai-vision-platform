@@ -85,3 +85,6 @@ sweep-report.json
 
 # Mac widget — its own private repo (creativeghq/hub-widget), cloned here for convenience
 hub-widget/
+
+# Wrangler local state
+.wrangler/

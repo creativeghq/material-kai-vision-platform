@@ -1,5 +1,3 @@
-// Canonical HTML escaper for the Vercel Node functions in `api/` (invariant 11).
-
 const HTML_ENTITIES = {
   '&': '&amp;',
   '<': '&lt;',

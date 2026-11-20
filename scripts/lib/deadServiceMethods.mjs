@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { globSync } from 'glob';
 
 const SERVICE_GLOBS = ['src/services/**/*.ts', 'src/modules/**/services/**/*.ts'];
-const CONSUMER_GLOBS = ['src/**/*.{ts,tsx}', 'supabase/functions/**/*.ts', 'tests/**/*.ts', 'api/**/*.js'];
+const CONSUMER_GLOBS = ['src/**/*.{ts,tsx}', 'supabase/functions/**/*.ts', 'tests/**/*.ts', 'cloudflare/app-worker/src/**/*.js'];
 const norm = (p) => p.split(String.fromCharCode(92)).join('/');
 
 const serviceFiles = [...new Set(SERVICE_GLOBS.flatMap((g) => globSync(g, { nodir: true })))]

@@ -39,7 +39,7 @@ const COLUMNS = 'id, name, slug, format, selection, currency, only_storefront_pu
   + 'public_token, enabled, last_built_at, last_item_count, last_fetched_at, fetch_count, last_gap_count, last_gaps';
 
 export function feedUrl(token: string): string {
-  const base = (import.meta.env?.VITE_SUPABASE_URL as string | undefined) ?? '';
+  const base = (process.env.SUPABASE_URL as string | undefined) ?? '';
   return `${base.replace(/\/$/, '')}/functions/v1/product-feed?token=${encodeURIComponent(token)}`;
 }
 

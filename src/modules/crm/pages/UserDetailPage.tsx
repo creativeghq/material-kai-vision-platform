@@ -101,7 +101,7 @@ const AIUsageTab: React.FC<{ userId: string }> = ({ userId }) => {
         if (!session) return;
 
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/crm-api/users/${userId}/ai-usage`,
+          `${process.env.SUPABASE_URL}/functions/v1/crm-api/users/${userId}/ai-usage`,
           {
             headers: {
               Authorization: `Bearer ${session.access_token}`,

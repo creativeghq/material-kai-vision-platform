@@ -2334,7 +2334,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+      const supabaseUrl = (supabase as any).supabaseUrl || process.env.SUPABASE_URL;
 
       const resolvedVideoType = videoType || 'walkthrough';
       const resolvedModel = videoModel === 'auto' ? undefined : videoModel;
@@ -2419,7 +2419,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+      const supabaseUrl = (supabase as any).supabaseUrl || process.env.SUPABASE_URL;
 
       const boardLabels = {
         'presentation-board': 'Presentation Board',
@@ -2493,7 +2493,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
-      const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+      const supabaseUrl = (supabase as any).supabaseUrl || process.env.SUPABASE_URL;
 
       toast({
         title: 'Generating virtual staging…',
@@ -2907,7 +2907,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         requestBody.workspace_id = getActiveWorkspaceId(session.user?.id) ?? workspaceId;
 
         // Get Supabase URL from the client
-        const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+        const supabaseUrl = (supabase as any).supabaseUrl || process.env.SUPABASE_URL;
 
         // Create AbortController to prevent premature cancellation
         const abortController = new AbortController();
@@ -7799,7 +7799,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               toast({ title: 'Not authenticated', variant: 'destructive' });
               return;
             }
-            const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+            const supabaseUrl = (supabase as any).supabaseUrl || process.env.SUPABASE_URL;
 
             try {
               const res = await fetch(`${supabaseUrl}/functions/v1/generate-region-edit`, {

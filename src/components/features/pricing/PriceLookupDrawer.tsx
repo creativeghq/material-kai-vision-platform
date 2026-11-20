@@ -265,7 +265,7 @@ export const PriceLookupDrawer: React.FC<PriceLookupDrawerProps> = ({
         throw new Error('Not authenticated');
       }
 
-      const supabaseUrl = (supabase as any).supabaseUrl ?? import.meta.env.VITE_SUPABASE_URL;
+      const supabaseUrl = (supabase as any).supabaseUrl ?? process.env.SUPABASE_URL;
       const url = `${supabaseUrl}/functions/v1/agent-chat`;
 
       const promptParts = [
