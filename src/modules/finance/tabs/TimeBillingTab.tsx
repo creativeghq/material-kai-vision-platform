@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { Button } from '@/components/core/ui/button';
 import { HubEmptyState } from '@/components/core/hub';
 import { Input } from '@/components/core/ui/input';
-import { Label } from '@/components/core/ui/label';
+import { FormField, FormGrid } from '@/components/core/ui/form-layout';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
@@ -164,6 +164,11 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
     catch (err: any) { toast({ title: 'Failed', description: err?.message, variant: 'destructive' }); }
   };
 
+  const entryAmount = useMemo(() => {
+    const h = parseDecimal(hours), r = parseDecimal(rate);
+    return Number.isFinite(h) && Number.isFinite(r) ? Math.round(h * r * 100) / 100 : null;
+  }, [hours, rate]);
+
   const projectNameById = useMemo(() => Object.fromEntries(projects.map((p) => [p.id, p.name])), [projects]);
 
   const unbilled = useMemo(() => entries.filter((e) => e.is_billable && !e.billed_invoice_id), [entries]);
@@ -221,77 +226,68 @@ export const TimeBillingTab: React.FC<Props> = ({ workspaceId }) => {
         <CardHeader className="border-b border-border/60 px-5 py-3">
           <CardTitle className="flex items-center gap-2"><Clock className="h-4 w-4" /> Log time</CardTitle>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-3 p-5 md:grid-cols-6">
-          <div className="space-y-1 md:col-span-2">
-            <Label className="text-xs">Customer (optional)</Label>
-            {customer ? (
-              <div className="flex items-center justify-between rounded-md border border-border/60 px-2 py-1.5 text-sm">
-                <span className="truncate">{customer.label}</span>
-                <button className="text-xs text-muted-foreground hover:text-foreground" onClick={() => setCustomer(null)}>Change</button>
+        <CardContent className="space-y-4 p-5">
+          <FormField label="What did you do?">
+            <Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. On-site measurement & consultation"
+              onKeyDown={(e) => { if (e.key === 'Enter' && !saving) void logEntry(); }} />
+          </FormField>
+          <FormGrid cols={3}>
+            <FormField label="Customer" optional>
+              {customer ? (
+                <div className="flex h-9 items-center justify-between gap-2 rounded-md border border-input bg-background px-3 text-sm">
+                  <span className="truncate">{customer.label}</span>
+                  <button type="button" className="shrink-0 text-xs text-muted-foreground hover:text-foreground" onClick={() => setCustomer(null)}>Change</button>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                  <Input className="h-9 pl-8 text-sm" placeholder="Search customer…" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  {options.length > 0 && (
+                    <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow-overlay">
+                      {options.map((o) => (
+                        <button key={`${o.type}-${o.id}`} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setCustomer(o); setSearch(''); setOptions([]); }}>{o.label}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </FormField>
+            {/* Project attribution feeds the project's job-cost card. */}
+            <FormField label="Project" optional>
+              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                <option value="">No project</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </FormField>
+            {/* Only roster employees: a member logs their own time as "Me" (#378 N1). */}
+            <FormField label="Worked By">
+              <select className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm" value={workerEmployeeId} onChange={(e) => setWorkerEmployeeId(e.target.value)}>
+                <option value="">Me</option>
+                {roster.filter((r2) => r2.kind === 'employee').map((r2) => (
+                  <option key={r2.id} value={r2.id}>{r2.name}</option>
+                ))}
+              </select>
+            </FormField>
+          </FormGrid>
+          <div className="flex flex-wrap items-end gap-3">
+            <FormField label="Date" className="w-full sm:w-44">
+              <Input type="date" className="h-9" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
+            </FormField>
+            <FormField label="Hours" className="w-[calc(50%-0.375rem)] sm:w-24">
+              <Input type="text" inputMode="decimal" className="h-9 text-right tabular-nums" value={hours} onChange={(e) => setHours(e.target.value)} />
+            </FormField>
+            <FormField label="Rate /h" className="w-[calc(50%-0.375rem)] sm:w-28">
+              <Input type="text" inputMode="decimal" className="h-9 text-right tabular-nums" value={rate} onChange={(e) => setRate(e.target.value)} />
+            </FormField>
+            <div className="ml-auto flex items-end gap-4">
+              <div className="text-right">
+                <div className="text-xs text-muted-foreground">Amount</div>
+                <div className="h-9 text-lg font-semibold leading-9 tabular-nums">{entryAmount == null ? '—' : formatMoney(entryAmount)}</div>
               </div>
-            ) : (
-              <div className="relative">
-                <Search className="absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-                <Input className="h-9 pl-7 text-sm" placeholder="Search customer…" value={search} onChange={(e) => setSearch(e.target.value)} />
-                {options.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full rounded-md border border-border/60 bg-popover shadow">
-                    {options.map((o) => (
-                      <button key={`${o.type}-${o.id}`} type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => { setCustomer(o); setSearch(''); setOptions([]); }}>{o.label}</button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-          {/* Whose hours (#378 N1). Only ROSTER rows are offered: a platform member logging their
-              own time is the default and needs no picker, while somebody with no login cannot log
-              their own and must be recorded by someone else. */}
-          <div className="space-y-1">
-            <Label className="text-xs">Worked By</Label>
-            <select
-              className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm"
-              value={workerEmployeeId}
-              onChange={(e) => setWorkerEmployeeId(e.target.value)}
-            >
-              <option value="">Me</option>
-              {roster.filter((r2) => r2.kind === 'employee').map((r2) => (
-                <option key={r2.id} value={r2.id}>{r2.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Date</Label>
-            <Input type="date" className="h-9" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Hours</Label>
-            <Input type="text" inputMode="decimal" className="h-9" value={hours} onChange={(e) => setHours(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Rate /h</Label>
-            <Input type="text" inputMode="decimal" className="h-9" value={rate} onChange={(e) => setRate(e.target.value)} />
-          </div>
-          <div className="flex items-end">
-            <Button size="sm" className="w-full" onClick={logEntry} disabled={saving}>
-              {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} Log
-            </Button>
-          </div>
-          <div className="space-y-1 md:col-span-4">
-            <Label className="text-xs">What did you do?</Label>
-            <Input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. On-site measurement & consultation" />
-          </div>
-          {/* Attributing the hours to a project is what makes them show up as labor cost in the
-              project's job-cost card. Optional — customer-only billing is unchanged. */}
-          <div className="space-y-1 md:col-span-2">
-            <Label className="text-xs">Project (optional)</Label>
-            <select
-              className="h-9 w-full rounded-md border border-border/60 bg-background px-2 text-sm"
-              value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
-            >
-              <option value="">No project</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+              <Button className="h-9 min-w-28" onClick={logEntry} disabled={saving}>
+                {saving ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />} Log time
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

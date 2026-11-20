@@ -5,7 +5,7 @@
 import {
   PieChart, ArrowDownCircle, ArrowUpCircle, Landmark, Truck, ShoppingCart, FileText, Receipt,
   FileMinus, Banknote, FileSignature, Building2, CalendarClock, Plane, Boxes, Clock, Gauge,
-  BarChart3, BookOpen, Send, Users, Bell, PackageSearch, Settings, Scale, Layers,
+  BarChart3, BookOpen, Send, Users, Bell, PackageSearch, Settings, Scale, Layers, CreditCard, Wallet, Store,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { FINANCE_TAB } from './routes';
@@ -50,14 +50,14 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
   { value: FINANCE_TAB.receivables, label: 'Receivables', icon: ArrowDownCircle, count: 'ar' },
   { value: FINANCE_TAB.payables, label: 'Payables', icon: ArrowUpCircle, count: 'ap' },
   { value: FINANCE_TAB.bankFeed, label: 'Bank Feed', icon: Landmark },
-  { value: FINANCE_TAB.supplierPortal, label: 'Supplier Portal', icon: Truck, hideForAccountant: true },
+  { value: FINANCE_TAB.supplierPortal, label: 'Supplier Portal', icon: Store, hideForAccountant: true },
 
   { value: FINANCE_TAB.orders, label: 'Orders', icon: ShoppingCart, group: 'documents', docType: 'orders' },
   { value: FINANCE_TAB.invoices, label: 'Invoices', icon: FileText, group: 'documents', docType: 'invoices' },
   { value: FINANCE_TAB.receipts, label: 'Receipts', icon: Receipt, group: 'documents', docType: 'receipts' },
   { value: FINANCE_TAB.creditNotes, label: 'Credit Notes', icon: FileMinus, group: 'documents', docType: 'credit_notes' },
   { value: FINANCE_TAB.payments, label: 'Payments', icon: Banknote, group: 'documents', docType: 'payments' },
-  { value: FINANCE_TAB.expenses, label: 'Expenses', icon: ArrowUpCircle, group: 'documents', docType: 'expenses' },
+  { value: FINANCE_TAB.expenses, label: 'Expenses', icon: Wallet, group: 'documents', docType: 'expenses' },
   // Sits next to Expenses because it is the same inbox read the other way round — by issuer
   // rather than by document. Not a `docType`: it has its own panel.
   { value: FINANCE_TAB.expenseSuppliers, label: 'By Supplier', icon: Building2, group: 'documents' },
@@ -70,7 +70,7 @@ export const FINANCE_SECTIONS: readonly FinanceSection[] = [
   { value: FINANCE_TAB.cheques, label: 'Cheques', icon: FileSignature, group: 'documents', docType: 'cheques' },
 
   { value: FINANCE_TAB.planning, label: 'Planning', icon: CalendarClock, group: 'tools' },
-  { value: FINANCE_TAB.tripCards, label: 'Expense Cards', icon: Plane, group: 'tools' },
+  { value: FINANCE_TAB.tripCards, label: 'Expense Cards', icon: CreditCard, group: 'tools' },
   { value: FINANCE_TAB.travel, label: 'Travel', icon: Plane, group: 'tools', hideForAccountant: true },
   { value: FINANCE_TAB.assets, label: 'Assets', icon: Boxes, group: 'tools' },
   { value: FINANCE_TAB.time, label: 'Time & Billing', icon: Clock, group: 'tools', hideForAccountant: true },
