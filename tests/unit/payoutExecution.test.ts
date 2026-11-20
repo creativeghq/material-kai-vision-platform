@@ -75,7 +75,7 @@ describe('the payout executor is the one implementation', () => {
    */
   it('no file anywhere still names the old table', () => {
     expect(payout).toContain("from('payout_instructions')");
-    const roots = [join(ROOT, 'supabase', 'functions'), join(ROOT, 'src'), join(ROOT, 'api')];
+    const roots = [join(ROOT, 'supabase', 'functions'), join(ROOT, 'src'), join(ROOT, 'cloudflare', 'app-worker', 'src')];
     const offenders: string[] = [];
     const walk = (dir: string) => {
       let entries: string[] = [];

@@ -20,7 +20,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 describe('profile services are finance services', () => {
   it('nothing in the codebase reads or writes the dropped user_profiles.services_detail column', () => {
-    const offenders = [...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'supabase')), ...walk(join(ROOT, 'api'))]
+    const offenders = [...walk(join(ROOT, 'src')), ...walk(join(ROOT, 'supabase')), ...walk(join(ROOT, 'cloudflare', 'app-worker', 'src'))]
       .filter((p) => readFileSync(p, 'utf8').includes('services_detail'))
       .map((p) => p.slice(ROOT.length + 1).split(sep).join('/'));
     expect(

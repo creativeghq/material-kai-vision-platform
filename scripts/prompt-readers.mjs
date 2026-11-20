@@ -60,7 +60,7 @@ const add = (type, category, file) => {
   readers.get(key).add(file.split('\\').join('/'));
 };
 
-for (const root of ['supabase/functions', 'api', 'src', 'mivaa-pdf-extractor/app']) {
+for (const root of ['supabase/functions', 'cloudflare/app-worker/src', 'src', 'mivaa-pdf-extractor/app']) {
   for (const file of walk(root)) {
     const src = readFileSync(file, 'utf8');
     if (file.endsWith('.py')) {

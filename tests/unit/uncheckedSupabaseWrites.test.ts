@@ -4,7 +4,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 
 const ROOT = process.cwd();
-const ROOTS = ['src', 'supabase/functions', 'api'];
+const ROOTS = ['src', 'supabase/functions', 'cloudflare/app-worker/src'];
 const SKIP = ['node_modules', 'integrations/supabase/types.ts', '_generated', '.deno'];
 
 /** Ratchet down as sites are fixed. NEVER raise these to make a build pass. */

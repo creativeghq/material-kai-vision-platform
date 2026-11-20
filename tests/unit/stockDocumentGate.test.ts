@@ -5,7 +5,7 @@ import { join, relative, sep } from 'node:path';
 import { stripComments as sharedStripComments, blankComments as sharedBlankComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
-const SCAN_DIRS = ['src', 'supabase/functions', 'api'];
+const SCAN_DIRS = ['src', 'supabase/functions', 'cloudflare/app-worker/src'];
 
 /**
  * The generated Supabase types are a machine projection of the schema: they DECLARE every RPC's

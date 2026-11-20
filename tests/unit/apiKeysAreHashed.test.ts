@@ -36,7 +36,7 @@ function walk(dir: string, out: string[] = []): string[] {
 // thirty of them ate real code, which is the failure mode where a guard reports green
 // because it has stopped seeing the source it guards.
 
-const SOURCE_DIRS = ['src', 'supabase/functions', 'api', 'mivaa-pdf-extractor/app'];
+const SOURCE_DIRS = ['src', 'supabase/functions', 'cloudflare/app-worker/src', 'mivaa-pdf-extractor/app'];
 
 function sourceFiles(): string[] {
   return SOURCE_DIRS.flatMap((d) => walk(join(ROOT, d)));

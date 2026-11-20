@@ -14,7 +14,7 @@ const SCAN = [
   'supabase/functions',
   'src',
   'tests/integration',
-  'api',
+  'cloudflare/app-worker/src',
 ];
 
 /** How far past a `.from()` to look for its `.select()` / `.insert()`. The hard stop at the next

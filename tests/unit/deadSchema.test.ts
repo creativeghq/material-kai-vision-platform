@@ -7,7 +7,7 @@ const ROOT = process.cwd();
 const TYPES = join(ROOT, 'src', 'integrations', 'supabase', 'types.ts');
 
 /** Roots that hold every runtime reference to a table. */
-const SOURCE_ROOTS = ['src', 'supabase/functions', 'api', 'mivaa-pdf-extractor/app', 'scripts'];
+const SOURCE_ROOTS = ['src', 'supabase/functions', 'cloudflare/app-worker/src', 'mivaa-pdf-extractor/app', 'scripts'];
 
 /**
  * Files that ENUMERATE table names rather than use them. A registry mentioning a table is not a

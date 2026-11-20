@@ -268,7 +268,7 @@ describe('email layout — one source, applied at the send chokepoint', () => {
   const senderSrc = read('supabase/functions/_shared/email-sender.ts');
 
   it('is declared exactly once in the repo', () => {
-    const copies = ['src', 'supabase/functions', 'api']
+    const copies = ['src', 'supabase/functions', 'cloudflare/app-worker/src']
       .flatMap(dir => grepFiles(dir))
       .filter(f => !f.endsWith('email-layout.ts') && !f.includes('tests'))
       .filter(f => read(f).includes('mk-content'));

@@ -63,7 +63,7 @@ function linkSites(): Array<{ file: string; tab: string }> {
       }
     }
   };
-  for (const top of ['src', 'supabase/functions', 'api']) {
+  for (const top of ['src', 'supabase/functions', 'cloudflare/app-worker/src']) {
     try { walk(join(ROOT, top)); } catch { /* optional tree */ }
   }
   return out;

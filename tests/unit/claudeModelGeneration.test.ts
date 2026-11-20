@@ -9,7 +9,7 @@ const ROOT = process.cwd();
 /** Retired or superseded ids. The current tier is Opus 5.5 / Sonnet 5.5 / Haiku 5.5. */
 const RETIRED = /claude-(?:opus-4-(?:6|7|8)|sonnet-4-(?:5|6|7)|sonnet-4-2025\d+|opus-5(?![-.\d])|sonnet-5(?![-.\d])|haiku-4-5|3(?:-[a-z0-9-]+)?|2|instant)\b/g;
 
-const ROOTS = ['src', 'supabase/functions', 'scripts', 'api'];
+const ROOTS = ['src', 'supabase/functions', 'scripts', 'cloudflare/app-worker/src'];
 const SKIP_DIRS = new Set(['node_modules', '.deno', 'dist', '.git', 'coverage']);
 /** Files whose whole job is to name the old ids. */
 const ALLOWED = new Set<string>([
