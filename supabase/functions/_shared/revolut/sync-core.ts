@@ -358,7 +358,9 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
     }
 
     const cps = await loadCounterpartyDirectory(service, cfg, issuer, all);
-    const rows = all.flatMap((tx) => (tx.legs ?? []).map((leg) => legToRow(workspaceId, tx, leg, mapping, cps)));
+    const unique = new Map(all.flatMap((tx) => (tx.legs ?? []).map((leg) => legToRow(workspaceId, tx, leg, mapping, cps)))
+      .map((r) => [r.provider_ref, r]));
+    const rows = [...unique.values()];
     let upserted = 0;
     // Chunked upserts; onConflict updates state so pending → completed transitions land.
     for (let i = 0; i < rows.length; i += 500) {
