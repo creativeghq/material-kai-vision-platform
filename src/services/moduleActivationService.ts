@@ -5,6 +5,7 @@
 // applies and either grants the entitlement or returns a Stripe checkout URL.
 import { supabase } from '@/integrations/supabase/client';
 import { edgeErrorMessage } from '@/utils/edgeError';
+import { refreshEntitlements } from '@/hooks/useEntitlements';
 
 const TIER_RANK: Record<string, number> = { free: 0, pro: 1, enterprise: 2 };
 export function tierRank(tier: string | null | undefined): number {
@@ -84,6 +85,7 @@ export async function activateModule(workspaceId: string, moduleSlug: string): P
     },
   });
   if (error) throw new Error(await edgeErrorMessage(error));
+  void refreshEntitlements(workspaceId);
   return (data ?? {}) as ActivateResult;
 }
 
@@ -111,6 +113,7 @@ export async function deactivateModule(
     body: { action: 'deactivate-module', workspace_id: workspaceId, module_slug: moduleSlug },
   });
   if (error) throw new Error(await edgeErrorMessage(error));
+  void refreshEntitlements(workspaceId);
   return (data ?? {}) as { status?: string; deactivated?: boolean };
 }
 

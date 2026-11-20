@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { refreshEntitlements } from '@/hooks/useEntitlements';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { flowEventService } from '@/services/flows/flowEventService';
 import { WORKSPACE_ROLE_META, type WorkspaceInviteRole, type WorkspaceMemberRole } from '@/auth/workspaceRoles';
@@ -311,6 +312,7 @@ export const workspaceManagementService = {
       p_workspace_id: workspaceId, p_module_slug: moduleSlug, p_enabled: enabled,
     });
     if (error) throw error;
+    void refreshEntitlements(workspaceId);
   },
 
   /** Map of workspace_id → enabled for a given module entitlement. */

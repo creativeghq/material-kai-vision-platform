@@ -233,6 +233,20 @@ await check('db.table-grants', ['DB_KEY'], async () => {
   return 'every table is granted to the roles its policies name';
 });
 
+await check('db.rls-per-row-helpers', ['DB_KEY'], async () => {
+  const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_per_row_rls_helpers`, {
+    method: 'POST',
+    headers: { apikey: DB_KEY, Authorization: `Bearer ${DB_KEY}`, 'Content-Type': 'application/json' },
+    body: '{}',
+  });
+  assert(res.ok, `rpc lint_per_row_rls_helpers → ${res.status} ${(JSON.stringify(json) || '').slice(0, 140)}`);
+  assert(Array.isArray(json), 'lint did not return an array');
+  assert(json.length === 0,
+    `${json.length} polic(ies) call a helper per row — use workspace_id IN (SELECT user_workspace_ids_with_capability(...)): `
+    + json.slice(0, 6).map((r) => `${r.table_name}.${r.policy_name} (${r.helper})`).join(', '));
+  return 'no policy re-runs a membership helper per row';
+});
+
 await check('db.definer-call-grants', ['DB_KEY'], async () => {
   const { res, json } = await http(`${SUPABASE_URL}/rest/v1/rpc/lint_definer_call_grants`, {
     method: 'POST',

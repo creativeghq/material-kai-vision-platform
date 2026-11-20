@@ -21,35 +21,76 @@ export interface EntitlementsApi {
   planName: string;
 }
 
+interface Snapshot { rows: ModuleAccessRow[]; planLevel: number; fetchedAt: number }
+
+// One read per workspace shared by every mounted hook (28 call sites each fired both RPCs).
+const STALE_MS = 60_000;
+const cache = new Map<string, Snapshot>();
+const inflight = new Map<string, Promise<Snapshot>>();
+const listeners = new Set<() => void>();
+const NO_ROWS: ModuleAccessRow[] = [];
+
+async function fetchSnapshot(workspaceId: string): Promise<Snapshot> {
+  const [access, plan] = await Promise.all([
+    supabase.rpc('get_workspace_module_access', { p_workspace_id: workspaceId }),
+    supabase.rpc('workspace_plan_level', { p_workspace_id: workspaceId }),
+  ]);
+  if (access.error) {
+    // Fail OPEN on a transient error — never strip a paid surface from a paying tenant
+    // because of a network blip. (The API/route remains the real boundary.) Not cached.
+    console.error('[useEntitlements] access fetch failed:', access.error.message || access.error);
+    return { rows: [], planLevel: typeof plan.data === 'number' ? plan.data : 0, fetchedAt: 0 };
+  }
+  return {
+    rows: (access.data ?? []) as ModuleAccessRow[],
+    planLevel: typeof plan.data === 'number' ? plan.data : 0,
+    fetchedAt: Date.now(),
+  };
+}
+
+function load(workspaceId: string, force = false): Promise<Snapshot> {
+  const hit = cache.get(workspaceId);
+  if (!force && hit && hit.fetchedAt > 0 && Date.now() - hit.fetchedAt < STALE_MS) return Promise.resolve(hit);
+  const running = inflight.get(workspaceId);
+  if (running && !force) return running;
+  const p = fetchSnapshot(workspaceId)
+    .catch((): Snapshot => ({ rows: [], planLevel: 0, fetchedAt: 0 }))
+    .then((snap) => {
+      cache.set(workspaceId, snap);
+      for (const l of listeners) l();
+      return snap;
+    })
+    .finally(() => { if (inflight.get(workspaceId) === p) inflight.delete(workspaceId); });
+  inflight.set(workspaceId, p);
+  return p;
+}
+
+/** Re-read entitlements after activating/deactivating a module so every gate sees it at once. */
+export function refreshEntitlements(workspaceId?: string): Promise<unknown> {
+  if (workspaceId) return load(workspaceId, true);
+  const ids = [...cache.keys()];
+  cache.clear();
+  return Promise.all(ids.map((id) => load(id, true)));
+}
+
 export function useEntitlements(): EntitlementsApi {
   const { activeWorkspaceId, loading: wsLoading } = useWorkspace();
-  const [rows, setRows] = useState<ModuleAccessRow[]>([]);
-  const [planLevel, setPlanLevel] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [, setTick] = useState(0);
 
   useEffect(() => {
-    if (!activeWorkspaceId) { setRows([]); setPlanLevel(0); setLoading(false); return; }
-    let cancelled = false;
-    (async () => {
-      setLoading(true);
-      const [access, plan] = await Promise.all([
-        supabase.rpc('get_workspace_module_access', { p_workspace_id: activeWorkspaceId }),
-        supabase.rpc('workspace_plan_level', { p_workspace_id: activeWorkspaceId }),
-      ]);
-      if (cancelled) return;
-      if (access.error) {
-        // Fail OPEN on a transient error — never strip a paid surface from a paying tenant
-        // because of a network blip. (The API/route remains the real boundary.)
-        console.error('[useEntitlements] access fetch failed:', access.error.message || access.error);
-        setRows([]);
-      } else {
-        setRows((access.data ?? []) as ModuleAccessRow[]);
-      }
-      setPlanLevel(typeof plan.data === 'number' ? plan.data : 0);
-      setLoading(false);
-    })();
-    return () => { cancelled = true; };
+    const onChange = () => setTick((n) => n + 1);
+    listeners.add(onChange);
+    return () => { listeners.delete(onChange); };
+  }, []);
+
+  useEffect(() => {
+    if (activeWorkspaceId) void load(activeWorkspaceId);
   }, [activeWorkspaceId]);
+
+  const snap = activeWorkspaceId ? cache.get(activeWorkspaceId) : undefined;
+  const loading = !!activeWorkspaceId && !snap;
+  const rows = snap?.rows ?? NO_ROWS;
+  const planLevel = snap?.planLevel ?? 0;
 
   return useMemo(() => {
     const available = new Set(rows.filter((r) => r.available).map((r) => r.slug));

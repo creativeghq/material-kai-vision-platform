@@ -93,6 +93,19 @@ const DOC_LABEL: Record<DocType, string> = {
   cheques: 'Cheques',
 };
 
+type DocSource = 'invoices' | 'credit_notes' | 'expenses' | 'payments' | 'delivery_notes' | 'cheques' | 'categories';
+/** What each tab renders — the loader reads these and nothing else. */
+const DOC_SOURCES: Record<DocType, DocSource[]> = {
+  invoices: ['invoices', 'categories'],
+  receipts: ['invoices', 'categories'],
+  credit_notes: ['credit_notes'],
+  expenses: ['expenses', 'categories'],
+  payments: ['payments', 'categories'],
+  delivery_notes: ['delivery_notes'],
+  cheques: ['cheques'],
+  dispatch: [],
+};
+
 const isReceipt = (docType: any) => String(docType ?? '').startsWith('11');
 const transmitted = (s: any) => s === 'accepted' || s === 'offline';
 /** myDATA states that mean the tax authority REFUSED or errored — not merely 'not sent yet'. */
@@ -287,55 +300,50 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
 
   const load = async () => {
     if (!activeWorkspaceId) return;
+    const ws = activeWorkspaceId;
     setLoading(true);
-    const inboundSeq = ++inboundFetchSeq.current;
-    inboundFetchedKey.current = JSON.stringify(inboundRangeRef.current);
+    const needs = (src: DocSource) => DOC_SOURCES[type].includes(src);
+    const inboundSeq = needs('expenses') ? ++inboundFetchSeq.current : inboundFetchSeq.current;
+    if (needs('expenses')) inboundFetchedKey.current = JSON.stringify(inboundRangeRef.current);
     try {
-      // `.catch(() => [])` on five of these made a FAILED query indistinguishable from an empty
-      // one: a payments query that errored rendered the same "No payments recorded." as a ledger
-      // with nothing in it, and the operator concluded the money was never entered. Each source
-      // still degrades independently — one failure must not blank the whole page — but it now
-      // records WHICH source failed so the table can say so.
+      // Each source degrades independently and records WHICH failed, so a failed query never
+      // renders as an empty ledger. Only the open tab's sources are read.
       const failed: Record<string, string> = {};
       const guard = <T,>(key: string, pr: Promise<T>, empty: T): Promise<T> =>
         pr.catch((e: any) => { failed[key] = e?.message ?? 'could not be loaded'; return empty; });
-      const [inv, cn, inb, pmts, dns, chq, cats, links] = await Promise.all([
-        // Paged client-side below, so the fetch cap is a safety ceiling, not a page size —
-        // 200 silently hid older documents once a workspace crossed it.
-        financeService.listInvoices({ workspaceId: activeWorkspaceId, limit: 1000 }),
-        financeService.listCreditNotes({ workspaceId: activeWorkspaceId }),
-        guard('expenses', inboundService.list(activeWorkspaceId, inboundRangeRef.current), { rows: [] as InboundDocument[], total: 0 }),
-        guard('payments', financeService.listPayments({ workspaceId: activeWorkspaceId, limit: 1000 }), [] as any[]),
-        guard('delivery_notes', deliveryNotesService.list(activeWorkspaceId), [] as any[]),
-        guard('cheques', chequesService.list(activeWorkspaceId), [] as any[]),
-        guard('categories', financeCategoriesService.list(activeWorkspaceId), [] as FinanceCategory[]),
-        // A ΔΑ and the ΤΙΜ that bills it. Guarded like the rest: a correlation we could not load
-        // must leave the row saying "Needs detail" — which is true — rather than blanking the tab.
-        guard('document_links', inboundService.linkSummary(activeWorkspaceId), {} as Record<string, InboundLinkSummary>),
+      const skip = <T,>(v: T) => Promise.resolve(v);
+      const [inv, cn, scn, inb, pmts, dns, chq, cats, links, rec] = await Promise.all([
+        // Paged client-side, so the fetch cap is a safety ceiling, not a page size.
+        needs('invoices') ? financeService.listInvoices({ workspaceId: ws, limit: 1000 }) : skip(null),
+        needs('credit_notes') ? financeService.listCreditNotes({ workspaceId: ws }) : skip(null),
+        needs('credit_notes') ? financeService.listSupplierCreditNotes({ workspaceId: ws }).catch(() => [] as SupplierCreditNote[]) : skip(null),
+        needs('expenses') ? guard('expenses', inboundService.list(ws, inboundRangeRef.current), { rows: [] as InboundDocument[], total: 0 }) : skip(null),
+        needs('payments') ? guard('payments', financeService.listPayments({ workspaceId: ws, limit: 1000 }), [] as any[]) : skip(null),
+        needs('delivery_notes') ? guard('delivery_notes', deliveryNotesService.list(ws), [] as any[]) : skip(null),
+        needs('cheques') ? guard('cheques', chequesService.list(ws), [] as any[]) : skip(null),
+        needs('categories') ? guard('categories', financeCategoriesService.list(ws), [] as FinanceCategory[]) : skip(null),
+        // A correlation we could not load leaves the row saying "Needs detail", which is true.
+        needs('expenses') ? guard('document_links', inboundService.linkSummary(ws), {} as Record<string, InboundLinkSummary>) : skip(null),
+        // Bill templates only: a plan template would claim to generate a categorised bill.
+        needs('expenses') ? financeService.listRecurringExpenses(ws).catch(() => [] as RecurringExpense[]) : skip(null),
       ]);
       setLoadErrors(failed);
-      // Recurring templates — Expenses tab only.
-      if (type === 'expenses') {
-        setRecurring((await financeService.listRecurringExpenses(activeWorkspaceId).catch(() => [] as RecurringExpense[]))
-          // Bill templates only. A plan template here would be described as generating a
-          // categorised bill each period, with an Auto-pay column it can never use.
-          .filter((r) => r.creates !== 'plan'));
+      if (rec) setRecurring(rec.filter((r) => r.creates !== 'plan'));
+      if (cats) {
+        setCategories(cats);
+        setCategoryMap(Object.fromEntries(cats.map((c) => [c.id, c.name])));
       }
-      setCategories(cats ?? []);
-      setCategoryMap(Object.fromEntries((cats ?? []).map((c) => [c.id, c.name])));
-      setInvoices(inv);
-      setCreditNotes(cn);
-      setSupplierCreditNotes(
-        await financeService.listSupplierCreditNotes({ workspaceId: activeWorkspaceId }).catch(() => [] as SupplierCreditNote[]),
-      );
-      if (inboundSeq === inboundFetchSeq.current) {
+      if (inv) setInvoices(inv);
+      if (cn) setCreditNotes(cn);
+      if (scn) setSupplierCreditNotes(scn);
+      if (inb && inboundSeq === inboundFetchSeq.current) {
         setInbound(inb.rows);
         setInboundTotal(inb.total);
       }
-      setInboundLinks(links);
-      setPayments(pmts);
-      setDeliveryNotes(dns);
-      setCheques(chq);
+      if (links) setInboundLinks(links);
+      if (pmts) setPayments(pmts);
+      if (dns) setDeliveryNotes(dns);
+      if (chq) setCheques(chq);
     } catch (err: any) {
       toast({ title: 'Failed to load documents', description: err?.message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -444,7 +452,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
   useEffect(() => {
     inboundRangeRef.current = { issuedFrom, issuedTo };
     const key = JSON.stringify(inboundRangeRef.current);
-    if (!activeWorkspaceId || key === inboundFetchedKey.current) return;
+    if (!activeWorkspaceId || type !== 'expenses' || key === inboundFetchedKey.current) return;
     inboundFetchedKey.current = key;
     const seq = ++inboundFetchSeq.current;
     inboundService.list(activeWorkspaceId, inboundRangeRef.current)
@@ -458,7 +466,7 @@ const DocumentsPage: React.FC<{ embeddedType: DocType }> = ({ embeddedType }) =>
         if (seq !== inboundFetchSeq.current) return;
         setLoadErrors((prev) => ({ ...prev, expenses: e?.message ?? 'could not be loaded' }));
       });
-  }, [activeWorkspaceId, issuedFrom, issuedTo]);
+  }, [activeWorkspaceId, issuedFrom, issuedTo, type]);
 
   const rows = activeRows as Invoice[];
   const filteredInbound = activeRows as InboundDocument[];
