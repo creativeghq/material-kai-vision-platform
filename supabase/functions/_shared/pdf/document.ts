@@ -321,6 +321,7 @@ function drawClientPage(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, font: PDF
 }
 
 // ── List (table) layout ───────────────────────────────────────────────────────
+const TOTALS_H = 122;
 function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: PDFImage | null, itemImages: Record<string, PDFImage>, font: PDFFont, fontBold: PDFFont): number {
   type Row = { kind: 'section'; title: string } | { kind: 'item'; item: BrandedDocItem; num: number };
   const rows: Row[] = [];
@@ -337,7 +338,7 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
 
   let pages = 0, idx = 0;
   while (idx < rows.length || pages === 0) {
-    const page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
+    let page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]);
     pages++;
     drawPageBackground(page, g, bgImage);
 
@@ -357,16 +358,21 @@ function drawListPages(pdfDoc: PDFDocument, g: Geom, doc: BrandedDoc, bgImage: P
         y -= g.DATA_ROW_H; idx++; drawn++; alt = 0;
         continue;
       }
-      const rowH = tableRowHeight(g, row.item, cols, font, fontBold);
+      const thumb = itemImages[row.item.image_key ?? ''] ?? null;
+      const rowH = tableRowHeight(g, row.item, cols, font, fontBold, !!thumb);
       if (drawn > 0 && y - rowH < floor) break;
-      drawTableRow(page, g, y, rowH, row.num, row.item, alt % 2 === 1, cols, doc.currency, font, fontBold, itemImages[row.item.image_key ?? ''] ?? null);
+      drawTableRow(page, g, y, rowH, row.num, row.item, alt % 2 === 1, cols, doc.currency, font, fontBold, thumb);
       y -= rowH; idx++; drawn++; alt++;
     }
 
     page.drawLine({ start: { x: g.TABLE_MARGIN, y }, end: { x: g.TABLE_MARGIN + g.TABLE_W, y }, thickness: 0.5, color: COLOR_LIGHT_GRAY });
 
     if (idx >= rows.length) {
-      if (doc.totals) { drawTotals(page, g, doc.totals, y, font, fontBold); y -= 122; }
+      if (doc.totals) {
+        // Totals that would cross the template footer start a page of their own.
+        if (y - TOTALS_H < floor) { page = pdfDoc.addPage([g.PAGE_W, g.PAGE_H]); pages++; drawPageBackground(page, g, bgImage); y = g.TABLE_Y_START; }
+        drawTotals(page, g, doc.totals, y, font, fontBold); y -= TOTALS_H;
+      }
       let tail = page;
       if (doc.terms?.trim()) {
         const r = drawTerms(pdfDoc, g, page, y, doc.terms, bgImage, font, fontBold);
@@ -421,10 +427,10 @@ function wrappedCell(item: BrandedDocItem, key: ColumnKey, w: number, font: PDFF
   }
 }
 
-function tableRowHeight(g: Geom, item: BrandedDocItem, cols: ColumnSpec[], font: PDFFont, fontBold: PDFFont): number {
+function tableRowHeight(g: Geom, item: BrandedDocItem, cols: ColumnSpec[], font: PDFFont, fontBold: PDFFont, hasThumb: boolean): number {
   let lines = 1;
   for (const col of cols) lines = Math.max(lines, wrappedCell(item, col.key, col.width, font, fontBold)?.length ?? 1);
-  const thumbH = cols.some((c) => c.key === 'thumb') ? g.IMG_CELL + 8 : 0;
+  const thumbH = hasThumb && cols.some((c) => c.key === 'thumb') ? g.IMG_CELL + 8 : 0;
   return Math.max(g.DATA_ROW_H, thumbH, lines * ROW_LINE_H + 2 * ROW_V_PAD);
 }
 
