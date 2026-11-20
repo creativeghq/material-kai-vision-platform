@@ -2,6 +2,8 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+// @ts-expect-error — plain ESM .js with no type declarations.
+import { SPA_ROUTE } from '../../cloudflare/app-worker/src/index.js';
 
 const ROOT = join(__dirname, '..', '..');
 
@@ -64,15 +66,10 @@ describe('manualChunks pins nothing optional into the eager payload', () => {
 });
 
 describe('the SPA catch-all serves real routes and 404s the scanner surface', () => {
-  const vercelConfig = JSON.parse(readFileSync(join(ROOT, 'vercel.json'), 'utf8')) as {
-    rewrites: Array<{ source: string; destination: string }>;
-  };
+  const re = SPA_ROUTE;
 
-  const spa = vercelConfig.rewrites.find((r) => r.destination === '/index.html');
-  const re = new RegExp('^' + spa!.source + '$');
-
-  it('has a catch-all rewrite to the app shell', () => {
-    expect(spa, 'vercel.json lost its SPA rewrite — every client-side route would 404').toBeDefined();
+  it('has a catch-all rule to the app shell', () => {
+    expect(re, 'the Worker lost its SPA rule — every client-side route would 404').toBeInstanceOf(RegExp);
   });
 
   // Every one of these is a real client-side route. A miss here is a 404 shown to a

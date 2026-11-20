@@ -7,7 +7,7 @@ Complete technical architecture of Material Kai Vision Platform.
 ## 🏗️ Three-Tier Architecture
 
 ┌─────────────────────────────────────────────────────────────┐
-│ FRONTEND TIER (Vercel Edge Network)                         │
+│ FRONTEND TIER (Cloudflare Worker + static assets)           │
 │ React 18 + TypeScript + Vite + Shadcn/UI                   │
 │ - Materials Catalog                                         │
 │ - Search Hub (Semantic, Vector, Hybrid, Visual)            │
@@ -56,7 +56,7 @@ Complete technical architecture of Material Kai Vision Platform.
 
 **Key Design**: Frontend calls MIVAA directly (no proxy Edge Functions)
 
-Frontend (Vercel)
+Frontend (Cloudflare Worker)
     ↓
     └─→ MIVAA API (v1api.materialshub.gr)
             ↓
@@ -275,7 +275,7 @@ py` code, `Settings. Only the `VisionProvider.
 ### Horizontal Scaling
 
 **Frontend**:
-- Vercel Edge Network (global CDN)
+- Cloudflare Workers static assets (global edge)
 - Auto-scaling
 - 99.99% uptime SLA
 
@@ -365,7 +365,7 @@ py` code, `Settings. Only the `VisionProvider.
 - Vite
 - Shadcn/ui
 - TailwindCSS
-- Vercel deployment
+- Cloudflare Workers deployment
 
 **Backend**:
 - FastAPI
@@ -388,7 +388,7 @@ py` code, `Settings. Only the `VisionProvider.
 - OpenAI API (optional alternative — GPT-4o/GPT-5; not vision)
 
 **Infrastructure**:
-- Vercel (Frontend)
+- Cloudflare Workers (Frontend)
 - Self-hosted server (Backend)
 - Supabase (Database)
 - Supabase Storage (Images)

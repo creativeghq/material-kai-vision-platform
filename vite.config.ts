@@ -65,7 +65,7 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       'process.env.NODE_ENV': JSON.stringify(mode),
-      // Supabase environment variables (supports both NEXT_PUBLIC_ prefix from Vercel and direct naming)
+      // Supabase environment variables (the legacy NEXT_PUBLIC_ names are still accepted)
       'process.env.SUPABASE_URL': JSON.stringify(env.SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL),
       'process.env.SUPABASE_ANON_KEY': JSON.stringify(env.SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
       // MIVAA environment variables
@@ -132,7 +132,7 @@ export default defineConfig(({ mode }) => {
               // PDF generation (dynamically imported on button click)
               'jspdf': 'vendor-pdf',
               'html2canvas': 'vendor-pdf',
-              // Utility libraries. Renamed from `vendor-utils` on 2026-09-11: a Vercel edge node
+              // Utility libraries. Renamed from `vendor-utils` on 2026-09-11: an edge node
               // was serving a cached 404 for `vendor-utils-Da9XzF8z.js` while the file was
               // present at origin and served 200 everywhere else. The entry bundle imports this
               // chunk STATICALLY, so that one poisoned cache entry killed the whole app on the

@@ -214,7 +214,7 @@ Common issues and solutions for Material Kai Vision Platform.
 - OpenAPI Schema: `/openapi.json`
 
 **Monitoring**:
-- Vercel Dashboard: https://vercel.com/dashboard
+- Cloudflare Dashboard (Worker `materialshub-app`): https://dash.cloudflare.com
 - Supabase Dashboard: https://app.supabase.com
 - Server Logs: SSH to v1api.materialshub.gr
 

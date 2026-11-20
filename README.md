@@ -45,7 +45,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Framework**: React 18 + TypeScript + Vite
 - **UI**: Tailwind CSS + Headless UI
 - **State**: React Query + Context API
-- **Deployment**: Vercel
+- **Deployment**: Cloudflare Worker (`materialshub-app`) + static assets
 - **URL**: https://materialshub.gr
 
 #### **Backend**
@@ -75,7 +75,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 ```
 ┌─────────────────┐
 │   Frontend      │
-│  (Vercel)       │
+│ (CF Worker)     │
 │  materialshub.gr│
 └────────┬────────┘
          │
@@ -154,9 +154,10 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 #### **Frontend (.env)**
 ```bash
-VITE_SUPABASE_URL=https://your-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your_anon_key
-VITE_MIVAA_API_URL=https://v1api.materialshub.gr
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+VITE_STRIPE_PRO_PRICE_ID=price_...
+VITE_STRIPE_ENTERPRISE_PRICE_ID=price_...
 ```
 
 #### **Backend (.env)**
@@ -510,7 +511,7 @@ This project is proprietary software owned by Creative GHQ.
 - **Voyage AI**: voyage-4 text embeddings
 - **WorldLabs**: Marble 3D Gaussian Splat generation
 - **Supabase**: Database and backend infrastructure
-- **Vercel**: Frontend hosting and deployment
+- **Cloudflare Workers**: Frontend hosting and deployment (`cloudflare/app-worker`)
 
 ---
 

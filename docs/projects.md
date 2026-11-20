@@ -349,8 +349,8 @@ guarded by [tests/unit/projectCover.test.ts](../tests/unit/projectCover.test.ts)
    the project is ABOUT: the name first (EN + Greek stems, accents folded), then the description,
    the category (`renovation`, `trip`, `warehouse`, `real_estate`), the most common room type,
    else the materials flat-lay. A room word beats a venue beats a dwelling beats the kind of work,
-   so "Villa Kavouri — kitchen" is a kitchen. `/covers` is excluded from the SPA catch-all in
-   `vercel.json`; without that every asset would 200 as `index.html`.
+   so "Villa Kavouri — kitchen" is a kitchen. `/covers` is excluded from the Worker routes via
+   `run_worker_first` in `cloudflare/app-worker/wrangler.jsonc`; without that every asset would 200 as `index.html`.
 
 The storage half is registered in `build_storage_reference_set()` (absolute URLs only — a library
 path is not a storage claim), see [storage-buckets.md](storage-buckets.md).

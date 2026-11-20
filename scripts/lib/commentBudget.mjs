@@ -348,7 +348,7 @@ export function findOverBudget(source, fileName = 'file.tsx') {
 /** Directories no rule should ever read: vendored, generated, or another repo. */
 export const SCAN_SKIP_DIRS = new Set([
   'node_modules', '.git', 'dist', 'build', '.next', 'out', 'coverage', '.nyc_output',
-  '.venv', 'venv', '__pycache__', '.turbo', '.vercel', 'deployed', 'mivaa-pdf-extractor',
+  '.venv', 'venv', '__pycache__', '.turbo', 'deployed', 'mivaa-pdf-extractor',
   '.ruru', 'public', 'storybook-static', '.cache', '.idea', '.vscode', 'docs',
 ]);
 

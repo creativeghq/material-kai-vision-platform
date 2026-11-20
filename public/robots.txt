@@ -17,7 +17,7 @@
 #      token IS the credential; an indexed one is a public document.
 #
 # This file is advisory. Scanners probing for /wp-login.php and /.env do not
-# read it — those are handled by the rewrite exclusions in vercel.json, which
+# read it — those are handled by the app Worker (cloudflare/app-worker), which
 # return a real 404 instead of the 5.5 KB app shell.
 
 # ── Search indexes and answer engines ───────────────────────────────────────────

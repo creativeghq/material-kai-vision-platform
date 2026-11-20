@@ -84,7 +84,7 @@ describe('the boot watchdog', () => {
   it('asks the NETWORK before wiping the device', () => {
     const at = html.indexOf('function check()');
     const block = html.slice(at, html.indexOf('function probeEntry', at));
-    // A bundle refused at the edge (Vercel Attack Challenge Mode, 2026-09-11), a 5xx, a captive
+    // A bundle refused at the edge (a firewall challenge, 2026-09-11), a 5xx, a captive
     // portal and a dead connection all present as "did not boot". Purging there signs the user
     // out to repair a fault that was never on their device, and does not fix it either.
     const probeAt = block.indexOf('probeEntry()');
@@ -172,7 +172,7 @@ describe('the diagnostics page tells the truth', () => {
   it('reports the chunk STATUS, because onerror only ever says "no"', () => {
     // 403 is blocked at the edge, 404 is a stale build reference, 200 means look elsewhere —
     // "FAILED to load" distinguishes none of them, which is the whole question.
-    expect(diag).toContain('x-vercel-mitigated');
+    expect(diag).toContain('cf-mitigated');
     expect(diag).toMatch(/HTTP ' \+ q\.status/);
   });
 
@@ -188,8 +188,8 @@ describe('the diagnostics page tells the truth', () => {
     // Transient / half-propagated is a different answer from "the file is really gone", and the
     // first request must stay the exact URL the module graph asks for.
     expect(block).toContain('firstFail');
-    expect(block).toContain('x-vercel-id');
-    expect(block).toContain('x-vercel-cache');
+    expect(block).toContain('cf-ray');
+    expect(block).toContain('cf-cache-status');
     // A chunk that answers only on the cache-bust is still a failed chunk — the plain URL is the
     // one the module graph asks for, so the row must read red rather than a reassuring 200.
     expect(block).toContain('q.status !== 200 || firstFail');

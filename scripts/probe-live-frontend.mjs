@@ -1,9 +1,9 @@
 /**
  * Probe the LIVE hostname, the way a visitor reaches it — no bypass secret, every asset.
  *
- * `fe-smoke` tests the unaliased *.vercel.app candidate with VERCEL_AUTOMATION_BYPASS_SECRET,
- * and that bypass skips the firewall, so it reported green through two total outages on
- * 2026-09-11. Neither was visible from the candidate URL.
+ * `fe-smoke` tests a version's preview URL, which never passes the live hostname's DNS or
+ * firewall, so it can be green while visitors are blocked — as it was through two total outages
+ * on 2026-09-11. Neither was visible from the candidate URL.
  *
  * Usage: node scripts/probe-live-frontend.mjs [origin]
  */
@@ -15,15 +15,15 @@ const BACKOFF_MS = 5000;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const bust = (url) => url + (url.includes('?') ? '&' : '?') + 'probe=' + Date.now() + Math.random().toString(36).slice(2);
 
-/** A challenge is a 200-shaped outage: the body is Vercel's, not ours. */
+/** A challenge is a 200-shaped outage: the body is Cloudflare's, not ours. */
 function mitigation(res) {
-  return res.headers.get('x-vercel-mitigated') || '';
+  return res.headers.get('cf-mitigated') || '';
 }
 
 async function get(url) {
   const res = await fetch(url, { redirect: 'manual', headers: { 'user-agent': 'materialshub-live-probe' } });
   const body = res.status === 200 ? await res.text() : '';
-  return { status: res.status, mitigated: mitigation(res), body, edge: res.headers.get('x-vercel-id') || '' };
+  return { status: res.status, mitigated: mitigation(res), body, edge: res.headers.get('cf-ray') || '' };
 }
 
 const failures = [];
@@ -42,7 +42,7 @@ async function main() {
   console.log(`  document        HTTP ${doc.status}${doc.mitigated ? ` [BLOCKED: ${doc.mitigated}]` : ''} · ${doc.body.length} bytes · ${doc.edge}`);
 
   if (doc.mitigated) {
-    note(`the edge is challenging visitors (x-vercel-mitigated: ${doc.mitigated}) — the site is unreachable, turn off Attack Challenge Mode`);
+    note(`the edge is challenging visitors (cf-mitigated: ${doc.mitigated}) — the site is unreachable, check Cloudflare Security → WAF / Bot Fight Mode`);
   }
   if (doc.status !== 200) {
     note(`document returned HTTP ${doc.status}`);

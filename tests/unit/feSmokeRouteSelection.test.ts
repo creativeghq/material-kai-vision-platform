@@ -34,7 +34,7 @@ describe('selectRoutes', () => {
   });
 
   it.each([
-    'package-lock.json', 'vite.config.ts', 'index.html', 'vercel.json', 'tailwind.config.ts',
+    'package-lock.json', 'vite.config.ts', 'index.html', 'cloudflare/app-worker/src/index.js', 'public/_headers', 'tailwind.config.ts',
     'tests/e2e/routeList.mjs', 'playwright.config.ts', 'public/sw.js', '.github/content-audit-baseline.json',
   ])('runs everything when global file %s changes', (f) => {
     expect(selectRoutes({ routes, changed: [f], record }).all).toBe(true);

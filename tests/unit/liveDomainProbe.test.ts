@@ -3,8 +3,8 @@
  *
  * On 2026-09-11 `fe-smoke` reported green through two separate total outages of
  * app.materialshub.gr — a firewall challenge answering every request 403, and a pruned
- * deployment orphaning a static vendor chunk — because it probes the unaliased *.vercel.app
- * candidate with VERCEL_AUTOMATION_BYPASS_SECRET, and that bypass skips the firewall.
+ * deployment orphaning a static vendor chunk — because it probes a candidate URL that never
+ * passes the live hostname's firewall.
  */
 import { describe, it, expect } from 'vitest';
 import fs from 'node:fs';
@@ -28,12 +28,12 @@ describe('the live-domain probe', () => {
   it('carries NO bypass secret — that is what blinded fe-smoke', () => {
     const at = workflow.indexOf('node scripts/probe-live-frontend.mjs');
     const step = workflow.slice(Math.max(0, at - 1200), at + 200);
-    expect(step).not.toContain('VERCEL_AUTOMATION_BYPASS_SECRET');
-    expect(probe).not.toContain('VERCEL_AUTOMATION_BYPASS_SECRET');
+    expect(step).not.toMatch(/BYPASS_SECRET/);
+    expect(probe).not.toMatch(/BYPASS_SECRET/);
   });
 
   it('fails on an edge challenge, which is a 403 wearing a 200-shaped page', () => {
-    expect(probe).toContain('x-vercel-mitigated');
+    expect(probe).toContain('cf-mitigated');
   });
 
   it('checks every asset the document references, not just the document', () => {

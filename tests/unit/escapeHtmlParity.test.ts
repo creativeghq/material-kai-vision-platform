@@ -75,7 +75,7 @@ describe('escapeHtml — canonical twins agree', () => {
 });
 
 /**
- * The Vercel twin is a `.js` file that Vercel compiles on its own — nothing else in the repo
+ * The Worker twin is a `.js` file that only the Worker bundles — nothing else in the repo
  * would notice if it were deleted or renamed, and kb-prerender would then fall back to a fresh
  * hand-rolled copy. Pin the import so that regression fails here rather than in production HTML.
  */

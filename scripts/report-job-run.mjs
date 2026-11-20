@@ -5,7 +5,7 @@
  * schedule, so without this row a disabled or silently-skipped workflow looks exactly like a
  * healthy one. Read back by dic_detect__ops_external_job_stalled at /admin/data-health.
  *
- * @example node scripts/report-job-run.mjs vercel-storage-prune succeeded '{"deleted":12}'
+ * @example node scripts/report-job-run.mjs storage-orphan-cleanup succeeded '{"deleted":12}'
  * @requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY — the RPC is granted to service_role only.
  */
 

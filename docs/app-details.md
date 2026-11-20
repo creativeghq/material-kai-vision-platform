@@ -66,7 +66,7 @@ Every step — ingestion, search, design, visualization, procurement — runs on
 
 | Layer | Technology | Hosting |
 |-------|-----------|---------|
-| Frontend | React 18 + TypeScript + Vite + Shadcn/UI | Vercel Edge Network (global CDN) |
+| Frontend | React 18 + TypeScript + Vite + Shadcn/UI | Cloudflare Worker + static assets (global edge) |
 | Backend API | FastAPI + Python 3.11 (MIVAA service) | Dedicated server (DigitalOcean) |
 | Database | Supabase PostgreSQL 15 + pgvector 0.8.0 | Supabase managed cloud |
 | Edge Functions | 30+ Deno/TypeScript functions | Supabase managed cloud |
@@ -77,7 +77,7 @@ Every step — ingestion, search, design, visualization, procurement — runs on
 - API Docs: `v1api.materialshub.gr/docs`
 
 **Scale characteristics:**
-- Frontend served via Vercel global edge — zero latency regardless of user geography
+- Frontend served from Cloudflare's global edge (Workers static assets)
 - Backend handles unlimited async job queue with checkpoint-based recovery
 - Database uses connection pooling and optimized halfvec (float16) vector indexes
 - 170+ API endpoints, 20 categories, 60+ Supabase Edge Functions, fully documented via OpenAPI/Swagger
@@ -641,7 +641,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 **Blended gross margin target on AI costs: 60–70%.** Highest margin on high-frequency, low-cost operations (query parsing, embeddings). Thinner margins on high-cost generation (VR, image gen) where pass-through pricing builds user trust.
 
 **Fixed infrastructure costs:**
-- Vercel: Included in Vercel plan at current scale (global CDN, zero egress cost)
+- Cloudflare Workers: static assets free and unmetered; only Worker invocations (non-static paths) count
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
 - Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. vision is now Anthropic-only via Claude Opus 5 tool use.

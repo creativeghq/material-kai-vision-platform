@@ -33,7 +33,6 @@ import {
   Search,
   Target,
   Server,
-  Triangle,
   ShieldCheck,
   Mail,
   Cog,
@@ -48,7 +47,7 @@ import { formatNumber } from '@/utils/decimal';
 interface AIServiceHealth {
   // `unknown` is a first-class state, not a rounding of `healthy`. An unreachable check is the
   // single most important thing a health surface can say, and this dashboard said `healthy`
-  // (Vercel) or `unhealthy` ("Check unavailable" — a claim about the service, from a failure of
+  // (hosting) or `unhealthy` ("Check unavailable" — a claim about the service, from a failure of
   // the checker) instead. (#365 AD-1/AD-3)
   status: 'healthy' | 'unhealthy' | 'unknown';
   message?: string;
@@ -115,7 +114,6 @@ interface HealthStatus {
     paddleocr?: AIServiceHealth;
     voyage_ai?: AIServiceHealth;
     supabase?: AIServiceHealth;
-    vercel?: AIServiceHealth;
   };
   timestamp: string;
 }
@@ -123,7 +121,7 @@ interface HealthStatus {
 /**
  * Cloudflare's three surfaces. Each is checked a different way because each fails differently, and
  * two of them can be genuinely unmeasurable — so `unknown` is a real state here, never rounded up
- * to healthy. That rounding is `AD-1`, the Vercel light that was green whether Vercel was up or not.
+ * to healthy. That rounding is `AD-1`, the hosting light that was green whether the host was up or not.
  */
 interface CloudflareCheck {
   status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
@@ -250,7 +248,6 @@ export const SystemHealthMonitor: React.FC = () => {
       const voyageResult      = edgeResults?.voyage_ai   ?? null;
       const embeddingsResult  = edgeResults?.embeddings  ?? null;
       const aiServicesResult  = edgeResults?.ai_services ?? null;
-      const vercelResult      = edgeResults?.vercel      ?? null;
       const cloudflareResult  = (edgeResults?.cloudflare ?? null) as CloudflareHealth | null;
       setCloudflare(cloudflareResult);
 
@@ -309,9 +306,6 @@ export const SystemHealthMonitor: React.FC = () => {
         embeddings: fromCheck(embeddingsResult),
         ai_services: fromCheck(aiServicesResult),
         supabase: { status: supabaseHealthy ? 'healthy' : 'unhealthy', message: supabaseHealthy ? 'Database connected' : 'Connection failed' },
-        // Was hard-coded `{ status: 'healthy', message: 'Platform operational' }` — green whether
-        // Vercel was up or down. `health-check` now HEADs the app's own origin. (#365 AD-1)
-        vercel: fromCheck(vercelResult),
       };
 
       // Derive overall status from real checks.
@@ -961,19 +955,6 @@ export const SystemHealthMonitor: React.FC = () => {
                   <span className="text-sm font-medium text-foreground">Supabase</span>
                 </div>
                 {health.ai_services.supabase?.status === 'healthy' ? (
-                  <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
-                ) : (
-                  <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>
-                )}
-              </div>
-
-              {/* Vercel */}
-              <div className="flex items-center justify-between p-3 bg-card border border-hairline rounded-sm">
-                <div className="flex items-center gap-2">
-                  <Triangle className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                  <span className="text-sm font-medium text-foreground">Vercel</span>
-                </div>
-                {health.ai_services.vercel?.status === 'healthy' ? (
                   <Badge variant="success"><CheckCircle2 className="h-3 w-3 mr-1" />Active</Badge>
                 ) : (
                   <Badge variant="error"><XCircle className="h-3 w-3 mr-1" />Offline</Badge>

@@ -37,7 +37,6 @@ dist-meta
 *.njsproj
 *.sln
 *.sw?
-.vercel
 .env*.local
 nul
 .mcp.json

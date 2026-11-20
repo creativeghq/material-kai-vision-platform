@@ -188,7 +188,7 @@
 
 **[deployment-guide.md](deployment-guide.md)** - Production deployment
 - Deployment architecture
-- Frontend (Vercel)
+- Frontend (Cloudflare Worker)
 - Backend (Self-hosted)
 - Database (Supabase)
 - CI/CD pipeline
@@ -372,7 +372,7 @@ The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#1
 - **90%+** material recognition accuracy
 
 ### Technology Stack
-- **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Vercel
+- **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Cloudflare Workers
 - **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 - **Database**: PostgreSQL 15, pgvector, Supabase
 - **AI**: Claude Opus 5 (vision tool use) / Sonnet 5 (chunking) / Haiku 4.5 (classifiers); Voyage AI voyage-4 (sole text + understanding embedder); PaddleOCR-VL 1.6 (Modal — layout + OCR backbone); SLIG SigLIP2 (5×768D visual); GPT-4o/GPT-5 optional alternatives
@@ -398,7 +398,7 @@ The multi-tenant business suite (#207/#208/#185/#206/#201/#196/#195/#212/#174/#1
 - OpenAPI Schema: `/openapi.json`
 
 **Dashboards**:
-- Vercel: https://vercel.com/dashboard
+- Cloudflare (Worker `materialshub-app`): https://dash.cloudflare.com
 - Supabase: https://app.supabase.com
 - Server: SSH to v1api.materialshub.gr
 

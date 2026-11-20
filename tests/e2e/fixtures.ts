@@ -1,9 +1,8 @@
 import { test as base, devices, type BrowserContext } from '@playwright/test';
-import { bypassHeaders } from './vercelBypass';
 
 export const SMOKE_BASE_URL = process.env.SMOKE_BASE_URL || 'https://app.materialshub.gr';
 
-// One context per WORKER so the HTTP cache spans routes: a cold app load costs ~45 Vercel edge requests.
+// One context per WORKER so the HTTP cache spans routes: a cold app load is ~45 requests.
 export const test = base.extend<object, { sharedContext: BrowserContext }>({
   sharedContext: [
     async ({ browser }, use) => {
@@ -12,7 +11,6 @@ export const test = base.extend<object, { sharedContext: BrowserContext }>({
         ...desktop,
         baseURL: SMOKE_BASE_URL,
         storageState: 'tests/e2e/.auth/state.json',
-        extraHTTPHeaders: bypassHeaders(SMOKE_BASE_URL),
         ignoreHTTPSErrors: true,
       });
       context.setDefaultNavigationTimeout(30_000);

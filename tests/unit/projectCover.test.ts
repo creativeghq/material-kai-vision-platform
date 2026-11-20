@@ -5,6 +5,8 @@
 import { describe, expect, it } from 'vitest';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+// @ts-expect-error — plain ESM .js with no type declarations.
+import { SPA_ROUTE } from '../../cloudflare/app-worker/src/index.js';
 
 import {
   PROJECT_COVER_CONCEPTS,
@@ -43,10 +45,7 @@ describe('the cover library', () => {
   });
 
   it('is served as a static file: the SPA catch-all leaves /covers alone', () => {
-    const vercel = JSON.parse(read('vercel.json')) as { rewrites: Array<{ source: string; destination: string }> };
-    const spa = vercel.rewrites.find((r) => r.destination === '/index.html');
-    expect(spa).toBeDefined();
-    const re = new RegExp('^' + spa!.source + '$');
+    const re = SPA_ROUTE as RegExp;
     expect(re.test('/covers/projects/kitchen.webp'), '/covers is being rewritten to index.html').toBe(false);
     // …and a real route is still a route.
     expect(re.test('/projects')).toBe(true);

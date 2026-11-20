@@ -50,7 +50,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Frontend**:
 - React 18 + TypeScript + Vite
 - Shadcn/ui + TailwindCSS
-- Deployed on Vercel Edge Network
+- Deployed as a Cloudflare Worker with static assets
 - Real-time updates via Supabase subscriptions
 
 **Backend**:
@@ -467,7 +467,7 @@ The platform uses **7 embedding types** for comprehensive search:
 ### Scalability
 
 - **Database**: Auto-scaling with connection pooling
-- **Frontend**: Global Edge Network (Vercel)
+- **Frontend**: Global edge network (Cloudflare Workers)
 - **API**: Docker containerized with horizontal scaling
 - **Storage**: Unlimited (Supabase)
 

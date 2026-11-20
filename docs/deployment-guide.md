@@ -30,36 +30,27 @@ Set these in **GitHub repo > Settings > Secrets and variables > Actions**.
 |------------|------|------------------|-------------|----------------|
 | `SUPABASE_ACCESS_TOKEN` | **Secret** | `deploy.yml`, `update-supabase-types.yml` | Supabase CLI access token for deploying edge functions and generating types | `sbp_xxxxxxxxxxxxxxxx` |
 | `SUPABASE_PROJECT_ID` | **Secret** | `deploy.yml`, `update-supabase-types.yml` | Supabase project reference ID | `bgbavxtjlbvgplozizxu` |
-| `VERCEL_TOKEN` | **Secret** | `deploy.yml` | Vercel deployment token | `xxxxxxxxxxxxxxxxxxxxxxxxx` |
-| `VERCEL_ORG_ID` | Public | `deploy.yml` | Vercel organization ID | `team_xxxxxxxxxxxxxxxx` |
-| `VERCEL_PROJECT_ID` | Public | `deploy.yml` | Vercel project ID | `prj_xxxxxxxxxxxxxxxx` |
+| `CLOUDFLARE_API_TOKEN` | **Secret** | `deploy.yml` | Cloudflare API token used by `wrangler` to upload and promote the `materialshub-app` Worker | `xxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `CLOUDFLARE_ACCOUNT_ID` | Public | `deploy.yml` | Cloudflare account that owns the Worker | `xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx` |
+| `SUPABASE_URL` / `SUPABASE_ANON_KEY` | Public | `deploy.yml` (`build-frontend`) | Baked into the frontend bundle at build time | see Supabase Secrets |
 | `GH_TOKEN` | **Secret** | `ai-changelog-update.yml`, `deploy-docs.yml` | GitHub personal access token (cross-repo access) | `ghp_xxxxxxxxxxxxxxxxxxxx` |
 | `OPENAI_API_KEY` | **Secret** | `ai-changelog-update.yml` | OpenAI API key for AI-powered changelog analysis | `sk-proj-xxxxxxxxxxxxxxxx` |
 | `SSH_PRIVATE_KEY` | **Secret** | Backend deployment (manual/orchestrated) | SSH key for MIVAA server deployment | `-----BEGIN OPENSSH PRIVATE KEY-----...` |
 | `SSH_HOST` | Public | Backend deployment (manual/orchestrated) | Server hostname | `v1api.materialshub.gr` |
 | `SSH_USER` | Public | Backend deployment (manual/orchestrated) | SSH username | `root` or `deploy` |
 
-### **Vercel Environment Variables**
+### **Frontend Build Variables**
 
-Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` prefixed vars are exposed to the frontend at build time via `import.meta.env.VITE_*`.
+The frontend is a static Vite build; its variables are baked in at `npm run build` time in the `build-frontend` job of `deploy.yml`. There is no hosting-side environment store — these four are the only variables the bundle reads.
 
-> **Important**: Variable names must match exactly as listed below (with `VITE_` prefix). The frontend code reads them via `import.meta.env.VITE_SUPABASE_URL`, not `import.meta.env.SUPABASE_URL`.
+| Variable Name | Where Set | Description | Example/Format |
+|------------|-----------|-------------|----------------|
+| `SUPABASE_URL` | GitHub secret | Supabase project URL (exposed as `process.env.SUPABASE_URL` via `define` in `vite.config.ts`) | `https://bgbavxtjlbvgplozizxu.supabase.co` |
+| `SUPABASE_ANON_KEY` | GitHub secret | Supabase anonymous/publishable key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
+| `VITE_STRIPE_PRO_PRICE_ID` | GitHub repo variable | Stripe price ID for Pro subscription | `price_...` |
+| `VITE_STRIPE_ENTERPRISE_PRICE_ID` | GitHub repo variable | Stripe price ID for Enterprise subscription | `price_...` |
 
-| Variable Name | Type | Environment | Description | Example/Format |
-|------------|------|-------------|-------------|----------------|
-| `VITE_SUPABASE_URL` | Public | Production, Preview | Supabase project URL | `https://bgbavxtjlbvgplozizxu.supabase.co` |
-| `VITE_SUPABASE_ANON_KEY` | Public | Production, Preview | Supabase anonymous/publishable key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `VITE_MIVAA_API_URL` | Public | Production, Preview | MIVAA Python backend URL (PDF processing, AI metrics, images) | `https://v1api.materialshub.gr` |
-| `VITE_MIVAA_SERVICE_URL` | Public | Production, Preview | MIVAA service URL (PDF upload progress) | `https://v1api.materialshub.gr` |
-| `VITE_MIVAA_GATEWAY_URL` | Public | Production, Preview | MIVAA gateway URL (admin temp file cleanup) | `https://v1api.materialshub.gr` |
-| `VITE_WS_URL` | Public | Production, Preview | WebSocket URL for real-time features | `wss://bgbavxtjlbvgplozizxu.supabase.co/realtime/v1` |
-| `VITE_STRIPE_PRO_PRICE_ID` | Public | Production, Preview | Stripe price ID for Pro subscription | `price_...` |
-| `VITE_STRIPE_ENTERPRISE_PRICE_ID` | Public | Production, Preview | Stripe price ID for Enterprise subscription | `price_...` |
-| `VITE_MIVAA_API_KEY` | **Secret** | Production, Preview | MIVAA API authentication key for frontend requests | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `NODE_ENV` | Public | Production | Node environment | `production` |
-| `VITE_DEBUG` | Public | Production, Preview | Debug mode | `false` (production), `true` (preview) |
-
-> **Source**: These variables are type-defined in [`src/vite-env.d.ts`](../src/vite-env.d.ts) and consumed throughout `src/services/` and `src/components/`.
+The Worker itself (`cloudflare/app-worker`) has its own runtime config for the sitemap and knowledge-base prerender: `SUPABASE_URL` as a `var` in `wrangler.jsonc`, and `SUPABASE_ANON_KEY` as a Worker secret (`npx wrangler@4 secret put SUPABASE_ANON_KEY`).
 
 ### **Backend/MIVAA Service Secrets**
 
@@ -84,7 +75,7 @@ Set these in **Vercel > Project Settings > Environment Variables**. All `VITE_` 
 | `REPLICATE_API_TOKEN` | **Secret** | Server ENV | Replicate API token | `r8_xxxxxxxxxxxxxxxx` |
 | `FIRECRAWL_API_KEY` | **Secret** | Server ENV | Firecrawl API key for price scraping | `fc-xxxxxxxxxxxxxxxx` |
 | `SENTRY_DSN` | **Secret** | Server ENV | Sentry error tracking DSN | `https://xxxxx@xxxxx.ingest.sentry.io/xxxxx` |
-| `CORS_ORIGINS` | Public | Server ENV | Allowed CORS origins | `https://your-domain.com,https://preview.vercel.app` |
+| `CORS_ORIGINS` | Public | Server ENV | Allowed CORS origins | `https://app.materialshub.gr,https://materialshub-app.broad-smoke-1567.workers.dev` |
 | `ENVIRONMENT` | Public | Server ENV | Environment name | `production`, `staging`, `development` |
 | `DEBUG` | Public | Server ENV | Debug mode | `false` (production), `true` (development) |
 | `LOG_LEVEL` | Public | Server ENV | Logging level | `ERROR`, `WARNING`, `INFO`, `DEBUG` |
@@ -474,11 +465,11 @@ Used by the `vies-validate` edge function (mounted in `src/components/core/Profi
 
 Add these secrets: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CREDITS_PRODUCT_ID`, `STRIPE_PRO_PRICE_ID`, and `STRIPE_ENTERPRISE_PRICE_ID`.
 
-### **Step 5: Configure Vercel Environment Variables**
+### **Step 5: Configure the Frontend Build Variables**
 
-**Go to:** https://vercel.com/creativeghq/material-kai-vision-platform/settings/environment-variables
+**Go to:** GitHub repo → Settings → Secrets and variables → Actions → **Variables**
 
-Add `VITE_STRIPE_PRO_PRICE_ID` and `VITE_STRIPE_ENTERPRISE_PRICE_ID` for ALL environments (Production, Preview, Development).
+Add `VITE_STRIPE_PRO_PRICE_ID` and `VITE_STRIPE_ENTERPRISE_PRICE_ID` as repository variables. The next `build-frontend` run bakes them into the bundle; locally, put them in `.env`.
 
 ### **Step 6: Test the Integration**
 
@@ -518,14 +509,14 @@ Add `VITE_STRIPE_PRO_PRICE_ID` and `VITE_STRIPE_ENTERPRISE_PRICE_ID` for ALL env
 
 The Material Kai Vision Platform uses a multi-service deployment strategy:
 
-1. **Frontend**: Vercel (Static hosting + Edge functions)
+1. **Frontend**: Cloudflare Worker `materialshub-app` with static assets (`app.materialshub.gr`)
 2. **MIVAA Service**: Systemd service with UV (Self-hosted server)
 3. **Database**: Supabase (Managed PostgreSQL)
 4. **External APIs**: Third-party services (OpenAI, Anthropic, Voyage AI, Modal, Replicate, WorldLabs)
 
 ## 🏗️ Infrastructure Overview
 
-**Production Environment**: Vercel Frontend (Static + Edge) connects to MIVAA Service (Systemd + UV) and Supabase (Database + Auth). MIVAA Service also connects to External APIs (OpenAI, Anthropic, Voyage AI, Modal).
+**Production Environment**: Cloudflare Worker frontend (static assets + Worker) connects to MIVAA Service (Systemd + UV) and Supabase (Database + Auth). MIVAA Service also connects to External APIs (OpenAI, Anthropic, Voyage AI, Modal).
 
 **Development Environment**: Local Frontend (localhost:5173) connects to Local MIVAA (localhost:8000) and Supabase Cloud (Shared Instance). Local MIVAA also connects to the shared Supabase Cloud instance.
 
@@ -533,23 +524,37 @@ The Material Kai Vision Platform uses a multi-service deployment strategy:
 
 ### Production Environment Variables
 
-**Frontend variables** (set in Vercel Production Environment): `NODE_ENV=production`, `VITE_DEBUG=false`, the Supabase URL and anon key with `VITE_` prefix, the three MIVAA service URLs (`VITE_MIVAA_API_URL`, `VITE_MIVAA_SERVICE_URL`, `VITE_MIVAA_GATEWAY_URL`) all pointing to `https://v1api.materialshub.gr`, the WebSocket URL, and the two Stripe price IDs.
+**Frontend variables**: baked in at build time from GitHub — see [Frontend Build Variables](#frontend-build-variables).
 
 **MIVAA Service variables** (set in deployment platform): `ENVIRONMENT=production`, `DEBUG=false`, `LOG_LEVEL=ERROR`, `HOST=0.0.0.0`, `PORT=8000`, the Supabase URL and both keys, `JWT_SECRET_KEY`, `CORS_ORIGINS`, rate limit settings (`RATE_LIMIT_REQUESTS=50`, `RATE_LIMIT_WINDOW=60`), performance settings (`MAX_WORKERS=4`, `CACHE_TTL=3600`, `DATABASE_POOL_SIZE=20`), and monitoring settings (`SENTRY_DSN`, `LOG_FILE`).
 
-## 📦 Frontend Deployment (Vercel)
+## 📦 Frontend Deployment (Cloudflare Worker)
 
-### Vercel Configuration
+### Worker Configuration
 
-**File**: `vercel.json` — configures the build command (`npm run build`), output directory (`dist`), framework (`vite`), and security headers. Static assets under `/assets/` get a one-year immutable cache. All routes get `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, and `X-XSS-Protection: 1; mode=block` headers.
+**Worker**: `materialshub-app`, configured in `cloudflare/app-worker/wrangler.jsonc`, code in `cloudflare/app-worker/src/`:
+- `index.js` — routing: returns the SPA shell for app routes and a real 404 for missing files and scanner paths (`/.env`, `/wp-login.php`, …).
+- `sitemap.js` — `/sitemap.xml`.
+- `kbPrerender.js` — `/knowledge-base/:slug` SEO prerender.
+- `html.js` — the HTML escaper (invariant 11 twin).
+
+**Static files** from `dist/` are served by Workers static assets, which is free and not metered. The Worker runs only for non-static paths (`run_worker_first` with exclusions for `/assets/*`, `/fonts/*`, etc.).
+
+**Headers and redirects**: cache and security headers live in `public/_headers` (one-year immutable cache on `/assets/*`, `nosniff`, `X-Frame-Options: DENY`, HSTS, report-only CSP); the `/documentation` → `/documentation/` redirect is in `public/_redirects`.
+
+**Domain**: `app.materialshub.gr` is a custom domain attached to the Worker (Cloudflare zone `materialshub.gr`). The workers.dev URL is `materialshub-app.broad-smoke-1567.workers.dev`.
 
 ### Deployment Steps
 
-1. **Connect Repository**: Install the Vercel CLI (`npm install -g vercel`), log in with `vercel login`, and link the project with `vercel link`.
+1. **CI (normal path)**: push to `main`. `deploy.yml` runs `build-frontend` → `deploy-frontend` (`wrangler versions upload` — a preview URL that serves no users) → `fe-smoke` (Playwright against that preview URL) → `promote` (`wrangler versions deploy <id>@100%`, then `scripts/probe-live-frontend.mjs` against `app.materialshub.gr`).
 
-2. **Configure Environment Variables**: Use `vercel env add` to set each `VITE_` prefixed variable for the production environment, including `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_MIVAA_API_URL`, `VITE_MIVAA_SERVICE_URL`, `VITE_MIVAA_GATEWAY_URL`, `VITE_WS_URL`, `VITE_STRIPE_PRO_PRICE_ID`, and `VITE_STRIPE_ENTERPRISE_PRICE_ID`.
+2. **Manual deploy**: `npm run build`, then in `cloudflare/app-worker` run `npx wrangler@4 deploy`.
 
-3. **Deploy**: Run `vercel --prod` for a manual production deploy, or push to `main` to trigger automatic deployment via Git.
+3. **Worker secret** (once): `npx wrangler@4 secret put SUPABASE_ANON_KEY` in `cloudflare/app-worker`.
+
+4. **Rollback**: `npx wrangler@4 rollback`, or `npx wrangler@4 versions deploy <older-id>@100%`.
+
+> Moved from Vercel on 2026-11-20: Vercel Hobby disabled the project after 1M edge requests in 30 days, driven by CI smoke runs.
 
 ### Build Optimization
 
@@ -738,7 +743,7 @@ All deployment results are displayed on the main GitHub Action page with:
 
 #### **Required Secrets by Workflow**
 
-**`deploy.yml`** (Frontend & Supabase Functions deployment): requires `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, and `VERCEL_PROJECT_ID`.
+**`deploy.yml`** (Frontend & Supabase Functions deployment): requires `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL` and `SUPABASE_ANON_KEY` (secrets), plus the `VITE_STRIPE_PRO_PRICE_ID` / `VITE_STRIPE_ENTERPRISE_PRICE_ID` repo variables.
 
 **`ai-changelog-update.yml`** (AI-powered changelog on PR merge): requires `GH_TOKEN` and `OPENAI_API_KEY`.
 
@@ -803,7 +808,7 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
 
 ### GitHub Actions Workflow
 
-**File**: `.github/workflows/deploy.yml` — a workflow named "Deploy to Production" triggered on push to `main`. It runs a `test` job (checkout, Node setup, `npm ci`, `npm test`, `npm run build`) and two deployment jobs that depend on `test`: `deploy-frontend` (using the Vercel GitHub Action with prod flag) and `deploy-backend` (using the SSH action to pull the latest code, install dependencies with UV, and restart the systemd service).
+**File**: `.github/workflows/deploy.yml` — a workflow named "Deploy to Production" triggered on push to `main`. It runs a `test` job (checkout, Node setup, `npm ci`, `npm test`, `npm run build`) and two deployment jobs that depend on `test`: the frontend chain `build-frontend` → `deploy-frontend` (`wrangler versions upload`) → `fe-smoke` (Playwright on the preview URL) → `promote` (`wrangler versions deploy <id>@100%` + live probe), and `deploy-backend` (using the SSH action to pull the latest code, install dependencies with UV, and restart the systemd service).
 
 ### ⚠️ GitHub Actions Security Notes
 
@@ -832,7 +837,7 @@ Use UFW to set default deny for incoming, default allow for outgoing, then expli
 
 2. **Environment Variable Mismatch**:
    - **Problem**: Different env vars between environments
-   - **Solution**: Configure environment-specific variables in Vercel (Production/Preview/Development)
+   - **Solution**: Frontend variables come only from the GitHub secrets/variables read by `build-frontend` (and `.env` locally); the Worker's own config is in `wrangler.jsonc` + `wrangler secret`
 
 3. **CORS Errors**:
    - **Problem**: Frontend can't connect to backend
@@ -884,7 +889,7 @@ To roll back the MIVAA service: SSH into the server at `root@165.227.31.109`, na
 - Backup strategy in place
 
 ### Deployment
-- Frontend deployed to Vercel
+- Frontend Worker version promoted (`promote` job green, live probe passing)
 - Backend deployed to production server
 - Database schema updated
 - Health checks passing
@@ -1187,20 +1192,14 @@ This section covers all third-party services used by the platform, their pricing
 
 ---
 
-### ☁️ Vercel (Frontend Hosting)
+### ☁️ Cloudflare Workers (Frontend Hosting)
 
-**Role**: Frontend hosting, edge network, and preview deployments.
+**Role**: Frontend hosting (Worker `materialshub-app` + static assets), custom domain `app.materialshub.gr`, and per-version preview URLs used by CI smoke.
 
-**Dashboard**: https://vercel.com
-**Pricing**: https://vercel.com/pricing
+**Dashboard**: https://dash.cloudflare.com
+**Pricing**: https://developers.cloudflare.com/workers/platform/pricing/
 
-#### Plans
-
-| Plan | Price | Bandwidth | Build minutes |
-|------|-------|-----------|---------------|
-| **Hobby** | $0/month | 100 GB | 6,000 min/month |
-| **Pro** | $20/month per member | 1 TB | 24,000 min/month |
-| **Enterprise** | Custom | Custom | Custom |
+Static asset requests are free and unmetered; only Worker invocations (non-static paths, roughly one per page load) count against the Workers request allowance.
 
 ---
 
@@ -1284,7 +1283,7 @@ Credits are refunded on generation failure.
 | **OpenAI** | $5–$20 | Embeddings + changelog |
 | **Voyage AI** | $5–$30 | Embedding volume |
 | **Supabase** | $25–$75 | Pro + storage add-ons |
-| **Vercel** | $20/member | Pro plan |
+| **Cloudflare Workers** | $0–$5 | Static assets free; Worker requests only |
 | **Modal** | $5–$20 | SLIG + PaddleOCR-VL GPU endpoints, scale-to-zero ($0 idle) |
 | **Firecrawl** | $16–$83 | Depends on scraping volume |
 | **DataForSEO** | $10–$50 | Depends on SEO pipeline usage |

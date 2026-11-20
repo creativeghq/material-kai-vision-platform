@@ -36,6 +36,10 @@ interface CloudflareConfig {
   workerName: string;
 }
 
+/** cloudflare/app-worker/wrangler.jsonc `name`, and the hostname it serves. */
+const APP_WORKER_NAME = 'materialshub-app';
+const APP_URL = 'https://app.materialshub.gr';
+
 const EMPTY_CLOUDFLARE_CONFIG: CloudflareConfig = {
   turnstileSecret: '', inboundDomain: '', apiToken: '', accountId: '',
   workerName: 'inbound-email-worker',
@@ -72,8 +76,8 @@ interface ExternalResult extends ServiceResult {
 
 /**
  * Cloudflare checks carry `unknown` because two of the three can genuinely be unmeasurable, and
- * #365 `AD-1` is precisely what happens when that state gets rounded to `healthy`: a Vercel light
- * that was green whether Vercel was up or down. Not configured is NOT healthy.
+ * #365 `AD-1` is precisely what happens when that state gets rounded to `healthy`: a hosting light
+ * that was green whether the host was up or down. Not configured is NOT healthy.
  */
 interface CloudflareCheck {
   status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
@@ -366,7 +370,7 @@ async function checkCloudflareWorkers(cfg: CloudflareConfig): Promise<Cloudflare
       };
     }
 
-    const want = cfg.workerName;
+    const wants = [cfg.workerName, APP_WORKER_NAME];
     const scripts = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/workers/scripts`,
       { headers: auth, signal: AbortSignal.timeout(8000) },
@@ -381,18 +385,32 @@ async function checkCloudflareWorkers(cfg: CloudflareConfig): Promise<Cloudflare
         error: `Token is valid but the Workers list was refused (HTTP ${scripts.status}) — check the token's permissions`,
       };
     }
-    const found = (scriptsJson.result ?? []).find((r) => r.id === want);
-    if (!found) {
+    const deployed = scriptsJson.result ?? [];
+    const missing = wants.filter((w) => !deployed.some((r) => r.id === w));
+    if (missing.length > 0) {
       return {
         status: 'unhealthy', latency_ms,
-        error: `Worker "${want}" is not deployed on this account — inbound mail has nothing to invoke`,
-        detail: { deployed: (scriptsJson.result ?? []).map((r) => r.id).filter(Boolean) },
+        error: `Worker(s) not deployed on this account: ${missing.join(', ')}`,
+        detail: { deployed: deployed.map((r) => r.id).filter(Boolean) },
+      };
+    }
+    // Deployed is not serving: the app Worker must also answer on its own hostname.
+    const app = await fetch(APP_URL, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(8000) })
+      .then((r) => r.status)
+      .catch(() => 0);
+    const detail = {
+      workers: wants.map((w) => ({ name: w, modified_on: deployed.find((r) => r.id === w)?.modified_on ?? null })),
+      app_http_status: app,
+    };
+    if (app === 0 || app >= 400) {
+      return {
+        status: 'unhealthy', latency_ms: Date.now() - start, detail,
+        error: `${APP_URL} ${app === 0 ? 'is unreachable' : `returned HTTP ${app}`}`,
       };
     }
     return {
-      status: 'healthy', latency_ms,
-      message: `Worker "${want}" deployed`,
-      detail: { modified_on: found.modified_on ?? null, worker_count: (scriptsJson.result ?? []).length },
+      status: 'healthy', latency_ms: Date.now() - start, detail,
+      message: `Workers ${wants.join(', ')} deployed; ${APP_URL} serving (${app})`,
     };
   } catch (e) {
     return { status: 'unhealthy', latency_ms: Date.now() - start, error: e instanceof Error ? e.message : String(e) };
@@ -447,31 +465,6 @@ function worstCloudflareStatus(parts: CloudflareCheck[]): CloudflareCheck['statu
   let worst: CloudflareCheck['status'] = 'healthy';
   for (const p of parts) if (rank[p.status] > rank[worst]) worst = p.status;
   return worst;
-}
-
-/**
- * The deployed frontend itself. `SystemHealthMonitor` used to render Vercel as a hard-coded
- * `{ status: 'healthy', message: 'Platform operational' }` — a health indicator that was green
- * whether Vercel was up or down (#365 `AD-1`). A HEAD against the app's own origin is the check
- * that light was always claiming to be.
- */
-async function checkVercel(): Promise<ExternalResult & { message?: string }> {
-  const url = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
-  const start = Date.now();
-  try {
-    const res = await fetch(url, { method: 'HEAD', redirect: 'manual', signal: AbortSignal.timeout(8000) });
-    const latency_ms = Date.now() - start;
-    if (res.status >= 500) {
-      return { status: 'unhealthy', latency_ms, http_status: res.status, error: `Deployment returned ${res.status}` };
-    }
-    return { status: 'healthy', latency_ms, http_status: res.status, message: `Serving ${url} (${res.status})` };
-  } catch (e) {
-    return {
-      status: 'unhealthy',
-      latency_ms: Date.now() - start,
-      error: e instanceof Error ? e.message : 'Unreachable',
-    };
-  }
 }
 
 async function checkExternalService(url: string): Promise<ExternalResult> {
@@ -590,7 +583,7 @@ serve(withApiLogging('health-check', async (req) => {
 
   const [
     claude, slig, paddleocr, voyage_ai,
-    embeddings, ai_services, vercel,
+    embeddings, ai_services,
     turnstile, emailRoutingMx, workers, inboundSpool, inboundDelivery,
     ...externalResults
   ] = await Promise.all([
@@ -601,7 +594,6 @@ serve(withApiLogging('health-check', async (req) => {
     checkVoyageAI(),
     checkPythonEndpoint('/api/embeddings/health'),
     checkPythonEndpoint('/api/v1/ai-services/health'),
-    checkVercel(),
     checkTurnstile(cfConfig),
     checkEmailRoutingMx(cfConfig),
     checkCloudflareWorkers(cfConfig),
@@ -642,7 +634,7 @@ serve(withApiLogging('health-check', async (req) => {
   if (cronMode) {
     const core: Array<[string, { status: string; latency_ms: number; error?: string; message?: string; detail?: unknown }]> = [
       ['claude', claude], ['voyage_ai', voyage_ai],
-      ['mivaa.embeddings', embeddings], ['mivaa.ai_services', ai_services], ['vercel', vercel],
+      ['mivaa.embeddings', embeddings], ['mivaa.ai_services', ai_services],
       ['cloudflare.turnstile', turnstile], ['cloudflare.email_routing', emailRoutingMx], ['cloudflare.workers', workers],
       ['cloudflare.inbound_spool', inboundSpool],
     ];
@@ -654,7 +646,7 @@ serve(withApiLogging('health-check', async (req) => {
 
   return new Response(JSON.stringify({
     claude, slig, paddleocr, voyage_ai,
-    embeddings, ai_services, vercel,
+    embeddings, ai_services,
     cloudflare,
     external,
     timestamp: new Date().toISOString(),

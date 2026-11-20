@@ -1,6 +1,5 @@
 import { chromium, type FullConfig } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { bypassHeaders } from './vercelBypass';
 
 // Logs the smoke account in via the real /auth form once, saves the storage state, and all
 // route-load tests reuse it. Using the UI (not token injection) guarantees the session is in
@@ -20,11 +19,7 @@ export default async function globalSetup(_config: FullConfig) {
   }
 
   const browser = await chromium.launch();
-  // Its own context: without the bypass header here the login hits the SSO wall.
-  const page = await browser.newPage({
-    ignoreHTTPSErrors: true,
-    extraHTTPHeaders: bypassHeaders(baseURL),
-  });
+  const page = await browser.newPage({ ignoreHTTPSErrors: true });
   await page.goto(`${baseURL}/auth`, { waitUntil: 'domcontentloaded' });
 
   // The auth page defaults to the Sign Up tab — activate Sign In if its field isn't visible.
@@ -32,22 +27,14 @@ export default async function globalSetup(_config: FullConfig) {
   if (!(await emailField.isVisible().catch(() => false))) {
     await page.getByRole('tab', { name: /sign in/i }).click().catch(() => {});
   }
-  // Say WHERE we ended up when the form never appears. The first gated run failed here with a
-  // bare "locator #signin-email not visible" timeout, which is consistent with the app being
-  // slow, the markup changing, OR the deployment-protection bypass not working and Vercel's
-  // login page being served instead — three very different problems, indistinguishable from
-  // the message. The landed URL and title tell them apart immediately.
+  // Say WHERE we ended up when the form never appears: a slow app, changed markup and an edge
+  // challenge page are indistinguishable from a bare locator timeout.
   try {
     await emailField.waitFor({ state: 'visible', timeout: 15_000 });
   } catch (err) {
     const landedOn = page.url();
     const title = await page.title().catch(() => '(no title)');
     console.error(`[smoke] sign-in form not found.\n  landed on: ${landedOn}\n  title: ${title}`);
-    if (/vercel\.com\/(login|sso)/.test(landedOn)) {
-      console.error('[smoke] That is Vercel\'s deployment-protection wall — the bypass header ' +
-        'did not take effect. Check VERCEL_AUTOMATION_BYPASS_SECRET against the project\'s ' +
-        'current Protection Bypass for Automation value.');
-    }
     throw err;
   }
   await emailField.fill(email);

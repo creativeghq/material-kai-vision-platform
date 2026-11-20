@@ -165,9 +165,9 @@
         var head = function (h) {
           try { return q.getResponseHeader(h) || ''; } catch (e) { return ''; }
         };
-        var mitigated = head('x-vercel-mitigated');
-        var edge = head('x-vercel-id');
-        var cache = head('x-vercel-cache');
+        var mitigated = head('cf-mitigated');
+        var edge = head('cf-ray');
+        var cache = head('cf-cache-status');
 
         // A 404 on one chunk is the whole failure — retry it past the cache before reporting,
         // so the line says whether it is transient or real.

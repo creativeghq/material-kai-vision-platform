@@ -332,7 +332,7 @@
          * A bundle that never DOWNLOADED is not a broken client. An edge challenge, a 5xx, a
          * captive portal and a dead connection all present as "the app did not boot" — and
          * purging there signs the user out to repair a fault that was never on their device.
-         * Vercel Attack Challenge Mode did exactly that on 2026-09-11. Ask the network first.
+         * An edge firewall challenge did exactly that on 2026-09-11. Ask the network first.
          */
         function probeEntry() {
           // The whole initial graph, not just the entry. A STATIC import that 404s takes the
