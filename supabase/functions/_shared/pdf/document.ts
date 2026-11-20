@@ -23,7 +23,7 @@ type Align = 'left' | 'right' | 'center';
 interface ColumnSpec { key: ColumnKey; label: string; width: number; align: Align; }
 const LIST_COLUMNS: ColumnSpec[] = [
   { key: 'index', label: '#', width: 20, align: 'left' },
-  { key: 'thumb', label: '', width: 30, align: 'center' },
+  { key: 'thumb', label: '', width: 50, align: 'center' },
   { key: 'sku', label: 'Code', width: 30, align: 'left' },
   { key: 'name', label: 'Description', width: 170, align: 'left' },
   { key: 'room', label: 'Room', width: 50, align: 'left' },
@@ -69,7 +69,7 @@ function computeGeom(PAGE_W: number, PAGE_H: number): Geom {
   const HEADER_ROW_H = 26;
   const DATA_ROW_H = 30;
   const ROWS_PER_PAGE = Math.max(4, Math.floor((TABLE_Y_START - HEADER_ROW_H - BOTTOM_GAP) / DATA_ROW_H));
-  return { PAGE_W, PAGE_H, MARGIN, MARGIN_TOP: 60, CONTENT_W, TABLE_MARGIN, TABLE_W, TABLE_Y_START, HEADER_ROW_H, DATA_ROW_H, ROWS_PER_PAGE, IMG_CELL: 26 };
+  return { PAGE_W, PAGE_H, MARGIN, MARGIN_TOP: 60, CONTENT_W, TABLE_MARGIN, TABLE_W, TABLE_Y_START, HEADER_ROW_H, DATA_ROW_H, ROWS_PER_PAGE, IMG_CELL: 72 };
 }
 
 /** A cell value counts as "present" when it's non-empty and not a bare placeholder. */
@@ -424,7 +424,8 @@ function wrappedCell(item: BrandedDocItem, key: ColumnKey, w: number, font: PDFF
 function tableRowHeight(g: Geom, item: BrandedDocItem, cols: ColumnSpec[], font: PDFFont, fontBold: PDFFont): number {
   let lines = 1;
   for (const col of cols) lines = Math.max(lines, wrappedCell(item, col.key, col.width, font, fontBold)?.length ?? 1);
-  return Math.max(g.DATA_ROW_H, lines * ROW_LINE_H + 2 * ROW_V_PAD);
+  const thumbH = cols.some((c) => c.key === 'thumb') ? g.IMG_CELL + 8 : 0;
+  return Math.max(g.DATA_ROW_H, thumbH, lines * ROW_LINE_H + 2 * ROW_V_PAD);
 }
 
 function drawTableRow(page: PDFPage, g: Geom, y: number, rowH: number, rowNum: number, item: BrandedDocItem, isAlt: boolean, cols: ColumnSpec[], currency: string, font: PDFFont, fontBold: PDFFont, thumb: PDFImage | null): void {
@@ -441,7 +442,7 @@ function drawTableRow(page: PDFPage, g: Geom, y: number, rowH: number, rowNum: n
     const w = col.width;
     switch (col.key) {
       case 'index': drawInCell(page, String(rowNum), x, w, textY, fs, font, COLOR_GRAY, col.align); break;
-      case 'thumb': if (thumb) { const s = Math.min(g.IMG_CELL / thumb.width, g.IMG_CELL / thumb.height); const iw = thumb.width * s, ih = thumb.height * s; page.drawImage(thumb, { x: x + (w - iw) / 2, y: y - rowH / 2 - ih / 2, width: iw, height: ih }); } break;
+      case 'thumb': if (thumb) { const cell = Math.min(g.IMG_CELL, w - 8); const s = Math.min(cell / thumb.width, cell / thumb.height); const iw = thumb.width * s, ih = thumb.height * s; page.drawImage(thumb, { x: x + (w - iw) / 2, y: y - rowH / 2 - ih / 2, width: iw, height: ih }); } break;
       case 'name': drawLines(wrappedCell(item, 'name', w, font, fontBold)!, x, w, fontBold, COLOR_BLACK, col.align); break;
       case 'room': drawLines(wrappedCell(item, 'room', w, font, fontBold)!, x, w, font, COLOR_BLACK, col.align); break;
       case 'sku': drawLines(wrappedCell(item, 'sku', w, font, fontBold)!, x, w, font, COLOR_GRAY, col.align); break;
