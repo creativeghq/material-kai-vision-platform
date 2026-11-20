@@ -23,6 +23,7 @@ import { callRevolutApi } from '@/modules/banking-revolut/services/revolutConfig
 import { ImportStatementDialog } from '@/modules/finance/components/ImportStatementDialog';
 import { TablePagination, TABLE_PAGE_SIZE, clampPage } from '@/components/core/ui/table-pagination';
 import { formatDate } from '@/utils/datetime';
+import { formatMoney } from '@/utils/decimal';
 import { inboundService, type BankLineDocCandidate } from '@/modules/finance/services/inboundService';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
 import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVocabulary';
@@ -126,7 +127,6 @@ const PROFILE_LABEL: Record<string, string> = { business: 'Business', personal: 
 const compactIban = (iban: string) => iban.replace(/\s/g, '');
 const ibanTail = (iban: string) => `${compactIban(iban).slice(0, 4)} … ${compactIban(iban).slice(-4)}`;
 const shortId = (id: string | null) => (id ? id.slice(0, 8) : '—');
-const money = (n: number, ccy: string) => `${n.toFixed(2)} ${ccy}`;
 
 const MatchBadge: React.FC<{ row: FeedRow }> = ({ row }) => {
   if (row.provider !== 'revolut') {
@@ -818,7 +818,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
               <div className="space-y-3">
                 <SheetHeader>
                   <SheetTitle className="font-sans">
-                    {detail.direction === 'in' ? '+' : '−'}{money(Number(detail.amount), detail.currency)}
+                    {detail.direction === 'in' ? '+' : '−'}{formatMoney(Number(detail.amount), detail.currency)}
                   </SheetTitle>
                   <SheetDescription className="flex flex-wrap items-center gap-2">
                     <span>{typeLabel(detail.type)} · {detail.direction === 'in' ? 'Money In' : 'Money Out'}</span>
@@ -863,12 +863,12 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
 
                 <DetailSection title="Money">
                   <DetailRow label="Account" value={acct?.name} />
-                  <DetailRow label="Amount" value={money(Number(detail.amount), detail.currency)} />
+                  <DetailRow label="Amount" value={formatMoney(Number(detail.amount), detail.currency)} />
                   {f.billAmount !== null && f.billCurrency && f.billCurrency !== detail.currency && (
-                    <DetailRow label="Original Amount" value={money(f.billAmount, f.billCurrency)} />
+                    <DetailRow label="Original Amount" value={formatMoney(f.billAmount, f.billCurrency)} />
                   )}
-                  <DetailRow label="Fee" value={f.fee !== null ? money(f.fee, detail.currency) : null} />
-                  <DetailRow label="Balance After" value={f.balanceAfter !== null ? money(f.balanceAfter, detail.currency) : null} />
+                  <DetailRow label="Fee" value={f.fee !== null ? formatMoney(f.fee, detail.currency) : null} />
+                  <DetailRow label="Balance After" value={f.balanceAfter !== null ? formatMoney(f.balanceAfter, detail.currency) : null} />
                 </DetailSection>
 
                 <DetailSection title="Reconciliation">
