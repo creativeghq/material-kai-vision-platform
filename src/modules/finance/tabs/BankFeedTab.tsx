@@ -94,13 +94,24 @@ function lineFacts(r: FeedRow) {
   const merchant = obj(raw?.merchant);
   const card = obj(raw?.card);
   const bill = num(leg?.bill_amount);
+  const cardBrand = str(raw?.card_brand);
+  const last4 = str(raw?.card_last4);
   return {
     description: str(leg?.description),
-    fee: num(leg?.fee),
+    fee: num(leg?.fee) ?? num(raw?.fee),
+    net: num(raw?.net),
+    payerEmail: str(raw?.email) ?? str(raw?.payer_email),
+    orderCode: str(raw?.order_code),
+    customerNote: str(raw?.customer_trns),
+    merchantRef: str(raw?.merchant_trns),
+    issuingBank: str(raw?.card_issuing_bank),
+    sourceId: str(raw?.source_id),
+    availableOn: str(raw?.available_on),
+    statementLine: str(raw?.line),
     balanceAfter: num(leg?.balance),
     billAmount: bill === null ? null : Math.abs(bill),
     billCurrency: str(leg?.bill_currency),
-    createdAt: str(raw?.created_at),
+    createdAt: str(raw?.created_at) ?? str(raw?.ins_date) ?? str(raw?.imported_at),
     completedAt: str(raw?.completed_at),
     requestId: str(raw?.request_id),
     relatedTx: str(raw?.related_transaction_id),
@@ -117,7 +128,8 @@ function lineFacts(r: FeedRow) {
     merchantCity: str(merchant?.city),
     merchantCountry: str(merchant?.country),
     merchantMcc: str(merchant?.category_code),
-    cardNumber: str(card?.card_number),
+    cardNumber: str(card?.card_number) ?? str(raw?.card_number) ?? (last4 ? `${cardBrand ? `${cardBrand.toUpperCase()} ` : ''}•••• ${last4}` : null),
+    cardCountry: str(raw?.card_country),
     cardHolder: [str(card?.first_name), str(card?.last_name)].filter(Boolean).join(' ') || null,
   };
 }
@@ -580,6 +592,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                 : [
                     f.iban ? ibanTail(f.iban) : f.accountNo,
                     f.merchantCity,
+                    f.payerEmail,
                     f.cpKind && !f.iban ? CP_KIND_LABEL[f.cpKind] : null,
                     (r.counterparty_name || f.cpName || f.merchantName) && f.description ? f.description : null,
                   ].filter(Boolean).join(' · ');
@@ -826,9 +839,9 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                   </SheetDescription>
                 </SheetHeader>
 
-                {!synced && detail.provider === 'revolut' && (
+                {!synced && detail.provider !== 'statement' && (
                   <p className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs text-muted-foreground">
-                    This line was synced before full details were kept. Recipient and balance details show once it is pulled from Revolut again.
+                    This line was recorded before full details were kept, so who it was with and its balance are not available here.
                   </p>
                 )}
 
@@ -845,13 +858,18 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     <DetailRow label="Merchant" value={[f.merchantName, f.merchantCity, f.merchantCountry].filter(Boolean).join(', ')} />
                   )}
                   {f.merchantMcc && <DetailRow label="Merchant Category" value={f.merchantMcc} mono />}
+                  {f.payerEmail && <DetailRow label="Email" value={f.payerEmail} copy={f.payerEmail} />}
                   {f.cardNumber && <DetailRow label="Card" value={[f.cardNumber, f.cardHolder].filter(Boolean).join(' · ')} />}
+                  {f.issuingBank && <DetailRow label="Issuing Bank" value={f.issuingBank} />}
+                  {f.cardCountry && <DetailRow label="Card Country" value={f.cardCountry} />}
+                  {f.customerNote && <DetailRow label="Customer Note" value={f.customerNote} />}
+                  {f.statementLine && <DetailRow label="Statement Line" value={f.statementLine} mono />}
                   <DetailRow label="Description" value={f.description} />
                 </DetailSection>
 
                 <DetailSection title="Transaction">
                   <DetailRow label="Transaction ID" value={detail.transaction_id} mono copy={detail.transaction_id} />
-                  <DetailRow label="Leg ID" value={detail.leg_id} mono copy={detail.leg_id} />
+                  {detail.leg_id && <DetailRow label="Leg ID" value={detail.leg_id} mono copy={detail.leg_id} />}
                   <DetailRow label="Reference" value={detail.reference} copy={detail.reference} />
                   <DetailRow label="State" value={STATE_LABEL[detail.state] ?? detail.state} />
                   <DetailRow label="Created" value={f.createdAt ? formatDate(f.createdAt, { withTime: true }) : null} />
@@ -859,6 +877,9 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                   {detail.legs_total !== null && <DetailRow label="Legs" value={String(detail.legs_total)} />}
                   {f.requestId && <DetailRow label="Request ID" value={f.requestId} mono copy={f.requestId} />}
                   {f.relatedTx && <DetailRow label="Related Transaction" value={f.relatedTx} mono copy={f.relatedTx} />}
+                  {f.orderCode && <DetailRow label="Order Code" value={f.orderCode} mono copy={f.orderCode} />}
+                  {f.merchantRef && <DetailRow label="Merchant Reference" value={f.merchantRef} />}
+                  {f.sourceId && <DetailRow label="Charge ID" value={f.sourceId} mono copy={f.sourceId} />}
                 </DetailSection>
 
                 <DetailSection title="Money">
@@ -868,7 +889,9 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     <DetailRow label="Original Amount" value={formatMoney(f.billAmount, f.billCurrency)} />
                   )}
                   <DetailRow label="Fee" value={f.fee !== null ? formatMoney(f.fee, detail.currency) : null} />
-                  <DetailRow label="Balance After" value={f.balanceAfter !== null ? formatMoney(f.balanceAfter, detail.currency) : null} />
+                  {f.net !== null && <DetailRow label="Net" value={formatMoney(f.net, detail.currency)} />}
+                  {f.availableOn && <DetailRow label="Available On" value={formatDate(f.availableOn)} />}
+                  {detail.provider === 'revolut' && <DetailRow label="Balance After" value={f.balanceAfter !== null ? formatMoney(f.balanceAfter, detail.currency) : null} />}
                 </DetailSection>
 
                 <DetailSection title="Reconciliation">

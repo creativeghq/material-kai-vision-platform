@@ -24,12 +24,15 @@ export async function syncStripeFeed(service: any, workspaceId: string): Promise
     .maybeSingle();
 
   const txns = await stripe.balanceTransactions.list(
-    { limit: 100 },
+    { limit: 100, expand: ['data.source'] },
     { stripeAccount: pc.stripe_connect_account_id },
   );
 
   const now = new Date().toISOString();
-  const rows = (txns?.data ?? []).map((t: any) => ({
+  const rows = (txns?.data ?? []).map((t: any) => {
+    const src = t.source && typeof t.source === 'object' ? t.source : null;
+    const payer = src?.billing_details?.name ?? src?.customer_details?.name ?? null;
+    return {
     workspace_id: workspaceId,
     provider: 'stripe',
     provider_ref: t.id,
@@ -42,12 +45,25 @@ export async function syncStripeFeed(service: any, workspaceId: string): Promise
     amount: Math.abs(Number(t.amount)) / 100,
     currency: String(t.currency ?? 'eur').toUpperCase(),
     booked_at: new Date(Number(t.created) * 1000).toISOString(),
-    counterparty_name: t.description ?? null,
+    counterparty_name: payer,
     reference: t.description ?? null,
     match_status: 'ignored', // settled by the Stripe webhook path; informational here
-    raw: { id: t.id, type: t.type, status: t.status },
+    raw: {
+      id: t.id, type: t.type, status: t.status,
+      source_id: typeof t.source === 'string' ? t.source : src?.id ?? null,
+      fee: Number(t.fee ?? 0) / 100,
+      net: Number(t.net ?? 0) / 100,
+      available_on: t.available_on ? new Date(Number(t.available_on) * 1000).toISOString() : null,
+      reporting_category: t.reporting_category ?? null,
+      payer_name: payer,
+      payer_email: src?.billing_details?.email ?? src?.receipt_email ?? null,
+      card_last4: src?.payment_method_details?.card?.last4 ?? null,
+      card_brand: src?.payment_method_details?.card?.brand ?? null,
+      card_country: src?.payment_method_details?.card?.country ?? null,
+    },
     updated_at: now,
-  }));
+    };
+  });
   if (rows.length === 0) return 0;
 
   const { error } = await service

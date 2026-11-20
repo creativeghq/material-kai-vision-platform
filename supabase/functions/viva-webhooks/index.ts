@@ -366,6 +366,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
         : 'Viva reversal — original transaction not identified',
       matchedInvoiceId: null,
       paymentId: null,
+      verified: reversalTx.raw,
     });
     if (!feed.ok) {
       // Refuse the acknowledgement: Viva retries, and a reversal nobody recorded is a hole in
@@ -448,6 +449,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       reference: `Order ${orderCode} — no matching invoice`,
       matchedInvoiceId: null,
       paymentId: null,
+      verified: tx.raw,
     });
     if (!feed.ok) {
       await settleDelivery('failed', { reason: 'unmatched_receipt_not_recorded', order_code: orderCode });
@@ -481,6 +483,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
       reference: `Order ${orderCode} — paid ${paid.toFixed(2)}, expected ${expected.toFixed(2)}`,
       matchedInvoiceId: null,
       paymentId: null,
+      verified: tx.raw,
     });
     if (!feed.ok) {
       await settleDelivery('failed', { reason: 'amount_mismatch_not_recorded', order_code: orderCode });
@@ -523,6 +526,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
     reference: `Order ${orderCode}`,
     matchedInvoiceId: intent.invoice_id,
     paymentId: res.paymentId ?? null,
+    verified: tx.raw,
   });
 
   await settleDelivery('done', { outcome: 'settled', order_code: orderCode, payment_id: res.paymentId ?? null });
@@ -564,8 +568,12 @@ async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
   reference?: string | null;
   matchedInvoiceId?: string | null;
   paymentId?: string | null;
+  verified?: Record<string, unknown> | null;
 }): Promise<{ ok: boolean; error?: string }> {
   try {
+    const v = row.verified ?? {};
+    const pick = (k: string) => (typeof v[k] === 'string' && (v[k] as string).trim() ? v[k] as string : v[k] ?? null);
+    const insDate = typeof v.insDate === 'string' && !Number.isNaN(Date.parse(v.insDate)) ? new Date(v.insDate).toISOString() : null;
     const { data: acct } = await db
       .from('finance_bank_accounts')
       .select('id')
@@ -585,8 +593,8 @@ async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
       direction: row.direction,
       amount: row.amount,
       currency: row.currency,
-      booked_at: new Date().toISOString(),
-      counterparty_name: row.counterparty ?? null,
+      booked_at: insDate ?? new Date().toISOString(),
+      counterparty_name: row.counterparty ?? (pick('fullName') as string | null),
       reference: row.reference ?? null,
       // `ignored` HIDES a row from the review queue — right for a fee or a payout we never
       // expected to match, wrong for money that arrived and could not be placed (#360 CB-5).
@@ -594,7 +602,20 @@ async function upsertVivaFeedRow(db: any, workspaceId: string, row: {
       match_status: row.matchedInvoiceId ? 'matched' : 'unmatched',
       matched_invoice_id: row.matchedInvoiceId ?? null,
       reconciled_payment_id: row.paymentId ?? null,
-      raw: { source: 'viva-webhook' },
+      raw: {
+        source: 'viva-webhook',
+        transaction_id: pick('transactionId'),
+        order_code: pick('orderCode'),
+        full_name: pick('fullName'),
+        email: pick('email'),
+        card_number: pick('cardNumber'),
+        card_country: pick('cardCountryCode'),
+        card_issuing_bank: pick('cardIssuingBank'),
+        customer_trns: pick('customerTrns'),
+        merchant_trns: pick('merchantTrns'),
+        ins_date: pick('insDate'),
+        transaction_type_id: pick('transactionTypeId'),
+      },
       updated_at: new Date().toISOString(),
     }, { onConflict: 'workspace_id,provider,provider_ref' });
     if (error) {
