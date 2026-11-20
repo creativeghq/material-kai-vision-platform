@@ -389,7 +389,7 @@ Deno.serve(withApiLogging('viva-webhooks', async (req) => {
   if (eventTypeId === EVENT_ACCOUNT_TRANSACTION) {
     const rf = await settlePendingRfOrders(db, cfg, ctx);
     // Only a 2xx is "handled". A 500 leaves the claim takeable, so Viva's retry actually retries.
-    await settleDelivery(rf.status < 300 ? 'done' : 'failed', { outcome: 'rf_sweep', status: rf.status });
+    await settleDelivery(rf.status < 300 ? 'done' : 'failed', { outcome: 'rf_sweep', status: rf.status, event_data: data });
     return rf;
   }
 

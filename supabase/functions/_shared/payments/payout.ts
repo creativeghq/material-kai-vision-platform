@@ -10,6 +10,7 @@ import {
   resolveVivaTransferContext,
   sendVivaBankTransfer,
 } from './viva-payout.ts';
+import { captureException } from '../sentry.ts';
 
 export type PayoutProvider = 'revolut' | 'viva';
 /** `draft` prepares it for a human to approve in the provider's own app; `payment` moves it now. */
@@ -276,6 +277,53 @@ async function sendViaRevolut(
   return { providerId: pay.id, state: pay.state ?? 'pending' };
 }
 
+async function recordVivaPayoutLine(
+  service: any,
+  params: PayoutParams,
+  counterparty: CounterpartyRow,
+  out: { commandId: string | null; walletTransactionId: string | null; isInstant: boolean; fee: number },
+): Promise<void> {
+  const ref = out.commandId ?? out.walletTransactionId ?? params.requestId;
+  const now = new Date().toISOString();
+  const { error } = await service.from('revolut_bank_transactions').upsert({
+    workspace_id: params.workspaceId,
+    provider: 'viva',
+    provider_ref: `viva-payout-${ref}`,
+    transaction_id: ref,
+    revolut_account_id: 'viva-wallet',
+    bank_account_id: params.source.bankAccountId,
+    state: out.isInstant ? 'completed' : 'pending',
+    type: 'payout',
+    direction: 'out',
+    amount: params.amount,
+    currency: params.currency.toUpperCase(),
+    booked_at: now,
+    counterparty_name: counterparty.displayName || null,
+    reference: params.reference || null,
+    match_status: 'unmatched',
+    raw: {
+      source: 'viva-payout',
+      command_id: out.commandId,
+      wallet_transaction_id: out.walletTransactionId,
+      is_instant: out.isInstant,
+      leg: { fee: out.fee, description: counterparty.displayName ? `To ${counterparty.displayName}` : null },
+      counterparty: {
+        account_type: 'external',
+        detail: { name: counterparty.displayName || null, account: { iban: counterparty.iban } },
+      },
+      supplier_bill_id: params.supplierBillId,
+      request_id: params.requestId,
+    },
+    updated_at: now,
+  }, { onConflict: 'workspace_id,provider,provider_ref' });
+  if (error) {
+    await captureException(new Error(`viva payout feed line not written: ${error.message}`), {
+      tags: { area: 'payout', provider: 'viva' },
+      extra: { request_id: params.requestId, provider_ref: ref },
+    });
+  }
+}
+
 async function sendViaViva(
   service: any,
   params: PayoutParams,
@@ -330,6 +378,7 @@ async function sendViaViva(
     amountMinor,
     description: reference || undefined,
   });
+  await recordVivaPayoutLine(service, params, counterparty, out);
 
   return {
     providerId: out.commandId ?? out.walletTransactionId,

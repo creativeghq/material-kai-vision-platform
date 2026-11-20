@@ -47,7 +47,6 @@ export interface SyncResult {
   error?: string;
 }
 
-/** Who a leg's counterparty is, resolved from Revolut's saved-counterparty list. */
 export interface CounterpartyDetail {
   id: string;
   name: string | null;

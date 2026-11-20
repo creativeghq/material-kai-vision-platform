@@ -26,6 +26,7 @@ import { formatDate } from '@/utils/datetime';
 import { formatMoney } from '@/utils/decimal';
 import { inboundService, type BankLineDocCandidate } from '@/modules/finance/services/inboundService';
 import { CRM_SEARCH_COLUMN, foldedLike } from '@/services/crmSearch';
+import { HubCellLink } from '@/components/core/hub';
 import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVocabulary';
 
 interface FeedRow {
@@ -55,7 +56,36 @@ interface FeedRow {
 interface InvoiceLite { id: string; internal_number: string; amount_due: number; currency: string }
 interface BillLite { id: string; supplier_bill_number: string | null; supplier_name: string | null; amount_due: number; currency: string }
 interface OrderLite { id: string; order_number: string | null }
-interface PartyLite { id: string; name: string; vat_number: string | null }
+interface PartyLite { id: string; name: string; vat_number: string | null; kind?: 'company' | 'contact' }
+
+/** One ranked document a line may settle, derived by `bank_line_insights`. */
+interface LineSuggestion {
+  kind: 'invoice' | 'bill' | 'expense' | 'party';
+  target_id: string;
+  party_kind?: 'company' | 'contact';
+  label: string;
+  detail: string | null;
+  amount: number;
+  currency: string;
+  score: number;
+  reasons: string[];
+}
+interface LineInsight {
+  tx_id: string;
+  nature: string;
+  nature_label: string;
+  party_kind: 'company' | 'contact' | null;
+  party_id: string | null;
+  party_name: string | null;
+  party_reason: 'iban' | 'revolut_counterparty' | 'name' | null;
+  suggestions: LineSuggestion[];
+}
+
+const PARTY_REASON_LABEL: Record<string, string> = {
+  iban: 'Matched by the IBAN on file', revolut_counterparty: 'Matched by their Revolut account', name: 'Matched by name',
+};
+const partyHref = (i: Pick<LineInsight, 'party_kind' | 'party_id'>) =>
+  (i.party_id ? `/crm/${i.party_kind === 'contact' ? 'contacts' : 'companies'}/${i.party_id}` : undefined);
 interface PlanCandidate {
   plan_id: string; title: string; amount: number; currency: string;
   scheduled_for: string; day_gap?: number; party_matches?: boolean; score: number;
@@ -255,6 +285,8 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [pickPlans, setPickPlans] = React.useState<PlanCandidate[] | null>(null);
   const [planHints, setPlanHints] = React.useState<Map<string, PlanHint>>(new Map());
   const [hintsFailed, setHintsFailed] = React.useState(false);
+  const [insights, setInsights] = React.useState<Map<string, LineInsight>>(new Map());
+  const [insightsFailed, setInsightsFailed] = React.useState(false);
 
   // Page is keyed to the filters, so changing any filter lands on page 1 without a second fetch.
   const filterKey = JSON.stringify([provider, accountF, direction, statusF, q, from, to, focusTx]);
@@ -324,6 +356,14 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         setHintsFailed(!!hintErr);
         setPlanHints(hintErr ? new Map() : new Map(((hints ?? []) as PlanHint[]).map((h) => [h.tx_id, h])));
       } else { setPlanHints(new Map()); setHintsFailed(false); }
+
+      if (feed.length) {
+        const { data: ins, error: insErr } = await supabase.rpc('bank_line_insights', { p_tx_ids: feed.map((r) => r.id) });
+        setInsightsFailed(!!insErr);
+        setInsights(insErr ? new Map() : new Map(((ins ?? []) as LineInsight[]).map((x) => [x.tx_id, {
+          ...x, suggestions: Array.isArray(x.suggestions) ? x.suggestions : [],
+        }])));
+      } else { setInsights(new Map()); setInsightsFailed(false); }
     } catch (e) {
       toast({ title: 'Failed to load the bank feed', description: (e as Error).message, variant: 'destructive' });
     } finally { setLoading(false); }
@@ -347,9 +387,9 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     toast({ title: 'Matching complete', description: `${out.autoMatched} matched, ${out.suggested} for review, ${out.billsSettled ?? 0} bills settled.` });
   });
 
-  const settleInvoice = (row: FeedRow, invoiceId: string) => act('Settle', async () => {
+  const settleInvoice = (row: FeedRow, invoiceId: string, label?: string) => act('Settle', async () => {
     const inv = invoices.get(invoiceId) ?? pickInvoices.find((i) => i.id === invoiceId);
-    if (!window.confirm(`Record ${Number(row.amount).toFixed(2)} ${row.currency} against ${inv?.internal_number ?? 'this invoice'}? This books a payment.`)) return;
+    if (!window.confirm(`Record ${Number(row.amount).toFixed(2)} ${row.currency} against ${inv?.internal_number ?? label ?? 'this invoice'}? This books a payment.`)) return;
     await callRevolutApi('confirm-match', workspaceId, { transaction_row_id: row.id, invoice_id: invoiceId });
     setPicking(null);
     toast({ title: 'Invoice settled', description: 'Recorded through the normal payment path; any linked order updates via its invoice.' });
@@ -383,7 +423,9 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const bookToParty = (row: FeedRow, party: PartyLite) => act('Book payment', async () => {
     const what = row.direction === 'in' ? `received from ${party.name}` : `paid to ${party.name}`;
     if (!window.confirm(`Record ${Number(row.amount).toFixed(2)} ${row.currency} as ${what}, on account? It lowers their balance and clears their oldest open items first.`)) return;
-    await callRevolutApi('confirm-party-payment', workspaceId, { transaction_row_id: row.id, company_id: party.id });
+    await callRevolutApi('confirm-party-payment', workspaceId, party.kind === 'contact'
+      ? { transaction_row_id: row.id, contact_id: party.id }
+      : { transaction_row_id: row.id, company_id: party.id });
     setPicking(null);
     toast({ title: 'Payment booked on account', description: `Shown on ${party.name}'s statement in Finance → Parties.` });
   });
@@ -402,6 +444,24 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const ignore = (row: FeedRow, ig: boolean) => act('Update', async () => {
     await callRevolutApi('ignore-transaction', workspaceId, { transaction_row_id: row.id, ignore: ig });
   });
+
+  /** Which suggestions this line can act on — the same rules the edge enforces per action. */
+  const canApply = (row: FeedRow, sg: LineSuggestion) =>
+    sg.kind === 'party' ? (row.provider === 'revolut' || row.provider === 'statement') : row.provider === 'revolut';
+  const applySuggestion = (row: FeedRow, sg: LineSuggestion) => {
+    switch (sg.kind) {
+      case 'invoice': return settleInvoice(row, sg.target_id, sg.label);
+      case 'bill': return settleBill(row, sg.target_id);
+      case 'expense': return payDocument(row, {
+        doc_id: sg.target_id, issuer_name: sg.detail, issuer_vat: null, issue_date: null,
+        doc_number: sg.label.replace(/^Expense Document\s*/, '') || null, doc_type: '', due: sg.amount, currency: sg.currency,
+        exact_amount: false, same_party: false, day_gap: null, has_bill: false,
+      });
+      case 'party': return bookToParty(row, {
+        id: sg.target_id, name: sg.label.replace(/^On Account:\s*/, ''), vat_number: null, kind: sg.party_kind ?? 'company',
+      });
+    }
+  };
 
   // Pickers: invoices (open), bills (open), orders → their open invoices.
   React.useEffect(() => {
@@ -567,7 +627,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
               <TableRow>
                 <TableHead className="w-28">Date</TableHead>
                 <TableHead>Counterparty</TableHead>
-                <TableHead className="w-28">Type</TableHead>
+                <TableHead className="w-36">What It Is</TableHead>
                 <TableHead>Reference</TableHead>
                 <TableHead className="w-44">Account</TableHead>
                 <TableHead className="w-24">Transaction ID</TableHead>
@@ -610,8 +670,21 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                       <span className="truncate font-medium">{party}</span>
                     </div>
                     {partySub && <div className="truncate pl-5 text-xs text-muted-foreground">{partySub}</div>}
+                    {(() => {
+                      const ins = insights.get(r.id);
+                      if (!ins?.party_id) return null;
+                      return (
+                        <div className="truncate pl-5 text-xs" title={PARTY_REASON_LABEL[ins.party_reason ?? ''] ?? undefined}>
+                          <span className="text-muted-foreground">CRM: </span>
+                          <HubCellLink to={partyHref(ins)}>{ins.party_name ?? 'Open record'}</HubCellLink>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs">{typeLabel(r.type)}</TableCell>
+                  <TableCell className="whitespace-nowrap text-xs">
+                    <div className="font-medium">{insights.get(r.id)?.nature_label ?? typeLabel(r.type)}</div>
+                    {insights.get(r.id) && <div className="text-[11px] text-muted-foreground">{typeLabel(r.type)}</div>}
+                  </TableCell>
                   <TableCell className="max-w-56">
                     <div className="truncate text-xs" title={r.reference ?? undefined}>{r.reference ?? '—'}</div>
                     {matched && <div className="truncate text-xs text-muted-foreground">→ {matched.internal_number}</div>}
@@ -639,12 +712,24 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                           </Button>
                         );
                       })()}
-                      {suggestions.slice(0, 1).map((inv) => (
-                        <Button key={inv.id} size="sm" variant="outline" className="h-7 text-xs" disabled={busy}
-                          onClick={() => settleInvoice(r, inv.id)}>
-                          Settle {inv.internal_number}
-                        </Button>
-                      ))}
+                      {(() => {
+                        const top = (insights.get(r.id)?.suggestions ?? []).find((sg) => sg.kind !== 'party' && canApply(r, sg));
+                        if (top) {
+                          return (
+                            <Button size="sm" variant="outline" className="h-7 max-w-44 truncate text-xs" disabled={busy}
+                              title={[top.detail, ...top.reasons].filter(Boolean).join(' · ')}
+                              onClick={() => applySuggestion(r, top)}>
+                              Match {top.label}
+                            </Button>
+                          );
+                        }
+                        return suggestions.slice(0, 1).map((inv) => (
+                          <Button key={inv.id} size="sm" variant="outline" className="h-7 text-xs" disabled={busy}
+                            onClick={() => settleInvoice(r, inv.id)}>
+                            Settle {inv.internal_number}
+                          </Button>
+                        ));
+                      })()}
                     </div>
                   </TableCell>
                   <TableCell className={`whitespace-nowrap text-right font-medium tabular-nums ${r.direction === 'in' ? 'text-success' : ''}`}>
@@ -707,6 +792,11 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
             })}
             </TableBody>
           </Table>
+        )}
+        {!loading && insightsFailed && (
+          <p className="border-t border-border/60 px-5 py-2 text-xs text-amber-800 dark:text-amber-300">
+            Suggested matches could not be worked out, so no line below is offering one. That is not a statement that nothing matches.
+          </p>
         )}
         {!loading && hintsFailed && (
           <p className="border-t border-border/60 px-5 py-2 text-xs text-amber-800 dark:text-amber-300">
@@ -844,6 +934,45 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     This line was recorded before full details were kept, so who it was with and its balance are not available here.
                   </p>
                 )}
+
+                {(() => {
+                  const ins = insights.get(detail.id);
+                  if (!ins) return null;
+                  return (
+                    <>
+                      <DetailSection title="Business">
+                        <DetailRow label="What It Is" value={ins.nature_label} />
+                        <DetailRow label="CRM Party" value={ins.party_id
+                          ? <HubCellLink to={partyHref(ins)}>{ins.party_name ?? 'Open record'}</HubCellLink>
+                          : 'Not in the CRM'} />
+                        {ins.party_reason && <DetailRow label="How" value={PARTY_REASON_LABEL[ins.party_reason]} />}
+                      </DetailSection>
+                      {ins.suggestions.length > 0 && (
+                        <DetailSection title="Suggested Matches">
+                          <ul className="space-y-2">
+                            {ins.suggestions.map((sg) => (
+                              <li key={`${sg.kind}:${sg.target_id}`} className="flex items-start justify-between gap-3 rounded-sm border border-hairline px-3 py-2">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-medium">{sg.label}</div>
+                                  {sg.detail && <div className="truncate text-xs text-muted-foreground">{sg.detail}</div>}
+                                  {sg.reasons.length > 0 && <div className="text-[11px] text-muted-foreground">{sg.reasons.join(' · ')}</div>}
+                                </div>
+                                <div className="flex shrink-0 flex-col items-end gap-1">
+                                  <span className="text-xs tabular-nums">{formatMoney(Number(sg.amount), sg.currency)}</span>
+                                  <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy || !canApply(detail, sg)}
+                                    title={canApply(detail, sg) ? undefined : 'Only a Revolut line can settle a document from here'}
+                                    onClick={() => { applySuggestion(detail, sg); setDetail(null); }}>
+                                    {sg.kind === 'party' ? 'Book on Account' : 'Match'}
+                                  </Button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        </DetailSection>
+                      )}
+                    </>
+                  );
+                })()}
 
                 <DetailSection title="Counterparty">
                   <DetailRow label="Name" value={f.cpKind === 'self' ? (own?.name ?? 'Own account') : (detail.counterparty_name || f.cpName || f.merchantName)} />
