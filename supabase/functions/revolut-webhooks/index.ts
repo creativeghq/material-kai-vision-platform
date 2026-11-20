@@ -4,8 +4,8 @@
 
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { resolveRevolutConfig } from '../_shared/revolut/client.ts';
-import { legToRow, loadAccountMapping } from '../_shared/revolut/sync-core.ts';
+import { issuerDomainFrom, resolveRevolutConfig } from '../_shared/revolut/client.ts';
+import { legToRow, loadAccountMapping, loadCounterpartyDirectory } from '../_shared/revolut/sync-core.ts';
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -89,7 +89,10 @@ Deno.serve(withApiLogging('revolut-webhooks', async (req) => {
       const tx = data;
       if (!tx?.id || !Array.isArray(tx?.legs)) return json({ ok: true, ignored: true });
       const mapping = await loadAccountMapping(service, cfg.workspace_id);
-      const rows = tx.legs.map((leg: any) => legToRow(cfg.workspace_id, tx, leg, mapping));
+      const cps = cfg.oauth_redirect_uri
+        ? await loadCounterpartyDirectory(service, cfg, issuerDomainFrom(cfg.oauth_redirect_uri), [tx])
+        : new Map();
+      const rows = tx.legs.map((leg: any) => legToRow(cfg.workspace_id, tx, leg, mapping, cps));
       const { error } = await service
         .from('revolut_bank_transactions')
         .upsert(rows, { onConflict: 'workspace_id,provider,provider_ref' });

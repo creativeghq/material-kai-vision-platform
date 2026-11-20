@@ -14,11 +14,13 @@ import {
   getTransaction,
   issuerDomainFrom,
   listAccounts,
+  listCounterparties,
   listTransactions,
   revolutHosts,
   revolutJson,
   type RevolutAccount,
   type RevolutConfigRow,
+  type RevolutCounterparty,
   type RevolutTransaction,
 } from './client.ts';
 import { financeNotifyRecipient } from './notify.ts';
@@ -45,8 +47,63 @@ export interface SyncResult {
   error?: string;
 }
 
+/** Who a leg's counterparty is, resolved from Revolut's saved-counterparty list. */
+export interface CounterpartyDetail {
+  id: string;
+  name: string | null;
+  profile_type: string | null;
+  country: string | null;
+  revtag: string | null;
+  account: {
+    id: string; name: string | null; type: string | null; currency: string | null; bank_country: string | null;
+    iban: string | null; bic: string | null; account_no: string | null;
+  } | null;
+}
+
+function toDetail(cp: RevolutCounterparty, accountId?: string): CounterpartyDetail {
+  const acc = (cp.accounts ?? []).find((a) => a.id === accountId) ?? null;
+  return {
+    id: cp.id,
+    name: cp.name ?? null,
+    profile_type: cp.profile_type ?? null,
+    country: cp.country ?? null,
+    revtag: cp.revtag ?? null,
+    account: acc ? {
+      id: acc.id, name: acc.name ?? null, type: acc.type ?? null, currency: acc.currency ?? null,
+      bank_country: acc.bank_country ?? null, iban: acc.iban ?? null, bic: acc.bic ?? null,
+      account_no: acc.account_no ?? null,
+    } : null,
+  };
+}
+
+/**
+ * Saved counterparties by id, fetched only when a leg names one. A failed read returns an empty
+ * map: the line still lands, with its description as the only clue to the party.
+ */
+export async function loadCounterpartyDirectory(
+  service: any, cfg: RevolutConfigRow, issuer: string, txs: RevolutTransaction[],
+): Promise<Map<string, RevolutCounterparty>> {
+  const wanted = txs.some((tx) => (tx.legs ?? []).some((l) => l.counterparty?.id && l.counterparty.account_type !== 'self'));
+  if (!wanted) return new Map();
+  try {
+    return new Map((await listCounterparties(service, cfg, issuer)).map((c) => [c.id, c]));
+  } catch (err) {
+    console.warn('[revolut-sync] counterparty list unreadable:', err instanceof Error ? err.message : err);
+    return new Map();
+  }
+}
+
 /** Map one transaction leg to a `revolut_bank_transactions` row. */
-export function legToRow(workspaceId: string, tx: RevolutTransaction, leg: RevolutTransaction['legs'][number], bankAccountByRevolutId: Map<string, string>) {
+export function legToRow(
+  workspaceId: string,
+  tx: RevolutTransaction,
+  leg: RevolutTransaction['legs'][number],
+  bankAccountByRevolutId: Map<string, string>,
+  counterparties: Map<string, RevolutCounterparty> = new Map(),
+) {
+  const cpRef = leg.counterparty;
+  const cp = cpRef?.id ? counterparties.get(cpRef.id) : undefined;
+  const detail = cp ? toDetail(cp, cpRef?.account_id) : null;
   return {
     workspace_id: workspaceId,
     provider: 'revolut',
@@ -75,10 +132,14 @@ export function legToRow(workspaceId: string, tx: RevolutTransaction, leg: Revol
     legs_total: Array.isArray(tx.legs) ? tx.legs.length : null,
     currency: leg.currency,
     booked_at: tx.completed_at ?? tx.created_at,
-    counterparty_name: tx.counterparty?.name ?? tx.merchant?.name ?? null,
+    counterparty_name: detail?.name ?? tx.counterparty?.name ?? tx.merchant?.name ?? null,
     reference: tx.reference ?? leg.description ?? null,
-    // Slim raw: enough to debug a mapping without persisting the whole payload per leg.
-    raw: { id: tx.id, type: tx.type, state: tx.state, created_at: tx.created_at },
+    // The whole transaction plus this leg and its resolved party — the feed's detail view reads it.
+    raw: {
+      ...tx,
+      leg,
+      counterparty: cpRef ? { ...cpRef, detail } : null,
+    },
     updated_at: new Date().toISOString(),
   };
 }
@@ -200,7 +261,8 @@ async function recoverStaleTransactions(service: any, cfg: RevolutConfigRow, iss
   for (const id of ids) {
     try {
       const tx = await getTransaction(service, cfg, issuer, id);
-      const rows = (tx.legs ?? []).map((leg) => legToRow(cfg.workspace_id, tx, leg, mapping));
+      const cps = await loadCounterpartyDirectory(service, cfg, issuer, [tx]);
+      const rows = (tx.legs ?? []).map((leg) => legToRow(cfg.workspace_id, tx, leg, mapping, cps));
       if (rows.length === 0) continue;
       const { error } = await service
         .from('revolut_bank_transactions')
@@ -295,7 +357,8 @@ export async function syncWorkspaceRevolut(service: any, cfg: RevolutConfigRow):
       holeBefore = null;
     }
 
-    const rows = all.flatMap((tx) => (tx.legs ?? []).map((leg) => legToRow(workspaceId, tx, leg, mapping)));
+    const cps = await loadCounterpartyDirectory(service, cfg, issuer, all);
+    const rows = all.flatMap((tx) => (tx.legs ?? []).map((leg) => legToRow(workspaceId, tx, leg, mapping, cps)));
     let upserted = 0;
     // Chunked upserts; onConflict updates state so pending → completed transitions land.
     for (let i = 0; i < rows.length; i += 500) {

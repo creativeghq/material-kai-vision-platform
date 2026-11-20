@@ -4,9 +4,12 @@
  */
 import React from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ArrowDownLeft, ArrowUpRight, Landmark, Loader2, MoreHorizontal, RefreshCw, Search } from 'lucide-react';
+import { ArrowDownLeft, ArrowUpRight, Copy, Landmark, Loader2, MoreHorizontal, RefreshCw, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
+import { Badge } from '@/components/core/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/core/ui/table';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/core/ui/sheet';
 import { Input } from '@/components/core/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
@@ -27,6 +30,14 @@ import { PAYMENT_PROVIDER_SLUGS, type PaymentProviderSlug } from '../paymentVoca
 interface FeedRow {
   id: string;
   provider: string;
+  bank_account_id: string | null;
+  revolut_account_id: string | null;
+  transaction_id: string | null;
+  leg_id: string | null;
+  legs_total: number | null;
+  match_method: string | null;
+  matched_at: string | null;
+  raw: Record<string, unknown> | null;
   booked_at: string | null;
   counterparty_name: string | null;
   reference: string | null;
@@ -54,23 +65,111 @@ interface PlanHint extends PlanCandidate { tx_id: string; candidates: number }
 // typecheck failure here rather than a filter option nobody added.
 const PROVIDER_LABEL: Record<PaymentProviderSlug, string> = { revolut: 'Revolut', stripe: 'Stripe', viva: 'Viva' };
 
-const MatchWord: React.FC<{ row: FeedRow }> = ({ row }) => {
+/** Revolut's transaction `type` values, as a reader names them. */
+const TYPE_LABEL: Record<string, string> = {
+  transfer: 'Transfer', card_payment: 'Card Payment', card_refund: 'Card Refund', card_chargeback: 'Card Chargeback',
+  card_credit: 'Card Credit', exchange: 'Exchange', topup: 'Top-Up', topup_return: 'Top-Up Return', fee: 'Fee',
+  refund: 'Refund', atm: 'ATM Withdrawal', loan: 'Loan', tax: 'Tax', tax_refund: 'Tax Refund',
+  charge: 'Charge', charge_refund: 'Charge Refund',
+};
+const typeLabel = (t: string | null) => (t ? TYPE_LABEL[t] ?? t.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) : '—');
+
+const STATE_LABEL: Record<string, string> = {
+  created: 'Created', pending: 'Pending', completed: 'Completed', declined: 'Declined', failed: 'Failed', reverted: 'Reverted',
+};
+
+type Obj = Record<string, unknown>;
+const obj = (v: unknown): Obj | null => (v && typeof v === 'object' && !Array.isArray(v) ? v as Obj : null);
+const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v : typeof v === 'number' ? String(v) : null);
+const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+
+/** What the stored payload says about a line. Lines synced before the payload was kept read as nulls. */
+function lineFacts(r: FeedRow) {
+  const raw = obj(r.raw);
+  const leg = obj(raw?.leg);
+  const cp = obj(raw?.counterparty);
+  const detail = obj(cp?.detail);
+  const acc = obj(detail?.account);
+  const merchant = obj(raw?.merchant);
+  const card = obj(raw?.card);
+  const bill = num(leg?.bill_amount);
+  return {
+    description: str(leg?.description),
+    fee: num(leg?.fee),
+    balanceAfter: num(leg?.balance),
+    billAmount: bill === null ? null : Math.abs(bill),
+    billCurrency: str(leg?.bill_currency),
+    createdAt: str(raw?.created_at),
+    completedAt: str(raw?.completed_at),
+    requestId: str(raw?.request_id),
+    relatedTx: str(raw?.related_transaction_id),
+    cpKind: str(cp?.account_type),
+    cpAccountId: str(cp?.account_id),
+    cpName: str(detail?.name),
+    cpProfile: str(detail?.profile_type),
+    cpCountry: str(detail?.country) ?? str(acc?.bank_country),
+    cpRevtag: str(detail?.revtag),
+    iban: str(acc?.iban),
+    bic: str(acc?.bic),
+    accountNo: str(acc?.account_no),
+    merchantName: str(merchant?.name),
+    merchantCity: str(merchant?.city),
+    merchantCountry: str(merchant?.country),
+    merchantMcc: str(merchant?.category_code),
+    cardNumber: str(card?.card_number),
+    cardHolder: [str(card?.first_name), str(card?.last_name)].filter(Boolean).join(' ') || null,
+  };
+}
+
+const CP_KIND_LABEL: Record<string, string> = { external: 'External Bank Account', revolut: 'Revolut Account', self: 'Own Account' };
+const PROFILE_LABEL: Record<string, string> = { business: 'Business', personal: 'Individual' };
+const compactIban = (iban: string) => iban.replace(/\s/g, '');
+const ibanTail = (iban: string) => `${compactIban(iban).slice(0, 4)} … ${compactIban(iban).slice(-4)}`;
+const shortId = (id: string | null) => (id ? id.slice(0, 8) : '—');
+const money = (n: number, ccy: string) => `${n.toFixed(2)} ${ccy}`;
+
+const MatchBadge: React.FC<{ row: FeedRow }> = ({ row }) => {
   if (row.provider !== 'revolut') {
     return row.match_status === 'matched'
-      ? <span className="text-xs text-success">Settled</span>
-      : <span className="text-xs text-muted-foreground">Info</span>;
+      ? <Badge variant="success">Settled</Badge>
+      : <Badge variant="neutral">Info</Badge>;
   }
-  if (row.state !== 'completed') return <span className="text-xs text-muted-foreground">{row.state}</span>;
+  if (row.state !== 'completed') {
+    return <Badge variant={row.state === 'pending' || row.state === 'created' ? 'info' : 'error'}>{STATE_LABEL[row.state] ?? row.state}</Badge>;
+  }
   switch (row.match_status) {
-    case 'matched': return <span className="text-xs text-success">Matched</span>;
-    case 'partial': return <span className="text-xs text-warning" title="Part of this transfer is attached to expenses. The rest can still be matched.">Part matched</span>;
-    case 'suggested': return <span className="text-xs text-warning">Needs review</span>;
-    case 'ignored': return <span className="text-xs text-muted-foreground">Ignored</span>;
-    default: return row.direction === 'in'
-      ? <span className="text-xs text-destructive">Unmatched</span>
-      : <span className="text-xs text-muted-foreground">Unmatched</span>;
+    case 'matched': return <Badge variant="success">Matched</Badge>;
+    case 'partial': return <Badge variant="warning" title="Part of this transfer is attached to expenses. The rest can still be matched.">Part Matched</Badge>;
+    case 'suggested': return <Badge variant="warning">Needs Review</Badge>;
+    case 'ignored': return <Badge variant="neutral">Ignored</Badge>;
+    default: return <Badge variant={row.direction === 'in' ? 'error' : 'neutral'}>Unmatched</Badge>;
   }
 };
+
+const DetailRow: React.FC<{ label: string; value: React.ReactNode; mono?: boolean; copy?: string | null }> = ({ label, value, mono, copy }) => {
+  const { toast } = useToast();
+  return (
+    <div className="grid grid-cols-[9rem_1fr] items-start gap-3 py-1.5 text-sm">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className={`flex min-w-0 items-start gap-1.5 ${mono ? 'font-mono text-xs' : ''}`}>
+        <span className="min-w-0 break-all">{value ?? '—'}</span>
+        {copy && (
+          <button type="button" aria-label={`Copy ${label}`} className="shrink-0 text-muted-foreground hover:text-foreground"
+            onClick={() => { void navigator.clipboard.writeText(copy); toast({ title: `${label} copied` }); }}>
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </span>
+    </div>
+  );
+};
+
+const DetailSection: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+  <section className="border-t border-hairline pt-3">
+    <h3 className="mb-1 text-xs font-semibold text-muted-foreground">{title}</h3>
+    {children}
+  </section>
+);
 
 export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
   // Accounts we reconcile that no integration feeds — the ones a statement has to be imported
@@ -78,6 +177,21 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   // and must never receive one.
   const [importAccounts, setImportAccounts] = React.useState<Array<{ id: string; name: string }>>([]);
   const [importFor, setImportFor] = React.useState<{ id: string; name: string } | null>(null);
+  const [accounts, setAccounts] = React.useState<Array<{ id: string; name: string; revolut_account_id: string | null }>>([]);
+  React.useEffect(() => {
+    if (!workspaceId) return;
+    void supabase
+      .from('finance_bank_accounts')
+      .select('id, name, revolut_account_id')
+      .eq('workspace_id', workspaceId)
+      .order('sort_order')
+      .then(({ data }) => setAccounts((data ?? []) as Array<{ id: string; name: string; revolut_account_id: string | null }>));
+  }, [workspaceId]);
+  const accountOf = React.useCallback((bankAccountId: string | null, revolutAccountId: string | null) =>
+    accounts.find((x) => x.id === bankAccountId)
+      ?? accounts.find((x) => !!revolutAccountId && x.revolut_account_id === revolutAccountId)
+      ?? null, [accounts]);
+  const [detail, setDetail] = React.useState<FeedRow | null>(null);
   React.useEffect(() => {
     if (!workspaceId) return;
     void supabase
@@ -97,6 +211,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
 
   // Filters
   const [provider, setProvider] = React.useState('');
+  const [accountF, setAccountF] = React.useState('');
   const [direction, setDirection] = React.useState('');
   const [statusF, setStatusF] = React.useState('');
   const [q, setQ] = React.useState('');
@@ -130,7 +245,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
   const [hintsFailed, setHintsFailed] = React.useState(false);
 
   // Page is keyed to the filters, so changing any filter lands on page 1 without a second fetch.
-  const filterKey = JSON.stringify([provider, direction, statusF, q, from, to, focusTx]);
+  const filterKey = JSON.stringify([provider, accountF, direction, statusF, q, from, to, focusTx]);
   const [pageState, setPageState] = React.useState({ key: filterKey, page: 1 });
   const page = pageState.key === filterKey ? pageState.page : 1;
   const setPage = (p: number) => setPageState({ key: filterKey, page: p });
@@ -142,13 +257,20 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       const start = (page - 1) * TABLE_PAGE_SIZE;
       let query = supabase
         .from('revolut_bank_transactions')
-        .select('id, provider, booked_at, counterparty_name, reference, amount, currency, direction, type, state, match_status, matched_invoice_id, suggested_invoice_ids', { count: 'exact' })
+        .select('id, provider, bank_account_id, revolut_account_id, transaction_id, leg_id, legs_total, match_method, matched_at, raw, booked_at, counterparty_name, reference, amount, currency, direction, type, state, match_status, matched_invoice_id, suggested_invoice_ids', { count: 'exact' })
         .eq('workspace_id', workspaceId)
         .order('booked_at', { ascending: false })
         .order('id', { ascending: false })
         .range(start, start + TABLE_PAGE_SIZE - 1);
       if (focusTx) query = query.eq('id', focusTx);
       if (provider) query = query.eq('provider', provider);
+      if (accountF) {
+        // Lines synced before an account was mapped carry only its Revolut id.
+        const acc = accounts.find((a) => a.id === accountF);
+        query = acc?.revolut_account_id
+          ? query.or(`bank_account_id.eq.${acc.id},revolut_account_id.eq.${acc.revolut_account_id}`)
+          : query.eq('bank_account_id', accountF);
+      }
       if (direction) query = query.eq('direction', direction);
       // Review = reconcilable lines with no home, both directions, plus card spend waiting for its
       // receipt. Own-money lines (top-ups, exchanges, fees) never turn up asking to be matched.
@@ -161,7 +283,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       else if (statusF) query = query.eq('match_status', statusF);
       if (from) query = query.gte('booked_at', `${from}T00:00:00Z`);
       if (to) query = query.lte('booked_at', `${to}T23:59:59Z`);
-      if (q.trim()) query = query.or(`counterparty_name.ilike.%${q.trim()}%,reference.ilike.%${q.trim()}%`);
+      if (q.trim()) query = query.or(`counterparty_name.ilike.%${q.trim()}%,reference.ilike.%${q.trim()}%,transaction_id.ilike.%${q.trim()}%`);
       const { data, error, count } = await query;
       if (error) throw new Error(error.message);
       const n = count ?? 0;
@@ -172,6 +294,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
       }
       const feed = (data ?? []).map((r) => ({
         ...r,
+        raw: r.raw && typeof r.raw === 'object' && !Array.isArray(r.raw) ? r.raw as Record<string, unknown> : null,
         suggested_invoice_ids: Array.isArray(r.suggested_invoice_ids) ? r.suggested_invoice_ids as string[] : null,
       })) as FeedRow[];
       setRows(feed);
@@ -192,7 +315,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
     } catch (e) {
       toast({ title: 'Failed to load the bank feed', description: (e as Error).message, variant: 'destructive' });
     } finally { setLoading(false); }
-  }, [workspaceId, provider, direction, statusF, q, from, to, toast, focusTx, page, filterKey]);
+  }, [workspaceId, provider, accountF, accounts, direction, statusF, q, from, to, toast, focusTx, page, filterKey]);
 
   React.useEffect(() => { void load(); }, [load]);
 
@@ -375,6 +498,15 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
               ))}
             </SelectContent>
           </Select>
+          {accounts.length > 1 && (
+            <Select value={accountF || 'all'} onValueChange={(v) => setAccountF(v === 'all' ? '' : v)}>
+              <SelectTrigger aria-label="Account filter" className="h-9 w-56"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Accounts</SelectItem>
+                {accounts.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={direction || 'all'} onValueChange={(v) => setDirection(v === 'all' ? '' : v)}>
             <SelectTrigger aria-label="Direction filter" className="h-9 w-32"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -402,7 +534,7 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           </label>
           <div className="relative min-w-44 flex-1">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input className="h-9 pl-8" placeholder="Counterparty or reference…" value={qInput} onChange={(e) => setQInput(e.target.value)} />
+            <Input className="h-9 pl-8" placeholder="Counterparty, reference or transaction ID…" value={qInput} onChange={(e) => setQInput(e.target.value)} />
           </div>
         </div>
       </CardHeader>
@@ -418,51 +550,94 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
         ) : rows.length === 0 ? (
           <p className="px-5 py-8 text-sm text-muted-foreground">No transactions match these filters.</p>
         ) : (
-          <div className="divide-y divide-border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-28">Date</TableHead>
+                <TableHead>Counterparty</TableHead>
+                <TableHead className="w-28">Type</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead className="w-44">Account</TableHead>
+                <TableHead className="w-24">Transaction ID</TableHead>
+                <TableHead className="w-36">Status</TableHead>
+                <TableHead className="w-32 text-right">Amount</TableHead>
+                <TableHead className="w-10"><span className="sr-only">Actions</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
             {rows.map((r) => {
               const matched = r.matched_invoice_id ? invoices.get(r.matched_invoice_id) : null;
               const suggestions = (r.suggested_invoice_ids ?? []).map((id) => invoices.get(id)).filter(Boolean) as InvoiceLite[];
               const revolut = r.provider === 'revolut';
               const bankLine = revolut || r.provider === 'statement';
+              const f = lineFacts(r);
+              const own = f.cpKind === 'self' ? accountOf(null, f.cpAccountId) : null;
+              const party = f.cpKind === 'self'
+                ? (own?.name ?? 'Own account')
+                : r.counterparty_name || f.cpName || f.merchantName || f.description || '—';
+              const partySub = f.cpKind === 'self'
+                ? 'Between own accounts'
+                : [
+                    f.iban ? ibanTail(f.iban) : f.accountNo,
+                    f.merchantCity,
+                    f.cpKind && !f.iban ? CP_KIND_LABEL[f.cpKind] : null,
+                    (r.counterparty_name || f.cpName || f.merchantName) && f.description ? f.description : null,
+                  ].filter(Boolean).join(' · ');
               return (
-                <div key={r.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
-                  {r.direction === 'in'
-                    ? <ArrowDownLeft className="h-4 w-4 shrink-0 text-success" />
-                    : <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" />}
-                  <span className="w-20 shrink-0 text-xs text-muted-foreground">{PROVIDER_LABEL[r.provider as PaymentProviderSlug] ?? (r.provider === 'statement' ? 'Statement' : r.provider)}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="truncate font-medium">{r.counterparty_name || r.type || '—'}</span>
-                      <MatchWord row={r} />
-                      {matched && <span className="text-xs text-muted-foreground">→ {matched.internal_number}</span>}
+                <TableRow key={r.id} className="cursor-pointer" onClick={() => setDetail(r)}>
+                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
+                    {r.booked_at ? formatDate(r.booked_at) : '—'}
+                    <div className="text-[11px]">{PROVIDER_LABEL[r.provider as PaymentProviderSlug] ?? (r.provider === 'statement' ? 'Statement' : r.provider)}</div>
+                  </TableCell>
+                  <TableCell className="max-w-64">
+                    <div className="flex items-center gap-1.5">
+                      {r.direction === 'in'
+                        ? <ArrowDownLeft className="h-3.5 w-3.5 shrink-0 text-success" />
+                        : <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                      <span className="truncate font-medium">{party}</span>
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {r.booked_at ? formatDate(r.booked_at) : '—'}{r.reference ? ` · ${r.reference}` : ''}
+                    {partySub && <div className="truncate pl-5 text-xs text-muted-foreground">{partySub}</div>}
+                  </TableCell>
+                  <TableCell className="whitespace-nowrap text-xs">{typeLabel(r.type)}</TableCell>
+                  <TableCell className="max-w-56">
+                    <div className="truncate text-xs" title={r.reference ?? undefined}>{r.reference ?? '—'}</div>
+                    {matched && <div className="truncate text-xs text-muted-foreground">→ {matched.internal_number}</div>}
+                  </TableCell>
+                  <TableCell className="max-w-44 truncate text-xs text-muted-foreground" title={accountOf(r.bank_account_id, r.revolut_account_id)?.name}>
+                    {accountOf(r.bank_account_id, r.revolut_account_id)?.name ?? '—'}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground" title={r.transaction_id ?? undefined}>
+                    {shortId(r.transaction_id)}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex flex-col items-start gap-1">
+                      <MatchBadge row={r} />
+                      {planHints.get(r.id) && (() => {
+                        const h = planHints.get(r.id)!;
+                        return h.candidates > 1 ? (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy}
+                            onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>
+                            {h.candidates} plans match
+                          </Button>
+                        ) : (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" disabled={busy}
+                            onClick={() => settlePlan(r, h)}>
+                            Close “{h.title}”
+                          </Button>
+                        );
+                      })()}
+                      {suggestions.slice(0, 1).map((inv) => (
+                        <Button key={inv.id} size="sm" variant="outline" className="h-7 text-xs" disabled={busy}
+                          onClick={() => settleInvoice(r, inv.id)}>
+                          Settle {inv.internal_number}
+                        </Button>
+                      ))}
                     </div>
-                  </div>
-                  {planHints.get(r.id) && (() => {
-                    const h = planHints.get(r.id)!;
-                    return h.candidates > 1 ? (
-                      <Button size="sm" variant="outline" className="text-xs" disabled={busy}
-                        onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>
-                        {h.candidates} plans match
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" className="text-xs" disabled={busy}
-                        onClick={() => settlePlan(r, h)}>
-                        Close “{h.title}”
-                      </Button>
-                    );
-                  })()}
-                  {suggestions.slice(0, 1).map((inv) => (
-                    <Button key={inv.id} size="sm" variant="outline" className="text-xs" disabled={busy}
-                      onClick={() => settleInvoice(r, inv.id)}>
-                      Settle {inv.internal_number}
-                    </Button>
-                  ))}
-                  <span className={`shrink-0 font-medium ${r.direction === 'in' ? 'text-success' : ''}`}>
+                  </TableCell>
+                  <TableCell className={`whitespace-nowrap text-right font-medium tabular-nums ${r.direction === 'in' ? 'text-success' : ''}`}>
                     {r.direction === 'in' ? '+' : '−'}{Number(r.amount).toFixed(2)} {r.currency}
-                  </span>
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button size="sm" variant="ghost" className="h-8 w-8 p-0" aria-label="Transaction actions"><MoreHorizontal className="h-4 w-4" /></Button>
@@ -470,32 +645,26 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                     <DropdownMenuContent align="end">
                       <DropdownMenuLabel className="text-xs">{Number(r.amount).toFixed(2)} {r.currency} · {PROVIDER_LABEL[r.provider as PaymentProviderSlug] ?? (r.provider === 'statement' ? 'Statement' : r.provider)}</DropdownMenuLabel>
                       <DropdownMenuSeparator />
-                      {/*
-                        * `ignored` is how the auto-matcher stamps BOTH legs of an internal pocket
-                        * transfer — not `matched` — so these actions stayed offered on money that
-                        * never came from outside (#351 D1). Matching the inbound leg to an invoice
-                        * of the same amount settles it though no customer paid.
-                        * The server refuses it outright now; offering it here anyway would just be
-                        * a button that always errors.
-                        */}
+                      <DropdownMenuItem onClick={() => setDetail(r)}>View Details</DropdownMenuItem>
+                      {/* `ignored` is how the auto-matcher stamps both legs of an internal pocket transfer (#351 D1); the server refuses matching those. */}
                       {revolut && r.direction === 'in' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
                         <>
-                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'invoice' }); setPickQuery(''); }}>Match to invoice…</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'order' }); setPickQuery(''); }}>Attach to order…</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'invoice' }); setPickQuery(''); }}>Match to Invoice…</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'order' }); setPickQuery(''); }}>Attach to Order…</DropdownMenuItem>
                         </>
                       )}
                       {revolut && r.direction === 'out' && r.match_status !== 'matched' && r.match_status !== 'ignored' && (
                         <>
-                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'expense' }); setPickQuery(''); }}>Match to expense document…</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'bill' }); setPickQuery(''); }}>Match to supplier bill…</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'expense' }); setPickQuery(''); }}>Match to Expense Document…</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'bill' }); setPickQuery(''); }}>Match to Supplier Bill…</DropdownMenuItem>
                           {r.match_status !== 'partial' && (
-                            <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>Match to a planned payment…</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'plan' }); setPickQuery(''); }}>Match to a Planned Payment…</DropdownMenuItem>
                           )}
                         </>
                       )}
                       {bankLine && (r.direction === 'in' || r.direction === 'out') && r.match_status !== 'matched' && r.match_status !== 'ignored' && r.match_status !== 'partial' && (
                         <DropdownMenuItem onClick={() => { setPicking({ row: r, kind: 'party' }); setPickQuery((r.counterparty_name ?? '').split(/\s+/)[0] ?? ''); }}>
-                          {r.direction === 'in' ? 'Received from a customer, on account…' : 'Paid to a supplier, on account…'}
+                          {r.direction === 'in' ? 'Received from a Customer, on Account…' : 'Paid to a Supplier, on Account…'}
                         </DropdownMenuItem>
                       )}
                       {revolut && r.match_status !== 'matched' && r.match_status !== 'partial' && (
@@ -503,20 +672,28 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
                           ? <DropdownMenuItem onClick={() => ignore(r, false)}>Unignore</DropdownMenuItem>
                           : <DropdownMenuItem onClick={() => ignore(r, true)}>Ignore</DropdownMenuItem>
                       )}
+                      <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(r.reference ?? r.id); toast({ title: 'Reference copied' }); }}>
-                        Copy reference
+                        Copy Reference
                       </DropdownMenuItem>
+                      {r.transaction_id && (
+                        <DropdownMenuItem onClick={() => { void navigator.clipboard.writeText(r.transaction_id ?? ''); toast({ title: 'Transaction ID copied' }); }}>
+                          Copy Transaction ID
+                        </DropdownMenuItem>
+                      )}
                       {!bankLine && (
                         <DropdownMenuItem disabled>
-                          Settled by {PROVIDER_LABEL[r.provider]} — informational
+                          Settled by {PROVIDER_LABEL[r.provider as PaymentProviderSlug]} — Informational
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
-                </div>
+                  </TableCell>
+                </TableRow>
               );
             })}
-          </div>
+            </TableBody>
+          </Table>
         )}
         {!loading && hintsFailed && (
           <p className="border-t border-border/60 px-5 py-2 text-xs text-amber-800 dark:text-amber-300">
@@ -628,6 +805,83 @@ export const BankFeedTab: React.FC<{ workspaceId: string }> = ({ workspaceId }) 
           </div>
         </DialogContent>
       </Dialog>
+
+      <Sheet open={!!detail} onOpenChange={(o) => !o && setDetail(null)}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-lg">
+          {detail && (() => {
+            const f = lineFacts(detail);
+            const acct = accountOf(detail.bank_account_id, detail.revolut_account_id);
+            const own = f.cpKind === 'self' ? accountOf(null, f.cpAccountId) : null;
+            const matched = detail.matched_invoice_id ? invoices.get(detail.matched_invoice_id) : null;
+            const synced = !!f.createdAt;
+            return (
+              <div className="space-y-3">
+                <SheetHeader>
+                  <SheetTitle className="font-sans">
+                    {detail.direction === 'in' ? '+' : '−'}{money(Number(detail.amount), detail.currency)}
+                  </SheetTitle>
+                  <SheetDescription className="flex flex-wrap items-center gap-2">
+                    <span>{typeLabel(detail.type)} · {detail.direction === 'in' ? 'Money In' : 'Money Out'}</span>
+                    <MatchBadge row={detail} />
+                  </SheetDescription>
+                </SheetHeader>
+
+                {!synced && detail.provider === 'revolut' && (
+                  <p className="rounded-sm border border-hairline bg-surface-sunken px-3 py-2 text-xs text-muted-foreground">
+                    This line was synced before full details were kept. Recipient and balance details show once it is pulled from Revolut again.
+                  </p>
+                )}
+
+                <DetailSection title="Counterparty">
+                  <DetailRow label="Name" value={f.cpKind === 'self' ? (own?.name ?? 'Own account') : (detail.counterparty_name || f.cpName || f.merchantName)} />
+                  <DetailRow label="Account Type" value={f.cpKind ? CP_KIND_LABEL[f.cpKind] ?? f.cpKind : null} />
+                  {f.cpProfile && <DetailRow label="Profile" value={PROFILE_LABEL[f.cpProfile] ?? f.cpProfile} />}
+                  {f.iban && <DetailRow label="IBAN" value={compactIban(f.iban)} mono copy={compactIban(f.iban)} />}
+                  {f.bic && <DetailRow label="BIC" value={f.bic} mono copy={f.bic} />}
+                  {f.accountNo && <DetailRow label="Account Number" value={f.accountNo} mono copy={f.accountNo} />}
+                  {f.cpRevtag && <DetailRow label="Revtag" value={`@${f.cpRevtag}`} />}
+                  {f.cpCountry && <DetailRow label="Country" value={f.cpCountry} />}
+                  {f.merchantName && (
+                    <DetailRow label="Merchant" value={[f.merchantName, f.merchantCity, f.merchantCountry].filter(Boolean).join(', ')} />
+                  )}
+                  {f.merchantMcc && <DetailRow label="Merchant Category" value={f.merchantMcc} mono />}
+                  {f.cardNumber && <DetailRow label="Card" value={[f.cardNumber, f.cardHolder].filter(Boolean).join(' · ')} />}
+                  <DetailRow label="Description" value={f.description} />
+                </DetailSection>
+
+                <DetailSection title="Transaction">
+                  <DetailRow label="Transaction ID" value={detail.transaction_id} mono copy={detail.transaction_id} />
+                  <DetailRow label="Leg ID" value={detail.leg_id} mono copy={detail.leg_id} />
+                  <DetailRow label="Reference" value={detail.reference} copy={detail.reference} />
+                  <DetailRow label="State" value={STATE_LABEL[detail.state] ?? detail.state} />
+                  <DetailRow label="Created" value={f.createdAt ? formatDate(f.createdAt, { withTime: true }) : null} />
+                  <DetailRow label="Completed" value={f.completedAt ? formatDate(f.completedAt, { withTime: true }) : null} />
+                  {detail.legs_total !== null && <DetailRow label="Legs" value={String(detail.legs_total)} />}
+                  {f.requestId && <DetailRow label="Request ID" value={f.requestId} mono copy={f.requestId} />}
+                  {f.relatedTx && <DetailRow label="Related Transaction" value={f.relatedTx} mono copy={f.relatedTx} />}
+                </DetailSection>
+
+                <DetailSection title="Money">
+                  <DetailRow label="Account" value={acct?.name} />
+                  <DetailRow label="Amount" value={money(Number(detail.amount), detail.currency)} />
+                  {f.billAmount !== null && f.billCurrency && f.billCurrency !== detail.currency && (
+                    <DetailRow label="Original Amount" value={money(f.billAmount, f.billCurrency)} />
+                  )}
+                  <DetailRow label="Fee" value={f.fee !== null ? money(f.fee, detail.currency) : null} />
+                  <DetailRow label="Balance After" value={f.balanceAfter !== null ? money(f.balanceAfter, detail.currency) : null} />
+                </DetailSection>
+
+                <DetailSection title="Reconciliation">
+                  <DetailRow label="Status" value={<MatchBadge row={detail} />} />
+                  {matched && <DetailRow label="Invoice" value={matched.internal_number} />}
+                  {detail.match_method && <DetailRow label="Matched By" value={typeLabel(detail.match_method)} />}
+                  {detail.matched_at && <DetailRow label="Matched On" value={formatDate(detail.matched_at, { withTime: true })} />}
+                </DetailSection>
+              </div>
+            );
+          })()}
+        </SheetContent>
+      </Sheet>
 
       {importFor && (
         <ImportStatementDialog

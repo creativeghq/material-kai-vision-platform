@@ -326,9 +326,12 @@ export interface RevolutAccount {
 export interface RevolutTransactionLeg {
   leg_id: string;
   account_id: string;
-  counterparty?: { account_type?: string; account_id?: string };
+  counterparty?: { id?: string; account_type?: 'self' | 'revolut' | 'external' | string; account_id?: string };
   amount: number;
+  fee?: number;
   currency: string;
+  bill_amount?: number;
+  bill_currency?: string;
   description?: string;
   balance?: number;
 }
@@ -341,7 +344,10 @@ export interface RevolutTransaction {
   updated_at?: string;
   completed_at?: string;
   reference?: string;
-  merchant?: { name?: string };
+  request_id?: string;
+  related_transaction_id?: string;
+  merchant?: { name?: string; city?: string; category_code?: string; country?: string };
+  card?: { card_number?: string; first_name?: string; last_name?: string };
   counterparty?: { name?: string };
   legs: RevolutTransactionLeg[];
 }
@@ -379,6 +385,30 @@ export interface RevolutCounterparty {
   id: string;
   name?: string;
   state?: string;
+  revtag?: string;
+  profile_type?: string;
+  country?: string;
+  created_at?: string;
+  accounts?: Array<{
+    id: string; name?: string; type?: string; currency?: string; bank_country?: string;
+    iban?: string; bic?: string; account_no?: string; sort_code?: string; routing_number?: string;
+  }>;
+}
+
+/** Every saved counterparty, newest first, paged by `created_before`. */
+export async function listCounterparties(supabase: any, cfg: RevolutConfigRow, issuerDomain: string) {
+  const out: RevolutCounterparty[] = [];
+  let before: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const q = new URLSearchParams({ limit: '1000' });
+    if (before) q.set('created_before', before);
+    const batch = await revolutJson<RevolutCounterparty[]>(supabase, cfg, issuerDomain, `/counterparties?${q.toString()}`);
+    out.push(...(batch ?? []));
+    if (!batch || batch.length < 1000) break;
+    before = batch[batch.length - 1].created_at;
+    if (!before) break;
+  }
+  return out;
 }
 
 /** Create an external-IBAN counterparty. Body per Revolut: company_name | individual_name + iban/bic. */
