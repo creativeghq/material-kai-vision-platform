@@ -303,10 +303,17 @@ const FinancePage: React.FC = () => {
   // No workspace once context settled → stop the spinner so the empty-state renders.
   useEffect(() => { if (!wsLoading && !workspaceId) setLoading(false); }, [wsLoading, workspaceId]);
 
-  // Dashboard insights — re-fetch when the workspace or period changes, independent
-  // of the heavy loadAll() so flipping the period is cheap.
-  useEffect(() => { if (workspaceId) void loadInsights(workspaceId, dashPeriod); }, [workspaceId, dashPeriod]);
-  useEffect(() => { if (workspaceId) void loadPnl(workspaceId, dashPeriod); }, [workspaceId, dashPeriod]);
+  // Dashboard-only reads: fetched when the Dashboard is open, once per workspace + period.
+  const onDashboard = activeTab === FINANCE_TAB.dashboard;
+  const dashFetchedKey = useRef('');
+  useEffect(() => {
+    if (!workspaceId || !onDashboard) return;
+    const key = `${workspaceId}|${dashPeriod}`;
+    if (dashFetchedKey.current === key) return;
+    dashFetchedKey.current = key;
+    void loadInsights(workspaceId, dashPeriod);
+    void loadPnl(workspaceId, dashPeriod);
+  }, [workspaceId, dashPeriod, onDashboard]);
 
   // Reconcile a deposit → turn the order it was taken on into a receipt/invoice draft.
   const issueFromOrder = async (orderId: string) => {
