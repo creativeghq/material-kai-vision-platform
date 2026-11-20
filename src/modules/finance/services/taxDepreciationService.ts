@@ -15,6 +15,7 @@ export type {
 export {
   TAX_STATUS_LABEL, TAX_RATE_STATUS_LABEL, taxBasisIsUnknown, rateIsConfirmed,
   rateNeedsAttention, differenceIsReportable, ADJUSTMENT_DOCUMENT, LEGAL_BASIS,
+  rateDiffersFromStatutory, prefillableCategories, suggestTaxCategory, formatRate,
 } from '@/modules/finance/taxDepreciationRules';
 
 export interface TaxRateInput {
@@ -54,28 +55,36 @@ export const taxDepreciationService = {
 
   /**
    * A rate change is a NEW ROW closing the previous one, never an edit: editing one rewrites every
-   * year that was already filed on the old rate.
+   * year that was already filed on the old rate. Same effective date = correcting that entry.
    */
   async recordRate(input: TaxRateInput): Promise<void> {
-    const { error: closeError } = await supabase
-      .from('tax_depreciation_rates')
-      .update({ effective_to: input.effectiveFrom })
-      .eq('workspace_id', input.workspaceId)
-      .eq('category_code', input.categoryCode)
-      .is('effective_to', null)
-      .lt('effective_from', input.effectiveFrom);
-    if (closeError) throw closeError;
+    const { error } = await supabase.rpc('record_tax_depreciation_rate' as never, {
+      p_workspace: input.workspaceId,
+      p_category: input.categoryCode,
+      p_rate: input.ratePercent,
+      p_effective_from: input.effectiveFrom,
+      p_source_note: input.sourceNote ?? null,
+      p_confirmed_on: input.confirmedOn ?? null,
+    } as never);
+    if (error) throw error;
+  },
 
-    const { data: auth } = await supabase.auth.getUser();
-    const { error } = await supabase.from('tax_depreciation_rates').insert({
-      workspace_id: input.workspaceId,
-      category_code: input.categoryCode,
-      rate_percent: input.ratePercent,
-      effective_from: input.effectiveFrom,
-      source_note: input.sourceNote ?? null,
-      confirmed_on: input.confirmedOn ?? null,
-      confirmed_by: input.confirmedOn ? (auth?.user?.id ?? null) : null,
-    });
+  /** Copies the statutory table into every category with nothing on file; lands unconfirmed. */
+  async prefillStatutory(workspaceId: string): Promise<number> {
+    const { data, error } = await supabase.rpc('adopt_statutory_tax_rates' as never, {
+      p_workspace: workspaceId,
+    } as never);
+    if (error) throw error;
+    return Number(data ?? 0);
+  },
+
+  async confirmRate(workspaceId: string, categoryCode: string, confirmedOn: string, sourceNote?: string | null): Promise<void> {
+    const { error } = await supabase.rpc('confirm_tax_depreciation_rate' as never, {
+      p_workspace: workspaceId,
+      p_category: categoryCode,
+      p_confirmed_on: confirmedOn,
+      p_source_note: sourceNote ?? null,
+    } as never);
     if (error) throw error;
   },
 };

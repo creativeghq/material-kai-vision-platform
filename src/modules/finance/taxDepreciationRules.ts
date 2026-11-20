@@ -43,6 +43,11 @@ export interface TaxRateRow {
   source_note: string | null;
   status: TaxRateStatus;
   asset_count: number;
+  statutory_rate_percent: number | null;
+  statutory_reference: string | null;
+  asset_category_hints: string[] | null;
+  history_count: number;
+  statutory_effective_from: string | null;
 }
 
 export interface BasisDifferenceAsset {
@@ -100,6 +105,22 @@ export const rateIsConfirmed = (row: Pick<TaxRateRow, 'rate_percent' | 'confirme
 
 export const rateNeedsAttention = (row: TaxRateRow): boolean =>
   row.asset_count > 0 && !rateIsConfirmed(row);
+
+/** The recorded rate departs from the platform's statutory table — worth a second look, not an error. */
+export const rateDiffersFromStatutory = (row: TaxRateRow): boolean =>
+  row.rate_percent != null && row.statutory_rate_percent != null
+  && Number(row.rate_percent) !== Number(row.statutory_rate_percent);
+
+/** Categories the platform table can prefill: a reference rate exists and nothing is on file yet. */
+export const prefillableCategories = (rows: TaxRateRow[]): TaxRateRow[] =>
+  rows.filter((r) => r.statutory_rate_percent != null && r.history_count === 0);
+
+/** The statutory category the asset form pre-selects for an asset category, if the registry names one. */
+export const suggestTaxCategory = (rows: TaxRateRow[], assetCategory: string): string | null =>
+  rows.find((r) => (r.asset_category_hints ?? []).includes(assetCategory))?.code ?? null;
+
+export const formatRate = (n: number | null): string =>
+  n == null ? '—' : `${Number(n).toLocaleString('en-US', { maximumFractionDigits: 3 })}%`;
 
 /**
  * The two bases legitimately differ, and where they do the difference is a real adjustment on the

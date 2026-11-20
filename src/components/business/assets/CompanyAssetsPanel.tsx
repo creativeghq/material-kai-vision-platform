@@ -25,7 +25,7 @@ import {
 import { Badge } from '@/components/core/ui/badge';
 import { TaxDepreciationCard } from './TaxDepreciationCard';
 import {
-  taxDepreciationService, TAX_STATUS_LABEL, taxBasisIsUnknown,
+  taxDepreciationService, TAX_STATUS_LABEL, taxBasisIsUnknown, suggestTaxCategory, formatRate,
   type TaxRateRow, type AssetTaxDepreciation,
 } from '@/modules/finance/services/taxDepreciationService';
 
@@ -151,7 +151,18 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
   const pageRows = useMemo(() => paginate(filtered, page, 15), [filtered, page]);
   useEffect(() => { setPage((p) => clampPage(p, filtered.length, 15)); }, [filtered.length]);
 
-  const openAdd = () => { setEditing(null); setForm(categoryFilter ? { ...EMPTY_FORM, category: categoryFilter } : EMPTY_FORM); setCostText(''); setSalvageText(''); setFormOpen(true); };
+  const openAdd = () => {
+    setEditing(null);
+    const category = categoryFilter ?? EMPTY_FORM.category;
+    setForm({ ...EMPTY_FORM, category, tax_category_code: suggestTaxCategory(taxCategories, category) });
+    setCostText(''); setSalvageText(''); setFormOpen(true);
+  };
+  // A suggested tax category follows the asset category until somebody picks one deliberately.
+  const changeCategory = (category: AssetCategory) => setForm((f) => {
+    const wasSuggested = !f.tax_category_code || f.tax_category_code === suggestTaxCategory(taxCategories, f.category);
+    return { ...f, category, tax_category_code: wasSuggested ? suggestTaxCategory(taxCategories, category) : f.tax_category_code };
+  });
+  const chosenTaxCategory = taxCategories.find((c) => c.code === form.tax_category_code);
   const openEdit = (a: CompanyAsset) => {
     setEditing(a);
     setForm({
@@ -377,7 +388,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
             <FormSection title="Asset">
               <FormGrid>
                 <FormField label="Category">
-                  <Select value={form.category} onValueChange={(v) => setForm((f) => ({ ...f, category: v as AssetCategory }))}>
+                  <Select value={form.category} onValueChange={(v) => changeCategory(v as AssetCategory)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{CATEGORIES.map((c) => <SelectItem key={c} value={c}>{ASSET_CATEGORY_LABEL[c]}</SelectItem>)}</SelectContent>
                   </Select>
@@ -473,7 +484,12 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                   )}
                 </FormGrid>
                 <FormGrid className="border-t border-hairline pt-3">
-                  <FormField label="Tax Category (άρθρο 24)">
+                  <FormField
+                    label="Tax Category (άρθρο 24)"
+                    hint={chosenTaxCategory
+                      ? `Rate on file: ${formatRate(chosenTaxCategory.rate_percent)}${chosenTaxCategory.rate_percent == null ? ` (law says ${formatRate(chosenTaxCategory.statutory_rate_percent)} — set it under Tax Depreciation)` : ''}`
+                      : undefined}
+                  >
                     <Select
                       value={form.tax_category_code || 'none'}
                       onValueChange={(v) => setForm((f) => ({ ...f, tax_category_code: v === 'none' ? null : v }))}
@@ -487,7 +503,7 @@ export const CompanyAssetsPanel: React.FC<Props> = ({ workspaceId, canManage = t
                       </SelectContent>
                     </Select>
                   </FormField>
-                  <FormField label="Put into Use On">
+                  <FormField label="Put into Use On" optional hint="Empty = the book start date, or else the acquired date.">
                     <Input
                       type="date" value={form.tax_placed_in_service_on || ''}
                       onChange={(e) => setForm((f) => ({ ...f, tax_placed_in_service_on: e.target.value }))}

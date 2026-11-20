@@ -13,6 +13,7 @@ import { stripComments } from '../helpers/stripComments';
 import {
   TAX_STATUS_LABEL, TAX_RATE_STATUS_LABEL, taxBasisIsUnknown, rateIsConfirmed,
   rateNeedsAttention, differenceIsReportable, ADJUSTMENT_DOCUMENT, LEGAL_BASIS,
+  rateDiffersFromStatutory, prefillableCategories, suggestTaxCategory,
   type TaxDepreciationStatus, type TaxRateRow, type BasisDifference,
 } from '@/modules/finance/taxDepreciationRules';
 import {
@@ -34,7 +35,9 @@ const reports = read('src/modules/finance/tabs/ReportsTab.tsx');
 const rate = (over: Partial<TaxRateRow>): TaxRateRow => ({
   code: 'machinery', label_el: 'Μηχανήματα', label_en: 'Machinery', sort_order: 50, notes: null,
   rate_percent: 10, effective_from: '2024-01-01', effective_to: null,
-  confirmed_on: '2026-09-13', source_note: null, status: 'in_force', asset_count: 3, ...over,
+  confirmed_on: '2026-09-13', source_note: null, status: 'in_force', asset_count: 3,
+  statutory_rate_percent: 10, statutory_reference: LEGAL_BASIS, asset_category_hints: ['equipment'],
+  history_count: 1, statutory_effective_from: '2014-01-01', ...over,
 });
 
 const verdict = (over: Partial<IntrastatFlowVerdict>): IntrastatFlowVerdict => ({
@@ -79,10 +82,24 @@ describe('a rate nobody confirmed is a number somebody typed', () => {
     }
   });
 
-  it('a revision closes the previous row instead of editing it', () => {
-    // Editing one rewrites every year that was already filed on the old rate.
-    expect(taxService).toMatch(/\.update\(\{ effective_to[\s\S]{0,600}\.insert\(/);
-    expect(taxService).toMatch(/is\('effective_to', null\)/);
+  it('a revision is ONE server write that closes the previous row, never a client close-then-insert', () => {
+    expect(taxService).toMatch(/rpc\('record_tax_depreciation_rate'/);
+    expect(taxService).not.toMatch(/from\('tax_depreciation_rates'\)/);
+  });
+
+  it('the statutory table only prefills what is empty, and a prefill is not a confirmation', () => {
+    expect(taxService).toMatch(/rpc\('adopt_statutory_tax_rates'/);
+    const rows = [rate({ code: 'a', history_count: 0 }), rate({ code: 'b' }), rate({ code: 'c', history_count: 0, statutory_rate_percent: null })];
+    expect(prefillableCategories(rows).map((r) => r.code)).toEqual(['a']);
+    expect(rateIsConfirmed(rate({ confirmed_on: null }))).toBe(false);
+  });
+
+  it('a recorded rate that departs from the table is flagged, and the asset form suggests from the registry', () => {
+    expect(rateDiffersFromStatutory(rate({ rate_percent: 15 }))).toBe(true);
+    expect(rateDiffersFromStatutory(rate({}))).toBe(false);
+    expect(rateDiffersFromStatutory(rate({ rate_percent: null }))).toBe(false);
+    expect(suggestTaxCategory([rate({})], 'equipment')).toBe('machinery');
+    expect(suggestTaxCategory([rate({})], 'payment_card')).toBeNull();
   });
 });
 
