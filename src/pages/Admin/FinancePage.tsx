@@ -81,7 +81,7 @@ import { SettingsTab } from '@/modules/finance/tabs/SettingsTab';
 import TripExpensesPanel from '@/modules/finance/components/TripExpensesPanel';
 import { SourcingBoardPanel } from '@/modules/finance/components/SourcingBoardPanel';
 import { CompanyAssetsPanel } from '@/components/business/assets/CompanyAssetsPanel';
-import type { FinanceSettings, PnlOverview, PnlMonthRow, PnlDayRow } from '@/modules/finance/services/financeService';
+import type { FinanceSettings, PnlOverview, PnlMonthRow, PnlDayRow, RevenuePipeline } from '@/modules/finance/services/financeService';
 import { InvoiceActionsMenu } from '@/modules/finance/components/InvoiceActionsMenu';
 import DocumentsView from '@/modules/finance/pages/DocumentsPage';
 import { OrdersPanel } from '@/modules/finance/components/OrdersPanel';
@@ -99,6 +99,7 @@ import { ExpenseKindsTab } from '@/modules/finance/tabs/ExpenseKindsTab';
 import { CategoriseExpensesPanel } from '@/modules/finance/components/CategoriseExpensesPanel';
 import { FinanceHealthStrip } from '@/modules/finance/components/FinanceHealthStrip';
 import { PnlOverviewCard } from '@/modules/finance/components/PnlOverviewCard';
+import { RevenuePipelineCard } from '@/modules/finance/components/RevenuePipelineCard';
 import { PnlTrendCard, pnlBucketDays } from '@/modules/finance/components/PnlTrendCard';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
 import { ModuleTabGate } from '@/components/core/ModuleTabGate';
@@ -235,6 +236,9 @@ const FinancePage: React.FC = () => {
   // cards as loaded - every tile "Unknown" - while these two reads were still in flight.
   const [pnlLoading, setPnlLoading] = useState(true);
   const [pnlError, setPnlError] = useState<string | null>(null);
+  const [pipeline, setPipeline] = useState<RevenuePipeline | null>(null);
+  const [pipelineLoading, setPipelineLoading] = useState(true);
+  const [pipelineError, setPipelineError] = useState<string | null>(null);
 
   const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
   const [newExpenseOpen, setNewExpenseOpen] = useState(false);
@@ -313,6 +317,7 @@ const FinancePage: React.FC = () => {
     dashFetchedKey.current = key;
     void loadInsights(workspaceId, dashPeriod);
     void loadPnl(workspaceId, dashPeriod);
+    void loadPipeline(workspaceId, dashPeriod);
   }, [workspaceId, dashPeriod, onDashboard]);
 
   // Reconcile a deposit → turn the order it was taken on into a receipt/invoice draft.
@@ -360,6 +365,21 @@ const FinancePage: React.FC = () => {
       setPnlError((err as { message?: string } | null)?.message ?? 'The query failed.');
     } finally {
       setPnlLoading(false);
+    }
+  };
+
+  const loadPipeline = async (wsId: string, period: DashPeriod) => {
+    const { from, to } = dashRange(period);
+    setPipelineLoading(true);
+    setPipeline(null);
+    try {
+      setPipeline(await financeService.getRevenuePipeline(wsId, from, to));
+      setPipelineError(null);
+    } catch (err) {
+      console.error('[finance] pipeline unavailable', err);
+      setPipelineError((err as { message?: string } | null)?.message ?? 'The query failed.');
+    } finally {
+      setPipelineLoading(false);
     }
   };
 
@@ -747,6 +767,14 @@ const FinancePage: React.FC = () => {
               loading={pnlLoading}
               error={pnlError}
               onRetry={() => workspaceId && void loadPnl(workspaceId, dashPeriod)}
+            />
+
+            <RevenuePipelineCard
+              pipeline={pipeline}
+              periodLabel={DASH_PERIOD_LABEL[dashPeriod]}
+              loading={pipelineLoading}
+              error={pipelineError}
+              onRetry={() => workspaceId && void loadPipeline(workspaceId, dashPeriod)}
             />
 
             <PnlTrendCard

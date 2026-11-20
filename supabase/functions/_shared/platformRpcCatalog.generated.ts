@@ -869,6 +869,48 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
     ]
   },
   {
+    "name": "get_lost_revenue",
+    "subject": "lost revenue",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_lost_revenue_by_reason",
+    "subject": "lost revenue by reason",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
+        "required": true
+      }
+    ]
+  },
+  {
     "name": "get_manageable_workspaces",
     "subject": "manageable workspaces",
     "args": []
@@ -1642,6 +1684,27 @@ export const PLATFORM_RPC_CATALOG: readonly PlatformRpcEntry[] = [
       {
         "name": "p_charge_ids",
         "type": "uuid[]",
+        "required": true
+      }
+    ]
+  },
+  {
+    "name": "get_revenue_pipeline",
+    "subject": "revenue pipeline",
+    "args": [
+      {
+        "name": "p_workspace_id",
+        "type": "uuid",
+        "required": true
+      },
+      {
+        "name": "p_from",
+        "type": "date",
+        "required": true
+      },
+      {
+        "name": "p_to",
+        "type": "date",
         "required": true
       }
     ]

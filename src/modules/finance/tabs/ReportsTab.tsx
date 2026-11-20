@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Loader2, Download, AlertTriangle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
@@ -21,12 +22,13 @@ type ReportKind =
   | 'top_customer_outstanding' | 'top_supplier_outstanding'
   | 'vat_return' | 'vat_by_code' | 'mydata_reconciliation' | 'myf'
   | 'intrastat_dispatch' | 'intrastat_arrival'
+  | 'lost_revenue' | 'lost_revenue_by_reason'
   | 'open_tasks';
 
 type Period = 'this_month' | 'last_month' | 'last_quarter' | 'ytd' | 'last_year' | 'custom';
 type SortDir = 'desc' | 'asc';
 
-type ReportGroup = 'overview' | 'sales' | 'purchases' | 'payments' | 'outstanding' | 'vat' | 'customs' | 'tasks';
+type ReportGroup = 'overview' | 'sales' | 'pipeline' | 'purchases' | 'payments' | 'outstanding' | 'vat' | 'customs' | 'tasks';
 
 const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: 'range' | 'snapshot' }[] = [
   // Overview (Oxygen Ταμείο)
@@ -41,6 +43,9 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
   { value: 'sales_per_product',   label: 'Sales per Product',       group: 'sales',       period: 'range' },
   { value: 'sales_per_category',  label: 'Sales per Category',      group: 'sales',       period: 'range' },
   { value: 'sales_per_designer',  label: 'Sales per Designer',      group: 'sales',       period: 'range' },
+  // Pipeline — quotes and deals that did not become sales
+  { value: 'lost_revenue',           label: 'Lost Revenue',           group: 'pipeline', period: 'range' },
+  { value: 'lost_revenue_by_reason', label: 'Lost Revenue by Reason', group: 'pipeline', period: 'range' },
   // Purchases
   { value: 'purchases_per_product', label: 'Purchases per Product', group: 'purchases',   period: 'range' },
   { value: 'receipts_per_product',  label: 'Receipts per Product',  group: 'purchases',   period: 'range' },
@@ -68,6 +73,7 @@ const REPORTS: { value: ReportKind; label: string; group: ReportGroup; period: '
 const GROUP_LABELS: Record<ReportGroup, string> = {
   overview: 'Overview (cash & P&L)',
   sales: 'Sales',
+  pipeline: 'Pipeline (Lost Quotes & Deals)',
   purchases: 'Purchases',
   payments: 'Payments (cash movements)',
   vat: 'VAT / myDATA',
@@ -174,6 +180,10 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
           data = await financeService.reportSpendPerSupplier(workspaceId, range.from, range.to); break;
         case 'payments_out_per_counterparty':
           data = await financeService.reportPaymentsOutPerCounterparty(workspaceId, range.from, range.to); break;
+        case 'lost_revenue':
+          data = await financeService.reportLostRevenue(workspaceId, range.from, range.to); break;
+        case 'lost_revenue_by_reason':
+          data = await financeService.reportLostRevenueByReason(workspaceId, range.from, range.to); break;
         case 'payments_in_per_counterparty':
           data = await financeService.reportPaymentsInPerCounterparty(workspaceId, range.from, range.to); break;
         case 'top_customer_outstanding':
@@ -272,7 +282,7 @@ export const ReportsTab: React.FC<Props> = ({ workspaceId }) => {
             <Select value={report} onValueChange={(v) => setReport(v as ReportKind)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {(['overview', 'sales', 'purchases', 'payments', 'vat', 'outstanding', 'tasks'] as ReportGroup[]).map((g) => {
+                {(['overview', 'sales', 'pipeline', 'purchases', 'payments', 'vat', 'customs', 'outstanding', 'tasks'] as ReportGroup[]).map((g) => {
                   const inGroup = REPORTS.filter((r) => r.group === g);
                   if (inGroup.length === 0) return null;
                   return (
@@ -428,6 +438,9 @@ function primarySortKey(report: ReportKind): string {
       return 'total_paid';
     case 'payments_in_per_counterparty':
       return 'total_received';
+    case 'lost_revenue':
+    case 'lost_revenue_by_reason':
+      return 'value';
     case 'top_customer_outstanding':
     case 'top_supplier_outstanding':
       return 'outstanding';
@@ -613,6 +626,13 @@ function computeTotals(report: ReportKind, rows: any[]): { label: string; value:
     }
     case 'open_tasks':
       return [{ label: 'Open tasks', value: String(rows.length) }];
+    case 'lost_revenue':
+      return [{ label: 'Lost', value: String(rows.length) }, ...moneyTotals(rows, 'value', 'Lost value')];
+    case 'lost_revenue_by_reason':
+      return [
+        { label: 'Lost', value: String(rows.reduce((s, r) => s + Number(r.lost_count || 0), 0)) },
+        ...moneyTotals(rows, 'value', 'Lost value'),
+      ];
   }
 }
 
@@ -748,6 +768,29 @@ function renderReport(
         ])}
         footer={<TablePagination page={page} total={rows.length} onPageChange={onPageChange} label="tasks" />}
       />
+    );
+  }
+  if (report === 'lost_revenue') {
+    return (
+      <Table
+        headers={['Quote / Deal', 'Customer', 'Reason', 'Owner', 'Lost On', 'Value']}
+        totals={totals}
+        rows={paginate(rows, page).map((r: any) => [
+          <Link key="l" className="hover:underline" to={r.source === 'quote' ? `/quotes/manage/${r.record_id}` : `/crm/deals/${r.record_id}`}>
+            {r.label} <span className="text-[10px] text-muted-foreground">· {r.source === 'quote' ? 'Quote' : 'Deal'}</span>
+          </Link>,
+          r.customer_name ?? '—', r.reason ?? 'No reason recorded', r.owner_name ?? '—',
+          r.lost_on ? formatDate(r.lost_on) : '—', formatMoney(Number(r.value || 0), r.currency || 'EUR'),
+        ])}
+        footer={<TablePagination page={page} total={rows.length} onPageChange={onPageChange} label="lost items" />}
+      />
+    );
+  }
+  if (report === 'lost_revenue_by_reason') {
+    return (
+      <Table headers={['Reason', 'Lost', 'Value']} totals={totals} rows={rows.map((r: any) => [
+        r.reason, String(r.lost_count ?? 0), formatMoney(Number(r.value || 0), r.currency || 'EUR'),
+      ])} />
     );
   }
   if (report === 'sales_per_factory') {

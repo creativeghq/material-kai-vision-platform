@@ -37921,6 +37921,10 @@ export type Database = {
           unpriced_lines: number
         }[]
       }
+      get_revenue_pipeline: {
+        Args: { p_from: string; p_to: string; p_workspace_id: string }
+        Returns: Json
+      }
       get_quote_pipeline_summary: {
         Args: { p_days?: number; p_workspace_id: string }
         Returns: Json
@@ -39754,6 +39758,29 @@ export type Database = {
           line_count: number
           revenue_net: number
           total_quantity: number
+        }[]
+      }
+      get_lost_revenue: {
+        Args: { p_from: string; p_to: string; p_workspace_id: string }
+        Returns: {
+          currency: string
+          customer_name: string
+          label: string
+          lost_on: string
+          owner_name: string
+          reason: string
+          record_id: string
+          source: string
+          value: number
+        }[]
+      }
+      get_lost_revenue_by_reason: {
+        Args: { p_from: string; p_to: string; p_workspace_id: string }
+        Returns: {
+          currency: string
+          lost_count: number
+          reason: string
+          value: number
         }[]
       }
       report_sales_per_customer: {

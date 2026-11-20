@@ -3569,6 +3569,22 @@ export interface SalesPerProductRow { product_id: string | null; product_name: s
 export interface CustomerTopProductRow { product_id: string; description: string; sku: string | null; total_quantity: number; revenue_net: number; order_count: number; last_ordered: string | null; on_hand: number; currency: string }
 export interface SalesPerCategoryRow { category_id: string | null; category_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number; currency: string }
 export interface PurchasesPerProductRow { product_id: string | null; product_name: string; sku: string | null; total_quantity: number; total_cost: number; currency: string }
+/** Sales opportunities in play, derived by `get_revenue_pipeline`. A quoted deal is counted once, through its quote. */
+export interface RevenuePipeline {
+  status: 'ok'; currency: string; period_from: string; period_to: string;
+  open_count: number; open_value: number;
+  open_quote_count: number; open_quote_value: number; open_quote_profit: number | null;
+  open_deal_count: number; open_deal_value: number;
+  draft_count: number; draft_value: number;
+  won_count: number; won_value: number;
+  lost_count: number; lost_value: number;
+  win_rate_value_pct: number | null; decided_count: number;
+  win_rate_status: 'ok' | 'not_enough_history';
+  expected_value: number | null;
+  other_currency_count: number;
+}
+export interface LostRevenueRow { source: 'quote' | 'deal'; record_id: string; label: string; customer_name: string | null; owner_name: string | null; reason: string | null; lost_on: string; value: number; currency: string }
+export interface LostRevenueByReasonRow { reason: string; lost_count: number; value: number; currency: string }
 export interface OpenTaskRow { quote_id: string; quote_label: string; kind: string; scheduled_for: string; days_until: number; body: string | null; owner_user_id: string | null }
 
 export interface SalesPerFactoryRow { factory_name: string; line_count: number; total_quantity: number; revenue_net: number; gross_margin: number; currency: string }
@@ -4070,6 +4086,21 @@ const _financeServiceV2 = {
     });
     if (error) throw error;
     return (data ?? []) as PurchasesPerProductRow[];
+  },
+  async getRevenuePipeline(workspaceId: string, from: string, to: string): Promise<RevenuePipeline> {
+    const { data, error } = await supabase.rpc('get_revenue_pipeline', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return data as unknown as RevenuePipeline;
+  },
+  async reportLostRevenue(workspaceId: string, from: string, to: string): Promise<LostRevenueRow[]> {
+    const { data, error } = await supabase.rpc('get_lost_revenue', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as LostRevenueRow[];
+  },
+  async reportLostRevenueByReason(workspaceId: string, from: string, to: string): Promise<LostRevenueByReasonRow[]> {
+    const { data, error } = await supabase.rpc('get_lost_revenue_by_reason', { p_workspace_id: workspaceId, p_from: from, p_to: to });
+    if (error) throw error;
+    return (data ?? []) as LostRevenueByReasonRow[];
   },
   async reportOpenTasks(workspaceId: string): Promise<OpenTaskRow[]> {
     const { data, error } = await supabase.rpc('report_open_tasks', { p_workspace_id: workspaceId });

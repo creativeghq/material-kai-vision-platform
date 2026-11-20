@@ -29,6 +29,7 @@ export const PLATFORM_RPC_WITHHELD: readonly WithheldRpc[] = [
   { name: 'get_tender_bid_analysis', reason: 'Competing tender bid prices side by side.' },
   { name: 'get_finance_pnl_overview', reason: 'Workspace profit and loss over a period, books against ΑΑΔΕ.' },
   { name: 'get_finance_pnl_monthly', reason: 'Monthly workspace profit and loss, books against ΑΑΔΕ.' },
+  { name: 'get_revenue_pipeline', reason: 'Profit on open quotes and the workspace sales pipeline.' },
   { name: 'get_finance_pnl_daily', reason: 'Day-by-day workspace income and expenses.' },
   { name: 'get_supplier_price_break', reason: 'What a supplier charges us per quantity break — our cost.' },
   { name: 'get_catalog_prices_for_workspace', reason: 'Catalogue prices including the cost the workspace pays.' },
