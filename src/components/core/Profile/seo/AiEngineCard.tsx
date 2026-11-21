@@ -117,6 +117,26 @@ const ProbeError: React.FC<{ engine: AiEngine; sampleError: string }> = ({ engin
   );
 };
 
+/** Read-but-not-cited: the engine fetched your page and then credited someone else. */
+const Retrieval: React.FC<{ engine: AiEngine }> = ({ engine }) => {
+  const r = engine.retrieval;
+  if (!r || engine.answered === 0) return null;
+  if (r.status !== 'ok') {
+    return <p className="text-[11px] leading-snug text-muted-foreground">{r.note}</p>;
+  }
+  return (
+    <p className="text-[11px] leading-snug text-muted-foreground">
+      Read your site in <span className="font-semibold text-foreground tabular-nums">{r.retrieved}</span> of {r.reported} answers
+      {r.retrieved_not_cited > 0 && (
+        <>
+          {' · '}
+          <span className="font-semibold text-amber-800 dark:text-amber-300 tabular-nums">{r.retrieved_not_cited}</span> without citing it
+        </>
+      )}
+    </p>
+  );
+};
+
 const Instead: React.FC<{ rivals: AiRival[]; model: string; sourced: boolean }> = ({ rivals, model, sourced }) => {
   const mine = rivals.filter((r) => r.engines.includes(model)).slice(0, 3);
   if (mine.length === 0) return null;
@@ -184,6 +204,7 @@ export const AiEngineCard: React.FC<{
       />
 
       <VerdictBar engine={engine} />
+      <Retrieval engine={engine} />
       <Instead
         rivals={engine.browses ? citedInstead : namedInstead}
         model={engine.model}

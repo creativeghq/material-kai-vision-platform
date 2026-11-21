@@ -17,3 +17,18 @@ describe('live advanced SERP price', () => {
     expect(serpLiveAdvancedUnits(0)).toBe(2);
   });
 });
+
+describe('poisoned-result check', () => {
+  it('bills one extra page and the rank tracker reserves for it', async () => {
+    const { serpLiveAdvancedUnitsWith, RANK_SERP_POISON_CHECK } = await import('../../supabase/functions/_shared/seo/serp-price');
+    const { readFileSync } = await import('node:fs');
+    const { stripComments } = await import('../helpers/stripComments');
+    expect(serpLiveAdvancedUnitsWith(100, true)).toBe(18);
+    expect(serpLiveAdvancedUnitsWith(100, false)).toBe(16);
+    expect(RANK_SERP_POISON_CHECK).toBe(true);
+    const gate = stripComments(readFileSync('supabase/functions/_shared/tools/dataforseo-spend-gate.ts', 'utf8'));
+    expect(gate).toMatch(/serpLiveAdvancedUnitsWith\(.*, poison\)/);
+    const tracker = stripComments(readFileSync('supabase/functions/seo-rank-tracker/index.ts', 'utf8'));
+    expect(tracker).toMatch(/resolve_poisoned: RANK_SERP_POISON_CHECK/);
+  });
+});

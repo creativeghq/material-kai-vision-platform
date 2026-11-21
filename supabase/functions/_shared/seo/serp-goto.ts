@@ -37,3 +37,34 @@ export function normalizeGotoInPlace(node: unknown, depth = 0): number {
   }
   return fixed;
 }
+
+const GOOGLE_HOP = /^https:\/\/(?:www\.)?google\.[a-z.]+\/goto\?url=[\w-]+$/;
+
+function ownsHost(url: string, host: string): boolean {
+  try {
+    const h = new URL(url).hostname.toLowerCase().replace(/^www\./, '');
+    return h === host || h.endsWith(`.${host}`);
+  } catch {
+    return false;
+  }
+}
+
+/** Our own row only: Google answers one GoTo per results page. Never fetches the destination. */
+export async function resolveOwnGoto(gotoUrl: string, host: string, fetchImpl: typeof fetch = fetch): Promise<string | null> {
+  let cur = gotoUrl;
+  for (let hop = 0; hop < 3; hop++) {
+    if (!GOOGLE_HOP.test(cur)) return null;
+    let res: Response;
+    try {
+      res = await fetchImpl(cur, { redirect: 'manual', signal: AbortSignal.timeout(5_000) });
+    } catch {
+      return null;
+    }
+    await res.body?.cancel().catch(() => {});
+    const loc = res.headers.get('location');
+    if (!loc) return null;
+    if (ownsHost(loc, host)) return loc;
+    cur = loc;
+  }
+  return null;
+}

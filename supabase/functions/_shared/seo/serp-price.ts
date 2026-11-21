@@ -16,3 +16,11 @@ export function serpLiveAdvancedUnits(depth: number): number {
 
 /** How deep the rank tracker reads Google: the estimate and the check must agree or the quoted price is a different product. */
 export const RANK_SERP_DEPTH = 100;
+
+export const POISON_CHECK_USD = FIRST_PAGE_USD;
+/** Rank checks restore poisoned organic listings (10/10 replaced on "πλακάκια θεσσαλονίκη", 2026-11-21). */
+export const RANK_SERP_POISON_CHECK = true;
+
+export function serpLiveAdvancedUnitsWith(depth: number, poisonCheck: boolean): number {
+  return Math.ceil(Math.round((serpLiveAdvancedUsd(depth) + (poisonCheck ? POISON_CHECK_USD : 0)) * 1e6) / 1000);
+}

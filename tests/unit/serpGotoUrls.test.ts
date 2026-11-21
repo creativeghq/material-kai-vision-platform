@@ -45,3 +45,33 @@ describe('Google GoTo passthrough URLs', () => {
     expect(py).toContain('google\\.[a-z.]+/goto\\?');
   });
 });
+
+describe('resolveOwnGoto', () => {
+  const GOTO1 = 'https://google.com/goto?url=CAESkQEBxCJF18Z88Vt';
+  const hop = (location: string | null) => new Response(null, { status: location ? 301 : 200, headers: location ? { location } : {} });
+
+  it('follows Google hops and returns only a page on our own host', async () => {
+    const seen: string[] = [];
+    const f = (async (u: string) => {
+      seen.push(u);
+      return u.startsWith('https://google.com') ? hop('https://www.google.com/goto?url=CAESkQEBxCJF18Z88Vt') : hop('https://materialshub.gr/plakakia');
+    }) as unknown as typeof fetch;
+    const { resolveOwnGoto } = await import('../../supabase/functions/_shared/seo/serp-goto');
+    expect(await resolveOwnGoto(GOTO1, 'materialshub.gr', f)).toBe('https://materialshub.gr/plakakia');
+    expect(seen.every((u) => /google\./.test(u))).toBe(true);
+  });
+
+  it('discards a destination on another host and never fetches it', async () => {
+    const seen: string[] = [];
+    const f = (async (u: string) => { seen.push(u); return hop('https://rival.gr/x'); }) as unknown as typeof fetch;
+    const { resolveOwnGoto } = await import('../../supabase/functions/_shared/seo/serp-goto');
+    expect(await resolveOwnGoto(GOTO1, 'materialshub.gr', f)).toBeNull();
+    expect(seen).toEqual([GOTO1]);
+  });
+
+  it('refuses anything that is not a Google GoTo link', async () => {
+    const f = (async () => { throw new Error('fetched'); }) as unknown as typeof fetch;
+    const { resolveOwnGoto } = await import('../../supabase/functions/_shared/seo/serp-goto');
+    expect(await resolveOwnGoto('http://169.254.169.254/latest', 'materialshub.gr', f)).toBeNull();
+  });
+});

@@ -9,7 +9,8 @@ import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { describeUpstreamError } from '../_shared/tool-result-shape.ts';
 import { agentReviewLink } from '../_shared/agent-handoff.ts';
 import { callDataForSEO, gatedGatewayPost } from '../_shared/tools/dataforseo-dispatch.ts';
-import { RANK_SERP_DEPTH } from '../_shared/seo/serp-price.ts';
+import { RANK_SERP_DEPTH, RANK_SERP_POISON_CHECK } from '../_shared/seo/serp-price.ts';
+import { resolveOwnGoto } from '../_shared/seo/serp-goto.ts';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -17,14 +18,7 @@ const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 /** Per invocation. A run that would exceed this rotates instead of billing for it. */
 const MAX_PER_RUN = 60;
 
-/**
- * SERP calls in flight at once. Measured 2026-09-04: one keyword takes ~19 s end to
- * end (a 7–15 s live SERP call per `ai_usage_logs.metadata.latency_ms`, plus two
- * writes), so checking the 60-keyword cap one at a time needs ~19 minutes, and the
- * edge gateway cuts the request off at 150 s with a 504 `IDLE_TIMEOUT` — well before
- * pg_net's 280 s. A sweep over a 129-keyword set checked TEN, so each keyword came
- * round every ~13 days under a panel that said "checked daily".
- */
+/** SERP calls in flight. One keyword takes ~19s and the gateway 504s at 150s, so serial checked ten of 129. */
 const CONCURRENCY = 12;
 
 /**
@@ -140,7 +134,7 @@ async function serp(
   const { ok, status, parsed } = await fetchSerp(budget, {
     params: {
       keyword: kw.keyword, country_code: kw.country_code, language_code: kw.language_code, depth,
-      device: kw.device === 'mobile' ? 'mobile' : 'desktop',
+      device: kw.device === 'mobile' ? 'mobile' : 'desktop', resolve_poisoned: RANK_SERP_POISON_CHECK,
       ...(kw.location_code ? { location_code: kw.location_code } : {}),
     },
   }, { user_id: userId, workspace_id: kw.workspace_id });
@@ -256,17 +250,17 @@ async function listLocations(country: string): Promise<{ ok: true; locations: Se
 }
 
 /** Find our best organic position on one SERP. */
-function findPosition(items: any[], host: string): { position: number | null; url: string | null } {
-  let best: { position: number; url: string | null } | null = null;
+function findPosition(items: any[], host: string): { position: number | null; url: string | null; goto: string | null } {
+  let best: { position: number; url: string | null; goto: string | null } | null = null;
   for (const it of items) {
     if (it?.type !== 'organic') continue;
     const d = String(it.domain || '').replace(/^www\./i, '').toLowerCase();
     if (!d || (d !== host && !d.endsWith(`.${host}`))) continue;
     const rank = Number(it.rank_group);
     if (!Number.isFinite(rank) || rank < 1) continue;
-    if (!best || rank < best.position) best = { position: rank, url: it.url ?? null };
+    if (!best || rank < best.position) best = { position: rank, url: it.url ?? null, goto: it.goto_url ?? null };
   }
-  return best ?? { position: null, url: null };
+  return best ?? { position: null, url: null, goto: null };
 }
 
 function isOurHost(value: unknown, host: string): boolean {
@@ -359,6 +353,7 @@ async function trackKeywords(
   const checkOne = async (kw: DueKeyword): Promise<void> => {
     let row: Record<string, unknown>;
     let triedShallow = false;
+    let ourGoto: string | null = null;
     try {
       let r = await serpWithRetry(kw, userId, deadline);
       let items: any[] = r.items || [];
@@ -381,6 +376,7 @@ async function trackKeywords(
         }
       }
       row = rowFrom(kw, r, items);
+      ourGoto = findPosition(items, hostFor(kw.url)).goto;
     } catch (e) {
       // The last thing to try before recording UNKNOWN: one read of the top 50. What
       // DataForSEO fails on is the DEEP pages — 40106 says exactly that, and the 40101s
@@ -393,6 +389,7 @@ async function trackKeywords(
         if (triedShallow) throw e;
         const r = await serp(kw, userId, false, 50, deadline);
         row = rowFrom(kw, r, r.items || []);
+        ourGoto = findPosition(r.items || [], hostFor(kw.url)).goto;
       } catch {
         // UNKNOWN, not unranked. `found:false` with an error set is a different fact
         // from `found:false` with none, and the report separates them. The feature
@@ -409,6 +406,9 @@ async function trackKeywords(
       }
     }
     const pos = row.position as number | null;
+    if (pos != null && row.url == null && ourGoto) {
+      row = { ...row, url: await resolveOwnGoto(ourGoto, hostFor(kw.url)) };
+    }
     if (row.error == null && kw.last_position != null && kw.last_position <= 10 && (pos == null || pos > 10)) {
       const rc = await recheckDrop(kw, userId, deadline);
       row = { ...row, rechecked: rc.rechecked, recheck_best_position: rc.best };
@@ -497,11 +497,7 @@ async function alertOnDrops(
       + `Read their day-by-day history and Search Console with seo_my_rankings (website_id ${website.id}, keywords: `
       + `${JSON.stringify(dropped.slice(0, 5).map((d: any) => d.keyword))}). For each one say whether the drop is real or day-to-day `
       + `volatility, which page was ranking, and what to do about it.`;
-    // `seo.ranking_movement`, not a new `seo.rank_drop`. The trigger already exists,
-    // is already in the tenant vocabulary, and already means "your rankings moved" —
-    // a second trigger for the same event would be one more copy of a vocabulary that
-    // is deliberately kept in one place, and flow-engine would match zero flows for it
-    // until all seven registration sites were updated. The payload carries the detail.
+    // The existing `seo.ranking_movement` trigger, never a second one: a new trigger matches zero flows.
     await emitFlowEventToWorkspaceRoles(
       website.workspace_id, ['owner', 'admin'], 'seo.ranking_movement', (uid) => ({
         user_id: uid, workspace_id: website.workspace_id,

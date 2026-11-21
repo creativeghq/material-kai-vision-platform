@@ -10,6 +10,7 @@
  */
 
 import { normalizeGotoInPlace } from './seo/serp-goto.ts';
+import { POISON_CHECK_USD, serpLiveAdvancedUsd } from './seo/serp-price.ts';
 import type {
   KeyTerm,
   KeywordCluster,
@@ -515,10 +516,23 @@ export class DataForSEOClient {
     return this.getSerpRegular(keyword, locationCode, languageCode);
   }
 
+  /** Same results with Google's GoTo redirects followed (~55-65s). Abort books its known price. */
+  async serpOrganicResolved(
+    keyword: string, locationCode: number, languageCode: string, signal: AbortSignal,
+  ): Promise<CompetitorData[] | null> {
+    try {
+      return await this.getSerpRegular(keyword, locationCode, languageCode, { resolveGoto: true, signal });
+    } catch (e) {
+      if ((e as Error)?.name === 'AbortError') this.spentUsd += serpLiveAdvancedUsd(10) + POISON_CHECK_USD;
+      return null;
+    }
+  }
+
   private async getSerpRegular(
     keyword: string,
     locationCode: number,
     languageCode: string,
+    opts: { resolveGoto?: boolean; signal?: AbortSignal } = {},
   ): Promise<CompetitorData[]> {
     const data = await this.apiCall(
       '/serp/google/organic/live/regular',
@@ -529,8 +543,11 @@ export class DataForSEOClient {
           language_code: languageCode,
           device: 'desktop',
           depth: 10,
+          resolve_poisoned_results: true,
+          ...(opts.resolveGoto ? { resolve_goto_urls: true } : {}),
         },
       ],
+      opts.resolveGoto ? { timeoutMs: 120_000, signal: opts.signal, retries: 0 } : {},
     );
 
     const items = data?.tasks?.[0]?.result?.[0]?.items || [];
@@ -662,16 +679,21 @@ export class DataForSEOClient {
   // ════════════════════════════════════════════════════════════════
 
   /** Make an API call with retry and timeout */
-  private async apiCall(endpoint: string, body: any[]): Promise<any> {
+  private async apiCall(
+    endpoint: string, body: any[],
+    opts: { timeoutMs?: number; signal?: AbortSignal; retries?: number } = {},
+  ): Promise<any> {
     let lastError: Error | null = null;
+    const maxRetries = opts.retries ?? MAX_RETRIES;
 
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(
           () => controller.abort(),
-          REQUEST_TIMEOUT_MS,
+          opts.timeoutMs ?? REQUEST_TIMEOUT_MS,
         );
+        opts.signal?.addEventListener('abort', () => controller.abort(), { once: true });
 
         const response = await fetch(`${DATAFORSEO_BASE_URL}${endpoint}`, {
           method: 'POST',
@@ -687,7 +709,7 @@ export class DataForSEOClient {
 
         if (!response.ok) {
           const errText = await response.text();
-          if (RETRYABLE_HTTP.has(response.status) && attempt < MAX_RETRIES) {
+          if (RETRYABLE_HTTP.has(response.status) && attempt < maxRetries) {
             console.warn(
               `[dataforseo] ${endpoint} returned ${response.status}, retrying in ${RETRY_DELAY_MS * (attempt + 1)}ms...`,
             );
@@ -718,7 +740,7 @@ export class DataForSEOClient {
         if (
           lastError.name === 'AbortError' ||
           lastError instanceof NonRetryableError ||
-          (attempt >= MAX_RETRIES)
+          (attempt >= maxRetries)
         ) {
           break;
         }

@@ -49,6 +49,8 @@ async function dataforseoCredentials(supabase: { from: (t: string) => any }): Pr
 
 const READ_PAGES_LIMIT = 5;
 const GUIDE_PAGES_LIMIT = 4;
+/** How long research waits for the redirect-resolved SERP, counted from its start (the stage has 90s). */
+const RESOLVED_SERP_WAIT_MS = 60_000;
 
 /** Ceiling on provider-reported DataForSEO spend for one research run, in $0.001 units (measured ~135). */
 const DATAFORSEO_CEILING_UNITS = 400;
@@ -200,6 +202,11 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       console.warn(`[seo-research] ${key} unavailable: ${failedSources[key]}`);
     };
     if (!countryCode) failed('serp_signals', `no country is mapped for location ${locationCode}`);
+    const resolvedStart = Date.now();
+    const resolvedAbort = new AbortController();
+    const resolvedSerp = readPages
+      ? client.serpOrganicResolved(body.target_keyword, locationCode, languageCode, resolvedAbort.signal)
+      : Promise.resolve(null);
     const [research, serpSignals, aiMode, guideSerp] = await Promise.all([
       client.researchKeyword(
         body.target_keyword,
@@ -223,6 +230,20 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
           .catch((e) => { failed('guide_serp', e); return [] as Awaited<ReturnType<typeof client.serpOrganic>>; })
         : Promise.resolve([] as Awaited<ReturnType<typeof client.serpOrganic>>),
     ]);
+
+    let waitTimer: number | undefined;
+    const resolved = await Promise.race([
+      resolvedSerp,
+      new Promise<null>((r) => {
+        waitTimer = setTimeout(() => { resolvedAbort.abort(); r(null); },
+          Math.max(0, RESOLVED_SERP_WAIT_MS - (Date.now() - resolvedStart))) as unknown as number;
+      }),
+    ]);
+    clearTimeout(waitTimer);
+    if (!resolved) await resolvedSerp;
+    if (resolved && resolved.filter((c) => !!c.url).length > research.serpInsights.filter((c) => !!c.url).length) {
+      research.serpInsights = resolved;
+    }
 
     await logDataForSeoDirectSpend(supabase, {
       userId, workspaceId, operation: 'seo_research', costUsd: client.spentUsd, ok: Object.keys(failedSources).length === 0,

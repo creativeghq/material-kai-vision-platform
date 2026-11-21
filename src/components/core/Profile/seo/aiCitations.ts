@@ -30,7 +30,17 @@ export interface AiEngine {
   last_error_at?: string | null;
   mention_rate: AiRate;
   citation_rate: AiRate;
+  /** Pages the engine READ while answering; `reported` 0 means it does not say. */
+  retrieval?: AiRetrieval;
   browses: boolean;
+  status: SeoMetricStatus | string;
+  note: string | null;
+}
+
+export interface AiRetrieval {
+  reported: number;
+  retrieved: number;
+  retrieved_not_cited: number;
   status: SeoMetricStatus | string;
   note: string | null;
 }
