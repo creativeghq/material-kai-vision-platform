@@ -93,6 +93,7 @@ export const SeoMetricTile: React.FC<{
             }
           : undefined
       }
+      note={hasDelta ? undefined : (m.note ?? undefined)}
       chart={
         // Optional: a caller that trims the series to keep a chat message small still gets a tile.
         m.series?.length >= 2 ? (

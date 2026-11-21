@@ -29,6 +29,8 @@ interface HubStatTileProps {
   help?: string;
   /** Sparkline / mini chart slot, rendered below the number. */
   chart?: React.ReactNode;
+  /** One line under the number saying why it has no delta or what to read it against. */
+  note?: string;
   onClick?: () => void;
   className?: string;
 }
@@ -41,6 +43,7 @@ export const HubStatTile: React.FC<HubStatTileProps> = ({
   delta,
   help,
   chart,
+  note,
   onClick,
   className,
 }) => {
@@ -95,6 +98,8 @@ export const HubStatTile: React.FC<HubStatTileProps> = ({
           )}
         </p>
       )}
+
+      {note && <p className="mt-1.5 text-[11px] leading-snug text-muted-foreground">{note}</p>}
 
       {chart && <div className="mt-2.5">{chart}</div>}
     </>

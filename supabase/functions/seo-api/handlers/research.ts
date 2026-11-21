@@ -229,6 +229,10 @@ export async function handleResearch(req: Request, body: any): Promise<Response>
       note: client.unpricedCalls > 0 ? 'a response carried no cost' : undefined,
     });
     research.aiModeAnswer = aiMode;
+    const hiddenUrls = research.serpInsights.filter((c) => !c.url).length;
+    if (hiddenUrls) {
+      failed('competitor_urls', `Google hid ${hiddenUrls} of ${research.serpInsights.length} ranking URLs behind redirects; those pages were not read (their domains are known).`);
+    }
     if (Object.keys(failedSources).length) research.failedSources = failedSources;
     research.readerQuestions = readerQuestions(
       research.clusters.flatMap((c) => [c.primaryKeyword, ...c.secondaryKeywords]).filter(Boolean),

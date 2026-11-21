@@ -176,7 +176,7 @@ export interface KeywordResearchResult {
   /** A page of the site that already serves this keyword; null when none was found, absent when not checked. */
   existingPage?: ExistingPage | null;
   /** Source → why it did not answer. A source named here is UNKNOWN, never "Google showed none". */
-  failedSources?: Partial<Record<'ai_mode' | 'guide_serp' | 'serp_signals', string>>;
+  failedSources?: Partial<Record<'ai_mode' | 'guide_serp' | 'serp_signals' | 'competitor_urls', string>>;
 }
 
 export interface ExistingPage {

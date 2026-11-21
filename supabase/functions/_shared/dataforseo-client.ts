@@ -9,6 +9,7 @@
  *   - DATAFORSEO_PASSWORD
  */
 
+import { normalizeGotoInPlace } from './seo/serp-goto.ts';
 import type {
   KeyTerm,
   KeywordCluster,
@@ -423,11 +424,12 @@ export class DataForSEOClient {
         const refs = item.references || item.items || [];
         if (Array.isArray(refs)) {
           for (const ref of refs) {
-            if (ref.url) {
+            const link = ref.url || ref.goto_url;
+            if (link) {
               serpFeatures.aiOverviewSources.push({
-                url: ref.url,
+                url: link,
                 title: ref.title || '',
-                domain: ref.domain || new URL(ref.url).hostname,
+                domain: ref.domain || (ref.url ? new URL(ref.url).hostname : ''),
               });
             }
           }
@@ -709,6 +711,7 @@ export class DataForSEOClient {
         // Not retried: the upstream ANSWERED, and it answered with a rejection. Retrying a
         // deterministic task error just pays DataForSEO twice for the same refusal.
         if (statusError) throw new NonRetryableError(statusError);
+        if (endpoint.startsWith('/serp/')) normalizeGotoInPlace(json);
         return json;
       } catch (error) {
         lastError = error as Error;
