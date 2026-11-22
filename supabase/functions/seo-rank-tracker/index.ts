@@ -616,14 +616,21 @@ Deno.serve(withApiLogging('seo-rank-tracker', async (req: Request) => {
   // `p_only_stale: false` — a person pressing Check now gets work done whatever the
   // sweep already covered today. The order is the same, so the keywords they have been
   // waiting on are still the ones that go first.
+  const tag = typeof body?.tag === 'string' && body.tag.trim() ? body.tag.trim().slice(0, 60) : null;
   const { data: due, error: dueErr } = await supabase.rpc('seo_keywords_due', {
-    p_website_id: website.id, p_limit: MAX_PER_RUN, p_only_stale: false,
+    p_website_id: website.id, p_limit: tag ? 1000 : MAX_PER_RUN, p_only_stale: false,
   });
   if (dueErr) return json({ error: dueErr.message }, 500);
+  let batch = (due as DueKeyword[] | null) || [];
+  if (tag) {
+    const { data: tagged, error: tagErr } = await supabase.from('seo_tracked_keywords').select('id')
+      .eq('website_id', website.id).eq('is_active', true).contains('tags', [tag]);
+    if (tagErr) return json({ error: tagErr.message }, 500);
+    const ids = new Set(((tagged ?? []) as { id: string }[]).map((t) => t.id));
+    batch = batch.filter((k) => ids.has(k.id)).slice(0, MAX_PER_RUN);
+  }
 
-  const r = await trackKeywords(
-    supabase, ((due as DueKeyword[] | null) || []), auth.userId, Date.now() + RUN_DEADLINE_MS,
-  );
+  const r = await trackKeywords(supabase, batch, auth.userId, Date.now() + RUN_DEADLINE_MS);
   const doneIds = r.doneIdsBySite.get(website.id) ?? [];
   if (doneIds.length > 0) await alertOnDrops(supabase, website, today, doneIds);
   return json({
