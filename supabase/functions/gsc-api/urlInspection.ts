@@ -187,8 +187,11 @@ export async function inspectSiteUrls(
   };
 }
 
+const PUBLISHED_RECHECK_MS = 7 * 86_400_000;
+
 /**
- * The work queue for one site: every known URL, never-inspected first, then the stalest.
+ * The work queue for one site: published article URLs not inspected in the last week first,
+ * then every known URL, never-inspected first, then the stalest.
  * Ordering here rather than in the caller keeps "what to ask next" in one place.
  */
 export async function buildInspectionQueue(
@@ -215,9 +218,22 @@ export async function buildInspectionQueue(
     seenAt.set(r.url, Date.parse(r.inspected_at));
   }
 
-  return all
+  const { data: articles } = await supabase
+    .from('seo_articles')
+    .select('published_url')
+    .eq('website_id', websiteId)
+    .not('published_url', 'is', null);
+  const dueBefore = Date.now() - PUBLISHED_RECHECK_MS;
+  const published = [...new Set(((articles || []) as Array<{ published_url: string }>)
+    .map((a) => a.published_url.replace(/\/+$/, '')))]
+    .filter((url) => (seenAt.get(url) ?? 0) < dueBefore)
+    .sort((a, b) => (seenAt.get(a) ?? 0) - (seenAt.get(b) ?? 0));
+  const first = new Set(published);
+
+  const rest = all
+    .filter((url) => !first.has(url))
     .map((url) => ({ url, at: seenAt.get(url) ?? 0 }))
     .sort((a, b) => a.at - b.at)
-    .slice(0, limit)
     .map((x) => x.url);
+  return [...published, ...rest].slice(0, limit);
 }
