@@ -1,7 +1,7 @@
 /** Editor's review after the writer: claims vs our page facts, sums, language; every finding is applied as an exact edit. */
 
 import type { DbClient } from '../../_shared/supabase-client.ts';
-import { DEFAULT_CLAUDE_MODEL, callClaudeMessages } from '../../_shared/ai-client.ts';
+import { callClaudeMessages } from '../../_shared/ai-client.ts';
 import { getToolPrompt } from '../../_shared/prompt-utils.ts';
 import type { NormalizedBrief } from './content-brief.ts';
 import { sitePagesBlock, sitePagesDataLines, type SitePage } from './site-pages.ts';
@@ -9,6 +9,7 @@ import { applyReviewEdits, pagesNamedIn, type ReviewEdit } from './site-assets.t
 import { reserveStage, settleStage, tokenCeiling, tokenCredits, type StageWallet } from './stage-billing.ts';
 import { findTellPassages, loadCopyRules } from '../../_shared/copy-check.ts';
 
+const REVIEW_MODEL = 'claude-sonnet-5-5';
 const REVIEW_MAX_INPUT_TOKENS = 14000;
 const REVIEW_CONCURRENCY = 4;
 const REVIEW_MAX_OUTPUT_TOKENS = 6000;
@@ -97,7 +98,7 @@ export async function reviewArticle(
   const wallet: StageWallet = { userId: opts.userId, workspaceId: opts.workspaceId, opType: 'seo_review' };
   const metaPart = `${META_PART}\nTITLE: ${opts.meta.title}\nMETA TITLE: ${opts.meta.metaTitle}\nMETA DESCRIPTION: ${opts.meta.metaDescription}`;
   const parts = [...sections(opts.markdown), metaPart];
-  const perPart = await tokenCeiling(supabase, DEFAULT_CLAUDE_MODEL, REVIEW_MAX_INPUT_TOKENS, REVIEW_MAX_OUTPUT_TOKENS, 25);
+  const perPart = await tokenCeiling(supabase, REVIEW_MODEL, REVIEW_MAX_INPUT_TOKENS, REVIEW_MAX_OUTPUT_TOKENS, 25);
   const ceiling = perPart * parts.length;
   let system: string;
   try {
@@ -121,7 +122,7 @@ export async function reviewArticle(
       try {
         const facts = sitePagesBlock(sitePagesDataLines(isMeta ? pagesFor('', opts.sitePages) : pagesFor(part, opts.sitePages)));
         const res = await callClaudeMessages({
-          model: DEFAULT_CLAUDE_MODEL,
+          model: REVIEW_MODEL,
           max_tokens: REVIEW_MAX_OUTPUT_TOKENS,
           system,
           messages: [{
@@ -134,7 +135,7 @@ export async function reviewArticle(
           }],
           output_config: { effort: 'medium', format: { type: 'json_schema', schema: SCHEMA } },
         }, { task: 'seo_review', userId: opts.userId, workspaceId: opts.workspaceId, timeoutMs: 180_000 });
-        priced.push(await tokenCredits(supabase, DEFAULT_CLAUDE_MODEL, res.usage ?? {}));
+        priced.push(await tokenCredits(supabase, REVIEW_MODEL, res.usage ?? {}));
         // A refusal or a truncated / unparseable reply is a failed section, never a reply to salvage.
         if (res.stop_reason === 'refusal' || res.stop_reason === 'max_tokens') {
           failures.push(`section ${res.stop_reason}`);
