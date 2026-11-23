@@ -118,6 +118,7 @@
     "list_granted_catalog_products",
     "list_supplier_products",
     "list_workspace_product_suppliers",
+    "price_kitchen_from_line",
     "price_supplier_hints",
     "product_sale_unit",
     "project_takeoff_room_areas",
