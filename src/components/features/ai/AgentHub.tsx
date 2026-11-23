@@ -202,8 +202,7 @@ const AGENT_HISTORY_SENT = 40;
 function boundedAgentHistory<T extends TurnMessage & { images?: unknown[]; geminiImageData?: unknown; virtualStagingData?: unknown; materialsBoardData?: unknown; videoData?: unknown }>(input: T[]): T[] {
   const all = input.filter((m) => !isResultCardRow(m));
   if (all.length <= AGENT_HISTORY_SENT) return all;
-  const older = all.slice(0, -AGENT_HISTORY_SENT)
-    .filter((m) => (m.images?.length ?? 0) > 0 || m.geminiImageData || m.virtualStagingData || m.materialsBoardData || m.videoData);
+  const older = all.slice(0, -AGENT_HISTORY_SENT).filter((m) => (m.images?.length ?? 0) > 0 || m.geminiImageData || m.virtualStagingData || m.materialsBoardData || m.videoData);
   return [...older, ...all.slice(-AGENT_HISTORY_SENT)];
 }
 
