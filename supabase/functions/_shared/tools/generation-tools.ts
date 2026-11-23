@@ -699,6 +699,11 @@ unchanged, preserved or identical: you have not looked at it, and saying so once
 generated stranger's kitchen into a confident "your room, floor swapped". If there is no \`edited\`
 block, no edit happened — say that plainly rather than describing a result.
 
+NEVER for a drawing someone builds or measures from (a technical/architectural drawing, plan or
+elevation with dimensions, a drawing "for the builder/carpenter/constructor", a clean copy of a sketch
+with sizes): an image model guesses the geometry and misplaces the numbers. Use manage_scenes create
+(kind plan_image) → layout → open mode drawings. This tool may only render that room afterwards.
+
 PARAMETER EXTRACTION — always do this before calling:
 1. Extract roomType from user message (bedroom, living_room, kitchen, bathroom, dining_room, home_office, etc.)
 2. Extract style from user message (modern, scandinavian, minimalist, industrial, japandi, luxury, etc.)

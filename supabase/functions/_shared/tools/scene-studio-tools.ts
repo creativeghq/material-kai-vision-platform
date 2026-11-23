@@ -309,10 +309,23 @@ export const createManageScenesTool = (
       const { data, error } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
       if (error) return JSON.stringify({ success: false, error: error.message });
       if (!data) return JSON.stringify({ success: false, error: 'Scene not found.' });
-      const { count } = await sb.from('floor_plan_objects').select('id', { count: 'exact', head: true }).eq('floor_plan_id', scene_id);
-      const scene = { ...data, object_count: count ?? 0 };
+      const { data: objs } = await sb.from('floor_plan_objects').select('label, kind, width_mm, height_mm, elevation_mm, kitchen_layout')
+        .eq('floor_plan_id', scene_id).is('removed_at', null);
+      const list = (objs ?? []) as Array<{ label: string; kind: string; width_mm: number; height_mm: number; elevation_mm: number; kitchen_layout: KitchenLayout & { source?: string; confirmed?: boolean } | null }>;
+      const kitchen_runs = list.filter((o) => KITCHEN_KINDS.has(o.kind)).map((o) => ({
+        run: o.label, kind: o.kind,
+        length_cm: Math.round(Number(o.width_mm) / 10), height_cm: Math.round(Number(o.height_mm) / 10), above_floor_cm: Math.round(Number(o.elevation_mm) / 10),
+        units: (o.kitchen_layout?.modules ?? []).map((m) => `${MODULE_LABELS[m.type] ?? m.type} ${Math.round(m.width_mm / 10)} cm`),
+        units_from: o.kitchen_layout ? (o.kitchen_layout.source === 'read' && !o.kitchen_layout.confirmed ? 'read from the drawing, not confirmed' : 'laid out') : 'none: automatic layout until set',
+      }));
+      const scene = { ...data, object_count: list.length };
       onChunk?.({ type: 'scene_studio_scene', scene, timestamp: Date.now() });
-      return JSON.stringify({ success: true, scene });
+      return JSON.stringify({
+        success: true, scene, kitchen_runs,
+        ...(kitchen_runs.length && data.extract_status === 'ready'
+          ? { message: 'Show the person each run as read and the assumptions in extract_notes, ask about anything that does not add up, then layout each run with the confirmed units before opening drawings.' }
+          : {}),
+      });
     }
 
     if (!image_url) return JSON.stringify({ success: false, error: 'create needs image_url: an image the user attached or a render from this conversation.' });
@@ -356,8 +369,11 @@ export const createManageScenesTool = (
       '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user '
       + 'rearranges it, recolours or swaps products, and renders it photo-real in any style. '
       + 'create: reads image_url (an image the user attached, or a render from this conversation) as kind '
-      + 'plan_image (a floor plan drawing), photo (a photo of a room) or render (a generated image); it is '
-      + 'charged once and takes about a minute. status: one scene by scene_id. list: the workspace\'s scenes. '
+      + 'plan_image (a floor plan, or a kitchen sketch or elevation with printed sizes, hand-drawn or CAD), photo (a photo of a room) or render (a generated image); it is '
+      + 'charged once and takes about a minute. status: one scene by scene_id, with each kitchen run and the units read for it. list: the workspace\'s scenes. '
+      + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
+      + 'create kind plan_image, status until ready, show the person the runs and units read and ask about anything that does not add up, '
+      + 'layout each run with the confirmed units, then open mode drawings. '
       + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
       + 'for Make 3D (10 credits, the user confirms), mode photo_walk offers a photo-real walk the user confirms. '
       + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space, '
@@ -373,7 +389,7 @@ export const createManageScenesTool = (
     schema: z.object({
       action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
-      kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
+      kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows; a dimensioned sketch or elevation is plan_image.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),

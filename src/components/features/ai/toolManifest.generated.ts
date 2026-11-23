@@ -1671,7 +1671,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     params: [
       { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line'], optional: false, description: 'What to do.' },
       { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },
-      { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows.' },
+      { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows; a dimensioned sketch or elevation is plan_image.' },
       { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },
       { name: 'scene_id', type: 'string', optional: true, description: 'status/open/finish: the scene.' },
       { name: 'object', type: 'string', optional: true, description: 'open/finish: the object, by its name in the room (e.g. sofa).' },
