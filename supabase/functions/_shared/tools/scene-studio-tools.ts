@@ -12,6 +12,7 @@ import { serviceClient } from '../supabase-client.ts';
 import { fetchImageGuarded } from '../fetch-image.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import { KITCHEN_KINDS, kitchenCompositionFromRoom, type RoomComposition } from '../kitchenComposition.generated.ts';
+import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
 
 const MODULE_SLUG = 'scene-studio';
 const BUCKET = 'generation-images';
@@ -25,7 +26,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -67,7 +68,7 @@ export const createManageScenesTool = (
         if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: list.map((r) => r.name) });
         roomId = hit.id;
       }
-      const intent = { mode: mode ?? 'view', object_id: target?.id ?? null, room_id: roomId, nonce: Date.now() };
+      const intent = { mode: mode ?? 'view', object_id: target?.id ?? null, room_id: roomId, ...(fronts ? { fronts } : {}), nonce: Date.now() };
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const next = mode === 'make_3d'
         ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
@@ -130,6 +131,34 @@ export const createManageScenesTool = (
       return JSON.stringify({
         success: true, room: hit.name, area, product: productRow?.name ?? null, colour: colour ?? null,
         message: `The ${area} of ${hit.name} now show ${productRow ? productRow.name : colour}. One wall or a backsplash is picked by clicking it with Paint in the room.`,
+      });
+    }
+
+    if (action === 'handles') {
+      if (!scene_id || !handles) return JSON.stringify({ success: false, error: 'handles needs scene_id and handles.' });
+      const { data: scene, error } = await sb.from('floor_plans').update({ cabinet_hardware: handles }).eq('id', scene_id).select(SCENE_COLUMNS).maybeSingle();
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent: { mode: 'view', object_id: null, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
+      return JSON.stringify({ success: true, handles: CABINET_HARDWARE_OPTIONS[handles].label, message: `The kitchen fronts now show ${CABINET_HARDWARE_OPTIONS[handles].label.toLowerCase()} in the room.` });
+    }
+
+    if (action === 'cut_list') {
+      if (!scene_id) return JSON.stringify({ success: false, error: 'cut_list needs scene_id.' });
+      const { data: scene } = await sb.from('floor_plans').select('id, project_plan_id').eq('id', scene_id).maybeSingle();
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      if (!scene.project_plan_id) return JSON.stringify({ success: false, error: 'The kitchen has not been priced yet; run price_kitchen first. The cut list comes from its plan, so it always matches the price.' });
+      const { data: lines, error } = await sb.from('project_plan_items').select('label, unit, quantity, quantity_formula')
+        .eq('plan_id', scene.project_plan_id).eq('is_schedule', true).order('sort_order');
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      const rows = (lines ?? []) as Array<{ label: string; unit: string | null; quantity: number; quantity_formula: string | null }>;
+      const cut = (r: { quantity_formula: string | null }) => ['total_board_m2_', 'total_edge_m_'].some((k) => (r.quantity_formula ?? '').includes(k));
+      const fmt = (r: { label: string; unit: string | null; quantity: number }) => ({ item: r.label, quantity: Number(r.quantity), unit: r.unit });
+      const boards = rows.filter(cut).map(fmt);
+      if (!boards.length) return JSON.stringify({ success: false, error: "This kitchen's blueprint is not built from boards, so it has no cut list. Its hardware schedule is on the plan." });
+      return JSON.stringify({
+        success: true, plan_id: scene.project_plan_id, boards, hardware: rows.filter((r) => !cut(r)).map(fmt),
+        message: 'Board areas and edge tape come from the cabinets on the kitchen plan. If the room has changed since it was priced, run price_kitchen again first.',
       });
     }
 
@@ -244,9 +273,12 @@ export const createManageScenesTool = (
       + 'or on one part of an object (object + part, e.g. the sofa upholstery or the kitchen fronts); free. '
       + 'price_kitchen: prices the kitchen units standing in the room on a project plan from the kitchen blueprint '
       + '(runs, cabinet counts, sizes; the door model and worktop chosen on the plan are kept) and returns the subtotal. '
+      + 'handles: sets how the kitchen fronts open (handles: bar_handles, knobs, gola, push_to_open, edge_pull, cup_pulls). '
+      + 'cut_list: the board areas (carcass, fronts, back, plinth, m²), edge tape (m) and hardware the priced kitchen needs; price_kitchen first. '
+      + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
@@ -259,6 +291,8 @@ export const createManageScenesTool = (
       product: z.string().max(200).optional().describe('finish: the catalogue product to lay, by exact name or id.'),
       colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
       project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet.'),
+      fronts: z.enum(['closed', 'half', 'open']).optional().describe('open: show the kitchen doors and drawers closed, half open or open.'),
+      handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
     }),
   },
 );

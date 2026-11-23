@@ -987,9 +987,11 @@ describe('what a PLAN says about the configuration', () => {
   });
 });
 
-/** The one line the generator is allowed to rewrite: Deno resolves a file, Vite resolves a module. */
+/** The two import lines the generator is allowed to rewrite: Deno resolves a file, Vite resolves a module. */
 const EDGE_IMPORT = "import { computeLinePricing, round2 } from './formula.ts';";
 const WEB_IMPORT = "import { computeLinePricing, round2 } from './blueprintFormula';";
+const EDGE_PANELS = "} from '../cabinetPanels.generated.ts';";
+const WEB_PANELS = "} from '@/lib/scene/cabinetPanels';";
 
 describe('edge ⇄ frontend mirror parity', () => {
   it('the checked-in mirror is exactly what the generator produces', () => {
@@ -1009,7 +1011,7 @@ describe('edge ⇄ frontend mirror parity', () => {
     expect(mirror).not.toContain(EDGE_IMPORT);
     // Swap that one line back and the mirror IS the edge copy behind its banner. Nothing else
     // may differ: the two files are one derivation living in two module systems.
-    expect(mirror.replace(WEB_IMPORT, EDGE_IMPORT).endsWith(edge)).toBe(true);
+    expect(mirror.replace(WEB_IMPORT, EDGE_IMPORT).replace(WEB_PANELS, EDGE_PANELS).endsWith(edge)).toBe(true);
   });
 });
 

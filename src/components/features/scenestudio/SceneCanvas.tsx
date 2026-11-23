@@ -15,6 +15,7 @@ import { canvasRelief, finishTone } from '@/components/features/scenestudio/surf
 import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
+import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import {
   indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, zonesOn, type Finish, type SurfaceTarget,
@@ -78,6 +79,9 @@ interface Props {
   onWalkEnd?(): void;
   modelUrls?: Record<string, string>;
   staleModels?: Set<string>;
+  /** Kitchen fronts: 0 closed … 1 open. */
+  frontsOpen?: number;
+  cabinetHardware?: string | null;
 }
 
 const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
@@ -738,7 +742,9 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
+    frontsOpen = 0, cabinetHardware,
   } = props;
+  const cabinetView = useMemo(() => ({ open: frontsOpen, hardware: cabinetHardware ?? 'bar_handles' }), [frontsOpen, cabinetHardware]);
   const hasModels = Object.keys(modelUrls).length > 0;
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
   const frame = useMemo(() => planFrame(bounds), [bounds]);
@@ -990,6 +996,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         const wall = walls.find((w) => w.id === o.wall_id);
         return wall ? <OpeningMesh key={o.id} wall={wall} opening={o} frame={frame} wireframe={wireframe} /> : null;
       })}
+      <CabinetViewContext.Provider value={cabinetView}>
       {objects.filter((o) => !o.removed_at).map((o) => (
         <ObjectMesh
           key={o.id}
@@ -1014,6 +1021,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           modelStale={staleModels?.has(o.id)}
         />
       ))}
+      </CabinetViewContext.Provider>
       <OrbitControls
         ref={controls}
         makeDefault

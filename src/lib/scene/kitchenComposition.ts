@@ -12,20 +12,56 @@ const ZONE_OF: Record<string, 'base' | 'wall' | 'tall' | 'island'> = {
 
 const cm = (mm: number) => Math.round(mm / 10);
 
-function splitRun(widthCm: number, sink: boolean, tall: boolean, doubleOnly: boolean, seq: { n: number }): ZoneModuleRow[] {
-  const rows: ZoneModuleRow[] = [];
+function runModules(widthCm: number, sink: boolean, tall: boolean, doubleOnly: boolean): Array<[string, number, number]> {
+  const out: Array<[string, number, number]> = [];
   let left = widthCm;
-  if (sink && left >= 60) { const w = Math.min(90, left); rows.push({ id: `room-${seq.n++}`, type: 'sink_base', width_cm: w, qty: 1 }); left -= w; }
-  if (left < 30) return rows;
+  if (sink && left >= 60) { const w = Math.min(90, left); out.push(['sink_base', w, 1]); left -= w; }
+  if (left < 30) return out;
   if (tall) {
     const n = Math.max(1, Math.round(left / 60));
-    rows.push({ id: `room-${seq.n++}`, type: 'larder', width_cm: Math.round(left / n), qty: n });
-    return rows;
+    out.push(['larder', left / n, n]);
+    return out;
   }
   const n = Math.max(1, Math.round(left / 80));
-  const w = Math.round(left / n);
-  rows.push({ id: `room-${seq.n++}`, type: w >= 60 || doubleOnly ? 'door2' : 'door1', width_cm: w, qty: n });
-  return rows;
+  const w = left / n;
+  out.push([Math.round(w) >= 60 || doubleOnly ? 'door2' : 'door1', w, n]);
+  return out;
+}
+
+function splitRun(widthCm: number, sink: boolean, tall: boolean, doubleOnly: boolean, seq: { n: number }): ZoneModuleRow[] {
+  return runModules(widthCm, sink, tall, doubleOnly)
+    .map(([type, w, qty]) => ({ id: `room-${seq.n++}`, type, width_cm: Math.round(w), qty }));
+}
+
+export interface KitchenPiece {
+  zone: 'base' | 'wall' | 'tall' | 'island';
+  type: string;
+  width_mm: number;
+  x_mm: number;
+  height_mm: number;
+  depth_mm: number;
+}
+
+/** The cabinets one kitchen object stands for, left to right; carcass sizes exclude plinth, worktop and fronts. */
+export function kitchenPieces(
+  o: Pick<KitchenObject, 'kind' | 'width_mm' | 'depth_mm' | 'height_mm'>,
+  build: { plinth_mm: number; front_mm: number; worktop_mm: number },
+): KitchenPiece[] {
+  if (!KITCHEN_KINDS.has(o.kind)) return [];
+  const zone = ZONE_OF[o.kind];
+  const floor = zone === 'base' || zone === 'island';
+  const height = o.height_mm - (floor ? build.plinth_mm + build.worktop_mm : zone === 'tall' ? build.plinth_mm : 0);
+  const depth = o.depth_mm - build.front_mm;
+  const pieces: KitchenPiece[] = [];
+  let x = -o.width_mm / 2;
+  for (const [type, wCm, n] of runModules(o.width_mm / 10, o.kind === 'sink', zone === 'tall', zone === 'island')) {
+    for (let i = 0; i < n; i++) {
+      const w = wCm * 10;
+      pieces.push({ zone, type, width_mm: w, x_mm: x + w / 2, height_mm: Math.max(100, height), depth_mm: Math.max(100, depth) });
+      x += w;
+    }
+  }
+  return pieces;
 }
 
 export function kitchenCompositionFromRoom(objects: KitchenObject[], previous: RoomComposition = {}): RoomComposition {

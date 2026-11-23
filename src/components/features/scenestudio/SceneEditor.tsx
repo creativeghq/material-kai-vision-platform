@@ -27,6 +27,8 @@ import { RegionEditCanvas, type RegionEditResult } from '@/components/features/a
 import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
+import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
+import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
 import type { PaintScope, SceneCanvasHandle, SceneTool } from '@/components/features/scenestudio/SceneCanvas';
 import {
@@ -58,10 +60,13 @@ export interface SceneEditorProps {
   pinned?: SceneProduct[];
   onRendered?(event: SceneRenderedEvent): void;
   onWalkThrough?(imageUrl: string, prompt: string): void;
-  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk'; object_id: string | null; room_id?: string | null; nonce: number };
+  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk'; object_id: string | null; room_id?: string | null; fronts?: FrontsState; nonce: number };
 }
 
 interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[]; finishes: SceneObjectFinish[] }
+
+type FrontsState = 'closed' | 'half' | 'open';
+const FRONTS_OPEN: Record<FrontsState, number> = { closed: 0, half: 0.5, open: 1 };
 
 const finishSig = (objectId: string, finishes: SceneObjectFinish[]) =>
   finishes.filter((f) => f.object_id === objectId).map((f) => `${f.slot}:${f.product_id ?? ''}:${f.colour_hex ?? ''}`).sort().join('|');
@@ -163,6 +168,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
   const [tool, setTool] = useState<SceneTool>('view');
   const [wireframe, setWireframe] = useState(false);
+  const [fronts, setFronts] = useState<FrontsState>('closed');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeRenderId, setActiveRenderId] = useState<string | null>(null);
   const [showRender, setShowRender] = useState(false);
@@ -631,10 +637,23 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     }
   };
 
+  const setHardware = async (hardware: string) => {
+    if (!data) return;
+    const previous = data.scene.cabinet_hardware;
+    setData((d) => (d ? { ...d, scene: { ...d.scene, cabinet_hardware: hardware } } : d));
+    try {
+      await sceneStudioService.setCabinetHardware(data.scene.id, hardware);
+    } catch (e) {
+      setData((d) => (d ? { ...d, scene: { ...d.scene, cabinet_hardware: previous } } : d));
+      fail('The handles could not be saved', e);
+    }
+  };
+
   const handledIntent = useRef<number | null>(null);
   useEffect(() => {
     if (!intent || !data || handledIntent.current === intent.nonce) return;
     handledIntent.current = intent.nonce;
+    if (intent.fronts) setFronts(intent.fronts);
     const obj = intent.object_id ? objects.find((o) => o.id === intent.object_id) : undefined;
     const roomId = intent.room_id ?? obj?.room_id ?? undefined;
     if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
@@ -950,6 +969,30 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             </div>
           )}
         </div>
+        {objects.some((o) => !o.removed_at && KITCHEN_KINDS.has(o.kind)) && (
+          <div className="space-y-2 border-t border-hairline pt-3">
+            <Label className="text-xs">Kitchen Fronts</Label>
+            <div className="grid grid-cols-3 gap-1">
+              {(['closed', 'half', 'open'] as const).map((f) => (
+                <Button key={f} size="sm" variant={fronts === f ? 'secondary' : 'outline'} className="h-7 text-xs" onClick={() => setFronts(f)}>
+                  {f === 'closed' ? 'Closed' : f === 'half' ? 'Half Open' : 'Open'}
+                </Button>
+              ))}
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Handles</Label>
+              <Select
+                value={scene.cabinet_hardware ?? 'bar_handles'}
+                onValueChange={(v) => void setHardware(v)}
+              >
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {CABINET_HARDWARE.map((k) => <SelectItem key={k} value={k} className="text-xs">{CABINET_HARDWARE_OPTIONS[k].label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        )}
         <KitchenPrice
           scene={scene}
           objects={objects}
@@ -1017,6 +1060,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 onPhotoProgress={(n, settled, preparing) => setPhotoSamples((p) => (p.n === n && p.settled === settled && p.preparing === preparing ? p : { n, settled, preparing }))}
                 onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
                 modelUrls={modelUrls}
+                frontsOpen={FRONTS_OPEN[fronts]}
+                cabinetHardware={scene.cabinet_hardware}
                 walkRoomId={walkRoomId}
                 onWalkEnd={() => setWalkRoomId(undefined)}
               />

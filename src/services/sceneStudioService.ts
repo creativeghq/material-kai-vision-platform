@@ -28,6 +28,8 @@ export interface SceneRow {
   extract_error: string | null;
   extract_notes: { scale_basis?: string; assumptions?: string[]; read_at?: string } | null;
   view_camera: SceneCamera | null;
+  /** CABINET_HARDWARE key; null draws bar handles. */
+  cabinet_hardware: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -116,7 +118,7 @@ export interface SceneData {
   renders: SceneRender[];
 }
 
-const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, created_at, updated_at';
+const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, cabinet_hardware, created_at, updated_at';
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex';
 const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex';
@@ -254,6 +256,11 @@ export const sceneStudioService = {
     const scene = await this.create({ workspaceId, name, kind, imageUrl });
     await this.read(scene.id);
     return scene;
+  },
+
+  async setCabinetHardware(sceneId: string, hardware: string | null): Promise<void> {
+    const { error } = await supabase.from('floor_plans').update({ cabinet_hardware: hardware }).eq('id', sceneId);
+    if (error) throw new Error(error.message);
   },
 
   async addRectRoom(sceneId: string, widthMm: number, depthMm: number, name: string): Promise<void> {

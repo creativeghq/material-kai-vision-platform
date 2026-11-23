@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ArrowUpRight, Calculator, FileText, Loader2, RefreshCw } from 'lucide-react';
 
 import { Badge } from '@/components/core/ui/badge';
-import { formatMoney } from '@/utils/decimal';
+import { formatMoney, formatNumber } from '@/utils/decimal';
 import { Button } from '@/components/core/ui/button';
 import { Label } from '@/components/core/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
@@ -95,6 +95,10 @@ export const KitchenPrice: React.FC<{
     () => [...items].filter((i) => i.kind === 'task' && i.is_selected !== false && (i.line_total ?? 0) > 0).sort((a, b) => b.line_total - a.line_total).slice(0, 6),
     [items],
   );
+  const cutLines = useMemo(() => {
+    const cutKeys = /total_(board_m2|edge_m)_/;
+    return items.filter((i) => i.kind === 'task' && i.is_schedule && cutKeys.test(i.quantity_formula ?? ''));
+  }, [items]);
 
   if (!kitchen.length) return null;
 
@@ -159,6 +163,19 @@ export const KitchenPrice: React.FC<{
                 </li>
               ))}
             </ul>
+          )}
+          {cutLines.length > 0 && (
+            <div className="space-y-0.5">
+              <Label className="text-xs">Cut List</Label>
+              <ul className="space-y-0.5 text-[11px]">
+                {cutLines.map((l) => (
+                  <li key={l.id} className="flex justify-between gap-2">
+                    <span className="truncate text-muted-foreground">{l.label}</span>
+                    <span className="shrink-0 tabular-nums">{formatNumber(l.quantity)} {l.unit ?? ''}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
           {pricedSig !== null && pricedSig !== sig && <p className="text-[11px] text-amber-800 dark:text-amber-300">The kitchen has changed in the room since it was priced.</p>}
           <div className="grid grid-cols-2 gap-1.5">

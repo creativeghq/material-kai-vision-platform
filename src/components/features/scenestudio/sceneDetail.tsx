@@ -1,5 +1,5 @@
 /** What makes the 3D room read as a real interior: light, default surfaces, and real shapes for every object kind. */
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useContext, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { RoundedBox } from '@react-three/drei';
 import { CanvasTexture, DoubleSide, PMREMGenerator, RepeatWrapping, SRGBColorSpace, type Mesh, type Texture } from 'three';
@@ -8,6 +8,9 @@ import { DARK, STEEL, STONE, WHITE, objectParts } from '@/lib/scene/objectParts'
 import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import type { Finish } from '@/lib/scene/sceneSurfaces';
 import { useFinishMaps } from '@/components/features/scenestudio/surfaceMaps';
+import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
+import type { BoardSlot } from '@/lib/scene/cabinetPanels';
+import { CabinetViewContext, buildKitchenGeometry, type FittingGroup } from '@/components/features/scenestudio/cabinetMesh';
 
 export const RoomLighting: React.FC<{ span: number }> = ({ span }) => {
   const { gl, scene } = useThree();
@@ -137,11 +140,67 @@ const PartMaterial: React.FC<{ part: ReturnType<typeof objectParts>[number]; fin
     ? <FinishMaterial finish={finish} fallback={part.color} w={Math.max(part.size[0], part.size[2])} h={part.size[1]} wireframe={wireframe} />
     : <meshStandardMaterial color={finish?.hex ?? part.color} roughness={part.rough ?? 0.7} metalness={part.metal ?? 0} wireframe={wireframe} />;
 
+const BOARD_DEFAULT: Record<BoardSlot, { colour: string; rough: number }> = {
+  carcass: { colour: '#ece9e3', rough: 0.55 },
+  back: { colour: '#e2ddd3', rough: 0.8 },
+  plinth: { colour: DARK, rough: 0.8 },
+  fronts: { colour: WHITE, rough: 0.35 },
+};
+
+const FITTING_LOOK: Record<FittingGroup, { colour: string; rough: number; metal: number }> = {
+  metal: { colour: STEEL, rough: 0.25, metal: 0.85 },
+  gola: { colour: '#8d9096', rough: 0.35, metal: 0.7 },
+  appliance: { colour: '#1d1f22', rough: 0.15, metal: 0.4 },
+};
+
+/** A kitchen object drawn as the boards its cabinets are cut from; the worktop and sink still come from objectParts. */
+const KitchenRun: React.FC<{
+  kind: string; w: number; d: number; h: number; colour: string; wireframe: boolean; common: Common; finishes: SlotFinishes;
+}> = ({ kind, w, d, h, colour, wireframe, common, finishes }) => {
+  const view = useContext(CabinetViewContext);
+  const geo = useMemo(() => buildKitchenGeometry(kind, w, d, h, view), [kind, w, d, h, view]);
+  useEffect(() => () => geo?.dispose(), [geo]);
+  const extras = useMemo(() => objectParts(kind, w, d, h, colour).filter((p) => p.slot === 'worktop' || p.slot === null), [kind, w, d, h, colour]);
+  const slotFinish = (slot: BoardSlot): Finish | null | undefined => (slot === 'back' ? null : finishes[slot]);
+  return (
+    <group>
+      {geo?.slots.map(({ slot, geometry }) => {
+        const finish = slotFinish(slot);
+        const fallback = slot === 'fronts' ? colour : BOARD_DEFAULT[slot].colour;
+        return (
+          <mesh key={slot} {...common} geometry={geometry}>
+            {finish?.imageUrl
+              ? <FinishMaterial finish={finish} fallback={fallback} w={1} h={1} wireframe={wireframe} />
+              : <meshStandardMaterial color={finish?.hex ?? fallback} roughness={BOARD_DEFAULT[slot].rough} wireframe={wireframe} />}
+          </mesh>
+        );
+      })}
+      {geo?.fittings.map(({ group, geometry }) => (
+        <mesh key={group} {...common} geometry={geometry}>
+          <meshStandardMaterial
+            color={group === 'metal' ? finishes.handles?.hex ?? FITTING_LOOK.metal.colour : FITTING_LOOK[group].colour}
+            roughness={FITTING_LOOK[group].rough}
+            metalness={FITTING_LOOK[group].metal}
+            wireframe={wireframe}
+          />
+        </mesh>
+      ))}
+      {extras.map((q, i) => (
+        <mesh key={`x${i}`} {...common} position={q.pos}>
+          <boxGeometry args={q.size} />
+          <PartMaterial part={q} finish={q.slot ? finishes[q.slot] : null} wireframe={wireframe} />
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 /** The detailed body of one object; every part carries the object's id so picking and the ID pass still work. */
 export const ObjectShape: React.FC<{
   kind: string; w: number; d: number; h: number; colour: string; wireframe: boolean; common: Common; finishes?: SlotFinishes;
 }> = ({ kind, w, d, h, colour, wireframe, common, finishes = {} }) => {
   const list = useMemo(() => objectParts(kind, w, d, h, colour), [kind, w, d, h, colour]);
+  if (KITCHEN_KINDS.has(kind)) return <KitchenRun kind={kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} />;
   if (kind === 'plant') {
     return (
       <group>

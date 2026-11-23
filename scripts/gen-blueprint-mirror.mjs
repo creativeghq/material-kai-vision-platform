@@ -14,12 +14,14 @@ const BANNER = [
   '',
 ].join('\n');
 
-/** The ONLY permitted difference: Deno resolves `./formula.ts`, Vite resolves `./blueprintFormula`. */
+/** The ONLY permitted differences: the two import specifiers, which each runtime resolves its own way. */
 export function renderMirror(source) {
-  return BANNER + source.replace(
-    "import { computeLinePricing, round2 } from './formula.ts';",
-    "import { computeLinePricing, round2 } from './blueprintFormula';",
-  );
+  return BANNER + source
+    .replace(
+      "import { computeLinePricing, round2 } from './formula.ts';",
+      "import { computeLinePricing, round2 } from './blueprintFormula';",
+    )
+    .replace("} from '../cabinetPanels.generated.ts';", "} from '@/lib/scene/cabinetPanels';");
 }
 
 export function expectedMirror() {

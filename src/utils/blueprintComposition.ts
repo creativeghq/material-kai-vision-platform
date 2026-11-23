@@ -4,6 +4,10 @@
 /** Blueprint COMPOSITION — the one place a configured set of zones becomes metres, counts and money. */
 
 import { computeLinePricing, round2 } from './blueprintFormula';
+import {
+  CUT_LIST_KEYS, cutList, cutListYields, generateCabinet,
+  type CabinetConstruction, type CabinetZone, type ModuleRecipe,
+} from '@/lib/scene/cabinetPanels';
 
 // ── Schema (blueprints.composition_schema) ──────────────────────────────────
 
@@ -110,6 +114,8 @@ export interface ModuleTypeDef {
   counts_length?: boolean;
   /** Width is fixed by the module type (a 15cm pull-out larder) — the configurator locks the field. */
   fixed_width?: boolean;
+  /** How it is built from boards; replaces the library recipe for this key (cabinetPanels MODULE_RECIPES). */
+  construction?: ModuleRecipe;
 }
 
 /** Who is buying it. The checklist question "are existing appliances to be included?", modelled. */
@@ -232,6 +238,11 @@ export interface ZoneDef {
    * answer the customer has; "how many metres of bar" is one they invent.
    */
   seats?: { global: string; cm_per_seat: number; min_cm?: number };
+  /**
+   * `units` only — board thicknesses and clearances. Present = this zone's cabinets are built from
+   * boards, and their cut list (`board_m2_<slot>`, `edge_m_<slot>`) joins the schedule.
+   */
+  construction?: Partial<CabinetConstruction>;
 }
 
 // ── Configuration (project_plans.composition) ───────────────────────────────
@@ -374,8 +385,16 @@ const YIELD_LABELS: Record<string, { label: string; unit: string }> = {
   duct_run: { label: 'Extraction Duct Runs', unit: 'run' },
   carbon_filter: { label: 'Recirculation Filters', unit: 'pcs' },
   worktop_cutout: { label: 'Worktop Cut-Outs', unit: 'pcs' },
+  board_m2_carcass: { label: 'Carcass Board', unit: 'm²' },
+  board_m2_fronts: { label: 'Front Board', unit: 'm²' },
+  board_m2_back: { label: 'Back Panel Board', unit: 'm²' },
+  board_m2_plinth: { label: 'Plinth Board', unit: 'm²' },
+  edge_m_carcass: { label: 'Carcass Edge Tape', unit: 'm' },
+  edge_m_fronts: { label: 'Front Edge Tape', unit: 'm' },
   appliance_housing: { label: 'Appliance Housings', unit: 'pcs' },
 };
+
+const CABINET_ZONES: ReadonlySet<string> = new Set(['base', 'wall', 'tall', 'highboard', 'island']);
 
 const titleise = (key: string) =>
   key.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
@@ -573,6 +592,7 @@ export function declaredYieldKeys(schema: ZoneDef[]): string[] {
   };
   for (const zone of asArray<ZoneDef>(schema)) {
     add(zone.run_yields);
+    if (zone.kind === 'units' && zone.construction) for (const k of CUT_LIST_KEYS) keys.add(k);
     for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
       for (const c of asArray<GlobalChoiceDef>(g.choices)) add(c.yields);
     }
@@ -791,6 +811,25 @@ export function deriveComposition(
             quantity: metres,
             line_kind: 'materials',
           }, round2(num(rateChoice?.unit_price) * factor), num(mod.margin_pct));
+        }
+
+        if (zone.construction) {
+          const chosenDrawers = asArray<ModuleOptionDef>(mod.options).reduce((sum, opt) => {
+            const choice = asArray<ModuleOptionChoice>(opt.choices).find((c) => c.value === ((row.options ?? {})[opt.key] ?? opt.default));
+            return sum + num(choice?.yields?.drawers);
+          }, 0);
+          const cabinet = generateCabinet({
+            zone: (CABINET_ZONES.has(zone.key) ? zone.key : 'base') as CabinetZone,
+            type: mod.key,
+            width_mm: widthM * 1000,
+            height_mm: numericGlobal(zone, globals, 'height') * 10,
+            depth_mm: numericGlobal(zone, globals, 'depth') * 10,
+            construction: zone.construction,
+            recipe: mod.construction ?? null,
+            drawers: chosenDrawers > 0 ? chosenDrawers : undefined,
+          });
+          if (cabinet) addYields(zoneYields, cutListYields(cutList([cabinet.panels])), qty);
+          else issues.push(`${zone.label} — ${mod.label}: no construction recipe, so it is not in the cut list.`);
         }
 
         // Per-piece module options (the runner set, a soft-close upgrade) stay their own line:
