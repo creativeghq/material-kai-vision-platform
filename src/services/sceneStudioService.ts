@@ -265,6 +265,12 @@ export const sceneStudioService = {
     return scene;
   },
 
+  async boardEdgeTapes(productId: string): Promise<Array<{ product_id: string; name: string }>> {
+    const { data, error } = await supabase.rpc('board_edge_tapes' as never, { p_product_id: productId } as never);
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Array<{ product_id: string; name: string }>;
+  },
+
   async setCabinetHardware(sceneId: string, hardware: string | null): Promise<void> {
     const { error } = await supabase.from('floor_plans').update({ cabinet_hardware: hardware }).eq('id', sceneId);
     if (error) throw new Error(error.message);

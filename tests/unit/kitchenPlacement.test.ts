@@ -136,3 +136,16 @@ describe('units read from a drawing', () => {
     expect(read.objects[1].units).toEqual([]);
   });
 });
+
+describe('a board decor is laid at its recorded repeat', () => {
+  it('reads "W x L" and a single size in mm, and nothing else', async () => {
+    const { decorRepeatM, resolveFinish } = await import('../../src/lib/scene/sceneSurfaces');
+    expect(decorRepeatM({ metadata: { decor_repeat_mm: '1300x2800' } })).toEqual([1.3, 2.8]);
+    expect(decorRepeatM({ metadata: { decor_repeat_mm: '600' } })).toEqual([0.6, 0.6]);
+    expect(decorRepeatM({ metadata: { decor_repeat_mm: '' } })).toBeNull();
+    expect(decorRepeatM({ metadata: {} })).toBeNull();
+    const board = { id: 'b', name: 'Oak 18mm', imageUrl: 'https://x/oak.jpg', attributes: null, metadata: { decor_repeat_mm: '1300x2800' } };
+    const f = resolveFinish({ colour_hex: null }, board)!;
+    expect([f.tileW, f.tileL, f.jointed]).toEqual([1.3, 2.8, false]);
+  });
+});

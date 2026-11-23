@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronDown, Loader2, Package, RotateCcw, Sparkles } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
@@ -6,7 +6,27 @@ import { Label } from '@/components/core/ui/label';
 import { ColourRow, ProductPicker } from '@/components/features/scenestudio/ScenePanels';
 import { SCENE_SLOT_FOLLOWS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { colourOptions, resolveFinish } from '@/lib/scene/sceneSurfaces';
-import type { SceneObject, SceneObjectFinish, SceneProduct } from '@/services/sceneStudioService';
+import { sceneStudioService, type SceneObject, type SceneObjectFinish, type SceneProduct } from '@/services/sceneStudioService';
+
+const EDGED_SLOTS: ReadonlySet<SceneObjectSlot> = new Set(['fronts', 'carcass']);
+
+/** The edge tape the catalogue matches to a board (same decor and surface structure); says so when there is none. */
+const BoardEdgeTape: React.FC<{ product: SceneProduct }> = ({ product }) => {
+  const decor = (product.metadata as Record<string, unknown> | null)?.decor_code;
+  const [tapes, setTapes] = useState<Array<{ name: string }> | null>(null);
+  useEffect(() => {
+    let live = true;
+    if (!decor) return;
+    void sceneStudioService.boardEdgeTapes(product.id).then((t) => { if (live) setTapes(t); }).catch(() => { if (live) setTapes([]); });
+    return () => { live = false; };
+  }, [product.id, decor]);
+  if (!decor || !tapes) return null;
+  return (
+    <p className="text-[11px] text-muted-foreground">
+      {tapes.length ? `Edge tape: ${tapes.map((t) => t.name).join(', ')}` : `No edge tape in the catalogue matches decor ${String(decor)}.`}
+    </p>
+  );
+};
 
 export const SlotMaterials: React.FC<{
   obj: SceneObject;
@@ -72,6 +92,7 @@ export const SlotMaterials: React.FC<{
                       ))}
                     </div>
                   )}
+                  {product && EDGED_SLOTS.has(slot) && <BoardEdgeTape product={product} />}
                   {product && row && !row.colour_hex && !product.albedoUrl && (
                     <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => onMakeTexture(product)}>
                       {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}

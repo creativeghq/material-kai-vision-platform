@@ -59,13 +59,24 @@ export interface Finish {
   roughnessUrl?: string | null;
 }
 
+export function decorRepeatM(product: { metadata?: unknown } | null | undefined): [number, number] | null {
+  const meta = product?.metadata && typeof product.metadata === 'object' ? (product.metadata as Record<string, unknown>) : {};
+  const raw = meta.decor_repeat_mm;
+  const m = String(raw ?? '').match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:[x×X]\s*(\d+(?:[.,]\d+)?))?\s*(?:mm)?\s*$/);
+  if (!m) return null;
+  const w = Number(m[1].replace(',', '.'));
+  const l = Number((m[2] ?? m[1]).replace(',', '.'));
+  return w > 0 && l > 0 ? [w / 1000, l / 1000] : null;
+}
+
 export function resolveFinish(surface: Pick<SceneSurface, 'colour_hex'> | null, product: SceneProduct | undefined): Finish | null {
   if (!surface) return null;
   if (!product) return surface.colour_hex ? { imageUrl: null, hex: surface.colour_hex, tileW: 1, tileL: 1, jointed: false, label: null } : null;
-  const fmt = tileFormatM(product);
+  const repeat = decorRepeatM(product);
+  const fmt = repeat ? { tileWidthM: repeat[0], tileLengthM: repeat[1], formatSource: 'recorded' as const } : tileFormatM(product);
   const option = surface.colour_hex ? colourOptions(product).find((o) => o.hex === surface.colour_hex.toLowerCase()) : undefined;
   const recorded = fmt.formatSource === 'recorded';
-  const jointed = recorded && fmt.tileWidthM <= 1.6 && fmt.tileLengthM <= 3.2;
+  const jointed = !repeat && recorded && fmt.tileWidthM <= 1.6 && fmt.tileLengthM <= 3.2;
   if (option) {
     return {
       imageUrl: option.swatch_url, hex: option.hex, tileW: fmt.tileWidthM, tileL: fmt.tileLengthM, jointed,
