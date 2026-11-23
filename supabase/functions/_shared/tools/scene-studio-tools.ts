@@ -28,7 +28,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -70,7 +70,7 @@ export const createManageScenesTool = (
         if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: list.map((r) => r.name) });
         roomId = hit.id;
       }
-      const intent = { mode: mode ?? 'view', object_id: target?.id ?? null, room_id: roomId, ...(fronts ? { fronts } : {}), nonce: Date.now() };
+      const intent = { mode: mode ?? 'view', object_id: target?.id ?? null, room_id: roomId, ...(fronts ? { fronts } : {}), ...(sun_hour != null ? { sun_hour } : {}), nonce: Date.now() };
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const next = mode === 'make_3d'
         ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
@@ -353,6 +353,7 @@ export const createManageScenesTool = (
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
       units: z.array(z.object({ type: z.enum(KITCHEN_MODULE_TYPES), width_cm: z.number() })).optional().describe('layout: the units of the run left to right; omit for an automatic layout.'),
       seating_cm: z.number().optional().describe('layout: seating overhang of an island worktop, cm.'),
+      sun_hour: z.number().min(6).max(20).optional().describe('open: light the room by the sun at this hour of the day (6 to 20).'),
       blueprint: z.string().max(200).optional().describe('price_kitchen: the kitchen blueprint to price with, by name: New Kitchen From Boards prices from the boards, New Kitchen per running metre; default the first one listed.'),
     }),
   },

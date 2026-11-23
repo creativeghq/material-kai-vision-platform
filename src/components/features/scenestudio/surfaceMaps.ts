@@ -93,10 +93,10 @@ export function canvasRelief(source: HTMLCanvasElement, strength: number, rough:
 
 function buildFinish(f: Finish): Promise<FinishMaps> {
   if (!f.imageUrl) return plasterMaps();
-  const key = `${f.imageUrl}|${f.jointed ? `${f.tileW}x${f.tileL}` : 'c'}`;
+  const key = `${f.imageUrl}|${f.jointed ? `${f.tileW}x${f.tileL}` : 'c'}|${f.normalUrl ?? ''}|${f.roughnessUrl ?? ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const job = loadImage(f.imageUrl).then((img) => {
+  const job = loadImage(f.imageUrl).then(async (img) => {
     const aspect = f.jointed ? f.tileL / f.tileW : img.height / img.width;
     const w = 512; const h = Math.max(64, Math.min(2048, Math.round(512 * aspect)));
     const c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -114,7 +114,17 @@ function buildFinish(f: Finish): Promise<FinishMaps> {
     const height = luminance(g, w, h);
     if (joint) for (let i = 0; i < height.length; i++) if (joint[i]) height[i] = 0;
     const relief = reliefMaps(height, joint, w, h, { strength: f.jointed ? 2.2 : 1.2, rough: f.jointed ? 0.32 : 0.75, roughJoint: 0.95 });
-    return { map: tex(c, true), ...relief };
+    const stored = async (url: string | null | undefined, fallback: Texture) => {
+      if (!url) return fallback;
+      const im = await loadImage(url).catch(() => null);
+      if (!im) return fallback;
+      const sc = document.createElement('canvas'); sc.width = w; sc.height = h;
+      sc.getContext('2d')!.drawImage(im, 0, 0, w, h);
+      fallback.dispose();
+      return tex(sc, false);
+    };
+    const [normalMap, roughnessMap] = await Promise.all([stored(f.normalUrl, relief.normalMap), stored(f.roughnessUrl, relief.roughnessMap)]);
+    return { map: tex(c, true), normalMap, roughnessMap };
   });
   job.catch(() => cache.delete(key));
   cache.set(key, job);
@@ -126,7 +136,7 @@ export function useFinishMaps(finish: Finish | null, widthM: number, heightM: nu
   const [base, setBase] = useState<FinishMaps | null>(null);
   const finishRef = useRef(finish);
   finishRef.current = finish;
-  const key = finish ? `${finish.imageUrl}|${finish.jointed}|${finish.tileW}|${finish.tileL}` : 'plaster';
+  const key = finish ? `${finish.imageUrl}|${finish.jointed}|${finish.tileW}|${finish.tileL}|${finish.normalUrl ?? ''}|${finish.roughnessUrl ?? ''}` : 'plaster';
   useEffect(() => {
     let live = true;
     const f = finishRef.current;

@@ -55,6 +55,8 @@ export interface Finish {
   tileL: number;
   jointed: boolean;
   label: string | null;
+  normalUrl?: string | null;
+  roughnessUrl?: string | null;
 }
 
 export function resolveFinish(surface: Pick<SceneSurface, 'colour_hex'> | null, product: SceneProduct | undefined): Finish | null {
@@ -70,7 +72,8 @@ export function resolveFinish(surface: Pick<SceneSurface, 'colour_hex'> | null, 
       label: `${product.name} — ${option.name}`,
     };
   }
-  return { imageUrl: product.albedoUrl ?? product.imageUrl, hex: surface.colour_hex, tileW: fmt.tileWidthM, tileL: fmt.tileLengthM, jointed, label: product.name };
+  const pbr = product.albedoUrl ? { normalUrl: product.normalUrl ?? null, roughnessUrl: product.roughnessUrl ?? null } : {};
+  return { imageUrl: product.albedoUrl ?? product.imageUrl, hex: surface.colour_hex, tileW: fmt.tileWidthM, tileL: fmt.tileLengthM, jointed, label: product.name, ...pbr };
 }
 
 export function describeTarget(t: { surface: string }, roomName: string, wallLabel?: string): string {

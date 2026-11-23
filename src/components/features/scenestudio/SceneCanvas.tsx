@@ -82,6 +82,8 @@ interface Props {
   /** Kitchen fronts: 0 closed … 1 open. */
   frontsOpen?: number;
   cabinetHardware?: string | null;
+  /** Time of day for the sun, 6–20; null keeps the studio light. */
+  sunHour?: number | null;
 }
 
 const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
@@ -742,7 +744,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
-    frontsOpen = 0, cabinetHardware,
+    frontsOpen = 0, cabinetHardware, sunHour = null,
   } = props;
   const cabinetView = useMemo(() => ({ open: frontsOpen, hardware: cabinetHardware ?? 'bar_handles' }), [frontsOpen, cabinetHardware]);
   const hasModels = Object.keys(modelUrls).length > 0;
@@ -885,7 +887,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       style={{ touchAction: 'none' }}
     >
       <color attach="background" args={['#e9e6e1']} />
-      <RoomLighting span={span} />
+      <RoomLighting span={span} sunHour={sunHour} />
       {!wireframe && windowLights.map((l) => <WindowLight key={l.id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
       {hasModels && <SparkLayer />}

@@ -83,6 +83,8 @@ export interface SceneProduct {
   name: string;
   imageUrl: string | null;
   albedoUrl?: string | null;
+  normalUrl?: string | null;
+  roughnessUrl?: string | null;
   attributes: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
 }
@@ -175,14 +177,17 @@ async function uploadTo(path: string, blob: Blob, contentType: string): Promise<
   if (error) throw new Error(`Upload failed: ${error.message}`);
 }
 
-const PRODUCT_COLUMNS = 'id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, is_selected, option_value_id)';
+const PRODUCT_COLUMNS = 'id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id)';
 
-function selectedAlbedo(row: Record<string, unknown>): string | null {
+function selectedMaps(row: Record<string, unknown>): { albedoUrl: string | null; normalUrl: string | null; roughnessUrl: string | null } {
   const maps = row.product_material_maps;
-  if (!Array.isArray(maps)) return null;
+  const none = { albedoUrl: null, normalUrl: null, roughnessUrl: null };
+  if (!Array.isArray(maps)) return none;
   const m = maps.find((x) => (x as { is_selected?: boolean; option_value_id?: string | null }).is_selected && !(x as { option_value_id?: string | null }).option_value_id) as
-    { storage_bucket?: string; albedo_path?: string | null } | undefined;
-  return m?.albedo_path ? supabase.storage.from(m.storage_bucket || SCENE_BUCKET).getPublicUrl(m.albedo_path).data.publicUrl : null;
+    { storage_bucket?: string; albedo_path?: string | null; normal_path?: string | null; roughness_path?: string | null } | undefined;
+  if (!m?.albedo_path) return none;
+  const url = (path: string | null | undefined) => (path ? supabase.storage.from(m.storage_bucket || SCENE_BUCKET).getPublicUrl(path).data.publicUrl : null);
+  return { albedoUrl: url(m.albedo_path), normalUrl: url(m.normal_path), roughnessUrl: url(m.roughness_path) };
 }
 
 async function fetchProducts(ids: string[]): Promise<Record<string, SceneProduct>> {
@@ -199,7 +204,7 @@ async function fetchProducts(ids: string[]): Promise<Record<string, SceneProduct
       id: r.id as string,
       name: (r.name as string) || 'Product',
       imageUrl: firstImage(r),
-      albedoUrl: selectedAlbedo(r),
+      ...selectedMaps(r),
       attributes: (r.attributes as Record<string, unknown>) ?? null,
       metadata: (r.metadata as Record<string, unknown>) ?? null,
     };
@@ -475,7 +480,7 @@ export const sceneStudioService = {
     const { data, error } = await req;
     if (error) throw new Error(error.message);
     return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-      id: r.id as string, name: (r.name as string) || 'Product', imageUrl: firstImage(r), albedoUrl: selectedAlbedo(r),
+      id: r.id as string, name: (r.name as string) || 'Product', imageUrl: firstImage(r), ...selectedMaps(r),
       attributes: (r.attributes as Record<string, unknown>) ?? null, metadata: (r.metadata as Record<string, unknown>) ?? null,
     }));
   },

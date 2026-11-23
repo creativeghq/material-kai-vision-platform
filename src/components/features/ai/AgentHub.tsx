@@ -800,7 +800,7 @@ interface Message {
     credits_used?: number;
   }; // Rendered presentation sheet PDF ready for download
   quoteData?: QuoteCanvasData; // Agent-created quote (real quotes row) + branded PDF, shown on canvas
-  sceneData?: { scene_id: string; name: string; source_kind: string; intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings'; object_id: string | null; room_id?: string | null; fronts?: 'closed' | 'half' | 'open'; nonce: number } };
+  sceneData?: { scene_id: string; name: string; source_kind: string; intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings'; object_id: string | null; room_id?: string | null; fronts?: 'closed' | 'half' | 'open'; sun_hour?: number; nonce: number } };
   sceneListData?: { scenes: Array<{ id: string; name: string; source_kind: string; extract_status: string; updated_at: string }> };
   mentionSummaryData?: {
     product_id: string;

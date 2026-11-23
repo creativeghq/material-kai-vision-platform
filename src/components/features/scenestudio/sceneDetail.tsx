@@ -12,7 +12,23 @@ import { KITCHEN_KINDS, type KitchenLayout } from '@/lib/scene/kitchenCompositio
 import type { BoardSlot } from '@/lib/scene/cabinetPanels';
 import { CabinetViewContext, buildKitchenGeometry, type FittingGroup } from '@/components/features/scenestudio/cabinetMesh';
 
-export const RoomLighting: React.FC<{ span: number }> = ({ span }) => {
+/** Where the sun stands at `hour` (6–20): rising in the east, highest at 13:00, warm and low at the ends of the day. */
+export function sunAt(hour: number, span: number): { position: [number, number, number]; colour: string; intensity: number; sky: number } {
+  const t = Math.min(1, Math.max(0, (hour - 6) / 14));
+  const el = (Math.PI / 3) * Math.sin(Math.PI * t);
+  const az = Math.PI * t;
+  const s = Math.max(span, 4);
+  const low = Math.min(1, el / (Math.PI / 9));
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * low);
+  return {
+    position: [s * 1.4 * Math.cos(az) * Math.cos(el), s * 1.6 * Math.max(0.12, Math.sin(el)), s * (0.35 + 0.5 * Math.sin(az)) * Math.cos(el)],
+    colour: `rgb(${mix(255, 255)}, ${mix(170, 241)}, ${mix(102, 220)})`,
+    intensity: 0.4 + 1.5 * Math.sin(el),
+    sky: 0.15 + 0.25 * Math.sin(el),
+  };
+}
+
+export const RoomLighting: React.FC<{ span: number; sunHour?: number | null }> = ({ span, sunHour }) => {
   const { gl, scene } = useThree();
   useEffect(() => {
     const pmrem = new PMREMGenerator(gl);
@@ -22,13 +38,14 @@ export const RoomLighting: React.FC<{ span: number }> = ({ span }) => {
     return () => { scene.environment = null; env.dispose(); pmrem.dispose(); };
   }, [gl, scene]);
   const s = Math.max(span, 4);
+  const sun = sunHour == null ? null : sunAt(sunHour, span);
   return (
     <>
-      <hemisphereLight args={['#fff7ec', '#bfae97', 0.35]} />
+      <hemisphereLight args={['#fff7ec', '#bfae97', sun?.sky ?? 0.35]} />
       <directionalLight
-        position={[s * 0.55, s * 1.1, s * 0.35]}
-        intensity={1.7}
-        color="#fff1dc"
+        position={sun?.position ?? [s * 0.55, s * 1.1, s * 0.35]}
+        intensity={sun?.intensity ?? 1.7}
+        color={sun?.colour ?? '#fff1dc'}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-bias={-0.0004}

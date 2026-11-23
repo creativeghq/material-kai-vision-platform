@@ -1686,6 +1686,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'handles', type: 'enum', enum: ['gola', 'push_to_open', 'edge_pull', 'bar_handles', 'knobs', 'cup_pulls'], optional: true, description: 'handles: how the kitchen fronts open.' },
       { name: 'units', type: 'array', optional: true, description: 'layout: the units of the run left to right; omit for an automatic layout.' },
       { name: 'seating_cm', type: 'number', optional: true, description: 'layout: seating overhang of an island worktop, cm.' },
+      { name: 'sun_hour', type: 'number', optional: true, description: 'open: light the room by the sun at this hour of the day (6 to 20).' },
       { name: 'blueprint', type: 'string', optional: true, description: 'price_kitchen: the kitchen blueprint to price with, by name: New Kitchen From Boards prices from the boards, New Kitchen per running metre; default the first one listed.' },
     ],
   },

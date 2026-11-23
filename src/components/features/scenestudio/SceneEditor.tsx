@@ -62,7 +62,7 @@ export interface SceneEditorProps {
   pinned?: SceneProduct[];
   onRendered?(event: SceneRenderedEvent): void;
   onWalkThrough?(imageUrl: string, prompt: string): void;
-  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings'; object_id: string | null; room_id?: string | null; fronts?: FrontsState; nonce: number };
+  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings'; object_id: string | null; room_id?: string | null; fronts?: FrontsState; sun_hour?: number; nonce: number };
 }
 
 interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[]; finishes: SceneObjectFinish[] }
@@ -172,6 +172,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [wireframe, setWireframe] = useState(false);
   const [fronts, setFronts] = useState<FrontsState>('closed');
   const [drawingsOpen, setDrawingsOpen] = useState(false);
+  const [sunHour, setSunHour] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeRenderId, setActiveRenderId] = useState<string | null>(null);
   const [showRender, setShowRender] = useState(false);
@@ -657,6 +658,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     if (!intent || !data || handledIntent.current === intent.nonce) return;
     handledIntent.current = intent.nonce;
     if (intent.fronts) setFronts(intent.fronts);
+    if (intent.sun_hour != null) setSunHour(Math.min(20, Math.max(6, intent.sun_hour)));
     if (intent.mode === 'drawings') { setDrawingsOpen(true); return; }
     const obj = intent.object_id ? objects.find((o) => o.id === intent.object_id) : undefined;
     const roomId = intent.room_id ?? obj?.room_id ?? undefined;
@@ -943,6 +945,24 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
         <p className="text-muted-foreground">
           {count(data.rooms.length, 'room')} · {count(data.walls.length, 'wall')} · {count(data.openings.length, 'door or window', 'doors and windows')} · {count(objects.filter((o) => !o.removed_at).length, 'object')}
         </p>
+        <div className="space-y-1">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="scene-sun" className="text-xs">Time of Day</Label>
+            <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground" onClick={() => setSunHour(null)}>
+              {sunHour == null ? 'Studio light' : `${String(Math.floor(sunHour)).padStart(2, '0')}:${sunHour % 1 ? '30' : '00'} · reset`}
+            </button>
+          </div>
+          <input
+            id="scene-sun"
+            type="range"
+            min={6}
+            max={20}
+            step={0.5}
+            value={sunHour ?? 13}
+            onChange={(e) => setSunHour(Number(e.target.value))}
+            className="w-full accent-primary"
+          />
+        </div>
         {(notes.assumptions?.length ?? 0) > 0 && (
           <div className="space-y-1">
             <Label className="text-xs">What was assumed</Label>
@@ -1076,6 +1096,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 onFocusRoom={(roomId) => goToRoom(roomId, eyeLevel)}
                 modelUrls={modelUrls}
                 frontsOpen={FRONTS_OPEN[fronts]}
+                sunHour={sunHour}
                 cabinetHardware={scene.cabinet_hardware}
                 walkRoomId={walkRoomId}
                 onWalkEnd={() => setWalkRoomId(undefined)}
