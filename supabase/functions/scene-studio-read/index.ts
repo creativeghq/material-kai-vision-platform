@@ -8,7 +8,8 @@ import { callClaudeMessages } from '../_shared/ai-client.ts';
 import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { captureException } from '../_shared/sentry.ts';
-import { SCENE_READ_SCHEMA, sanitizeSceneRead } from '../_shared/sceneReadSchema.generated.ts';
+import { SCENE_READ_SCHEMA, sanitizeSceneRead, type SceneRead } from '../_shared/sceneReadSchema.generated.ts';
+import { MODULE_LABELS, placeRun, runContext, spansBehind } from '../_shared/kitchenComposition.generated.ts';
 
 const BUCKET = 'generation-images';
 const MODEL = 'claude-fable-5-2';
@@ -102,13 +103,29 @@ async function readSource(admin: DbClient, plan: Plan, uid: string, charge: Char
     }
     const { error: applyError } = await admin.rpc('scene_studio_apply_read', {
       p_floor_plan_id: plan.id,
-      p_read: { ...read, source_kind: plan.source_kind },
+      p_read: { ...withKitchenLayouts(read), source_kind: plan.source_kind },
     });
     if (applyError) return await fail(`The room could not be saved: ${applyError.message}`);
   } catch (err) {
     void captureException(err instanceof Error ? err : new Error(String(err)), { tags: { function: 'scene-studio-read' }, extra: { floor_plan_id: plan.id } });
     await fail(err instanceof Error ? err.message : 'Reading the image failed.');
   }
+}
+
+/** Printed kitchen units go through the placement engine: what it builds becomes a proposed layout, what it refuses is named in the assumptions. */
+function withKitchenLayouts(read: SceneRead) {
+  const walls = read.walls.map((w, i) => ({ id: String(i), x1_mm: w.x1, y1_mm: w.y1, x2_mm: w.x2, y2_mm: w.y2, thickness_mm: w.thickness_mm }));
+  const openings = read.openings.map((o) => ({ ...o, wall_id: String(o.wall) }));
+  const assumptions = [...read.assumptions];
+  const objects = read.objects.map((o) => {
+    const ctx = o.units.length ? runContext(o, spansBehind(o, walls, openings)) : null;
+    if (!ctx) return { ...o, kitchen_layout: null };
+    const placed = placeRun(o.units, ctx);
+    for (const r of placed.rejected) assumptions.push(`${o.label}: ${MODULE_LABELS[r.module.type] ?? r.module.type} read from the drawing was not placed. ${r.reason}`);
+    const modules = placed.built.filter((m) => !m.auto).map((m) => ({ type: m.type, width_mm: m.width_mm }));
+    return { ...o, kitchen_layout: modules.length ? { modules, source: 'read', confirmed: false } : null };
+  });
+  return { ...read, objects, assumptions: assumptions.slice(0, 24) };
 }
 
 Deno.serve(withApiLogging('scene-studio-read', async (req: Request) => {

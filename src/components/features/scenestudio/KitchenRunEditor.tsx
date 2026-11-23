@@ -46,8 +46,15 @@ export const KitchenRunEditor: React.FC<{
     apply(next);
   };
 
+  const proposed = obj.kitchen_layout?.source === 'read' && !obj.kitchen_layout.confirmed;
   return (
     <div className="space-y-2 border-t border-hairline pt-3">
+      {proposed && (
+        <div className="space-y-1.5 rounded-sm border border-hairline bg-surface-sunken p-2 text-[11px]">
+          <p>These units were read from the drawing. Check each one against it, then confirm.</p>
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => onChange({ ...obj.kitchen_layout!, confirmed: true })}>Confirm Units</Button>
+        </div>
+      )}
       <div className="flex items-center justify-between">
         <Label className="text-xs">Units, Left to Right</Label>
         <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" onClick={() => apply(autoLayout(obj.kind, ctx))}>

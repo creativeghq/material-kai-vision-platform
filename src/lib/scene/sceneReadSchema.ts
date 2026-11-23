@@ -48,6 +48,7 @@ export interface SceneReadObject {
   label: string; kind: SceneObjectKind; room: number;
   x_mm: number; y_mm: number; rotation_deg: number;
   width_mm: number; depth_mm: number; height_mm: number; elevation_mm: number; colour_hex: string;
+  units: Array<{ type: string; width_mm: number }>;
 }
 export interface SceneReadCamera { x_mm: number; y_mm: number; height_mm: number; look_x_mm: number; look_y_mm: number; fov_deg: number }
 
@@ -103,6 +104,7 @@ export const SCENE_READ_SCHEMA = closed({
       label: str, kind: { type: 'string', enum: [...SCENE_OBJECT_KINDS] }, room: int,
       x_mm: num, y_mm: num, rotation_deg: num,
       width_mm: num, depth_mm: num, height_mm: num, elevation_mm: num, colour_hex: str,
+      units: { type: 'array', items: closed({ type: str, width_mm: num }) },
     }),
   },
   camera: closed({ x_mm: num, y_mm: num, height_mm: num, look_x_mm: num, look_y_mm: num, fov_deg: num }),
@@ -201,6 +203,9 @@ export function sanitizeSceneRead(raw: unknown): SceneRead {
       height_mm: size(b.height_mm, 5, 5000, 800),
       elevation_mm: size(b.elevation_mm, 0, 5000, 0),
       colour_hex: hex(b.colour_hex),
+      units: (Array.isArray(b.units) ? b.units : []).filter(isObj).slice(0, 40)
+        .map((u) => ({ type: text(u.type, 40), width_mm: Math.round(clamp(finite(u.width_mm), 0, 3000)) }))
+        .filter((u) => u.type && u.width_mm > 0),
     });
   }
 

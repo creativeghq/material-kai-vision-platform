@@ -120,3 +120,19 @@ describe('a stored layout is what is drawn and what is priced', () => {
     expect(placeRun(autoLayout('kitchen_base', ctx), ctx).built.map((m) => m.type)).toEqual(drawn);
   });
 });
+
+describe('units read from a drawing', () => {
+  it('keeps printed units, drops nameless or widthless ones, and gives every object a list', async () => {
+    const { sanitizeSceneRead } = await import('../../src/lib/scene/sceneReadSchema');
+    const read = sanitizeSceneRead({
+      read_ok: true,
+      rooms: [{ name: 'K', outline: [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 3000 }] }],
+      objects: [
+        { label: 'Sink run', kind: 'sink', units: [{ type: 'sink_base', width_mm: 900 }, { type: '', width_mm: 600 }, { type: 'door2', width_mm: 0 }] },
+        { label: 'Sofa', kind: 'sofa' },
+      ],
+    });
+    expect(read.objects[0].units).toEqual([{ type: 'sink_base', width_mm: 900 }]);
+    expect(read.objects[1].units).toEqual([]);
+  });
+});

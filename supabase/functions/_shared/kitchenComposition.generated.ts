@@ -10,7 +10,7 @@ export type RunZone = 'base' | 'wall' | 'tall' | 'island';
 
 export interface RunModule { type: string; width_mm: number; options?: Record<string, string> }
 
-export interface KitchenLayout { modules: RunModule[]; seating_mm?: number }
+export interface KitchenLayout { modules: RunModule[]; seating_mm?: number; source?: 'read'; confirmed?: boolean }
 
 export interface KitchenObject {
   id: string; kind: string; width_mm: number; depth_mm: number; height_mm: number;
