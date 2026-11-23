@@ -408,8 +408,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       }
     }
 
-    // The scroll walkthrough (#604 phase 8). Service role, so `embed_walkthrough` is the access
-    // control; every field is projected by hand and nothing priced leaves.
+    // Service role, so `embed_walkthrough` is the access control; fields projected by hand, nothing priced.
     let walkthrough: unknown = null;
     if (view.embed_walkthrough && view.walkthrough_floor_plan_id) {
       const fp = view.walkthrough_floor_plan_id;
