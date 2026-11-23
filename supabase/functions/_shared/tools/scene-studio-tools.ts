@@ -10,6 +10,8 @@ import { moduleGate } from './module-gate.ts';
 import { callerDbClient } from '../caller-client.ts';
 import { serviceClient } from '../supabase-client.ts';
 import { fetchImageGuarded } from '../fetch-image.ts';
+import { emitFlowEvent } from '../flow-events.ts';
+import { escapeHtml } from '../html.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import {
   KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, spansBehind, zoneOfKind,
@@ -29,7 +31,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour, line, series }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -180,6 +182,55 @@ export const createManageScenesTool = (
         message: placed.rejected.length
           ? 'Some units were refused by the placement engine; tell the user which and why. Run price_kitchen again to update the price.'
           : 'The run is laid out in the room. Run price_kitchen again to update the price.',
+      });
+    }
+
+    if (action === 'share_walkthrough') {
+      if (!scene_id) return JSON.stringify({ success: false, error: 'share_walkthrough needs scene_id.' });
+      const { data: scene } = await sb.from('floor_plans').select('id, name, project_id').eq('id', scene_id).maybeSingle();
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      if (!scene.project_id) return JSON.stringify({ success: false, error: 'This 3D room is not on a project. Price the kitchen on a project first, or open the project and attach the room on its Client View tab.' });
+      const { data: views } = await sb.from('project_client_views').select('id, title, public_share_token, public_share_enabled, cover')
+        .eq('project_id', scene.project_id).eq('public_share_enabled', true).order('updated_at', { ascending: false }).limit(1);
+      const view = ((views ?? []) as Array<{ id: string; title: string; public_share_token: string | null; cover: { client_name?: string } | null }>)[0];
+      if (!view?.public_share_token) {
+        return JSON.stringify({ success: false, error: 'The project has no shared client view yet. Create and share one on the project\u2019s Client View tab first.', link: `/projects/${scene.project_id}?tab=client-view` });
+      }
+      const email = recipient_email?.trim() ?? '';
+      if (email && !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) return JSON.stringify({ success: false, error: `"${email}" is not an email address.` });
+      if (confirm !== true) {
+        onChunk?.({
+          type: 'action_confirmation',
+          tool: 'manage_scenes',
+          input: { action: 'share_walkthrough', scene_id, recipient_email: email || undefined, recipient_name: recipient_name || undefined, confirm: true },
+          title: email ? `Share the walkthrough with ${email}?` : 'Add the walkthrough to the client view?',
+          summary: `Shows the scroll walkthrough of **${scene.name}** on the client view **${view.title}**`
+            + (email ? ` and emails its link to ${email}.` : '.')
+            + ' The link is live: later changes to the room are visible to the client at once. No prices are shown.',
+          toolkit_id: 'generation',
+          timestamp: Date.now(),
+        });
+        return JSON.stringify({ success: true, awaiting_confirmation: true, message: 'Waiting for the user to approve on the card. Do not retry.' });
+      }
+      const { error: upErr } = await sb.from('project_client_views').update({ embed_walkthrough: true, walkthrough_floor_plan_id: scene.id }).eq('id', view.id);
+      if (upErr) return JSON.stringify({ success: false, error: upErr.message });
+      const appBase = (Deno.env.get('PUBLIC_APP_URL') || 'https://app.materialshub.gr').replace(/\/+$/, '');
+      const link = `${appBase}/cv/${view.public_share_token}`;
+      if (email) {
+        const name = recipient_name?.trim() || view.cover?.client_name || '';
+        const { data: me } = await sb.from('user_profiles').select('full_name').eq('user_id', userId).maybeSingle();
+        const sender = (me as { full_name?: string | null } | null)?.full_name || 'Your designer';
+        await emitFlowEvent('client_view_sent', {
+          workspace_id: workspaceId, user_id: userId, client_view_id: view.id, project_id: scene.project_id,
+          recipient_email: email, recipient_name: name || null, subject: `${view.title} — from ${sender}`, link,
+          greeting_html: name ? ` ${escapeHtml(name)}` : '', sender_html: escapeHtml(sender), title_html: escapeHtml(view.title),
+          title: `${view.title} sent to ${email}`, body: `The online presentation was emailed to ${email}.`,
+          action_url: `/projects/${scene.project_id}?tab=client-view`, type: 'info',
+        });
+      }
+      return JSON.stringify({
+        success: true, client_view: view.title, link, emailed: email || null,
+        message: email ? `The walkthrough is on the client view and its link was emailed to ${email}.` : 'The walkthrough is on the client view; share its link or send it from the Client View tab.',
       });
     }
 
@@ -382,12 +433,13 @@ export const createManageScenesTool = (
       + '(runs, cabinet counts, sizes; the door model and worktop chosen on the plan are kept) and returns the subtotal. '
       + 'handles: sets how the kitchen fronts open (handles: bar_handles, knobs, gola, push_to_open, edge_pull, cup_pulls). '
       + 'layout: lays out one kitchen run (object) through the placement engine, from units left to right or automatically; each unit is built or refused with the reason (a wall unit over a window, a unit that does not fit). '
+      + 'share_walkthrough: puts the room\'s scroll walkthrough on the project\'s shared client view and, with recipient_email, emails the link; the user approves on a card first. '
       + 'price_line: prices the kitchen from a supplier ready-made cabinet line (line + series): every unit matched to a cabinet code, units with no code listed. '
       + 'cut_list: the board areas (carcass, fronts, back, plinth, m²), edge tape (m) and hardware the priced kitchen needs; price_kitchen first. '
       + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows; a dimensioned sketch or elevation is plan_image.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
@@ -404,6 +456,9 @@ export const createManageScenesTool = (
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
       units: z.array(z.object({ type: z.enum(KITCHEN_MODULE_TYPES), width_cm: z.number() })).optional().describe('layout: the units of the run left to right; omit for an automatic layout.'),
       seating_cm: z.number().optional().describe('layout: seating overhang of an island worktop, cm.'),
+      recipient_email: z.string().max(200).optional().describe('share_walkthrough: email the client view link to this address (optional).'),
+      recipient_name: z.string().max(120).optional().describe('share_walkthrough: the recipient\'s name for the greeting.'),
+      confirm: z.boolean().optional().describe('Leave unset. share_walkthrough previews and asks the user to approve; the Approve button re-invokes it with confirm:true.'),
       line: z.string().max(200).optional().describe('price_line: the ready-made cabinet line, by name (e.g. Trend Line).'),
       series: z.string().max(120).optional().describe('price_line: the front series of that line (e.g. BONO).'),
       sun_hour: z.number().min(6).max(20).optional().describe('open: light the room by the sun at this hour of the day (6 to 20).'),

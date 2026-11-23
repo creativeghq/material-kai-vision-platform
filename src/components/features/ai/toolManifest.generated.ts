@@ -1670,7 +1670,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageScenesTool',
     description: '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user rearranges it, recolours or swaps products, and renders it photo-real in any style. create: reads image_url …',
     params: [
-      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line'], optional: false, description: 'What to do.' },
+      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough'], optional: false, description: 'What to do.' },
       { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },
       { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows; a dimensioned sketch or elevation is plan_image.' },
       { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },
@@ -1687,6 +1687,9 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'handles', type: 'enum', enum: ['gola', 'push_to_open', 'edge_pull', 'bar_handles', 'knobs', 'cup_pulls'], optional: true, description: 'handles: how the kitchen fronts open.' },
       { name: 'units', type: 'array', optional: true, description: 'layout: the units of the run left to right; omit for an automatic layout.' },
       { name: 'seating_cm', type: 'number', optional: true, description: 'layout: seating overhang of an island worktop, cm.' },
+      { name: 'recipient_email', type: 'string', optional: true, description: 'share_walkthrough: email the client view link to this address (optional).' },
+      { name: 'recipient_name', type: 'string', optional: true, description: 'share_walkthrough: the recipient\'s name for the greeting.' },
+      { name: 'confirm', type: 'boolean', optional: true, description: 'Leave unset. share_walkthrough previews and asks the user to approve; the Approve button re-invokes it with confirm:true.' },
       { name: 'line', type: 'string', optional: true, description: 'price_line: the ready-made cabinet line, by name (e.g. Trend Line).' },
       { name: 'series', type: 'string', optional: true, description: 'price_line: the front series of that line (e.g. BONO).' },
       { name: 'sun_hour', type: 'number', optional: true, description: 'open: light the room by the sun at this hour of the day (6 to 20).' },
