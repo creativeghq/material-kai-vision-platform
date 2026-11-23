@@ -2,6 +2,9 @@
  * Background Tools: createDispatchBackgroundTaskTool, createInteriorVideoV2Tool
  */
 
+import { resolveImageSlots } from './image-slots.ts';
+import { resolveMediaSource } from '../conversation-media.ts';
+
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
 // makes agent-chat exceed 12 GB and drop out of the edge typecheck gate entirely (inbox-api is a
@@ -218,9 +221,20 @@ export const createInteriorVideoV2Tool = (
   workspaceId: string,
   onChunk?: (chunk: any) => void,
   conversationId?: string,
+  conversationImages: string[] = [],
+  userImages: string[] = [],
 ) => {
   return tool(
-    async ({ source_image_url, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url }) => {
+    async ({ source_image_url: explicitSource, source, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url }) => {
+      const slots = resolveImageSlots(userImages.length);
+      const picked = resolveMediaSource({
+        sourceImageUrl: explicitSource, source, conversationImages,
+        uploadedRoom: slots.baseIndex >= 0 ? userImages[slots.baseIndex] : undefined,
+      });
+      const source_image_url = picked.url;
+      if (!source_image_url) {
+        return JSON.stringify({ success: false, error: 'No image to animate: attach one, generate one first, or pass source_image_url.' });
+      }
       try {
         onChunk?.({ type: 'tool_progress', status: `Starting ${video_type} video generation with ${model ?? 'auto-selected model'}...`, timestamp: Date.now() });
 
@@ -275,10 +289,11 @@ export const createInteriorVideoV2Tool = (
 
         // Echo the frame this animated. The whole upstream body used to be passed through
         // unfiltered, so the model learned nothing about WHAT was animated and described the
-        // video anyway. `source_image_url` is required in the schema, so this is always known.
+        // video anyway. The source is resolved before the call, so this is always known.
         return JSON.stringify({
           ...result,
           source_image_url,
+          source_image_origin: picked.origin,
           ...(before_image_url ? { before_image_url } : {}),
         });
       } catch (error) {
@@ -320,7 +335,8 @@ Long-form, with sound (the only models here that pass 10 seconds):
 
 Returns video_url when complete, or prediction_id if still processing (poll check_generation_status). YOU CANNOT SEE THE VIDEO THIS RETURNS — report the source_image_url it echoes back and never describe what happens on screen.`,
       schema: z.object({
-        source_image_url: z.string().describe('Source image URL to animate or base the video on'),
+        source_image_url: z.string().optional().describe('Image URL to animate: any earlier result in this conversation (a render, a staged room, a scene render) or an attachment. Omit to use the newest generated image.'),
+        source: z.enum(['auto', 'my_upload', 'last_generated']).optional().describe('When source_image_url is omitted: my_upload animates the attached photo, otherwise the newest generated image.'),
         video_type: z.enum(['walkthrough', 'product_spotlight', 'before_after', 'floorplan_flythrough', 'social_reel'])
           .describe('Type of video to generate'),
         // These MUST be generate-interior-video-v2's VideoModel keys — the value is

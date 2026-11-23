@@ -261,7 +261,7 @@ describe('the images stay reachable on the next turn', () => {
     );
     // These four are read by name inside executeAgent. Projecting the history down to
     // {role, content} made both recovery paths dead code for every conversation ever run.
-    for (const field of ['images', 'metadata', 'geminiImageData', 'tool_results']) {
+    for (const field of ['images', 'metadata', 'geminiImageData', 'virtualStagingData', 'materialsBoardData', 'videoData', 'tool_results']) {
       expect(map).toContain(`msg.${field}`);
     }
   });
@@ -269,7 +269,7 @@ describe('the images stay reachable on the next turn', () => {
   it('both recovery paths still read the fields the map carries', () => {
     const src = read(AGENT_CHAT);
     expect(src).toContain('const raw = m.images ?? m.metadata?.attachedImages;');
-    expect(src).toContain('if (m.geminiImageData?.image_url)');
+    expect(src).toContain('collectConversationMedia(messages)');
   });
 
   it('an earlier upload comes back as the SET it was, not as its last URL', () => {
@@ -389,12 +389,14 @@ describe('every media tool on the agent, not just the one that broke', () => {
       'createVirtualStagingTool',
       'createApplyLightingPresetTool',
       'createGenerateVRWorldTool',
+      'createInteriorVideoV2Tool',
     ]) {
       const call = agentChat.slice(agentChat.indexOf(`tools.push(${factory}(`));
       expect(call.slice(0, 220), `${factory} is not handed the user's attachments`)
         .toContain('toolImages');
     }
-    expect(read(GENERATION_TOOLS)).toContain('function resolveMediaSource(');
+    expect(read(GENERATION_TOOLS)).toContain("import { resolveMediaSource } from '../conversation-media.ts'");
+    expect(read('supabase/functions/_shared/tools/background-tools.ts')).toContain("import { resolveMediaSource } from '../conversation-media.ts'");
   });
 
   it('generate_3d picks the room by the shared convention, not by index 0', () => {

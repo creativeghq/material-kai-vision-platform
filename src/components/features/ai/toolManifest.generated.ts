@@ -970,7 +970,8 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createInteriorVideoV2Tool',
     description: 'Generate an interior design video using AI.',
     params: [
-      { name: 'source_image_url', type: 'string', optional: false, description: 'Source image URL to animate or base the video on' },
+      { name: 'source_image_url', type: 'string', optional: true, description: 'Image URL to animate: any earlier result in this conversation (a render, a staged room, a scene render) or an attachment. Omit to use the newest generated image.' },
+      { name: 'source', type: 'enum', enum: ['auto', 'my_upload', 'last_generated'], optional: true, description: 'When source_image_url is omitted: my_upload animates the attached photo, otherwise the newest generated image.' },
       { name: 'video_type', type: 'enum', enum: ['walkthrough', 'product_spotlight', 'before_after', 'floorplan_flythrough', 'social_reel'], optional: false, description: 'Type of video to generate' },
       { name: 'model', type: 'enum', enum: ['gemini-omni-1.2-flash-720p', 'gemini-omni-1.2-flash-1080p', 'kling-v3.0', 'runway-gen4-turbo', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p', 'seedance-2.5-480p', 'seedance-2.5-720p', 'h3-max-768p', 'h3-max-480p', 'ray-3.2-720p', 'ray-3.2-1080p'], optional: true, description: 'Override model selection: gemini-omni-1.2-flash-720p 20cr, gemini-omni-1.2-flash-1080p 30cr (Google, 3-15s with native audio described in the prompt), kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 30cr, wan-3.0-720p 55cr, wan-3.0-1080p 110cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, h3-max-768p 25cr, h3-max-480p 15cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)' },
       { name: 'prompt', type: 'string', optional: true, description: 'Additional prompt for the video generation' },

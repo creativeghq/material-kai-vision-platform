@@ -29,6 +29,7 @@ import { shapeForModel, shapeToolResult, turnProducedWork } from '../_shared/too
 // Security invariant 9 — the approval gate is enforced, not requested (#352 A1).
 import { stripModelAuthoredApproval } from '../_shared/tools/approval-gate.ts';
 import { loadVocabulary } from '../_shared/vocabularies.ts';
+import { collectConversationMedia, conversationMediaContext, stillsOf } from '../_shared/conversation-media.ts';
 
 // Type-only LangChain imports. Erased at compile time, so the boot budget is untouched and
 // the runtime still loads these lazily inside initRuntime() — but `deno check` now sees the
@@ -1948,26 +1949,9 @@ async function executeAgent(
     })
     .map(([id]) => id);
 
-  // Extract previously generated image URLs from assistant messages (for edit mode).
-  // Sources checked in priority order:
-  //   1. geminiImageData.image_url — Gemini single-image result (restored from DB on page revisit)
-  //   2. tool_results[].image_url  — inline tool result image URLs (live session only)
-  const conversationImages: string[] = messages
-    .filter((m: any) => m.role === 'assistant')
-    .flatMap((m: any) => {
-      const urls: string[] = [];
-      // Gemini image result (present in restored messages loaded from DB)
-      if (m.geminiImageData?.image_url) {
-        urls.push(m.geminiImageData.image_url as string);
-      }
-      // Tool results (present during live sessions)
-      if (Array.isArray(m.tool_results)) {
-        for (const tr of m.tool_results) {
-          if (tr.image_url) urls.push(tr.image_url as string);
-        }
-      }
-      return urls;
-    });
+  // Every earlier result (render, staging, board, video), so any generator can take any of them as input.
+  const conversationMedia = collectConversationMedia(messages);
+  const conversationImages: string[] = stillsOf(conversationMedia);
 
   // Images the user UPLOADED on an EARLIER turn.
   const priorUploadGroups: string[][] = messages
@@ -2135,8 +2119,8 @@ async function executeAgent(
   }
 
   // If there are previously generated images in the conversation, remind the agent to use them for follow-up edits
-  if (conversationImages.length > 0) {
-    systemPrompt += `\n\n[CONTEXT] There are ${conversationImages.length} previously generated image(s) in this conversation. The most recent is: ${conversationImages[conversationImages.length - 1]}. If the user asks to modify, adjust, change, or refine the design in any way — even without uploading a new image — call generate_gemini with mode=image-edit using this image as the reference. Do not respond with text only when the user is clearly asking for a visual change.`;
+  if (conversationMedia.length > 0) {
+    systemPrompt += `\n\n${conversationMediaContext(conversationMedia)} Do not respond with text only when the user is clearly asking for a visual change.`;
   }
 
   // Special handling for Demo Agent - return structured command
@@ -3267,7 +3251,7 @@ async function executeAgent(
   // ever emit it. Deliberately NOT inside the isAdmin block below: this is a Generation
   // cluster tool like generate_3d, not an operator tool.
   if (config.tools.includes('generate_video') && createInteriorVideoV2Tool) {
-    tools.push(createInteriorVideoV2Tool(userId, workspaceId, onChunk, conversation_id ?? undefined));
+    tools.push(createInteriorVideoV2Tool(userId, workspaceId, onChunk, conversation_id ?? undefined, conversationImages, toolImages));
   }
 
   // --- Admin-only tools (gated by RBAC) ---
@@ -4449,6 +4433,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
       ...(msg.images ? { images: msg.images } : {}),
       ...(msg.metadata ? { metadata: msg.metadata } : {}),
       ...(msg.geminiImageData ? { geminiImageData: msg.geminiImageData } : {}),
+      ...(msg.virtualStagingData ? { virtualStagingData: msg.virtualStagingData } : {}),
+      ...(msg.materialsBoardData ? { materialsBoardData: msg.materialsBoardData } : {}),
+      ...(msg.videoData ? { videoData: msg.videoData } : {}),
       ...(msg.tool_results ? { tool_results: msg.tool_results } : {}),
     }));
 

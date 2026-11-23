@@ -8,6 +8,7 @@ import { resolveImageSlots } from './image-slots.ts';
 import { PATTERNS as SURFACE_PATTERNS } from '../surfacePatterns.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS, type CabinetHardware } from '../cabinetHardware.generated.ts';
 import { loadPrompt, renderPromptTemplate } from '../prompt-utils.ts';
+import { resolveMediaSource } from '../conversation-media.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -30,46 +31,10 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-/** Which image a media tool acts on — and, just as important, a NAME for it. */
-type MediaSourceChoice = 'auto' | 'my_upload' | 'last_generated';
-
-interface ResolvedMediaSource {
-  url?: string;
-  /** How to describe the choice to the user. Always set, including when nothing was found. */
-  origin: string;
-}
-
 /** The room the user ATTACHED, under the one slot convention (see ./image-slots.ts). */
 function resolveUploadedRoom(userImages: string[]): string | undefined {
   const slots = resolveImageSlots(userImages.length);
   return slots.baseIndex >= 0 ? userImages[slots.baseIndex] : undefined;
-}
-
-function resolveMediaSource(opts: {
-  sourceImageUrl?: string;
-  source?: MediaSourceChoice;
-  conversationImages: string[];
-  uploadedRoom?: string;
-}): ResolvedMediaSource {
-  const lastGenerated = opts.conversationImages[opts.conversationImages.length - 1];
-  if (opts.sourceImageUrl) {
-    return { url: opts.sourceImageUrl, origin: 'a URL supplied in the tool call' };
-  }
-  // An explicit ask wins. Falling back the other way rather than failing is deliberate: the
-  // user asked for the work, not for a lecture about which image was available.
-  if (opts.source === 'my_upload' && opts.uploadedRoom) {
-    return { url: opts.uploadedRoom, origin: "the photo the user attached" };
-  }
-  if (opts.source === 'last_generated' && lastGenerated) {
-    return { url: lastGenerated, origin: 'the image generated most recently in this conversation' };
-  }
-  if (lastGenerated) {
-    return { url: lastGenerated, origin: 'the image generated most recently in this conversation' };
-  }
-  if (opts.uploadedRoom) {
-    return { url: opts.uploadedRoom, origin: "the photo the user attached" };
-  }
-  return { url: undefined, origin: 'no image was available' };
 }
 
 /** Every media tool says this, because none of them can look at what they made. */
