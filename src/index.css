@@ -1917,3 +1917,13 @@ html.light .msg-assistant a { color: hsl(var(--primary)); }
   background-color: hsl(var(--paper));
   color: hsl(var(--ink));
 }
+
+/* Kitchen drawing sheets (#604): hidden on screen, the only thing printed while body.print-kitchen-drawings is set. */
+.kitchen-drawings-print { display: none; }
+@page kitchen-sheet { size: A4 landscape; margin: 8mm; }
+@media print {
+  body.print-kitchen-drawings > *:not(.kitchen-drawings-print) { display: none !important; }
+  body.print-kitchen-drawings .kitchen-drawings-print { display: block; }
+  body.print-kitchen-drawings .kitchen-drawings-print > div { display: block; }
+  body.print-kitchen-drawings .kitchen-sheet { page: kitchen-sheet; break-after: page; max-width: none; }
+}

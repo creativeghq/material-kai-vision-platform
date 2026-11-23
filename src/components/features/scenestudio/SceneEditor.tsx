@@ -1,7 +1,7 @@
 /** The editable 3D room, hosted in the interior designer's canvas (#564). Renders go back into the conversation. */
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Box, Eye, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
+  Box, Eye, FileText, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
   RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Globe, Aperture, Eraser,
 } from 'lucide-react';
 
@@ -28,6 +28,7 @@ import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSl
 import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
 import { KitchenRunEditor } from '@/components/features/scenestudio/KitchenRunEditor';
+import { KitchenDrawingsDialog } from '@/components/features/scenestudio/KitchenDrawingsDialog';
 import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
@@ -61,7 +62,7 @@ export interface SceneEditorProps {
   pinned?: SceneProduct[];
   onRendered?(event: SceneRenderedEvent): void;
   onWalkThrough?(imageUrl: string, prompt: string): void;
-  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk'; object_id: string | null; room_id?: string | null; fronts?: FrontsState; nonce: number };
+  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings'; object_id: string | null; room_id?: string | null; fronts?: FrontsState; nonce: number };
 }
 
 interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[]; finishes: SceneObjectFinish[] }
@@ -170,6 +171,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [tool, setTool] = useState<SceneTool>('view');
   const [wireframe, setWireframe] = useState(false);
   const [fronts, setFronts] = useState<FrontsState>('closed');
+  const [drawingsOpen, setDrawingsOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeRenderId, setActiveRenderId] = useState<string | null>(null);
   const [showRender, setShowRender] = useState(false);
@@ -655,6 +657,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     if (!intent || !data || handledIntent.current === intent.nonce) return;
     handledIntent.current = intent.nonce;
     if (intent.fronts) setFronts(intent.fronts);
+    if (intent.mode === 'drawings') { setDrawingsOpen(true); return; }
     const obj = intent.object_id ? objects.find((o) => o.id === intent.object_id) : undefined;
     const roomId = intent.room_id ?? obj?.room_id ?? undefined;
     if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
@@ -999,6 +1002,9 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 </SelectContent>
               </Select>
             </div>
+            <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setDrawingsOpen(true)}>
+              <FileText className="h-3.5 w-3.5" />Drawings
+            </Button>
           </div>
         )}
         <KitchenPrice
@@ -1026,6 +1032,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
   return (
     <PinnedProductsContext.Provider value={pinned}>
+      <KitchenDrawingsDialog open={drawingsOpen} onOpenChange={setDrawingsOpen} data={data} objects={objects} />
       <div className="space-y-3">
         <div className="relative h-[64vh] min-h-[440px] overflow-hidden rounded-md border border-hairline bg-surface-sunken">
           {reading ? (

@@ -76,7 +76,8 @@ export const createManageScenesTool = (
         ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
         : mode === 'photo_walk'
           ? 'The room is open with the photo-real walk offer; the user confirms it there (a render plus 190 credits).'
-          : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.' : 'The room is open on the canvas.';
+          : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.'
+            : mode === 'drawings' ? 'The kitchen drawings are open: floor plan with dimensions, an elevation per wall and the cut list; Print is in the dialog.' : 'The room is open on the canvas.';
       return JSON.stringify({ success: true, scene_id, object: target, mode: intent.mode, message: next });
     }
 
@@ -341,7 +342,7 @@ export const createManageScenesTool = (
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),
-      mode: z.enum(['view', 'walk', 'make_3d', 'photo_walk']).optional().describe('open: what to do in the room.'),
+      mode: z.enum(['view', 'walk', 'make_3d', 'photo_walk', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
       room: z.string().max(120).optional().describe('open/finish: the space, by name (e.g. living room).'),
       area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
       part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),
