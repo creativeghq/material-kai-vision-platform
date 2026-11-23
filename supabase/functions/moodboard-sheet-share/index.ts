@@ -144,7 +144,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   // ---------- 1. CLIENT VIEW token? ----------
   const { data: view } = await supabase
     .from('project_client_views')
-    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, feedback_enabled, vr_world_id, quote_id, embed_room_plan, room_layout_id')
+    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, feedback_enabled, vr_world_id, quote_id, embed_room_plan, room_layout_id, embed_walkthrough, walkthrough_floor_plan_id')
     .eq('public_share_token', token)
     .maybeSingle();
 
@@ -408,6 +408,76 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       }
     }
 
+    // The scroll walkthrough (#604 phase 8). Service role, so `embed_walkthrough` is the access
+    // control; every field is projected by hand and nothing priced leaves.
+    let walkthrough: unknown = null;
+    if (view.embed_walkthrough && view.walkthrough_floor_plan_id) {
+      const fp = view.walkthrough_floor_plan_id;
+      const { data: plan } = await supabase.from('floor_plans')
+        .select('id, name, workspace_id, default_wall_height_mm, cabinet_hardware').eq('id', fp).maybeSingle();
+      if (plan && !belongsToView(plan)) {
+        console.error(`[moodboard-sheet-share] floor_plan ${fp} is not in the view's workspace — withheld`);
+      } else if (plan) {
+        const [rooms, walls, openings, objects, surfaces, finishes, renders] = await Promise.all([
+          supabase.from('floor_plan_rooms').select('id, name, outline, height_mm, walk_order').eq('floor_plan_id', fp).order('walk_order'),
+          supabase.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm, height_mm').eq('floor_plan_id', fp),
+          supabase.from('floor_plan_openings').select('id, wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', fp),
+          supabase.from('floor_plan_objects')
+            .select('id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, colour_hex, kitchen_layout')
+            .eq('floor_plan_id', fp).is('removed_at', null),
+          supabase.from('floor_plan_surfaces')
+            .select('id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex')
+            .eq('floor_plan_id', fp),
+          supabase.from('floor_plan_object_finishes').select('id, object_id, slot, product_id, colour_hex').eq('floor_plan_id', fp),
+          supabase.from('scene_renders').select('image_url, camera, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(1),
+        ]);
+        const productIds = [...new Set([
+          ...((objects.data ?? []) as any[]).map((o) => o.product_id),
+          ...((surfaces.data ?? []) as any[]).map((sf) => sf.product_id),
+          ...((finishes.data ?? []) as any[]).map((f) => f.product_id),
+        ].filter(Boolean))];
+        const products: Record<string, unknown> = {};
+        if (productIds.length) {
+          const { data: prows } = await supabase.from('products')
+            .select('id, name, workspace_id, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id)')
+            .in('id', productIds);
+          const FORMAT_ATTRS = ['width_mm', 'length_mm', 'roll_width_mm', 'roll_length_m', 'plank_width_mm', 'plank_length_mm', 'slab_size'];
+          const FORMAT_META = [...FORMAT_ATTRS, 'dimensions', 'available_sizes', 'dimensions_cm_from_vision', 'decor_repeat_mm'];
+          const pick = (src: unknown, keys: string[]) => {
+            const o = (src && typeof src === 'object' ? src : {}) as Record<string, unknown>;
+            return Object.fromEntries(keys.filter((k) => o[k] != null).map((k) => [k, o[k]]));
+          };
+          for (const p of (prows ?? []) as any[]) {
+            if (!belongsToView(p)) continue;
+            const imgs = ((p.image_product_associations ?? []) as any[])
+              .sort((a, b) => (b.overall_score ?? 0) - (a.overall_score ?? 0))
+              .map((a) => a.document_images?.image_url).filter(Boolean);
+            const m = ((p.product_material_maps ?? []) as any[]).find((x) => x.is_selected && !x.option_value_id);
+            const url = (path: string | null | undefined) => (path && m ? supabase.storage.from(m.storage_bucket || 'generation-images').getPublicUrl(path).data.publicUrl : null);
+            products[p.id] = {
+              id: p.id, name: p.name, imageUrl: imgs[0] ?? null,
+              albedoUrl: url(m?.albedo_path), normalUrl: url(m?.normal_path), roughnessUrl: url(m?.roughness_path),
+              attributes: pick(p.attributes, FORMAT_ATTRS), metadata: pick(p.metadata, FORMAT_META),
+            };
+          }
+        }
+        const render = ((renders.data ?? []) as any[])[0] ?? null;
+        walkthrough = {
+          name: plan.name,
+          default_wall_height_mm: plan.default_wall_height_mm,
+          cabinet_hardware: plan.cabinet_hardware,
+          rooms: rooms.data ?? [],
+          walls: walls.data ?? [],
+          openings: openings.data ?? [],
+          objects: ((objects.data ?? []) as any[]).map((o) => ({ ...o, product_id: o.product_id && products[o.product_id] ? o.product_id : null })),
+          surfaces: surfaces.data ?? [],
+          finishes: finishes.data ?? [],
+          products,
+          render: render ? { image_url: render.image_url, camera: render.camera } : null,
+        };
+      }
+    }
+
     // WS4 #285 — the handover snag list. ONLY client_visible snags, and only the fields a client
     // needs: no assignee, no internal description, no severity triage. This runs on the service
     // role, so the `client_visible` filter here IS the access control — RLS is not in play.
@@ -465,6 +535,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         ffe,
         lighting_image_url: view.embed_lighting ? lightingImageUrl : null,
         room_plan,
+        walkthrough,
         room_views,
         snags,
       },

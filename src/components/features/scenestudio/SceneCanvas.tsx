@@ -4,7 +4,7 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
 import {
   Box3, Color, DoubleSide, Material, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
-  type Object3D, type PerspectiveCamera, type RectAreaLight,
+  type Object3D, type PerspectiveCamera, type RectAreaLight, type Group,
 } from 'three';
 import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -16,6 +16,7 @@ import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint'
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
 import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
+import type { Pose } from '@/lib/scene/walkthroughTimeline';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
 import {
   indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, zonesOn, type Finish, type SurfaceTarget,
@@ -84,7 +85,25 @@ interface Props {
   cabinetHardware?: string | null;
   /** Time of day for the sun, 6–20; null keeps the studio light. */
   sunHour?: number | null;
+  /** Read-only playback (the client walkthrough): camera, wall height and unit rise are read from this ref every frame. */
+  script?: React.MutableRefObject<ScriptFrame | null>;
 }
+
+export interface ScriptFrame { pose: Pose; walls: number; objects: number }
+
+const ScriptDriver: React.FC<{ script: React.MutableRefObject<ScriptFrame | null>; walls: React.RefObject<Group>; objects: React.RefObject<Group> }> = ({ script, walls, objects }) => {
+  useFrame(({ camera }) => {
+    const f = script.current;
+    if (!f) return;
+    camera.position.set(...f.pose.position);
+    camera.lookAt(...f.pose.target);
+    const cam = camera as PerspectiveCamera;
+    if (Math.abs(cam.fov - f.pose.fov) > 0.01) { cam.fov = f.pose.fov; cam.updateProjectionMatrix(); }
+    if (walls.current) walls.current.scale.y = Math.max(0.001, f.walls);
+    if (objects.current) { objects.current.scale.y = Math.max(0.001, f.objects); objects.current.visible = f.objects > 0.01; }
+  });
+  return null;
+};
 
 const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
 
@@ -744,8 +763,10 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
-    frontsOpen = 0, cabinetHardware, sunHour = null,
+    frontsOpen = 0, cabinetHardware, sunHour = null, script,
   } = props;
+  const wallsGroup = useRef<Group>(null);
+  const objectsGroup = useRef<Group>(null);
   const cabinetView = useMemo(() => ({ open: frontsOpen, hardware: cabinetHardware ?? 'bar_handles' }), [frontsOpen, cabinetHardware]);
   const hasModels = Object.keys(modelUrls).length > 0;
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
@@ -951,6 +972,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           </mesh>
         );
       })}
+      <group ref={wallsGroup}>
       {walls.map((wall) => (
         <WallMesh
           key={wall.id}
@@ -998,7 +1020,9 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         const wall = walls.find((w) => w.id === o.wall_id);
         return wall ? <OpeningMesh key={o.id} wall={wall} opening={o} frame={frame} wireframe={wireframe} /> : null;
       })}
+      </group>
       <CabinetViewContext.Provider value={cabinetView}>
+      <group ref={objectsGroup}>
       {objects.filter((o) => !o.removed_at).map((o) => (
         <ObjectMesh
           key={o.id}
@@ -1023,10 +1047,13 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           modelStale={staleModels?.has(o.id)}
         />
       ))}
+      </group>
       </CabinetViewContext.Provider>
+      {script && <ScriptDriver script={script} walls={wallsGroup} objects={objectsGroup} />}
       <OrbitControls
         ref={controls}
         makeDefault
+        enabled={!script}
         enableDamping
         enableRotate={tool !== 'move' && tool !== 'turn'}
         target={initial.target}

@@ -63,6 +63,8 @@ interface FormState {
   vrWorldId: string;
   embedRoomPlan: boolean;
   roomLayoutId: string;
+  embedWalkthrough: boolean;
+  walkthroughFloorPlanId: string;
 }
 
 const emptyForm = (): FormState => ({
@@ -80,6 +82,8 @@ const emptyForm = (): FormState => ({
   vrWorldId: '',
   embedRoomPlan: false,
   roomLayoutId: '',
+  embedWalkthrough: false,
+  walkthroughFloorPlanId: '',
 });
 
 export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, projectName, onShowSheets }) => {
@@ -91,6 +95,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const [vrWorlds, setVrWorlds] = useState<VrWorld[]>([]);
   const [roomLayouts, setRoomLayouts] = useState<Array<{ id: string; name: string }>>([]);
   const [layoutsFailed, setLayoutsFailed] = useState(false);
+  const [scenes, setScenes] = useState<Array<{ id: string; name: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -120,6 +125,12 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       setQuotes((q || []).map((x: any) => ({ id: x.id, name: x.name, quote_number: x.quote_number, status: x.status ?? null, grand_total: x.grand_total ?? null, currency: x.currency ?? null })));
       setVrWorlds(w);
       setRoomLayouts((plans ?? []).map((l) => ({ id: l.id, name: l.name ?? 'Untitled room' })));
+      if (activeWorkspaceId) {
+        const { data: fp } = await supabase.from('floor_plans').select('id, name, project_id').eq('workspace_id', activeWorkspaceId)
+          .order('updated_at', { ascending: false }).limit(100);
+        const rows = (fp ?? []) as Array<{ id: string; name: string; project_id: string | null }>;
+        setScenes([...rows.filter((r) => r.project_id === projectId), ...rows.filter((r) => r.project_id !== projectId)].map((r) => ({ id: r.id, name: r.name })));
+      }
       // Resolve the project's client name so the deck cover's "Prepared for" is prefilled.
       const { data: proj } = await supabase.from('projects').select('client_company_id, client_contact_id').eq('id', projectId).maybeSingle();
       const companyId = (proj as any)?.client_company_id as string | null;
@@ -163,6 +174,8 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       vrWorldId: view.vr_world_id || '',
       embedRoomPlan: view.embed_room_plan ?? false,
       roomLayoutId: view.room_layout_id || '',
+      embedWalkthrough: view.embed_walkthrough ?? false,
+      walkthroughFloorPlanId: view.walkthrough_floor_plan_id || '',
     });
     setEditorOpen(true);
   };
@@ -207,6 +220,8 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
     vr_world_id: form.vrWorldId || null,
     embed_room_plan: form.embedRoomPlan,
     room_layout_id: form.roomLayoutId || null,
+    embed_walkthrough: form.embedWalkthrough,
+    walkthrough_floor_plan_id: form.walkthroughFloorPlanId || null,
   });
 
   const save = async (thenGenerate: boolean) => {
@@ -417,7 +432,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
 
             {/* Online embeds */}
             <div className="grid sm:grid-cols-2 gap-3">
-              <ToggleRow label="3D walkthrough (Marble)" desc="Embed an explorable 3D world in the online version" checked={form.embedVr} onChange={(v) => setForm({ ...form, embedVr: v })} />
+              <ToggleRow label="Explorable World (Marble)" desc="Embed an explorable 3D world in the online version" checked={form.embedVr} onChange={(v) => setForm({ ...form, embedVr: v })} />
               <ToggleRow label="Lighting Moods" desc="Let the client preview the render under different lighting" checked={form.embedLighting} onChange={(v) => setForm({ ...form, embedLighting: v })} />
               <ToggleRow label="Live FF&E Pricing" desc="Show an interactive FF&E table from a quote" checked={form.embedFfe} onChange={(v) => setForm({ ...form, embedFfe: v })} />
               <ToggleRow label="Client Feedback" desc="Allow inline approve / comment on the online page" checked={form.feedbackEnabled} onChange={(v) => setForm({ ...form, feedbackEnabled: v })} />
@@ -493,6 +508,28 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+              <ToggleRow
+                label="Scroll Walkthrough"
+                desc="The plan rises into the rooms as your client scrolls, ending on the latest render"
+                checked={form.embedWalkthrough}
+                onChange={(v) => setForm({ ...form, embedWalkthrough: v })}
+              />
+              {form.embedWalkthrough && (
+                <div className="space-y-1.5">
+                  <Label>3D Room</Label>
+                  <Select
+                    value={form.walkthroughFloorPlanId || '__none__'}
+                    onValueChange={(v) => setForm({ ...form, walkthroughFloorPlanId: v === '__none__' ? '' : v })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="— none —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— none —</SelectItem>
+                      {scenes.map((sc) => <SelectItem key={sc.id} value={sc.id}>{sc.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">The link is live: changes you make in the room are visible to your client immediately. Prices are never shown.</p>
                 </div>
               )}
             </div>

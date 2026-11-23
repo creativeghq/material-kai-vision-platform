@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Loader2, Box, Sun, Check, MessageSquare, FileText, Grid3x3 } from 'lucide-react';
 import { RoomViewHotspots, type HotspotLayer, type HotspotPin } from '@/components/features/visualizer/RoomViewHotspots';
@@ -55,6 +55,7 @@ interface ClientViewData {
   snags?: CvSnag[];
   /** Room views (#560): a picture with a pin per finished surface. */
   room_views?: Array<{ id: string; title: string; scene_name: string | null; image_url: string | null; layers: HotspotLayer[]; pins: HotspotPin[] }>;
+  walkthrough?: WalkthroughPayload | null;
 }
 
 const LIGHTING_PRESETS: { label: string; filter: string }[] = [
@@ -67,6 +68,9 @@ const LIGHTING_PRESETS: { label: string; filter: string }[] = [
 
 import { formatMoney as money } from '@/utils/decimal';
 import { httpUrlOrNull } from '@/utils/safeUrl';
+import type { WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
+
+const ScrollWalkthrough = lazy(() => import('@/components/features/scenestudio/ScrollWalkthrough'));
 
 export default function PublicClientViewPage() {
   const { token } = useParams<{ token: string }>();
@@ -288,6 +292,16 @@ export default function PublicClientViewPage() {
           );
         })()}
 
+        {view.walkthrough && view.walkthrough.rooms.length > 0 && (
+          <section>
+            <h2 className="mb-1 flex items-center gap-2 text-lg font-semibold"><Box className="h-5 w-5 text-primary" /> Walk Through Your Design</h2>
+            <p className="mb-3 text-sm text-muted-foreground">Scroll: the plan rises into your rooms, then the finished design. A schematic of the specified design, to scale.</p>
+            <Suspense fallback={<div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>}>
+              <ScrollWalkthrough data={view.walkthrough} />
+            </Suspense>
+          </section>
+        )}
+
         {/* 3D walkthrough */}
         {view.embed_vr && vr && vrUrl && (
           <section>
@@ -301,7 +315,7 @@ export default function PublicClientViewPage() {
                   Walk through an explorable 3D reconstruction of the design.
                 </p>
                 <Button asChild>
-                  <a href={vrUrl} target="_blank" rel="noreferrer">Open 3D walkthrough</a>
+                  <a href={vrUrl} target="_blank" rel="noreferrer">Open the explorable world</a>
                 </Button>
               </div>
             </Card>

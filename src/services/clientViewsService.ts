@@ -32,6 +32,9 @@ export interface ClientView {
   /** Room plan shown to the client (#259 Ph4). Attachment and visibility are separate. */
   room_layout_id: string | null;
   embed_room_plan: boolean;
+  /** The scroll walkthrough of a Scene Studio room (#604 phase 8). */
+  walkthrough_floor_plan_id: string | null;
+  embed_walkthrough: boolean;
   pdf_storage_path: string | null;
   pdf_generation_status: 'draft' | 'generating' | 'completed' | 'failed';
   pdf_generated_at: string | null;
@@ -60,6 +63,8 @@ export interface CreateClientViewInput {
   quote_id?: string | null;
   room_layout_id?: string | null;
   embed_room_plan?: boolean;
+  walkthrough_floor_plan_id?: string | null;
+  embed_walkthrough?: boolean;
 }
 
 export interface UpdateClientViewInput {
@@ -74,6 +79,8 @@ export interface UpdateClientViewInput {
   quote_id?: string | null;
   room_layout_id?: string | null;
   embed_room_plan?: boolean;
+  walkthrough_floor_plan_id?: string | null;
+  embed_walkthrough?: boolean;
 }
 
 export interface ClientViewFeedback {
@@ -125,6 +132,10 @@ class ClientViewsService {
         feedback_enabled: input.feedback_enabled ?? true,
         vr_world_id: input.vr_world_id ?? null,
         quote_id: input.quote_id ?? null,
+        room_layout_id: input.room_layout_id ?? null,
+        embed_room_plan: input.embed_room_plan ?? false,
+        walkthrough_floor_plan_id: input.walkthrough_floor_plan_id ?? null,
+        embed_walkthrough: input.embed_walkthrough ?? false,
         created_by: user.id,
       })
       .select('*')
