@@ -192,3 +192,57 @@ describe('a kitchen object in the 3D room is drawn from its cabinets', () => {
     expect(buildKitchenGeometry('sofa', 2, 0.9, 0.8, { open: 0, hardware: 'bar_handles' })).toBeNull();
   });
 });
+
+describe('a kitchen priced from its materials (#604 phase 2)', () => {
+  const boards = [
+    { key: 'carcass_board', label: 'Carcass Board', type: 'option' as const, option_group: 'Carcass Board', board_slot: 'carcass' as const },
+    { key: 'front_board', label: 'Front Board', type: 'option' as const, option_group: 'Front Board', board_slot: 'fronts' as const },
+    { key: 'front_edge', label: 'Front Edge Tape', type: 'option' as const, option_group: 'Front Edge Tape', edge_slot: 'fronts' as const },
+  ];
+  const zone = (key: string, height: number, depth: number): ZoneDef => ({
+    key, label: key, kind: 'units', pricing: 'materials', construction: { wastage_pct: 10, sheet_m2: 5.796 },
+    modules: [{ key: 'door2', label: '2-door cabinet', default_width_cm: 80, price_mode: 'per_m' }],
+    globals: [...boards, { key: 'height', label: 'Height', type: 'number', default: height }, { key: 'depth', label: 'Depth', type: 'number', default: depth }],
+  });
+  const items = [
+    { id: 'c1', label: 'White Melamine 18mm', option_group: 'Carcass Board', unit: 'sheet', material_cost: 50, margin_pct: 0 },
+    { id: 'f1', label: 'Super Matt 18mm', option_group: 'Front Board', unit: 'm²', material_cost: 30, margin_pct: 0 },
+    { id: 'e1', label: 'ABS 1mm', option_group: 'Front Edge Tape', unit: 'm', material_cost: 1, margin_pct: 0 },
+  ];
+  const config = {
+    base: { enabled: true, modules: [{ id: 'a', type: 'door2', width_cm: 80, qty: 3 }] },
+    wall: { enabled: true, modules: [{ id: 'b', type: 'door2', width_cm: 80, qty: 3 }] },
+  };
+  const derived = deriveComposition([zone('base', 72, 56), zone('wall', 72, 35)], config, items);
+
+  it('buys each board once across zones, in whole sheets with wastage', () => {
+    const lines = derived.lines.filter((l) => l.key.startsWith('boards:'));
+    const carcass = lines.find((l) => l.label.includes('White Melamine'))!;
+    const area = derived.vars.total_board_m2_carcass;
+    expect(carcass.unit).toBe('sheet');
+    expect(carcass.quantity).toBe(Math.ceil((area * 1.1) / 5.796));
+    expect(carcass.line_total).toBe(carcass.quantity * 50);
+    expect(lines.filter((l) => l.label.includes('White Melamine'))).toHaveLength(1);
+  });
+
+  it('prices fronts per m² and edge tape per metre', () => {
+    const front = derived.lines.find((l) => l.label.includes('Super Matt'))!;
+    expect(front.unit).toBe('m²');
+    expect(front.quantity).toBeCloseTo(derived.vars.total_board_m2_fronts * 1.1, 2);
+    const edge = derived.lines.find((l) => l.label.includes('ABS'))!;
+    expect(edge.unit).toBe('m');
+    expect(edge.quantity).toBeCloseTo(derived.vars.total_edge_m_fronts * 1.1, 2);
+  });
+
+  it('charges nothing per running metre, and the total is the board lines', () => {
+    expect(derived.lines.some((l) => l.unit === 'm' && l.label.includes('2-door'))).toBe(false);
+    const boardsTotal = derived.lines.filter((l) => l.key.startsWith('boards:')).reduce((s, l) => s + l.line_total, 0);
+    expect(derived.total).toBeCloseTo(boardsTotal, 2);
+    expect(derived.issues.some((i) => i.includes('prices at 0'))).toBe(false);
+  });
+
+  it('says so when no board is on offer', () => {
+    const bare = deriveComposition([zone('base', 72, 56)], { base: config.base }, []);
+    expect(bare.issues.some((i) => i.includes('Carcass Board') && i.includes('prices at 0'))).toBe(true);
+  });
+});

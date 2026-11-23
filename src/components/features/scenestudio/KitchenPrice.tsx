@@ -30,6 +30,8 @@ export const KitchenPrice: React.FC<{
   const [busy, setBusy] = useState<string | null>(null);
   const [projects, setProjects] = useState<Array<{ id: string; name: string }> | null>(null);
   const [projectId, setProjectId] = useState<string | null>(scene.project_id);
+  const [blueprints, setBlueprints] = useState<Array<{ id: string; title: string }> | null>(null);
+  const [blueprintId, setBlueprintId] = useState<string | null>(null);
   const [pricedSig, setPricedSig] = useState<string | null>(null);
   const kitchen = objects.filter((o) => !o.removed_at && KITCHEN_KINDS.has(o.kind));
   const sig = kitchenSignature(objects);
@@ -50,12 +52,19 @@ export const KitchenPrice: React.FC<{
       .catch(() => setProjects([]));
   }, [scene.project_plan_id, projects]);
 
+  useEffect(() => {
+    if (scene.project_plan_id || blueprints) return;
+    void sceneStudioService.kitchenBlueprints(scene.workspace_id)
+      .then((list) => { setBlueprints(list); setBlueprintId((id) => id ?? list[0]?.id ?? null); })
+      .catch(() => setBlueprints([]));
+  }, [scene.project_plan_id, scene.workspace_id, blueprints]);
+
   const fail = (title: string, e: unknown) => toast({ title, description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
 
   const price = async () => {
     setBusy('price');
     try {
-      const res = await sceneStudioService.priceKitchen(scene, objects, projectId);
+      const res = await sceneStudioService.priceKitchen(scene, objects, projectId, blueprintId);
       setPlan(res.plan);
       setItems(res.items);
       setPricedSig(sig);
@@ -135,6 +144,15 @@ export const KitchenPrice: React.FC<{
           <p className="text-[11px] text-muted-foreground">
             Prices the {kitchen.length === 1 ? 'kitchen unit' : `${kitchen.length} kitchen units`} in this room from your kitchen blueprint: runs, cabinet counts, door model and worktop, on a project plan you can quote.
           </p>
+          {blueprints && blueprints.length > 1 && (
+            <div className="space-y-1">
+              <Label className="text-xs">Price By</Label>
+              <Select value={blueprintId ?? undefined} onValueChange={setBlueprintId}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>{blueprints.map((b) => <SelectItem key={b.id} value={b.id} className="text-xs">{b.title}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          )}
           {!scene.project_id && (
             <Select value={projectId ?? undefined} onValueChange={setProjectId}>
               <SelectTrigger className="h-8 text-xs"><SelectValue placeholder={projects ? 'Choose the project' : 'Loading projects…'} /></SelectTrigger>
@@ -153,6 +171,9 @@ export const KitchenPrice: React.FC<{
             <span className="text-[11px] text-muted-foreground">before tax</span>
           </div>
           {choiceSelect('Door Model', 'Cabinet model', UNIT_ZONES, 'door_model')}
+          {choiceSelect('Carcass Board', 'Carcass Board', UNIT_ZONES, 'carcass_board')}
+          {choiceSelect('Front Board', 'Front Board', UNIT_ZONES, 'front_board')}
+          {choiceSelect('Front Edge Tape', 'Front Edge Tape', UNIT_ZONES, 'front_edge')}
           {choiceSelect('Worktop', 'Worktop', TOP_ZONES, 'material')}
           {topLines.length > 0 && (
             <ul className="space-y-0.5 text-[11px]">

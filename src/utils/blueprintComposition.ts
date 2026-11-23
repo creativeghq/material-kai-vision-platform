@@ -6,7 +6,7 @@
 import { computeLinePricing, round2 } from './blueprintFormula';
 import {
   CUT_LIST_KEYS, cutList, cutListYields, generateCabinet,
-  type CabinetConstruction, type CabinetZone, type ModuleRecipe,
+  type BoardSlot, type CabinetConstruction, type CabinetZone, type ModuleRecipe,
 } from '@/lib/scene/cabinetPanels';
 
 // ── Schema (blueprints.composition_schema) ──────────────────────────────────
@@ -51,6 +51,9 @@ export interface ZoneGlobalDef {
   factors?: ZoneFactorBand[];
   /** `type:'choice'` — the answers on offer. Inline, because they are spec and carry no rate. */
   choices?: GlobalChoiceDef[];
+  /** `type:'option'` on a `pricing:'materials'` zone: the chosen board prices this slot's cut area (per m², or per `sheet`); `edge_slot` its edge tape (per m). */
+  board_slot?: BoardSlot;
+  edge_slot?: BoardSlot;
   /**
    * `type:'choice'` — more than one answer can be true at once. "What forms of energy are
    * available" is electricity AND gas in plenty of kitchens, and forcing a pick-one there is how a
@@ -238,11 +241,10 @@ export interface ZoneDef {
    * answer the customer has; "how many metres of bar" is one they invent.
    */
   seats?: { global: string; cm_per_seat: number; min_cm?: number };
-  /**
-   * `units` only — board thicknesses and clearances. Present = this zone's cabinets are built from
-   * boards, and their cut list (`board_m2_<slot>`, `edge_m_<slot>`) joins the schedule.
-   */
-  construction?: Partial<CabinetConstruction>;
+  /** `units` only: present = built from boards, so the cut list (`board_m2_<slot>`, `edge_m_<slot>`) joins the schedule. */
+  construction?: Partial<CabinetConstruction> & { wastage_pct?: number; sheet_m2?: number };
+  /** `materials`: modules are counted, not priced; the money comes from the boards, edge tape and module options. */
+  pricing?: 'per_m' | 'materials';
 }
 
 // ── Configuration (project_plans.composition) ───────────────────────────────
@@ -737,6 +739,7 @@ export function deriveComposition(
   const moduleCountsByZone: Record<string, Record<string, number>> = {};
   const scheduleTotals: Record<string, number> = {};
   const derivedAppliances: DerivedAppliance[] = [];
+  const boardUse = new Map<string, { zone: ZoneDef; global: ZoneGlobalDef; choice: RateChoice | null; edge: boolean; amount: number; sheet_m2: number; wastage: number }>();
   let total = 0;
 
   const emit = (line: Omit<DerivedLine, 'line_total' | 'unit_price'>, rate: number, marginPct: number) => {
@@ -764,12 +767,14 @@ export function deriveComposition(
       ?? asArray<ZoneGlobalDef>(zone.globals).find((g) => g.type === 'option');
     const rateChoice = rateGlobal ? resolveRateChoice(items, rateGlobal.option_group, globals[rateGlobal.key]) : null;
     const factor = sizeFactor(zone, globals);
+    const byMaterials = zone.pricing === 'materials';
 
     let length = 0;
     let count = 0;
     let zoneTotal = 0;
     const perType: Record<string, number> = {};
     const zoneYields: Record<string, number> = {};
+    const zoneCut: Record<string, number> = {};
     applyChoiceGlobals(zone, globals, enabled, vars, zoneYields);
     // By reference: the appliance pass runs after this loop finishes, so it sees the final counts.
     moduleCountsByZone[zone.key] = perType;
@@ -787,7 +792,7 @@ export function deriveComposition(
         if (mod.counts_length !== false) length += widthM * qty;
         addYields(zoneYields, mod.yields, qty);
 
-        if (mod.price_mode === 'per_piece') {
+        if (!byMaterials && mod.price_mode === 'per_piece') {
           zoneTotal += emit({
             key: `${zone.key}:${row.id}`,
             zone_key: zone.key,
@@ -797,7 +802,7 @@ export function deriveComposition(
             quantity: qty,
             line_kind: 'materials',
           }, num(mod.unit_price), num(mod.margin_pct));
-        } else {
+        } else if (!byMaterials) {
           if (!rateChoice) {
             issues.push(`${zone.label}: no ${rateGlobal?.label ?? 'material'} chosen — its units price at 0.`);
           }
@@ -828,7 +833,7 @@ export function deriveComposition(
             recipe: mod.construction ?? null,
             drawers: chosenDrawers > 0 ? chosenDrawers : undefined,
           });
-          if (cabinet) addYields(zoneYields, cutListYields(cutList([cabinet.panels])), qty);
+          if (cabinet) addYields(zoneCut, cutListYields(cutList([cabinet.panels])), qty);
           else issues.push(`${zone.label} — ${mod.label}: no construction recipe, so it is not in the cut list.`);
         }
 
@@ -853,6 +858,25 @@ export function deriveComposition(
         }
       }
       if (rows.length === 0) issues.push(`${zone.label}: no units added yet.`);
+      addYields(zoneYields, zoneCut, 1);
+      if (byMaterials) {
+        for (const g of asArray<ZoneGlobalDef>(zone.globals)) {
+          const slot = g.board_slot ?? g.edge_slot;
+          if (g.type !== 'option' || !slot) continue;
+          const edge = !g.board_slot;
+          const amount = num(zoneCut[`${edge ? 'edge_m' : 'board_m2'}_${slot}`]);
+          if (amount <= 0) continue;
+          const choice = resolveRateChoice(items, g.option_group, globals[g.key]);
+          if (!choice) issues.push(`${zone.label}: no ${g.label} chosen — it prices at 0.`);
+          const key = `${g.option_group}|${choice?.id ?? '-'}|${edge ? 'e' : 'b'}`;
+          const use = boardUse.get(key) ?? {
+            zone, global: g, choice, edge, amount: 0,
+            sheet_m2: num(zone.construction?.sheet_m2, 5.796), wastage: num(zone.construction?.wastage_pct, 10) / 100,
+          };
+          use.amount += amount;
+          boardUse.set(key, use);
+        }
+      }
       // Whatever one RUN needs regardless of unit count — the two caps that close a gola profile.
       if (count > 0) addYields(zoneYields, zone.run_yields, 1);
       // Hinges follow the doors and the door HEIGHT, so the rule lives once here rather than being
@@ -873,6 +897,23 @@ export function deriveComposition(
     for (const [key, value] of Object.entries(zoneYields)) vars[`${zone.key}_${key}`] = value;
     addYields(scheduleTotals, zoneYields, 1);
     derivedZones.push({ key: zone.key, label: zone.label, kind: 'units', enabled, length_m: length, unit_count: count, total: round2(zoneTotal), yields: zoneYields });
+  }
+
+  for (const [key, use] of boardUse) {
+    const gross = use.amount * (1 + use.wastage);
+    const perSheet = !use.edge && (use.choice?.unit ?? '').toLowerCase().startsWith('sheet');
+    const quantity = perSheet ? Math.ceil(gross / use.sheet_m2) : round2(gross);
+    const lineTotal = emit({
+      key: `boards:${key}`,
+      zone_key: use.zone.key,
+      zone_label: use.zone.label,
+      label: `${use.global.label}${use.choice ? ` — ${use.choice.label}` : ''}`,
+      unit: perSheet ? 'sheet' : use.edge ? 'm' : 'm²',
+      quantity,
+      line_kind: 'materials',
+    }, num(use.choice?.unit_price), 0);
+    const dz = derivedZones.find((z) => z.key === use.zone.key);
+    if (dz) dz.total = round2(dz.total + lineTotal);
   }
 
   // Pass 2 — `appliances` zones.

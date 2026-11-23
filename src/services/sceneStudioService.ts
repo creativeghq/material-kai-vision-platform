@@ -414,20 +414,26 @@ export const sceneStudioService = {
     return data as { albedo_url: string; charged: boolean; credits_used?: number };
   },
 
-  async kitchenBlueprintId(workspaceId: string): Promise<string> {
-    const { data, error } = await supabase.from('blueprints').select('id, workspace_id, is_platform_starter')
+  /** The workspace's own kitchen blueprints first (newest first), then the platform starters in the order they were added. */
+  async kitchenBlueprints(workspaceId: string): Promise<Array<{ id: string; title: string; own: boolean }>> {
+    const { data, error } = await supabase.from('blueprints').select('id, title, workspace_id, created_at, updated_at')
       .eq('project_type', 'kitchen_cabinets').eq('status', 'active')
-      .or(`workspace_id.eq.${workspaceId},is_platform_starter.eq.true`)
-      .order('updated_at', { ascending: false });
+      .or(`workspace_id.eq.${workspaceId},is_platform_starter.eq.true`);
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<{ id: string; workspace_id: string | null }>;
-    const pick = rows.find((r) => r.workspace_id === workspaceId) ?? rows[0];
+    const rows = (data ?? []) as Array<{ id: string; title: string; workspace_id: string | null; created_at: string; updated_at: string }>;
+    const own = rows.filter((r) => r.workspace_id === workspaceId).sort((a, b) => b.updated_at.localeCompare(a.updated_at));
+    const starters = rows.filter((r) => r.workspace_id !== workspaceId).sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return [...own, ...starters].map((r) => ({ id: r.id, title: r.title, own: r.workspace_id === workspaceId }));
+  },
+
+  async kitchenBlueprintId(workspaceId: string): Promise<string> {
+    const pick = (await this.kitchenBlueprints(workspaceId))[0];
     if (!pick) throw new Error('No kitchen blueprint is available to price from.');
     return pick.id;
   },
 
   /** Prices the room's kitchen on its linked plan, creating the plan (on `projectId`) the first time. */
-  async priceKitchen(scene: SceneRow, objects: SceneObject[], projectId: string | null): Promise<PlanWithItems> {
+  async priceKitchen(scene: SceneRow, objects: SceneObject[], projectId: string | null, blueprintId?: string | null): Promise<PlanWithItems> {
     if (scene.project_plan_id) {
       const plan = await projectPlansService.get(scene.project_plan_id);
       if (plan) {
@@ -439,7 +445,7 @@ export const sceneStudioService = {
     if (!project) throw new Error('Choose the project this kitchen is quoted on.');
     const res = await projectPlansService.createFromBlueprint({
       project_id: project,
-      blueprint_id: await this.kitchenBlueprintId(scene.workspace_id),
+      blueprint_id: blueprintId ?? await this.kitchenBlueprintId(scene.workspace_id),
       title: `${scene.name} — kitchen`.slice(0, 200),
       composition: kitchenCompositionFromRoom(objects) as unknown as Composition,
     });

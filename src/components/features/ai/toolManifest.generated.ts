@@ -1684,6 +1684,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'project', type: 'string', optional: true, description: 'price_kitchen: the project to price on, by name, when the room has none yet.' },
       { name: 'fronts', type: 'enum', enum: ['closed', 'half', 'open'], optional: true, description: 'open: show the kitchen doors and drawers closed, half open or open.' },
       { name: 'handles', type: 'enum', enum: ['gola', 'push_to_open', 'edge_pull', 'bar_handles', 'knobs', 'cup_pulls'], optional: true, description: 'handles: how the kitchen fronts open.' },
+      { name: 'blueprint', type: 'string', optional: true, description: 'price_kitchen: the kitchen blueprint to price with, by name: New Kitchen From Boards prices from the boards, New Kitchen per running metre; default the first one listed.' },
     ],
   },
   {

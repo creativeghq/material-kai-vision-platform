@@ -26,7 +26,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -193,12 +193,21 @@ export const createManageScenesTool = (
             projectId = list[0]?.id ?? null;
           }
           if (!projectId) return JSON.stringify({ success: false, error: 'This 3D room is not on a project yet. Ask which project the kitchen is quoted on and pass project.' });
-          const { data: bps } = await sb.from('blueprints').select('id, workspace_id').eq('project_type', 'kitchen_cabinets').eq('status', 'active')
-            .or(`workspace_id.eq.${workspaceId},is_platform_starter.eq.true`).order('updated_at', { ascending: false });
-          const bpList = (bps ?? []) as Array<{ id: string; workspace_id: string | null }>;
-          const blueprint = bpList.find((b) => b.workspace_id === workspaceId) ?? bpList[0];
-          if (!blueprint) return JSON.stringify({ success: false, error: 'No kitchen blueprint is available to price from.' });
-          plan = await engine({ action: 'create-from-blueprint', project_id: projectId, blueprint_id: blueprint.id, title: `${scene.name} — kitchen`.slice(0, 200), composition: kitchenCompositionFromRoom(objects) });
+          const { data: bps } = await sb.from('blueprints').select('id, title, workspace_id, created_at, updated_at').eq('project_type', 'kitchen_cabinets').eq('status', 'active')
+            .or(`workspace_id.eq.${workspaceId},is_platform_starter.eq.true`);
+          const bpRows = (bps ?? []) as Array<{ id: string; title: string; workspace_id: string | null; created_at: string; updated_at: string }>;
+          const bpList = [
+            ...bpRows.filter((b) => b.workspace_id === workspaceId).sort((a, b) => b.updated_at.localeCompare(a.updated_at)),
+            ...bpRows.filter((b) => b.workspace_id !== workspaceId).sort((a, b) => a.created_at.localeCompare(b.created_at)),
+          ];
+          const wanted = blueprint?.trim().toLowerCase();
+          const chosen = wanted
+            ? bpList.find((b) => b.title.toLowerCase() === wanted) ?? bpList.find((b) => b.title.toLowerCase().includes(wanted))
+            : bpList[0];
+          if (!chosen) {
+            return JSON.stringify({ success: false, error: wanted ? `No kitchen blueprint called "${blueprint}".` : 'No kitchen blueprint is available to price from.', blueprints: bpList.map((b) => b.title) });
+          }
+          plan = await engine({ action: 'create-from-blueprint', project_id: projectId, blueprint_id: chosen.id, title: `${scene.name} — kitchen`.slice(0, 200), composition: kitchenCompositionFromRoom(objects) });
           const { error: linkErr } = await sb.from('floor_plans').update({ project_id: projectId, project_plan_id: plan.id }).eq('id', scene_id);
           if (linkErr) return JSON.stringify({ success: false, plan_id: plan.id, error: `The kitchen was priced but the room could not be linked to its plan: ${linkErr.message}` });
         }
@@ -293,6 +302,7 @@ export const createManageScenesTool = (
       project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet.'),
       fronts: z.enum(['closed', 'half', 'open']).optional().describe('open: show the kitchen doors and drawers closed, half open or open.'),
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
+      blueprint: z.string().max(200).optional().describe('price_kitchen: the kitchen blueprint to price with, by name: New Kitchen From Boards prices from the boards, New Kitchen per running metre; default the first one listed.'),
     }),
   },
 );
