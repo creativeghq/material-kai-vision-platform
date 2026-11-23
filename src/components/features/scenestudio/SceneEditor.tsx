@@ -29,6 +29,7 @@ import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
 import { KitchenRunEditor } from '@/components/features/scenestudio/KitchenRunEditor';
 import { KitchenDrawingsDialog } from '@/components/features/scenestudio/KitchenDrawingsDialog';
+import { ReadyMadeLinePrice } from '@/components/features/scenestudio/ReadyMadeLinePrice';
 import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
@@ -1032,6 +1033,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
           objects={objects}
           onSceneChange={(patch) => setData((d) => (d ? { ...d, scene: { ...d.scene, ...patch } } : d))}
         />
+        <ReadyMadeLinePrice objects={objects} />
         <div className="space-y-1.5 border-t border-hairline pt-3">
           <Label className="text-xs">Photo-Real Furniture</Label>
           {batchProgress ? (

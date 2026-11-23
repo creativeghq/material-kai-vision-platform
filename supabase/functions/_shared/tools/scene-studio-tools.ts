@@ -12,7 +12,8 @@ import { serviceClient } from '../supabase-client.ts';
 import { fetchImageGuarded } from '../fetch-image.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import {
-  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, kitchenCompositionFromRoom, placeRun, runContext, spansBehind, type RoomComposition,
+  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, spansBehind, zoneOfKind,
+  type KitchenLayout, type RoomComposition,
 } from '../kitchenComposition.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
 
@@ -28,7 +29,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour, line, series }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -182,6 +183,39 @@ export const createManageScenesTool = (
       });
     }
 
+    if (action === 'price_line') {
+      if (!scene_id) return JSON.stringify({ success: false, error: 'price_line needs scene_id.' });
+      const { data: codes, error: codeErr } = await sb.from('ready_made_cabinet_codes').select('supplier, product_line, prices').not('module_type', 'is', null);
+      if (codeErr) return JSON.stringify({ success: false, error: codeErr.message });
+      const lines = new Map<string, { supplier: string; product_line: string; series: Set<string> }>();
+      for (const r of (codes ?? []) as Array<{ supplier: string; product_line: string; prices: Record<string, number> | null }>) {
+        const k = `${r.supplier}|${r.product_line}`;
+        const l = lines.get(k) ?? { supplier: r.supplier, product_line: r.product_line, series: new Set<string>() };
+        for (const s of Object.keys(r.prices ?? {})) l.series.add(s);
+        lines.set(k, l);
+      }
+      const offer = [...lines.values()].map((l) => ({ line: `${l.supplier} · ${l.product_line}`, series: [...l.series].sort() }));
+      const wanted = line?.trim().toLowerCase();
+      const pick = wanted ? [...lines.values()].find((l) => `${l.supplier} ${l.product_line}`.toLowerCase().includes(wanted) || l.product_line.toLowerCase() === wanted) : undefined;
+      if (!pick) return JSON.stringify({ success: false, error: wanted ? `No ready-made line called "${line}".` : 'Name the ready-made line (line) and its front series (series).', lines: offer });
+      const chosen = series ? [...pick.series].find((s) => s.toLowerCase() === series.trim().toLowerCase()) ?? [...pick.series].find((s) => s.toLowerCase().includes(series.trim().toLowerCase())) : undefined;
+      if (!chosen) return JSON.stringify({ success: false, error: `Name the front series of ${pick.product_line}.`, series: [...pick.series].sort() });
+      const { data: objs } = await sb.from('floor_plan_objects').select('kind, label, width_mm, height_mm, elevation_mm, kitchen_layout').eq('floor_plan_id', scene_id).is('removed_at', null);
+      const modules = ((objs ?? []) as Array<{ kind: string; label: string; width_mm: number; height_mm: number; elevation_mm: number; kitchen_layout: KitchenLayout | null }>)
+        .filter((o) => KITCHEN_KINDS.has(o.kind))
+        .flatMap((o) => runModulesOf({ ...o, width_mm: Number(o.width_mm), height_mm: Number(o.height_mm), elevation_mm: Number(o.elevation_mm) })
+          .map((m) => ({ zone: zoneOfKind(o.kind), type: m.type, width_mm: m.width_mm, label: o.label, ...(m.type === 'drawers' ? { drawers: 3 } : {}) })));
+      if (!modules.length) return JSON.stringify({ success: false, error: 'There is no kitchen in this 3D room to price.' });
+      const { data: priced, error: priceErr } = await sb.rpc('price_kitchen_from_line', { p_supplier: pick.supplier, p_line: pick.product_line, p_series: chosen, p_modules: modules });
+      if (priceErr) return JSON.stringify({ success: false, error: priceErr.message });
+      const r = priced as { total: number; matched: number; unmatched: number; units: Array<{ label: string; type: string; width_mm: number; code: string | null; price: number | null }> };
+      return JSON.stringify({
+        success: true, line: `${pick.supplier} · ${pick.product_line}`, series: chosen, supplier_net_total: Number(r.total), matched: r.matched, unmatched: r.unmatched,
+        units: r.units.map((u) => ({ unit: `${MODULE_LABELS[u.type] ?? u.type} ${Math.round(Number(u.width_mm) / 10)} cm (${u.label})`, code: u.code, price: u.price })),
+        message: r.unmatched ? 'Units with no code in this line are left out of the total; say which.' : 'Every unit matched a code in this line. The total is the supplier net price, before margin and VAT.',
+      });
+    }
+
     if (action === 'handles') {
       if (!scene_id || !handles) return JSON.stringify({ success: false, error: 'handles needs scene_id and handles.' });
       const { data: scene, error } = await sb.from('floor_plans').update({ cabinet_hardware: handles }).eq('id', scene_id).select(SCENE_COLUMNS).maybeSingle();
@@ -332,11 +366,12 @@ export const createManageScenesTool = (
       + '(runs, cabinet counts, sizes; the door model and worktop chosen on the plan are kept) and returns the subtotal. '
       + 'handles: sets how the kitchen fronts open (handles: bar_handles, knobs, gola, push_to_open, edge_pull, cup_pulls). '
       + 'layout: lays out one kitchen run (object) through the placement engine, from units left to right or automatically; each unit is built or refused with the reason (a wall unit over a window, a unit that does not fit). '
+      + 'price_line: prices the kitchen from a supplier ready-made cabinet line (line + series): every unit matched to a cabinet code, units with no code listed. '
       + 'cut_list: the board areas (carcass, fronts, back, plinth, m²), edge tape (m) and hardware the priced kitchen needs; price_kitchen first. '
       + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
@@ -353,6 +388,8 @@ export const createManageScenesTool = (
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
       units: z.array(z.object({ type: z.enum(KITCHEN_MODULE_TYPES), width_cm: z.number() })).optional().describe('layout: the units of the run left to right; omit for an automatic layout.'),
       seating_cm: z.number().optional().describe('layout: seating overhang of an island worktop, cm.'),
+      line: z.string().max(200).optional().describe('price_line: the ready-made cabinet line, by name (e.g. Trend Line).'),
+      series: z.string().max(120).optional().describe('price_line: the front series of that line (e.g. BONO).'),
       sun_hour: z.number().min(6).max(20).optional().describe('open: light the room by the sun at this hour of the day (6 to 20).'),
       blueprint: z.string().max(200).optional().describe('price_kitchen: the kitchen blueprint to price with, by name: New Kitchen From Boards prices from the boards, New Kitchen per running metre; default the first one listed.'),
     }),

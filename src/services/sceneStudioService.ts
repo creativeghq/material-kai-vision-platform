@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { KitchenLayout } from '@/lib/scene/kitchenComposition';
+import { KITCHEN_KINDS, runModulesOf, zoneOfKind, type KitchenLayout } from '@/lib/scene/kitchenComposition';
 import { edgeError, parseEdgeError } from '@/utils/edgeError';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
 import type { SurfaceTarget } from '@/lib/scene/sceneSurfaces';
@@ -109,6 +109,18 @@ export interface SceneRender {
 }
 
 export interface LayoutEntry { colour_hex: string | null; product_id: string | null; x_mm: number; y_mm: number; rotation_deg: number; removed: boolean; finishes?: string }
+
+export interface ReadyMadeLine { supplier: string; product_line: string; series: string[] }
+export interface LinePricing {
+  total: number; matched: number; unmatched: number;
+  units: Array<{ label: string; zone: string; type: string; width_mm: number; code: string | null; price: number | null }>;
+}
+
+/** Every unit of every kitchen run, as the line pricing reads them. */
+export function kitchenUnitsForPricing(objects: SceneObject[]) {
+  return objects.filter((o) => !o.removed_at && KITCHEN_KINDS.has(o.kind)).flatMap((o) =>
+    runModulesOf(o).map((m) => ({ zone: zoneOfKind(o.kind), type: m.type, width_mm: m.width_mm, label: o.label, ...(m.type === 'drawers' ? { drawers: 3 } : {}) })));
+}
 
 export interface SceneData {
   scene: SceneRow;
@@ -263,6 +275,28 @@ export const sceneStudioService = {
     const scene = await this.create({ workspaceId, name, kind, imageUrl });
     await this.read(scene.id);
     return scene;
+  },
+
+  async readyMadeLines(): Promise<ReadyMadeLine[]> {
+    const { data, error } = await supabase.from('ready_made_cabinet_codes' as never).select('supplier, product_line, prices').not('module_type', 'is', null);
+    if (error) throw new Error(error.message);
+    const lines = new Map<string, ReadyMadeLine>();
+    for (const r of (data ?? []) as Array<{ supplier: string; product_line: string; prices: Record<string, number> | null }>) {
+      const key = `${r.supplier}|${r.product_line}`;
+      const line = lines.get(key) ?? { supplier: r.supplier, product_line: r.product_line, series: [] };
+      for (const s of Object.keys(r.prices ?? {})) if (!line.series.includes(s)) line.series.push(s);
+      lines.set(key, line);
+    }
+    return [...lines.values()].map((l) => ({ ...l, series: l.series.sort() })).sort((a, b) => `${a.supplier}${a.product_line}`.localeCompare(`${b.supplier}${b.product_line}`));
+  },
+
+  async priceFromLine(line: Pick<ReadyMadeLine, 'supplier' | 'product_line'>, series: string, objects: SceneObject[]): Promise<LinePricing> {
+    const { data, error } = await supabase.rpc('price_kitchen_from_line' as never, {
+      p_supplier: line.supplier, p_line: line.product_line, p_series: series, p_modules: kitchenUnitsForPricing(objects),
+    } as never);
+    if (error) throw new Error(error.message);
+    const r = data as unknown as LinePricing;
+    return { ...r, total: Number(r.total), units: (r.units ?? []).map((u) => ({ ...u, width_mm: Number(u.width_mm), price: u.price == null ? null : Number(u.price) })) };
   },
 
   async boardEdgeTapes(productId: string): Promise<Array<{ product_id: string; name: string }>> {
