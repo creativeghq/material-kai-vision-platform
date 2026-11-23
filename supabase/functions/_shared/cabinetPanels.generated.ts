@@ -62,6 +62,7 @@ export const MODULE_RECIPES: Record<string, ModuleRecipe> = {
   corner: { fronts: [{ kind: 'corner', count: 1 }], shelves: 1 },
   waste_base: { fronts: [{ kind: 'drawers', count: 1 }], shelves: 0 },
   end_panel: { carcass: false, end_panel: true, fronts: [] },
+  filler: { carcass: false, fronts: [{ kind: 'fixed', count: 1 }] },
   dishwasher_housing: { carcass: false, fronts: [{ kind: 'fixed', count: 1 }] },
   oven_base: { fronts: [{ kind: 'drawers', count: 1, height_mm: 120 }, { kind: 'opening' }], shelves: 0 },
   appliance_base: { carcass: false, fronts: [{ kind: 'opening' }] },

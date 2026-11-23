@@ -3,7 +3,7 @@ import { createContext } from 'react';
 import { BoxGeometry, Euler, Matrix4, Quaternion, Vector3, type BufferGeometry } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { DEFAULT_CONSTRUCTION, generateCabinet, type BoardSlot, type CabinetConstruction, type Fitting, type Vec3 } from '@/lib/scene/cabinetPanels';
-import { kitchenPieces } from '@/lib/scene/kitchenComposition';
+import { kitchenPieces, type KitchenLayout } from '@/lib/scene/kitchenComposition';
 
 export interface CabinetView {
   /** 0 closed … 1 open. */
@@ -22,6 +22,8 @@ export type FittingGroup = 'metal' | 'gola' | 'appliance';
 export interface KitchenGeometry {
   slots: Array<{ slot: BoardSlot; geometry: BufferGeometry }>;
   fittings: Array<{ group: FittingGroup; geometry: BufferGeometry }>;
+  /** Centre of the sink base along the run, metres; null when the run has none. */
+  sinkX: number | null;
   dispose(): void;
 }
 
@@ -44,10 +46,10 @@ function placedBox(size: Vec3, pos: Vec3, rot: Vec3 | undefined, offset: Vec3): 
 }
 
 /** Every cabinet one kitchen object stands for, in object space: x centred, y up from its base, front at +d/2. */
-export function buildKitchenGeometry(kind: string, w: number, d: number, h: number, view: CabinetView): KitchenGeometry | null {
+export function buildKitchenGeometry(kind: string, w: number, d: number, h: number, view: CabinetView, layout?: KitchenLayout | null): KitchenGeometry | null {
   const c = { ...DEFAULT_CONSTRUCTION, ...(view.construction ?? {}) };
   const pieces = kitchenPieces(
-    { kind, width_mm: w * 1000, depth_mm: d * 1000, height_mm: h * 1000 },
+    { kind, width_mm: w * 1000, depth_mm: d * 1000, height_mm: h * 1000, kitchen_layout: layout },
     { plinth_mm: c.plinth_mm, front_mm: c.front_mm, worktop_mm: SCENE_WORKTOP_MM },
   );
   if (!pieces.length) return null;
@@ -79,9 +81,11 @@ export function buildKitchenGeometry(kind: string, w: number, d: number, h: numb
   };
   const slots = Array.from(bySlot, ([slot, parts]) => ({ slot, geometry: merge(parts) }));
   const fittings = Array.from(byGroup, ([group, parts]) => ({ group, geometry: merge(parts) }));
+  const sink = pieces.find((p) => p.type === 'sink_base');
   return {
     slots,
     fittings,
+    sinkX: sink ? sink.x_mm / 1000 : null,
     dispose() {
       for (const s of slots) s.geometry.dispose();
       for (const f of fittings) f.geometry.dispose();

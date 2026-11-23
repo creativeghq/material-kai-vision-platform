@@ -11,7 +11,9 @@ import { callerDbClient } from '../caller-client.ts';
 import { serviceClient } from '../supabase-client.ts';
 import { fetchImageGuarded } from '../fetch-image.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
-import { KITCHEN_KINDS, kitchenCompositionFromRoom, type RoomComposition } from '../kitchenComposition.generated.ts';
+import {
+  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, kitchenCompositionFromRoom, placeRun, runContext, spansBehind, type RoomComposition,
+} from '../kitchenComposition.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
 
 const MODULE_SLUG = 'scene-studio';
@@ -26,7 +28,7 @@ export const createManageScenesTool = (
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -131,6 +133,51 @@ export const createManageScenesTool = (
       return JSON.stringify({
         success: true, room: hit.name, area, product: productRow?.name ?? null, colour: colour ?? null,
         message: `The ${area} of ${hit.name} now show ${productRow ? productRow.name : colour}. One wall or a backsplash is picked by clicking it with Paint in the room.`,
+      });
+    }
+
+    if (action === 'layout') {
+      if (!scene_id || !object) return JSON.stringify({ success: false, error: 'layout needs scene_id and object (the kitchen run, by name).' });
+      const [{ data: objs }, { data: walls }, { data: openings }] = await Promise.all([
+        sb.from('floor_plan_objects').select('id, label, kind, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, kitchen_layout').eq('floor_plan_id', scene_id).is('removed_at', null),
+        sb.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm').eq('floor_plan_id', scene_id),
+        sb.from('floor_plan_openings').select('wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', scene_id),
+      ]);
+      const n = (v: unknown) => Number(v) || 0;
+      const runs = ((objs ?? []) as Array<Record<string, unknown>>).filter((o) => KITCHEN_KINDS.has(String(o.kind)));
+      const needle = object.trim().toLowerCase();
+      const found = runs.find((o) => String(o.label).toLowerCase() === needle)
+        ?? runs.find((o) => String(o.label).toLowerCase().includes(needle) || String(o.kind).replace(/_/g, ' ').includes(needle));
+      if (!found) return JSON.stringify({ success: false, error: `No kitchen run called "${object}" in this room.`, runs: runs.map((o) => o.label) });
+      const run = {
+        kind: String(found.kind), x_mm: n(found.x_mm), y_mm: n(found.y_mm), rotation_deg: n(found.rotation_deg),
+        width_mm: n(found.width_mm), depth_mm: n(found.depth_mm), height_mm: n(found.height_mm), elevation_mm: n(found.elevation_mm),
+      };
+      const wallRows = ((walls ?? []) as Array<Record<string, unknown>>).map((w) => ({ id: String(w.id), x1_mm: n(w.x1_mm), y1_mm: n(w.y1_mm), x2_mm: n(w.x2_mm), y2_mm: n(w.y2_mm), thickness_mm: n(w.thickness_mm) }));
+      const openingRows = ((openings ?? []) as Array<Record<string, unknown>>).map((o) => ({ wall_id: String(o.wall_id), kind: String(o.kind), offset_mm: n(o.offset_mm), width_mm: n(o.width_mm), sill_mm: n(o.sill_mm), head_mm: n(o.head_mm) }));
+      const ctx = runContext(run, spansBehind(run, wallRows, openingRows));
+      if (!ctx) return JSON.stringify({ success: false, error: 'That object is not a kitchen run.' });
+      const asked = units?.length ? units.map((u) => ({ type: u.type, width_mm: Math.round(u.width_cm * 10) })) : autoLayout(run.kind, ctx);
+      const placed = placeRun(asked, ctx);
+      const previous = found.kitchen_layout as { seating_mm?: number } | null;
+      const seating = seating_cm != null ? Math.round(seating_cm * 10) : previous?.seating_mm;
+      const layout = {
+        modules: placed.built.filter((m) => !m.auto).map((m) => ({ type: m.type, width_mm: m.width_mm, ...(m.options ? { options: m.options } : {}) })),
+        ...(seating ? { seating_mm: seating } : {}),
+      };
+      const { error: upErr } = await sb.from('floor_plan_objects').update({ kitchen_layout: layout }).eq('id', found.id);
+      if (upErr) return JSON.stringify({ success: false, error: upErr.message });
+      const { data: scene } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
+      if (scene) onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent: { mode: 'view', object_id: found.id, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
+      return JSON.stringify({
+        success: true,
+        run: found.label,
+        built: placed.built.map((m) => `${MODULE_LABELS[m.type] ?? m.type} ${Math.round(m.width_mm / 10)} cm${m.auto ? ' (added)' : ''}`),
+        not_built: placed.rejected.map((r) => ({ unit: MODULE_LABELS[r.module.type] ?? r.module.type, reason: r.reason })),
+        issues: placed.issues,
+        message: placed.rejected.length
+          ? 'Some units were refused by the placement engine; tell the user which and why. Run price_kitchen again to update the price.'
+          : 'The run is laid out in the room. Run price_kitchen again to update the price.',
       });
     }
 
@@ -283,11 +330,12 @@ export const createManageScenesTool = (
       + 'price_kitchen: prices the kitchen units standing in the room on a project plan from the kitchen blueprint '
       + '(runs, cabinet counts, sizes; the door model and worktop chosen on the plan are kept) and returns the subtotal. '
       + 'handles: sets how the kitchen fronts open (handles: bar_handles, knobs, gola, push_to_open, edge_pull, cup_pulls). '
+      + 'layout: lays out one kitchen run (object) through the placement engine, from units left to right or automatically; each unit is built or refused with the reason (a wall unit over a window, a unit that does not fit). '
       + 'cut_list: the board areas (carcass, fronts, back, plinth, m²), edge tape (m) and hardware the priced kitchen needs; price_kitchen first. '
       + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
       + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
@@ -302,6 +350,8 @@ export const createManageScenesTool = (
       project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet.'),
       fronts: z.enum(['closed', 'half', 'open']).optional().describe('open: show the kitchen doors and drawers closed, half open or open.'),
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
+      units: z.array(z.object({ type: z.enum(KITCHEN_MODULE_TYPES), width_cm: z.number() })).optional().describe('layout: the units of the run left to right; omit for an automatic layout.'),
+      seating_cm: z.number().optional().describe('layout: seating overhang of an island worktop, cm.'),
       blueprint: z.string().max(200).optional().describe('price_kitchen: the kitchen blueprint to price with, by name: New Kitchen From Boards prices from the boards, New Kitchen per running metre; default the first one listed.'),
     }),
   },

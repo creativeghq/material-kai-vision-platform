@@ -453,7 +453,7 @@ const ObjectMesh: React.FC<{
               bands={splatBandsOf(obj.kind)}
             />
           )
-          : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} />}
+          : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} layout={obj.kitchen_layout} />}
       </group>
     );
   })();

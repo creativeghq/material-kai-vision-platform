@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { KitchenLayout } from '@/lib/scene/kitchenComposition';
 import { edgeError, parseEdgeError } from '@/utils/edgeError';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
 import type { SurfaceTarget } from '@/lib/scene/sceneSurfaces';
@@ -56,6 +57,7 @@ export interface SceneObject {
   model_storage_path?: string | null;
   model_error?: string | null;
   model_finish?: string | null;
+  kitchen_layout?: KitchenLayout | null;
 }
 
 export interface SceneSurface {
@@ -119,7 +121,7 @@ export interface SceneData {
 }
 
 const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, cabinet_hardware, created_at, updated_at';
-const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish';
+const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish, kitchen_layout';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex';
 const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex';
 const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, instruction, image_url, vr_world_id, layout_snapshot, created_at';
@@ -350,6 +352,7 @@ export const sceneStudioService = {
       product_id: o.product_id, x_mm: Math.round(o.x_mm), y_mm: Math.round(o.y_mm), rotation_deg: Math.round(o.rotation_deg) % 360,
       width_mm: Math.max(1, Math.round(o.width_mm)), depth_mm: Math.max(1, Math.round(o.depth_mm)), height_mm: Math.max(1, Math.round(o.height_mm)), elevation_mm: Math.max(0, Math.round(o.elevation_mm)),
       size_source: o.size_source, colour_hex: o.colour_hex, source: o.source, removed_at: o.removed_at,
+      kitchen_layout: o.kitchen_layout ?? null,
     }));
     const { error } = await supabase.from('floor_plan_objects').upsert(rows, { onConflict: 'id' });
     if (error) throw new Error(`The layout could not be saved: ${error.message}`);

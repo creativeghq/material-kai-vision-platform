@@ -8,7 +8,7 @@ import { DARK, STEEL, STONE, WHITE, objectParts } from '@/lib/scene/objectParts'
 import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import type { Finish } from '@/lib/scene/sceneSurfaces';
 import { useFinishMaps } from '@/components/features/scenestudio/surfaceMaps';
-import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
+import { KITCHEN_KINDS, type KitchenLayout } from '@/lib/scene/kitchenComposition';
 import type { BoardSlot } from '@/lib/scene/cabinetPanels';
 import { CabinetViewContext, buildKitchenGeometry, type FittingGroup } from '@/components/features/scenestudio/cabinetMesh';
 
@@ -155,12 +155,17 @@ const FITTING_LOOK: Record<FittingGroup, { colour: string; rough: number; metal:
 
 /** A kitchen object drawn as the boards its cabinets are cut from; the worktop and sink still come from objectParts. */
 const KitchenRun: React.FC<{
-  kind: string; w: number; d: number; h: number; colour: string; wireframe: boolean; common: Common; finishes: SlotFinishes;
-}> = ({ kind, w, d, h, colour, wireframe, common, finishes }) => {
+  kind: string; w: number; d: number; h: number; colour: string; wireframe: boolean; common: Common; finishes: SlotFinishes; layout?: KitchenLayout | null;
+}> = ({ kind, w, d, h, colour, wireframe, common, finishes, layout }) => {
   const view = useContext(CabinetViewContext);
-  const geo = useMemo(() => buildKitchenGeometry(kind, w, d, h, view), [kind, w, d, h, view]);
+  const geo = useMemo(() => buildKitchenGeometry(kind, w, d, h, view, layout), [kind, w, d, h, view, layout]);
   useEffect(() => () => geo?.dispose(), [geo]);
-  const extras = useMemo(() => objectParts(kind, w, d, h, colour).filter((p) => p.slot === 'worktop' || p.slot === null), [kind, w, d, h, colour]);
+  const seating = (layout?.seating_mm ?? 0) / 1000;
+  const extras = useMemo(() => objectParts(kind, w, d, h, colour)
+    .filter((p) => p.slot === 'worktop' || p.slot === null)
+    .map((p) => (p.slot === 'worktop' && seating > 0
+      ? { ...p, size: [p.size[0], p.size[1], p.size[2] + seating] as [number, number, number], pos: [p.pos[0], p.pos[1], p.pos[2] - seating / 2] as [number, number, number] }
+      : p.slot === null && geo?.sinkX != null ? { ...p, pos: [p.pos[0] + geo.sinkX, p.pos[1], p.pos[2]] as [number, number, number] } : p)), [kind, w, d, h, colour, seating, geo]);
   const slotFinish = (slot: BoardSlot): Finish | null | undefined => (slot === 'back' ? null : finishes[slot]);
   return (
     <group>
@@ -197,10 +202,10 @@ const KitchenRun: React.FC<{
 
 /** The detailed body of one object; every part carries the object's id so picking and the ID pass still work. */
 export const ObjectShape: React.FC<{
-  kind: string; w: number; d: number; h: number; colour: string; wireframe: boolean; common: Common; finishes?: SlotFinishes;
-}> = ({ kind, w, d, h, colour, wireframe, common, finishes = {} }) => {
+  kind: string; w: number; d: number; h: number; colour: string; wireframe: boolean; common: Common; finishes?: SlotFinishes; layout?: KitchenLayout | null;
+}> = ({ kind, w, d, h, colour, wireframe, common, finishes = {}, layout }) => {
   const list = useMemo(() => objectParts(kind, w, d, h, colour), [kind, w, d, h, colour]);
-  if (KITCHEN_KINDS.has(kind)) return <KitchenRun kind={kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} />;
+  if (KITCHEN_KINDS.has(kind)) return <KitchenRun kind={kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} layout={layout} />;
   if (kind === 'plant') {
     return (
       <group>

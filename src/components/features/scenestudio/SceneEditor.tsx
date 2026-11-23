@@ -27,6 +27,7 @@ import { RegionEditCanvas, type RegionEditResult } from '@/components/features/a
 import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
+import { KitchenRunEditor } from '@/components/features/scenestudio/KitchenRunEditor';
 import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
@@ -812,6 +813,13 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
         />
       )}
     />
+    {KITCHEN_KINDS.has(selected.kind) && (
+      <Card>
+        <CardContent className="p-3">
+          <KitchenRunEditor obj={selected} walls={data.walls} openings={data.openings} onChange={(layout) => patchObject(selected.id, { kitchen_layout: layout })} />
+        </CardContent>
+      </Card>
+    )}
     <Card>
       <CardContent className="space-y-2 p-3 text-xs">
         {selected.model_status === 'ready' && staleModels.has(selected.id) ? (
