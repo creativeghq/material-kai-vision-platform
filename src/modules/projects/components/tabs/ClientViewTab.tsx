@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Loader2, Plus, FileText, Share2, Link2, Trash2, RefreshCw, Eye,
-  MessageSquare, Check, Pencil, X, ExternalLink, GripVertical, Presentation, FileImage,
+  MessageSquare, Check, Pencil, X, ExternalLink, GripVertical, Presentation, FileImage, Mail,
 } from 'lucide-react';
+import { DeliveryTrailCell } from '@/components/features/finance/DeliveryTrailCell';
+import { fetchDeliveryTrails, type DeliveryTrail } from '@/services/documentDeliveryService';
+import { SendClientViewDialog } from './SendClientViewDialog';
 
 import { Card, CardContent } from '@/components/core/ui/card';
 import { HubEmptyState } from '@/components/core/hub';
@@ -96,6 +99,8 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const [roomLayouts, setRoomLayouts] = useState<Array<{ id: string; name: string }>>([]);
   const [layoutsFailed, setLayoutsFailed] = useState(false);
   const [scenes, setScenes] = useState<Array<{ id: string; name: string }>>([]);
+  const [sending, setSending] = useState<ClientView | null>(null);
+  const [trails, setTrails] = useState<Record<string, DeliveryTrail>>({});
   const [loading, setLoading] = useState(true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -121,6 +126,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
           : Promise.resolve([]),
       ]);
       setViews(v);
+      void fetchDeliveryTrails('client_view', v.map((x) => x.id)).then(setTrails).catch(() => setTrails({}));
       setSheets(s);
       setQuotes((q || []).map((x: any) => ({ id: x.id, name: x.name, quote_number: x.quote_number, status: x.status ?? null, grand_total: x.grand_total ?? null, currency: x.currency ?? null })));
       setVrWorlds(w);
@@ -583,6 +589,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                         {view.page_count ? ` · ${view.page_count} pages` : ''}
                         {view.cover?.client_name ? ` · for ${view.cover.client_name}` : ''}
                       </p>
+                      {trails[view.id] && <DeliveryTrailCell trail={trails[view.id]} className="mt-1" />}
                       {view.error_message && (
                         <p className="text-xs text-destructive mt-1">{view.error_message}</p>
                       )}
@@ -601,6 +608,9 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                         <>
                           <Button size="sm" variant="ghost" onClick={() => copyExisting(view)}>
                             <Link2 className="h-3.5 w-3.5 mr-1" /> Copy link
+                          </Button>
+                          <Button size="sm" variant="ghost" onClick={() => setSending(view)}>
+                            <Mail className="h-3.5 w-3.5 mr-1" /> Send by email
                           </Button>
                           {view.public_share_token && (
                             <Button asChild size="sm" variant="ghost">
@@ -646,6 +656,14 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
           })}
         </div>
       )}
+      <SendClientViewDialog
+        view={sending}
+        projectId={projectId}
+        projectName={projectName}
+        workspaceId={activeWorkspaceId ?? null}
+        onClose={() => setSending(null)}
+        onSent={() => void load()}
+      />
     </div>
   );
 };

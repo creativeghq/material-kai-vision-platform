@@ -484,6 +484,9 @@ async function executeAction(
           // (subject/body) are rendered from `variables` server-side.
           templateSlug: resolved.template_id || resolved.template_slug || undefined,
           variables: emailVariables,
+          ...(resolved.entity_type && resolved.entity_id && !String(resolved.entity_id).includes('{{')
+            ? { entityType: String(resolved.entity_type), entityId: String(resolved.entity_id) }
+            : {}),
           // Attribution travels even when the SENDER does not. An operator flow emailing a
           // tenant's customer from the platform address still belongs to that tenant's history —
           // and until now it was logged against nobody, so the tenant could not see the order and

@@ -168,6 +168,7 @@ export const triggerIcons: Record<TriggerType, React.ElementType> = {
   email_clicked: MousePointerClick,
   catalog_sent_to_customers: Send,
   quote_sent: Send,
+  client_view_sent: Send,
   price_alert_triggered: TrendingDown,
   mention_alert_triggered: AtSign,
   job_alert_triggered: Briefcase,

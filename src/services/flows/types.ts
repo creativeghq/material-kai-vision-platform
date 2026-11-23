@@ -228,6 +228,8 @@ export type TriggerType =
   // Catalog sent to customers; a quote emailed to its customer
   | 'catalog_sent_to_customers'
   | 'quote_sent'
+  // A client view (the online presentation) emailed to the client by the designer
+  | 'client_view_sent'
   // Monitoring alerts (bridged from the Python dispatchers via DB triggers on the *_alert_log tables)
   | 'price_alert_triggered'
   | 'mention_alert_triggered'
@@ -370,6 +372,7 @@ export interface EmailOpenedTriggerConfig {}
 export interface EmailClickedTriggerConfig {}
 export interface CatalogSentToCustomersTriggerConfig {}
 export interface QuoteSentTriggerConfig {}
+export interface ClientViewSentTriggerConfig {}
 export interface PriceAlertTriggeredTriggerConfig {}
 export interface MentionAlertTriggeredTriggerConfig {}
 export interface JobAlertTriggeredTriggerConfig {}
@@ -722,6 +725,7 @@ export type TriggerConfigMap = {
   email_clicked: EmailClickedTriggerConfig;
   catalog_sent_to_customers: CatalogSentToCustomersTriggerConfig;
   quote_sent: QuoteSentTriggerConfig;
+  client_view_sent: ClientViewSentTriggerConfig;
   price_alert_triggered: PriceAlertTriggeredTriggerConfig;
   mention_alert_triggered: MentionAlertTriggeredTriggerConfig;
   job_alert_triggered: JobAlertTriggeredTriggerConfig;

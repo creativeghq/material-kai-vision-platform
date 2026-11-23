@@ -513,6 +513,9 @@ export const paletteItems: NodePaletteItem[] = [
   { type: 'triggerNode', category: 'trigger', subType: 'quote_sent', group: 'Quotes',
     label: 'Quote Sent', description: 'A quote was emailed to its customer', icon: 'Send', color: 'emerald',
     defaultData: { label: 'Quote Sent', category: 'trigger', triggerType: 'quote_sent', config: {} } as TriggerNodeData },
+  { type: 'triggerNode', category: 'trigger', subType: 'client_view_sent', group: 'Projects',
+    label: 'Client View Sent', description: 'A designer emailed the online presentation (client view) to their client', icon: 'Send', color: 'emerald',
+    defaultData: { label: 'Client View Sent', category: 'trigger', triggerType: 'client_view_sent', config: {} } as TriggerNodeData },
   // Monitoring (bridged from the Python dispatchers via DB triggers on *_alert_log)
   { type: 'triggerNode', category: 'trigger', subType: 'price_alert_triggered', group: 'Monitoring',
     label: 'Price Alert', description: 'The price-monitoring dispatcher fired an alert (drop / new retailer / promo / anomaly)', icon: 'TrendingDown', color: 'blue',
