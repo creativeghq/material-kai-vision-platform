@@ -3463,7 +3463,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Show a product or a 3D-room object as a photo-real 3D model",
-    "description": "Returns a photo-real 3D model (a Gaussian splat .ply) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits BEFORE any w",
+    "description": "Returns a photo-real 3D model (a Gaussian splat, compressed .spz) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits ",
     "fields": {
       "product_id": {
         "type": "string",

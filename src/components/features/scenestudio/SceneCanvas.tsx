@@ -3,7 +3,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, use
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
 import {
-  Box3, Color, DoubleSide, Material, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
+  Box3, Color, DoubleSide, Material, Matrix4, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
   type Object3D, type PerspectiveCamera, type RectAreaLight, type Group,
 } from 'three';
 import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
@@ -13,6 +13,7 @@ import { ToneMappingMode } from 'postprocessing';
 import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, oakFloorTexture, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
 import { canvasRelief, finishTone } from '@/components/features/scenestudio/surfaceMaps';
 import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
+import { MODEL_FRONT_TURN_DEG, fitModel } from '@/lib/scene/splatFit';
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
 import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
@@ -135,21 +136,40 @@ const SplatModel: React.FC<{
       const n = mesh.packedSplats.numSplats;
       const all = { y: new Float32Array(n), rgb: new Float32Array(n * 3), opacity: new Float32Array(n), tinted: false };
       const v = new Vector3();
-      mesh.forEachSplat((i, center, _s, _q, opacity, color) => {
-        v.copy(center).applyQuaternion(SPLAT_TURN);
-        all.y[i] = v.y; all.opacity[i] = opacity;
-        all.rgb[i * 3] = color.r; all.rgb[i * 3 + 1] = color.g; all.rgb[i * 3 + 2] = color.b;
+      mesh.forEachSplat((_i, center, _s, _q, opacity) => {
         if (opacity < 0.2) return;
+        v.copy(center).applyQuaternion(SPLAT_TURN);
         xs.push(v.x); ys.push(v.y); zs.push(v.z);
       });
-      source.current = all;
       if (xs.length < 100) return;
       const q = (arr: number[], p: number) => { const a = [...arr].sort((m, n2) => m - n2); return a[Math.floor(p * (a.length - 1))]; };
       const box = new Box3(new Vector3(q(xs, 0.02), q(ys, 0.01), q(zs, 0.02)), new Vector3(q(xs, 0.98), q(ys, 0.99), q(zs, 0.98)));
       const size = box.getSize(new Vector3());
-      const scale = Math.min(w / Math.max(size.x, 1e-6), d / Math.max(size.z, 1e-6), h / Math.max(size.y, 1e-6));
-      const c = box.getCenter(new Vector3());
-      setFit({ mesh, scale, offset: [-c.x * scale, -box.min.y * scale, -c.z * scale] });
+      const k = fitModel(size, w, d, h);
+      const front = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), (MODEL_FRONT_TURN_DEG * Math.PI) / 180);
+      const place = front.clone().multiply(SPLAT_TURN);
+      const c = box.getCenter(new Vector3()).applyQuaternion(front);
+      const shift = new Vector3(-c.x * k[0], -box.min.y * k[1], -c.z * k[2]);
+      const stretch = new Vector3(k[0], k[1], k[2]);
+      const rot = new Quaternion(); const basis = new Matrix4(); const sc = new Vector3();
+      const ax = [new Vector3(), new Vector3(), new Vector3()];
+      mesh.packedSplats.forEachSplat((i, center, scales, quat, opacity, color) => {
+        center.applyQuaternion(place).multiply(stretch).add(shift);
+        rot.copy(place).multiply(quat);
+        basis.makeRotationFromQuaternion(rot).extractBasis(ax[0], ax[1], ax[2]);
+        ax[0].multiply(stretch).multiplyScalar(scales.x); ax[1].multiply(stretch).multiplyScalar(scales.y); ax[2].multiply(stretch).multiplyScalar(scales.z);
+        sc.set(ax[0].length(), ax[1].length(), ax[2].length());
+        ax[0].normalize(); ax[1].addScaledVector(ax[0], -ax[1].dot(ax[0])).normalize(); ax[2].crossVectors(ax[0], ax[1]);
+        rot.setFromRotationMatrix(basis.makeBasis(ax[0], ax[1], ax[2]));
+        mesh.packedSplats.setSplat(i, center, sc, rot, opacity, color);
+        all.y[i] = center.y; all.opacity[i] = opacity;
+        all.rgb[i * 3] = color.r; all.rgb[i * 3 + 1] = color.g; all.rgb[i * 3 + 2] = color.b;
+      });
+      mesh.packedSplats.needsUpdate = true;
+      mesh.needsUpdate = true;
+      mesh.quaternion.identity();
+      source.current = all;
+      setFit({ mesh, scale: 1, offset: [0, 0, 0] });
     }).catch(() => { /* the box stays as the stand-in */ });
     return () => { live = false; mesh.dispose(); };
   }, [url, w, d, h]);
@@ -1062,7 +1082,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
-      {!wireframe && !photo && (
+      {!wireframe && !photo && !hasModels && (
         <EffectComposer multisampling={4}>
           <N8AO aoRadius={0.5} distanceFalloff={0.6} intensity={2.2} halfRes quality="medium" />
           <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />

@@ -42,12 +42,13 @@ const pair = (w: number | null, l: number | null, factor: number | null): TileFo
 const obj = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
 
-/** "60x60", "60 × 120 cm", "320x160 cm", "12x24 in" → a format. The unit defaults to cm. */
+/** "60x60", "60 × 120 cm", "12x24 in" → a format (cm by default); a board's "2750×119×16 mm" is length × width × thickness. */
 export function parseFormatText(text: unknown): TileFormat | null {
   if (typeof text !== 'string') return null;
-  const m = text.match(/(\d+(?:[.,]\d+)?)\s*[x×X]\s*(\d+(?:[.,]\d+)?)\s*(mm|cm|m|in|inch|ft|")?/);
+  const m = text.match(/(\d+(?:[.,]\d+)?)\s*[x×X]\s*(\d+(?:[.,]\d+)?)(?:\s*[x×X]\s*(\d+(?:[.,]\d+)?))?\s*(mm|cm|m|in|inch|ft|")?/);
   if (!m) return null;
-  return pair(positive(m[1]), positive(m[2]), unitFactor(m[3], 'cm'));
+  const factor = unitFactor(m[4], 'cm');
+  return m[3] ? pair(positive(m[2]), positive(m[1]), factor) : pair(positive(m[1]), positive(m[2]), factor);
 }
 
 /**

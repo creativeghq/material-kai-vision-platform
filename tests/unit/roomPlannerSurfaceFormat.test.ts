@@ -46,6 +46,8 @@ describe('one piece of a surface product, in metres', () => {
     expect(tileFormatM({ attributes: { slab_size: '320x160 cm' } })).toEqual(recorded(3.2, 1.6));
     expect(parseFormatText('12 x 24 in')?.tileWidthM).toBeCloseTo(0.3048, 6);
     expect(parseFormatText('large format')).toBeNull();
+    expect(parseFormatText('2750×119×16 mm')).toEqual(recorded(0.119, 2.75));
+    expect(tileFormatM({ metadata: { available_sizes: ['2750×119×16 mm', '2750×77×16 mm'] } })).toEqual(recorded(0.119, 2.75));
     expect(parseFormatText(60)).toBeNull();
   });
 

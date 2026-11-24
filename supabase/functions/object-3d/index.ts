@@ -107,7 +107,7 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-cron-secret': Deno.env.get('CRON_SECRET') || '' },
       body: JSON.stringify({
-        target: t.kind, row_id: t.rowId, image_path: cleanPath, out_path: `${t.folder}/${stamp}.ply`, link_object_id: t.linkObjectId ?? null,
+        target: t.kind, row_id: t.rowId, image_path: cleanPath, out_path: `${t.folder}/${stamp}.spz`, link_object_id: t.linkObjectId ?? null,
         model_finish: t.finish?.text ?? null,
         refund: { user_id: charge.uid, credits: charge.credits, transaction_id: charge.transactionId, workspace_id: charge.workspaceId },
       }),
@@ -172,7 +172,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
       ? await admin.from('product_3d_model_variants')
         .select('id, status, storage_path, updated_at').eq('product_id', product.id).eq('variant_key', variantKey).maybeSingle()
       : await admin.from('product_3d_models')
-        .select('id, status, storage_path, updated_at').eq('product_id', product.id).eq('format', 'ply').maybeSingle();
+        .select('id, status, storage_path, updated_at').eq('product_id', product.id).in('format', ['ply', 'spz']).maybeSingle();
     if (row?.status === 'ready') ready = row.storage_path;
     else if (row?.status === 'processing' && Date.parse(row.updated_at) > Date.now() - STALE_MS) processing = true;
     else if (!imageUrl) throw new HttpError(409, 'This product has no photo to make a 3D model from.');
@@ -221,7 +221,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
           }).select('id').maybeSingle()
           : await admin.from('product_3d_models').insert({
             product_id: target.id, workspace_id: productWorkspace,
-            format: 'ply', storage_bucket: BUCKET, storage_path: `${target.folder}/pending`, status: 'processing', source: 'generated', created_by: uid,
+            format: 'spz', storage_bucket: BUCKET, storage_path: `${target.folder}/pending`, status: 'processing', source: 'generated', created_by: uid,
           }).select('id').maybeSingle();
         if (error || !ins) return json({ success: true, status: 'processing', charged: false });
         target.rowId = ins.id;
