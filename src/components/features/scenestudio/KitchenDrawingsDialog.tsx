@@ -1,10 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { FileDown, Printer } from 'lucide-react';
+import { FileDown, FileText, Printer, Wrench } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
-import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { AssemblySheets } from '@/components/features/scenestudio/AssemblyDrawings';
 import { KitchenDrawings, type CutLine } from '@/components/features/scenestudio/KitchenDrawings';
 import { useToast } from '@/hooks/use-toast';
@@ -136,18 +135,16 @@ export const KitchenDrawingsDialog: React.FC<{
               Floor plan with wall lengths, room areas and furniture{runs.length ? `, an elevation and a services sheet (sockets, water, waste, gas, extraction) per kitchen wall and the cut list${planId ? '' : ' (price the kitchen to add it)'}, from the same units as the 3D room and the price` : ''}.
               {data.scene.project_id ? '' : ' The room is on no project, so saving puts the PDF in the conversation.'}
             </>}</DialogDescription>
-            {runs.length > 0 && (
-              <Tabs value={set} onValueChange={(v) => onSetChange?.(v === 'assembly' ? 'assembly' : 'drawings')}>
-                <TabsList>
-                  <TabsTrigger value="drawings">Drawing Set</TabsTrigger>
-                  <TabsTrigger value="assembly">Workshop Assembly</TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
+
           </DialogHeader>
           <div ref={sheetRoot} className="rounded-sm border border-hairline bg-surface-sunken p-3">{sheets}</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+            {runs.length > 0 && onSetChange && (
+              <Button variant="outline" className="gap-1.5" onClick={() => onSetChange(assemblyView ? 'drawings' : 'assembly')}>
+                {assemblyView ? <FileText className="h-4 w-4" /> : <Wrench className="h-4 w-4" />}{assemblyView ? 'Drawing set' : 'Workshop assembly'}
+              </Button>
+            )}
             <Button variant="outline" className="gap-1.5" onClick={print} disabled={!drawable}><Printer className="h-4 w-4" />Print</Button>
             <Button className="gap-1.5" onClick={() => void save()} disabled={!drawable || saving}><FileDown className="h-4 w-4" />{saving ? 'Saving…' : data.scene.project_id && !assemblyView ? 'Save to project' : 'Save as PDF'}</Button>
           </DialogFooter>
