@@ -17,6 +17,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, isCronAuthorized, userCanAccessWorkspace, type AuthResult, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
+import { resolveHtmlTemplate } from '../_shared/flow-html-template.ts';
 import { debitExternalServiceCredits, checkCreditBalance } from '../_shared/credit-utils.ts';
 import { priceWhatsAppMessage } from '../_shared/whatsapp-rates.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
@@ -81,6 +82,8 @@ interface FlowScope {
   /** The flow owner (flows.created_by) — the acting user for workspace-pool debits when a
    *  tenant flow runs off a 'system' trigger (no real acting user). */
   ownerUserId: string | null;
+  /** flows.trigger_type: a raw {{{x}}} in an email body is honoured only when this is a server-only event. */
+  triggerType?: string;
   /** Delivery channels the EVENT's workspace has muted on this (global) flow — see
    *  `workspace_flow_preferences`. Empty/absent means deliver everything, which is the
    *  platform default. Applied in executeAction, the one place every action passes through. */
@@ -479,7 +482,9 @@ async function executeAction(
           to: emailTo,
           from: resolved.from || undefined,
           subject: resolved.subject,
-          html: resolved.body,
+          html: typeof config.body === 'string'
+            ? resolveHtmlTemplate(config.body, context as unknown as Record<string, unknown>, SERVER_ONLY_EVENTS.has(scope?.triggerType ?? ''))
+            : undefined,
           // email-api expects templateSlug (not template_id); template fields
           // (subject/body) are rendered from `variables` server-side.
           templateSlug: resolved.template_id || resolved.template_slug || undefined,
@@ -2048,6 +2053,7 @@ async function handleExecuteFlow(
     workspaceId: (flow.workspace_id as string | null) ?? null,
     isGlobal: flow.is_global === true,
     ownerUserId: (flow.created_by as string | null) ?? null,
+    triggerType: (flow.trigger_type as string | null) ?? undefined,
     mutedActions: mutedActions && mutedActions.length ? new Set(mutedActions) : undefined,
   };
 
@@ -2163,6 +2169,8 @@ const SERVER_ONLY_EVENTS = new Set<string>([
   // #193 — both assert a fact about a LEGAL document / the operator's provider account.
   'fiscal_document_rejected', 'fiscal_credits_low',
   'server_maintenance_completed',
+  // Their payload carries a whole pre-built email body and its recipient.
+  'moodboard_dormancy_warning', 'moodboard_dormancy_reminder',
   'hr_late_checkin', 'hr.applicant_stage_changed', 'background_agent_failed',
   'material_alert', 'inventory_low_stock', 'freight_quote_requested', 'order_dispatched', 'marketplace_want_match',
   'purchase_order.sent', 'quote_pdf_generated',
@@ -2184,7 +2192,7 @@ async function handleResumeWaits(supabase: DbClient): Promise<Response> {
   for (const w of (waits ?? []) as Array<Record<string, any>>) {
     const [{ data: run }, { data: flow }] = await Promise.all([
       supabase.from('flow_runs').select('id, status, trigger_event_data, initiated_by, started_at').eq('id', w.flow_run_id).maybeSingle(),
-      supabase.from('flows').select('id, status, graph_definition, workspace_id, is_global, created_by').eq('id', w.flow_id).maybeSingle(),
+      supabase.from('flows').select('id, status, graph_definition, workspace_id, is_global, created_by, trigger_type').eq('id', w.flow_id).maybeSingle(),
     ]);
     if (!run || !flow) { results.push({ wait_id: w.id, outcome: 'run_or_flow_gone' }); continue; }
     const parkedStep = (status: 'completed' | 'skipped') => supabase.from('flow_run_steps').update({ status })
@@ -2212,6 +2220,7 @@ async function handleResumeWaits(supabase: DbClient): Promise<Response> {
       workspaceId: (flow.workspace_id as string | null) ?? null,
       isGlobal: flow.is_global === true,
       ownerUserId: (flow.created_by as string | null) ?? null,
+      triggerType: (flow.trigger_type as string | null) ?? undefined,
       mutedActions: Array.isArray(w.muted_actions) && w.muted_actions.length ? new Set(w.muted_actions as string[]) : undefined,
     };
     try {

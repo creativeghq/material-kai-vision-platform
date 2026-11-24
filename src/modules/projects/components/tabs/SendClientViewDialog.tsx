@@ -10,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { flowEventService } from '@/services/flows/flowEventService';
 import type { ClientView } from '@/services/clientViewsService';
-import { escapeHtml } from '@/utils/escapeHtml';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/;
 
@@ -63,9 +62,9 @@ export const SendClientViewDialog: React.FC<{
         recipient_name: name.trim() || null,
         subject: `${title} — from ${sender}`,
         link,
-        greeting_html: name.trim() ? ` ${escapeHtml(name.trim())}` : '',
-        sender_html: escapeHtml(sender),
-        title_html: escapeHtml(title),
+        greeting: name.trim() ? ` ${name.trim()}` : '',
+        sender_name: sender,
+        view_title: title,
         title: `${title} sent to ${email.trim()}`,
         body: `The online presentation was emailed to ${email.trim()}.`,
         action_url: `/projects/${projectId}?tab=client-view`,

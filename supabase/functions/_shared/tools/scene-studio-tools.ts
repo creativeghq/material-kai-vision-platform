@@ -11,7 +11,6 @@ import { callerDbClient } from '../caller-client.ts';
 import { serviceClient } from '../supabase-client.ts';
 import { fetchImageGuarded } from '../fetch-image.ts';
 import { emitFlowEvent } from '../flow-events.ts';
-import { escapeHtml } from '../html.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import {
   KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, spansBehind, zoneOfKind,
@@ -223,7 +222,7 @@ export const createManageScenesTool = (
         await emitFlowEvent('client_view_sent', {
           workspace_id: workspaceId, user_id: userId, client_view_id: view.id, project_id: scene.project_id,
           recipient_email: email, recipient_name: name || null, subject: `${view.title} — from ${sender}`, link,
-          greeting_html: name ? ` ${escapeHtml(name)}` : '', sender_html: escapeHtml(sender), title_html: escapeHtml(view.title),
+          greeting: name ? ` ${name}` : '', sender_name: sender, view_title: view.title,
           title: `${view.title} sent to ${email}`, body: `The online presentation was emailed to ${email}.`,
           action_url: `/projects/${scene.project_id}?tab=client-view`, type: 'info',
         });
