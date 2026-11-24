@@ -192,7 +192,7 @@ describe('finishing a room surface by surface', () => {
     expect(src).toMatch(/new ThreeMesh\(sub, material\)/);
     expect(src).toMatch(/_generator = new PathTracingSceneGenerator\(\)/);
     const canvas = blankComments(readFileSync('src/components/features/scenestudio/SceneCanvas.tsx', 'utf8'));
-    expect(canvas).toMatch(/!wireframe && !photo && \(\s*<EffectComposer/);
+    expect(canvas).toMatch(/!wireframe && !photo && !hasModels && \(\s*<EffectComposer/);
   });
 });
 
