@@ -128,11 +128,11 @@ describe('units read from a drawing', () => {
       read_ok: true,
       rooms: [{ name: 'K', outline: [{ x: 0, y: 0 }, { x: 4000, y: 0 }, { x: 4000, y: 3000 }] }],
       objects: [
-        { label: 'Sink run', kind: 'sink', units: [{ type: 'sink_base', width_mm: 900 }, { type: '', width_mm: 600 }, { type: 'door2', width_mm: 0 }] },
+        { label: 'Sink run', kind: 'sink', units: [{ type: 'sink_base', width_mm: 900, printed: true }, { type: 'drawers', width_mm: 600 }, { type: '', width_mm: 600 }, { type: 'door2', width_mm: 0 }] },
         { label: 'Sofa', kind: 'sofa' },
       ],
     });
-    expect(read.objects[0].units).toEqual([{ type: 'sink_base', width_mm: 900 }]);
+    expect(read.objects[0].units).toEqual([{ type: 'sink_base', width_mm: 900, printed: true }, { type: 'drawers', width_mm: 600, printed: false }]);
     expect(read.objects[1].units).toEqual([]);
   });
 });

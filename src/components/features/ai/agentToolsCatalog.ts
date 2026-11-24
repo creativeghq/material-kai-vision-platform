@@ -1240,6 +1240,20 @@ const INTERIOR_DESIGNER_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
+    id: 'manage_client_view', name: 'Client Package', category: 'Generation',
+    desc: 'Put a project\'s drawings, sheets, quote, walkthrough and explorable world on one client view, by id.',
+    examples: [
+      'Add the kitchen drawings and the accepted quote to the client view of the Papadopoulos project',
+    ],
+  },
+  {
+    id: 'save_to_moodboard', name: 'Save to Moodboard', category: 'Generation',
+    desc: 'Save a render, staged room or video from this conversation to a moodboard.',
+    examples: [
+      'Save the last render to my "Kifisia Loft" moodboard',
+    ],
+  },
+  {
     id: 'generate_presentation_sheet', name: 'Presentation Sheet', category: 'Generation',
     desc: 'Build A3 moodboard sheets (material board / color palette / concept board / lighting plan / annotated render / etc.).',
     examples: [
@@ -3346,7 +3360,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
     name: 'Presentation Sheets',
     description: 'A3 client-ready moodboard sheets: material board / color palette / lighting plan / annotated render / FF&E / full deck.',
     icon: 'LayoutTemplate',
-    tool_ids: ['generate_presentation_sheet'],
+    tool_ids: ['generate_presentation_sheet', 'manage_client_view', 'save_to_moodboard'],
     quick_starts: [
       // Each opens the guided SheetWizardModal (pick moodboard → inputs → generate)
       // with the type pre-selected. The "New sheet" entry opens it at the type picker.

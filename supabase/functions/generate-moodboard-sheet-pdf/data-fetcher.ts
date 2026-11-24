@@ -371,7 +371,7 @@ export async function fetchSheets(
   // included_sheet_id can't pull another user's sheet content into the deck.
   let sheetsQuery = supabase
     .from('moodboard_presentation_sheets')
-    .select('id, moodboard_id, created_by, sheet_type, title, data')
+    .select('id, moodboard_id, project_id, created_by, sheet_type, title, data')
     .in('id', sheetIds);
   if (scopeUserId) sheetsQuery = sheetsQuery.eq('created_by', scopeUserId);
   const { data, error } = await sheetsQuery;

@@ -47,6 +47,7 @@ const SHEET_TYPE_DESCRIPTIONS: Record<SheetType, string> = {
   scope_of_works: 'What will happen — phases and works, from the client-visible tasks on the project',
   area_breakdown: 'Composited design board: hero render + plan + elevation + finishes',
   room_view: 'Moodboard products laid on a room at their real size, with numbered pins',
+  drawing_set: 'Dimensioned plan, kitchen elevations and cut list, saved from the 3D room',
   full_deck: 'Multi-page presentation deck assembling outputs from other tools',
 };
 

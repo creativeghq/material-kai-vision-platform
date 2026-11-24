@@ -24,6 +24,21 @@ export interface WalkthroughPayload {
 
 const noop = () => undefined;
 
+export function walkPlanOf(ordered: PlanRoom[], walls: PlanWall[], objects: SceneObject[]): { span: number; walk: WalkRoom[] } {
+  const b = planBounds(ordered, walls);
+  const f = planFrame(b);
+  const walk: WalkRoom[] = ordered.filter((r) => r.outline.length >= 3).map((r) => {
+    const [cx, cy] = polygonCentroid(r.outline);
+    const far = r.outline.reduce((best, p) => (Math.hypot(p[0] - cx, p[1] - cy) > Math.hypot(best[0] - cx, best[1] - cy) ? p : best), r.outline[0]);
+    const inside = objects.filter((o) => !o.removed_at && (o.room_id === r.id || (!o.room_id && pointInPolygon(o.x_mm, o.y_mm, r.outline))));
+    const focus = inside.length
+      ? toScene(inside.reduce((s, o) => s + o.x_mm, 0) / inside.length, inside.reduce((s, o) => s + o.y_mm, 0) / inside.length, f)
+      : null;
+    return { centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus };
+  });
+  return { span: Math.max((b.maxX - b.minX) / 1000, (b.maxY - b.minY) / 1000, 2), walk };
+}
+
 const webgl2 = () => {
   try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
 };
@@ -38,20 +53,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
   const canRender = useMemo(() => typeof document !== 'undefined' && webgl2(), []);
 
   const ordered = useMemo(() => [...data.rooms].sort((a, b) => (a.walk_order ?? 0) - (b.walk_order ?? 0)), [data.rooms]);
-  const { span, walk } = useMemo(() => {
-    const b = planBounds(ordered, data.walls);
-    const f = planFrame(b);
-    const rooms: WalkRoom[] = ordered.filter((r) => r.outline.length >= 3).map((r) => {
-      const [cx, cy] = polygonCentroid(r.outline);
-      const far = r.outline.reduce((best, p) => (Math.hypot(p[0] - cx, p[1] - cy) > Math.hypot(best[0] - cx, best[1] - cy) ? p : best), r.outline[0]);
-      const inside = data.objects.filter((o) => !o.removed_at && (o.room_id === r.id || (!o.room_id && pointInPolygon(o.x_mm, o.y_mm, r.outline))));
-      const focus = inside.length
-        ? toScene(inside.reduce((s, o) => s + o.x_mm, 0) / inside.length, inside.reduce((s, o) => s + o.y_mm, 0) / inside.length, f)
-        : null;
-      return { centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus };
-    });
-    return { span: Math.max((b.maxX - b.minX) / 1000, (b.maxY - b.minY) / 1000, 2), walk: rooms };
-  }, [ordered, data.walls, data.objects]);
+  const { span, walk } = useMemo(() => walkPlanOf(ordered, data.walls, data.objects), [ordered, data.walls, data.objects]);
   const finalPose = data.render?.camera ?? null;
   const names = ordered.map((r) => r.name);
 

@@ -36,6 +36,7 @@ export const SHEET_CREDITS: Record<SheetType, number> = {
   scope_of_works: 1,
   // The surface render is drawn in the browser; the cost is the PDF, as for a material board.
   room_view: 1,
+  drawing_set: 0,
   full_deck: 5,
 };
 
@@ -489,6 +490,8 @@ function validateInitialData(sheet_type: SheetType, data: Record<string, any> | 
         return 'area_breakdown needs a hero render (or a plan/elevation image, or finishes).';
       }
       return null;
+    case 'drawing_set':
+      return 'Drawings are drawn and saved from the 3D room (manage_scenes drawing_set), not created here.';
     case 'room_view':
       if (!d.render_image_url) return 'room_view is saved from the moodboard Room Views tab, which draws the render.';
       if (!Array.isArray(d.layers) || d.layers.length === 0) return 'room_view needs at least one finished surface.';

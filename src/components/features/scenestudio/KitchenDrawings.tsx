@@ -1,7 +1,8 @@
-/** The kitchen's drawing set (#604 phase 5): plan, one elevation per wall, cut list; printed as A4 landscape sheets. */
+/** A room's drawing set: the dimensioned plan of any room, plus an elevation per kitchen wall and the cut list when there is a kitchen; A4 landscape sheets. */
 import React, { useMemo } from 'react';
 
-import { kitchenElevations, kitchenPlan, type DimLine, type DrawRun, type Elevation, type Pt } from '@/lib/scene/kitchenDrawings';
+import { kitchenElevations, kitchenPlan, roomPlan, type DimLine, type DrawRun, type Elevation, type Pt } from '@/lib/scene/kitchenDrawings';
+import type { DrawingCheck } from '@/lib/scene/kitchenComposition';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
 import { todayLocalISO } from '@/utils/datetime';
 
@@ -11,12 +12,15 @@ const MARGIN = 10;
 const BLOCK_H = 22;
 const INK = '#1d1d1b';
 const FAINT = '#8a8780';
+const STATED = '#1f5fbf';
+const CONFLICT = '#c0392b';
+const SIDE_W = 96;
 
 export interface CutLine { label: string; quantity: number; unit: string | null }
 
-interface SheetProps { title: string; project: string; sheet: string; index: number; total: number; children: React.ReactNode; scaleNote: string }
+interface SheetProps { title: string; company?: string; project: string; sheet: string; index: number; total: number; children: React.ReactNode; scaleNote: string }
 
-const Sheet: React.FC<SheetProps> = ({ title, project, sheet, index, total, children, scaleNote }) => (
+const Sheet: React.FC<SheetProps> = ({ title, company, project, sheet, index, total, children, scaleNote }) => (
   <div className="kitchen-sheet mx-auto w-full max-w-[1100px] bg-white">
     <svg viewBox={`0 0 ${SHEET_W} ${SHEET_H}`} className="block h-auto w-full" role="img" aria-label={`${sheet}, ${project}`}>
       <rect width={SHEET_W} height={SHEET_H} fill="#fff" />
@@ -28,7 +32,7 @@ const Sheet: React.FC<SheetProps> = ({ title, project, sheet, index, total, chil
         <line x1={70} y1={8} x2={70} y2={BLOCK_H} stroke={INK} strokeWidth={0.25} />
         <text x={2} y={5.6} fontSize={3.6} fontWeight={700}>{title}</text>
         <text x={2} y={13} fontSize={3}>{sheet}</text>
-        <text x={2} y={19} fontSize={2.4} fill={FAINT}>{project}</text>
+        <text x={2} y={19} fontSize={2.4} fill={FAINT}>{company ? `${project} · ${company}` : project}</text>
         <text x={72} y={13} fontSize={2.4}>Sheet {index} of {total}</text>
         <text x={72} y={17} fontSize={2.4}>{todayLocalISO()}</text>
         <text x={72} y={21} fontSize={2.2} fill={FAINT}>{scaleNote}</text>
@@ -38,12 +42,20 @@ const Sheet: React.FC<SheetProps> = ({ title, project, sheet, index, total, chil
 );
 
 /** Fits a drawing of `w × h` mm into the sheet's drawing area; returns the scale and the offset. */
-function fit(w: number, h: number) {
-  const areaW = SHEET_W - 2 * MARGIN;
+function fit(w: number, h: number, side = 0) {
+  const areaW = SHEET_W - 2 * MARGIN - side;
   const areaH = SHEET_H - 2 * MARGIN - BLOCK_H - 4;
   const s = Math.min(areaW / Math.max(w, 1), areaH / Math.max(h, 1));
   return { s, ox: MARGIN + (areaW - w * s) / 2, oy: MARGIN + (areaH - h * s) / 2 };
 }
+
+const Hatch: React.FC = () => (
+  <defs>
+    <pattern id="conflict-hatch" width={1.6} height={1.6} patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <line x1={0} y1={0} x2={0} y2={1.6} stroke={CONFLICT} strokeWidth={0.35} />
+    </pattern>
+  </defs>
+);
 
 const Dim: React.FC<{ d: DimLine; tx: (p: Pt) => Pt }> = ({ d, tx }) => {
   const a = tx([d.a[0] + d.offset[0], d.a[1] + d.offset[1]]);
@@ -60,13 +72,18 @@ const Dim: React.FC<{ d: DimLine; tx: (p: Pt) => Pt }> = ({ d, tx }) => {
       <line x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} />
       <circle cx={a[0]} cy={a[1]} r={0.35} fill={INK} />
       <circle cx={b[0]} cy={b[1]} r={0.35} fill={INK} />
-      <text x={mid[0]} y={mid[1] - 0.8} fontSize={2.2} textAnchor="middle" stroke="none" fill={INK} fontFamily="Arial, sans-serif" transform={`rotate(${upright} ${mid[0]} ${mid[1]})`}>{d.text}</text>
+      <text
+        x={mid[0]} y={mid[1] - 0.8} fontSize={2.2} textAnchor="middle" stroke="none" fontFamily="Arial, sans-serif"
+        fill={d.tone === 'stated' ? STATED : d.tone === 'assumed' ? FAINT : INK} fontStyle={d.tone === 'assumed' ? 'italic' : undefined}
+        transform={`rotate(${upright} ${mid[0]} ${mid[1]})`}
+      >{d.tone === 'assumed' ? `≈${d.text}` : d.text}</text>
     </g>
   );
 };
 
-const PlanSheet: React.FC<{ rooms: PlanRoom[]; walls: PlanWall[]; openings: PlanOpening[]; runs: DrawRun[] }> = ({ rooms, walls, openings, runs }) => {
+const PlanSheet: React.FC<{ rooms: PlanRoom[]; walls: PlanWall[]; openings: PlanOpening[]; runs: DrawRun[]; furniture: DrawRun[]; side: number }> = ({ rooms, walls, openings, runs, furniture, side }) => {
   const plan = useMemo(() => kitchenPlan(runs), [runs]);
+  const base = useMemo(() => roomPlan(rooms, walls, furniture), [rooms, walls, furniture]);
   const pts: Pt[] = [
     ...rooms.flatMap((r) => r.outline),
     ...walls.flatMap((w) => [[w.x1_mm, w.y1_mm], [w.x2_mm, w.y2_mm]] as Pt[]),
@@ -78,7 +95,7 @@ const PlanSheet: React.FC<{ rooms: PlanRoom[]; walls: PlanWall[]; openings: Plan
   const minY = Math.min(...pts.map((p) => p[1])) - pad;
   const maxX = Math.max(...pts.map((p) => p[0])) + pad;
   const maxY = Math.max(...pts.map((p) => p[1])) + pad;
-  const { s, ox, oy } = fit(maxX - minX, maxY - minY);
+  const { s, ox, oy } = fit(maxX - minX, maxY - minY, side);
   const tx = (p: Pt): Pt => [ox + (p[0] - minX) * s, oy + (p[1] - minY) * s];
   const poly = (o: Pt[]) => o.map((p) => tx(p).join(',')).join(' ');
   return (
@@ -117,6 +134,27 @@ const PlanSheet: React.FC<{ rooms: PlanRoom[]; walls: PlanWall[]; openings: Plan
           <polygon points={poly(r.outline)} fill="none" stroke={INK} strokeWidth={0.4} />
         </g>
       ))}
+      {base.furniture.map((f) => {
+        const c = f.outline.reduce<Pt>((acc, p) => [acc[0] + p[0] / 4, acc[1] + p[1] / 4], [0, 0]);
+        const [x, y] = tx(c);
+        return (
+          <g key={f.id}>
+            <polygon points={poly(f.outline)} fill="none" stroke={FAINT} strokeWidth={0.2} />
+            <text x={x} y={y + 0.7} fontSize={1.7} textAnchor="middle" fill={FAINT} fontFamily="Arial, sans-serif">{f.label}</text>
+          </g>
+        );
+      })}
+      {base.labels.map((l, i) => {
+        const [x, y] = tx(l.at);
+        return (
+          <g key={`r${i}`} fontFamily="Arial, sans-serif" fill={INK} textAnchor="middle">
+            <text x={x} y={y - 1} fontSize={2.6} fontWeight={700}>{l.name}</text>
+            <text x={x} y={y + 2.2} fontSize={2.2}>{l.area}</text>
+          </g>
+        );
+      })}
+      {base.dims.map((d, i) => <Dim key={`w${i}`} d={d} tx={tx} />)}
+      {plan.conflicts.map((c, i) => <polygon key={`c${i}`} points={poly(c)} fill="url(#conflict-hatch)" stroke={CONFLICT} strokeWidth={0.3} />)}
       {plan.dims.map((d, i) => <Dim key={i} d={d} tx={tx} />)}
     </g>
   );
@@ -134,6 +172,7 @@ const ElevationSheet: React.FC<{ e: Elevation }> = ({ e }) => {
     appliance: { fill: '#3a3a38', stroke: INK, w: 0.2 },
     worktop: { fill: '#e7e3da', stroke: INK, w: 0.3 },
     window: { fill: '#eef3f6', stroke: INK, w: 0.25 },
+    conflict: { fill: 'url(#conflict-hatch)', stroke: CONFLICT, w: 0.3 },
   };
   return (
     <g>
@@ -144,11 +183,79 @@ const ElevationSheet: React.FC<{ e: Elevation }> = ({ e }) => {
         return <rect key={i} x={x} y={y} width={r.w * s} height={r.h * s} fill={st.fill} stroke={st.stroke} strokeWidth={st.w} />;
       })}
       {e.dims.map((d, i) => (
-        <Dim key={i} d={{ a: [d.x0, 0], b: [d.x1, 0], offset: [0, d.y], text: d.text }} tx={([x, y]) => tx(x, y)} />
+        <Dim key={i} d={{ a: [d.x0, 0], b: [d.x1, 0], offset: [0, d.y], text: d.text, tone: d.tone }} tx={([x, y]) => tx(x, y)} />
       ))}
       {e.heights.map((h, i) => (
         <Dim key={`h${i}`} d={{ a: [0, h.y0], b: [0, h.y1], offset: [-250 - i * 200, 0], text: h.text }} tx={([x, y]) => tx(x, y)} />
       ))}
+    </g>
+  );
+};
+
+const wrap = (text: string, max: number): string[] => {
+  const out: string[] = [];
+  let line = '';
+  for (const w of text.split(/\s+/)) {
+    if ((line + ' ' + w).trim().length > max) { if (line) out.push(line); line = w; } else line = `${line} ${w}`.trim();
+  }
+  if (line) out.push(line);
+  return out;
+};
+
+const Legend: React.FC<{ kitchen: boolean }> = ({ kitchen }) => {
+  const items: Array<{ w: number; node: React.ReactNode; label: string }> = [
+    ...(kitchen ? [
+      { w: 22, node: <rect width={4} height={2.4} fill="none" stroke={INK} strokeWidth={0.25} />, label: 'Base / tall unit' },
+      { w: 24, node: <rect width={4} height={2.4} fill="none" stroke={INK} strokeWidth={0.22} strokeDasharray="1.2 0.8" />, label: 'Wall unit (in plan)' },
+      { w: 32, node: <rect width={4} height={2.4} fill="url(#conflict-hatch)" stroke={CONFLICT} strokeWidth={0.25} />, label: 'Does not add up as drawn' },
+    ] : []),
+    { w: 30, node: <text y={2.2} fontSize={2.4} fill={STATED} fontFamily="Arial, sans-serif">228</text>, label: 'From the drawing or confirmed' },
+    { w: 20, node: <text y={2.2} fontSize={2.4} fill={FAINT} fontStyle="italic" fontFamily="Arial, sans-serif">≈60</text>, label: 'Assumed' },
+  ];
+  let x = MARGIN;
+  return (
+    <g fontFamily="Arial, sans-serif" fontSize={2.1} fill={INK}>
+      {items.map((it) => {
+        const at = x;
+        x += it.w + 6;
+        return <g key={it.label} transform={`translate(${at}, ${MARGIN - 1.5})`}>{it.node}<text x={6} y={2.1}>{it.label}</text></g>;
+      })}
+    </g>
+  );
+};
+
+const ReadingPanel: React.FC<{ sourceUrl?: string | null; notes: string[]; checks: DrawingCheck[] }> = ({ sourceUrl, notes, checks }) => {
+  const x0 = SHEET_W - MARGIN - SIDE_W + 4;
+  let y = MARGIN + 4;
+  const rows: React.ReactNode[] = [];
+  if (sourceUrl) {
+    rows.push(<text key="st" x={x0} y={y} fontSize={2.4} fontWeight={700}>Original drawing</text>);
+    rows.push(<image key="si" href={sourceUrl} x={x0} y={y + 1.5} width={SIDE_W - 6} height={52} preserveAspectRatio="xMidYMid meet" />);
+    y += 58;
+  }
+  if (notes.length) {
+    rows.push(<text key="nt" x={x0} y={y} fontSize={2.4} fontWeight={700}>How the drawing reads</text>);
+    y += 3.6;
+    for (const [i, n] of notes.slice(0, 8).entries()) {
+      for (const [j, l] of wrap(n, 62).entries()) { rows.push(<text key={`n${i}-${j}`} x={x0} y={y} fontSize={1.9}>{j ? '  ' : '• '}{l}</text>); y += 2.6; }
+      if (y > SHEET_H - BLOCK_H - 48) break;
+    }
+    y += 2;
+  }
+  if (checks.length) {
+    rows.push(<text key="ct" x={x0} y={y} fontSize={2.4} fontWeight={700}>Checks before building</text>);
+    y += 3.6;
+    for (const [i, c] of checks.entries()) {
+      rows.push(<text key={`c${i}`} x={x0} y={y} fontSize={2} fontWeight={700} fill={c.ok ? '#2e7d32' : CONFLICT}>{c.ok ? '✓' : '✗'} {c.rule}</text>);
+      y += 2.6;
+      if (!c.ok) for (const [j, l] of wrap(c.detail, 64).slice(0, 3).entries()) { rows.push(<text key={`c${i}-${j}`} x={x0 + 2.5} y={y} fontSize={1.8} fill={INK}>{l}</text>); y += 2.4; }
+      if (y > SHEET_H - BLOCK_H - 8) break;
+    }
+  }
+  return (
+    <g fontFamily="Arial, sans-serif" fill={INK}>
+      <line x1={x0 - 3} y1={MARGIN} x2={x0 - 3} y2={SHEET_H - MARGIN - BLOCK_H - 2} stroke="#d9d6cf" strokeWidth={0.3} />
+      {rows}
     </g>
   );
 };
@@ -172,11 +279,17 @@ export const KitchenDrawings: React.FC<{
   walls: PlanWall[];
   openings: PlanOpening[];
   runs: DrawRun[];
+  furniture?: DrawRun[];
   lines?: CutLine[];
-}> = ({ project, rooms, walls, openings, runs, lines = [] }) => {
+  company?: string;
+  notes?: string[];
+  sourceUrl?: string | null;
+  checks?: DrawingCheck[];
+}> = ({ project, rooms, walls, openings, runs, furniture = [], lines = [], company, notes = [], sourceUrl = null, checks = [] }) => {
+  const side = notes.length || sourceUrl || checks.length ? SIDE_W : 0;
   const elevations = useMemo(() => kitchenElevations(runs, walls, openings), [runs, walls, openings]);
   const sheets: Array<{ name: string; body: React.ReactNode }> = [
-    { name: 'Floor Plan', body: <PlanSheet rooms={rooms} walls={walls} openings={openings} runs={runs} /> },
+    { name: 'Floor Plan', body: <><Legend kitchen={runs.length > 0} /><PlanSheet rooms={rooms} walls={walls} openings={openings} runs={runs} furniture={furniture} side={side} />{side ? <ReadingPanel sourceUrl={sourceUrl} notes={notes} checks={checks} /> : null}</> },
     ...elevations.map((e, i) => ({
       name: `Elevation ${String.fromCharCode(65 + i)} · ${e.runs.join(', ')}`,
       body: <ElevationSheet e={e} />,
@@ -186,7 +299,8 @@ export const KitchenDrawings: React.FC<{
   return (
     <div className="space-y-4">
       {sheets.map((sh, i) => (
-        <Sheet key={sh.name} title="Kitchen" project={project} sheet={sh.name} index={i + 1} total={sheets.length} scaleNote="Dimensions in cm · not to scale">
+        <Sheet key={sh.name} title={runs.length ? 'Kitchen' : 'Floor Plan'} company={company} project={project} sheet={sh.name} index={i + 1} total={sheets.length} scaleNote="Dimensions in cm · not to scale">
+          <Hatch />
           {sh.body}
         </Sheet>
       ))}

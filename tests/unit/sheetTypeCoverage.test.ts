@@ -75,6 +75,8 @@ describe('presentation sheet type coverage', () => {
   it('every sheet type has a credit cost and a label', () => {
     for (const t of ALL_TYPES) {
       expect(SHEET_TYPE_LABELS[t], `${t} has no label`).toBeTruthy();
+      // A drawing set is drawn in the 3D room and stored, never generated here, so it is free.
+      if (t === 'drawing_set') { expect(SHEET_TYPE_CREDITS[t]).toBe(0); continue; }
       expect(SHEET_TYPE_CREDITS[t], `${t} has no credit cost`).toBeGreaterThan(0);
     }
   });

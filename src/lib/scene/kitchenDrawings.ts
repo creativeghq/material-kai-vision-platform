@@ -1,6 +1,6 @@
 import { DEFAULT_CONSTRUCTION, generateCabinet, type CabinetConstruction } from '@/lib/scene/cabinetPanels';
 import {
-  KITCHEN_KINDS, MODULE_LABELS, kitchenPieces, runModulesOf, spansBehind, zoneOfKind, type KitchenLayout, type OpeningLike, type WallLike,
+  KITCHEN_KINDS, MODULE_LABELS, kitchenPieces, runModulesOf, runShortfall, spansBehind, unitStated, zoneOfKind, type KitchenLayout, type OpeningLike, type WallLike,
 } from '@/lib/scene/kitchenComposition';
 
 export type Pt = [number, number];
@@ -11,10 +11,12 @@ export interface DrawRun {
   kitchen_layout?: KitchenLayout | null;
 }
 
-export interface DimLine { a: Pt; b: Pt; offset: Pt; text: string }
+export type DimTone = 'stated' | 'assumed';
+export interface DimLine { a: Pt; b: Pt; offset: Pt; text: string; tone?: DimTone }
 export interface PlanDrawing {
   runs: Array<{ id: string; outline: Pt[]; units: Array<{ outline: Pt[]; label: string; hidden: boolean }> }>;
   dims: DimLine[];
+  conflicts: Pt[][];
 }
 
 const axes = (r: DrawRun) => {
@@ -30,7 +32,7 @@ const rect = (r: DrawRun, x0: number, x1: number, z0: number, z1: number): Pt[] 
 const cm = (mm: number) => `${Math.round(mm / 10)}`;
 
 export function kitchenPlan(runs: DrawRun[]): PlanDrawing {
-  const out: PlanDrawing = { runs: [], dims: [] };
+  const out: PlanDrawing = { runs: [], dims: [], conflicts: [] };
   for (const r of runs) {
     if (!KITCHEN_KINDS.has(r.kind)) continue;
     const half = r.depth_mm / 2;
@@ -40,6 +42,8 @@ export function kitchenPlan(runs: DrawRun[]): PlanDrawing {
       hidden: r.kind === 'kitchen_wall',
     }));
     out.runs.push({ id: r.id, outline: rect(r, 0, r.width_mm, -half, half), units });
+    const gap = runShortfall(r);
+    if (gap) out.conflicts.push(rect(r, gap.from_mm, gap.to_mm, -half, half));
     const { front } = axes(r);
     const off = (k: number): Pt => [front[0] * (half + k), front[1] * (half + k)];
     const offset = r.kind === 'kitchen_wall' ? 0 : 1;
@@ -47,15 +51,57 @@ export function kitchenPlan(runs: DrawRun[]): PlanDrawing {
     out.dims.push({ a: at(r, 0, 0), b: at(r, r.width_mm, 0), offset: off(450), text: cm(r.width_mm) });
     for (const m of runModulesOf(r)) {
       if (m.width_mm < 100) continue;
-      out.dims.push({ a: at(r, m.x_mm, 0), b: at(r, m.x_mm + m.width_mm, 0), offset: off(220), text: cm(m.width_mm) });
+      const tone: DimTone = unitStated(r.kitchen_layout, m) ? 'stated' : 'assumed';
+      out.dims.push({ a: at(r, m.x_mm, 0), b: at(r, m.x_mm + m.width_mm, 0), offset: off(220), text: cm(m.width_mm), tone });
     }
   }
   return out;
 }
 
-export type ElevationKind = 'carcass' | 'front' | 'handle' | 'appliance' | 'worktop' | 'plinth' | 'window';
+export interface RoomPlanDrawing {
+  labels: Array<{ at: Pt; name: string; area: string }>;
+  furniture: Array<{ id: string; outline: Pt[]; label: string }>;
+  dims: DimLine[];
+}
+
+export function roomPlan(
+  rooms: Array<{ name: string; outline: Pt[] }>,
+  walls: Array<{ x1_mm: number; y1_mm: number; x2_mm: number; y2_mm: number; thickness_mm: number }>,
+  furniture: DrawRun[],
+): RoomPlanDrawing {
+  const pts = [...rooms.flatMap((r) => r.outline), ...walls.flatMap((w) => [[w.x1_mm, w.y1_mm], [w.x2_mm, w.y2_mm]] as Pt[])];
+  const cx = pts.length ? pts.reduce((s, p) => s + p[0], 0) / pts.length : 0;
+  const cy = pts.length ? pts.reduce((s, p) => s + p[1], 0) / pts.length : 0;
+  const dims: DimLine[] = [];
+  for (const w of walls) {
+    const len = Math.hypot(w.x2_mm - w.x1_mm, w.y2_mm - w.y1_mm);
+    if (len < 300) continue;
+    let n: Pt = [-(w.y2_mm - w.y1_mm) / len, (w.x2_mm - w.x1_mm) / len];
+    const mx = (w.x1_mm + w.x2_mm) / 2;
+    const my = (w.y1_mm + w.y2_mm) / 2;
+    if ((mx - cx) * n[0] + (my - cy) * n[1] < 0) n = [-n[0], -n[1]];
+    const k = w.thickness_mm / 2 + 350;
+    dims.push({ a: [w.x1_mm, w.y1_mm], b: [w.x2_mm, w.y2_mm], offset: [n[0] * k, n[1] * k], text: cm(len) });
+  }
+  const labels = rooms.filter((r) => r.outline.length >= 3).map((r) => {
+    let a = 0;
+    for (let i = 0; i < r.outline.length; i++) {
+      const [x1, y1] = r.outline[i];
+      const [x2, y2] = r.outline[(i + 1) % r.outline.length];
+      a += x1 * y2 - x2 * y1;
+    }
+    const c = r.outline.reduce<Pt>((acc, p) => [acc[0] + p[0] / r.outline.length, acc[1] + p[1] / r.outline.length], [0, 0]);
+    return { at: c, name: r.name, area: `${(Math.abs(a) / 2 / 1e6).toFixed(1)} m²` };
+  });
+  const items = furniture.filter((f) => !KITCHEN_KINDS.has(f.kind)).map((f) => ({
+    id: f.id, label: f.label, outline: rect(f, 0, f.width_mm, -f.depth_mm / 2, f.depth_mm / 2),
+  }));
+  return { labels, furniture: items, dims };
+}
+
+export type ElevationKind = 'carcass' | 'front' | 'handle' | 'appliance' | 'worktop' | 'plinth' | 'window' | 'conflict';
 export interface ElevationRect { x: number; y: number; w: number; h: number; kind: ElevationKind }
-export interface Elevation { key: string; runs: string[]; width_mm: number; height_mm: number; rects: ElevationRect[]; dims: Array<{ x0: number; x1: number; y: number; text: string }>; heights: Array<{ y0: number; y1: number; text: string }> }
+export interface Elevation { key: string; runs: string[]; width_mm: number; height_mm: number; rects: ElevationRect[]; dims: Array<{ x0: number; x1: number; y: number; text: string; tone?: DimTone }>; heights: Array<{ y0: number; y1: number; text: string }> }
 
 export function kitchenElevations(
   runs: DrawRun[], walls: Array<WallLike & { id: string }> = [], openings: OpeningLike[] = [], construction: Partial<CabinetConstruction> = {}, worktopMm = 40,
@@ -118,10 +164,14 @@ export function kitchenElevations(
         }
       }
       if (zone === 'base' || zone === 'island') rects.push({ x: x0, y: r.height_mm - worktopMm, w: r.width_mm, h: worktopMm, kind: 'worktop' });
-      if (r.kind !== 'kitchen_wall') {
-        dims.push({ x0, x1: x0 + r.width_mm, y: -150, text: cm(r.width_mm) });
-        for (const m of runModulesOf(r)) {
-          if (m.width_mm >= 100 && m.type !== 'gap') dims.push({ x0: x0 + m.x_mm, x1: x0 + m.x_mm + m.width_mm, y: -350, text: cm(m.width_mm) });
+      const gap = runShortfall(r);
+      if (gap) rects.push({ x: x0 + gap.from_mm, y: lift, w: gap.to_mm - gap.from_mm, h: r.height_mm, kind: 'conflict' });
+      const above = r.kind === 'kitchen_wall' ? lift + r.height_mm : 0;
+      const sign = r.kind === 'kitchen_wall' ? 1 : -1;
+      dims.push({ x0, x1: x0 + r.width_mm, y: above + sign * 150, text: cm(r.width_mm) });
+      for (const m of runModulesOf(r)) {
+        if (m.width_mm >= 100 && m.type !== 'gap') {
+          dims.push({ x0: x0 + m.x_mm, x1: x0 + m.x_mm + m.width_mm, y: above + sign * 350, text: cm(m.width_mm), tone: unitStated(r.kitchen_layout, m) ? 'stated' : 'assumed' });
         }
       }
     }

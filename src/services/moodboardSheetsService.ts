@@ -69,6 +69,7 @@ export const SHEET_TYPE_LABELS: Record<SheetType, string> = {
   area_breakdown: 'Area Breakdown',
   scope_of_works: 'Scope of Works',
   room_view: 'Room View',
+  drawing_set: 'Drawings',
   full_deck: 'Full Presentation Deck',
 };
 
@@ -101,6 +102,7 @@ export const SHEET_TYPE_CREDITS: Record<SheetType, number> = {
   // image generation, no model call — the cost is the render itself.
   scope_of_works: 1,
   room_view: 1,
+  drawing_set: 0,
   full_deck: 5,
 };
 

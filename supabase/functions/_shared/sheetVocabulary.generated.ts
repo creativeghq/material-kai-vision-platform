@@ -25,6 +25,7 @@ export const SHEET_TYPES = [
   'electrical_plan',
   'scope_of_works',
   'room_view',
+  'drawing_set',
 ] as const;
 
 export type SheetType = (typeof SHEET_TYPES)[number];

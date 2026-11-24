@@ -18,7 +18,23 @@ function field(m: Rec, key: string): Rec | null {
   return rec(m[key]) ?? rec(rec(m.metadata)?.[key]);
 }
 
-export function collectConversationMedia(messages: unknown[]): ConversationMedia[] {
+export function gridJobIdsOf(messages: unknown[]): string[] {
+  const ids: string[] = [];
+  for (const raw of messages) {
+    const m = rec(raw);
+    const id = m && m.role === 'assistant' ? field(m, 'generation_job')?.job_id : null;
+    if (typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id) && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+
+export function gridTilesOf(modelsResults: unknown): string[] {
+  const r = rec(modelsResults);
+  if (!r) return [];
+  return Object.values(r).map((v) => (rec(v)?.success === false ? null : str(rec(v)?.image_url))).filter((u): u is string => !!u);
+}
+
+export function collectConversationMedia(messages: unknown[], gridTiles: Record<string, string[]> = {}): ConversationMedia[] {
   const out: ConversationMedia[] = [];
   const seen = new Set<string>();
   const add = (kind: ConversationMediaKind, url: string | null, label: string) => {
@@ -29,6 +45,8 @@ export function collectConversationMedia(messages: unknown[]): ConversationMedia
   for (const raw of messages) {
     const m = rec(raw);
     if (!m || m.role !== 'assistant') continue;
+    const job = field(m, 'generation_job')?.job_id;
+    if (typeof job === 'string') for (const url of gridTiles[job] ?? []) add('image', url, 'image grid tile');
     const gem = field(m, 'geminiImageData');
     if (gem) add('image', str(gem.image_url), String(gem.mode ?? 'generated image'));
     const staged = field(m, 'virtualStagingData');

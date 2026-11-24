@@ -4,7 +4,7 @@ export type RoomComposition = Record<string, ZoneConfig>;
 
 export type RunZone = 'base' | 'wall' | 'tall' | 'island';
 
-export interface RunModule { type: string; width_mm: number; options?: Record<string, string> }
+export interface RunModule { type: string; width_mm: number; options?: Record<string, string>; printed?: boolean }
 
 export interface KitchenLayout { modules: RunModule[]; seating_mm?: number; source?: 'read'; confirmed?: boolean }
 
@@ -273,3 +273,68 @@ export function kitchenCompositionFromRoom(objects: KitchenObject[], previous: R
 export const kitchenSignature = (objects: KitchenObject[]) =>
   objects.filter((o) => !o.removed_at && KITCHEN_KINDS.has(o.kind))
     .map((o) => `${o.id}:${o.kind}:${cm(o.width_mm)}:${cm(o.depth_mm)}:${cm(o.height_mm)}:${JSON.stringify(o.kitchen_layout ?? null)}`).sort().join('|');
+
+export function unitStated(layout: KitchenLayout | null | undefined, m: PlacedModule): boolean {
+  if (m.auto || !layout?.modules?.length) return false;
+  return layout.source !== 'read' || layout.confirmed === true || m.printed === true;
+}
+
+export function runShortfall(o: Pick<KitchenObject, 'kind' | 'width_mm' | 'height_mm' | 'kitchen_layout'>): { from_mm: number; to_mm: number } | null {
+  const built = runModulesOf(o).filter((m) => !m.auto);
+  const end = built.reduce((x, m) => Math.max(x, m.x_mm + m.width_mm), 0);
+  return built.length && o.width_mm - end > MAX_FILLER_MM ? { from_mm: end, to_mm: o.width_mm } : null;
+}
+
+export interface DrawingCheck { rule: string; ok: boolean; detail: string }
+
+const STANDARD_APPLIANCE_MM: Record<string, number[]> = { dishwasher_housing: [450, 600], oven_base: [600], oven_housing: [600], fridge_housing: [600, 700, 900], extractor: [600, 900] };
+
+export function drawingChecks(runs: Array<Pick<KitchenObject, 'kind' | 'width_mm' | 'height_mm' | 'kitchen_layout'> & { label: string; elevation_mm?: number; x_mm: number; y_mm: number; rotation_deg: number; depth_mm: number }>): DrawingCheck[] {
+  const kitchen = runs.filter((r) => KITCHEN_KINDS.has(r.kind));
+  if (!kitchen.length) return [];
+  const out: DrawingCheck[] = [];
+  const add = (rule: string, bad: string[], good: string) => out.push({ rule, ok: !bad.length, detail: bad.length ? bad.join(' ') : good });
+  const cmOf = (n: number) => `${Math.round(n / 10)}`;
+
+  const unconfirmed = kitchen.filter((r) => r.kitchen_layout?.source === 'read' && !r.kitchen_layout.confirmed).map((r) => r.label);
+  const auto = kitchen.filter((r) => !r.kitchen_layout?.modules?.length).map((r) => r.label);
+  add('Units confirmed by a person', [
+    ...(unconfirmed.length ? [`Read from the drawing, not confirmed: ${unconfirmed.join(', ')}.`] : []),
+    ...(auto.length ? [`Laid out automatically, no unit stated: ${auto.join(', ')}.`] : []),
+  ], 'Every run was laid out or confirmed by a person.');
+
+  const assumed = kitchen.flatMap((r) => runModulesOf(r).filter((m) => m.type !== 'gap' && m.type !== 'end_panel' && !unitStated(r.kitchen_layout, m))
+    .map((m) => `${r.label}: ${MODULE_LABELS[m.type] ?? m.type} ≈${cmOf(m.width_mm)}`));
+  add('Every width is stated', assumed.length ? [`Assumed, drawn grey with ≈: ${assumed.slice(0, 12).join('; ')}${assumed.length > 12 ? '…' : ''}.`] : [], 'Every unit width was printed or confirmed.');
+
+  const open = kitchen.map((r) => ({ r, gap: runShortfall(r) })).filter((x) => x.gap).map(({ r, gap }) => `${r.label}: ${cmOf(gap!.to_mm - gap!.from_mm)} cm not covered by units (hatched red).`);
+  const refused = kitchen.flatMap((r) => {
+    const ctx = runContext(r);
+    const stored = r.kitchen_layout?.modules;
+    return ctx && stored?.length ? placeRun(stored, { ...ctx, behind: [] }).rejected.map((x) => `${r.label}: ${x.reason}`) : [];
+  });
+  add('Every chain closes on its run', [...open, ...refused], 'The units of every run add up to its length.');
+
+  const odd = kitchen.flatMap((r) => runModulesOf(r).filter((m) => STANDARD_APPLIANCE_MM[m.type] && !STANDARD_APPLIANCE_MM[m.type].includes(m.width_mm))
+    .map((m) => `${r.label}: ${MODULE_LABELS[m.type]} ${cmOf(m.width_mm)} cm (usual ${STANDARD_APPLIANCE_MM[m.type].map(cmOf).join(' or ')}).`));
+  add('Appliances fit a standard opening', odd, 'Every appliance space is a standard width.');
+
+  const heightBad = kitchen.flatMap((r) => {
+    const z = zoneOfKind(r.kind);
+    if ((z === 'base' || z === 'island') && (r.height_mm < 820 || r.height_mm > 960)) return [`${r.label}: worktop at ${cmOf(r.height_mm)} cm.`];
+    if (z === 'wall' && (r.elevation_mm ?? 0) < 1300) return [`${r.label}: wall units start ${cmOf(r.elevation_mm ?? 0)} cm above the floor.`];
+    return [];
+  });
+  add('Heights are buildable', heightBad, 'Worktop and wall-unit heights are within the usual range.');
+
+  const axis = (r: { rotation_deg: number }) => { const a = (r.rotation_deg * Math.PI) / 180; return [Math.cos(a), Math.sin(a)] as const; };
+  const floating = kitchen.filter((w) => w.kind === 'kitchen_wall').filter((w) => {
+    const [ax, ay] = axis(w);
+    const c = w.x_mm * ax + w.y_mm * ay;
+    return !kitchen.some((b) => (zoneOfKind(b.kind) === 'base') && Math.abs(((b.rotation_deg - w.rotation_deg) % 360 + 360) % 360) < 3
+      && Math.hypot(b.x_mm - w.x_mm, b.y_mm - w.y_mm) < Math.max(b.width_mm, w.width_mm)
+      && Math.abs((b.x_mm * ax + b.y_mm * ay) - c) < (b.width_mm + w.width_mm) / 2);
+  }).map((w) => `${w.label} has no base run beneath it on the same wall.`);
+  add('Wall units sit over a base run', floating, 'Every wall run stands over a base run.');
+  return out;
+}

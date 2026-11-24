@@ -540,6 +540,54 @@ export const sceneStudioService = {
     return { image_url: data.image_url as string, credits_used: num(data.credits_used) };
   },
 
+  async businessName(workspaceId: string): Promise<string> {
+    const { data } = await supabase.from('finance_settings').select('business_name').eq('workspace_id', workspaceId).maybeSingle();
+    return ((data as { business_name?: string | null } | null)?.business_name ?? '').trim();
+  },
+
+  /** Stores the drawing set as the project's `drawing_set` sheet; one per room, replaced on each save so a client view keeps pointing at it. */
+  async saveDrawingSet(scene: Pick<SceneRow, 'id' | 'name' | 'project_id'>, pdf: Blob, pageCount: number): Promise<{ sheet_id: string; title: string; project_id: string }> {
+    if (!scene.project_id) throw new Error('This 3D room is not on a project yet; price it on a project or attach it to one first.');
+    const { data: auth } = await supabase.auth.getUser();
+    const path = `project-docs/${scene.project_id}/drawing-sets/${scene.id}-${Date.now()}.pdf`;
+    const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdf, { contentType: 'application/pdf', upsert: false });
+    if (upErr) throw new Error(`The drawings could not be uploaded: ${upErr.message}`);
+    const title = `${scene.name} — Drawings`.slice(0, 200);
+    const row = {
+      title, status: 'ready' as const, pdf_storage_path: path, pdf_generated_at: new Date().toISOString(), page_count: pageCount,
+      data: { scene_id: scene.id, pdf_storage_path: path, page_count: pageCount },
+    };
+    const { data: existing } = await supabase.from('moodboard_presentation_sheets').select('id')
+      .eq('project_id', scene.project_id).eq('sheet_type', 'drawing_set').contains('data', { scene_id: scene.id }).limit(1);
+    const prior = (existing ?? [])[0] as { id: string } | undefined;
+    const { data, error } = prior
+      ? await supabase.from('moodboard_presentation_sheets').update(row).eq('id', prior.id).select('id').single()
+      : await supabase.from('moodboard_presentation_sheets').insert({ ...row, project_id: scene.project_id, sheet_type: 'drawing_set', created_by: auth.user?.id ?? null }).select('id').single();
+    if (error || !data) throw new Error(`The drawings were uploaded but not saved to the project: ${error?.message ?? 'no row'}`);
+    return { sheet_id: (data as { id: string }).id, title, project_id: scene.project_id };
+  },
+
+  async linkRenderWorld(renderId: string, vrWorldId: string): Promise<void> {
+    const { error } = await supabase.from('scene_renders').update({ vr_world_id: vrWorldId }).eq('id', renderId);
+    if (error) throw new Error(error.message);
+  },
+
+  /** A recorded walkthrough becomes a `generation_videos` row, so it joins the conversation's media like any generated video. */
+  async saveWalkthroughVideo(scene: Pick<SceneRow, 'id' | 'workspace_id' | 'name'>, video: Blob): Promise<{ id: string; video_url: string }> {
+    const ext = video.type.includes('mp4') ? 'mp4' : 'webm';
+    const path = `${sceneFolder(scene)}/walkthroughs/${Date.now()}.${ext}`;
+    await uploadTo(path, video, ext === 'mp4' ? 'video/mp4' : 'video/webm');
+    const url = supabase.storage.from(SCENE_BUCKET).getPublicUrl(path).data.publicUrl;
+    const { data: auth } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from('generation_videos').insert({
+      user_id: auth.user?.id, workspace_id: scene.workspace_id, source_image_url: url, video_url: url,
+      prompt: `Walkthrough of ${scene.name}`.slice(0, 500), status: 'completed', model: 'scene-walkthrough', video_type: 'walkthrough',
+      credits_used: 0, completed_at: new Date().toISOString(),
+    }).select('id').single();
+    if (error || !data) throw new Error(`The walkthrough was recorded but not saved: ${error?.message ?? 'no row'}`);
+    return { id: (data as { id: string }).id, video_url: url };
+  },
+
   async saveRender(row: Omit<SceneRender, 'id' | 'created_at' | 'vr_world_id'>): Promise<SceneRender> {
     const { data, error } = await supabase.from('scene_renders').insert(row).select(RENDER_COLUMNS).single();
     if (error) throw new Error(`The render was made but could not be saved to the scene: ${error.message}`);

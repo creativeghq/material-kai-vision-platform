@@ -52,6 +52,7 @@ const SHEET_LABELS: Record<string, string> = {
   area_breakdown: 'AREA BREAKDOWN',
   scope_of_works: 'SCOPE OF WORKS',
   room_view: 'ROOM VIEW',
+  drawing_set: 'DRAWINGS',
   full_deck: 'PRESENTATION DECK',
 };
 
@@ -1598,6 +1599,7 @@ export async function buildSheetForDeck(
   /** Optional so an older caller still compiles; a scope sheet without it renders its own
    *  "no client-visible works" state rather than a blank page. */
   resolveScope?: (projectId: string, showOwners: boolean) => Promise<ScopePhase[]>,
+  resolveStoredPdf?: (path: string) => Promise<Uint8Array | null>,
 ): Promise<void> {
   const td: TitleBlockData = {
     ...parentTd,
@@ -1703,6 +1705,18 @@ export async function buildSheetForDeck(
         resolveChips,
       });
       break;
+    case 'drawing_set': {
+      const raw = typeof sheet.data.pdf_storage_path === 'string' ? sheet.data.pdf_storage_path : null;
+      const path = raw && sheet.project_id && raw.startsWith(`project-docs/${sheet.project_id}/drawing-sets/`) && !raw.includes('..') ? raw : null;
+      const bytes = path && resolveStoredPdf ? await resolveStoredPdf(path) : null;
+      if (!bytes) {
+        newSheetPage(pdfDoc).drawText('The drawings could not be read; save them again from the 3D room.', { x: MARGIN, y: PAGE_H / 2, size: 14, font: fonts.regular, color: COLOR_GRAY });
+        break;
+      }
+      const src = await PDFDocument.load(bytes);
+      for (const p of await pdfDoc.copyPages(src, src.getPageIndices())) pdfDoc.addPage(p);
+      break;
+    }
     default:
       // Unknown sub-sheet type — emit a placeholder page
       const page = newSheetPage(pdfDoc);

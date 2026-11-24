@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  collectConversationMedia, conversationMediaContext, resolveMediaSource, stillsOf,
+  collectConversationMedia, conversationMediaContext, gridJobIdsOf, gridTilesOf, resolveMediaSource, stillsOf,
 } from '../../supabase/functions/_shared/conversation-media.ts';
 
 const u = (n: string) => `https://x.test/${n}.jpg`;
@@ -37,6 +37,15 @@ describe('every generated result can feed the next generator', () => {
     expect(resolveMediaSource({ source: 'my_upload', uploadedRoom: u('up'), conversationImages: [u('b')] }).url).toBe(u('up'));
     expect(resolveMediaSource({ conversationImages: [], uploadedRoom: u('up') }).url).toBe(u('up'));
     expect(resolveMediaSource({ conversationImages: [] }).url).toBeUndefined();
+  });
+
+it('image-grid tiles join the chain at the grid message, in model order, failures left out', () => {
+    const job = '11111111-2222-3333-4444-555555555555';
+    const msgs = [{ role: 'assistant', metadata: { generation_job: { job_id: job } } }, { role: 'assistant', geminiImageData: { image_url: u('after') } }];
+    expect(gridJobIdsOf(msgs)).toEqual([job]);
+    const tiles = gridTilesOf({ mode: 'text-to-image', a: { success: true, image_url: u('t1') }, b: { success: false, image_url: u('bad') }, c: { image_url: u('t2') } });
+    expect(tiles).toEqual([u('t1'), u('t2')]);
+    expect(stillsOf(collectConversationMedia(msgs, { [job]: tiles }))).toEqual([u('t1'), u('t2'), u('after')]);
   });
 
   it('user turns and non-URLs are ignored', () => {

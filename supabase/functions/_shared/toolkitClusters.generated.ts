@@ -206,7 +206,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'presentation-sheets': {
     capability: ['moodboards.use', 'projects.use', 'quotes.use'],
-    tool_ids: ['generate_presentation_sheet'],
+    tool_ids: ['generate_presentation_sheet', 'manage_client_view', 'save_to_moodboard'],
   },
   'generation': {
     capability: ['moodboards.use', 'projects.use', 'quotes.use', 'marketing.seo', 'realestate.listings.manage'],

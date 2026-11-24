@@ -42,7 +42,7 @@ interface ClientViewTabProps {
 
 type AvailableSheet = Awaited<ReturnType<typeof projectsService.listProjectSheets>>[number];
 type ProjectQuote = { id: string; name: string | null; quote_number: string | null; status: string | null; grand_total: number | null; currency: string | null };
-type VrWorld = { id: string; display_name: string | null; thumbnail_url: string | null };
+type VrWorld = { id: string; display_name: string | null; thumbnail_url: string | null; from_project_room?: boolean };
 
 const STATUS_TONE: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground border-border',
@@ -116,7 +116,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
         clientViewsService.listForProject(projectId),
         projectsService.listProjectSheets(projectId),
         projectsService.listProjectQuotes(projectId),
-        clientViewsService.listVrWorlds(),
+        clientViewsService.listVrWorlds(projectId),
         // Room plans are workspace-scoped, not project-scoped — `room_layouts` has no project_id —
         // so this offers the workspace's plans rather than pretending there is a narrower set.
         activeWorkspaceId
@@ -160,7 +160,8 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const sheetById = useMemo(() => new Map(sheets.map((s) => [s.id, s])), [sheets]);
 
   const openCreate = () => {
-    setForm({ ...emptyForm(), title: `${projectName} — Client Presentation`, clientName: clientDisplayName });
+    const ownWorld = vrWorlds.find((w) => w.from_project_room);
+    setForm({ ...emptyForm(), title: `${projectName} — Client Presentation`, clientName: clientDisplayName, ...(ownWorld ? { vrWorldId: ownWorld.id } : {}) });
     setEditorOpen(true);
   };
 

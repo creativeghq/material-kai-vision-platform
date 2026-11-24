@@ -152,7 +152,8 @@ const SceneEditor = lazy(() => import('@/components/features/scenestudio/SceneEd
 import { sceneStudioService, type SceneProduct } from '@/services/sceneStudioService';
 import { sceneSourceLabel as formatSceneSource } from '@/lib/scene/sceneLabels';
 import { useEntitlements } from '@/hooks/useEntitlements';
-import type { SceneRenderedEvent } from '@/components/features/scenestudio/SceneEditor';
+import type { SceneIntent, SceneRenderedEvent } from '@/components/features/scenestudio/SceneEditor';
+import type { DrawingSetSaved } from '@/components/features/scenestudio/KitchenDrawingsDialog';
 import { vrWorldService } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 import { moodboardAPI } from '@/services/moodboardAPI';
@@ -199,10 +200,12 @@ interface AgentDefinition {
 // bound by agent-chat's AGENT_CONFIGS, the one source for what an agent can do.
 const AGENT_HISTORY_SENT = 40;
 
-function boundedAgentHistory<T extends TurnMessage & { images?: unknown[]; geminiImageData?: unknown; virtualStagingData?: unknown; materialsBoardData?: unknown; videoData?: unknown }>(input: T[]): T[] {
+type HistoryMessage = TurnMessage & { images?: unknown[]; geminiImageData?: unknown; virtualStagingData?: unknown; materialsBoardData?: unknown; videoData?: unknown; generation_job?: unknown };
+
+function boundedAgentHistory<T extends HistoryMessage>(input: T[]): T[] {
   const all = input.filter((m) => !isResultCardRow(m));
   if (all.length <= AGENT_HISTORY_SENT) return all;
-  const older = all.slice(0, -AGENT_HISTORY_SENT).filter((m) => (m.images?.length ?? 0) > 0 || m.geminiImageData || m.virtualStagingData || m.materialsBoardData || m.videoData);
+  const older = all.slice(0, -AGENT_HISTORY_SENT).filter((m) => (m.images?.length ?? 0) > 0 || m.geminiImageData || m.virtualStagingData || m.materialsBoardData || m.videoData || m.generation_job);
   return [...older, ...all.slice(-AGENT_HISTORY_SENT)];
 }
 
@@ -704,6 +707,7 @@ interface Message {
     video_url?: string;
     job_id: string;
     status: 'processing' | 'completed' | 'failed';
+    video_type?: string;
   }; // Veo video walkthrough
   /** A deterministic surface preview the browser draws itself (#447). */
   visualizerData?: VisualizerRenderData;
@@ -800,7 +804,7 @@ interface Message {
     credits_used?: number;
   }; // Rendered presentation sheet PDF ready for download
   quoteData?: QuoteCanvasData; // Agent-created quote (real quotes row) + branded PDF, shown on canvas
-  sceneData?: { scene_id: string; name: string; source_kind: string; intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings'; object_id: string | null; room_id?: string | null; fronts?: 'closed' | 'half' | 'open'; sun_hour?: number; nonce: number } };
+  sceneData?: { scene_id: string; name: string; source_kind: string; intent?: SceneIntent };
   sceneListData?: { scenes: Array<{ id: string; name: string; source_kind: string; extract_status: string; updated_at: string }> };
   mentionSummaryData?: {
     product_id: string;
@@ -2264,7 +2268,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   // Handle VR world generation from a generated room image (ProgressiveImageGrid actions).
   const handleGenerateVR = useCallback(async (
     imageUrl: string,
-    context: { prompt?: string; roomType?: string; style?: string },
+    context: { prompt?: string; roomType?: string; style?: string; sceneRenderId?: string },
     _sourceMessage: Message,
   ) => {
     try {
@@ -2277,6 +2281,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         conversationId: conversationIdRef.current ?? undefined,
       });
 
+      if (context.sceneRenderId && vrResult.vrWorldId) {
+        await sceneStudioService.linkRenderWorld(context.sceneRenderId, vrResult.vrWorldId)
+          .catch((e) => toast({ title: 'The world is ready but not linked to its room', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }));
+      }
       // World is already completed — pass all splat URLs directly to WorldViewer (no polling needed)
       const vrMessage: Message = {
         id: `vr-${Date.now()}`,
@@ -2611,6 +2619,38 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (convId) {
       void saveAndLinkMessage(msg.id, { conversationId: convId, role: 'assistant', content: msg.content, metadata: { agentId: 'interior-designer', geminiImageData } });
     }
+  }, [saveAndLinkMessage]);
+
+  const handleDrawingSetSaved = useCallback(async (saved: DrawingSetSaved) => {
+    const path = (await supabase.from('moodboard_presentation_sheets').select('pdf_storage_path').eq('id', saved.sheet_id).maybeSingle()).data?.pdf_storage_path as string | undefined;
+    const signed = path ? (await supabase.storage.from('pdf-documents').createSignedUrl(path, 60 * 60 * 24 * 7)).data?.signedUrl : undefined;
+    const sheetPdfData = { sheet_id: saved.sheet_id, sheet_type: 'drawing_set' as const, title: saved.title, pdf_url: signed ?? '', page_count: saved.page_count, credits_used: 0 };
+    const msg: Message = {
+      id: `msg-drawings-${Date.now()}`,
+      role: 'assistant',
+      content: `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} saved to the project. They can go on the client view and into the deck.`,
+      timestamp: new Date(),
+      agentId: 'interior-designer',
+      sheetPdfData,
+    };
+    setMessages((prev) => [...prev, msg]);
+    const convId = conversationIdRef.current;
+    if (convId) void saveAndLinkMessage(msg.id, { conversationId: convId, role: 'assistant', content: msg.content, metadata: { agentId: 'interior-designer', sheetPdfData } });
+  }, [saveAndLinkMessage]);
+
+  const handleWalkthroughVideo = useCallback((video: { id: string; video_url: string; label: string }) => {
+    const videoData = { video_url: video.video_url, job_id: video.id, status: 'completed' as const, video_type: 'walkthrough' };
+    const msg: Message = {
+      id: `msg-walkthrough-${Date.now()}`,
+      role: 'assistant',
+      content: `${video.label}, recorded from the 3D room.`,
+      timestamp: new Date(),
+      agentId: 'interior-designer',
+      videoData,
+    };
+    setMessages((prev) => [...prev, msg]);
+    const convId = conversationIdRef.current;
+    if (convId) void saveAndLinkMessage(msg.id, { conversationId: convId, role: 'assistant', content: msg.content, metadata: { agentId: 'interior-designer', videoData } });
   }, [saveAndLinkMessage]);
 
   // Use a product image as input for a 3D interior design scene
@@ -3626,7 +3666,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   const opened = intent?.mode === 'walk' ? 'is open in walk mode: WASD or arrows to walk, drag to look.'
                     : intent?.mode === 'make_3d' ? 'is open with the object selected. Press Make 3D to confirm (10 credits).'
                       : intent?.mode === 'photo_walk' ? 'is open. Confirm the photo-real walk there.'
-                        : 'is open on the canvas. Arrange it, then pick a style to render it.';
+                        : intent?.mode === 'render' ? `is rendering${intent.style ? ` in ${intent.style}` : ''}; the render arrives here.`
+                          : intent?.mode === 'record_walkthrough' ? 'is recording its walkthrough video; keep this tab in front.'
+                            : intent?.mode === 'drawings' ? (intent.save ? 'is saving its drawings to the project.' : 'has its drawings open.')
+                              : 'is open on the canvas. Arrange it, then pick a style to render it.';
                   const scMsg: Message = {
                     id: `msg-scene-${Date.now()}`,
                     role: 'assistant',
@@ -5837,7 +5880,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             sceneId={message.sceneData.scene_id}
             pinned={scenePinned}
             onRendered={(ev) => handleSceneRendered(ev, message.sceneData!.name)}
-            onWalkThrough={(imageUrl, prompt) => handleGenerateVR(imageUrl, { prompt }, message)}
+            onWalkThrough={(imageUrl, prompt, renderId) => handleGenerateVR(imageUrl, { prompt, sceneRenderId: renderId }, message)}
+            onDrawingSetSaved={(saved) => void handleDrawingSetSaved(saved)}
+            onWalkthroughVideo={(video) => handleWalkthroughVideo(video)}
             intent={message.sceneData.intent}
           />
         </Suspense>

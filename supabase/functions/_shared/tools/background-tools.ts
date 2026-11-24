@@ -225,7 +225,7 @@ export const createInteriorVideoV2Tool = (
   userImages: string[] = [],
 ) => {
   return tool(
-    async ({ source_image_url: explicitSource, source, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url }) => {
+    async ({ source_image_url: explicitSource, source, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url, reference_image_urls, last_frame_url }) => {
       const slots = resolveImageSlots(userImages.length);
       const picked = resolveMediaSource({
         sourceImageUrl: explicitSource, source, conversationImages,
@@ -258,6 +258,8 @@ export const createInteriorVideoV2Tool = (
               aspect_ratio: aspect_ratio ?? '16:9',
               duration_seconds: duration_seconds ?? 8,
               before_image_url,
+              ...(reference_image_urls?.length ? { reference_image_urls } : {}),
+              ...(last_frame_url ? { last_frame_url } : {}),
               conversation_id: conversationId,
             }),
             signal: videoController.signal,
@@ -363,6 +365,10 @@ Returns video_url when complete, or prediction_id if still processing (poll chec
           .describe('Duration in seconds, clamped to the model ceiling (kling 10s, runway/ray 5 or 10s, omni/h3-max 15s, wan/seedance 30s). Default: 8'),
         before_image_url: z.string().optional()
           .describe('Required only for before_after type: the "before" state image URL'),
+        reference_image_urls: z.array(z.string().url()).max(19).optional()
+          .describe('Wan/Seedance: images held in shot (a product, a moodboard tile, another render of the room), by URL from this conversation.'),
+        last_frame_url: z.string().url().optional()
+          .describe('Wan/Seedance/Ray: the frame the clip ends on, e.g. a second render of the same 3D room from another camera, so the motion is between two real views.'),
       }),
     }
   );

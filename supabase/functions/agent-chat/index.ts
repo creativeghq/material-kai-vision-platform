@@ -29,7 +29,7 @@ import { shapeForModel, shapeToolResult, turnProducedWork } from '../_shared/too
 // Security invariant 9 — the approval gate is enforced, not requested (#352 A1).
 import { stripModelAuthoredApproval } from '../_shared/tools/approval-gate.ts';
 import { loadVocabulary } from '../_shared/vocabularies.ts';
-import { collectConversationMedia, conversationMediaContext, stillsOf } from '../_shared/conversation-media.ts';
+import { collectConversationMedia, conversationMediaContext, gridJobIdsOf, gridTilesOf, stillsOf } from '../_shared/conversation-media.ts';
 
 // Type-only LangChain imports. Erased at compile time, so the boot budget is untouched and
 // the runtime still loads these lazily inside initRuntime() — but `deno check` now sees the
@@ -1210,7 +1210,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       // in registerTools; listing them here is what makes the toolkit filter and
       // load_toolkit agree with what the agent can actually call.
       'generate_3d', 'generate_gemini', 'virtual_staging', 'apply_lighting_preset', 'generate_vr_world',
-      'visualize_on_surface',
+      'visualize_on_surface', 'manage_scenes', 'generate_presentation_sheet', 'manage_client_view', 'save_to_moodboard',
       // The read half of the generation kit. Unlisted and unclustered until 2026-08-26, so an
       // agent could start a render and had no way to report whether it had finished.
       'check_generation_status',
@@ -1294,7 +1294,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'visualize_on_surface',
       'manage_scenes',
       // Presentation sheets (all users; per-sheet credit cost gated inside the tool)
-      'generate_presentation_sheet',
+      'generate_presentation_sheet', 'manage_client_view', 'save_to_moodboard',
       // Project Workspace — interior designers benefit most from the container
       'create_project', 'list_my_projects', 'find_project', 'add_task',
       'project_cvr', 'project_applications', 'list_variations', 'tender_status',
@@ -1950,7 +1950,13 @@ async function executeAgent(
     .map(([id]) => id);
 
   // Every earlier result (render, staging, board, video), so any generator can take any of them as input.
-  const conversationMedia = collectConversationMedia(messages);
+  const gridJobs = gridJobIdsOf(messages).slice(-10);
+  const gridTiles: Record<string, string[]> = {};
+  if (gridJobs.length && userId) {
+    const { data: jobs } = await supabase.from('generation_3d').select('id, models_results').in('id', gridJobs).eq('user_id', userId);
+    for (const j of (jobs ?? []) as Array<{ id: string; models_results: unknown }>) gridTiles[j.id] = gridTilesOf(j.models_results);
+  }
+  const conversationMedia = collectConversationMedia(messages, gridTiles);
   const conversationImages: string[] = stillsOf(conversationMedia);
 
   // Images the user UPLOADED on an EARLIER turn.
@@ -2621,6 +2627,11 @@ async function executeAgent(
   // Presentation sheet generator (all users; per-sheet credit cost handled inside the tool)
   if (config.tools.includes('generate_presentation_sheet') && createPresentationSheetTool) {
     tools.push(createPresentationSheetTool(userId, onChunk));
+  }
+  if (config.tools.includes('manage_client_view') || config.tools.includes('save_to_moodboard')) {
+    const pkg = await import('../_shared/tools/client-package-tools.ts');
+    if (config.tools.includes('manage_client_view')) tools.push(pkg.createManageClientViewTool(userId, workspaceId, userJwt, onChunk));
+    if (config.tools.includes('save_to_moodboard')) tools.push(pkg.createSaveToMoodboardTool(userId, workspaceId, userJwt, conversationMedia));
   }
 
   // ── Connected-website context for the SEO toolkit ──────────────────────────
@@ -4436,6 +4447,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
       ...(msg.virtualStagingData ? { virtualStagingData: msg.virtualStagingData } : {}),
       ...(msg.materialsBoardData ? { materialsBoardData: msg.materialsBoardData } : {}),
       ...(msg.videoData ? { videoData: msg.videoData } : {}),
+      ...(msg.generation_job ? { generation_job: msg.generation_job } : {}),
       ...(msg.tool_results ? { tool_results: msg.tool_results } : {}),
     }));
 

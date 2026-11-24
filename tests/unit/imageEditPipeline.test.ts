@@ -269,7 +269,7 @@ describe('the images stay reachable on the next turn', () => {
   it('both recovery paths still read the fields the map carries', () => {
     const src = read(AGENT_CHAT);
     expect(src).toContain('const raw = m.images ?? m.metadata?.attachedImages;');
-    expect(src).toContain('collectConversationMedia(messages)');
+    expect(src).toMatch(/collectConversationMedia\(messages[,)]/);
   });
 
   it('an earlier upload comes back as the SET it was, not as its last URL', () => {

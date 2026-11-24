@@ -81,6 +81,11 @@ import { fetchImageGuardedOrNull } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
+async function fetchStoredPdf(supabase: DbClient, path: string): Promise<Uint8Array | null> {
+  const { data, error } = await supabase.storage.from('pdf-documents').download(path);
+  return error || !data ? null : new Uint8Array(await data.arrayBuffer());
+}
+
 Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -399,9 +404,10 @@ Deno.serve(withApiLogging('generate-moodboard-sheet-pdf', async (req: Request) =
             (ids) => fetchProductChips(supabase, ids, scopeWorkspaceIds),
             (qid) => fetchQuoteFfeItems(supabase, qid, quoteScope),
             (pid, showOwners) => fetchProjectScopePhases(supabase, pid, quoteScope, { showOwners }),
+            (path) => fetchStoredPdf(supabase, path),
           );
         }
-        pageCount = subSheets.length + 1;
+        pageCount = pdfDoc.getPageCount();
         break;
       }
       default:
@@ -625,9 +631,10 @@ async function buildClientViewPdf(
         (ids) => fetchProductChips(supabase, ids, ownerWorkspaceIds),
         (qid) => fetchQuoteFfeItems(supabase, qid, deckQuoteScope),
         (pid, showOwners) => fetchProjectScopePhases(supabase, pid, deckQuoteScope, { showOwners }),
+        (path) => fetchStoredPdf(supabase, path),
       );
     }
-    const pageCount = sheets.length + 1;
+    const pageCount = pdfDoc.getPageCount();
 
     pdfDoc.setTitle(`${project?.name || ''} — ${cover.title}`);
     pdfDoc.setSubject('Client Presentation');
@@ -757,6 +764,8 @@ function validatePdfContent(sheet_type: string, data: Record<string, any> | unde
         return 'area_breakdown needs at least a hero_image_url (or a plan/elevation image, or finishes).';
       }
       return null;
+    case 'drawing_set':
+      return 'Drawings are drawn and saved from the 3D room (manage_scenes drawing_set), not generated here.';
     case 'room_view':
       if (!d.render_image_url) return "Missing render_image_url for room_view — save it from the moodboard's Room Views tab.";
       if (!Array.isArray(d.layers) || d.layers.length === 0) return 'No surfaces — room_view needs at least one finished surface.';

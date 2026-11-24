@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Eye, FileText, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
-  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Globe, Aperture, Eraser,
+  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Globe, Aperture, Eraser, Film,
 } from 'lucide-react';
 
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -28,7 +28,9 @@ import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSl
 import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
 import { KitchenRunEditor } from '@/components/features/scenestudio/KitchenRunEditor';
-import { KitchenDrawingsDialog } from '@/components/features/scenestudio/KitchenDrawingsDialog';
+import { KitchenDrawingsDialog, type DrawingSetSaved } from '@/components/features/scenestudio/KitchenDrawingsDialog';
+import type { WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
+import type { Pose } from '@/lib/scene/walkthroughTimeline';
 import { ReadyMadeLinePrice } from '@/components/features/scenestudio/ReadyMadeLinePrice';
 import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
@@ -42,6 +44,7 @@ import {
 } from '@/components/features/scenestudio/ScenePanels';
 
 const SceneCanvas = lazy(() => import('@/components/features/scenestudio/SceneCanvas').then((m) => ({ default: m.SceneCanvas })));
+const WalkthroughRecorder = lazy(() => import('@/components/features/scenestudio/WalkthroughRecorder'));
 
 const TOOLS: Array<{ id: SceneTool; label: string; icon: React.ComponentType<{ className?: string }>; hint: string }> = [
   { id: 'view', label: 'View', icon: Eye, hint: 'Drag to turn the view · right-drag to pan · scroll to zoom · double-click a floor to go to that room · click an object to select it' },
@@ -62,9 +65,25 @@ export interface SceneEditorProps {
   sceneId: string;
   pinned?: SceneProduct[];
   onRendered?(event: SceneRenderedEvent): void;
-  onWalkThrough?(imageUrl: string, prompt: string): void;
-  intent?: { mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings'; object_id: string | null; room_id?: string | null; fronts?: FrontsState; sun_hour?: number; nonce: number };
+  onWalkThrough?(imageUrl: string, prompt: string, renderId: string): void;
+  onDrawingSetSaved?(saved: DrawingSetSaved): void;
+  onWalkthroughVideo?(video: { id: string; video_url: string; label: string }): void;
+  intent?: SceneIntent;
 }
+
+export interface SceneIntent {
+  mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings' | 'render' | 'record_walkthrough';
+  object_id: string | null;
+  room_id?: string | null;
+  fronts?: FrontsState;
+  sun_hour?: number;
+  style?: string;
+  style_reference_url?: string;
+  save?: boolean;
+  nonce: number;
+}
+
+const INTENT_FRESH_MS = 120_000;
 
 interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[]; finishes: SceneObjectFinish[] }
 
@@ -154,7 +173,7 @@ const hasWebGL2 = () => {
   try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
 };
 
-export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWalkThrough, intent }: SceneEditorProps) {
+export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWalkThrough, onDrawingSetSaved, onWalkthroughVideo, intent }: SceneEditorProps) {
   const { toast } = useToast();
   const canvasRef = useRef<SceneCanvasHandle>(null);
 
@@ -173,6 +192,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [wireframe, setWireframe] = useState(false);
   const [fronts, setFronts] = useState<FrontsState>('closed');
   const [drawingsOpen, setDrawingsOpen] = useState(false);
+  const [drawingsAutoSave, setDrawingsAutoSave] = useState(false);
+  const [recording, setRecording] = useState<{ auto: boolean } | null>(null);
   const [sunHour, setSunHour] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeRenderId, setActiveRenderId] = useState<string | null>(null);
@@ -622,6 +643,28 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     }
   };
 
+  const walkthroughPayload = (): WalkthroughPayload => {
+    const latest = renders.find((r) => r.kind === 'full' && r.image_url);
+    return {
+      name: data?.scene.name ?? '3D room', default_wall_height_mm: data?.scene.default_wall_height_mm ?? 2600, cabinet_hardware: data?.scene.cabinet_hardware ?? null,
+      rooms: data?.rooms ?? [], walls: data?.walls ?? [], openings: data?.openings ?? [],
+      objects, surfaces, finishes, products,
+      render: latest ? { image_url: latest.image_url, camera: (latest.camera as unknown as Pose | null) ?? null } : null,
+    };
+  };
+
+  const saveWalkthrough = async (blob: Blob) => {
+    if (!data) return;
+    try {
+      const saved = await sceneStudioService.saveWalkthroughVideo(data.scene, blob);
+      setRecording(null);
+      onWalkthroughVideo?.({ ...saved, label: `${data.scene.name} walkthrough` });
+      toast({ title: 'Walkthrough recorded', description: 'The video is in the conversation, ready to share or to feed the next step.' });
+    } catch (e) {
+      fail('The walkthrough could not be saved', e);
+    }
+  };
+
   const [photoWalkRoom, setPhotoWalkRoom] = useState<string | null>(null);
   const [photoWalking, setPhotoWalking] = useState(false);
   const runPhotoWalk = async (roomId: string) => {
@@ -636,7 +679,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       await new Promise((r) => setTimeout(r, 1300));
       const saved = await render(styleChoice);
       const roomName = data.rooms.find((r) => r.id === roomId)?.name ?? scene.name;
-      if (saved) onWalkThrough(saved.image_url, `${roomName}${saved.style_label ? ` — ${saved.style_label}` : ''}`);
+      if (saved) onWalkThrough(saved.image_url, `${roomName}${saved.style_label ? ` — ${saved.style_label}` : ''}`, saved.id);
     } finally {
       setPhotoWalking(false);
     }
@@ -660,9 +703,28 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     handledIntent.current = intent.nonce;
     if (intent.fronts) setFronts(intent.fronts);
     if (intent.sun_hour != null) setSunHour(Math.min(20, Math.max(6, intent.sun_hour)));
-    if (intent.mode === 'drawings') { setDrawingsOpen(true); return; }
+    const fresh = Date.now() - intent.nonce < INTENT_FRESH_MS;
+    if (intent.mode === 'drawings') { setDrawingsAutoSave(!!intent.save && fresh); setDrawingsOpen(true); return; }
+    if (intent.mode === 'record_walkthrough') { setRecording({ auto: fresh }); return; }
     const obj = intent.object_id ? objects.find((o) => o.id === intent.object_id) : undefined;
     const roomId = intent.room_id ?? obj?.room_id ?? undefined;
+    if (intent.mode === 'render') {
+      if (!fresh) return;
+      const wanted = intent.style?.trim().toLowerCase();
+      const term = wanted ? styles.find((t) => t.label.toLowerCase() === wanted || t.value.toLowerCase() === wanted) : undefined;
+      const choice: StyleChoice | null = intent.style_reference_url
+        ? { kind: 'reference', url: intent.style_reference_url, label: intent.style?.trim() || 'Reference' }
+        : term ? { kind: 'style', value: term.value, label: term.label, brief: String((term.metadata as { brief?: string } | null)?.brief ?? term.label) }
+          : intent.style?.trim() ? { kind: 'style', value: wanted!, label: intent.style.trim(), brief: intent.style.trim() } : styleChoice;
+      if (roomId) {
+        setWalkRoomId(undefined);
+        setFocusRoomId(roomId);
+        setEyeLevel(true);
+        canvasRef.current?.focusRoom(roomId, true);
+      }
+      setTimeout(() => void render(choice), roomId ? 2200 : 1500);
+      return;
+    }
     if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
     if (intent.mode === 'photo_walk') { setPhotoWalkRoom(roomId ?? data.rooms[0]?.id ?? null); return; }
     if (roomId) goToRoom(roomId, false);
@@ -1054,7 +1116,32 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
 
   return (
     <PinnedProductsContext.Provider value={pinned}>
-      <KitchenDrawingsDialog open={drawingsOpen} onOpenChange={setDrawingsOpen} data={data} objects={objects} />
+      <KitchenDrawingsDialog
+        open={drawingsOpen}
+        onOpenChange={(o) => { setDrawingsOpen(o); if (!o) setDrawingsAutoSave(false); }}
+        data={data}
+        objects={objects}
+        autoSave={drawingsAutoSave}
+        onSaved={(saved) => { setDrawingsAutoSave(false); onDrawingSetSaved?.(saved); }}
+      />
+      <Dialog open={!!recording} onOpenChange={(o) => { if (!o) setRecording(null); }}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Walkthrough Video</DialogTitle>
+            <DialogDescription>The plan from above, the walls and units rising, then each room at eye level, recorded from the 3D room itself.</DialogDescription>
+          </DialogHeader>
+          {recording && (
+            <Suspense fallback={<div className="h-48" />}>
+              <WalkthroughRecorder
+                data={walkthroughPayload()}
+                autoStart={recording.auto}
+                onCancel={() => setRecording(null)}
+                onRecorded={(blob) => void saveWalkthrough(blob)}
+              />
+            </Suspense>
+          )}
+        </DialogContent>
+      </Dialog>
       <div className="space-y-3">
         <div className="relative h-[64vh] min-h-[440px] overflow-hidden rounded-md border border-hairline bg-surface-sunken">
           {reading ? (
@@ -1128,6 +1215,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                   active={photo}
                   onClick={() => { setPhoto((v) => !v); setWireframe(false); setPhotoSamples({ n: 0, settled: false, preparing: true }); }}
                 ><Aperture className="h-4 w-4" /></DockButton>
+                <DockButton label="Drawings" hint="Dimensioned plan of the rooms (and the kitchen elevations), to print or save to the project" onClick={() => setDrawingsOpen(true)}><FileText className="h-4 w-4" /></DockButton>
+                <DockButton label="Walkthrough Video" hint="Record the walkthrough of the real plan as a video. Free." disabled={!data.rooms.length} onClick={() => setRecording({ auto: false })}><Film className="h-4 w-4" /></DockButton>
                 <DockButton label="Wireframe" hint="See through walls and furniture" active={wireframe} onClick={() => { setWireframe((w) => !w); setPhoto(false); }}><Grid3x3 className="h-4 w-4" /></DockButton>
                 <DockButton
                   label={eyeLevel ? 'Eye level: on' : 'Eye level: off'}
@@ -1199,7 +1288,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.setPose(activeRender.camera as unknown as Parameters<SceneCanvasHandle['setPose']>[0]); }}><Eye className="h-3.5 w-3.5" />Edit from this view</Button>
                 <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setAreaEditing(true)}><Paintbrush className="h-3.5 w-3.5" />Change an area</Button>
                 {onWalkThrough && (
-                  <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(activeRender.image_url, `${scene.name}${activeRender.style_label ? ` — ${activeRender.style_label}` : ''}`)}>
+                  <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(activeRender.image_url, `${scene.name}${activeRender.style_label ? ` — ${activeRender.style_label}` : ''}`, activeRender.id)}>
                     <Footprints className="h-3.5 w-3.5" />Walk through ({VR_CREDIT_COSTS['marble-1.1']} credits)
                   </Button>
                 )}

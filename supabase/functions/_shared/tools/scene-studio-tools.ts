@@ -13,7 +13,7 @@ import { fetchImageGuarded } from '../fetch-image.ts';
 import { emitFlowEvent } from '../flow-events.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import {
-  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, spansBehind, zoneOfKind,
+  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, drawingChecks, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, spansBehind, unitStated, zoneOfKind,
   type KitchenLayout, type RoomComposition,
 } from '../kitchenComposition.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
@@ -24,13 +24,68 @@ const SCENE_COLUMNS = 'id, name, source_kind, extract_status, extract_error, ext
 
 const extOf = (mime: string) => (mime.includes('png') ? 'png' : mime.includes('webp') ? 'webp' : 'jpg');
 
+const MAX_PAGE_BYTES = 4_500_000;
+
+type KitchenRun = { label: string; kind: string; x_mm: number; y_mm: number; rotation_deg: number; width_mm: number; depth_mm: number; height_mm: number; elevation_mm: number; kitchen_layout: KitchenLayout | null };
+
+async function kitchenRunsOf(sb: ReturnType<typeof callerDbClient>, sceneId: string): Promise<KitchenRun[]> {
+  const { data } = await sb.from('floor_plan_objects').select('label, kind, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, kitchen_layout')
+    .eq('floor_plan_id', sceneId).is('removed_at', null);
+  return ((data ?? []) as Array<Record<string, unknown>>).map((o) => ({
+    label: String(o.label), kind: String(o.kind), kitchen_layout: (o.kitchen_layout as KitchenLayout | null) ?? null,
+    x_mm: Number(o.x_mm) || 0, y_mm: Number(o.y_mm) || 0, rotation_deg: Number(o.rotation_deg) || 0, width_mm: Number(o.width_mm) || 0,
+    depth_mm: Number(o.depth_mm) || 0, height_mm: Number(o.height_mm) || 0, elevation_mm: Number(o.elevation_mm) || 0,
+  }));
+}
+
+async function drawingPage(
+  sb: ReturnType<typeof callerDbClient>, workspaceId: string, drawing: string, project: string | undefined, page: number,
+): Promise<{ bytes: Uint8Array; project_id: string; label: string } | { error: string; drawings?: string[] }> {
+  let q = sb.from('project_document_revisions')
+    .select('id, rev_label, storage_bucket, storage_object_path, is_current, project_documents!inner(id, title, drawing_number, project_id, projects!inner(id, name, workspace_id))')
+    .eq('project_documents.projects.workspace_id', workspaceId).not('storage_object_path', 'is', null).limit(200);
+  if (/^[0-9a-f-]{36}$/i.test(drawing.trim())) q = q.eq('id', drawing.trim());
+  const { data, error } = await q;
+  if (error) return { error: error.message };
+  type Rev = { id: string; rev_label: string | null; storage_bucket: string | null; storage_object_path: string; is_current: boolean | null; project_documents: { id: string; title: string | null; drawing_number: string | null; project_id: string; projects: { id: string; name: string } } };
+  let revs = (data ?? []) as unknown as Rev[];
+  if (project) {
+    const p = project.trim().toLowerCase();
+    revs = revs.filter((r) => r.project_documents.project_id === project.trim() || r.project_documents.projects.name.toLowerCase().includes(p));
+  }
+  const needle = drawing.trim().toLowerCase();
+  const label = (r: Rev) => [r.project_documents.drawing_number, r.project_documents.title].filter(Boolean).join(' ') || 'Drawing';
+  const hits = revs.filter((r) => r.id === drawing.trim() || label(r).toLowerCase().includes(needle));
+  const current = hits.filter((r) => r.is_current !== false);
+  const pick = (current.length ? current : hits);
+  if (!pick.length) return { error: `No project drawing called "${drawing}".`, drawings: [...new Set(revs.filter((r) => r.is_current !== false).map(label))].slice(0, 30) };
+  if (new Set(pick.map((r) => r.project_documents.id)).size > 1) return { error: 'More than one drawing matches; name one exactly.', drawings: [...new Set(pick.map(label))].slice(0, 30) };
+  const rev = pick[0];
+  const doc = rev.project_documents;
+  if (rev.storage_bucket !== 'pdf-documents' || rev.storage_object_path.includes('..') || !rev.storage_object_path.startsWith(`project-docs/${doc.project_id}/${doc.id}/`)) {
+    return { error: 'That drawing has no readable file.' };
+  }
+  const { data: file, error: dlErr } = await sb.storage.from('pdf-documents').download(rev.storage_object_path);
+  if (dlErr || !file) return { error: `The drawing could not be read: ${dlErr?.message ?? 'no file'}` };
+  const { PDFDocument } = await import('https://esm.sh/pdf-lib@1.17.1');
+  const src = await PDFDocument.load(new Uint8Array(await file.arrayBuffer()), { ignoreEncryption: true });
+  const count = src.getPageCount();
+  if (page < 1 || page > count) return { error: `The drawing has ${count} ${count === 1 ? 'page' : 'pages'}; pass page 1 to ${count}.` };
+  const one = await PDFDocument.create();
+  const [copied] = await one.copyPages(src, [page - 1]);
+  one.addPage(copied);
+  const bytes = await one.save();
+  if (bytes.byteLength > MAX_PAGE_BYTES) return { error: 'That page is too large to read; export the plan page as an image and attach it instead.' };
+  return { bytes, project_id: doc.project_id, label: `${label(rev)}${count > 1 ? ` p.${page}` : ''}` };
+}
+
 export const createManageScenesTool = (
   userId: string,
   workspaceId: string,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm, style, style_reference_url, drawing, page }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -354,45 +409,106 @@ export const createManageScenesTool = (
       }
     }
 
+    if (action === 'render' || action === 'drawing_set' || action === 'walkthrough_video') {
+      if (!scene_id) return JSON.stringify({ success: false, error: `${action} needs scene_id.` });
+      const { data: scene } = await sb.from('floor_plans').select(`${SCENE_COLUMNS}, project_id`).eq('id', scene_id).maybeSingle();
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      if (action === 'drawing_set' && !scene.project_id) {
+        return JSON.stringify({ success: false, error: 'The drawings are saved on a project and this 3D room is on none. Ask which project, then price_kitchen with project (a kitchen) or attach the room on the project first.' });
+      }
+      let roomId: string | null = null;
+      if (room) {
+        const { data: rooms } = await sb.from('floor_plan_rooms').select('id, name').eq('floor_plan_id', scene_id);
+        const list = (rooms ?? []) as Array<{ id: string; name: string }>;
+        const needle = room.trim().toLowerCase();
+        const hit = list.find((r) => r.name.toLowerCase() === needle) ?? list.find((r) => r.name.toLowerCase().includes(needle));
+        if (!hit) return JSON.stringify({ success: false, error: `No space called "${room}" in this 3D room.`, spaces: list.map((r) => r.name) });
+        roomId = hit.id;
+      }
+      const intent = action === 'render'
+        ? { mode: 'render', object_id: null, room_id: roomId, ...(style ? { style } : {}), ...(style_reference_url ? { style_reference_url } : {}), nonce: Date.now() }
+        : action === 'drawing_set'
+          ? { mode: 'drawings', object_id: null, room_id: null, save: true, nonce: Date.now() }
+          : { mode: 'record_walkthrough', object_id: null, room_id: null, nonce: Date.now() };
+      onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
+      const checks = action === 'drawing_set' ? drawingChecks(await kitchenRunsOf(sb, scene_id)) : [];
+      const failed = checks.filter((c) => !c.ok);
+      return JSON.stringify({
+        success: true, scene_id, mode: intent.mode,
+        ...(action === 'drawing_set' ? { checks, ...(failed.length ? { warning: `The set is saved with ${failed.length} failing ${failed.length === 1 ? 'check' : 'checks'}, printed on sheet 1. Name each failure to the person; the drawings are not ready to build from until they pass.` } : {}) } : {}),
+        message: action === 'render'
+          ? `The room is rendering on the canvas${style ? ` in ${style}` : ''}${roomId ? `, from eye height in ${room}` : ''}; it is charged like a render from the room and arrives in this conversation, where every image tool can take it. Do not call again.`
+          : action === 'drawing_set'
+            ? 'The drawings (plan with wall lengths and areas, plus elevations and the cut list when there is a kitchen) are being saved to the project as one PDF; the link arrives in this conversation. Lay out each kitchen run first if it is not confirmed.'
+            : 'The walkthrough of the real plan is recording on the canvas (free, about half a minute; the tab must stay in front). The video arrives in this conversation and can be shared or fed to the next step.',
+      });
+    }
+
+    if (action === 'renders') {
+      if (!scene_id) return JSON.stringify({ success: false, error: 'renders needs scene_id.' });
+      const { data, error } = await sb.from('scene_renders').select('id, kind, style_label, image_url, vr_world_id, created_at')
+        .eq('floor_plan_id', scene_id).order('created_at', { ascending: false }).limit(20);
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      const renders = (data ?? []) as Array<{ id: string; kind: string; style_label: string | null; image_url: string; vr_world_id: string | null; created_at: string }>;
+      return JSON.stringify({
+        success: true, count: renders.length,
+        renders: renders.map((r) => ({ id: r.id, kind: r.kind, style: r.style_label, image_url: r.image_url, explorable_world: !!r.vr_world_id, created_at: r.created_at })),
+        message: renders.length ? 'Any image_url here can be the source of the next generator (video, staging, lighting, a sheet).' : 'No renders yet; render the room first.',
+      });
+    }
+
     if (action === 'status') {
       if (!scene_id) return JSON.stringify({ success: false, error: 'status needs scene_id.' });
       const { data, error } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
       if (error) return JSON.stringify({ success: false, error: error.message });
       if (!data) return JSON.stringify({ success: false, error: 'Scene not found.' });
-      const { data: objs } = await sb.from('floor_plan_objects').select('label, kind, width_mm, height_mm, elevation_mm, kitchen_layout')
-        .eq('floor_plan_id', scene_id).is('removed_at', null);
-      const list = (objs ?? []) as Array<{ label: string; kind: string; width_mm: number; height_mm: number; elevation_mm: number; kitchen_layout: KitchenLayout & { source?: string; confirmed?: boolean } | null }>;
+      const list = await kitchenRunsOf(sb, scene_id);
+      const checks = drawingChecks(list);
+      const failed = checks.filter((c) => !c.ok);
       const kitchen_runs = list.filter((o) => KITCHEN_KINDS.has(o.kind)).map((o) => ({
         run: o.label, kind: o.kind,
         length_cm: Math.round(Number(o.width_mm) / 10), height_cm: Math.round(Number(o.height_mm) / 10), above_floor_cm: Math.round(Number(o.elevation_mm) / 10),
-        units: (o.kitchen_layout?.modules ?? []).map((m) => `${MODULE_LABELS[m.type] ?? m.type} ${Math.round(m.width_mm / 10)} cm`),
+        units: runModulesOf(o).filter((m) => m.type !== 'gap').map((m) => `${MODULE_LABELS[m.type] ?? m.type} ${unitStated(o.kitchen_layout, m) ? '' : '≈'}${Math.round(m.width_mm / 10)} cm`),
         units_from: o.kitchen_layout ? (o.kitchen_layout.source === 'read' && !o.kitchen_layout.confirmed ? 'read from the drawing, not confirmed' : 'laid out') : 'none: automatic layout until set',
       }));
       const scene = { ...data, object_count: list.length };
       onChunk?.({ type: 'scene_studio_scene', scene, timestamp: Date.now() });
       return JSON.stringify({
-        success: true, scene, kitchen_runs,
+        success: true, scene, kitchen_runs, checks,
         ...(kitchen_runs.length && data.extract_status === 'ready'
-          ? { message: 'Show the person each run as read and the assumptions in extract_notes, ask about anything that does not add up, then layout each run with the confirmed units before opening drawings.' }
+          ? { message: `Show the person each run as read (≈ marks a width that was not printed) and the assumptions in extract_notes, ask about anything that does not add up, then layout each run with the confirmed units before opening drawings.${failed.length ? ` ${failed.length} drawing ${failed.length === 1 ? 'check fails' : 'checks fail'}: name each one; never call the drawings finished while one fails.` : ''}` }
           : {}),
       });
     }
 
-    if (!image_url) return JSON.stringify({ success: false, error: 'create needs image_url: an image the user attached or a render from this conversation.' });
     let image: { bytes: Uint8Array; mimeType: string };
-    try {
-      image = await fetchImageGuarded(image_url);
-    } catch (e) {
-      return JSON.stringify({ success: false, error: `The image could not be fetched: ${e instanceof Error ? e.message : String(e)}` });
+    let sourceKind: string = kind;
+    let projectId: string | null = null;
+    let sourceLabel = name ?? '';
+    if (drawing) {
+      const picked = await drawingPage(sb, workspaceId, drawing, project, page ?? 1);
+      if ('error' in picked) return JSON.stringify({ success: false, ...picked });
+      image = { bytes: picked.bytes, mimeType: 'application/pdf' };
+      sourceKind = 'plan_image';
+      projectId = picked.project_id;
+      sourceLabel ||= picked.label;
+    } else {
+      if (!image_url) return JSON.stringify({ success: false, error: 'create needs image_url (an image the user attached or a render from this conversation) or drawing (a project drawing).' });
+      try {
+        image = await fetchImageGuarded(image_url);
+      } catch (e) {
+        return JSON.stringify({ success: false, error: `The image could not be fetched: ${e instanceof Error ? e.message : String(e)}` });
+      }
     }
     const { data: created, error: createErr } = await sb.from('floor_plans')
-      .insert({ workspace_id: workspaceId, name: (name ?? '').trim().slice(0, 200) || '3D room from chat', source_kind: kind })
+      .insert({ workspace_id: workspaceId, name: sourceLabel.trim().slice(0, 200) || '3D room from chat', source_kind: sourceKind, ...(projectId ? { project_id: projectId } : {}) })
       .select('id, workspace_id, name').single();
     if (createErr || !created) return JSON.stringify({ success: false, error: createErr?.message ?? 'The scene could not be created.' });
 
-    const path = `scene-studio/${created.workspace_id}/${created.id}/source.${extOf(image.mimeType)}`;
+    const isPdf = image.mimeType === 'application/pdf';
+    const path = `scene-studio/${created.workspace_id}/${created.id}/source.${isPdf ? 'pdf' : extOf(image.mimeType)}`;
     const admin = serviceClient();
-    const { error: upErr } = await admin.storage.from(BUCKET).upload(path, image.bytes, { contentType: image.mimeType, upsert: false });
+    const { error: upErr } = await admin.storage.from(isPdf ? 'pdf-documents' : BUCKET).upload(path, image.bytes, { contentType: image.mimeType, upsert: false });
     if (upErr) return JSON.stringify({ success: false, error: `Upload failed: ${upErr.message}` });
     const { error: pathErr } = await sb.from('floor_plans').update({ source_storage_path: path }).eq('id', created.id);
     if (pathErr) return JSON.stringify({ success: false, error: pathErr.message });
@@ -403,7 +519,7 @@ export const createManageScenesTool = (
       body: JSON.stringify({ floor_plan_id: created.id }),
     });
     const body = await res.json().catch(() => ({})) as { error?: string };
-    const scene = { id: created.id, name: created.name, source_kind: kind, extract_status: res.ok ? 'extracting' : 'failed' };
+    const scene = { id: created.id, name: created.name, source_kind: sourceKind, extract_status: res.ok ? 'extracting' : 'failed' };
     onChunk?.({ type: 'scene_studio_scene', scene, timestamp: Date.now() });
     if (!res.ok) {
       return JSON.stringify({ success: false, scene, error: body.error ?? `The image could not be sent for reading (HTTP ${res.status}).` });
@@ -420,7 +536,12 @@ export const createManageScenesTool = (
       + 'rearranges it, recolours or swaps products, and renders it photo-real in any style. '
       + 'create: reads image_url (an image the user attached, or a render from this conversation) as kind '
       + 'plan_image (a floor plan, or a kitchen sketch or elevation with printed sizes, hand-drawn or CAD), photo (a photo of a room) or render (a generated image); it is '
-      + 'charged once and takes about a minute. status: one scene by scene_id, with each kitchen run and the units read for it. list: the workspace\'s scenes. '
+      + 'charged once and takes about a minute. create with drawing (a project drawing by number, title or revision id, + page, + project when names repeat) reads one page of that '
+      + 'project PDF as a plan and puts the room on the project. status: one scene by scene_id, with each kitchen run and the units read for it. list: the workspace\'s scenes. '
+      + 'render: renders the room photo-real on the canvas in style (a style name or free words) or after style_reference_url, from the saved view or from eye height in room; '
+      + 'the render arrives in the conversation and every image tool can take it. renders: the room\'s stored renders with their URLs. '
+      + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations and cut list for a kitchen) to the project as a PDF sheet for the client view and deck. '
+      + 'walkthrough_video: records the walkthrough of the real plan as a video, free; it arrives in the conversation. '
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
       + 'create kind plan_image, status until ready, show the person the runs and units read and ask about anything that does not add up, '
       + 'layout each run with the confirmed units, then open mode drawings. '
@@ -436,21 +557,21 @@ export const createManageScenesTool = (
       + 'price_line: prices the kitchen from a supplier ready-made cabinet line (line + series): every unit matched to a cabinet code, units with no code listed. '
       + 'cut_list: the board areas (carcass, fronts, back, plinth, m²), edge tape (m) and hardware the priced kitchen needs; price_kitchen first. '
       + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
-      + 'Rendering and editing happen in the room on the canvas; each render returns to the conversation.',
+      + 'Every render, drawing set and video returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'walkthrough_video']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows; a dimensioned sketch or elevation is plan_image.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),
       mode: z.enum(['view', 'walk', 'make_3d', 'photo_walk', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
-      room: z.string().max(120).optional().describe('open/finish: the space, by name (e.g. living room).'),
+      room: z.string().max(120).optional().describe('open/finish/render: the space, by name (e.g. living room).'),
       area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
       part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),
       product: z.string().max(200).optional().describe('finish: the catalogue product to lay, by exact name or id.'),
       colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
-      project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet.'),
+      project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet; create with drawing: the project the drawing is on.'),
       fronts: z.enum(['closed', 'half', 'open']).optional().describe('open: show the kitchen doors and drawers closed, half open or open.'),
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
       units: z.array(z.object({ type: z.enum(KITCHEN_MODULE_TYPES), width_cm: z.number() })).optional().describe('layout: the units of the run left to right; omit for an automatic layout.'),
@@ -461,6 +582,10 @@ export const createManageScenesTool = (
       line: z.string().max(200).optional().describe('price_line: the ready-made cabinet line, by name (e.g. Trend Line).'),
       series: z.string().max(120).optional().describe('price_line: the front series of that line (e.g. BONO).'),
       sun_hour: z.number().min(6).max(20).optional().describe('open: light the room by the sun at this hour of the day (6 to 20).'),
+      style: z.string().max(200).optional().describe('render: the style, by name (e.g. Japandi) or in a few words.'),
+      style_reference_url: z.string().url().optional().describe('render: an image whose look the render follows, instead of a style name.'),
+      drawing: z.string().max(200).optional().describe('create: a project drawing (number, title or revision id) to read instead of image_url.'),
+      page: z.number().int().min(1).max(500).optional().describe('create with drawing: which page holds the plan (default 1).'),
       blueprint: z.string().max(200).optional().describe('price_kitchen: the kitchen blueprint to price with, by name: New Kitchen From Boards prices from the boards, New Kitchen per running metre; default the first one listed.'),
     }),
   },

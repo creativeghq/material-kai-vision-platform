@@ -109,6 +109,13 @@ const SHEET_TYPE_META: Record<SheetType, SheetTypeMeta> = {
     ],
     bestFor: 'The scope section of a proposal, and the programme a client refers back to once work starts.',
   },
+  drawing_set: {
+    icon: Ruler,
+    what: 'The drawings of a 3D room: the floor plan with every wall length, room areas and the furniture, and for a kitchen an elevation per wall and the cut list.',
+    produces: 'An A4 landscape PDF, one page per sheet, saved on the project. It is drawn from the same geometry as the 3D room and the price, never from an image.',
+    inputs: ['A 3D room on a project', 'For a kitchen: each run laid out with its units'],
+    bestFor: 'What the builder, carpenter or client works from, and the drawing pages of a client view or deck.',
+  },
   room_view: {
     icon: Grid3x3,
     what: 'Your moodboard products laid on a room photo at their real format — the floor in one product, the wall in another — with the pattern and joint you chose, and a numbered pin on each surface.',

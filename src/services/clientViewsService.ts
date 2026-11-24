@@ -219,8 +219,8 @@ class ClientViewsService {
     if (error) throw error;
   }
 
-  /** Completed 3D worlds the current user can embed (for the VR picker). */
-  async listVrWorlds(): Promise<{ id: string; display_name: string | null; thumbnail_url: string | null }[]> {
+  /** Completed 3D worlds the current user can embed; those made from a 3D room of `projectId` come first, named after the room. */
+  async listVrWorlds(projectId?: string): Promise<{ id: string; display_name: string | null; thumbnail_url: string | null; from_project_room: boolean }[]> {
     const { data, error } = await supabase
       .from('vr_worlds')
       .select('id, display_name, thumbnail_url, status, created_at')
@@ -228,7 +228,17 @@ class ClientViewsService {
       .order('created_at', { ascending: false })
       .limit(50);
     if (error) return [];
-    return (data || []).map((w: any) => ({ id: w.id, display_name: w.display_name, thumbnail_url: w.thumbnail_url }));
+    const rooms = new Map<string, string>();
+    if (projectId) {
+      const { data: links } = await supabase.from('scene_renders').select('vr_world_id, floor_plans!inner(name, project_id)')
+        .eq('floor_plans.project_id', projectId).not('vr_world_id', 'is', null);
+      for (const l of (links ?? []) as unknown as Array<{ vr_world_id: string; floor_plans: { name: string } }>) rooms.set(l.vr_world_id, l.floor_plans.name);
+    }
+    const worlds = (data || []).map((w: any) => ({
+      id: w.id as string, thumbnail_url: w.thumbnail_url as string | null, from_project_room: rooms.has(w.id),
+      display_name: rooms.has(w.id) ? `${rooms.get(w.id)} — photo-real walk` : (w.display_name as string | null),
+    }));
+    return [...worlds.filter((w) => w.from_project_room), ...worlds.filter((w) => !w.from_project_room)];
   }
 
   async listFeedback(id: string): Promise<ClientViewFeedback[]> {
