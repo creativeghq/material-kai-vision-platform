@@ -1,5 +1,5 @@
 /** The client's scroll walkthrough (#539, #604 phase 8): the real plan, its rooms and units, ending on the render from its own camera. */
-import React, { Suspense, lazy, useEffect, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
 import { planBounds, planFrame, pointInPolygon, polygonCentroid, toScene, type PlanOpening, type PlanRoom, type PlanWall } from '@/lib/scene/sceneGeometry';
 import { walkthroughFrame, type Pose, type WalkRoom } from '@/lib/scene/walkthroughTimeline';
@@ -15,7 +15,7 @@ export interface WalkthroughPayload {
   rooms: Array<PlanRoom & { walk_order?: number | null }>;
   walls: PlanWall[];
   openings: PlanOpening[];
-  objects: SceneObject[];
+  objects: Array<SceneObject & { model_url?: string | null }>;
   surfaces: SceneSurface[];
   finishes: SceneObjectFinish[];
   products: Record<string, SceneProduct>;
@@ -34,7 +34,7 @@ export function walkPlanOf(ordered: PlanRoom[], walls: PlanWall[], objects: Scen
     const focus = inside.length
       ? toScene(inside.reduce((s, o) => s + o.x_mm, 0) / inside.length, inside.reduce((s, o) => s + o.y_mm, 0) / inside.length, f)
       : null;
-    return { centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus };
+    return { centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus, corners: r.outline.map((p) => toScene(p[0], p[1], f)) };
   });
   return { span: Math.max((b.maxX - b.minX) / 1000, (b.maxY - b.minY) / 1000, 2), walk };
 }
@@ -56,6 +56,19 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
   const { span, walk } = useMemo(() => walkPlanOf(ordered, data.walls, data.objects), [ordered, data.walls, data.objects]);
   const finalPose = data.render?.camera ?? null;
   const names = ordered.map((r) => r.name);
+  const modelUrls = useMemo(() => Object.fromEntries(data.objects.filter((o) => o.model_url).map((o) => [o.id, o.model_url as string])), [data.objects]);
+
+  useLayoutEffect(() => {
+    const el = section.current;
+    if (!el?.parentElement) return;
+    const fit = () => {
+      el.style.width = `${document.documentElement.clientWidth}px`;
+      el.style.marginLeft = `${-el.parentElement!.getBoundingClientRect().left}px`;
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [reduced, canRender]);
 
   useEffect(() => {
     if (reduced || !canRender) return;
@@ -110,6 +123,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
             onRemoveObject={noop}
             onPaint={noop}
             cabinetHardware={data.cabinet_hardware}
+            modelUrls={modelUrls}
             script={script}
           />
         </Suspense>

@@ -54,4 +54,13 @@ describe('walkthroughFrame', () => {
     expect(a.position[2]).toBeGreaterThan(0);
     expect(a.target).toEqual([0, 1, -1.5]);
   });
+
+  it('with the outline known, shoots from the corner farthest from the furniture, looking across the room', () => {
+    const room: WalkRoom = { centre: [0, 0], far: [2, 2], focus: [1, -1], corners: [[-2, -2], [2, -2], [2, 2], [-2, 2]] };
+    const [a, b] = roomPoses(room);
+    expect(a.position[0]).toBeLessThan(-1.4);
+    expect(a.position[2]).toBeGreaterThan(1.4);
+    expect(a.target).toEqual([1, 1.1, -1]);
+    expect(Math.hypot(b.position[0] - 1, b.position[2] + 1)).toBeLessThan(Math.hypot(a.position[0] - 1, a.position[2] + 1));
+  });
 });

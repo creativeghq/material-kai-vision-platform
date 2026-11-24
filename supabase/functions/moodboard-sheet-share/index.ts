@@ -422,7 +422,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           supabase.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm, height_mm').eq('floor_plan_id', fp),
           supabase.from('floor_plan_openings').select('id, wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', fp),
           supabase.from('floor_plan_objects')
-            .select('id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, colour_hex, kitchen_layout')
+            .select('id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, colour_hex, kitchen_layout, model_status, model_storage_path')
             .eq('floor_plan_id', fp).is('removed_at', null),
           supabase.from('floor_plan_surfaces')
             .select('id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex')
@@ -442,6 +442,10 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
             .in('id', productIds);
           const FORMAT_ATTRS = ['width_mm', 'length_mm', 'roll_width_mm', 'roll_length_m', 'plank_width_mm', 'plank_length_mm', 'slab_size'];
           const FORMAT_META = [...FORMAT_ATTRS, 'dimensions', 'available_sizes', 'dimensions_cm_from_vision', 'decor_repeat_mm'];
+          const colourOptionsOf = (meta: unknown) => {
+            const raw = (meta as { colour_options?: unknown } | null)?.colour_options;
+            return Array.isArray(raw) ? raw.map((o: any) => ({ hex: o?.hex ?? null, name: o?.name ?? null, swatch_url: o?.swatch_url ?? null })) : [];
+          };
           const pick = (src: unknown, keys: string[]) => {
             const o = (src && typeof src === 'object' ? src : {}) as Record<string, unknown>;
             return Object.fromEntries(keys.filter((k) => o[k] != null).map((k) => [k, o[k]]));
@@ -456,7 +460,8 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
             products[p.id] = {
               id: p.id, name: p.name, imageUrl: imgs[0] ?? null,
               albedoUrl: url(m?.albedo_path), normalUrl: url(m?.normal_path), roughnessUrl: url(m?.roughness_path),
-              attributes: pick(p.attributes, FORMAT_ATTRS), metadata: pick(p.metadata, FORMAT_META),
+              attributes: pick(p.attributes, FORMAT_ATTRS),
+              metadata: { ...pick(p.metadata, FORMAT_META), colour_options: colourOptionsOf(p.metadata) },
             };
           }
         }
@@ -468,7 +473,11 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           rooms: rooms.data ?? [],
           walls: walls.data ?? [],
           openings: openings.data ?? [],
-          objects: ((objects.data ?? []) as any[]).map((o) => ({ ...o, product_id: o.product_id && products[o.product_id] ? o.product_id : null })),
+          objects: ((objects.data ?? []) as any[]).map(({ model_status, model_storage_path, ...o }) => ({
+            ...o,
+            product_id: o.product_id && products[o.product_id] ? o.product_id : null,
+            model_url: model_status === 'ready' && model_storage_path ? supabase.storage.from('generation-images').getPublicUrl(model_storage_path).data.publicUrl : null,
+          })),
           surfaces: surfaces.data ?? [],
           finishes: finishes.data ?? [],
           products,

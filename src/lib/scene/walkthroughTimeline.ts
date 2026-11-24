@@ -1,6 +1,6 @@
 export type V3 = [number, number, number];
 export interface Pose { position: V3; target: V3; fov: number }
-export interface WalkRoom { centre: [number, number]; far: [number, number]; focus?: [number, number] | null }
+export interface WalkRoom { centre: [number, number]; far: [number, number]; focus?: [number, number] | null; corners?: Array<[number, number]> }
 export interface WalkFrame { pose: Pose; walls: number; objects: number; dip: number; render: number; room: number }
 
 const EYE = 1.6;
@@ -11,7 +11,22 @@ const mix = (a: number, b: number, t: number) => a + (b - a) * t;
 const mixV = (a: V3, b: V3, t: number): V3 => [mix(a[0], b[0], t), mix(a[1], b[1], t), mix(a[2], b[2], t)];
 const mixPose = (a: Pose, b: Pose, t: number): Pose => ({ position: mixV(a.position, b.position, t), target: mixV(a.target, b.target, t), fov: mix(a.fov, b.fov, t) });
 
+function cornerPoses(r: WalkRoom, corners: Array<[number, number]>): [Pose, Pose] {
+  const [cx, cz] = r.centre;
+  const [tx, tz] = r.focus ?? r.centre;
+  const [kx, kz] = corners.reduce((best, c) => (Math.hypot(c[0] - tx, c[1] - tz) > Math.hypot(best[0] - tx, best[1] - tz) ? c : best), corners[0]);
+  const inset = Math.min(0.45, Math.hypot(cx - kx, cz - kz) * 0.3) / Math.max(1e-6, Math.hypot(cx - kx, cz - kz));
+  const sx = kx + (cx - kx) * inset;
+  const sz = kz + (cz - kz) * inset;
+  const target: V3 = [tx, 1.1, tz];
+  return [
+    { position: [sx, EYE, sz], target, fov: 64 },
+    { position: [sx + (tx - sx) * 0.18, EYE, sz + (tz - sz) * 0.18], target, fov: 64 },
+  ];
+}
+
 export function roomPoses(r: WalkRoom): [Pose, Pose] {
+  if (r.corners && r.corners.length >= 3) return cornerPoses(r, r.corners);
   const [cx, cz] = r.centre;
   const reach = Math.hypot(r.far[0] - cx, r.far[1] - cz);
   if (r.focus && Math.hypot(r.focus[0] - cx, r.focus[1] - cz) > 0.15) {
