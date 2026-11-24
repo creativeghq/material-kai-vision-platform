@@ -430,7 +430,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
             .select('id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex')
             .eq('floor_plan_id', fp),
           supabase.from('floor_plan_object_finishes').select('id, object_id, slot, product_id, colour_hex').eq('floor_plan_id', fp),
-          supabase.from('scene_renders').select('image_url, camera, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(1),
+          supabase.from('scene_renders').select('image_url, camera, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(24),
         ]);
         const productIds = [...new Set([
           ...((objects.data ?? []) as any[]).map((o) => o.product_id),
@@ -484,6 +484,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           finishes: finishes.data ?? [],
           products,
           render: render ? { image_url: render.image_url, camera: render.camera } : null,
+          renders: ((renders.data ?? []) as any[]).map((r) => ({ image_url: r.image_url, camera: r.camera })),
         };
       }
     }

@@ -1,7 +1,7 @@
 export type V3 = [number, number, number];
 export interface Pose { position: V3; target: V3; fov: number }
-export interface WalkRoom { centre: [number, number]; far: [number, number]; focus?: [number, number] | null; corners?: Array<[number, number]> }
-export interface WalkFrame { pose: Pose; walls: number; objects: number; dip: number; render: number; room: number }
+export interface WalkRoom { centre: [number, number]; far: [number, number]; focus?: [number, number] | null; corners?: Array<[number, number]>; shot?: Pose | null }
+export interface WalkFrame { pose: Pose; walls: number; objects: number; dip: number; render: number; room: number; shot: number }
 
 const EYE = 1.6;
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t));
@@ -26,6 +26,11 @@ function cornerPoses(r: WalkRoom, corners: Array<[number, number]>): [Pose, Pose
 }
 
 export function roomPoses(r: WalkRoom): [Pose, Pose] {
+  if (r.shot) {
+    const { position: [px, py, pz], target: [tx, , tz] } = r.shot;
+    const len = Math.max(1e-6, Math.hypot(tx - px, tz - pz));
+    return [{ position: [px - ((tx - px) / len) * 0.5, py, pz - ((tz - pz) / len) * 0.5], target: r.shot.target, fov: r.shot.fov + 6 }, r.shot];
+  }
   if (r.corners && r.corners.length >= 3) return cornerPoses(r, r.corners);
   const [cx, cz] = r.centre;
   const reach = Math.hypot(r.far[0] - cx, r.far[1] - cz);
@@ -51,6 +56,12 @@ export function roomPoses(r: WalkRoom): [Pose, Pose] {
   ];
 }
 
+export function fitFov(fov: number, aspect: number, designAspect = 1.5): number {
+  if (aspect >= designAspect) return fov;
+  const half = Math.atan(Math.tan((fov * Math.PI) / 360) * designAspect / Math.max(0.2, aspect));
+  return Math.min(110, (half * 360) / Math.PI);
+}
+
 export function walkthroughFrame(p: number, span: number, rooms: WalkRoom[], finalPose: Pose | null): WalkFrame {
   const top: Pose = { position: [0, span * 1.7, 0.001], target: [0, 0, 0], fov: 42 };
   const three: Pose = { position: [span * 0.85, span * 0.95, span * 0.95], target: [0, 0.3, 0], fov: 45 };
@@ -60,7 +71,7 @@ export function walkthroughFrame(p: number, span: number, rooms: WalkRoom[], fin
   if (p < 0.35 || !rooms.length) {
     const t = rooms.length ? span01(p, 0.12, 0.35) : span01(p, 0.12, 0.9);
     const pose = mixPose(top, rooms.length ? three : end, t);
-    return { pose, walls, objects, dip: 0, render: rooms.length ? 0 : span01(p, 0.9, 1), room: -1 };
+    return { pose, walls, objects, dip: 0, render: rooms.length ? 0 : span01(p, 0.9, 1), room: -1, shot: 0 };
   }
   if (p < 0.85) {
     const per = 0.5 / rooms.length;
@@ -68,8 +79,10 @@ export function walkthroughFrame(p: number, span: number, rooms: WalkRoom[], fin
     const local = (p - 0.35 - i * per) / per;
     const [a, b] = roomPoses(rooms[i]);
     const dip = local < 0.15 ? 1 - local / 0.15 : local > 0.9 ? (local - 0.9) / 0.1 : 0;
-    return { pose: mixPose(a, b, ease(local)), walls: 1, objects: 1, dip: clamp01(dip), room: i, render: 0 };
+    const shot = rooms[i].shot ? span01(local, 0.5, 0.68) : 0;
+    const pose = mixPose(a, b, rooms[i].shot ? ease(local / 0.5) : ease(local));
+    return { pose, walls: 1, objects: 1, dip: clamp01(dip), room: i, render: 0, shot };
   }
   const t = (p - 0.85) / 0.15;
-  return { pose: end, walls: 1, objects: 1, dip: clamp01(1 - t / 0.25), room: rooms.length, render: span01(p, 0.9, 1) };
+  return { pose: end, walls: 1, objects: 1, dip: clamp01(1 - t / 0.25), room: rooms.length, render: finalPose ? span01(p, 0.9, 1) : 0, shot: 0 };
 }

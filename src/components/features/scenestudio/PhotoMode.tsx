@@ -174,7 +174,8 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
   }, [scene, gl, sky, tracer, depthOnly, denoise]);
 
   useFrame(({ clock }) => {
-    gl.toneMappingExposure = camera.position.y < ceilingHeight ? 2.3 : 0.85;
+    const tracing = !(tracer as unknown as { isCompiling: boolean }).isCompiling && tracer.samples >= 1;
+    gl.toneMappingExposure = !tracing ? 1 : camera.position.y < ceilingHeight ? 2.3 : 0.85;
     const sig = sceneSignature(scene);
     const now = clock.elapsedTime;
     if (sig !== built.current) {

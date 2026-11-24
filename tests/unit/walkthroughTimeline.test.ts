@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { roomPoses, walkthroughFrame, type Pose, type WalkRoom } from '../../src/lib/scene/walkthroughTimeline';
+import { fitFov, roomPoses, walkthroughFrame, type Pose, type WalkRoom } from '../../src/lib/scene/walkthroughTimeline';
 
 const rooms: WalkRoom[] = [{ centre: [-1, 0], far: [-3, -2] }, { centre: [2, 1], far: [4, 3] }];
 const render: Pose = { position: [3, 1.4, 4], target: [0, 1, 0], fov: 55 };
@@ -62,5 +62,36 @@ describe('walkthroughFrame', () => {
     expect(a.position[2]).toBeGreaterThan(1.4);
     expect(a.target).toEqual([1, 1.1, -1]);
     expect(Math.hypot(b.position[0] - 1, b.position[2] + 1)).toBeLessThan(Math.hypot(a.position[0] - 1, a.position[2] + 1));
+  });
+
+  it('a room with its own render arrives on that render camera and crossfades into the photo', () => {
+    const shot: Pose = { position: [-1, 1.5, 1], target: [-2, 1, -1], fov: 60 };
+    const withShot: WalkRoom[] = [{ ...rooms[0], shot }, rooms[1]];
+    const late = walkthroughFrame(0.35 + 0.25 * 0.8, 6, withShot, null);
+    expect(late.room).toBe(0);
+    expect(late.pose).toEqual(shot);
+    expect(late.shot).toBe(1);
+    expect(walkthroughFrame(0.35 + 0.25 * 0.2, 6, withShot, null).shot).toBe(0);
+    expect(walkthroughFrame(0.75, 6, withShot, null).shot).toBe(0);
+  });
+
+  it('with no final render, ends on the whole home and shows no photo', () => {
+    const f = walkthroughFrame(1, 6, rooms, null);
+    expect(f.render).toBe(0);
+    expect(f.pose.position[1]).toBeGreaterThan(3);
+  });
+});
+
+describe('fitFov', () => {
+  it('keeps the field of view on a landscape screen', () => {
+    expect(fitFov(60, 1.78)).toBe(60);
+  });
+
+  it('widens it on a portrait phone so the room is not cropped to a sliver', () => {
+    const v = fitFov(60, 390 / 844);
+    expect(v).toBeGreaterThan(95);
+    const h = (a: number, fov: number) => 2 * Math.atan(Math.tan((fov * Math.PI) / 360) * a);
+    expect(h(390 / 844, v)).toBeGreaterThan(h(1.5, 60) * 0.8);
+    expect(h(390 / 844, 60)).toBeLessThan(h(1.5, 60) * 0.5);
   });
 });
