@@ -33,8 +33,8 @@ const Sheet: React.FC<SheetProps> = ({ title, company, project, sheet, index, to
         <line x1={0} y1={8} x2={110} y2={8} stroke={INK} strokeWidth={0.25} />
         <line x1={70} y1={8} x2={70} y2={BLOCK_H} stroke={INK} strokeWidth={0.25} />
         <text x={2} y={5.6} fontSize={3.6} fontWeight={700}>{title}</text>
-        <text x={2} y={13} fontSize={3}>{sheet}</text>
-        <text x={2} y={19} fontSize={2.4} fill={FAINT}>{company ? `${project} · ${company}` : project}</text>
+        <text x={2} y={13} fontSize={3}>{clip(sheet, 40)}</text>
+        <text x={2} y={19} fontSize={2.4} fill={FAINT}>{clip(company ? `${project} · ${company}` : project, 50)}</text>
         <text x={72} y={13} fontSize={2.4}>Sheet {index} of {total}</text>
         <text x={72} y={17} fontSize={2.4}>{todayLocalISO()}</text>
         <text x={72} y={21} fontSize={2.2} fill={FAINT}>{scaleNote}</text>
@@ -44,6 +44,8 @@ const Sheet: React.FC<SheetProps> = ({ title, company, project, sheet, index, to
 );
 
 /** Fits a drawing of `w × h` mm into the sheet's drawing area; returns the scale and the offset. */
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
 function fit(w: number, h: number, side = 0) {
   const areaW = SHEET_W - 2 * MARGIN - side;
   const areaH = SHEET_H - 2 * MARGIN - BLOCK_H - 4;
@@ -304,12 +306,17 @@ const ServiceLegend: React.FC = () => {
     { id: 'stated', node: <text y={2.2} fontSize={2.4} fill={STATED}>110</text>, label: 'Set by a Person' },
     { id: 'assumed', node: <text y={2.2} fontSize={2.4} fill={FAINT} fontStyle="italic">≈110</text>, label: 'Trade Default' },
   ];
+  const maxX = SHEET_W - MARGIN - SIDE_W - 4;
+  let row = 0;
   return (
     <g fontFamily="Arial, sans-serif" fontSize={2.1} fill={INK}>
       {items.map((it) => {
+        const lead = it.id === 'assumed' ? 7.5 : it.id === 'stated' ? 6 : 4;
+        const w = lead + it.label.length * 1.05 + 6;
+        if (x + w > maxX && x > MARGIN) { x = MARGIN; row += 1; }
         const at = x;
-        x += it.label.length * 1.05 + 12;
-        return <g key={it.id} transform={`translate(${at}, ${MARGIN - 1.5})`}>{it.node}<text x={it.id === 'assumed' ? 7.5 : 4} y={2.1}>{it.label}</text></g>;
+        x += w;
+        return <g key={it.id} transform={`translate(${at}, ${MARGIN - 1.5 + row * 4.5})`}>{it.node}<text x={lead} y={2.1}>{it.label}</text></g>;
       })}
     </g>
   );
