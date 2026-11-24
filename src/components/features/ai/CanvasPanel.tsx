@@ -287,6 +287,7 @@ export const ArtifactModal: React.FC<ArtifactModalProps> = ({
            * scrolling — but a small one is now the size of the thing in it.
            */
           'flex max-h-[92dvh] w-[96vw] max-w-5xl flex-col gap-0 overflow-hidden p-0',
+          active?.kind === 'scene' && 'max-w-7xl',
           // Full-bleed SHEET on a phone — a FIXED height here, unlike the desktop cap above.
           // DialogContent centres itself (`top-1/2` + `-translate-y-1/2`), so content-sized +
           // full-width + square corners made a small result a band floating across the middle of

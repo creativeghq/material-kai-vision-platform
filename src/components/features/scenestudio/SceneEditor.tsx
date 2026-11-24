@@ -29,7 +29,7 @@ import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
 import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
 import { KitchenRunEditor } from '@/components/features/scenestudio/KitchenRunEditor';
 import { KitchenDrawingsDialog, type DrawingSetSaved } from '@/components/features/scenestudio/KitchenDrawingsDialog';
-import { RenderMaterials, renderMaterialRows } from '@/components/features/scenestudio/RenderMaterials';
+import { MaterialsPanel, renderMaterialRows } from '@/components/features/scenestudio/RenderMaterials';
 import type { WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
 import type { Pose } from '@/lib/scene/walkthroughTimeline';
 import { ReadyMadeLinePrice } from '@/components/features/scenestudio/ReadyMadeLinePrice';
@@ -1121,6 +1121,37 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     </Card>
   );
 
+  const viewingRender = showRender && activeRender ? activeRender : null;
+  const editing = !viewingRender && ((!!selected && !selected.removed_at) || tool === 'paint');
+  const materialRows = renderMaterialRows(objects, finishes, surfaces, products, data.rooms);
+  const pickSurface = () => { setShowRender(false); setSelectedId(null); setTool('paint'); };
+  const materialsPanel = viewingRender ? (
+    <MaterialsPanel
+      title={viewingRender.style_label ?? 'Render'}
+      subtitle="What this render is made of"
+      plan={viewingRender.colour_plan ?? []}
+      rows={materialRows}
+      onPickObject={(id) => { setShowRender(false); setSelectedId(id); }}
+      onPickSurface={pickSurface}
+      actions={(
+        <>
+          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowRender(false)}><Layers className="h-3.5 w-3.5" />Back to 3D</Button>
+          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.setPose(viewingRender.camera as unknown as Parameters<SceneCanvasHandle['setPose']>[0]); }}><Eye className="h-3.5 w-3.5" />Edit from this view</Button>
+          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setAreaEditing(true)}><Paintbrush className="h-3.5 w-3.5" />Change an area</Button>
+          {onWalkThrough && (
+          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(viewingRender.image_url, `${scene.name}${viewingRender.style_label ? ` — ${viewingRender.style_label}` : ''}`, viewingRender.id)}>
+          <Footprints className="h-3.5 w-3.5" />Walk through ({VR_CREDIT_COSTS['marble-1.1']} credits)
+          </Button>
+          )}
+          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setDrawingsOpen(true)}><FileText className="h-3.5 w-3.5" />Drawings</Button>
+          <a className="px-2 py-1.5 text-xs text-muted-foreground underline" href={viewingRender.image_url} target="_blank" rel="noreferrer">Full size</a>
+        </>
+      )}
+    />
+  ) : (
+    <MaterialsPanel title="Materials" subtitle="What this room is made of. Click one to change it." rows={materialRows} onPickObject={setSelectedId} onPickSurface={pickSurface} />
+  );
+
   return (
     <PinnedProductsContext.Provider value={pinned}>
       <KitchenDrawingsDialog
@@ -1151,7 +1182,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
           )}
         </DialogContent>
       </Dialog>
-      <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-3">
         <div className="relative h-[64vh] min-h-[440px] overflow-hidden rounded-md border border-hairline bg-surface-sunken">
           {reading ? (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-4 text-center text-sm text-muted-foreground">
@@ -1290,29 +1322,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
           )}
 
           {showRender && activeRender && (
-            <div className="absolute inset-0 flex flex-col bg-background md:flex-row">
-              <div className="min-h-0 min-w-0 flex-1">
-                <img src={activeRender.image_url} alt={activeRender.style_label ?? 'Render'} className="h-full w-full object-contain" />
-              </div>
-              <RenderMaterials
-                render={activeRender}
-                rows={renderMaterialRows(objects, finishes, surfaces, products, (roomId) => data.rooms.find((r) => r.id === roomId)?.name ?? 'Room')}
-                actions={(
-                  <>
-
-                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowRender(false)}><Layers className="h-3.5 w-3.5" />Back to 3D</Button>
-                <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.setPose(activeRender.camera as unknown as Parameters<SceneCanvasHandle['setPose']>[0]); }}><Eye className="h-3.5 w-3.5" />Edit from this view</Button>
-                <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setAreaEditing(true)}><Paintbrush className="h-3.5 w-3.5" />Change an area</Button>
-                {onWalkThrough && (
-                  <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(activeRender.image_url, `${scene.name}${activeRender.style_label ? ` — ${activeRender.style_label}` : ''}`, activeRender.id)}>
-                    <Footprints className="h-3.5 w-3.5" />Walk through ({VR_CREDIT_COSTS['marble-1.1']} credits)
-                  </Button>
-                )}
-                    <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setDrawingsOpen(true)}><FileText className="h-3.5 w-3.5" />Drawings</Button>
-                    <a className="px-2 py-1.5 text-xs text-muted-foreground underline" href={activeRender.image_url} target="_blank" rel="noreferrer">Full size</a>
-                  </>
-                )}
-              />
+            <div className="absolute inset-0 bg-background">
+              <img src={activeRender.image_url} alt={activeRender.style_label ?? 'Render'} className="h-full w-full object-contain" />
             </div>
           )}
         </div>
@@ -1395,14 +1406,18 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             ))}
           </div>
         )}
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <StylePanel
-            styles={styles} references={references} active={styleChoice} busy={rendering} disabled={rendering || reading || noRoom}
-            onPick={pickStyle} plan={colourPlan} onPlanChange={setColourPlan} onRender={() => void render(styleChoice)}
-          />
-          <div>{sidePanel}</div>
         </div>
+
+        <aside aria-label="Materials and styles" className="relative min-w-0">
+          <div className="custom-scrollbar space-y-3 md:absolute md:inset-0 md:overflow-y-auto">
+            {editing ? sidePanel : materialsPanel}
+            <StylePanel
+              styles={styles} references={references} active={styleChoice} busy={rendering} disabled={rendering || reading || noRoom}
+              onPick={pickStyle} plan={colourPlan} onPlanChange={setColourPlan} onRender={() => void render(styleChoice)}
+            />
+            {!editing && sidePanel}
+          </div>
+        </aside>
       </div>
     </PinnedProductsContext.Provider>
   );
