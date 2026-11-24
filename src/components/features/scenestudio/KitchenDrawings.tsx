@@ -205,11 +205,11 @@ const wrap = (text: string, max: number): string[] => {
 const Legend: React.FC<{ kitchen: boolean }> = ({ kitchen }) => {
   const items: Array<{ w: number; node: React.ReactNode; label: string }> = [
     ...(kitchen ? [
-      { w: 22, node: <rect width={4} height={2.4} fill="none" stroke={INK} strokeWidth={0.25} />, label: 'Base / tall unit' },
-      { w: 24, node: <rect width={4} height={2.4} fill="none" stroke={INK} strokeWidth={0.22} strokeDasharray="1.2 0.8" />, label: 'Wall unit (in plan)' },
-      { w: 32, node: <rect width={4} height={2.4} fill="url(#conflict-hatch)" stroke={CONFLICT} strokeWidth={0.25} />, label: 'Does not add up as drawn' },
+      { w: 22, node: <rect width={4} height={2.4} fill="none" stroke={INK} strokeWidth={0.25} />, label: 'Base / Tall Unit' },
+      { w: 24, node: <rect width={4} height={2.4} fill="none" stroke={INK} strokeWidth={0.22} strokeDasharray="1.2 0.8" />, label: 'Wall Unit (In Plan)' },
+      { w: 32, node: <rect width={4} height={2.4} fill="url(#conflict-hatch)" stroke={CONFLICT} strokeWidth={0.25} />, label: 'Does Not Add Up as Drawn' },
     ] : []),
-    { w: 30, node: <text y={2.2} fontSize={2.4} fill={STATED} fontFamily="Arial, sans-serif">228</text>, label: 'From the drawing or confirmed' },
+    { w: 30, node: <text y={2.2} fontSize={2.4} fill={STATED} fontFamily="Arial, sans-serif">228</text>, label: 'From the Drawing or Confirmed' },
     { w: 20, node: <text y={2.2} fontSize={2.4} fill={FAINT} fontStyle="italic" fontFamily="Arial, sans-serif">≈60</text>, label: 'Assumed' },
   ];
   let x = MARGIN;
