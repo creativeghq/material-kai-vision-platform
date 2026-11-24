@@ -152,11 +152,11 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
           />
         </Suspense>}
         {shots.map((x, i) => x && (
-          <img key={i} ref={(el) => { shotImgs.current[i] = el; }} src={x.image_url} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0 }} />
+          <img key={i} ref={(el) => { shotImgs.current[i] = el; }} src={x.image_url} alt="" className="pointer-events-none absolute inset-0 h-full w-full bg-background object-cover" style={{ opacity: 0 }} />
         ))}
         <div ref={dip} className="pointer-events-none absolute inset-0 bg-background" style={{ opacity: 0 }} />
         {data.render && !heroInRoom && (
-          <img ref={photo} src={data.render.image_url} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" style={{ opacity: 0 }} />
+          <img ref={photo} src={data.render.image_url} alt="" className="pointer-events-none absolute inset-0 h-full w-full bg-background object-cover" style={{ opacity: 0 }} />
         )}
         <p ref={caption} className="pointer-events-none absolute bottom-6 left-6 rounded-sm bg-card px-3 py-1.5 text-sm shadow-overlay" />
         <Button size="sm" variant="secondary" className="absolute right-4 top-4 gap-1.5 bg-card shadow-overlay" onClick={() => setExploring(true)}>
