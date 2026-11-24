@@ -1687,7 +1687,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageScenesTool',
     description: '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user rearranges it, recolours or swaps products, and renders it photo-real in any style. create: reads image_url …',
     params: [
-      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'walkthrough_video'], optional: false, description: 'What to do.' },
+      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video'], optional: false, description: 'What to do.' },
       { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },
       { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows; a dimensioned sketch or elevation is plan_image.' },
       { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },

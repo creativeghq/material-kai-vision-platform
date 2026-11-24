@@ -13,10 +13,11 @@ import { fetchImageGuarded } from '../fetch-image.ts';
 import { emitFlowEvent } from '../flow-events.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import {
-  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, drawingChecks, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, serviceChecks, serviceCounts, spansBehind, unitStated, zoneOfKind,
+  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, assemblyPiecesOf, autoLayout, drawingChecks, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, serviceChecks, serviceCounts, spansBehind, unitStated, zoneOfKind,
   type KitchenLayout, type RoomComposition,
 } from '../kitchenComposition.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
+import { cabinetAssemblies, DEFAULT_CONSTRUCTION } from '../cabinetPanels.generated.ts';
 
 const MODULE_SLUG = 'scene-studio';
 const BUCKET = 'generation-images';
@@ -412,6 +413,27 @@ export const createManageScenesTool = (
       }
     }
 
+    if (action === 'assembly_sheets') {
+      if (!scene_id) return JSON.stringify({ success: false, error: 'assembly_sheets needs scene_id.' });
+      const { data: scene } = await sb.from('floor_plans').select(SCENE_COLUMNS).eq('id', scene_id).maybeSingle();
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      const runs = (await kitchenRunsOf(sb, scene_id)).filter((r) => KITCHEN_KINDS.has(r.kind));
+      const build = { plinth_mm: DEFAULT_CONSTRUCTION.plinth_mm, front_mm: DEFAULT_CONSTRUCTION.front_mm, worktop_mm: 40 };
+      const assemblies = cabinetAssemblies(runs.flatMap((r) => assemblyPiecesOf(r, build)));
+      if (!assemblies.length) return JSON.stringify({ success: false, error: 'This room has no cabinets built from boards, so there is nothing to assemble.' });
+      onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent: { mode: 'drawings', set: 'assembly', object_id: null, room_id: null, save: true, nonce: Date.now() } }, timestamp: Date.now() });
+      const cabinets = assemblies.map((a) => ({
+        cabinet: `${MODULE_LABELS[a.type] ?? a.type} ${Math.round(a.width_mm / 10)} × ${Math.round(a.height_mm / 10)} × ${Math.round(a.depth_mm / 10)} cm`,
+        count: a.count, parts: a.parts.reduce((n, p) => n + p.qty, 0), failed_checks: a.checks.filter((c) => !c.ok).map((c) => `${c.rule}: ${c.detail}`),
+      }));
+      const failing = cabinets.filter((c) => c.failed_checks.length);
+      return JSON.stringify({
+        success: true, scene_id, distinct_cabinets: assemblies.length, cabinets,
+        ...(failing.length ? { warning: `${failing.length} of ${cabinets.length} cabinets fail a check before cutting. Name each one to the person; the workshop should not cut those until they pass.` } : {}),
+        message: 'One sheet per distinct cabinet (exploded view, numbered panel list with sizes and edge banding, hardware, checks) is being saved as a PDF; the link arrives in this conversation. Hinges come from the kitchen hardware schedule, not this sheet.',
+      });
+    }
+
     if (action === 'render' || action === 'drawing_set' || action === 'walkthrough_video') {
       if (!scene_id) return JSON.stringify({ success: false, error: `${action} needs scene_id.` });
       const { data: scene } = await sb.from('floor_plans').select(`${SCENE_COLUMNS}, project_id`).eq('id', scene_id).maybeSingle();
@@ -552,7 +574,8 @@ export const createManageScenesTool = (
       + 'project PDF as a plan and puts the room on the project. status: one scene by scene_id, with each kitchen run and the units read for it. list: the workspace\'s scenes. '
       + 'render: renders the room photo-real on the canvas in style (a style name or free words) or after style_reference_url, from the saved view or from eye height in room; '
       + 'the render arrives in the conversation and every image tool can take it. renders: the room\'s stored renders with their URLs. '
-      + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, a services sheet per wall for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks and service_checks, name each failure. '
+      + 'assembly_sheets: workshop sheets, one per distinct cabinet (exploded view, panel list with sizes and edge banding, hardware), saved as a PDF into the conversation; name every failed check per cabinet. '
+        + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, a services sheet per wall for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks and service_checks, name each failure. '
       + 'walkthrough_video: records the walkthrough of the real plan as a video, free; it arrives in the conversation. '
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
       + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '
@@ -571,7 +594,7 @@ export const createManageScenesTool = (
       + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
       + 'Every render, drawing set and video returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'walkthrough_video']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows; a dimensioned sketch or elevation is plan_image.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),

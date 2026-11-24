@@ -83,6 +83,7 @@ export interface SceneIntent {
   style?: string;
   style_reference_url?: string;
   save?: boolean;
+  set?: 'assembly';
   nonce: number;
 }
 
@@ -195,6 +196,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
   const [fronts, setFronts] = useState<FrontsState>('closed');
   const [drawingsOpen, setDrawingsOpen] = useState(false);
   const [drawingsAutoSave, setDrawingsAutoSave] = useState(false);
+  const [drawingsSet, setDrawingsSet] = useState<'drawings' | 'assembly'>('drawings');
   const [recording, setRecording] = useState<{ auto: boolean } | null>(null);
   const [sunHour, setSunHour] = useState<number | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -709,7 +711,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     if (intent.fronts) setFronts(intent.fronts);
     if (intent.sun_hour != null) setSunHour(Math.min(20, Math.max(6, intent.sun_hour)));
     const fresh = Date.now() - intent.nonce < INTENT_FRESH_MS;
-    if (intent.mode === 'drawings') { setDrawingsAutoSave(!!intent.save && fresh); setDrawingsOpen(true); return; }
+    if (intent.mode === 'drawings') { setDrawingsSet(intent.set === 'assembly' ? 'assembly' : 'drawings'); setDrawingsAutoSave(!!intent.save && fresh); setDrawingsOpen(true); return; }
     if (intent.mode === 'record_walkthrough') { setRecording({ auto: fresh }); return; }
     const obj = intent.object_id ? objects.find((o) => o.id === intent.object_id) : undefined;
     const roomId = intent.room_id ?? obj?.room_id ?? undefined;
@@ -1127,6 +1129,8 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
         data={data}
         objects={objects}
         autoSave={drawingsAutoSave}
+        set={drawingsSet}
+        onSetChange={setDrawingsSet}
         onSaved={(saved) => { setDrawingsAutoSave(false); onDrawingSetSaved?.(saved); }}
       />
       <Dialog open={!!recording} onOpenChange={(o) => { if (!o) setRecording(null); }}>

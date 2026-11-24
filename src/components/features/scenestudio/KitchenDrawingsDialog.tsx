@@ -4,16 +4,21 @@ import { FileDown, Printer } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
+import { Tabs, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { AssemblySheets } from '@/components/features/scenestudio/AssemblyDrawings';
 import { KitchenDrawings, type CutLine } from '@/components/features/scenestudio/KitchenDrawings';
 import { useToast } from '@/hooks/use-toast';
 import type { DrawRun } from '@/lib/scene/kitchenDrawings';
-import { KITCHEN_KINDS, drawingChecks } from '@/lib/scene/kitchenComposition';
+import { cabinetAssemblies, DEFAULT_CONSTRUCTION, type BoardSlot } from '@/lib/scene/cabinetPanels';
+import { KITCHEN_KINDS, assemblyPiecesOf, drawingChecks } from '@/lib/scene/kitchenComposition';
 import { projectPlansService } from '@/services/projectPlansService';
 import { publicUrl, sceneStudioService, type SceneData, type SceneObject } from '@/services/sceneStudioService';
 
 const PRINT_CLASS = 'print-kitchen-drawings';
 
-export interface DrawingSetSaved { sheet_id: string | null; title: string; project_id: string | null; pdf_path: string; page_count: number }
+export interface DrawingSetSaved { sheet_id: string | null; title: string; project_id: string | null; pdf_path: string; page_count: number; set?: 'drawings' | 'assembly' }
+
+const WORKTOP_MM = 40;
 
 export async function sheetsToPdf(root: HTMLElement): Promise<{ pdf: Blob; pages: number }> {
   const svgs = [...root.querySelectorAll<SVGSVGElement>('.kitchen-sheet svg')];
@@ -34,7 +39,9 @@ export const KitchenDrawingsDialog: React.FC<{
   objects: SceneObject[];
   autoSave?: boolean;
   onSaved?(saved: DrawingSetSaved): void;
-}> = ({ open, onOpenChange, data, objects, autoSave = false, onSaved }) => {
+  set?: 'drawings' | 'assembly';
+  onSetChange?(set: 'drawings' | 'assembly'): void;
+}> = ({ open, onOpenChange, data, objects, autoSave = false, onSaved, set = 'drawings', onSetChange }) => {
   const { toast } = useToast();
   const [lines, setLines] = useState<CutLine[]>([]);
   const [linesReady, setLinesReady] = useState(false);
@@ -67,10 +74,23 @@ export const KitchenDrawingsDialog: React.FC<{
   const furniture = useMemo(() => live.filter((o) => !KITCHEN_KINDS.has(o.kind)).map(toDraw), [live]);
   const drawable = data.walls.length > 0 || data.rooms.length > 0 || runs.length > 0;
 
+  const assemblies = useMemo(() => {
+    const boards = (objectId: string): Partial<Record<BoardSlot, string>> => {
+      const out: Partial<Record<BoardSlot, string>> = {};
+      for (const f of data.finishes.filter((x) => x.object_id === objectId)) {
+        const name = f.decor_code ? [f.decor_brand, f.decor_code, f.decor_name].filter(Boolean).join(' ') : f.product_id ? data.products[f.product_id]?.name : f.colour_hex ? `Colour ${f.colour_hex}` : null;
+        if (name && (f.slot === 'carcass' || f.slot === 'fronts' || f.slot === 'plinth')) out[f.slot] = name;
+      }
+      return out;
+    };
+    const build = { plinth_mm: DEFAULT_CONSTRUCTION.plinth_mm, front_mm: DEFAULT_CONSTRUCTION.front_mm, worktop_mm: WORKTOP_MM };
+    return cabinetAssemblies(runs.flatMap((r) => assemblyPiecesOf(r, build).map((p) => ({ ...p, boards: boards(r.id) }))));
+  }, [runs, data.finishes, data.products]);
+  const assemblyView = set === 'assembly' && runs.length > 0;
   const checks = useMemo(() => drawingChecks(runs.map((r) => ({ ...r, kitchen_layout: r.kitchen_layout ?? null }))), [runs]);
   const src = data.scene.source_storage_path;
   const sourceUrl = src && !src.endsWith('.pdf') && data.scene.source_kind === 'plan_image' ? publicUrl(src) : null;
-  const sheets = (
+  const sheets = assemblyView ? <AssemblySheets assemblies={assemblies} project={data.scene.name} company={company} /> : (
     <KitchenDrawings
       project={data.scene.name} company={company} rooms={data.rooms} walls={data.walls} openings={data.openings} runs={runs} furniture={furniture} lines={lines}
       notes={data.scene.extract_notes?.assumptions ?? []} sourceUrl={sourceUrl} checks={checks}
@@ -88,9 +108,9 @@ export const KitchenDrawingsDialog: React.FC<{
     setSaving(true);
     try {
       const { pdf, pages } = await sheetsToPdf(sheetRoot.current);
-      const saved = await sceneStudioService.saveDrawingSet(data.scene, pdf, pages);
-      onSaved?.({ ...saved, page_count: pages });
-      toast({ title: 'Drawings saved', description: saved.project_id ? `${pages} ${pages === 1 ? 'sheet' : 'sheets'} on the project, ready for the client view and the deck.` : `${pages} ${pages === 1 ? 'sheet' : 'sheets'} saved as a PDF in the conversation.` });
+      const saved = await sceneStudioService.saveDrawingSet(data.scene, pdf, pages, assemblyView ? 'assembly' : 'drawings');
+      onSaved?.({ ...saved, page_count: pages, set: assemblyView ? 'assembly' : 'drawings' });
+      toast({ title: assemblyView ? 'Assembly sheets saved' : 'Drawings saved', description: assemblyView ? `${pages} ${pages === 1 ? 'sheet' : 'sheets'} saved as a PDF in the conversation.` : saved.project_id ? `${pages} ${pages === 1 ? 'sheet' : 'sheets'} on the project, ready for the client view and the deck.` : `${pages} ${pages === 1 ? 'sheet' : 'sheets'} saved as a PDF in the conversation.` });
     } catch (e) {
       toast({ title: 'The drawings could not be saved', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
     } finally {
@@ -100,28 +120,36 @@ export const KitchenDrawingsDialog: React.FC<{
 
   useEffect(() => {
     if (!open) { autoSaved.current = false; return; }
-    if (!autoSave || autoSaved.current || !linesReady || !drawable) return;
+    if (!autoSave || autoSaved.current || !linesReady || !drawable || (set === 'assembly' && !assemblies.length)) return;
     autoSaved.current = true;
     const t = setTimeout(() => void save(), 400);
     return () => clearTimeout(t);
-  }, [open, autoSave, linesReady, drawable]);
+  }, [open, autoSave, linesReady, drawable, set, assemblies.length]);
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Drawings</DialogTitle>
-            <DialogDescription>
+            <DialogTitle>{assemblyView ? 'Workshop Assembly' : 'Drawings'}</DialogTitle>
+            <DialogDescription>{assemblyView ? `One sheet per distinct cabinet (${assemblies.length}): an exploded view with numbered parts, the panel list with sizes and edge banding, the hardware, and the checks before cutting. Built from the same panels as the 3D room and the cut list.` : <>
               Floor plan with wall lengths, room areas and furniture{runs.length ? `, an elevation and a services sheet (sockets, water, waste, gas, extraction) per kitchen wall and the cut list${planId ? '' : ' (price the kitchen to add it)'}, from the same units as the 3D room and the price` : ''}.
               {data.scene.project_id ? '' : ' The room is on no project, so saving puts the PDF in the conversation.'}
-            </DialogDescription>
+            </>}</DialogDescription>
+            {runs.length > 0 && (
+              <Tabs value={set} onValueChange={(v) => onSetChange?.(v === 'assembly' ? 'assembly' : 'drawings')}>
+                <TabsList>
+                  <TabsTrigger value="drawings">Drawing Set</TabsTrigger>
+                  <TabsTrigger value="assembly">Workshop Assembly</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
           </DialogHeader>
           <div ref={sheetRoot} className="rounded-sm border border-hairline bg-surface-sunken p-3">{sheets}</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
             <Button variant="outline" className="gap-1.5" onClick={print} disabled={!drawable}><Printer className="h-4 w-4" />Print</Button>
-            <Button className="gap-1.5" onClick={() => void save()} disabled={!drawable || saving}><FileDown className="h-4 w-4" />{saving ? 'Saving…' : data.scene.project_id ? 'Save to project' : 'Save as PDF'}</Button>
+            <Button className="gap-1.5" onClick={() => void save()} disabled={!drawable || saving}><FileDown className="h-4 w-4" />{saving ? 'Saving…' : data.scene.project_id && !assemblyView ? 'Save to project' : 'Save as PDF'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

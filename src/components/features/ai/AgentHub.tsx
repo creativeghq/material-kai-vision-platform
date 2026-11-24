@@ -2628,7 +2628,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const msg: Message = {
       id: `msg-drawings-${Date.now()}`,
       role: 'assistant',
-      content: saved.project_id
+      content: saved.set === 'assembly'
+        ? `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} for the workshop, one per distinct cabinet, each with its exploded view, panel list, edge banding and checks.`
+        : saved.project_id
         ? `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} saved to the project. They can go on the client view and into the deck.`
         : `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} as a PDF. Put the room on a project to add them to the client view and the deck.`,
       timestamp: new Date(),
@@ -3670,7 +3672,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       : intent?.mode === 'photo_walk' ? 'is open. Confirm the photo-real walk there.'
                         : intent?.mode === 'render' ? `is rendering${intent.style ? ` in ${intent.style}` : ''}; the render arrives here.`
                           : intent?.mode === 'record_walkthrough' ? 'is recording its walkthrough video; keep this tab in front.'
-                            : intent?.mode === 'drawings' ? (intent.save ? 'is saving its drawings to the project.' : 'has its drawings open.')
+                            : intent?.mode === 'drawings' ? (intent.set === 'assembly' ? (intent.save ? 'is saving its workshop assembly sheets.' : 'has its workshop assembly sheets open.') : intent.save ? 'is saving its drawings to the project.' : 'has its drawings open.')
                               : 'is open on the canvas. Arrange it, then pick a style to render it.';
                   const scMsg: Message = {
                     id: `msg-scene-${Date.now()}`,

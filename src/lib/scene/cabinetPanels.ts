@@ -322,3 +322,84 @@ export function cutListYields(entries: CutListEntry[]): Record<string, number> {
 }
 
 export const CUT_LIST_KEYS = ['board_m2_carcass', 'board_m2_fronts', 'board_m2_back', 'board_m2_plinth', 'edge_m_carcass', 'edge_m_fronts'] as const;
+
+export const PART_LABELS: Record<PanelRole, string> = {
+  side: 'Side', bottom: 'Bottom', top: 'Top', rail: 'Rail', back: 'Back Panel', shelf: 'Shelf', plinth: 'Plinth', end_panel: 'End Panel',
+  door: 'Door', drawer_front: 'Drawer Front', lift_door: 'Lift-Up Door', fixed_front: 'Fixed Front',
+  drawer_side: 'Drawer Side', drawer_end: 'Drawer Front/Back', drawer_bottom: 'Drawer Bottom',
+};
+
+export const STANDARD_BOARD_MM: readonly [number, number] = [2800, 2070];
+
+export interface AssemblyPart {
+  no: number; role: PanelRole; slot: BoardSlot; qty: number;
+  length_mm: number; width_mm: number; thickness_mm: number;
+  band_long: number | null; band_short: number | null;
+}
+
+export interface AssemblyCheck { rule: string; ok: boolean; detail: string }
+
+export interface AssemblyPiece { zone: CabinetZone; type: string; width_mm: number; height_mm: number; depth_mm: number; stated: boolean; where: string; boards?: Partial<Record<BoardSlot, string>> }
+
+export interface CabinetAssembly {
+  key: string; zone: CabinetZone; type: string; width_mm: number; height_mm: number; depth_mm: number;
+  count: number; where: string[]; stated: boolean; boards: Partial<Record<BoardSlot, string>>;
+  cabinet: Cabinet; parts: AssemblyPart[]; panel_part: number[];
+  hardware: { handles: number; knobs: number; drawer_runners: number; doors: number; lift_stays: number };
+  checks: AssemblyCheck[];
+}
+
+const r1 = (n: number) => Math.round(n * 10) / 10;
+
+export function edgeBanding(p: Panel): { long: number; short: number } | null {
+  const [a, b] = [...p.size].sort((x, y) => y - x);
+  if (p.edge_mm <= 0) return { long: 0, short: 0 };
+  for (const long of [2, 1, 0]) for (const short of [2, 1, 0]) if (Math.abs(long * a + short * b - p.edge_mm) < 0.5) return { long, short };
+  return null;
+}
+
+export function cabinetAssemblies(pieces: AssemblyPiece[], construction: Partial<CabinetConstruction> = {}, board: readonly [number, number] = STANDARD_BOARD_MM): CabinetAssembly[] {
+  const c: CabinetConstruction = { ...DEFAULT_CONSTRUCTION, ...construction };
+  const out = new Map<string, CabinetAssembly>();
+  for (const pc of pieces) {
+    const key = `${pc.zone}:${pc.type}:${Math.round(pc.width_mm)}x${Math.round(pc.height_mm)}x${Math.round(pc.depth_mm)}:${JSON.stringify(pc.boards ?? {})}`;
+    const seen = out.get(key);
+    if (seen) { seen.count += 1; seen.where.push(pc.where); seen.stated = seen.stated && pc.stated; continue; }
+    const cabinet = generateCabinet({ zone: pc.zone, type: pc.type, width_mm: pc.width_mm, height_mm: pc.height_mm, depth_mm: pc.depth_mm, construction: c });
+    if (!cabinet || !cabinet.panels.length) continue;
+    const parts: AssemblyPart[] = [];
+    const panel_part = cabinet.panels.map((p) => {
+      const [a, b, t] = [...p.size].sort((x, y) => y - x);
+      const band = edgeBanding(p);
+      const hit = parts.find((q) => q.role === p.role && q.slot === p.slot && q.length_mm === r1(a) && q.width_mm === r1(b) && q.thickness_mm === r1(t) && q.band_long === (band?.long ?? null) && q.band_short === (band?.short ?? null));
+      if (hit) { hit.qty += 1; return hit.no; }
+      const no = parts.length + 1;
+      parts.push({ no, role: p.role, slot: p.slot, qty: 1, length_mm: r1(a), width_mm: r1(b), thickness_mm: r1(t), band_long: band?.long ?? null, band_short: band?.short ?? null });
+      return no;
+    });
+    const count = (k: Fitting['kind']) => cabinet.fittings.filter((f) => f.kind === k).length;
+    const drawerFronts = cabinet.panels.filter((p) => p.role === 'drawer_front');
+    const hardware = {
+      handles: count('handle'), knobs: count('knob'), drawer_runners: cabinet.panels.filter((p) => p.role === 'drawer_bottom').length,
+      doors: cabinet.panels.filter((p) => p.role === 'door').length, lift_stays: cabinet.panels.filter((p) => p.role === 'lift_door').length,
+    };
+    const oversize = parts.filter((p) => p.length_mm > board[0] || p.width_mm > board[1]);
+    const unbanded = parts.filter((p) => p.band_long == null);
+    const sides = cabinet.panels.filter((p) => p.role === 'drawer_side');
+    const boxIssues: string[] = [];
+    sides.forEach((s, i) => {
+      if (i % 2) return;
+      const front = drawerFronts[i / 2];
+      if (front && s.size[1] + 25 > front.size[1]) boxIssues.push(`box ${s.size[1]} mm high behind a ${r1(front.size[1])} mm front`);
+      if (s.size[2] > pc.depth_mm - c.back_mm - 5) boxIssues.push(`box ${s.size[2]} mm deep in a ${pc.depth_mm} mm carcass`);
+    });
+    const checks: AssemblyCheck[] = [
+      { rule: 'Every Panel Fits a Standard Board', ok: !oversize.length, detail: oversize.length ? `Part ${oversize.map((p) => `${p.no} (${p.length_mm} × ${p.width_mm})`).join(', ')} is larger than a ${board[0]} × ${board[1]} mm board; it needs a joint or a bigger sheet.` : `Largest part ${Math.max(...parts.map((p) => p.length_mm))} mm.` },
+      { rule: 'Edge Banding Resolves to Whole Edges', ok: !unbanded.length, detail: unbanded.length ? `Part ${unbanded.map((p) => p.no).join(', ')}: the banded length does not match whole edges; band it from the panel, not this sheet.` : 'Every banded length is whole edges of its part.' },
+      ...(sides.length ? [{ rule: 'Drawer Boxes Fit Their Fronts and the Carcass', ok: !boxIssues.length, detail: boxIssues.length ? [...new Set(boxIssues)].join('; ') : `${sides.length / 2} boxes, each inside its front and the carcass depth.` }] : []),
+      { rule: 'Cabinet Size Stated by a Person', ok: pc.stated, detail: pc.stated ? 'The width is from a confirmed layout.' : 'The width is assumed (≈); confirm the layout before cutting.' },
+    ];
+    out.set(key, { key, zone: pc.zone, type: pc.type, width_mm: pc.width_mm, height_mm: pc.height_mm, depth_mm: pc.depth_mm, count: 1, where: [pc.where], stated: pc.stated, boards: pc.boards ?? {}, cabinet, parts, panel_part, hardware, checks });
+  }
+  return [...out.values()];
+}

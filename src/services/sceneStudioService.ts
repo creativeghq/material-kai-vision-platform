@@ -570,11 +570,11 @@ export const sceneStudioService = {
 
   /** Stores the drawing set as the project's `drawing_set` sheet; one per room, replaced on each save so a client view keeps pointing at it. */
   async saveDrawingSet(
-    scene: Pick<SceneRow, 'id' | 'name' | 'project_id' | 'workspace_id'>, pdf: Blob, pageCount: number,
+    scene: Pick<SceneRow, 'id' | 'name' | 'project_id' | 'workspace_id'>, pdf: Blob, pageCount: number, set: 'drawings' | 'assembly' = 'drawings',
   ): Promise<{ sheet_id: string | null; title: string; project_id: string | null; pdf_path: string }> {
-    const title = `${scene.name} — Drawings`.slice(0, 200);
-    if (!scene.project_id) {
-      const loose = `${sceneFolder(scene)}/drawings/${Date.now()}.pdf`;
+    const title = `${scene.name} — ${set === 'assembly' ? 'Workshop Assembly' : 'Drawings'}`.slice(0, 200);
+    if (!scene.project_id || set === 'assembly') {
+      const loose = `${sceneFolder(scene)}/drawings/${set === 'assembly' ? 'assembly-' : ''}${Date.now()}.pdf`;
       const { error: looseErr } = await supabase.storage.from('pdf-documents').upload(loose, pdf, { contentType: 'application/pdf', upsert: false });
       if (looseErr) throw new Error(`The drawings could not be uploaded: ${looseErr.message}`);
       return { sheet_id: null, title, project_id: null, pdf_path: loose };

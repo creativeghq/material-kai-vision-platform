@@ -232,6 +232,14 @@ export function kitchenPieces(
     }));
 }
 
+export function assemblyPiecesOf(
+  o: Pick<KitchenObject, 'kind' | 'width_mm' | 'depth_mm' | 'height_mm' | 'kitchen_layout'> & { label: string },
+  build: { plinth_mm: number; front_mm: number; worktop_mm: number },
+): Array<KitchenPiece & { stated: boolean; where: string }> {
+  const modules = runModulesOf(o).filter((m) => m.type !== 'gap');
+  return kitchenPieces(o, build).map((p, i) => ({ ...p, stated: modules[i] ? unitStated(o.kitchen_layout, modules[i]) : false, where: `${o.label} #${i + 1}` }));
+}
+
 const cm = (n: number) => Math.round(n / 10);
 
 export function kitchenCompositionFromRoom(objects: KitchenObject[], previous: RoomComposition = {}): RoomComposition {
