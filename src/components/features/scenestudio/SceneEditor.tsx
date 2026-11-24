@@ -1396,7 +1396,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
           </div>
         )}
 
-        <div className="grid gap-3 xl:grid-cols-2">
+        <div className="grid gap-3 md:grid-cols-2">
           <StylePanel
             styles={styles} references={references} active={styleChoice} busy={rendering} disabled={rendering || reading || noRoom}
             onPick={pickStyle} plan={colourPlan} onPlanChange={setColourPlan} onRender={() => void render(styleChoice)}
