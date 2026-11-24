@@ -440,6 +440,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           const { data: prows } = await supabase.from('products')
             .select('id, name, workspace_id, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id)')
             .in('id', productIds);
+          const SCENE_MODEL_BUCKET = 'generation-images';
           const FORMAT_ATTRS = ['width_mm', 'length_mm', 'roll_width_mm', 'roll_length_m', 'plank_width_mm', 'plank_length_mm', 'slab_size'];
           const FORMAT_META = [...FORMAT_ATTRS, 'dimensions', 'available_sizes', 'dimensions_cm_from_vision', 'decor_repeat_mm'];
           const colourOptionsOf = (meta: unknown) => {
@@ -476,7 +477,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           objects: ((objects.data ?? []) as any[]).map(({ model_status, model_storage_path, ...o }) => ({
             ...o,
             product_id: o.product_id && products[o.product_id] ? o.product_id : null,
-            model_url: model_status === 'ready' && model_storage_path ? supabase.storage.from('generation-images').getPublicUrl(model_storage_path).data.publicUrl : null,
+            model_url: model_status === 'ready' && model_storage_path ? supabase.storage.from(SCENE_MODEL_BUCKET).getPublicUrl(model_storage_path).data.publicUrl : null,
           })),
           surfaces: surfaces.data ?? [],
           finishes: finishes.data ?? [],
