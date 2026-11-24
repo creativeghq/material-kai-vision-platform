@@ -22,6 +22,8 @@ interface PublicQuoteItem {
   id: string;
   name: string;
   sku: string | null;
+  image_url?: string | null;
+  unit?: string | null;
   quantity: number;
   selected_size: string | null;
   selected_color: string | null;
@@ -51,6 +53,9 @@ interface PublicQuote {
   expires_at: string | null;
   created_at: string | null;
   client_name: string | null;
+  client_email?: string | null;
+  notes?: string | null;
+  terms?: string | null;
   items: PublicQuoteItem[];
 }
 
@@ -122,6 +127,12 @@ export default function PublicQuotePage() {
   }, [token]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!quote) return;
+    setSignerName((v) => v || quote.client_name || '');
+    setSignerEmail((v) => v || quote.client_email || '');
+  }, [quote]);
 
   const handleAccept = async () => {
     if (!signerName.trim()) { setAcceptError('Please enter your name to sign.'); return; }
@@ -273,6 +284,13 @@ export default function PublicQuotePage() {
                   return (
                     <tr key={it.id} className={idx % 2 ? 'bg-white/[0.02]' : ''}>
                       <td className="p-3">
+                        <div className="flex items-start gap-3">
+                        {it.image_url && (
+                          <a href={it.image_url} target="_blank" rel="noreferrer" className="shrink-0">
+                            <img src={it.image_url} alt={it.name} loading="lazy" className="h-20 w-20 rounded-sm border border-hairline object-cover bg-surface-sunken" />
+                          </a>
+                        )}
+                        <div className="min-w-0">
                         <div className="font-medium">{it.name}</div>
                         <div className="flex gap-2 text-xs text-muted-foreground mt-0.5">
                           {it.sku && <span>{it.sku}</span>}
@@ -283,8 +301,10 @@ export default function PublicQuotePage() {
                           ).map((part) => <span key={part}>· {part}</span>)}
                           {it.dimensions && <span>· {it.dimensions}</span>}
                         </div>
+                        </div>
+                        </div>
                       </td>
-                      <td className="p-3 text-center">{it.quantity}</td>
+                      <td className="p-3 text-center whitespace-nowrap">{it.quantity}{it.unit ? ` ${it.unit}` : ''}</td>
                       <td className="p-3 text-right">{money(effective, currency)}</td>
                       <td className="p-3 text-right font-medium">{money(it.line_total, currency)}</td>
                     </tr>
@@ -314,6 +334,23 @@ export default function PublicQuotePage() {
             ))}
           </div>
         </div>
+
+        {(quote.notes?.trim() || quote.terms?.trim()) && (
+          <Card className="dashboard-card border border-hairline p-4 space-y-4 text-sm">
+            {quote.notes?.trim() && (
+              <div className="space-y-1">
+                <h3 className="font-semibold">Notes</h3>
+                <p className="whitespace-pre-line text-muted-foreground">{quote.notes}</p>
+              </div>
+            )}
+            {quote.terms?.trim() && (
+              <div className="space-y-1">
+                <h3 className="font-semibold">Terms &amp; Conditions</h3>
+                <p className="whitespace-pre-line text-muted-foreground">{quote.terms}</p>
+              </div>
+            )}
+          </Card>
+        )}
 
         {/* Sign & Accept (e-sign + audit trail). Shows the accepted banner once signed. */}
         {(quote.status === 'accepted' || quote.signed_by) ? (

@@ -31,7 +31,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   // Validate the token + that sharing is currently enabled.
   const { data: quote, error } = await supabase
     .from('quotes')
-    .select('id, name, quote_number, status, currency, vat_rate, cash_discount_pct, expires_at, created_at, pdf_storage_path, public_share_enabled, customer_company_id, customer_contact_id, workspace_id')
+    .select('id, name, quote_number, status, currency, vat_rate, cash_discount_pct, expires_at, created_at, pdf_storage_path, public_share_enabled, customer_company_id, customer_contact_id, workspace_id, notes, terms')
     .eq('public_share_token', token)
     .maybeSingle();
 
@@ -42,7 +42,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
   // Fetch items (catalog + custom).
   const { data: rawItems } = await supabase
     .from('quote_items')
-    .select('id, product_id, quantity, selected_size, selected_color, selected_attributes, unit_price, discounted_price, line_total, custom_product_name, custom_unit, room, dimensions, products ( name, sku )')
+    .select('id, product_id, quantity, selected_size, selected_color, selected_attributes, unit_price, discounted_price, line_total, custom_product_name, custom_unit, custom_image_url, room, dimensions, products ( name, sku )')
     .eq('quote_id', quote.id)
     .order('added_at', { ascending: true });
 
@@ -91,6 +91,18 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     }
   } catch { /* falls back to the bare name */ }
 
+  // Same image rule as the quote PDF: the line's own picture, else the catalogue variant's photo.
+  const lineImages: Record<string, string> = {};
+  await Promise.all((rawItems ?? []).filter((it: any) => !it.custom_image_url && it.product_id).map(async (it: any) => {
+    try {
+      const { data: imageRows } = await supabase.rpc('get_product_variant_images', {
+        p_pairs: [{ product_id: it.product_id, attributes: it.selected_attributes ?? {}, color: it.selected_color ?? null, size: it.selected_size ?? null }],
+      });
+      const url = ((imageRows ?? []) as Array<{ image_url: string | null }>)[0]?.image_url;
+      if (url) lineImages[it.id] = url;
+    } catch { /* a missing photo never stops the page */ }
+  }));
+
   const items = (rawItems ?? []).map((it: any) => {
     const product = it.products;
     const isCustom = !product;
@@ -98,6 +110,8 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       id: it.id,
       name: lineNames[it.id] || (isCustom ? (it.custom_product_name || 'Custom Item') : (product?.name || 'Product')),
       sku: isCustom ? null : (product?.sku ?? null),
+      image_url: it.custom_image_url || lineImages[it.id] || null,
+      unit: it.custom_unit ?? null,
       quantity: it.quantity,
       selected_size: it.selected_size ?? null,
       selected_color: it.selected_color ?? null,
@@ -199,19 +213,22 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     return jsonResponse({ ok: true, accepted: true, signed_at: new Date().toISOString() });
   }
 
-  // Resolve a friendly bill-to name (no contact details exposed publicly) + the customer's
-  // VAT-inclusive display preference (gross prices for retail/consumer customers).
+  // Bill-to name + email (pre-fills the signature form; the link is the client's own) and the
+  // customer's VAT-inclusive display preference. No other contact details leave this function.
   let client_name: string | null = null;
+  let client_email: string | null = null;
   let prices_vat_inclusive = false;
   if (quote.customer_company_id) {
     const { data: c } = await supabase
-      .from('crm_companies').select('name, prices_vat_inclusive').eq('id', quote.customer_company_id).maybeSingle();
+      .from('crm_companies').select('name, email, prices_vat_inclusive').eq('id', quote.customer_company_id).maybeSingle();
     client_name = c?.name ?? null;
+    client_email = c?.email ?? null;
     prices_vat_inclusive = !!c?.prices_vat_inclusive;
   } else if (quote.customer_contact_id) {
     const { data: c } = await supabase
-      .from('crm_contacts').select('name, prices_vat_inclusive').eq('id', quote.customer_contact_id).maybeSingle();
+      .from('crm_contacts').select('name, email, prices_vat_inclusive').eq('id', quote.customer_contact_id).maybeSingle();
     client_name = c?.name ?? null;
+    client_email = c?.email ?? null;
     prices_vat_inclusive = !!c?.prices_vat_inclusive;
   }
 
@@ -409,6 +426,9 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
       expires_at: quote.expires_at,
       created_at: quote.created_at,
       client_name,
+      client_email,
+      notes: quote.notes ?? null,
+      terms: quote.terms ?? null,
       items,
     },
     seller,
