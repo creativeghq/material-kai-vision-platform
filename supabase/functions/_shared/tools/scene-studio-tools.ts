@@ -13,7 +13,7 @@ import { fetchImageGuarded } from '../fetch-image.ts';
 import { emitFlowEvent } from '../flow-events.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import {
-  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, drawingChecks, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, spansBehind, unitStated, zoneOfKind,
+  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, autoLayout, drawingChecks, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, serviceChecks, serviceCounts, spansBehind, unitStated, zoneOfKind,
   type KitchenLayout, type RoomComposition,
 } from '../kitchenComposition.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
@@ -79,11 +79,14 @@ async function drawingPage(
   return { bytes, project_id: doc.project_id, label: `${label(rev)}${count > 1 ? ` p.${page}` : ''}` };
 }
 
+const isGeneratedImage = (url: string) => /\/generation-images\/(gemini\/|u\/[^/]+\/sessions\/[^/]+\/gen\/)/.test(url);
+
 export const createManageScenesTool = (
   userId: string,
   workspaceId: string,
   jwt: string | undefined,
   onChunk?: (chunk: any) => void,
+  uploads: string[] = [],
 ) => tool(
   async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm, style, style_reference_url, drawing, page }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
@@ -413,9 +416,6 @@ export const createManageScenesTool = (
       if (!scene_id) return JSON.stringify({ success: false, error: `${action} needs scene_id.` });
       const { data: scene } = await sb.from('floor_plans').select(`${SCENE_COLUMNS}, project_id`).eq('id', scene_id).maybeSingle();
       if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
-      if (action === 'drawing_set' && !scene.project_id) {
-        return JSON.stringify({ success: false, error: 'The drawings are saved on a project and this 3D room is on none. Ask which project, then price_kitchen with project (a kitchen) or attach the room on the project first.' });
-      }
       let roomId: string | null = null;
       if (room) {
         const { data: rooms } = await sb.from('floor_plan_rooms').select('id, name').eq('floor_plan_id', scene_id);
@@ -431,11 +431,17 @@ export const createManageScenesTool = (
           ? { mode: 'drawings', object_id: null, room_id: null, save: true, nonce: Date.now() }
           : { mode: 'record_walkthrough', object_id: null, room_id: null, nonce: Date.now() };
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
-      const checks = action === 'drawing_set' ? drawingChecks(await kitchenRunsOf(sb, scene_id)) : [];
+      const setRuns = action === 'drawing_set' ? await kitchenRunsOf(sb, scene_id) : [];
+      const checks = drawingChecks(setRuns);
+      const service_checks = serviceChecks(setRuns);
       const failed = checks.filter((c) => !c.ok);
+      const serviceFailed = service_checks.filter((c) => !c.ok);
       return JSON.stringify({
         success: true, scene_id, mode: intent.mode,
-        ...(action === 'drawing_set' ? { checks, ...(failed.length ? { warning: `The set is saved with ${failed.length} failing ${failed.length === 1 ? 'check' : 'checks'}, printed on sheet 1. Name each failure to the person; the drawings are not ready to build from until they pass.` } : {}) } : {}),
+        ...(action === 'drawing_set' ? {
+          checks, service_points: serviceCounts(setRuns), service_checks,
+          ...(failed.length || serviceFailed.length ? { warning: `The set is saved with ${failed.length + serviceFailed.length} failing ${failed.length + serviceFailed.length === 1 ? 'check' : 'checks'} (drawing checks on sheet 1, service checks on each Services sheet). Name each failure to the person; the drawings are not ready to build from, and the electrician and plumber not ready to first-fix, until they pass.` } : {}),
+        } : {}),
         message: action === 'render'
           ? `The room is rendering on the canvas${style ? ` in ${style}` : ''}${roomId ? `, from eye height in ${room}` : ''}; it is charged like a render from the room and arrives in this conversation, where every image tool can take it. Do not call again.`
           : action === 'drawing_set'
@@ -464,7 +470,8 @@ export const createManageScenesTool = (
       if (!data) return JSON.stringify({ success: false, error: 'Scene not found.' });
       const list = await kitchenRunsOf(sb, scene_id);
       const checks = drawingChecks(list);
-      const failed = checks.filter((c) => !c.ok);
+      const service_checks = serviceChecks(list);
+      const failed = [...checks, ...service_checks].filter((c) => !c.ok);
       const kitchen_runs = list.filter((o) => KITCHEN_KINDS.has(o.kind)).map((o) => ({
         run: o.label, kind: o.kind,
         length_cm: Math.round(Number(o.width_mm) / 10), height_cm: Math.round(Number(o.height_mm) / 10), above_floor_cm: Math.round(Number(o.elevation_mm) / 10),
@@ -474,7 +481,7 @@ export const createManageScenesTool = (
       const scene = { ...data, object_count: list.length };
       onChunk?.({ type: 'scene_studio_scene', scene, timestamp: Date.now() });
       return JSON.stringify({
-        success: true, scene, kitchen_runs, checks,
+        success: true, scene, kitchen_runs, checks, service_points: serviceCounts(list), service_checks,
         ...(kitchen_runs.length && data.extract_status === 'ready'
           ? { message: `Show the person each run as read (≈ marks a width that was not printed) and the assumptions in extract_notes, ask about anything that does not add up, then layout each run with the confirmed units before opening drawings.${failed.length ? ` ${failed.length} drawing ${failed.length === 1 ? 'check fails' : 'checks fail'}: name each one; never call the drawings finished while one fails.` : ''}` }
           : {}),
@@ -493,9 +500,14 @@ export const createManageScenesTool = (
       projectId = picked.project_id;
       sourceLabel ||= picked.label;
     } else {
-      if (!image_url) return JSON.stringify({ success: false, error: 'create needs image_url (an image the user attached or a render from this conversation) or drawing (a project drawing).' });
+      const ownUpload = uploads[uploads.length - 1];
+      const source = image_url ?? ownUpload;
+      if (!source) return JSON.stringify({ success: false, error: 'create needs image_url (an image the user attached or a render from this conversation) or drawing (a project drawing).' });
+      if (kind === 'plan_image' && ownUpload && source !== ownUpload && !uploads.includes(source) && isGeneratedImage(source)) {
+        return JSON.stringify({ success: false, error: `That is a generated image, so its numbers are invented. Read the user's own sketch instead: create again without image_url, or with image_url ${ownUpload}.` });
+      }
       try {
-        image = await fetchImageGuarded(image_url);
+        image = await fetchImageGuarded(source);
       } catch (e) {
         return JSON.stringify({ success: false, error: `The image could not be fetched: ${e instanceof Error ? e.message : String(e)}` });
       }
@@ -534,16 +546,16 @@ export const createManageScenesTool = (
     description:
       '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user '
       + 'rearranges it, recolours or swaps products, and renders it photo-real in any style. '
-      + 'create: reads image_url (an image the user attached, or a render from this conversation) as kind '
+      + 'create: reads image_url (an image the user attached, or a render from this conversation; omit it to read the image the user attached) as kind '
       + 'plan_image (a floor plan, or a kitchen sketch or elevation with printed sizes, hand-drawn or CAD), photo (a photo of a room) or render (a generated image); it is '
       + 'charged once and takes about a minute. create with drawing (a project drawing by number, title or revision id, + page, + project when names repeat) reads one page of that '
       + 'project PDF as a plan and puts the room on the project. status: one scene by scene_id, with each kitchen run and the units read for it. list: the workspace\'s scenes. '
       + 'render: renders the room photo-real on the canvas in style (a style name or free words) or after style_reference_url, from the saved view or from eye height in room; '
       + 'the render arrives in the conversation and every image tool can take it. renders: the room\'s stored renders with their URLs. '
-      + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations and cut list for a kitchen) to the project as a PDF sheet for the client view and deck. '
+      + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, a services sheet per wall for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks and service_checks, name each failure. '
       + 'walkthrough_video: records the walkthrough of the real plan as a video, free; it arrives in the conversation. '
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
-      + 'create kind plan_image, status until ready, show the person the runs and units read and ask about anything that does not add up, '
+      + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '
       + 'layout each run with the confirmed units, then open mode drawings. '
       + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
       + 'for Make 3D (10 credits, the user confirms), mode photo_walk offers a photo-real walk the user confirms. '

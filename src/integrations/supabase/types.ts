@@ -35308,6 +35308,18 @@ export type Database = {
       }
     }
     Functions: {
+      search_board_decors: {
+        Args: { p_workspace_id: string; p_query?: string; p_limit?: number }
+        Returns: {
+          brand: string
+          decor_code: string
+          decor_name: string | null
+          collection: string | null
+          supplier: string | null
+          thicknesses: string[] | null
+          price_row_id: number
+        }[]
+      }
       set_document_pnl_exclusion: {
         Args: { p_exclude: boolean; p_id: string; p_kind: string }
         Returns: boolean

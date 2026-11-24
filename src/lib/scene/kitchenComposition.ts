@@ -338,3 +338,125 @@ export function drawingChecks(runs: Array<Pick<KitchenObject, 'kind' | 'width_mm
   add('Wall units sit over a base run', floating, 'Every wall run stands over a base run.');
   return out;
 }
+
+export type ServiceKey = 'socket' | 'socket_dedicated' | 'water_in' | 'waste_out' | 'gas_point' | 'duct_run' | 'carbon_filter';
+export type ServiceTone = 'stated' | 'assumed';
+export interface ServicePoint { key: ServiceKey; x_mm: number; height_mm: number; serves: string; note: string; tone: ServiceTone; height_tone: ServiceTone }
+export interface RunServices { label: string; kind: string; width_mm: number; points: ServicePoint[] }
+
+type ServiceRule = { key: ServiceKey; height_mm: number; at: 'centre' | 'beside' | 'sink' | 'top'; note: string };
+
+export const SERVICE_DEFAULTS: Record<string, ServiceRule[]> = {
+  sink_base: [{ key: 'water_in', height_mm: 500, at: 'centre', note: 'Hot and Cold' }, { key: 'waste_out', height_mm: 400, at: 'centre', note: 'Sink Trap' }],
+  dishwasher_housing: [
+    { key: 'socket_dedicated', height_mm: 300, at: 'beside', note: 'Behind the Next Unit' },
+    { key: 'water_in', height_mm: 500, at: 'sink', note: 'Cold Valve' },
+    { key: 'waste_out', height_mm: 400, at: 'sink', note: 'Onto the Sink Trap' },
+  ],
+  oven_base: [{ key: 'socket_dedicated', height_mm: 1100, at: 'beside', note: 'Cooker Circuit Isolator' }],
+  oven_base_gas: [{ key: 'gas_point', height_mm: 500, at: 'centre', note: 'Hob Gas Valve' }, { key: 'socket', height_mm: 300, at: 'beside', note: 'Ignition' }],
+  oven_housing: [{ key: 'socket_dedicated', height_mm: 1100, at: 'beside', note: 'Oven Circuit Isolator' }],
+  fridge_housing: [{ key: 'socket', height_mm: 300, at: 'beside', note: 'Behind the Next Unit' }],
+  appliance_base: [{ key: 'socket', height_mm: 300, at: 'beside', note: 'Appliance Not Stated' }],
+  extractor: [{ key: 'socket', height_mm: 2000, at: 'centre', note: 'Above the Hood' }, { key: 'duct_run', height_mm: 0, at: 'top', note: 'To Ceiling or Outside Wall' }],
+  extractor_recirculating: [{ key: 'socket', height_mm: 2000, at: 'centre', note: 'Above the Hood' }, { key: 'carbon_filter', height_mm: 0, at: 'top', note: 'Recirculating' }],
+};
+
+export const WORKTOP_SOCKETS = { height_mm: 1100, spacing_mm: 1200, clear_mm: 300, beside_mm: 300, note: 'Double Socket' } as const;
+const DEFAULT_WALL_TOP_MM = 2150;
+const WET_OR_HOT = new Set(['sink_base', 'oven_base']);
+const NOT_A_UNIT = new Set(['gap', 'filler', 'end_panel']);
+
+const serviceVariant = (m: RunModule) =>
+  m.type === 'oven_base' && m.options?.fuel === 'gas' ? 'oven_base_gas'
+    : m.type === 'extractor' && m.options?.extraction === 'recirculation' ? 'extractor_recirculating' : m.type;
+
+type ServiceRun = Pick<KitchenObject, 'kind' | 'width_mm' | 'height_mm' | 'kitchen_layout'> & { label: string; elevation_mm?: number };
+
+export function runServicePoints(r: ServiceRun): ServicePoint[] {
+  if (!KITCHEN_KINDS.has(r.kind)) return [];
+  const solid = runModulesOf(r).filter((m) => !NOT_A_UNIT.has(m.type));
+  const stated = (m: PlacedModule): ServiceTone => (unitStated(r.kitchen_layout, m) ? 'stated' : 'assumed');
+  const centre = (m: PlacedModule) => m.x_mm + m.width_mm / 2;
+  const sink = solid.find((m) => m.type === 'sink_base');
+  const points: ServicePoint[] = [];
+  for (const [i, m] of solid.entries()) {
+    for (const rule of SERVICE_DEFAULTS[serviceVariant(m)] ?? []) {
+      let x = centre(m);
+      let tone = stated(m);
+      if (rule.at === 'beside') {
+        const next = [solid[i - 1], solid[i + 1]].filter((n): n is PlacedModule => !!n);
+        const pick = next.find((n) => !SERVICE_DEFAULTS[n.type]) ?? next[0];
+        x = pick ? centre(pick) : m.x_mm + m.width_mm + WORKTOP_SOCKETS.beside_mm;
+        if (pick && stated(pick) === 'assumed') tone = 'assumed';
+      } else if (rule.at === 'sink' && sink) {
+        x = sink.x_mm < m.x_mm ? sink.x_mm + sink.width_mm - 100 : sink.x_mm + 100;
+        if (stated(sink) === 'assumed') tone = 'assumed';
+      }
+      const height = rule.at === 'top' ? (r.elevation_mm ? r.elevation_mm + r.height_mm : DEFAULT_WALL_TOP_MM) : rule.height_mm;
+      points.push({ key: rule.key, x_mm: Math.round(x), height_mm: height, serves: MODULE_LABELS[m.type] ?? m.type, note: rule.note, tone, height_tone: 'assumed' });
+    }
+  }
+  if (zoneOfKind(r.kind) === 'base') {
+    const blocked = solid.filter((m) => WET_OR_HOT.has(m.type)).map((m) => [m.x_mm - WORKTOP_SOCKETS.clear_mm, m.x_mm + m.width_mm + WORKTOP_SOCKETS.clear_mm]);
+    let last = -Infinity;
+    for (let x = 150; x <= r.width_mm - 150; x += 50) {
+      const under = solid.find((m) => x >= m.x_mm && x <= m.x_mm + m.width_mm);
+      if (!under || blocked.some(([a, b]) => x > a && x < b) || x - last < WORKTOP_SOCKETS.spacing_mm) continue;
+      last = x;
+      points.push({ key: 'socket', x_mm: x, height_mm: WORKTOP_SOCKETS.height_mm, serves: 'Worktop', note: WORKTOP_SOCKETS.note, tone: stated(under), height_tone: 'assumed' });
+    }
+  }
+  return points.sort((a, b) => a.x_mm - b.x_mm);
+}
+
+export function servicePoints(runs: ServiceRun[]): RunServices[] {
+  return runs.filter((r) => KITCHEN_KINDS.has(r.kind)).map((r) => ({ label: r.label, kind: r.kind, width_mm: r.width_mm, points: runServicePoints(r) }));
+}
+
+export function serviceCounts(runs: ServiceRun[]): Partial<Record<ServiceKey, number>> {
+  const out: Partial<Record<ServiceKey, number>> = {};
+  for (const p of servicePoints(runs).flatMap((r) => r.points)) out[p.key] = (out[p.key] ?? 0) + 1;
+  return out;
+}
+
+export function serviceChecks(runs: ServiceRun[]): DrawingCheck[] {
+  const kitchen = runs.filter((r) => KITCHEN_KINDS.has(r.kind));
+  if (!kitchen.length) return [];
+  const out: DrawingCheck[] = [];
+  const add = (rule: string, bad: string[], good: string) => out.push({ rule, ok: !bad.length, detail: bad.length ? bad.join(' ') : good });
+  const cmOf = (n: number) => `${Math.round(n / 10)}`;
+  const all = kitchen.map((r) => ({ r, solid: runModulesOf(r).filter((m) => !NOT_A_UNIT.has(m.type)), points: runServicePoints(r) }));
+
+  const missing = all.flatMap(({ r, solid, points }) => solid.flatMap((m) => {
+    if (m.type === 'appliance_base') return [`${r.label}: the Appliance Space at ${cmOf(m.x_mm)} cm does not say which appliance, so only a socket is drawn.`];
+    const label = MODULE_LABELS[m.type] ?? m.type;
+    const lacking = (SERVICE_DEFAULTS[serviceVariant(m)] ?? []).filter((rule) => !points.some((p) => p.key === rule.key && p.serves === label)).map((rule) => rule.key);
+    return lacking.length ? [`${r.label}: ${label} has no ${lacking.join(', ')}.`] : [];
+  }));
+  add('Every Appliance Has Its Connections', missing, 'Every appliance has its power, water, waste and extraction drawn.');
+
+  const close = all.flatMap(({ r, solid, points }) => {
+    const hot = solid.filter((m) => WET_OR_HOT.has(m.type));
+    return points.filter((p) => (p.key === 'socket' || p.key === 'socket_dedicated') && p.height_mm >= 850 && p.height_mm < 1500)
+      .flatMap((p) => hot.filter((m) => p.x_mm > m.x_mm - WORKTOP_SOCKETS.clear_mm && p.x_mm < m.x_mm + m.width_mm + WORKTOP_SOCKETS.clear_mm)
+        .map((m) => `${r.label}: ${p.note} at ${cmOf(p.x_mm)} cm is within ${cmOf(WORKTOP_SOCKETS.clear_mm)} cm of the ${MODULE_LABELS[m.type]}.`));
+  });
+  add('Sockets Clear of Sink and Hob', close, `Every socket above the worktop is at least ${cmOf(WORKTOP_SOCKETS.clear_mm)} cm from the sink and hob.`);
+
+  const drains = all.flatMap(({ r, solid }) => solid.filter((m) => m.type === 'dishwasher_housing').flatMap((d) => {
+    const sinks = solid.filter((m) => m.type === 'sink_base');
+    if (!sinks.length) return [`${r.label}: the dishwasher has no sink on its run to drain into.`];
+    const gap = Math.min(...sinks.map((s) => Math.max(0, s.x_mm - (d.x_mm + d.width_mm), d.x_mm - (s.x_mm + s.width_mm))));
+    return gap > 600 ? [`${r.label}: the dishwasher is ${cmOf(gap)} cm from the sink; its waste should run no further than one unit.`] : [];
+  }));
+  add('Dishwasher Drains Beside the Sink', drains, 'Every dishwasher sits within one unit of a sink.');
+
+  const bare = all.filter(({ r, points }) => zoneOfKind(r.kind) === 'base' && r.width_mm >= WORKTOP_SOCKETS.spacing_mm && !points.some((p) => p.serves === 'Worktop'))
+    .map(({ r }) => `${r.label}: no place on the worktop is ${cmOf(WORKTOP_SOCKETS.clear_mm)} cm clear of the sink and hob for a socket.`);
+  add('Worktop Has Sockets', bare, 'Every base run has worktop sockets clear of the sink and hob.');
+
+  const assumed = all.reduce((n, x) => n + x.points.filter((p) => p.height_tone === 'assumed').length, 0);
+  add('Heights Confirmed by a Person', assumed ? [`${assumed} service heights are trade defaults (drawn grey with ≈); expected until the electrician or plumber confirms them on site.`] : [], 'Every service height was set by a person.');
+  return out;
+}

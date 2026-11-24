@@ -13,7 +13,7 @@ import { publicUrl, sceneStudioService, type SceneData, type SceneObject } from 
 
 const PRINT_CLASS = 'print-kitchen-drawings';
 
-export interface DrawingSetSaved { sheet_id: string; title: string; project_id: string; page_count: number }
+export interface DrawingSetSaved { sheet_id: string | null; title: string; project_id: string | null; pdf_path: string; page_count: number }
 
 async function sheetsToPdf(root: HTMLElement): Promise<{ pdf: Blob; pages: number }> {
   const svgs = [...root.querySelectorAll<SVGSVGElement>('.kitchen-sheet svg')];
@@ -90,7 +90,7 @@ export const KitchenDrawingsDialog: React.FC<{
       const { pdf, pages } = await sheetsToPdf(sheetRoot.current);
       const saved = await sceneStudioService.saveDrawingSet(data.scene, pdf, pages);
       onSaved?.({ ...saved, page_count: pages });
-      toast({ title: 'Drawings saved', description: `${pages} ${pages === 1 ? 'sheet' : 'sheets'} on the project, ready for the client view and the deck.` });
+      toast({ title: 'Drawings saved', description: saved.project_id ? `${pages} ${pages === 1 ? 'sheet' : 'sheets'} on the project, ready for the client view and the deck.` : `${pages} ${pages === 1 ? 'sheet' : 'sheets'} saved as a PDF in the conversation.` });
     } catch (e) {
       toast({ title: 'The drawings could not be saved', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
     } finally {
@@ -113,15 +113,15 @@ export const KitchenDrawingsDialog: React.FC<{
           <DialogHeader>
             <DialogTitle>Drawings</DialogTitle>
             <DialogDescription>
-              Floor plan with wall lengths, room areas and furniture{runs.length ? `, an elevation per kitchen wall and the cut list${planId ? '' : ' (price the kitchen to add it)'}, from the same units as the 3D room and the price` : ''}.
-              {data.scene.project_id ? '' : ' Saving needs the room on a project.'}
+              Floor plan with wall lengths, room areas and furniture{runs.length ? `, an elevation and a services sheet (sockets, water, waste, gas, extraction) per kitchen wall and the cut list${planId ? '' : ' (price the kitchen to add it)'}, from the same units as the 3D room and the price` : ''}.
+              {data.scene.project_id ? '' : ' The room is on no project, so saving puts the PDF in the conversation.'}
             </DialogDescription>
           </DialogHeader>
           <div ref={sheetRoot} className="rounded-sm border border-hairline bg-surface-sunken p-3">{sheets}</div>
           <DialogFooter>
             <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
             <Button variant="outline" className="gap-1.5" onClick={print} disabled={!drawable}><Printer className="h-4 w-4" />Print</Button>
-            <Button className="gap-1.5" onClick={() => void save()} disabled={!drawable || saving || !data.scene.project_id}><FileDown className="h-4 w-4" />{saving ? 'Saving…' : 'Save to project'}</Button>
+            <Button className="gap-1.5" onClick={() => void save()} disabled={!drawable || saving}><FileDown className="h-4 w-4" />{saving ? 'Saving…' : data.scene.project_id ? 'Save to project' : 'Save as PDF'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

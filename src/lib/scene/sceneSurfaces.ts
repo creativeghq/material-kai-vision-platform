@@ -1,5 +1,6 @@
 import type { SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
-import { SCENE_SLOT_FOLLOWS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
+import { SCENE_SLOT_FOLLOWS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
+import { decorLabel, decorOfRow, decorPrompt, type BoardDecorRef } from '@/lib/scene/boardDecor';
 import { tileFormatM } from '@/components/features/roomplanner/surfaceFormat';
 
 export type SurfaceTarget =
@@ -57,6 +58,7 @@ export interface Finish {
   label: string | null;
   normalUrl?: string | null;
   roughnessUrl?: string | null;
+  decor?: BoardDecorRef | null;
 }
 
 export function decorRepeatM(product: { metadata?: unknown } | null | undefined): [number, number] | null {
@@ -69,8 +71,12 @@ export function decorRepeatM(product: { metadata?: unknown } | null | undefined)
   return w > 0 && l > 0 ? [w / 1000, l / 1000] : null;
 }
 
-export function resolveFinish(surface: Pick<SceneSurface, 'colour_hex'> | null, product: SceneProduct | undefined): Finish | null {
+type FinishSource = Pick<SceneSurface, 'colour_hex'> & { decor_brand?: string | null; decor_code?: string | null; decor_name?: string | null };
+
+export function resolveFinish(surface: FinishSource | null, product: SceneProduct | undefined): Finish | null {
   if (!surface) return null;
+  const decor = product ? null : decorOfRow(surface);
+  if (decor) return { imageUrl: null, hex: surface.colour_hex, tileW: 1, tileL: 1, jointed: false, label: decorLabel(decor), decor };
   if (!product) return surface.colour_hex ? { imageUrl: null, hex: surface.colour_hex, tileW: 1, tileL: 1, jointed: false, label: null } : null;
   const repeat = decorRepeatM(product);
   const fmt = repeat ? { tileWidthM: repeat[0], tileLengthM: repeat[1], formatSource: 'recorded' as const } : tileFormatM(product);
@@ -115,4 +121,21 @@ export function objectSlotFinishes(
     out[slot] = resolveFinish(row, row.product_id ? products[row.product_id] : undefined);
   }
   return out;
+}
+
+export const finishSignature = (objectId: string, rows: SceneObjectFinish[]): string =>
+  rows.filter((f) => f.object_id === objectId)
+    .map((f) => `${f.slot}:${f.product_id ?? ''}:${f.colour_hex ?? ''}${f.decor_code ? `:${f.decor_brand ?? ''} ${f.decor_code}` : ''}`)
+    .sort().join('|');
+
+export function describeObjectFinishes(
+  obj: { id: string; kind: string }, rows: SceneObjectFinish[], products: Record<string, SceneProduct>,
+): string {
+  const slots = objectSlotFinishes(obj, rows, products);
+  return slotsForKind(obj.kind).flatMap((slot) => {
+    const f = slots[slot];
+    if (!f) return [];
+    const what = f.decor ? decorPrompt(f.decor) : f.label ? `"${f.label}"` : `colour ${f.hex}`;
+    return [`${SCENE_SLOT_LABELS[slot].toLowerCase()} in ${what}`];
+  }).join(', ');
 }

@@ -1,6 +1,6 @@
 import { DEFAULT_CONSTRUCTION, generateCabinet, type CabinetConstruction } from '@/lib/scene/cabinetPanels';
 import {
-  KITCHEN_KINDS, MODULE_LABELS, kitchenPieces, runModulesOf, runShortfall, spansBehind, unitStated, zoneOfKind, type KitchenLayout, type OpeningLike, type WallLike,
+  KITCHEN_KINDS, MODULE_LABELS, kitchenPieces, runModulesOf, runServicePoints, runShortfall, spansBehind, unitStated, zoneOfKind, type KitchenLayout, type OpeningLike, type ServicePoint, type WallLike,
 } from '@/lib/scene/kitchenComposition';
 
 export type Pt = [number, number];
@@ -101,7 +101,7 @@ export function roomPlan(
 
 export type ElevationKind = 'carcass' | 'front' | 'handle' | 'appliance' | 'worktop' | 'plinth' | 'window' | 'conflict';
 export interface ElevationRect { x: number; y: number; w: number; h: number; kind: ElevationKind }
-export interface Elevation { key: string; runs: string[]; width_mm: number; height_mm: number; rects: ElevationRect[]; dims: Array<{ x0: number; x1: number; y: number; text: string; tone?: DimTone }>; heights: Array<{ y0: number; y1: number; text: string }> }
+export interface Elevation { key: string; runs: string[]; run_ids: string[]; width_mm: number; height_mm: number; rects: ElevationRect[]; dims: Array<{ x0: number; x1: number; y: number; text: string; tone?: DimTone }>; heights: Array<{ y0: number; y1: number; text: string }>; services: ServicePoint[] }
 
 export function kitchenElevations(
   runs: DrawRun[], walls: Array<WallLike & { id: string }> = [], openings: OpeningLike[] = [], construction: Partial<CabinetConstruction> = {}, worktopMm = 40,
@@ -132,8 +132,10 @@ export function kitchenElevations(
     let width = 0;
     let height = 0;
     const windows = new Set<string>();
+    const services: ServicePoint[] = [];
     for (const r of list) {
       const x0 = left(r) - origin;
+      for (const p of runServicePoints(r)) services.push({ ...p, x_mm: x0 + p.x_mm });
       if (r.kind !== 'island') {
         for (const sp of spansBehind(r, walls, openings)) {
           const key = `${Math.round(x0 + sp.from_mm)}:${Math.round(sp.sill_mm)}`;
@@ -180,7 +182,7 @@ export function kitchenElevations(
     if (base) heights.push({ y0: 0, y1: base.height_mm, text: cm(base.height_mm) });
     const wall = list.find((r) => r.kind === 'kitchen_wall');
     if (wall) heights.push({ y0: wall.elevation_mm, y1: wall.elevation_mm + wall.height_mm, text: cm(wall.height_mm) });
-    elevations.push({ key, runs: list.map((r) => r.label), width_mm: width, height_mm: height, rects, dims, heights });
+    elevations.push({ key, runs: list.map((r) => r.label), run_ids: list.map((r) => r.id), width_mm: width, height_mm: height, rects, dims, heights, services: services.sort((a, b) => a.x_mm - b.x_mm) });
   }
   return elevations;
 }

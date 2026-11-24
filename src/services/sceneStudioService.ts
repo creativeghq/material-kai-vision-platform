@@ -4,6 +4,7 @@ import { edgeError, parseEdgeError } from '@/utils/edgeError';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
 import type { SurfaceTarget } from '@/lib/scene/sceneSurfaces';
 import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
+import type { BoardDecorRef } from '@/lib/scene/boardDecor';
 import { kitchenCompositionFromRoom, type RoomComposition } from '@/lib/scene/kitchenComposition';
 import { projectPlansService, type PlanWithItems } from '@/services/projectPlansService';
 import type { Composition, PlanComposition } from '@/utils/blueprintComposition';
@@ -76,7 +77,15 @@ export interface SceneSurface {
   colour_hex: string | null;
 }
 
-export interface SceneObjectFinish { id: string; object_id: string; slot: SceneObjectSlot; product_id: string | null; colour_hex: string | null }
+export interface SceneObjectFinish {
+  id: string; object_id: string; slot: SceneObjectSlot; product_id: string | null; colour_hex: string | null;
+  decor_brand?: string | null; decor_code?: string | null; decor_name?: string | null;
+}
+
+export interface BoardDecor {
+  brand: string; decor_code: string; decor_name: string | null; collection: string | null;
+  supplier: string | null; thicknesses: string[] | null; price_row_id: number;
+}
 
 export interface SceneProduct {
   id: string;
@@ -101,6 +110,7 @@ export interface SceneRender {
   id_map: Record<string, string>;
   style_reference_url: string | null;
   style_label: string | null;
+  colour_plan?: Array<{ role: string; hex: string }> | null;
   instruction: string | null;
   image_url: string;
   vr_world_id: string | null;
@@ -137,8 +147,8 @@ export interface SceneData {
 const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, cabinet_hardware, created_at, updated_at';
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish, kitchen_layout';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex';
-const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex';
-const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, instruction, image_url, vr_world_id, layout_snapshot, created_at';
+const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex, decor_brand, decor_code, decor_name';
+const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, colour_plan, instruction, image_url, vr_world_id, layout_snapshot, created_at';
 
 const num = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 
@@ -299,6 +309,12 @@ export const sceneStudioService = {
     return { ...r, total: Number(r.total), units: (r.units ?? []).map((u) => ({ ...u, width_mm: Number(u.width_mm), price: u.price == null ? null : Number(u.price) })) };
   },
 
+  async searchBoardDecors(workspaceId: string, query: string): Promise<BoardDecor[]> {
+    const { data, error } = await supabase.rpc('search_board_decors', { p_workspace_id: workspaceId, p_query: query.trim(), p_limit: 40 });
+    if (error) throw new Error(error.message);
+    return (data ?? []) as BoardDecor[];
+  },
+
   async boardEdgeTapes(productId: string): Promise<Array<{ product_id: string; name: string }>> {
     const { data, error } = await supabase.rpc('board_edge_tapes' as never, { p_product_id: productId } as never);
     if (error) throw new Error(error.message);
@@ -432,9 +448,16 @@ export const sceneStudioService = {
     return data as SceneSurface;
   },
 
-  async setObjectFinish(sceneId: string, objectId: string, slot: SceneObjectSlot, patch: { product_id: string | null; colour_hex: string | null }): Promise<SceneObjectFinish> {
+  async setObjectFinish(
+    sceneId: string, objectId: string, slot: SceneObjectSlot,
+    patch: { product_id: string | null; colour_hex: string | null; decor?: BoardDecorRef | null },
+  ): Promise<SceneObjectFinish> {
+    const decor = patch.product_id ? null : patch.decor ?? null;
     const { data, error } = await supabase.from('floor_plan_object_finishes')
-      .upsert({ floor_plan_id: sceneId, object_id: objectId, slot, product_id: patch.product_id, colour_hex: patch.colour_hex }, { onConflict: 'object_id,slot' })
+      .upsert({
+        floor_plan_id: sceneId, object_id: objectId, slot, product_id: patch.product_id, colour_hex: patch.colour_hex,
+        decor_brand: decor?.brand ?? null, decor_code: decor?.code ?? null, decor_name: decor?.name ?? null,
+      }, { onConflict: 'object_id,slot' })
       .select(FINISH_COLUMNS).single();
     if (error) throw new Error(error.message);
     return data as SceneObjectFinish;
@@ -546,13 +569,20 @@ export const sceneStudioService = {
   },
 
   /** Stores the drawing set as the project's `drawing_set` sheet; one per room, replaced on each save so a client view keeps pointing at it. */
-  async saveDrawingSet(scene: Pick<SceneRow, 'id' | 'name' | 'project_id'>, pdf: Blob, pageCount: number): Promise<{ sheet_id: string; title: string; project_id: string }> {
-    if (!scene.project_id) throw new Error('This 3D room is not on a project yet; price it on a project or attach it to one first.');
+  async saveDrawingSet(
+    scene: Pick<SceneRow, 'id' | 'name' | 'project_id' | 'workspace_id'>, pdf: Blob, pageCount: number,
+  ): Promise<{ sheet_id: string | null; title: string; project_id: string | null; pdf_path: string }> {
+    const title = `${scene.name} — Drawings`.slice(0, 200);
+    if (!scene.project_id) {
+      const loose = `${sceneFolder(scene)}/drawings/${Date.now()}.pdf`;
+      const { error: looseErr } = await supabase.storage.from('pdf-documents').upload(loose, pdf, { contentType: 'application/pdf', upsert: false });
+      if (looseErr) throw new Error(`The drawings could not be uploaded: ${looseErr.message}`);
+      return { sheet_id: null, title, project_id: null, pdf_path: loose };
+    }
     const { data: auth } = await supabase.auth.getUser();
     const path = `project-docs/${scene.project_id}/drawing-sets/${scene.id}-${Date.now()}.pdf`;
     const { error: upErr } = await supabase.storage.from('pdf-documents').upload(path, pdf, { contentType: 'application/pdf', upsert: false });
     if (upErr) throw new Error(`The drawings could not be uploaded: ${upErr.message}`);
-    const title = `${scene.name} — Drawings`.slice(0, 200);
     const row = {
       title, status: 'ready' as const, pdf_storage_path: path, pdf_generated_at: new Date().toISOString(), page_count: pageCount,
       data: { scene_id: scene.id, pdf_storage_path: path, page_count: pageCount },
@@ -564,7 +594,7 @@ export const sceneStudioService = {
       ? await supabase.from('moodboard_presentation_sheets').update(row).eq('id', prior.id).select('id').single()
       : await supabase.from('moodboard_presentation_sheets').insert({ ...row, project_id: scene.project_id, sheet_type: 'drawing_set', created_by: auth.user?.id ?? null }).select('id').single();
     if (error || !data) throw new Error(`The drawings were uploaded but not saved to the project: ${error?.message ?? 'no row'}`);
-    return { sheet_id: (data as { id: string }).id, title, project_id: scene.project_id };
+    return { sheet_id: (data as { id: string }).id, title, project_id: scene.project_id, pdf_path: path };
   },
 
   async linkRenderWorld(renderId: string, vrWorldId: string): Promise<void> {

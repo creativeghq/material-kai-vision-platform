@@ -2121,7 +2121,8 @@ async function executeAgent(
   } else if (priorUploadedImages.length > 0) {
     systemPrompt += `\n\n[CONTEXT] The user attached an image EARLIER in this conversation and has not `
       + `attached a new one on this turn. It is still available to the image tools as the default `
-      + `reference — do NOT tell the user no image was received, and do not ask them to re-upload.`;
+      + `reference — do NOT tell the user no image was received, and do not ask them to re-upload. `
+      + `The user's own upload(s), newest last: ${priorUploadedImages.slice(-4).join(' ')}`;
   }
 
   // If there are previously generated images in the conversation, remind the agent to use them for follow-up edits
@@ -2918,7 +2919,7 @@ async function executeAgent(
 
   if (config.tools.includes('manage_scenes')) {
     const sceneStudioMod = await import('../_shared/tools/scene-studio-tools.ts');
-    tools.push(sceneStudioMod.createManageScenesTool(userId, workspaceId, userJwt, onChunk));
+    tools.push(sceneStudioMod.createManageScenesTool(userId, workspaceId, userJwt, onChunk, toolImages));
   }
 
   // Appointments / meetings (crm module + entitlement gated; per-user via RLS)

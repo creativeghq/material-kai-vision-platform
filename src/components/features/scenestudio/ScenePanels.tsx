@@ -12,9 +12,10 @@ import type { VocabularyTerm } from '@/services/vocabularies';
 import { sceneStudioService, type SceneObject, type SceneProduct } from '@/services/sceneStudioService';
 import { effectiveSize } from '@/lib/scene/sceneGeometry';
 import { SCENE_OBJECT_KINDS } from '@/lib/scene/sceneReadSchema';
+import { COLOUR_ROLE_LABELS, type ColourPlanEntry } from '@/lib/scene/colourPlan';
 
 export type StyleChoice =
-  | { kind: 'style'; value: string; label: string; brief: string }
+  | { kind: 'style'; value: string; label: string; brief: string; palette?: string[] }
   | { kind: 'reference'; url: string; label: string };
 
 export const PinnedProductsContext = createContext<SceneProduct[]>([]);
@@ -28,7 +29,12 @@ export const StylePanel: React.FC<{
   busy: boolean;
   disabled: boolean;
   onPick(choice: StyleChoice): void;
-}> = ({ styles, references, active, busy, disabled, onPick }) => {
+  plan: ColourPlanEntry[];
+  onPlanChange(plan: ColourPlanEntry[]): void;
+  onRender(): void;
+}> = ({ styles, references, active, busy, disabled, onPick, plan, onPlanChange, onRender }) => {
+  const [editing, setEditing] = useState<number | null>(null);
+  const palette = active?.kind === 'style' ? (active.palette ?? []) : [];
   const [q, setQ] = useState('');
   const needle = q.trim().toLowerCase();
   const shownStyles = styles.filter((s) => !needle || s.label.toLowerCase().includes(needle) || String((s.metadata as { brief?: string })?.brief ?? '').toLowerCase().includes(needle));
@@ -37,7 +43,7 @@ export const StylePanel: React.FC<{
     <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Styles</CardTitle>
-        <p className="text-xs text-muted-foreground">Click a style to render the current layout in it.</p>
+        <p className="text-xs text-muted-foreground">Pick a style: its colours are spread over the room. Change any part, then render.</p>
       </CardHeader>
       <CardContent className="space-y-3">
         <form onSubmit={(e) => { e.preventDefault(); if (custom && !disabled) onPick({ kind: 'style', value: needle, label: q.trim(), brief: q.trim() }); }}>
@@ -55,7 +61,7 @@ export const StylePanel: React.FC<{
                 key={s.value}
                 type="button"
                 disabled={disabled}
-                onClick={() => onPick({ kind: 'style', value: s.value, label: s.label, brief: meta.brief ?? s.label })}
+                onClick={() => onPick({ kind: 'style', value: s.value, label: s.label, brief: meta.brief ?? s.label, palette: meta.palette })}
                 className={`overflow-hidden rounded-sm border text-left disabled:opacity-50 ${isActive ? 'border-primary ring-2 ring-primary' : 'border-hairline hover:border-foreground/40'}`}
                 title={meta.brief}
               >
@@ -70,9 +76,53 @@ export const StylePanel: React.FC<{
             );
           })}
         </div>
+        {plan.length > 0 && (
+          <div className="space-y-1.5">
+            <Label className="text-xs">Colour Plan</Label>
+            <div className="divide-y divide-hairline rounded-sm border border-hairline">
+              {plan.map((p, i) => (
+                <div key={`${p.role}-${i}`} className="px-2 py-1.5">
+                  <button type="button" className="flex w-full items-center gap-2 text-left" onClick={() => setEditing(editing === i ? null : i)}>
+                    <span className="h-5 w-5 shrink-0 rounded-sm border border-hairline" style={{ backgroundColor: p.hex }} />
+                    <span className="flex-1 text-xs">{COLOUR_ROLE_LABELS[p.role]}</span>
+                    <span className="font-mono text-[11px] text-muted-foreground">{p.hex}</span>
+                  </button>
+                  {editing === i && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      {palette.map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          aria-label={`Use ${c}`}
+                          onClick={() => { onPlanChange(plan.map((x, j) => (j === i ? { ...x, hex: c.toLowerCase() } : x))); setEditing(null); }}
+                          className={`h-6 w-6 rounded-sm border ${p.hex === c.toLowerCase() ? 'ring-2 ring-primary ring-offset-1' : 'border-hairline'}`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                      <input
+                        type="color"
+                        value={p.hex}
+                        onChange={(e) => onPlanChange(plan.map((x, j) => (j === i ? { ...x, hex: e.target.value } : x)))}
+                        className="h-6 w-8 cursor-pointer rounded-sm border border-hairline bg-transparent"
+                        aria-label="Pick any colour"
+                      />
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">Parts you coloured or gave a material yourself keep it.</p>
+          </div>
+        )}
+        {active && (
+          <Button className="w-full gap-1.5" disabled={disabled} onClick={onRender}>
+            {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+            Render in {active.label}
+          </Button>
+        )}
         {custom && (
           <Button variant="outline" size="sm" className="w-full gap-1.5" disabled={disabled} onClick={() => onPick({ kind: 'style', value: needle, label: q.trim(), brief: q.trim() })}>
-            <Sparkles className="h-3.5 w-3.5" />Render as “{q.trim()}”
+            <Sparkles className="h-3.5 w-3.5" />Use “{q.trim()}”
           </Button>
         )}
         {references.length > 0 && (

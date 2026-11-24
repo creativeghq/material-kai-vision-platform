@@ -2,8 +2,9 @@
 import React, { useMemo } from 'react';
 
 import { kitchenElevations, kitchenPlan, roomPlan, type DimLine, type DrawRun, type Elevation, type Pt } from '@/lib/scene/kitchenDrawings';
-import type { DrawingCheck } from '@/lib/scene/kitchenComposition';
+import { serviceChecks, type DrawingCheck, type ServiceKey, type ServicePoint } from '@/lib/scene/kitchenComposition';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
+import { yieldMeta } from '@/utils/blueprintComposition';
 import { todayLocalISO } from '@/utils/datetime';
 
 const SHEET_W = 297;
@@ -15,6 +16,7 @@ const FAINT = '#8a8780';
 const STATED = '#1f5fbf';
 const CONFLICT = '#c0392b';
 const SIDE_W = 96;
+const WATER = '#2e86c1';
 
 export interface CutLine { label: string; quantity: number; unit: string | null }
 
@@ -224,10 +226,21 @@ const Legend: React.FC<{ kitchen: boolean }> = ({ kitchen }) => {
   );
 };
 
-const ReadingPanel: React.FC<{ sourceUrl?: string | null; notes: string[]; checks: DrawingCheck[] }> = ({ sourceUrl, notes, checks }) => {
+interface ScheduleRow { key: ServiceKey; label: string; count: number; unit: string }
+
+const ReadingPanel: React.FC<{ sourceUrl?: string | null; notes: string[]; checks: DrawingCheck[]; schedule?: ScheduleRow[] }> = ({ sourceUrl, notes, checks, schedule = [] }) => {
   const x0 = SHEET_W - MARGIN - SIDE_W + 4;
   let y = MARGIN + 4;
   const rows: React.ReactNode[] = [];
+  if (schedule.length) {
+    rows.push(<text key="sh" x={x0} y={y} fontSize={2.4} fontWeight={700}>Services Schedule</text>);
+    y += 4.4;
+    for (const r of schedule) {
+      rows.push(<g key={`s${r.key}`}><ServiceSymbol k={r.key} x={x0 + 1.4} y={y - 0.7} /><text x={x0 + 4.5} y={y} fontSize={2}>{r.label}</text><text x={x0 + SIDE_W - 8} y={y} fontSize={2} textAnchor="end">{r.count} {r.unit}</text></g>);
+      y += 3.6;
+    }
+    y += 2;
+  }
   if (sourceUrl) {
     rows.push(<text key="st" x={x0} y={y} fontSize={2.4} fontWeight={700}>Original drawing</text>);
     rows.push(<image key="si" href={sourceUrl} x={x0} y={y + 1.5} width={SIDE_W - 6} height={52} preserveAspectRatio="xMidYMid meet" />);
@@ -256,6 +269,87 @@ const ReadingPanel: React.FC<{ sourceUrl?: string | null; notes: string[]; check
     <g fontFamily="Arial, sans-serif" fill={INK}>
       <line x1={x0 - 3} y1={MARGIN} x2={x0 - 3} y2={SHEET_H - MARGIN - BLOCK_H - 2} stroke="#d9d6cf" strokeWidth={0.3} />
       {rows}
+    </g>
+  );
+};
+
+const ServiceSymbol: React.FC<{ k: ServiceKey; x: number; y: number }> = ({ k, x, y }) => {
+  const r = 1.2;
+  const box = <rect x={x - r} y={y - r} width={2 * r} height={2 * r} fill="#fff" stroke={INK} strokeWidth={0.25} />;
+  const tag = (t: string, fill = INK) => <text x={x} y={y + 0.55} fontSize={1.4} fontWeight={700} textAnchor="middle" fill={fill} fontFamily="Arial, sans-serif">{t}</text>;
+  if (k === 'socket') return <g>{box}<circle cx={x} cy={y} r={0.35} fill={INK} /></g>;
+  if (k === 'socket_dedicated') return <g>{box}{tag('DC')}</g>;
+  if (k === 'carbon_filter') return <g>{box}{tag('CF')}</g>;
+  if (k === 'water_in') return <circle cx={x} cy={y} r={r} fill="#fff" stroke={WATER} strokeWidth={0.35} />;
+  if (k === 'waste_out') return <circle cx={x} cy={y} r={r} fill={INK} />;
+  if (k === 'gas_point') return <g><circle cx={x} cy={y} r={r} fill="#fff" stroke={INK} strokeWidth={0.25} />{tag('G')}</g>;
+  return (
+    <g stroke={INK} strokeWidth={0.3}>
+      <line x1={x} y1={y + r} x2={x} y2={y - r + 0.6} strokeDasharray="0.6 0.4" />
+      <polygon points={`${x - 0.8},${y - r + 0.8} ${x + 0.8},${y - r + 0.8} ${x},${y - r - 0.6}`} fill={INK} stroke="none" />
+    </g>
+  );
+};
+
+const SERVICE_ORDER: ServiceKey[] = ['socket', 'socket_dedicated', 'water_in', 'waste_out', 'gas_point', 'duct_run', 'carbon_filter'];
+
+const scheduleOf = (points: ServicePoint[]): ScheduleRow[] => SERVICE_ORDER
+  .map((key) => ({ key, count: points.filter((p) => p.key === key).length, ...yieldMeta(key) }))
+  .filter((r) => r.count > 0);
+
+const ServiceLegend: React.FC = () => {
+  let x = MARGIN;
+  const items = [
+    ...SERVICE_ORDER.map((k) => ({ id: k, node: <ServiceSymbol k={k} x={1.2} y={1.2} />, label: yieldMeta(k).label })),
+    { id: 'stated', node: <text y={2.2} fontSize={2.4} fill={STATED}>110</text>, label: 'Set by a Person' },
+    { id: 'assumed', node: <text y={2.2} fontSize={2.4} fill={FAINT} fontStyle="italic">≈110</text>, label: 'Trade Default' },
+  ];
+  return (
+    <g fontFamily="Arial, sans-serif" fontSize={2.1} fill={INK}>
+      {items.map((it) => {
+        const at = x;
+        x += it.label.length * 1.05 + 12;
+        return <g key={it.id} transform={`translate(${at}, ${MARGIN - 1.5})`}>{it.node}<text x={it.id === 'assumed' ? 7.5 : 4} y={2.1}>{it.label}</text></g>;
+      })}
+    </g>
+  );
+};
+
+const ServicesSheet: React.FC<{ e: Elevation; checks: DrawingCheck[] }> = ({ e, checks }) => {
+  const levels = [...new Map(e.services.map((p) => [p.height_mm, p])).values()].sort((a, b) => a.height_mm - b.height_mm);
+  const along = [...new Map(e.services.map((p) => [p.x_mm, p])).values()].sort((a, b) => a.x_mm - b.x_mm);
+  const pad = 500;
+  const padL = 450 + levels.length * 180;
+  const right = Math.max(e.width_mm, ...e.services.map((p) => p.x_mm));
+  const top = Math.max(e.height_mm, ...e.services.map((p) => p.height_mm));
+  const { s, ox, oy } = fit(right + padL + pad, top + 2 * pad + 300, SIDE_W);
+  const tx = (x: number, y: number): Pt => [ox + (x + padL) * s, oy + (top + pad - y) * s];
+  const dimTx = ([x, y]: Pt) => tx(x, y);
+  let prev = 0;
+  const chain: DimLine[] = [];
+  for (const p of along) {
+    if (p.x_mm - prev < 50) continue;
+    chain.push({ a: [prev, 0], b: [p.x_mm, 0], offset: [0, -300], text: `${Math.round((p.x_mm - prev) / 10)}`, tone: p.tone });
+    prev = p.x_mm;
+  }
+  return (
+    <g>
+      <ServiceLegend />
+      <line x1={tx(-200, 0)[0]} y1={tx(0, 0)[1]} x2={tx(right + 200, 0)[0]} y2={tx(0, 0)[1]} stroke={INK} strokeWidth={0.5} />
+      {e.rects.filter((r) => r.kind !== 'handle').map((r, i) => {
+        const [x, y] = tx(r.x, r.y + r.h);
+        const fill = r.kind === 'conflict' ? 'url(#conflict-hatch)' : r.kind === 'window' ? '#f3f6f8' : 'none';
+        return <rect key={i} x={x} y={y} width={r.w * s} height={r.h * s} fill={fill} stroke={r.kind === 'conflict' ? CONFLICT : '#c9c5bc'} strokeWidth={0.15} />;
+      })}
+      {levels.map((p, i) => (
+        <Dim key={`h${i}`} d={{ a: [0, 0], b: [0, p.height_mm], offset: [-(300 + i * 180), 0], text: `${Math.round(p.height_mm / 10)}`, tone: p.height_tone }} tx={dimTx} />
+      ))}
+      {chain.map((d, i) => <Dim key={`x${i}`} d={d} tx={dimTx} />)}
+      {e.services.map((p, i) => {
+        const [x, y] = tx(p.x_mm, p.height_mm);
+        return <ServiceSymbol key={i} k={p.key} x={x} y={y} />;
+      })}
+      <ReadingPanel notes={[]} checks={checks} schedule={scheduleOf(e.services)} />
     </g>
   );
 };
@@ -293,6 +387,10 @@ export const KitchenDrawings: React.FC<{
     ...elevations.map((e, i) => ({
       name: `Elevation ${String.fromCharCode(65 + i)} · ${e.runs.join(', ')}`,
       body: <ElevationSheet e={e} />,
+    })),
+    ...elevations.map((e, i) => ({ e, i })).filter(({ e }) => e.services.length).map(({ e, i }) => ({
+      name: `Services ${String.fromCharCode(65 + i)} · ${e.runs.join(', ')}`,
+      body: <ServicesSheet e={e} checks={serviceChecks(runs.filter((r) => e.run_ids.includes(r.id)))} />,
     })),
     ...(lines.length ? [{ name: 'Cut List', body: <CutListSheet lines={lines} /> }] : []),
   ];

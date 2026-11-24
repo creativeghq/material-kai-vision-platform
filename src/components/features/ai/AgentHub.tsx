@@ -1133,6 +1133,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   const [selectedModel, setSelectedModel] = useState<string>(
     AGENTS.find(a => a.id === 'orchestrator')?.defaultModel || 'anthropic/claude-opus-5-5',
   );
+  const savedSceneIds = useRef(new Set<string>());
   const [messages, setMessages] = useState<Message[]>([]);
   /**
    * Artifacts the user closed from this conversation's view (the canvas tab menu's
@@ -2622,13 +2623,14 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }, [saveAndLinkMessage]);
 
   const handleDrawingSetSaved = useCallback(async (saved: DrawingSetSaved) => {
-    const path = (await supabase.from('moodboard_presentation_sheets').select('pdf_storage_path').eq('id', saved.sheet_id).maybeSingle()).data?.pdf_storage_path as string | undefined;
-    const signed = path ? (await supabase.storage.from('pdf-documents').createSignedUrl(path, 60 * 60 * 24 * 7)).data?.signedUrl : undefined;
-    const sheetPdfData = { sheet_id: saved.sheet_id, sheet_type: 'drawing_set' as const, title: saved.title, pdf_url: signed ?? '', page_count: saved.page_count, credits_used: 0 };
+    const signed = (await supabase.storage.from('pdf-documents').createSignedUrl(saved.pdf_path, 60 * 60 * 24 * 7)).data?.signedUrl;
+    const sheetPdfData = { sheet_id: saved.sheet_id ?? '', sheet_type: 'drawing_set' as const, title: saved.title, pdf_url: signed ?? '', page_count: saved.page_count, credits_used: 0 };
     const msg: Message = {
       id: `msg-drawings-${Date.now()}`,
       role: 'assistant',
-      content: `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} saved to the project. They can go on the client view and into the deck.`,
+      content: saved.project_id
+        ? `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} saved to the project. They can go on the client view and into the deck.`
+        : `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} as a PDF. Put the room on a project to add them to the client view and the deck.`,
       timestamp: new Date(),
       agentId: 'interior-designer',
       sheetPdfData,
@@ -3679,7 +3681,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     model: selectedModel,
                     sceneData,
                   };
-                  const known = !intent && messages.some((m) => m.sceneData?.scene_id === sceneData.scene_id);
+                  const known = !intent && (savedSceneIds.current.has(sceneData.scene_id) || messages.some((m) => m.sceneData?.scene_id === sceneData.scene_id));
+                  if (!intent) savedSceneIds.current.add(sceneData.scene_id);
                   setMessages((prev) => (!intent && prev.some((m) => m.sceneData?.scene_id === sceneData.scene_id) ? prev : [...prev, scMsg]));
                   if (conversationId && !known) {
                     await saveAndLinkMessage(scMsg.id, { conversationId, role: 'assistant', content: scMsg.content, metadata: { agentId: selectedAgent, model: selectedModel, sceneData } });

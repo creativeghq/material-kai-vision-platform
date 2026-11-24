@@ -262,6 +262,7 @@ interface GenerateInteriorRequest {
   item_name?: string;
   spec?: Record<string, unknown>;
   scene_objects?: string[];
+  colour_plan?: string[];
   user_id?: string;
   workspace_id?: string;
   conversation_id?: string;
@@ -979,6 +980,9 @@ VIEW OVERRIDE — the camera position above is replaced. Photograph this specifi
         image_roles: roles.join('\n'),
         style: (body.style ?? 'as the room already suggests').slice(0, 200),
         instruction: body.prompt ? `ADDITIONAL INSTRUCTION: ${body.prompt.slice(0, 600)}` : '',
+        colour_plan: (body.colour_plan ?? []).length
+          ? `COLOUR PLAN (use every colour in it; it sets each named part's colour even where the 3D view shows another):\n${(body.colour_plan ?? []).slice(0, 16).map((l) => `- ${String(l).replace(/\s+/g, ' ').slice(0, 120)}`).join('\n')}`
+          : '',
       });
       const result = await generateImageWithGemini(
         { text: renderText, images: [...(styleBuffer ? [styleBuffer] : []), ...materialBuffers, captureBuffer] },

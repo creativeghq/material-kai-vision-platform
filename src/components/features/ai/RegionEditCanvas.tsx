@@ -29,15 +29,18 @@ interface RegionEditCanvasProps {
   /** Must return a Promise — canvas stays in loading state until it resolves/rejects */
   onApply: (result: RegionEditResult) => Promise<void>;
   onClose: () => void;
+  colours?: string[];
 }
 
 const BRUSH_SIZES = [12, 24, 40, 64] as const;
+const repaint = (hex: string) => `Change the colour of what is in the marked area to ${hex}. Keep its material, texture, shape, reflections and lighting exactly as they are.`;
 const MASK_FILL = 'rgba(245, 158, 11, 0.55)'; // amber-500 semi-transparent
 
 export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
   imageUrl,
   onApply,
   onClose,
+  colours,
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -315,6 +318,23 @@ export const RegionEditCanvas: React.FC<RegionEditCanvasProps> = ({
             <Trash2 className="w-3 h-3" /> Clear
           </button>
         </div>
+
+        {colours && colours.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Repaint the area:</span>
+            {colours.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={`Repaint in ${c}`}
+                onClick={() => setPrompt(repaint(c))}
+                className="h-6 w-6 rounded-sm border border-border"
+                style={{ backgroundColor: c }}
+              />
+            ))}
+            <input type="color" onChange={(e) => setPrompt(repaint(e.target.value))} className="h-6 w-8 cursor-pointer rounded-sm border border-border bg-transparent" aria-label="Pick any colour" />
+          </div>
+        )}
 
         {/* Prompt input + apply row */}
         <div className="flex gap-2">
