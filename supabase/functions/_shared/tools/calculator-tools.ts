@@ -23,7 +23,7 @@ import {
 } from '../calculators/heatPumpSizing.generated.ts';
 import { computeHeatingCostComparison, HEATING_COST_DEFAULTS, type AcType } from '../calculators/heatingCostComparison.generated.ts';
 import {
-  buildTileFloorPlan, DEFAULT_TILE_FLOOR, floorMaterialsKg, suggestBackButter, suggestedTrowelNotchMm, TILE_FLOOR_LIMITS,
+  buildTileFloorPlan, DEFAULT_TILE_FLOOR, floorMaterialsKg, suggestBackButter, suggestedTrowelNotchMm, TILE_FLOOR_LIMITS, tileSetOut, type TileCheck,
 } from '../installation/tileFloorTemplate.generated.ts';
 import { callerDbClient } from '../caller-client.ts';
 import { serviceClient } from '../supabase-client.ts';
@@ -451,6 +451,7 @@ export const createTileInstallationTool = (
       let spacers: number | null = 0;
       let steps: { title: string; instruction: string; wait: string | null }[] = [];
       const warnings = new Set<string>();
+      const setOut: Record<string, { full: number; cut_pieces: number; edges_mm: Record<string, number | null>; checks: TileCheck[] }> = {};
       for (const r of rooms) {
         if (r.width_m == null || r.depth_m == null) { spacers = null; continue; }
         const plan = buildTileFloorPlan({ ...DEFAULT_TILE_FLOOR, ...setting, areaWidthM: r.width_m, areaDepthM: r.depth_m, pattern });
@@ -458,6 +459,8 @@ export const createTileInstallationTool = (
         if (errors.length) return JSON.stringify({ success: false, error: `${r.label}: ${errors.join(' ')}` });
         for (const w of plan.issues.filter((i) => i.level === 'warning')) warnings.add(w.message);
         if (spacers !== null) spacers += plan.quantities.spacers;
+        const so = tileSetOut(plan, { sizesStated: r.source === 'stated' });
+        setOut[r.label] = { full: so.full, cut_pieces: so.cuts.reduce((n, c) => n + c.count, 0), edges_mm: so.edges, checks: so.checks };
         if (!steps.length) steps = plan.steps.map((s) => ({ title: s.title, instruction: s.instruction, wait: s.wait ?? null }));
       }
 
@@ -465,7 +468,8 @@ export const createTileInstallationTool = (
         product: product ? { id: product.id, name: product.name, size: sizeText } : null,
         tile: { length_mm: tileMm.lengthMm, width_mm: tileMm.widthMm },
         pattern: PATTERN_LABELS[pattern],
-        rooms: rooms.map((r) => ({ label: r.label, area_m2: Math.round(r.area_m2 * 100) / 100, source: r.source })),
+        rooms: rooms.map((r) => ({ label: r.label, area_m2: Math.round(r.area_m2 * 100) / 100, source: r.source, width_m: r.width_m, depth_m: r.depth_m, set_out: setOut[r.label] ?? null })),
+        pattern_key: pattern,
         rooms_from: roomsFrom,
         area_m2: areaM2,
         wastage_percent: (order?.wastage_percent as number | null | undefined) ?? wastage,
@@ -497,6 +501,7 @@ export const createTileInstallationTool = (
         + 'Never estimate a size that is not printed (do not measure by eye or from the drawing\'s scale) — ask the user for that room instead. '
         + 'To also SHOW the tile on the plan, call generate_gemini with the plan and the tile attached (its floor-plan render / 3D modes). '
         + 'Name the product (product_name or product_id); a series with several sizes needs `size`. Report `order.reason`, `order.box_m2_estimated` and every entry in `notes` and `warnings`. '
+        + 'A room given as width × depth also gets a setting-out drawing (start lines, every cut, edge pieces per wall) on the result card; name every failed check in its `set_out.checks` before anyone lays tiles. '
         + `Rooms typed as dimensions are ${TILE_FLOOR_LIMITS.areaM.min}–${TILE_FLOOR_LIMITS.areaM.max} m per side; split a larger floor into rectangles.`,
       schema: z.object({
         product_id: z.string().optional().describe('The tile product id, when known.'),

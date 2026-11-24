@@ -412,3 +412,6 @@ export const KitchenDrawings: React.FC<{
     </div>
   );
 };
+
+export const DRAWING = { SHEET_W, SHEET_H, MARGIN, BLOCK_H, SIDE_W, INK, FAINT, STATED, CONFLICT } as const;
+export { Sheet as DrawingSheet, Dim as DrawingDim, Hatch as ConflictHatch, fit as fitDrawing };

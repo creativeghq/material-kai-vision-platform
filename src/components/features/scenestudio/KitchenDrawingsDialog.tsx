@@ -15,7 +15,7 @@ const PRINT_CLASS = 'print-kitchen-drawings';
 
 export interface DrawingSetSaved { sheet_id: string | null; title: string; project_id: string | null; pdf_path: string; page_count: number }
 
-async function sheetsToPdf(root: HTMLElement): Promise<{ pdf: Blob; pages: number }> {
+export async function sheetsToPdf(root: HTMLElement): Promise<{ pdf: Blob; pages: number }> {
   const svgs = [...root.querySelectorAll<SVGSVGElement>('.kitchen-sheet svg')];
   if (!svgs.length) throw new Error('There is nothing to draw yet.');
   const [{ jsPDF }] = await Promise.all([import('jspdf'), import('svg2pdf.js')]);

@@ -1,8 +1,11 @@
 /** Inline AgentHub card for the `tile_installation` chunk emitted by plan_tile_installation. */
 
-import { AlertTriangle, Grid3x3 } from 'lucide-react';
+import { lazy, Suspense, useState } from 'react';
+import { AlertTriangle, Grid3x3, Ruler } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Button } from '@/components/core/ui/button';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { PATTERNS, type Pattern } from '@/lib/surfaceRenderer/patternVocabulary';
 import { formatNumber } from '@/utils/decimal';
 import type { TileQuantity } from '@/modules/finance/approvalRules';
 
@@ -10,7 +13,11 @@ export interface TileInstallationResult {
   product: { id: string; name: string; size: string | null } | null;
   tile: { length_mm: number; width_mm: number };
   pattern: string;
-  rooms: { label: string; area_m2: number; source: string }[];
+  rooms: {
+    label: string; area_m2: number; source: string; width_m?: number | null; depth_m?: number | null;
+    set_out?: { full: number; cut_pieces: number; checks: { rule: string; ok: boolean; detail: string }[] } | null;
+  }[];
+  pattern_key?: string;
   rooms_from: string;
   area_m2: number;
   wastage_percent: number | null;
@@ -25,7 +32,10 @@ export interface TileInstallationResult {
   notes: string[];
 }
 
+const TileDrawingsDialog = lazy(() => import('@/components/features/scenestudio/TileDrawingsDialog'));
+
 export function TileInstallationResultCard({ result }: { result: TileInstallationResult }) {
+  const [drawingsOpen, setDrawingsOpen] = useState(false);
   if (!result?.rooms?.length) return null;
   const n = (v: number | null | undefined, dp = 0) => formatNumber(v ?? null, { maxDecimals: dp });
   const o = result.order;
@@ -43,6 +53,10 @@ export function TileInstallationResultCard({ result }: { result: TileInstallatio
   const tileLabel = result.product
     ? `${result.product.name}${result.product.size ? ` ${result.product.size}` : ''}`
     : `${n(result.tile.length_mm)}×${n(result.tile.width_mm)} mm tile`;
+
+  const sized = result.rooms.filter((r) => r.width_m && r.depth_m);
+  const patternKey = PATTERNS.find((p) => p === result.pattern_key) as Pattern | undefined;
+  const failed = sized.flatMap((r) => (r.set_out?.checks ?? []).filter((c) => !c.ok).map((c) => `${r.label}: ${c.rule}`));
 
   return (
     <Card className="dashboard-card border-primary/30 max-w-md">
@@ -83,9 +97,31 @@ export function TileInstallationResultCard({ result }: { result: TileInstallatio
           </div>
         )}
 
+        {sized.length > 0 && patternKey && (
+          <div className="space-y-1.5 border-t border-hairline pt-2">
+            {failed.length > 0 && <p className="text-[11px] text-destructive">Before laying: {failed.join(' · ')}</p>}
+            <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setDrawingsOpen(true)}>
+              <Ruler className="h-3.5 w-3.5" />Setting-out drawing
+            </Button>
+          </div>
+        )}
+
         <Link to="/tools/tile-installation" className="block text-xs text-primary hover:underline">
           See the laying steps in 3D →
         </Link>
+        {drawingsOpen && patternKey && (
+          <Suspense fallback={null}>
+            <TileDrawingsDialog
+              open={drawingsOpen}
+              onOpenChange={setDrawingsOpen}
+              project={tileLabel}
+              input={{
+                rooms: sized.map((r) => ({ label: r.label, width_m: r.width_m!, depth_m: r.depth_m!, stated: r.source === 'stated' })),
+                tileLengthMm: result.tile.length_mm, tileWidthMm: result.tile.width_mm, pattern: patternKey, jointMm: result.joint_mm, tileLabel,
+              }}
+            />
+          </Suspense>
+        )}
       </CardContent>
     </Card>
   );

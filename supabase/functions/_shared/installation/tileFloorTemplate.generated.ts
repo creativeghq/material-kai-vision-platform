@@ -579,3 +579,82 @@ export function cameraPose(shot: CameraShot, widthM: number, depthM: number): Ca
       return from([0.55, 0.95, 1], span * 1.55, [0, 0, 0]);
   }
 }
+
+export interface TileCheck { rule: string; ok: boolean; detail: string }
+export interface TileCutGroup { xMm: number; zMm: number; count: number; thin: boolean }
+export interface TileSetOut {
+  axisAligned: boolean;
+  full: number;
+  cuts: TileCutGroup[];
+  thinCuts: number[];
+  edges: { left: number | null; right: number | null; top: number | null; bottom: number | null };
+  checks: TileCheck[];
+}
+
+const extentOf = (p: TilePiece) => ({
+  x: Math.abs(p.length * Math.cos(p.angle)) + Math.abs(p.width * Math.sin(p.angle)),
+  z: Math.abs(p.length * Math.sin(p.angle)) + Math.abs(p.width * Math.cos(p.angle)),
+});
+
+export function tileSetOut(plan: TileFloorPlan, opts: { sizesStated: boolean }): TileSetOut {
+  const { params } = plan;
+  const axisAligned = RUNNING.includes(params.pattern) && (((params.rotationDeg % 90) + 90) % 90) === 0 && plan.pieces.every((p) => p.visible);
+  const gap = params.perimeterGapMm;
+  const x1 = gap + plan.innerWidthMm;
+  const z1 = gap + plan.innerDepthMm;
+  const groups = new Map<string, TileCutGroup>();
+  const thinCuts: number[] = [];
+  const edgeMin = { left: Infinity, right: Infinity, top: Infinity, bottom: Infinity };
+  for (const p of plan.pieces) {
+    if (!p.cut || !p.visible) continue;
+    const full = extentOf(p);
+    const cutX = p.visible.lx < full.x - EPS;
+    const cutZ = p.visible.lz < full.z - EPS;
+    const thin = (cutX && p.visible.lx < full.x / 3) || (cutZ && p.visible.lz < full.z / 3);
+    if (thin) thinCuts.push(p.index);
+    const xMm = Math.round(p.visible.lx);
+    const zMm = Math.round(p.visible.lz);
+    const key = `${xMm}x${zMm}`;
+    const g = groups.get(key) ?? { xMm, zMm, count: 0, thin };
+    g.count += 1;
+    groups.set(key, g);
+    const minX = p.cx - full.x / 2;
+    const maxX = p.cx + full.x / 2;
+    const minZ = p.cz - full.z / 2;
+    const maxZ = p.cz + full.z / 2;
+    if (cutX && minX < gap - EPS) edgeMin.left = Math.min(edgeMin.left, p.visible.lx);
+    if (cutX && maxX > x1 + EPS) edgeMin.right = Math.min(edgeMin.right, p.visible.lx);
+    if (cutZ && minZ < gap - EPS) edgeMin.top = Math.min(edgeMin.top, p.visible.lz);
+    if (cutZ && maxZ > z1 + EPS) edgeMin.bottom = Math.min(edgeMin.bottom, p.visible.lz);
+  }
+  const edge = (v: number) => (Number.isFinite(v) ? Math.round(v) : null);
+  const edges = { left: edge(edgeMin.left), right: edge(edgeMin.right), top: edge(edgeMin.top), bottom: edge(edgeMin.bottom) };
+  const cuts = [...groups.values()].sort((a, b) => b.count - a.count || a.xMm - b.xMm);
+  const narrowest = Math.min(Infinity, ...plan.pieces.filter((p) => thinCuts.includes(p.index)).map((p) => Math.min(p.visible!.lx, p.visible!.lz)));
+  const off = (a: number | null, b: number | null) => (a != null && b != null && Math.abs(a - b) > 10 ? `${a} and ${b} mm` : null);
+  const unbalanced = [off(edges.left, edges.right), off(edges.top, edges.bottom)].filter(Boolean);
+  const checks: TileCheck[] = [
+    axisAligned
+      ? {
+        rule: 'No Cut Under a Third of a Tile',
+        ok: thinCuts.length === 0,
+        detail: thinCuts.length
+          ? `${thinCuts.length} cut ${thinCuts.length === 1 ? 'piece is' : 'pieces are'} under a third of the tile (narrowest ${Math.round(narrowest)} mm, hatched red). Move the start line, or choose another size or pattern.`
+          : 'Every cut piece is at least a third of the tile.',
+      }
+      : { rule: 'No Cut Under a Third of a Tile', ok: false, detail: 'Cuts in this pattern are angled and are not measured here; the tiler sets them out on site.' },
+    axisAligned
+      ? {
+        rule: 'Edge Cuts Match on Opposite Walls',
+        ok: params.anchor !== 'centre' || unbalanced.length === 0,
+        detail: unbalanced.length ? `Opposite edges differ: ${unbalanced.join('; ')}.` : 'Opposite edges are cut to the same width.',
+      }
+      : { rule: 'Edge Cuts Match on Opposite Walls', ok: false, detail: 'Not measured for an angled pattern.' },
+    {
+      rule: 'Room Sizes Stated by a Person',
+      ok: opts.sizesStated,
+      detail: opts.sizesStated ? 'Width and depth were given by a person.' : 'The room sizes are assumed; measure the room before cutting.',
+    },
+  ];
+  return { axisAligned, full: plan.pieces.filter((p) => !p.cut).length, cuts, thinCuts, edges, checks };
+}
