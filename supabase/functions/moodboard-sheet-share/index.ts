@@ -13,6 +13,8 @@ import { recordPageEvent } from '../_shared/document-events.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { SHEET_ASSET_BUCKET, sheetAssetPath } from '../_shared/sheetAssetRefs.generated.ts';
 
+const SCENE_MODEL_BUCKET = 'generation-images';
+
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
@@ -440,7 +442,6 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           const { data: prows } = await supabase.from('products')
             .select('id, name, workspace_id, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id)')
             .in('id', productIds);
-          const SCENE_MODEL_BUCKET = 'generation-images';
           const FORMAT_ATTRS = ['width_mm', 'length_mm', 'roll_width_mm', 'roll_length_m', 'plank_width_mm', 'plank_length_mm', 'slab_size'];
           const FORMAT_META = [...FORMAT_ATTRS, 'dimensions', 'available_sizes', 'dimensions_cm_from_vision', 'decor_repeat_mm'];
           const colourOptionsOf = (meta: unknown) => {

@@ -1532,8 +1532,8 @@ export async function buildFullDeckCover(
 ): Promise<void> {
   const page = newSheetPage(pdfDoc);
 
-  // Cover artwork: a user-picked photo is a backdrop (dimmed so the title reads); the
-  // workspace's branded template cover is a designed page, so it renders full strength.
+  // A user-picked photo is a dimmed backdrop under the title. The workspace's designed cover renders
+  // full strength and untouched, so the deck's own facts go in a white band above its artwork.
   if (cover.cover_image_url) {
     const bytes = await fetchImageBytes(cover.cover_image_url);
     const img = bytes ? await embedImageBytes(pdfDoc, bytes) : null;
@@ -1557,6 +1557,14 @@ export async function buildFullDeckCover(
         width: d.width,
         height: d.height,
       });
+      const band = 64;
+      page.drawRectangle({ x: 0, y: PAGE_H - band, width: PAGE_W, height: band, color: rgb(1, 1, 1) });
+      page.drawText(cover.title, {
+        x: MARGIN, y: PAGE_H - 30, size: 18, font: fonts.bold, color: COLOR_DARK, maxWidth: PAGE_W - MARGIN * 2,
+      });
+      const facts = [cover.client_name ? `Prepared for ${cover.client_name}` : null, cover.date.slice(0, 10)].filter(Boolean).join('  ·  ');
+      page.drawText(facts, { x: MARGIN, y: PAGE_H - 50, size: 10, font: fonts.regular, color: COLOR_GRAY });
+      return;
     }
   }
 
