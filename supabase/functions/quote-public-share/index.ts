@@ -91,7 +91,6 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     }
   } catch { /* falls back to the bare name */ }
 
-  // Same image rule as the quote PDF: the line's own picture, else the catalogue variant's photo.
   const lineImages: Record<string, string> = {};
   await Promise.all((rawItems ?? []).filter((it: any) => !it.custom_image_url && it.product_id).map(async (it: any) => {
     try {
@@ -213,8 +212,7 @@ Deno.serve(withApiLogging('quote-public-share', async (req: Request) => {
     return jsonResponse({ ok: true, accepted: true, signed_at: new Date().toISOString() });
   }
 
-  // Bill-to name + email (pre-fills the signature form; the link is the client's own) and the
-  // customer's VAT-inclusive display preference. No other contact details leave this function.
+  // Bill-to name + email pre-fill the signature form; no other contact detail leaves this function.
   let client_name: string | null = null;
   let client_email: string | null = null;
   let prices_vat_inclusive = false;
