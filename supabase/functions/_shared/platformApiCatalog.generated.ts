@@ -4933,6 +4933,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "required": true,
         "description": "The caller's workspace that is charged. (string (uuid))"
+      },
+      "colour_hex": {
+        "type": "string",
+        "description": "One of the product's own colour options; its swatch becomes a flat decor of that colour, kept in product_colour_textures"
       }
     }
   },

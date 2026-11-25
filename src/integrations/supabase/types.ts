@@ -19967,6 +19967,60 @@ export type Database = {
           },
         ]
       }
+      product_colour_textures: {
+        Row: {
+          albedo_path: string
+          colour_hex: string
+          covers_mm: number
+          created_at: string
+          created_by: string | null
+          id: string
+          product_id: string
+          source_image_url: string | null
+          storage_bucket: string
+          workspace_id: string
+        }
+        Insert: {
+          albedo_path: string
+          colour_hex: string
+          covers_mm: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id: string
+          source_image_url?: string | null
+          storage_bucket?: string
+          workspace_id: string
+        }
+        Update: {
+          albedo_path?: string
+          colour_hex?: string
+          covers_mm?: number
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          product_id?: string
+          source_image_url?: string | null
+          storage_bucket?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_colour_textures_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_colour_textures_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_material_maps: {
         Row: {
           albedo_path: string | null
@@ -27395,6 +27449,72 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scene_materials: {
+        Row: {
+          albedo_path: string
+          created_at: string
+          is_active: boolean
+          key: string
+          kind: string
+          label: string
+          license: string
+          mean_linear: number[]
+          normal_path: string
+          normal_scale: number
+          priority: number
+          roles: string[]
+          roughness_factor: number
+          roughness_path: string
+          source_url: string | null
+          storage_bucket: string
+          tile_mm: number
+          tint_only: boolean
+          words: string[]
+        }
+        Insert: {
+          albedo_path: string
+          created_at?: string
+          is_active?: boolean
+          key: string
+          kind: string
+          label: string
+          license: string
+          mean_linear: number[]
+          normal_path: string
+          normal_scale?: number
+          priority?: number
+          roles?: string[]
+          roughness_factor?: number
+          roughness_path: string
+          source_url?: string | null
+          storage_bucket?: string
+          tile_mm: number
+          tint_only?: boolean
+          words?: string[]
+        }
+        Update: {
+          albedo_path?: string
+          created_at?: string
+          is_active?: boolean
+          key?: string
+          kind?: string
+          label?: string
+          license?: string
+          mean_linear?: number[]
+          normal_path?: string
+          normal_scale?: number
+          priority?: number
+          roles?: string[]
+          roughness_factor?: number
+          roughness_path?: string
+          source_url?: string | null
+          storage_bucket?: string
+          tile_mm?: number
+          tint_only?: boolean
+          words?: string[]
+        }
+        Relationships: []
       }
       scene_settings: {
         Row: {

@@ -393,12 +393,14 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     return () => window.removeEventListener('keydown', onKey);
   });
 
-  const makeTexture = async (p: SceneProduct) => {
+  const makeTexture = async (p: SceneProduct, hex?: string | null) => {
     if (!data) return;
     setMakingTexture(true);
     try {
-      const res = await sceneStudioService.makeTexture(data.scene.workspace_id, p.id);
-      const next = { ...p, albedoUrl: res.albedo_url };
+      const res = await sceneStudioService.makeTexture(data.scene.workspace_id, p.id, hex);
+      const next = hex
+        ? { ...p, colourTextures: { ...p.colourTextures, [hex]: { url: res.albedo_url, coversM: (res.covers_mm ?? 1000) / 1000 } } }
+        : { ...p, albedoUrl: res.albedo_url };
       setProducts((map) => ({ ...map, [p.id]: next }));
       setPaintProduct((cur) => (cur?.id === p.id ? next : cur));
       toast({
@@ -930,7 +932,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
           makingTexture={makingTexture}
           onSet={(slot, patch) => void setSlot(selected, slot, patch)}
           onReset={(slot) => void resetSlot(selected, slot)}
-          onMakeTexture={(p) => void makeTexture(p)}
+          onMakeTexture={(p, hex) => void makeTexture(p, hex)}
         />
       )}
     />
@@ -1029,13 +1031,13 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
               <p className="text-[11px] text-muted-foreground">{paintOption ? colourOptions(paintProduct).find((o) => o.hex === paintOption)?.name : 'No option picked: the product photo is used.'}</p>
             </div>
           )}
-          {paintProduct && !paintOption && (
-            paintProduct.albedoUrl
+          {paintProduct && (paintOption ? colourOptions(paintProduct).some((o) => o.hex === paintOption && o.swatch_url) : true) && (
+            (paintOption ? paintProduct.colourTextures?.[paintOption] : paintProduct.albedoUrl)
               ? <p className="text-[11px] text-muted-foreground">Laid with its clean texture.</p>
               : (
                 <div className="space-y-1 rounded-sm border border-hairline bg-surface-sunken p-2">
-                  <p className="text-[11px] text-muted-foreground">Laid from the product photo, which may show a whole room. A clean texture is one flat piece of the material, made once and kept on the product for every room.</p>
-                  <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => void makeTexture(paintProduct)}>
+                  <p className="text-[11px] text-muted-foreground">{paintOption ? 'The catalogue swatch of this colour is very small, so a library material in the same tone is laid. A clean texture is this colour itself, made once and kept on the product for every room.' : 'Laid from the product photo, which may show a whole room. A clean texture is one flat piece of the material, made once and kept on the product for every room.'}</p>
+                  <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => void makeTexture(paintProduct, paintOption)}>
                     {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                     {makingTexture ? 'Making the Texture…' : 'Make a Clean Texture (6 credits)'}
                   </Button>

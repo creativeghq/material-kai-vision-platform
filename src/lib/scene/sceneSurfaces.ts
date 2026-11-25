@@ -56,6 +56,8 @@ export interface Finish {
   tileL: number;
   jointed: boolean;
   label: string | null;
+  thicknessMm?: number | null;
+  colourTexture?: { url: string; coversM: number } | null;
   normalUrl?: string | null;
   roughnessUrl?: string | null;
   decor?: BoardDecorRef | null;
@@ -69,6 +71,15 @@ export function decorRepeatM(product: { metadata?: unknown } | null | undefined)
   const w = Number(m[1].replace(',', '.'));
   const l = Number((m[2] ?? m[1]).replace(',', '.'));
   return w > 0 && l > 0 ? [w / 1000, l / 1000] : null;
+}
+
+function thicknessMm(product: SceneProduct): number | null {
+  const sizes = (product.metadata as Record<string, unknown> | null)?.available_sizes;
+  const found = (Array.isArray(sizes) ? sizes : []).flatMap((s) => {
+    const m = String(s).match(/^\s*[\d.,]+\s*[x×]\s*[\d.,]+\s*[x×]\s*([\d.,]+)\s*mm/i);
+    return m ? [Number(m[1].replace(',', '.'))] : [];
+  });
+  return found.length ? Math.max(...found) : null;
 }
 
 type FinishSource = Pick<SceneSurface, 'colour_hex'> & { decor_brand?: string | null; decor_code?: string | null; decor_name?: string | null };
@@ -86,7 +97,8 @@ export function resolveFinish(surface: FinishSource | null, product: SceneProduc
   if (option) {
     return {
       imageUrl: option.swatch_url, hex: option.hex, tileW: fmt.tileWidthM, tileL: fmt.tileLengthM, jointed,
-      label: `${product.name} — ${option.name}`,
+      label: `${product.name} — ${option.name}`, thicknessMm: thicknessMm(product),
+      colourTexture: product.colourTextures?.[option.hex] ?? null,
     };
   }
   const pbr = product.albedoUrl ? { normalUrl: product.normalUrl ?? null, roughnessUrl: product.roughnessUrl ?? null } : {};

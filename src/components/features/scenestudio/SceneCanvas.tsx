@@ -10,8 +10,8 @@ import { PackedSplats, SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
-import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, oakFloorTexture, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
-import { canvasRelief, finishTone } from '@/components/features/scenestudio/surfaceMaps';
+import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, type LitRoom, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
+import { finishTone } from '@/components/features/scenestudio/surfaceMaps';
 import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
 import { MODEL_FRONT_TURN_DEG, MAX_MODEL_SPLATS, crowded, fitModel, isMeshModel, thinSplats } from '@/lib/scene/splatFit';
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
@@ -26,7 +26,7 @@ import {
   indexSurfaces, objectSlotFinishes, resolveFinish, splashFinish, surfaceKey, wallFaceFinish, zonesOn, type Finish, type SurfaceTarget,
 } from '@/lib/scene/sceneSurfaces';
 import {
-  effectiveSize, idColour, openingPlacement, planBounds, planFrame, pointInPolygon, rgbToHex,
+  effectiveSize, idColour, openingPlacement, planBounds, planFrame, pointInPolygon, polygonCentroid, rgbToHex,
   rotationToPlan, rotationToScene, toPlan, toScene, walkStep, wallPieces,
   type PlanFrame, type PlanOpening, type PlanRoom, type PlanWall,
 } from '@/lib/scene/sceneGeometry';
@@ -332,6 +332,7 @@ const SplatShadow: React.FC<{ kind: string; w: number; d: number; h: number; onF
 
 const MAX_CAPTURE_SIDE = 1536;
 const WALL_DEFAULT = '#efebe4';
+const FLOOR_DEFAULT = '#a98f6f';
 const SELECT_COLOUR = '#ff7a3d';
 
 const KIND_COLOURS: Record<string, string> = {
@@ -371,10 +372,7 @@ const FloorMesh: React.FC<{
     s.closePath();
     return s;
   }, [room.outline, frame]);
-  const oak = useMemo(() => oakFloorTexture(), []);
-  const oakRelief = useMemo(() => canvasRelief(oak.image as HTMLCanvasElement, 1.4, 0.5), [oak]);
   const finish = useMemo(() => resolveFinish(surface ?? null, product), [surface, product]);
-  const tiled = !!finish?.imageUrl;
   return (
     <group>
       <mesh
@@ -390,25 +388,11 @@ const FloorMesh: React.FC<{
         onPointerOut={() => onHover(null)}
       >
         <shapeGeometry args={[shape]} />
-        {tiled
-          ? <FinishMaterial finish={finish} fallback="#ffffff" w={1} h={1} wireframe={wireframe} highlight={highlightFloor} />
-          : (
-            <meshStandardMaterial
-              key="oak"
-              map={oak}
-              normalMap={oakRelief.normalMap}
-              roughnessMap={oakRelief.roughnessMap}
-              color={surface?.colour_hex ? new Color(surface.colour_hex).lerp(new Color('#ffffff'), 0.55) : '#ffffff'}
-              roughness={1}
-              emissive={highlightFloor ? '#3d7bff' : '#000000'}
-              emissiveIntensity={highlightFloor ? 0.22 : 0}
-              wireframe={wireframe}
-            />
-          )}
+        <FinishMaterial role="surface:floor" finish={finish} fallback={FLOOR_DEFAULT} w={1} h={1} wireframe={wireframe} highlight={highlightFloor} rough={0.5} />
       </mesh>
       <Ceiling height={ceilingHeight} onClick={onPickCeiling} onHover={(on) => onHover(on ? 'ceiling' : null)}>
         <shapeGeometry args={[ceilingShape]} />
-        <FinishMaterial finish={ceiling} fallback="#f4f2ee" w={1} h={1} wireframe={wireframe} highlight={highlightCeiling} side={DoubleSide} />
+        <FinishMaterial role="surface:ceiling" finish={ceiling} fallback="#f4f2ee" w={1} h={1} wireframe={wireframe} highlight={highlightCeiling} side={DoubleSide} />
       </Ceiling>
     </group>
   );
@@ -904,11 +888,11 @@ const WalkController: React.FC<{
 let rectLightsReady = false;
 
 /** Daylight coming in through one window: a soft area light in the opening, aimed into the room and slightly down. */
-const WindowLight: React.FC<{ pos: [number, number, number]; look: [number, number, number]; width: number; height: number }> = ({ pos, look, width, height }) => {
+const WindowLight: React.FC<{ roomId: string | null; pos: [number, number, number]; look: [number, number, number]; width: number; height: number }> = ({ roomId, pos, look, width, height }) => {
   const ref = useRef<RectAreaLight>(null);
   if (!rectLightsReady) { RectAreaLightUniformsLib.init(); rectLightsReady = true; }
   useEffect(() => { ref.current?.lookAt(look[0], look[1], look[2]); }, [look]);
-  return <rectAreaLight ref={ref} position={pos} width={width} height={height} intensity={3.2} color="#fff6e8" />;
+  return <rectAreaLight ref={ref} position={pos} width={width} height={height} intensity={2.2} color="#fff6e8" userData={{ windowRoom: roomId }} />;
 };
 
 export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => {
@@ -1054,8 +1038,14 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     const inset = Math.max(wall.thickness_mm, 20) / 2000 + 0.03;
     const pos: [number, number, number] = [p.center[0] + nx * inset, p.center[1], p.center[2] + nz * inset];
     const look: [number, number, number] = [pos[0] + nx, pos[1] - 0.25, pos[2] + nz];
-    return [{ id: o.id, pos, look, width: p.width, height: p.height }];
+    const roomId = sides.exterior === 'minus' ? sides.plus : sides.minus;
+    return [{ id: o.id, roomId, pos, look, width: p.width, height: p.height }];
   }), [openings, walls, wallSides, frame]);
+  const litRooms = useMemo<LitRoom[]>(() => rooms.filter((r) => r.outline.length > 2).map((r) => ({
+    id: r.id, outline: r.outline.map(([x, y]) => toScene(x, y, frame)), centre: toScene(...polygonCentroid(r.outline), frame), height: (r.height_mm ?? defaultWallHeightMm) / 1000,
+  })), [rooms, frame, defaultWallHeightMm]);
+  const lightVersion = useMemo(() => ({ surfaces, finishes, objects, products, sunHour }), [surfaces, finishes, objects, products, sunHour]);
+  const lightReady = useCallback(() => !!drawn.current?.visible && (wallsGroup.current?.scale.y ?? 0) > 0.99, []);
 
   const roomOfPoint = (xMm: number, yMm: number) => rooms.find((r) => pointInPolygon(xMm, yMm, r.outline))?.id ?? null;
 
@@ -1070,8 +1060,8 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       style={{ touchAction: 'none' }}
     >
       <color attach="background" args={['#e9e6e1']} />
-      <RoomLighting span={span} sunHour={sunHour} />
-      {!wireframe && windowLights.map((l) => <WindowLight key={l.id} {...l} />)}
+      <RoomLighting span={span} sunHour={sunHour} rooms={litRooms} version={lightVersion} solid={lightReady} />
+      {!wireframe && windowLights.map(({ id, ...l }) => <WindowLight key={id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
       {(hasSplats || worlds.length > 0) && <SparkLayer />}
       <AssetContext.Provider value={track}>
@@ -1131,7 +1121,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           >
             <planeGeometry args={[w, d]} />
             {z
-              ? <FinishMaterial finish={finishOfSurface(z)} fallback="#cfc6b8" w={w} h={d} wireframe={wireframe} highlight={tool === 'paint' && hover === `zone:${z.id}`} />
+              ? <FinishMaterial finish={finishOfSurface(z)} role="surface:floor" fallback="#cfc6b8" w={w} h={d} wireframe={wireframe} highlight={tool === 'paint' && hover === `zone:${z.id}`} />
               : <meshBasicMaterial color="#3d7bff" transparent opacity={0.35} depthWrite={false} />}
           </mesh>
         );
@@ -1242,7 +1232,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       {!wireframe && !photo && (hasSplats || worlds.length > 0) && <SplatsAfterComposer script={script} />}
       {!wireframe && !photo && (
         <EffectComposer multisampling={4}>
-          <N8AO aoRadius={0.5} distanceFalloff={0.6} intensity={2.2} halfRes quality="medium" />
+          <N8AO aoRadius={0.3} distanceFalloff={0.4} intensity={1.2} halfRes quality="medium" />
           <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         </EffectComposer>
       )}

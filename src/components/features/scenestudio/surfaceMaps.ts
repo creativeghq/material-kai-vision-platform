@@ -1,11 +1,10 @@
-/** Colour, relief and gloss for a surface finish, derived in the browser from the product image (joints recessed, glaze from tone). */
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { CanvasTexture, NoColorSpace, RepeatWrapping, SRGBColorSpace, type Texture } from 'three';
+/** Colour, relief and gloss for a surface: the product's own image, or the library material its colour, name or part calls for. */
+import { useContext, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { CanvasTexture, NoColorSpace, RepeatWrapping, SRGBColorSpace, TextureLoader, type Texture } from 'three';
+import { linearOfHex, pickMaterial, tintFor, type SceneMaterial } from '@/lib/scene/sceneMaterials';
+import { AssetContext } from '@/components/features/scenestudio/assetContext';
 import type { Finish } from '@/lib/scene/sceneSurfaces';
-
-export interface FinishMaps { map: Texture | null; normalMap: Texture; roughnessMap: Texture }
-
-const cache = new Map<string, Promise<FinishMaps>>();
+import { sceneMaterials } from '@/services/sceneMaterialsService';
 
 function loadImage(url: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -59,61 +58,155 @@ function luminance(g: CanvasRenderingContext2D, w: number, h: number): Float32Ar
   return out;
 }
 
-let plaster: Promise<FinishMaps> | null = null;
-
-/** Painted plaster: a soft trowelled relief, no colour of its own. */
-export function plasterMaps(): Promise<FinishMaps> {
-  if (plaster) return plaster;
-  const w = 256; const h = 256;
-  const height = new Float32Array(w * h);
-  let seed = 11;
-  const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-  for (let k = 0; k < 900; k++) {
-    const cx = rnd() * w; const cy = rnd() * h; const rad = 4 + rnd() * 18; const amp = (rnd() - 0.5) * 0.25;
-    for (let y = Math.floor(cy - rad); y < cy + rad; y++) {
-      for (let x = Math.floor(cx - rad); x < cx + rad; x++) {
-        const d = Math.hypot(x - cx, y - cy) / rad;
-        if (d < 1) height[((y + h) % h) * w + ((x + w) % w)] += amp * (1 - d * d);
-      }
-    }
-  }
-  for (let i = 0; i < height.length; i++) height[i] = 0.5 + height[i] + (rnd() - 0.5) * 0.04;
-  plaster = Promise.resolve({ map: null, ...reliefMaps(height, null, w, h, { strength: 1.6, rough: 0.92, roughJoint: 0.92 }) });
-  return plaster;
+export interface Look {
+  map: Texture | null;
+  normalMap: Texture | null;
+  roughnessMap: Texture | null;
+  aoMap: Texture | null;
+  /** Linear factor on the map, or the plain colour itself. */
+  colour: [number, number, number];
+  normalScale: number;
+  roughness: number;
+  /** Metres one repeat covers, for the colour and gloss and for the relief. */
+  tile: [number, number];
+  reliefTile: [number, number];
 }
 
-/** Oak boards: grain from the albedo, board joints recessed. */
-export function canvasRelief(source: HTMLCanvasElement, strength: number, rough: number): FinishMaps {
-  const w = 512; const h = Math.round(512 * (source.height / source.width));
+const cache = new Map<string, Promise<Look>>();
+const loader = new TextureLoader();
+const shared = new Map<string, Promise<Texture>>();
+
+function loadTexture(url: string, colour: boolean): Promise<Texture> {
+  const hit = shared.get(url);
+  if (hit) return hit;
+  const job = loader.loadAsync(url).then((t) => {
+    t.wrapS = RepeatWrapping; t.wrapT = RepeatWrapping;
+    t.colorSpace = colour ? SRGBColorSpace : NoColorSpace;
+    t.anisotropy = 8;
+    return t;
+  });
+  job.catch(() => shared.delete(url));
+  shared.set(url, job);
+  return job;
+}
+
+async function libraryLook(m: SceneMaterial, hex: string | null): Promise<Look> {
+  const [map, normalMap, roughnessMap] = await Promise.all([loadTexture(m.albedoUrl, true), loadTexture(m.normalUrl, false), loadTexture(m.roughnessUrl, false)]);
+  return {
+    map, normalMap, roughnessMap, aoMap: null, colour: tintFor(m, hex), normalScale: m.normalScale, roughness: m.roughnessFactor,
+    tile: [m.tileM, m.tileM], reliefTile: [m.tileM, m.tileM],
+  };
+}
+
+const plainLook = (hex: string, roughness: number): Look => ({
+  map: null, normalMap: null, roughnessMap: null, aoMap: null, colour: linearOfHex(hex), normalScale: 1, roughness, tile: [1, 1], reliefTile: [1, 1],
+});
+
+const decors = new Map<string, Promise<Look>>();
+
+/** One colour of a product as its own flat decor; the fine relief and gloss follow its grain. */
+function decorLook(url: string, coversM: number): Promise<Look> {
+  const hit = decors.get(url);
+  if (hit) return hit;
+  const job = loadImage(url).then((img): Look => {
+    const side = Math.min(1024, img.width);
+    const c = document.createElement('canvas'); c.width = side; c.height = side;
+    const g = c.getContext('2d', { willReadFrequently: true })!;
+    g.imageSmoothingQuality = 'high';
+    g.drawImage(img, 0, 0, side, side);
+    const { normalMap, roughnessMap } = reliefMaps(luminance(g, side, side), null, side, side, { strength: 0.9, rough: 0.5, roughJoint: 0.5 });
+    return { map: tex(c, true), normalMap, roughnessMap, aoMap: null, colour: [1, 1, 1], normalScale: 1, roughness: 1, tile: [coversM, coversM], reliefTile: [coversM, coversM] };
+  });
+  job.catch(() => decors.delete(url));
+  decors.set(url, job);
+  return job;
+}
+
+const profiles = new Map<string, { normalMap: Texture; aoMap: Texture }>();
+
+/** Relief that only changes across the width of a board: its flutes, and the joint with the next board. */
+function boardProfile(key: string, columns: Float32Array | null, widthM: number): { normalMap: Texture; aoMap: Texture } {
+  const hit = profiles.get(key);
+  if (hit) return hit;
+  const w = 1024; const h = 4;
+  const height = new Float32Array(w * h).fill(1);
+  const joint = Math.max(2, Math.round((0.0025 / widthM) * w));
+  for (let x = 0; x < w; x++) {
+    let v = 1;
+    if (columns) {
+      const at = (x / w) * columns.length - 0.5;
+      const i = Math.max(0, Math.floor(at)); const j = Math.min(columns.length - 1, i + 1);
+      v = columns[i] + (columns[j] - columns[i]) * Math.max(0, at - i);
+    } else if (x < joint) v = Math.abs(x - joint / 2) / (joint / 2);
+    for (let y = 0; y < h; y++) height[y * w + x] = v;
+  }
+  const { normalMap, roughnessMap } = reliefMaps(height, null, w, h, { strength: columns ? 9 : 2.4, rough: 1, roughJoint: 1 });
+  roughnessMap.dispose();
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const g = c.getContext('2d')!;
+  const img = g.createImageData(w, h);
+  for (let i = 0; i < w * h; i++) { img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = 255 * (0.45 + 0.55 * height[i]); img.data[i * 4 + 3] = 255; }
+  g.putImageData(img, 0, 0);
+  const made = { normalMap, aoMap: tex(c, false) };
+  profiles.set(key, made);
+  return made;
+}
+
+const SWATCH_MIN_PX = 256;
+
+interface Swatch { img: HTMLImageElement; small: boolean; columns: Float32Array | null; spread: number }
+
+/** What a catalogue swatch can tell: how big it is, how much it varies, and whether it only varies from side to side (flutes). */
+async function readSwatch(url: string): Promise<Swatch> {
+  const img = await loadImage(url);
+  const w = Math.min(img.width, 128); const h = Math.min(img.height, 128);
   const c = document.createElement('canvas'); c.width = w; c.height = h;
   const g = c.getContext('2d', { willReadFrequently: true })!;
-  g.drawImage(source, 0, 0, w, h);
-  return { map: null, ...reliefMaps(luminance(g, w, h), null, w, h, { strength, rough, roughJoint: 0.9 }) };
+  g.drawImage(img, 0, 0, w, h);
+  const lum = luminance(g, w, h);
+  const mean = lum.reduce((s, v) => s + v, 0) / lum.length;
+  const spread = Math.sqrt(lum.reduce((s, v) => s + (v - mean) ** 2, 0) / lum.length);
+  const cols = new Float32Array(w);
+  for (let x = 0; x < w; x++) { for (let y = 0; y < h; y++) cols[x] += lum[y * w + x]; cols[x] /= h; }
+  const across = Math.sqrt(cols.reduce((s, v) => s + (v - mean) ** 2, 0) / w);
+  const lo = Math.min(...cols); const hi = Math.max(...cols);
+  const striped = spread > 0.04 && across / spread > 0.75;
+  return { img, small: Math.min(img.width, img.height) < SWATCH_MIN_PX, spread, columns: striped ? cols.map((v) => (v - lo) / Math.max(0.01, hi - lo)) : null };
 }
 
-function buildFinish(f: Finish): Promise<FinishMaps> {
-  if (!f.imageUrl) return plasterMaps();
-  const key = `${f.imageUrl}|${f.jointed ? `${f.tileW}x${f.tileL}` : 'c'}|${f.normalUrl ?? ''}|${f.roughnessUrl ?? ''}`;
+const swatches = new Map<string, Promise<Swatch>>();
+const readOnce = (url: string) => {
+  const hit = swatches.get(url);
+  if (hit) return hit;
+  const job = readSwatch(url);
+  job.catch(() => swatches.delete(url));
+  swatches.set(url, job);
+  return job;
+};
+
+function imageLook(f: Finish, img: HTMLImageElement, wood: boolean): Promise<Look> {
+  const key = `${f.imageUrl}|${f.jointed ? `${f.tileW}x${f.tileL}` : 'c'}|${wood ? 'w' : ''}|${f.normalUrl ?? ''}|${f.roughnessUrl ?? ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const job = loadImage(f.imageUrl).then(async (img) => {
+  const job = (async (): Promise<Look> => {
     const aspect = f.jointed ? f.tileL / f.tileW : img.height / img.width;
-    const w = 512; const h = Math.max(64, Math.min(2048, Math.round(512 * aspect)));
+    const w = Math.min(1024, Math.max(512, img.width)); const h = Math.max(64, Math.min(2048, Math.round(w * aspect)));
     const c = document.createElement('canvas'); c.width = w; c.height = h;
     const g = c.getContext('2d', { willReadFrequently: true })!;
     const scale = Math.max(w / img.width, h / img.height);
+    g.imageSmoothingQuality = 'high';
     g.drawImage(img, (w - img.width * scale) / 2, (h - img.height * scale) / 2, img.width * scale, img.height * scale);
     let joint: Uint8Array | null = null;
     if (f.jointed) {
-      const px = Math.max(2, Math.round((0.003 / f.tileW) * w));
-      g.fillStyle = 'rgba(200, 195, 186, 0.92)';
+      const px = Math.max(1, Math.round(((wood ? 0.001 : 0.0025) / f.tileW) * w));
+      g.fillStyle = wood ? 'rgba(58, 40, 26, 0.75)' : 'rgba(176, 171, 163, 0.9)';
       g.fillRect(0, 0, w, px); g.fillRect(0, 0, px, h);
       joint = new Uint8Array(w * h);
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < px || y < px) joint[y * w + x] = 1;
     }
     const height = luminance(g, w, h);
     if (joint) for (let i = 0; i < height.length; i++) if (joint[i]) height[i] = 0;
-    const relief = reliefMaps(height, joint, w, h, { strength: f.jointed ? 2.2 : 1.2, rough: f.jointed ? 0.32 : 0.75, roughJoint: 0.95 });
+    const relief = reliefMaps(height, joint, w, h, { strength: f.jointed ? 1.4 : 0.8, rough: f.jointed && !wood ? 0.36 : 0.6, roughJoint: 0.95 });
     const stored = async (url: string | null | undefined, fallback: Texture) => {
       if (!url) return fallback;
       const im = await loadImage(url).catch(() => null);
@@ -124,40 +217,70 @@ function buildFinish(f: Finish): Promise<FinishMaps> {
       return tex(sc, false);
     };
     const [normalMap, roughnessMap] = await Promise.all([stored(f.normalUrl, relief.normalMap), stored(f.roughnessUrl, relief.roughnessMap)]);
-    return { map: tex(c, true), normalMap, roughnessMap };
-  });
+    return { map: tex(c, true), normalMap, roughnessMap, aoMap: null, colour: [1, 1, 1], normalScale: 1, roughness: 1, tile: [f.tileW, f.tileL], reliefTile: [f.tileW, f.tileL] };
+  })();
   job.catch(() => cache.delete(key));
   cache.set(key, job);
   return job;
 }
 
-/** This mesh's own copies of the finish maps, laid at the finish's real size over `widthM` × `heightM`. */
-export function useFinishMaps(finish: Finish | null, widthM: number, heightM: number, offsetX = 0, offsetY = 0): FinishMaps | null {
-  const [base, setBase] = useState<FinishMaps | null>(null);
-  const finishRef = useRef(finish);
-  finishRef.current = finish;
-  const key = finish ? `${finish.imageUrl}|${finish.jointed}|${finish.tileW}|${finish.tileL}|${finish.normalUrl ?? ''}|${finish.roughnessUrl ?? ''}` : 'plaster';
+/** Boards thinner than this are flat; a striped swatch of one shows another board's flutes. */
+const FLUTED_MIN_MM = 10;
+
+export interface LookWant { role: string | null; fallback: string; rough?: number }
+
+export async function buildLook(f: Finish | null, want: LookWant): Promise<Look> {
+  const library = await sceneMaterials().catch(() => []);
+  const hex = f?.hex ?? null;
+  const text = f?.label ?? null;
+  if (!f?.imageUrl) {
+    const colour = hex ?? want.fallback;
+    const m = pickMaterial(library, { role: want.role, text, hex: colour });
+    return m ? libraryLook(m, m.kind === 'wood' && !hex ? null : colour) : plainLook(colour, want.rough ?? 0.6);
+  }
+  const named = pickMaterial(library, { role: null, text, hex });
+  const swatch = await readOnce(f.imageUrl);
+  if (!f.colourTexture && (!swatch.small || !hex)) return imageLook(f, swatch.img, named?.kind === 'wood');
+  if (!f.colourTexture && !named && swatch.spread > 0.05 && !swatch.columns) return imageLook(f, swatch.img, false);
+  const base = f.colourTexture ? await decorLook(f.colourTexture.url, f.colourTexture.coversM)
+    : named ? await libraryLook(named, hex) : plainLook(hex ?? want.fallback, want.rough ?? 0.42);
+  const onWall = want.role?.startsWith('surface:') ?? false;
+  const fluted = swatch.columns && (f.thicknessMm ?? 0) >= FLUTED_MIN_MM ? swatch.columns : null;
+  if (!fluted && !(onWall && f.jointed)) return base;
+  const p = boardProfile(`${fluted ? f.imageUrl : 'flat'}|${f.tileW}`, fluted, f.tileW);
+  return { ...base, normalMap: p.normalMap, aoMap: p.aoMap, normalScale: 1, reliefTile: [f.tileW, 1] };
+}
+
+/** This mesh's own copies of the finish's textures, laid at their real size over `widthM` × `heightM`. */
+export function useLook(finish: Finish | null, want: LookWant, widthM: number, heightM: number, offsetX = 0, offsetY = 0): Look | null {
+  const [base, setBase] = useState<Look | null>(null);
+  const track = useContext(AssetContext);
+  const id = useId();
+  const latest = useRef({ finish, want });
+  latest.current = { finish, want };
+  const key = `${want.role}|${want.fallback}|${want.rough ?? ''}|${finish ? `${finish.imageUrl}|${finish.hex}|${finish.label}|${finish.jointed}|${finish.tileW}|${finish.tileL}|${finish.thicknessMm ?? ''}|${finish.colourTexture?.url ?? ''}|${finish.normalUrl ?? ''}|${finish.roughnessUrl ?? ''}` : ''}`;
   useEffect(() => {
     let live = true;
-    const f = finishRef.current;
-    const job = f ? buildFinish(f) : plasterMaps();
-    job.then((m) => { if (live) setBase(m); }).catch(() => { void plasterMaps().then((m) => { if (live) setBase(m); }); });
-    return () => { live = false; };
-  }, [key]);
-  const tileW = finish?.imageUrl ? finish.tileW : 0.8;
-  const tileL = finish?.imageUrl ? finish.tileL : 0.8;
+    const { finish: f, want: n } = latest.current;
+    track(id, true);
+    buildLook(f, n).then((m) => { if (live) setBase(m); })
+      .catch(() => { if (live) setBase(plainLook(f?.hex ?? n.fallback, n.rough ?? 0.6)); })
+      .finally(() => { if (live) track(id, false); });
+    return () => { live = false; track(id, false); };
+  }, [key, id, track]);
   const own = useMemo(() => {
     if (!base) return null;
-    const place = (t: Texture) => {
+    const place = (t: Texture | null, [tw, tl]: [number, number]) => {
+      if (!t) return null;
       const c = t.clone();
-      c.repeat.set(widthM / tileW, heightM / tileL);
-      c.offset.set(offsetX / tileW, offsetY / tileL);
+      c.repeat.set(widthM / tw, heightM / tl);
+      c.offset.set(offsetX / tw, offsetY / tl);
       c.needsUpdate = true;
       return c;
     };
-    return { map: base.map ? place(base.map) : null, normalMap: place(base.normalMap), roughnessMap: place(base.roughnessMap) };
-  }, [base, widthM, heightM, tileW, tileL, offsetX, offsetY]);
-  useEffect(() => () => { own?.map?.dispose(); own?.normalMap.dispose(); own?.roughnessMap.dispose(); }, [own]);
+    return { ...base, map: place(base.map, base.tile), roughnessMap: place(base.roughnessMap, base.tile), normalMap: place(base.normalMap, base.reliefTile), aoMap: place(base.aoMap, base.reliefTile) };
+  }, [base, widthM, heightM, offsetX, offsetY]);
+  useEffect(() => () => { own?.map?.dispose(); own?.normalMap?.dispose(); own?.roughnessMap?.dispose(); own?.aoMap?.dispose(); }, [own]);
   return own;
 }
 

@@ -11,6 +11,7 @@ import type { DbClient } from '../_shared/supabase-client.ts';
 
 const BUCKET = 'generation-images';
 const SERVICE = 'surface-texture';
+const COLOUR_COVERS_MM = 1000;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -40,7 +41,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   if (!auth.success || !auth.userId) throw new HttpError(401, auth.error || 'Invalid session');
   const uid = auth.userId;
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
-  const body = (await req.json().catch(() => ({}))) as { product_id?: string; workspace_id?: string };
+  const body = (await req.json().catch(() => ({}))) as { product_id?: string; workspace_id?: string; colour_hex?: string };
   if (!body.product_id || !body.workspace_id) throw new HttpError(400, 'product_id and workspace_id required');
 
   const ws = body.workspace_id;
@@ -56,43 +57,58 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   const { data: entitled } = await admin.rpc('is_workspace_entitled', { p_workspace_id: ws, p_module_slug: 'scene-studio' });
   if (entitled !== true) throw new HttpError(403, '3D rooms are not enabled for this workspace.');
 
+  const colourHex = typeof body.colour_hex === 'string' ? body.colour_hex.trim().toLowerCase() : null;
+  if (colourHex && !/^#[0-9a-f]{6}$/.test(colourHex)) throw new HttpError(400, 'colour_hex must be #rrggbb');
+  const options = (product.metadata as { colour_options?: Array<{ hex?: string; name?: string; swatch_url?: string | null }> } | null)?.colour_options;
+  const option = colourHex ? (Array.isArray(options) ? options : []).find((o) => o?.hex?.toLowerCase() === colourHex) : null;
+  if (colourHex && !option) throw new HttpError(404, 'This product has no such colour.');
+
   const existing = async () => {
+    if (colourHex) {
+      const { data } = await admin.from('product_colour_textures').select('storage_bucket, albedo_path').eq('product_id', product.id).eq('colour_hex', colourHex).maybeSingle();
+      return data ? admin.storage.from(data.storage_bucket).getPublicUrl(data.albedo_path).data.publicUrl as string : null;
+    }
     const { data } = await admin.from('product_material_maps')
       .select('storage_bucket, albedo_path').eq('product_id', product.id).eq('is_selected', true).is('option_value_id', null).maybeSingle();
     return data?.albedo_path ? admin.storage.from(data.storage_bucket).getPublicUrl(data.albedo_path).data.publicUrl as string : null;
   };
   const already = await existing();
-  if (already) return json({ success: true, status: 'ready', charged: false, albedo_url: already });
+  if (already) return json({ success: true, status: 'ready', charged: false, albedo_url: already, covers_mm: colourHex ? COLOUR_COVERS_MM : null });
 
-  const { data: img } = await admin
+  const { data: img } = colourHex ? { data: null } : await admin
     .from('image_product_associations')
     .select('overall_score, document_images(image_url)')
     .eq('product_id', product.id)
     .order('overall_score', { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
-  const imageUrl = (img?.document_images as { image_url?: string } | null)?.image_url;
-  if (!imageUrl) throw new HttpError(409, 'This product has no photo to make a texture from.');
+  const imageUrl = colourHex ? option?.swatch_url ?? undefined : (img?.document_images as { image_url?: string } | null)?.image_url;
+  if (!imageUrl) throw new HttpError(409, colourHex ? 'This colour has no swatch to make a texture from.' : 'This product has no photo to make a texture from.');
 
-  const debit = await debitExternalServiceCredits(admin, uid, SERVICE, 'scene_studio_texture', 1, { product_id: product.id }, ws);
+  const debit = await debitExternalServiceCredits(admin, uid, SERVICE, 'scene_studio_texture', 1, { product_id: product.id, colour_hex: colourHex }, ws);
   if (!debit.success) {
     return json({ success: false, error: debit.error ?? 'Insufficient credits', credits_required: debit.credits_debited, service: SERVICE }, 402);
   }
 
   try {
     const source = await fetchImageGuarded(imageUrl);
-    const prompt = (await loadPrompt(admin, 'generation', 'scene_texture', 'albedo'))
+    const prompt = (await loadPrompt(admin, 'generation', 'scene_texture', colourHex ? 'colour' : 'albedo'))
       .split('{product}').join(`"${product.name}"`)
+      .split('{colour}').join(`"${option?.name ?? colourHex}" (${colourHex})`)
+      .split('{covers}').join(`an area of ${COLOUR_COVERS_MM / 10} × ${COLOUR_COVERS_MM / 10} cm`)
       .split('{format}').join(formatText(product.attributes as Record<string, unknown> | null, product.metadata as Record<string, unknown> | null));
     const out = await generateImageWithGemini(
       { text: prompt, images: [source.bytes] },
       { task: 'surface-texture-albedo', userId: uid, workspaceId: ws, chargedSeparately: true },
     );
-    const path = `material-maps/products/${product.id}/${Date.now()}-albedo.png`;
+    const path = `material-maps/products/${product.id}/${Date.now()}-${colourHex ? `colour-${colourHex.slice(1)}` : 'albedo'}.png`;
     const bytes = Uint8Array.from(atob(out.base64), (c) => c.charCodeAt(0));
     const { error: upErr } = await admin.storage.from(BUCKET).upload(path, bytes, { contentType: out.mimeType || 'image/png', upsert: false });
     if (upErr) throw new Error(`The texture could not be stored: ${upErr.message}`);
-    const { error: insErr } = await admin.from('product_material_maps').insert({
+    const { error: insErr } = colourHex ? await admin.from('product_colour_textures').insert({
+      workspace_id: product.workspace_id, product_id: product.id, colour_hex: colourHex, storage_bucket: BUCKET, albedo_path: path,
+      covers_mm: COLOUR_COVERS_MM, source_image_url: imageUrl, created_by: uid,
+    }) : await admin.from('product_material_maps').insert({
       workspace_id: product.workspace_id, product_id: product.id, option_value_id: null, model: 'gemini-image',
       storage_bucket: BUCKET, albedo_path: path, is_selected: true, source: 'ai_derived', source_image_url: imageUrl, created_by: uid,
     });
@@ -101,11 +117,12 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
       if (!raced) throw new Error(`The texture could not be saved: ${insErr.message}`);
       await admin.storage.from(BUCKET).remove([path]);
       await refundCharge(admin, uid, debit.credits_debited, debit.transaction_id ?? null, ws, 'Made by another request at the same time');
-      return json({ success: true, status: 'ready', charged: false, albedo_url: raced });
+      return json({ success: true, status: 'ready', charged: false, albedo_url: raced, covers_mm: colourHex ? COLOUR_COVERS_MM : null });
     }
     return json({
       success: true, status: 'ready', charged: true, credits_used: debit.credits_debited,
       albedo_url: admin.storage.from(BUCKET).getPublicUrl(path).data.publicUrl,
+      covers_mm: colourHex ? COLOUR_COVERS_MM : null,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

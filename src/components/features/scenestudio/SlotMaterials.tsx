@@ -94,7 +94,7 @@ export const SlotMaterials: React.FC<{
   makingTexture: boolean;
   onSet(slot: SceneObjectSlot, patch: { product: SceneProduct | null; colour_hex: string | null; decor?: BoardDecorRef | null }): void;
   onReset(slot: SceneObjectSlot): void;
-  onMakeTexture(product: SceneProduct): void;
+  onMakeTexture(product: SceneProduct, hex?: string | null): void;
 }> = ({ obj, rows, products, workspaceId, makingTexture, onSet, onReset, onMakeTexture }) => {
   const slots = slotsForKind(obj.kind);
   const [open, setOpen] = useState<SceneObjectSlot | null>(slots.length === 1 ? slots[0] : null);
@@ -157,8 +157,10 @@ export const SlotMaterials: React.FC<{
                     </div>
                   )}
                   {product && EDGED_SLOTS.has(slot) && <BoardEdgeTape product={product} />}
-                  {product && row && !row.colour_hex && !product.albedoUrl && (
-                    <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => onMakeTexture(product)}>
+                  {product && row && (row.colour_hex
+                    ? !product.colourTextures?.[row.colour_hex] && colourOptions(product).some((o) => o.hex === row.colour_hex && o.swatch_url)
+                    : !product.albedoUrl) && (
+                    <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => onMakeTexture(product, row.colour_hex)}>
                       {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                       {makingTexture ? 'Making the Texture…' : 'Make a Clean Texture (6 credits)'}
                     </Button>

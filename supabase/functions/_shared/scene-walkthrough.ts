@@ -34,7 +34,7 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
   const products: Record<string, unknown> = {};
   if (productIds.length) {
     const { data: prows } = await supabase.from('products')
-      .select('id, name, workspace_id, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id)')
+      .select('id, name, workspace_id, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id), product_colour_textures(colour_hex, storage_bucket, albedo_path, covers_mm)')
       .in('id', productIds);
     const FORMAT_ATTRS = ['width_mm', 'length_mm', 'roll_width_mm', 'roll_length_m', 'plank_width_mm', 'plank_length_mm', 'slab_size'];
     const FORMAT_META = [...FORMAT_ATTRS, 'dimensions', 'available_sizes', 'dimensions_cm_from_vision', 'decor_repeat_mm'];
@@ -56,6 +56,7 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
       products[p.id] = {
         id: p.id, name: p.name, imageUrl: imgs[0] ?? null,
         albedoUrl: url(m?.albedo_path), normalUrl: url(m?.normal_path), roughnessUrl: url(m?.roughness_path),
+        colourTextures: Object.fromEntries(((p.product_colour_textures ?? []) as any[]).map((c) => [c.colour_hex, { url: supabase.storage.from(c.storage_bucket).getPublicUrl(c.albedo_path).data.publicUrl, coversM: c.covers_mm / 1000 }])),
         attributes: pick(p.attributes, FORMAT_ATTRS),
         metadata: { ...pick(p.metadata, FORMAT_META), colour_options: colourOptionsOf(p.metadata) },
       };

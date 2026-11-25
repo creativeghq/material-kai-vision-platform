@@ -33306,7 +33306,7 @@
         ],
         "summary": "Make a product's seamless surface texture for 3D rooms",
         "operationId": "post_surface_texture",
-        "description": "Returns the clean, flat, seamless texture of a catalogue product (a tile, a wood, a wall covering) that 3D rooms lay at the product's real size. Made once from the product's best photo with the image model and kept in product_material_maps as the product's selected albedo; a product that already has one is served it at no charge. Making one debits 6 credits BEFORE the model call and refunds them on any failure. The workspace is checked for moodboards.use and the 3D rooms module, and the product must be visible to the caller.\n\n**Response:** `200 { status: ready, charged, credits_used?, albedo_url }`",
+        "description": "Returns the clean, flat, seamless texture of a catalogue product (a tile, a wood, a wall covering) that 3D rooms lay at the product's real size. Made once from the product's best photo with the image model and kept in product_material_maps as the product's selected albedo; a product that already has one is served it at no charge. Making one debits 6 credits BEFORE the model call and refunds them on any failure. The workspace is checked for moodboards.use and the 3D rooms module, and the product must be visible to the caller.\n\n**Response:** `200 { status: ready, charged, credits_used?, albedo_url, covers_mm }`",
         "security": [
           {
             "supabaseJwt": []
@@ -33378,6 +33378,10 @@
                   "workspace_id": {
                     "type": "string",
                     "description": "The caller's workspace that is charged. (string (uuid))"
+                  },
+                  "colour_hex": {
+                    "type": "string",
+                    "description": "One of the product's own colour options; its swatch becomes a flat decor of that colour, kept in product_colour_textures. (string (#rrggbb))"
                   }
                 },
                 "required": [

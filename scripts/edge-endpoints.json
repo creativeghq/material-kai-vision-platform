@@ -18577,9 +18577,15 @@
         "type": "string (uuid)",
         "required": true,
         "desc": "The caller's workspace that is charged."
+      },
+      {
+        "name": "colour_hex",
+        "type": "string (#rrggbb)",
+        "required": false,
+        "desc": "One of the product's own colour options; its swatch becomes a flat decor of that colour, kept in product_colour_textures."
       }
     ],
-    "response": "200 { status: ready, charged, credits_used?, albedo_url }"
+    "response": "200 { status: ready, charged, credits_used?, albedo_url, covers_mm }"
   },
   {
     "name": "installation-guide-extract",

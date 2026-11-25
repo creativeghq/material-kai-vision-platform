@@ -112,6 +112,7 @@ export interface SceneProduct {
   albedoUrl?: string | null;
   normalUrl?: string | null;
   roughnessUrl?: string | null;
+  colourTextures?: Record<string, { url: string; coversM: number }>;
   attributes: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
 }
@@ -216,7 +217,7 @@ async function uploadTo(path: string, blob: Blob, contentType: string): Promise<
   if (error) throw new Error(`Upload failed: ${error.message}`);
 }
 
-const PRODUCT_COLUMNS = 'id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id)';
+const PRODUCT_COLUMNS = 'id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id), product_colour_textures(colour_hex, storage_bucket, albedo_path, covers_mm)';
 
 function selectedMaps(row: Record<string, unknown>): { albedoUrl: string | null; normalUrl: string | null; roughnessUrl: string | null } {
   const maps = row.product_material_maps;
@@ -227,6 +228,11 @@ function selectedMaps(row: Record<string, unknown>): { albedoUrl: string | null;
   if (!m?.albedo_path) return none;
   const url = (path: string | null | undefined) => (path ? supabase.storage.from(m.storage_bucket || SCENE_BUCKET).getPublicUrl(path).data.publicUrl : null);
   return { albedoUrl: url(m.albedo_path), normalUrl: url(m.normal_path), roughnessUrl: url(m.roughness_path) };
+}
+
+function colourTextures(row: Record<string, unknown>): Record<string, { url: string; coversM: number }> {
+  const list = Array.isArray(row.product_colour_textures) ? row.product_colour_textures as Array<{ colour_hex: string; storage_bucket: string; albedo_path: string; covers_mm: number }> : [];
+  return Object.fromEntries(list.map((c) => [c.colour_hex, { url: supabase.storage.from(c.storage_bucket).getPublicUrl(c.albedo_path).data.publicUrl, coversM: c.covers_mm / 1000 }]));
 }
 
 async function fetchProducts(ids: string[]): Promise<Record<string, SceneProduct>> {
@@ -244,6 +250,7 @@ async function fetchProducts(ids: string[]): Promise<Record<string, SceneProduct
       name: (r.name as string) || 'Product',
       imageUrl: firstImage(r),
       ...selectedMaps(r),
+      colourTextures: colourTextures(r),
       attributes: (r.attributes as Record<string, unknown>) ?? null,
       metadata: (r.metadata as Record<string, unknown>) ?? null,
     };
@@ -555,10 +562,10 @@ export const sceneStudioService = {
 
   products: fetchProducts,
 
-  async makeTexture(workspaceId: string, productId: string): Promise<{ albedo_url: string; charged: boolean; credits_used?: number }> {
-    const { data, error } = await supabase.functions.invoke('surface-texture', { body: { workspace_id: workspaceId, product_id: productId } });
+  async makeTexture(workspaceId: string, productId: string, colourHex?: string | null): Promise<{ albedo_url: string; covers_mm: number | null; charged: boolean; credits_used?: number }> {
+    const { data, error } = await supabase.functions.invoke('surface-texture', { body: { workspace_id: workspaceId, product_id: productId, colour_hex: colourHex ?? undefined } });
     if (error) throw await edgeError(error, 'The texture could not be made');
-    return data as { albedo_url: string; charged: boolean; credits_used?: number };
+    return data as { albedo_url: string; covers_mm: number | null; charged: boolean; credits_used?: number };
   },
 
   /** The workspace's own kitchen blueprints first (newest first), then the platform starters in the order they were added. */
@@ -619,7 +626,7 @@ export const sceneStudioService = {
     const { data, error } = await req;
     if (error) throw new Error(error.message);
     return ((data ?? []) as Record<string, unknown>[]).map((r) => ({
-      id: r.id as string, name: (r.name as string) || 'Product', imageUrl: firstImage(r), ...selectedMaps(r),
+      id: r.id as string, name: (r.name as string) || 'Product', imageUrl: firstImage(r), ...selectedMaps(r), colourTextures: colourTextures(r),
       attributes: (r.attributes as Record<string, unknown>) ?? null, metadata: (r.metadata as Record<string, unknown>) ?? null,
     }));
   },
