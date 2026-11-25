@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-import { sunAt } from '../../src/components/features/scenestudio/sceneDetail';
+import { sunAt } from '../../src/lib/scene/sun';
 
 describe('sunAt', () => {
   it('stands highest and brightest at 13:00 and rises and sets low', () => {
