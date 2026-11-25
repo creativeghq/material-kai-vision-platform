@@ -2,7 +2,7 @@ import { pointInPolygon } from '@/lib/scene/sceneGeometry';
 
 export type V3 = [number, number, number];
 export interface Pose { position: V3; target: V3; fov: number }
-export interface WalkRoom { centre: [number, number]; far: [number, number]; focus?: [number, number] | null; corners?: Array<[number, number]>; shot?: Pose | null; start?: [number, number] | null }
+export interface WalkRoom { centre: [number, number]; far: [number, number]; focus?: [number, number] | null; corners?: Array<[number, number]>; shot?: Pose | null }
 export interface WalkFrame { pose: Pose; walls: number; objects: number; dip: number; render: number; room: number; shot: number }
 
 const EYE = 1.6;
@@ -16,12 +16,6 @@ const mixPose = (a: Pose, b: Pose, t: number): Pose => ({ position: mixV(a.posit
 function cornerPoses(r: WalkRoom, corners: Array<[number, number]>): [Pose, Pose] {
   const [cx, cz] = r.centre;
   const [tx, tz] = r.focus ?? r.centre;
-  if (r.start) {
-    const [sx, sz] = r.start;
-    const target: V3 = [tx, 1.1, tz];
-    const step = Math.min(0.5, Math.hypot(tx - sx, tz - sz) * 0.18) / Math.max(1e-6, Math.hypot(tx - sx, tz - sz));
-    return [{ position: [sx, EYE, sz], target, fov: 64 }, { position: [sx + (tx - sx) * step, EYE, sz + (tz - sz) * step], target, fov: 64 }];
-  }
   const [kx, kz] = corners.reduce((best, c) => (Math.hypot(c[0] - tx, c[1] - tz) > Math.hypot(best[0] - tx, best[1] - tz) ? c : best), corners[0]);
   const inset = Math.min(0.45, Math.hypot(cx - kx, cz - kz) * 0.3) / Math.max(1e-6, Math.hypot(cx - kx, cz - kz));
   const sx = kx + (cx - kx) * inset;
@@ -101,12 +95,12 @@ export function walkthroughFrame(p: number, span: number, rooms: WalkRoom[], fin
 export interface WalkthroughStage { frame: WalkFrame; caption: string; dip: number; hero: number; shotRoom: number; shotOpacity: number }
 
 export function walkthroughStage(
-  p: number, plan: { span: number; walk: WalkRoom[]; names: string[]; photoreal: boolean[]; finalPose: Pose | null },
+  p: number, plan: { span: number; walk: WalkRoom[]; names: string[]; finalPose: Pose | null },
 ): WalkthroughStage {
   const frame = walkthroughFrame(p, plan.span, plan.walk, plan.finalPose);
   const inRoom = frame.room >= 0 && frame.room < plan.walk.length;
   const caption = frame.room < 0 ? (p < 0.12 ? 'The plan' : 'Your rooms, to scale')
     : frame.room < plan.names.length ? plan.names[frame.room] : plan.finalPose ? 'The finished design' : 'Your home';
-  const showsShot = inRoom && !!plan.walk[frame.room].shot && !plan.photoreal[frame.room];
+  const showsShot = inRoom && !!plan.walk[frame.room].shot;
   return { frame, caption, dip: frame.dip, hero: frame.render, shotRoom: showsShot ? frame.room : -1, shotOpacity: showsShot ? frame.shot : 0 };
 }

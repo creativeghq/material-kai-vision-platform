@@ -18,11 +18,10 @@ import { useToast } from '@/hooks/use-toast';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import {
   publicUrl, sceneStudioService,
-  type LayoutEntry, type SceneData, type SceneObject, type SceneObjectFinish, type SceneProduct, type SceneRender, type SceneSurface, type WorldQuality,
+  type LayoutEntry, type SceneData, type SceneObject, type SceneObjectFinish, type SceneProduct, type SceneRender, type SceneSurface,
 } from '@/services/sceneStudioService';
 import { describeBox, describeObject, effectiveSize, planBounds, planFrame, pointInPolygon, polygonCentroid, type PlanRoom } from '@/lib/scene/sceneGeometry';
-import { WORLD_VIEW_H, WORLD_VIEW_W, encodeLogDepthPng, roomSignature, worldViewPoses, type WorldPose } from '@/lib/scene/worldViews';
-import { PhotorealDialog, useSceneWorlds, type RoomWorldState } from '@/components/features/scenestudio/PhotorealRooms';
+import { roomSignature } from '@/lib/scene/roomSignature';
 import { compositeMasked, loadImage, objectMask, paintedMask } from '@/lib/scene/sceneCompositing';
 import { RegionEditCanvas, type RegionEditResult } from '@/components/features/ai/RegionEditCanvas';
 import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
@@ -36,7 +35,7 @@ import { roomPoses, type Pose } from '@/lib/scene/walkthroughTimeline';
 import { ReadyMadeLinePrice } from '@/components/features/scenestudio/ReadyMadeLinePrice';
 import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
-import { CLIENT_LOOKS, CLIENT_LOOK_LABELS, rendersForLook, worldsForLook, type ClientLook } from '@/config/sceneClientLook';
+import { CLIENT_LOOKS, CLIENT_LOOK_LABELS, rendersForLook, type ClientLook } from '@/config/sceneClientLook';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
 import type { PaintScope, SceneCanvasHandle, SceneTool } from '@/components/features/scenestudio/SceneCanvas';
 import { decorOfRow, type BoardDecorRef } from '@/lib/scene/boardDecor';
@@ -76,7 +75,7 @@ export interface SceneEditorProps {
 }
 
 export interface SceneIntent {
-  mode: 'view' | 'walk' | 'make_3d' | 'photoreal' | 'drawings' | 'render' | 'record_walkthrough' | 'photograph';
+  mode: 'view' | 'walk' | 'make_3d' | 'drawings' | 'render' | 'record_walkthrough' | 'photograph';
   object_id: string | null;
   room_id?: string | null;
   fronts?: FrontsState;
@@ -155,7 +154,7 @@ const DockButton: React.FC<{ label: string; hint?: string; active?: boolean; dis
   </Tooltip>
 );
 
-const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen(): void; onStand?(): void; photoreal?: { state: RoomWorldState; onMake(): void } }> = ({ title, meta, active, onOpen, onStand, photoreal }) => (
+const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen(): void; onStand?(): void }> = ({ title, meta, active, onOpen, onStand }) => (
   <div className={`flex w-48 shrink-0 items-stretch overflow-hidden rounded-md border bg-card ${active ? 'border-primary ring-1 ring-primary' : 'border-hairline'}`}>
     <button type="button" onClick={onOpen} className="min-w-0 flex-1 px-3 py-2 text-left hover:bg-surface-sunken">
       <span className="block truncate text-sm font-medium">{title}</span>
@@ -164,18 +163,6 @@ const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen
     {onStand && (
       <button type="button" onClick={onStand} className="flex items-center border-l border-hairline px-2.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground" title="Walk in" aria-label={`Walk in ${title}`}>
         <Footprints className="h-4 w-4" />
-      </button>
-    )}
-    {photoreal && (
-      <button
-        type="button"
-        onClick={photoreal.onMake}
-        disabled={!!photoreal.state.running}
-        className={`flex items-center border-l border-hairline px-2.5 hover:bg-surface-sunken ${photoreal.state.ready && !photoreal.state.stale ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-        title={photoreal.state.running ? 'Being made photoreal…' : photoreal.state.stale ? 'The photoreal version is out of date; make it again' : photoreal.state.ready ? 'Photoreal and up to date' : 'Make photoreal'}
-        aria-label={`${photoreal.state.ready ? 'Make photoreal again' : 'Make photoreal'}: ${title}`}
-      >
-        {photoreal.state.running ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
       </button>
     )}
   </div>
@@ -672,7 +659,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
       rooms: data?.rooms ?? [], walls: data?.walls ?? [], openings: data?.openings ?? [],
       objects: objects.map((o) => ({ ...o, model_url: modelUrls[o.id] ?? null })), surfaces, finishes, products,
       renders: shared.map((r) => ({ image_url: r.image_url, camera: (r.camera as unknown as Pose | null) ?? null, source: r.source, sig: r.room_sig })),
-      worlds: worldsForLook(data?.scene.client_look, worlds.ready).map((w) => ({ room_id: w.room_id, url: publicUrl(w.splat_path as string), sig: w.layout_snapshot?.sig ?? null })),
       render: latest ? { image_url: latest.image_url, camera: (latest.camera as unknown as Pose | null) ?? null } : null,
     };
   };
@@ -690,49 +676,11 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   };
 
   const signatureOf = (roomId: string) => roomSignature(roomId, objects, surfaces, finishes);
-  const worlds = useSceneWorlds(id, signatureOf);
-  const [photorealFor, setPhotorealFor] = useState<string | null>(null);
-  const [photorealBusy, setPhotorealBusy] = useState(false);
-  const [photorealOn, setPhotorealOn] = useState(true);
   const planFrameNow = useMemo(() => (data ? planFrame(planBounds(data.rooms, data.walls)) : null), [data]);
   const shotOf = (room: PlanRoom) => (planFrameNow ? renders.find((r) => {
     const p = (r.camera as { position?: number[] } | null)?.position;
     return r.kind === 'full' && !!r.image_url && !!p && pointInPolygon(p[0] * 1000 + planFrameNow.cx, p[2] * 1000 + planFrameNow.cy, room.outline);
   }) ?? null : null);
-  const makePhotoreal = async (roomId: string, quality: WorldQuality) => {
-    const room = data?.rooms.find((r) => r.id === roomId);
-    if (!data || !room || !planFrameNow || !canvasRef.current) return;
-    setPhotorealBusy(true);
-    try {
-      setShowRender(false);
-      setSelectedId(null);
-      setWalkRoomId(undefined);
-      await new Promise((r) => setTimeout(r, 400));
-      const shot = shotOf(room);
-      const obstacles = objects.filter((o) => !o.removed_at).map((o) => {
-        const size = effectiveSize(o, o.product_id ? products[o.product_id] : undefined);
-        return { x_mm: o.x_mm, y_mm: o.y_mm, width_mm: size.width_mm, depth_mm: size.depth_mm, rotation_deg: o.rotation_deg, top_mm: o.elevation_mm + size.height_mm };
-      });
-      const poses = worldViewPoses(room, planFrameNow, obstacles, (shot?.camera ?? null) as unknown as WorldPose | null);
-      const depths = canvasRef.current.captureDepth(poses);
-      const views = [];
-      for (let i = 0; i < poses.length; i++) {
-        views.push({ position: poses[i].position, fov: poses[i].fov, quaternion: depths[i].quaternion, ...(await encodeLogDepthPng(depths[i].depth, WORLD_VIEW_W, WORLD_VIEW_H)) });
-      }
-      const started = await sceneStudioService.startWorld(data.scene, {
-        roomId, quality, views, styleRenderId: shot?.id ?? null, sig: signatureOf(roomId),
-        finishes: surfaceLines(roomId).join('. '), objects: objectLines(roomId).join('. '),
-      });
-      setPhotorealFor(null);
-      await worlds.reload();
-      toast({ title: `${room.name} is being made photoreal`, description: `${started.credits_used ?? 0} credits used. You can keep working; it appears when it is ready.` });
-    } catch (e) {
-      fail('The photoreal room could not be started', e);
-    } finally {
-      setPhotorealBusy(false);
-    }
-  };
-
   const photoNow = useRef(photoSamples);
   photoNow.current = photoSamples;
   const [photographing, setPhotographing] = useState<string | null>(null);
@@ -847,7 +795,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     }
     if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
     if (intent.mode === 'photograph') { if (fresh) setTimeout(() => void photographRooms(), 1500); return; }
-    if (intent.mode === 'photoreal') { setPhotorealFor(roomId ?? data.rooms[0]?.id ?? null); return; }
     if (roomId) goToRoom(roomId, false);
     if (obj) setSelectedId(obj.id);
     if (intent.mode === 'make_3d' && obj) {
@@ -1367,7 +1314,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
                 cabinetHardware={scene.cabinet_hardware}
                 walkRoomId={walkRoomId}
                 onWalkEnd={() => setWalkRoomId(undefined)}
-                worlds={walking && photorealOn && !rendering ? worlds.shown : undefined}
               />
             </Suspense>
           )}
@@ -1426,9 +1372,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
               {walking && (
                 <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-md border border-hairline bg-card px-3 py-1.5 text-xs shadow-overlay">
                   <span className="text-muted-foreground">WASD or arrows to walk · drag to look · click the floor to go there · Shift to hurry</span>
-                  {worlds.shown.length > 0 && (
-                    <Button size="sm" variant={photorealOn ? 'secondary' : 'outline'} className="h-7 gap-1.5" aria-pressed={photorealOn} onClick={() => setPhotorealOn((v) => !v)}><Sparkles className="h-3.5 w-3.5" />Photoreal</Button>
-                  )}
                   <Button size="sm" variant="outline" className="h-7" onClick={() => setWalkRoomId(undefined)}>Stop · Esc</Button>
                 </div>
               )}
@@ -1490,7 +1433,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
                 active={focusRoomId === r.id}
                 onOpen={() => { setEyeLevel(false); goToRoom(r.id, false); }}
                 onStand={() => startWalk(r.id)}
-                photoreal={{ state: worlds.stateOf(r.id), onMake: () => setPhotorealFor(r.id) }}
               />
             ))}
           </div>
@@ -1504,15 +1446,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
             onApply={async (r) => { try { await applyArea(r); } catch (e) { fail('The area could not be changed', e); } }}
           />
         )}
-
-        <PhotorealDialog
-          roomName={photorealFor ? data.rooms.find((r) => r.id === photorealFor)?.name ?? 'this space' : null}
-          hasRender={!!photorealFor && !!data.rooms.find((r) => r.id === photorealFor && shotOf(r))}
-          state={photorealFor ? worlds.stateOf(photorealFor) : null}
-          busy={photorealBusy}
-          onClose={() => setPhotorealFor(null)}
-          onStart={(q) => photorealFor && void makePhotoreal(photorealFor, q)}
-        />
 
         <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
           <DialogContent className="max-w-md">

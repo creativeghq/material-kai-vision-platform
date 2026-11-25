@@ -3,7 +3,7 @@ import { Image as ImageIcon, X } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import type { PlanRoom } from '@/lib/scene/sceneGeometry';
-import type { RoomWorld, SceneCanvasHandle } from '@/components/features/scenestudio/SceneCanvas';
+import type { SceneCanvasHandle } from '@/components/features/scenestudio/SceneCanvas';
 
 export interface Explore {
   on: boolean;
@@ -19,11 +19,10 @@ export interface Explore {
 }
 
 /** Walking freely through the home the page is already showing: same canvas, so nothing is loaded twice. */
-export function useExplore(rooms: PlanRoom[], worlds: RoomWorld[], shots: Record<string, string>, canvas: React.RefObject<SceneCanvasHandle>): Explore {
+export function useExplore(rooms: PlanRoom[], shots: Record<string, string>, canvas: React.RefObject<SceneCanvasHandle>): Explore {
   const [on, setOn] = useState(false);
   const [roomId, setRoomId] = useState<string | undefined>(undefined);
   const [finished, setFinished] = useState(false);
-  const real = !!roomId && worlds.some((w) => w.roomId === roomId);
 
   useEffect(() => {
     if (!on) return;
@@ -43,7 +42,7 @@ export function useExplore(rooms: PlanRoom[], worlds: RoomWorld[], shots: Record
   return {
     on, roomId, finished,
     roomName: rooms.find((r) => r.id === roomId)?.name,
-    shot: roomId && !real ? shots[roomId] : undefined,
+    shot: roomId ? shots[roomId] : undefined,
     start: () => { setFinished(false); setRoomId(rooms[0]?.id); setOn(true); },
     close: () => setOn(false),
     overview: () => { setRoomId(undefined); setFinished(false); },

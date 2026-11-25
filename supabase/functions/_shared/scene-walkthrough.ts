@@ -1,6 +1,6 @@
 /** The public walkthrough of one 3D room (client view and property listing): projected by hand, nothing priced. */
 import type { DbClient } from './supabase-client.ts';
-import { rendersForLook, worldsForLook } from './sceneClientLook.generated.ts';
+import { rendersForLook } from './sceneClientLook.generated.ts';
 
 const SCENE_MODEL_BUCKET = 'generation-images';
 
@@ -13,7 +13,7 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
     console.error(`[scene-walkthrough] floor_plan ${fp} is not in the expected workspace, withheld`);
     return null;
   }
-  const [rooms, walls, openings, objects, surfaces, finishes, renders, worlds] = await Promise.all([
+  const [rooms, walls, openings, objects, surfaces, finishes, renders] = await Promise.all([
     supabase.from('floor_plan_rooms').select('id, name, outline, height_mm, walk_order').eq('floor_plan_id', fp).order('walk_order'),
     supabase.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm, height_mm').eq('floor_plan_id', fp),
     supabase.from('floor_plan_openings').select('id, wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', fp),
@@ -25,7 +25,6 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
       .eq('floor_plan_id', fp),
     supabase.from('floor_plan_object_finishes').select('id, object_id, slot, product_id, colour_hex').eq('floor_plan_id', fp),
     supabase.from('scene_renders').select('image_url, camera, source, room_sig, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(24),
-    supabase.from('scene_worlds').select('room_id, splat_path, layout_snapshot, created_at').eq('floor_plan_id', fp).eq('status', 'ready').not('splat_path', 'is', null).order('created_at', { ascending: false }).limit(40),
   ]);
   const productIds = [...new Set([
     ...((objects.data ?? []) as any[]).map((o) => o.product_id),
@@ -82,10 +81,5 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
     products,
     render: render ? { image_url: render.image_url, camera: render.camera } : null,
     renders: pictures.map((r) => ({ image_url: r.image_url, camera: r.camera, source: r.source, sig: r.room_sig })),
-    worlds: [...new Map(worldsForLook(plan.client_look, (worlds.data ?? []) as any[]).slice().reverse().map((w) => [w.room_id, {
-      room_id: w.room_id,
-      url: supabase.storage.from(SCENE_MODEL_BUCKET).getPublicUrl(w.splat_path).data.publicUrl,
-      sig: w.layout_snapshot?.sig ?? null,
-    }])).values()],
   };
 }

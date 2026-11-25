@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { rendersForLook, worldsForLook } from '@/config/sceneClientLook';
+import { rendersForLook } from '@/config/sceneClientLook';
 import { currentRenders, type WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
-import { roomSignature, worldsNear } from '@/lib/scene/worldViews';
+import { roomSignature } from '@/lib/scene/roomSignature';
 import { bowlFor, slabAround } from '@/lib/scene/fixturePlan';
 import { blankedSource } from '../helpers/sourceIndex';
 
@@ -13,13 +13,11 @@ const payload = (sig: string | null, source: string): WalkthroughPayload => ({
 });
 
 describe('what a shared walkthrough shows', () => {
-  it('the live look shows only pictures of the live rooms, and no photoreal room', () => {
+  it('the live look shows only pictures of the live rooms', () => {
     const all = [{ source: 'ai' }, { source: 'photo_mode' }];
     expect(rendersForLook('drawn', all)).toEqual([{ source: 'photo_mode' }]);
-    expect(rendersForLook('photoreal', all)).toHaveLength(2);
+    expect(rendersForLook('renders', all)).toHaveLength(2);
     expect(rendersForLook(null, all)).toHaveLength(2);
-    expect(worldsForLook('drawn', [1])).toEqual([]);
-    expect(worldsForLook('photoreal', [1])).toEqual([1]);
   });
 
   it('a Photo Mode picture of a room that has changed since is left out', () => {
@@ -33,21 +31,11 @@ describe('what a shared walkthrough shows', () => {
   it('the public builder applies the look, so the editor setting decides what a client can fetch', () => {
     const src = blankedSource('supabase/functions/_shared/scene-walkthrough.ts');
     expect(src).toMatch(/rendersForLook\(plan\.client_look,/);
-    expect(src).toMatch(/worldsForLook\(plan\.client_look,/);
   });
 
   it('walking around reuses the canvas of the page: one SceneCanvas, so nothing loads twice', () => {
     expect(blankedSource('src/components/features/scenestudio/ScrollWalkthrough.tsx').match(/<SceneCanvas\b/g)).toHaveLength(1);
     expect(blankedSource('src/components/features/scenestudio/WalkthroughExplore.tsx')).not.toMatch(/<SceneCanvas[\s/]/);
-  });
-});
-
-describe('photoreal rooms in memory', () => {
-  const homes = ['a', 'b', 'c'].map((id, i) => ({ id, outline: [[i * 5000, 0], [i * 5000 + 4000, 0], [i * 5000 + 4000, 4000], [i * 5000, 4000]] as Array<[number, number]> }));
-  const worlds = homes.map((r) => ({ roomId: r.id, url: r.id }));
-  it('holds the room the camera is in and the nearest other, never the whole home', () => {
-    expect(worldsNear(worlds, homes, 2000, 2000)).toEqual(['a', 'b']);
-    expect(worldsNear(worlds, homes, 12000, 2000)).toEqual(['b', 'c']);
   });
 });
 

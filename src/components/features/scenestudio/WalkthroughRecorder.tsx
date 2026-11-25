@@ -52,8 +52,8 @@ export const WalkthroughRecorder: React.FC<{
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const plan = useWalkthrough(data);
-  const { walk, shots, worlds, modelUrls, hero: heroShot, heroInRoom } = plan;
-  const assets = Object.keys(modelUrls).length + worlds.length;
+  const { walk, shots, modelUrls, hero: heroShot, heroInRoom } = plan;
+  const assets = Object.keys(modelUrls).length;
   const [pending, setPending] = useState<number | null>(assets ? null : 0);
   const ready = pending === 0;
   const seconds = Math.min(60, Math.max(12, (walk.length + 3) * SECONDS_PER_STOP));
@@ -133,7 +133,7 @@ export const WalkthroughRecorder: React.FC<{
               rooms={data.rooms} walls={data.walls} openings={data.openings} surfaces={data.surfaces} finishes={data.finishes}
               objects={data.objects} products={data.products} defaultWallHeightMm={data.default_wall_height_mm} viewCamera={null}
               tool="view" wireframe={false} selectedId={null} onSelect={noop} onMoveObject={noop} onRemoveObject={noop} onPaint={noop}
-              cabinetHardware={data.cabinet_hardware} modelUrls={modelUrls} worlds={worlds} allWorlds script={script} onAssets={setPending}
+              cabinetHardware={data.cabinet_hardware} modelUrls={modelUrls} script={script} onAssets={setPending}
             />
           </Suspense>
         </div>
@@ -143,7 +143,7 @@ export const WalkthroughRecorder: React.FC<{
       {error && <p className="text-xs text-destructive">{error}</p>}
       <p className="text-xs text-muted-foreground">
         {canEncode
-          ? `${walk.length} ${walk.length === 1 ? 'room' : 'rooms'}, a ${seconds}-second video of the real plan with the same furniture, photoreal rooms and renders the client sees. It is made frame by frame, so it takes a few minutes. Keep this tab in front. No credits.`
+          ? `${walk.length} ${walk.length === 1 ? 'room' : 'rooms'}, a ${seconds}-second video of the real plan with the same furniture and pictures the client sees. It is made frame by frame, so it takes a minute or more. Keep this tab in front. No credits.`
           : 'This browser cannot make video. Use a current Chrome, Edge, Firefox or Safari.'}
       </p>
       <div className="flex justify-end gap-2">

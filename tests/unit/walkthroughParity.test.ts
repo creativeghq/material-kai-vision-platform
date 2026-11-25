@@ -10,10 +10,9 @@ const room: WalkRoom = { centre: [0, 0], far: [2, 2], corners: [[-2, -2], [2, -2
 const base = { span: 6, walk: [room, room], names: ['Living Room', 'Kitchen'], finalPose: null };
 
 describe('walkthroughStage', () => {
-  it('ends a room on its own render, and never when the room has a photoreal version', () => {
+  it('ends a room on its own render', () => {
     const at = 0.35 + 0.25 * 0.8;
-    expect(walkthroughStage(at, { ...base, photoreal: [false, false] })).toMatchObject({ caption: 'Living Room', shotRoom: 0, shotOpacity: 1 });
-    expect(walkthroughStage(at, { ...base, photoreal: [true, false] })).toMatchObject({ shotRoom: -1, shotOpacity: 0 });
+    expect(walkthroughStage(at, base)).toMatchObject({ caption: 'Living Room', shotRoom: 0, shotOpacity: 1 });
   });
 
   it('starts inside the room even when its picture was taken near a wall, so the room is lit from the first frame', () => {
@@ -23,8 +22,8 @@ describe('walkthroughStage', () => {
   });
 
   it('does not promise a finished design when there is no closing render', () => {
-    expect(walkthroughStage(1, { ...base, photoreal: [false, false] }).caption).toBe('Your home');
-    expect(walkthroughStage(1, { ...base, photoreal: [false, false], finalPose: pose }).caption).toBe('The finished design');
+    expect(walkthroughStage(1, base).caption).toBe('Your home');
+    expect(walkthroughStage(1, { ...base, finalPose: pose }).caption).toBe('The finished design');
   });
 });
 
@@ -37,30 +36,16 @@ describe('the recorded walkthrough shows what the client sees', () => {
       expect(src).toContain('walkthroughStage(');
       expect(src).not.toContain('walkthroughFrame(');
       expect(src).toMatch(/modelUrls=\{modelUrls\}/);
-      expect(src).toMatch(/worlds=\{worlds\}/);
     }
     expect(recorder).toMatch(/settled\(\)/);
     expect(recorder).toMatch(/=== room && scene\.current\?\.lit\(\) \? SETTLE_FRAME_MS : SETTLE_ROOM_MS/);
     expect(recorder).toMatch(/disabled=\{[^}]*!ready/);
   });
 
-  it('the editor hands the recorder its models, renders and photoreal rooms', () => {
+  it('the editor hands the recorder its models and renders', () => {
     const editor = read('src/components/features/scenestudio/SceneEditor.tsx');
     const payload = editor.slice(editor.indexOf('const walkthroughPayload'), editor.indexOf('const saveWalkthrough'));
-    for (const part of ['model_url:', 'renders:', 'worlds:']) expect(payload).toContain(part);
-  });
-});
-
-describe('a photoreal room', () => {
-  it('replaces the drawn room as soon as its splat is on screen, even while the camera moves', () => {
-    const canvas = read('src/components/features/scenestudio/SceneCanvas.tsx');
-    const body = canvas.slice(canvas.indexOf('const PhotorealRooms'), canvas.indexOf('const SPLAT_TURN'));
-    expect(body).toMatch(/drawn\.current\.visible = !room \|\| !splatShown\(scene, loaded\[room\.id\]\)/);
-    expect(body).not.toContain('splatsSettled');
-  });
-
-  it('is walked from an open spot, not from the render camera', () => {
-    expect(read('src/components/features/scenestudio/ScrollWalkthrough.tsx')).toMatch(/shot: real \? null : shot\?\.camera \?\? null, start: real \? openSpot\(/);
+    for (const part of ['model_url:', 'renders:']) expect(payload).toContain(part);
   });
 });
 

@@ -6,7 +6,7 @@ import { Button } from '@/components/core/ui/button';
 
 import { planBounds, planFrame, pointInPolygon, polygonCentroid, toScene, type PlanOpening, type PlanRoom, type PlanWall } from '@/lib/scene/sceneGeometry';
 import { fitFov, walkthroughStage, type Pose, type WalkRoom } from '@/lib/scene/walkthroughTimeline';
-import { freeSpots, roomSignature } from '@/lib/scene/worldViews';
+import { roomSignature } from '@/lib/scene/roomSignature';
 import type { SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 import { ExploreBar, ExploreShot, exploreHint, useExplore } from '@/components/features/scenestudio/WalkthroughExplore';
 import type { SceneCanvasHandle, ScriptFrame } from '@/components/features/scenestudio/SceneCanvas';
@@ -26,13 +26,7 @@ export interface WalkthroughPayload {
   products: Record<string, SceneProduct>;
   render: { image_url: string; camera: Pose | null } | null;
   renders?: Array<{ image_url: string; camera: Pose | null; source?: string | null; sig?: string | null }>;
-  worlds?: Array<{ room_id: string; url: string; sig: string | null }>;
 }
-
-/** Photoreal rooms that still match the plan; one made before a change is not shown to the client. */
-export const currentWorlds = (d: WalkthroughPayload) => (d.worlds ?? [])
-  .filter((w) => w.sig === roomSignature(w.room_id, d.objects, d.surfaces, d.finishes))
-  .map((w) => ({ roomId: w.room_id, url: w.url }));
 
 /** Pictures a room can end on: a Photo Mode picture of a room that has changed since is left out. */
 export function currentRenders(d: WalkthroughPayload): NonNullable<WalkthroughPayload['renders']> {
@@ -49,25 +43,8 @@ type Shot = { image_url: string; camera: Pose };
 
 const noop = () => undefined;
 
-/** The open spot furthest from the furniture's middle: a photoreal room is only sharp from where its views were taken. */
-function openSpot(outline: Array<[number, number]>, inside: SceneObject[], f: ReturnType<typeof planFrame>): [number, number] | null {
-  const { free } = freeSpots(outline, inside.map((o) => ({ x_mm: o.x_mm, y_mm: o.y_mm, width_mm: o.width_mm, depth_mm: o.depth_mm, rotation_deg: o.rotation_deg, top_mm: (o.elevation_mm ?? 0) + o.height_mm })));
-  const [gx, gy] = inside.length
-    ? [inside.reduce((s, o) => s + o.x_mm, 0) / inside.length, inside.reduce((s, o) => s + o.y_mm, 0) / inside.length]
-    : polygonCentroid(outline);
-  const xs = outline.map((p) => p[0]);
-  const ys = outline.map((p) => p[1]);
-  let best: [number, number] | null = null;
-  for (let x = Math.min(...xs); x <= Math.max(...xs); x += 150) {
-    for (let y = Math.min(...ys); y <= Math.max(...ys); y += 150) {
-      if (free(x, y) && (!best || Math.hypot(x - gx, y - gy) > Math.hypot(best[0] - gx, best[1] - gy))) best = [x, y];
-    }
-  }
-  return best ? toScene(best[0], best[1], f) : null;
-}
-
 export function walkPlanOf(
-  ordered: PlanRoom[], walls: PlanWall[], objects: SceneObject[], renders: Shot[] = [], photoreal: ReadonlySet<string> = new Set(),
+  ordered: PlanRoom[], walls: PlanWall[], objects: SceneObject[], renders: Shot[] = [],
 ): { span: number; walk: WalkRoom[]; shots: Array<Shot | null> } {
   const b = planBounds(ordered, walls);
   const f = planFrame(b);
@@ -81,11 +58,7 @@ export function walkPlanOf(
     const focus = inside.length
       ? toScene(inside.reduce((s, o) => s + o.x_mm, 0) / inside.length, inside.reduce((s, o) => s + o.y_mm, 0) / inside.length, f)
       : null;
-    const real = photoreal.has(r.id);
-    return {
-      centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus, corners: r.outline.map((p) => toScene(p[0], p[1], f)),
-      shot: real ? null : shot?.camera ?? null, start: real ? openSpot(r.outline, inside, f) : null,
-    };
+    return { centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus, corners: r.outline.map((p) => toScene(p[0], p[1], f)), shot: shot?.camera ?? null };
   });
   return { span: Math.max((b.maxX - b.minX) / 1000, (b.maxY - b.minY) / 1000, 2), walk, shots };
 }
@@ -94,18 +67,16 @@ export function walkPlanOf(
 export function useWalkthrough(data: WalkthroughPayload) {
   return useMemo(() => {
     const ordered = [...data.rooms].sort((a, b) => (a.walk_order ?? 0) - (b.walk_order ?? 0)).filter((r) => r.outline.length >= 3);
-    const worlds = currentWorlds(data);
     const current = currentRenders(data);
     const { span, walk, shots } = walkPlanOf(
-      ordered, data.walls, data.objects, current.filter((r): r is Shot => !!r.camera?.position), new Set(worlds.map((w) => w.roomId)),
+      ordered, data.walls, data.objects, current.filter((r): r is Shot => !!r.camera?.position),
     );
     const hero = data.render && (!data.renders || current.some((r) => r.image_url === data.render!.image_url)) ? data.render : null;
     const heroInRoom = !!hero && shots.some((x) => x?.image_url === hero.image_url);
     return {
-      ordered, span, walk, shots, worlds, hero, heroInRoom,
+      ordered, span, walk, shots, hero, heroInRoom,
       finalPose: heroInRoom ? null : hero?.camera ?? null,
       names: ordered.map((r) => r.name),
-      photoreal: ordered.map((r) => worlds.some((w) => w.roomId === r.id)),
       shotByRoom: Object.fromEntries(ordered.flatMap((r, i) => (shots[i] ? [[r.id, shots[i]!.image_url]] : []))) as Record<string, string>,
       modelUrls: Object.fromEntries(data.objects.filter((o) => o.model_url).map((o) => [o.id, o.model_url as string])) as Record<string, string>,
     };
@@ -128,8 +99,8 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
   const canRender = useMemo(() => typeof document !== 'undefined' && webgl2(), []);
 
   const plan = useWalkthrough(data);
-  const { ordered, walk, shots, worlds, hero, heroInRoom, names, shotByRoom, modelUrls } = plan;
-  const explore = useExplore(ordered, worlds, shotByRoom, canvas);
+  const { ordered, walk, shots, hero, heroInRoom, names, shotByRoom, modelUrls } = plan;
+  const explore = useExplore(ordered, shotByRoom, canvas);
   const exploring = explore.on;
 
   useLayoutEffect(() => {
@@ -205,7 +176,6 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
               onPaint={noop}
               cabinetHardware={data.cabinet_hardware}
               modelUrls={modelUrls}
-              worlds={worlds}
               script={exploring ? undefined : script}
               walkRoomId={exploring ? explore.roomId : undefined}
               onWalkEnd={explore.overview}

@@ -7,7 +7,6 @@ import type { SurfaceTarget } from '@/lib/scene/sceneSurfaces';
 import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import type { BoardDecorRef } from '@/lib/scene/boardDecor';
 import { kitchenCompositionFromRoom, type RoomComposition } from '@/lib/scene/kitchenComposition';
-import type { WorldPose } from '@/lib/scene/worldViews';
 import { projectPlansService, type PlanWithItems } from '@/services/projectPlansService';
 import type { Composition, PlanComposition } from '@/utils/blueprintComposition';
 
@@ -15,22 +14,6 @@ export const SCENE_BUCKET = 'generation-images';
 const MAX_SOURCE_LONG_SIDE = 2048;
 
 export type SceneSourceKind = 'blank' | 'plan_image' | 'photo' | 'render' | 'drawing';
-export type WorldQuality = 'draft' | 'refined';
-
-export interface SceneWorld {
-  id: string;
-  room_id: string;
-  quality: WorldQuality;
-  engine: 'atlas' | 'ray_trace';
-  status: 'views' | 'building' | 'ready' | 'failed';
-  splat_path: string | null;
-  poster_path: string | null;
-  layout_snapshot: { sig?: string } | null;
-  error: string | null;
-  created_at: string;
-}
-
-export interface WorldView extends Pick<WorldPose, 'position' | 'fov'> { png: Blob; zMin: number; zMax: number; quaternion: [number, number, number, number] }
 
 export type SceneReadStatus = 'none' | 'extracting' | 'ready' | 'failed';
 
@@ -455,48 +438,6 @@ export const sceneStudioService = {
     if (error) throw new Error(error.message);
     const row = data as { capture_path: string | null; floor_plans: { id: string; name: string; source_kind: string } } | null;
     return row ? { ...row.floor_plans, capture_url: row.capture_path ? publicUrl(row.capture_path) : null } : null;
-  },
-
-  async listWorlds(sceneId: string): Promise<SceneWorld[]> {
-    const { data, error } = await supabase.from('scene_worlds')
-      .select('id, room_id, quality, engine, status, splat_path, poster_path, layout_snapshot, error, created_at')
-      .eq('floor_plan_id', sceneId).order('created_at', { ascending: false }).limit(60);
-    if (error) throw new Error(error.message);
-    return (data ?? []) as unknown as SceneWorld[];
-  },
-
-  /** What one room costs, by quality, from the platform price list. */
-  async worldPrices(): Promise<Record<WorldQuality, number | null>> {
-    const { data, error } = await supabase.from('ai_model_pricing').select('model_key, credits').in('model_key', ['scene-world-draft', 'scene-world-refined']).eq('is_active', true);
-    if (error) throw new Error(error.message);
-    const of = (k: string) => { const v = (data ?? []).find((p) => p.model_key === k)?.credits; return v == null ? null : Number(v); };
-    return { draft: of('scene-world-draft'), refined: of('scene-world-refined') };
-  },
-
-  async startWorld(scene: Pick<SceneRow, 'workspace_id' | 'id'>, input: {
-    roomId: string; quality: WorldQuality; views: WorldView[]; styleRenderId: string | null; finishes: string; objects: string; sig: string;
-  }): Promise<{ id: string; credits_used?: number }> {
-    const stamp = Date.now();
-    const views = await Promise.all(input.views.map(async (v, i) => {
-      const path = `${sceneFolder(scene)}/worlds/${stamp}-${i}.png`;
-      await uploadTo(path, v.png, 'image/png');
-      return { depth_path: path, z_min: v.zMin, z_max: v.zMax, position: v.position, quaternion: v.quaternion, fov: v.fov };
-    }));
-    const { data, error } = await supabase.functions.invoke('scene-world', {
-      body: {
-        action: 'start', floor_plan_id: scene.id, room_id: input.roomId, quality: input.quality, views, style_render_id: input.styleRenderId,
-        finishes: input.finishes, objects: input.objects, layout_snapshot: { sig: input.sig },
-      },
-    });
-    if (error) throw await edgeError(error, 'The photoreal room could not be started');
-    if (!data?.success) throw new Error(data?.error || 'The photoreal room could not be started.');
-    return data;
-  },
-
-  async worldStatus(id: string): Promise<Pick<SceneWorld, 'id' | 'room_id' | 'quality' | 'status' | 'splat_path' | 'poster_path' | 'error'> | null> {
-    const { data, error } = await supabase.functions.invoke('scene-world', { body: { action: 'status', id } });
-    if (error) throw await edgeError(error, 'The photoreal room could not be checked');
-    return data?.world ?? null;
   },
 
   async saveObjects(objects: SceneObject[]): Promise<void> {

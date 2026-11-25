@@ -3587,7 +3587,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   const intent = sc.intent && typeof sc.intent === 'object' ? sc.intent as NonNullable<NonNullable<Message['sceneData']>['intent']> : undefined;
                   const sceneData = { scene_id: sc.id as string, name: (sc.name as string) || '3D room', source_kind: (sc.source_kind as string) || 'photo', ...(intent ? { intent } : {}) };
                   const opened = intent?.mode === 'walk' ? 'is open in walk mode: WASD or arrows to walk, drag to look.'
-                    : intent?.mode === 'photoreal' ? 'is open. Pick the quality and confirm the photoreal room there.'
                     : intent?.mode === 'make_3d' ? 'is open with the object selected. Press Make 3D to confirm (10 credits).'
                         : intent?.mode === 'render' ? `is rendering${intent.style ? ` in ${intent.style}` : ''}; the render arrives here.`
                           : intent?.mode === 'photograph' ? 'is photographing every room; keep this tab in front.'

@@ -150,7 +150,6 @@ export const createManageScenesTool = (
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const next = mode === 'make_3d'
         ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
-        : mode === 'photoreal' ? 'The room is open with the photoreal offer; the user picks the quality, sees the price and confirms it there.'
         : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.'
             : mode === 'drawings' ? 'The kitchen drawings are open: floor plan with dimensions, an elevation per wall, the electrical and the plumbing drawings and the cut list; Print is in the dialog.' : 'The room is open on the canvas.';
       const services = mode === 'drawings' ? servicesReport(await kitchenRunsOf(sb, scene_id)).out : {};
@@ -612,12 +611,12 @@ export const createManageScenesTool = (
         + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, separate sheets labelled Electrical and Plumbing for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks, electrical and plumbing, name each failure. A KITCHEN MADE FROM A DESIGN (plan, sketch or render) ALWAYS GETS ITS ELECTRICAL AND PLUMBING DRAWINGS: status, layout, price_kitchen and drawing_set all return the electrical and plumbing checks; report them every time. '
       + 'walkthrough_video: records the walkthrough of the real plan as a video, free; it arrives in the conversation. '
       + 'photograph: takes one Photo Mode picture of every room, free; they arrive in the conversation and end each room of the shared walkthrough. '
-      + 'client_look: what the shared walkthrough shows (look drawn: the live 3D rooms and their Photo Mode pictures; photoreal: photoreal rooms and renders where they exist). '
+      + 'client_look: what the shared walkthrough shows (look drawn: the live 3D rooms and their Photo Mode pictures; renders: also every stored render). '
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
       + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '
       + 'layout each run with the confirmed units, then open mode drawings. '
       + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
-      + 'for Make 3D (10 credits, the user confirms), mode photoreal with a room offers to rebuild that room photoreal so it can be walked around in (the user sees the price and confirms). '
+      + 'for Make 3D (10 credits, the user confirms). '
       + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space, '
       + 'or on one part of an object (object + part, e.g. the sofa upholstery or the kitchen fronts); free. '
       + 'price_kitchen: prices the kitchen units standing in the room on a project plan from the kitchen blueprint '
@@ -636,7 +635,7 @@ export const createManageScenesTool = (
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),
-      mode: z.enum(['view', 'walk', 'make_3d', 'photoreal', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
+      mode: z.enum(['view', 'walk', 'make_3d', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
       room: z.string().max(120).optional().describe('open/finish/render: the space, by name (e.g. living room).'),
       area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
       part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),
@@ -644,7 +643,7 @@ export const createManageScenesTool = (
       colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
       project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet; create with drawing: the project the drawing is on.'),
       fronts: z.enum(['closed', 'half', 'open']).optional().describe('open: show the kitchen doors and drawers closed, half open or open.'),
-      look: z.enum(CLIENT_LOOKS).optional().describe('client_look: drawn or photoreal.'),
+      look: z.enum(CLIENT_LOOKS).optional().describe('client_look: drawn or renders.'),
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
       units: z.array(z.object({ type: z.enum(KITCHEN_MODULE_TYPES), width_cm: z.number() })).optional().describe('layout: the units of the run left to right; omit for an automatic layout.'),
       seating_cm: z.number().optional().describe('layout: seating overhang of an island worktop, cm.'),

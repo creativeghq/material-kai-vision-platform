@@ -19,7 +19,7 @@ import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
 import { AssetContext } from '@/components/features/scenestudio/assetContext';
 import { MeshModel } from '@/components/features/scenestudio/meshModel';
-import { drawSplatsOver, isSplat, splatShown, splatsSettled } from '@/components/features/scenestudio/splatOverlay';
+import { drawSplatsOver, isSplat, splatsSettled } from '@/components/features/scenestudio/splatOverlay';
 import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
 import type { Pose } from '@/lib/scene/walkthroughTimeline';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
@@ -31,8 +31,6 @@ import {
   rotationToPlan, rotationToScene, toPlan, toScene, walkStep, wallPieces,
   type PlanFrame, type PlanOpening, type PlanRoom, type PlanWall,
 } from '@/lib/scene/sceneGeometry';
-import { renderDepthViews, type DepthView } from '@/components/features/scenestudio/worldCapture';
-import { worldsNear, type WorldPose } from '@/lib/scene/worldViews';
 import type { SceneCamera, SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 
 export type SceneTool = 'view' | 'move' | 'turn' | 'remove' | 'paint';
@@ -54,8 +52,6 @@ export interface SceneCanvasHandle {
   capture(): Promise<SceneCapture>;
   /** ID pass only, from the given pose, with the current layout. For object edits on an existing render. */
   captureIdPassAt(pose: CameraPose): Promise<{ idPass: Blob; idMap: Record<string, string> }>;
-  /** Depth of the scene as it stands from each pose, for a photoreal version of a room. */
-  captureDepth(poses: WorldPose[]): DepthView[];
   /** False while splats are still catching up with the camera or the layout. */
   settled(): boolean;
   /** False while the room the camera stands in is still taking its own light. */
@@ -103,17 +99,11 @@ interface Props {
   sunHour?: number | null;
   /** Read-only playback (the client walkthrough): camera, wall height and unit rise are read from this ref every frame. */
   script?: React.MutableRefObject<ScriptFrame | null>;
-  /** Photoreal versions of rooms, in scene coordinates: shown while the camera stands in that room. */
-  worlds?: RoomWorld[];
-  /** How many furniture models and photoreal rooms are still loading; a failed one counts as done. */
+  /** How many furniture models are still loading; a failed one counts as done. */
   onAssets?(pending: number): void;
-  /** Loads every photoreal room up front; off, only the nearest two are in memory. */
-  allWorlds?: boolean;
   /** Trades sharpness for speed on a slow device. */
   adaptive?: boolean;
 }
-
-export interface RoomWorld { roomId: string; url: string }
 
 export interface ScriptFrame { pose: Pose; walls: number; objects: number }
 
@@ -133,55 +123,6 @@ const ScriptDriver: React.FC<{ script: React.MutableRefObject<ScriptFrame | null
     if (objects.current) { objects.current.scale.y = 1; objects.current.visible = true; }
   }, [walls, objects]);
   return null;
-};
-
-/** Swaps the drawn room for its photoreal version while the camera is inside it, and back outside. Loads the room ahead and drops the one behind, unless `all`. */
-const PhotorealRooms: React.FC<{
-  worlds: RoomWorld[]; rooms: PlanRoom[]; frame: PlanFrame; heightM: number; drawn: React.RefObject<Group>; all: boolean;
-}> = ({ worlds, rooms, frame, heightM, drawn, all }) => {
-  const [loaded, setLoaded] = useState<Record<string, SplatMesh>>({});
-  const [wanted, setWanted] = useState<string[]>([]);
-  const track = useContext(AssetContext);
-  const made = useRef(new Map<string, SplatMesh>());
-  useEffect(() => {
-    const keep = new Set(wanted);
-    for (const w of worlds) {
-      if (!keep.has(w.url) || made.current.has(w.url)) continue;
-      const mesh = new SplatMesh({ url: w.url });
-      mesh.userData.splat = true;
-      mesh.visible = false;
-      made.current.set(w.url, mesh);
-      track(w.url, true);
-      void mesh.initialized.then(() => true, () => false).then((ok) => {
-        track(w.url, false);
-        if (ok && made.current.get(w.url) === mesh) setLoaded((m) => ({ ...m, [w.roomId]: mesh }));
-      });
-    }
-    for (const [url, mesh] of made.current) {
-      if (keep.has(url)) continue;
-      made.current.delete(url);
-      track(url, false);
-      setLoaded((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== mesh)));
-      mesh.dispose();
-    }
-  }, [wanted, worlds, track]);
-  useEffect(() => {
-    const mine = made.current;
-    return () => {
-      mine.forEach((mesh, url) => { track(url, false); mesh.dispose(); });
-      mine.clear();
-      if (drawn.current) drawn.current.visible = true;
-    };
-  }, [track, drawn]);
-  useFrame(({ camera, scene }) => {
-    const [x, y] = toPlan(camera.position.x, camera.position.z, frame);
-    const want = all ? worlds.map((w) => w.url) : worldsNear(worlds, rooms, x, y);
-    if (want.join() !== wanted.join()) setWanted(want);
-    const room = camera.position.y < heightM ? rooms.find((r) => loaded[r.id] && pointInPolygon(x, y, r.outline)) : undefined;
-    for (const [id, mesh] of Object.entries(loaded)) mesh.visible = id === room?.id;
-    if (drawn.current) drawn.current.visible = !room || !splatShown(scene, loaded[room.id]);
-  });
-  return <group>{Object.entries(loaded).map(([id, mesh]) => <primitive key={id} object={mesh} />)}</group>;
 };
 
 const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
@@ -792,7 +733,6 @@ const Bridge = forwardRef<SceneCanvasHandle, {
         setPose(before);
       }
     },
-    captureDepth(poses) { return renderDepthViews(gl, scene, poses, span / 2); },
     settled() { return splatsSettled(scene); },
     lit() { return lit.current; },
     async picture() {
@@ -936,7 +876,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
-    frontsOpen = 0, cabinetHardware, sunHour = null, script, worlds = [], onAssets, allWorlds = false, adaptive = false,
+    frontsOpen = 0, cabinetHardware, sunHour = null, script, onAssets, adaptive = false,
   } = props;
   const loading = useRef(new Set<string>());
   const reportAssets = useRef(onAssets);
@@ -1111,7 +1051,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       <RoomLighting span={span} sunHour={sunHour} rooms={litRooms} version={lightVersion} solid={lightReady} lit={lit} loaded={loaded} />
       {!wireframe && windowLights.map(({ id, ...l }) => <WindowLight key={id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
-      {(hasSplats || worlds.length > 0) && <SparkLayer />}
+      {hasSplats && <SparkLayer />}
       <AssetContext.Provider value={track}>
       <group ref={drawn}>
       <group userData={{ splat: true }}>
@@ -1262,7 +1202,6 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       ))}
       </CabinetViewContext.Provider>
       </group>
-      {worlds.length > 0 && <PhotorealRooms worlds={worlds} rooms={rooms} frame={frame} heightM={defaultWallHeightMm / 1000} drawn={drawn} all={allWorlds} />}
       </AssetContext.Provider>
       {script && <ScriptDriver script={script} walls={wallsGroup} objects={objectsGroup} />}
       <OrbitControls
@@ -1277,7 +1216,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} lit={lit} />
-      {!wireframe && !photo && (hasSplats || worlds.length > 0) && <SplatsAfterComposer script={script} />}
+      {!wireframe && !photo && hasSplats && <SplatsAfterComposer script={script} />}
       {!wireframe && !photo && (
         <EffectComposer multisampling={4}>
           <N8AO aoRadius={0.5} distanceFalloff={0.5} intensity={1.7} halfRes quality="medium" />

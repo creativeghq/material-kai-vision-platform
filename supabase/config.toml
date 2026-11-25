@@ -87,9 +87,6 @@ verify_jwt = false
 [functions.health-check]
 verify_jwt = false
 
-[functions.scene-world]
-verify_jwt = false
-
 [functions.campaign-processor]
 verify_jwt = false
 

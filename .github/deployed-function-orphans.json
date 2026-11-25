@@ -5,6 +5,11 @@
       "reason": "The VR World feature was removed (World Labs retires the Marble API on 2027-01-08). Retired in place to a 410 stub that holds no secret; nothing invokes it.",
       "version": 199,
       "wayOut": "Supabase dashboard, Edge Functions, generate-vr-world, Delete (or: supabase functions delete generate-vr-world --project-ref \"$PROJECT_REF\"). Then remove this entry."
+    },
+    "scene-world": {
+      "reason": "Photoreal rooms by World Labs Atlas were removed; 3D rooms and Photo Mode replaced them. Retired in place to a 410 stub that holds no secret; nothing invokes it.",
+      "version": 0,
+      "wayOut": "Supabase dashboard, Edge Functions, scene-world, Delete (or: supabase functions delete scene-world --project-ref \"$PROJECT_REF\"). Then remove this entry."
     }
   }
 }

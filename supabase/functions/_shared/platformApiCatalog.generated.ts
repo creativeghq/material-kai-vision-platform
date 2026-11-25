@@ -4398,63 +4398,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
-    "name": "scene-world",
-    "tag": "Projects",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Make a photoreal, walkable version of one room of a 3D scene",
-    "description": "Turns one room of a 3D scene into a photoreal 3D room. `start` takes 6-20 depth views of the room (PNG captures stored in the scene's folder, with their cameras), an optional approved render whose look is matched, and a quality; it debits the room's price BEFORE any work. World Labs Atlas draws the same room photoreal at those cameras and builds one Gaussian splat in scene coordinates. `status` st",
-    "fields": {
-      "action": {
-        "type": "string",
-        "enum": [
-          "start",
-          "status",
-          "advance"
-        ],
-        "required": true,
-        "description": "Which operation to run"
-      },
-      "floor_plan_id": {
-        "type": "string",
-        "description": "the 3D scene. (string (uuid))"
-      },
-      "room_id": {
-        "type": "string",
-        "description": "the room in that scene. (string (uuid))"
-      },
-      "views": {
-        "type": "array",
-        "description": "depth_path, z_min, z_max, position, quaternion, fov per view."
-      },
-      "quality": {
-        "type": "string",
-        "description": "draft is quick, refined is sharper and takes about 20 minutes. (one of: draft | refined)"
-      },
-      "style_render_id": {
-        "type": "string",
-        "description": "a render of this scene whose look the room takes. (string (uuid))"
-      },
-      "finishes": {
-        "type": "string",
-        "description": "the room's surface finishes, in words."
-      },
-      "objects": {
-        "type": "string",
-        "description": "the furniture in the room, in words."
-      },
-      "layout_snapshot": {
-        "type": "object",
-        "description": "the layout the views were taken from."
-      },
-      "id": {
-        "type": "string",
-        "description": "the photoreal room. (string (uuid))"
-      }
-    }
-  },
-  {
     "name": "send-quote-email",
     "tag": "Quotes",
     "methods": [
