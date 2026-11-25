@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { wipeAt } from '../../src/lib/scene/beforeAfterVideo';
-import { walkthroughStage, type Pose, type WalkRoom } from '../../src/lib/scene/walkthroughTimeline';
+import { roomPoses, walkthroughStage, type Pose, type WalkRoom } from '../../src/lib/scene/walkthroughTimeline';
 import { blankedSource } from '../helpers/sourceIndex';
 
 const read = (p: string) => blankedSource(p);
@@ -14,6 +14,12 @@ describe('walkthroughStage', () => {
     const at = 0.35 + 0.25 * 0.8;
     expect(walkthroughStage(at, { ...base, photoreal: [false, false] })).toMatchObject({ caption: 'Living Room', shotRoom: 0, shotOpacity: 1 });
     expect(walkthroughStage(at, { ...base, photoreal: [true, false] })).toMatchObject({ shotRoom: -1, shotOpacity: 0 });
+  });
+
+  it('starts inside the room even when its picture was taken near a wall, so the room is lit from the first frame', () => {
+    const near: Pose = { position: [0, 1.5, 1.65], target: [0, 1, -2], fov: 60 };
+    expect(roomPoses({ ...room, shot: near })[0].position[2]).toBeLessThan(2);
+    expect(roomPoses({ ...room, shot: { ...near, position: [0, 1.5, 0] } })[0].position[2]).toBeCloseTo(0.5, 5);
   });
 
   it('does not promise a finished design when there is no closing render', () => {

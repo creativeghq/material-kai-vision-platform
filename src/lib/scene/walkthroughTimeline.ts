@@ -1,3 +1,5 @@
+import { pointInPolygon } from '@/lib/scene/sceneGeometry';
+
 export type V3 = [number, number, number];
 export interface Pose { position: V3; target: V3; fov: number }
 export interface WalkRoom { centre: [number, number]; far: [number, number]; focus?: [number, number] | null; corners?: Array<[number, number]>; shot?: Pose | null; start?: [number, number] | null }
@@ -35,7 +37,10 @@ export function roomPoses(r: WalkRoom): [Pose, Pose] {
   if (r.shot) {
     const { position: [px, py, pz], target: [tx, , tz] } = r.shot;
     const len = Math.max(1e-6, Math.hypot(tx - px, tz - pz));
-    return [{ position: [px - ((tx - px) / len) * 0.5, py, pz - ((tz - pz) / len) * 0.5], target: r.shot.target, fov: r.shot.fov + 6 }, r.shot];
+    const behind = (m: number): [number, number] => [px - ((tx - px) / len) * m, pz - ((tz - pz) / len) * m];
+    const inside = (m: number) => !r.corners || r.corners.length < 3 || pointInPolygon(...behind(m + 0.15), r.corners);
+    const [sx, sz] = behind([0.5, 0.35, 0.2, 0.1].find(inside) ?? 0);
+    return [{ position: [sx, py, sz], target: r.shot.target, fov: r.shot.fov + 6 }, r.shot];
   }
   if (r.corners && r.corners.length >= 3) return cornerPoses(r, r.corners);
   const [cx, cz] = r.centre;
