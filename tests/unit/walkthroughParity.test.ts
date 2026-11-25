@@ -34,6 +34,7 @@ describe('the recorded walkthrough shows what the client sees', () => {
       expect(src).toMatch(/worlds=\{worlds\}/);
     }
     expect(recorder).toMatch(/settled\(\)/);
+    expect(recorder).toMatch(/=== room && scene\.current\?\.lit\(\) \? SETTLE_FRAME_MS : SETTLE_ROOM_MS/);
     expect(recorder).toMatch(/disabled=\{[^}]*!ready/);
   });
 

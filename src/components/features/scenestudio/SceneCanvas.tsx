@@ -57,6 +57,8 @@ export interface SceneCanvasHandle {
   captureDepth(poses: WorldPose[]): DepthView[];
   /** False while splats are still catching up with the camera or the layout. */
   settled(): boolean;
+  /** False while the room the camera stands in is still taking its own light. */
+  lit(): boolean;
   setPose(pose: CameraPose): void;
   topView(): void;
   resetView(): void;
@@ -631,8 +633,8 @@ const ObjectModel: React.FC<{ obj: SceneObject; frame: PlanFrame; product?: Scen
 /** Exposes capture and camera moves to the page. Lives inside the Canvas so it can reach the renderer. */
 const Bridge = forwardRef<SceneCanvasHandle, {
   controls: React.MutableRefObject<OrbitControlsImpl | null>; span: number; initial: CameraPose; idHexById: Record<string, string>;
-  rooms: PlanRoom[]; frame: PlanFrame;
-}>(({ controls, span, initial, idHexById, rooms, frame }, ref) => {
+  rooms: PlanRoom[]; frame: PlanFrame; lit: React.MutableRefObject<boolean>;
+}>(({ controls, span, initial, idHexById, rooms, frame, lit }, ref) => {
   const { gl, scene, camera, size } = useThree();
   const flight = useRef<{ from: CameraPose; to: CameraPose; t: number } | null>(null);
 
@@ -766,6 +768,7 @@ const Bridge = forwardRef<SceneCanvasHandle, {
     },
     captureDepth(poses) { return renderDepthViews(gl, scene, poses, span / 2); },
     settled() { return splatsSettled(scene); },
+    lit() { return lit.current; },
     setPose(pose) { flight.current = null; setPose(pose); },
     topView() { flyTo({ position: [0, span * 1.35, 0.01], target: [0, 0, 0], fov: 45 }); },
     resetView() { flyTo(initial); },
@@ -911,6 +914,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
   }, []);
   const drawn = useRef<Group>(null);
   const wallsGroup = useRef<Group>(null);
+  const lit = useRef(true);
   const objectsGroup = useRef<Group>(null);
   const cabinetView = useMemo(() => ({ open: frontsOpen, hardware: cabinetHardware ?? 'bar_handles' }), [frontsOpen, cabinetHardware]);
   const hasSplats = Object.values(modelUrls).some((u) => !isMeshModel(u));
@@ -1060,7 +1064,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       style={{ touchAction: 'none' }}
     >
       <color attach="background" args={['#e9e6e1']} />
-      <RoomLighting span={span} sunHour={sunHour} rooms={litRooms} version={lightVersion} solid={lightReady} />
+      <RoomLighting span={span} sunHour={sunHour} rooms={litRooms} version={lightVersion} solid={lightReady} lit={lit} />
       {!wireframe && windowLights.map(({ id, ...l }) => <WindowLight key={id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
       {(hasSplats || worlds.length > 0) && <SparkLayer />}
@@ -1228,7 +1232,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         minDistance={0.5}
         maxDistance={span * 4}
       />
-      <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
+      <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} lit={lit} />
       {!wireframe && !photo && (hasSplats || worlds.length > 0) && <SplatsAfterComposer script={script} />}
       {!wireframe && !photo && (
         <EffectComposer multisampling={4}>

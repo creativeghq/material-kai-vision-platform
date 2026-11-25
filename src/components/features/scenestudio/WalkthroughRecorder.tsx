@@ -93,9 +93,9 @@ export const WalkthroughRecorder: React.FC<{
         const st = walkthroughStage(i / (total - 1), plan);
         script.current = { pose: st.frame.pose, walls: st.frame.walls, objects: st.frame.objects };
         await painted();
-        const limit = st.frame.room === room ? SETTLE_FRAME_MS : SETTLE_ROOM_MS;
+        const limit = st.frame.room === room && scene.current?.lit() ? SETTLE_FRAME_MS : SETTLE_ROOM_MS;
         room = st.frame.room;
-        for (const until = performance.now() + limit; !scene.current?.settled() && performance.now() < until;) await painted();
+        for (const until = performance.now() + limit; !(scene.current?.settled() && scene.current.lit()) && performance.now() < until;) await painted();
         ctx.drawImage(gl, 0, 0, W, H);
         const shot = st.shotRoom >= 0 ? shotPictures[st.shotRoom] : null;
         if (shot && st.shotOpacity > 0) drawCover(ctx, shot, st.shotOpacity);

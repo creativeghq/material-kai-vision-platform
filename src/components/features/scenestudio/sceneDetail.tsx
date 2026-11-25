@@ -69,7 +69,7 @@ function showWindowsOf(scene: Object3D, room: string | null) {
 }
 
 /** Lights the room the camera stands in with what that room itself looks like, so the floor warms the walls and the window side stays brighter. */
-function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean) {
+function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, lit?: React.MutableRefObject<boolean>) {
   const { gl, scene } = useThree();
   const base = useRef<Texture | null>(null);
   const own = useRef(new Set<Texture>());
@@ -136,6 +136,7 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean) 
   };
 
   useFrame(({ camera, clock }) => {
+    if (lit) lit.current = true;
     if (scene.environment && !own.current.has(scene.environment)) return;
     const s = state.current;
     if (s.version !== version) { s.version = version; s.since = null; s.shot = 0; }
@@ -148,6 +149,7 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean) 
       s.since ??= clock.elapsedTime;
       const due = s.shot < PROBE_AGES_S.length && clock.elapsedTime - s.since >= PROBE_AGES_S[s.shot];
       if (due) { s.shot += 1; rooms.forEach(capture); } else if (!probes.current.has(room.id)) capture(room);
+      if (lit) lit.current = s.shot >= PROBE_AGES_S.length;
     }
     const probe = room ? probes.current.get(room.id) : null;
     scene.environment = probe?.texture ?? base.current;
@@ -158,8 +160,8 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean) 
 const BASE_LIGHT = 0.75;
 const ROOM_LIGHT = 0.95;
 
-export const RoomLighting: React.FC<{ span: number; sunHour?: number | null; rooms: LitRoom[]; version: unknown; solid(): boolean }> = ({ span, sunHour, rooms, version, solid }) => {
-  useRoomLight(rooms, version, solid);
+export const RoomLighting: React.FC<{ span: number; sunHour?: number | null; rooms: LitRoom[]; version: unknown; solid(): boolean; lit?: React.MutableRefObject<boolean> }> = ({ span, sunHour, rooms, version, solid, lit }) => {
+  useRoomLight(rooms, version, solid, lit);
   const s = Math.max(span, 4);
   const sun = sunHour == null ? null : sunAt(sunHour, span);
   return (
