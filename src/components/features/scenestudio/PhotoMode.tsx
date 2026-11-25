@@ -5,13 +5,14 @@ import { ACESFilmicToneMapping, BufferAttribute, BufferGeometry, Color, Matrix4,
 import { DenoiseMaterial, GradientEquirectTexture, PathTracingSceneGenerator, WebGLPathTracer } from 'three-gpu-pathtracer';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 
-import { denoise as cleanPhoto, denoiserNet, photoExposure, photoTexture, readFloatPixels, renderGuides, type PhotoGuides } from '@/components/features/scenestudio/photoDenoiser';
+import { denoise as cleanPhoto, denoiserNet, forgetDenoiser, photoExposure, photoTexture, readFloatPixels, renderGuides, type PhotoGuides } from '@/components/features/scenestudio/photoDenoiser';
 import { drawOutdoorsOver } from '@/components/features/scenestudio/outdoorsOverlay';
 import { drawSplatsOver, invisibleMaterial, isSplat } from '@/components/features/scenestudio/splatOverlay';
 
-const MAX_SAMPLES = 240;
+const MAX_SAMPLES = 120;
 /** A clean picture is made at each of these; the last one is the photo. */
-const CLEAN_AT = [24, 72, MAX_SAMPLES];
+const CLEAN_AT = [24, 60, MAX_SAMPLES];
+const DENOISE_LIMIT_MS = 60_000;
 const EXPOSE_AT = 6;
 
 /** The library's own dispose() reads a field that does not exist in 0.0.23 and throws, taking the canvas with it. */
@@ -186,7 +187,11 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
       const guides = p.guides ??= renderGuides(gl, scene as Scene, camera, target.width, target.height, excludedFromTrace);
       const job = cleanPhoto(unet, pixels, guides);
       p.abort = job.abort;
-      const out = await job.result;
+      let late = 0;
+      const limit = new Promise<null>((resolve) => { late = window.setTimeout(() => resolve(null), DENOISE_LIMIT_MS); });
+      const out = await Promise.race([job.result, limit]);
+      clearTimeout(late);
+      if (!out) { job.abort(); forgetDenoiser(); throw new Error('The denoiser did not finish.'); }
       if (run !== p.run) return;
       p.texture?.dispose();
       p.texture = photoTexture(out, target.width, target.height);

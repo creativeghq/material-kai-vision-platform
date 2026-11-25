@@ -16,6 +16,9 @@ export function denoiserNet(): Promise<UNet | null> {
   return net;
 }
 
+/** A denoiser that hung is made again for the next picture. */
+export function forgetDenoiser(): void { net = null; }
+
 export interface PhotoGuides { albedo: Float32Array; normal: Float32Array; width: number; height: number }
 
 const black = new Color('#000000');

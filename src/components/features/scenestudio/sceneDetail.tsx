@@ -157,7 +157,7 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, 
           if (o.userData?.outdoors || o.userData?.surface === 'ceiling') show(o, true);
           if ('windowRoom' in o.userData) show(o, room === null || o.userData.windowRoom === room.id);
         });
-        void gl.compileAsync(scene, camera).catch(() => undefined);
+        gl.compile(scene, camera);
       }
     } finally {
       gl.setRenderTarget(before);
