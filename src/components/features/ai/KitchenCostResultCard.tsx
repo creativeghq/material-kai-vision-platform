@@ -2,6 +2,7 @@
 
 import { AlertTriangle, CookingPot } from 'lucide-react';
 import { Card, CardContent } from '@/components/core/ui/card';
+import { yieldMeta } from '@/utils/blueprintComposition';
 import { formatMoney } from '@/utils/decimal';
 
 export interface KitchenCostResult {
@@ -15,6 +16,7 @@ export interface KitchenCostResult {
     lines: { label: string; quantity: number; unit: string | null; unit_price: number; line_total: number }[];
   }[];
   unmatched?: string[];
+  services?: { electrical: Record<string, number>; plumbing: Record<string, number>; priced: boolean } | null;
 }
 
 export function KitchenCostResultCard({ result }: { result: KitchenCostResult }) {
@@ -63,6 +65,18 @@ export function KitchenCostResultCard({ result }: { result: KitchenCostResult })
             </div>
           ))}
         </div>
+
+        {result.services && (
+          <div className="space-y-1 border-t border-hairline pt-2 text-[11px] text-muted-foreground">
+            {(['electrical', 'plumbing'] as const).map((t) => (
+              <p key={t}>
+                <span className="font-semibold text-foreground">{t === 'electrical' ? 'Electrical' : 'Plumbing'}:</span>{' '}
+                {Object.entries(result.services![t]).map(([k, n]) => `${yieldMeta(k).label} × ${n}`).join(', ') || 'None counted'}
+              </p>
+            ))}
+            <p>{result.services.priced ? 'Counted from an automatic layout.' : 'Counted from an automatic layout and not in the price.'}</p>
+          </div>
+        )}
 
         {result.unmatched && result.unmatched.length > 0 && (
           <div className="flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 p-2">

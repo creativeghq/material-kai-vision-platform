@@ -1,6 +1,7 @@
 import { DEFAULT_CONSTRUCTION, generateCabinet, type CabinetConstruction } from '@/lib/scene/cabinetPanels';
 import {
-  KITCHEN_KINDS, MODULE_LABELS, kitchenPieces, runModulesOf, runServicePoints, runShortfall, spansBehind, unitStated, zoneOfKind, type KitchenLayout, type OpeningLike, type ServicePoint, type WallLike,
+  KITCHEN_KINDS, MODULE_LABELS, kitchenPieces, runModulesOf, runServicePoints, runShortfall, SERVICE_TRADE_OF, SERVICE_TRADES, spansBehind, tradeTitle, unitStated, zoneOfKind,
+  type KitchenLayout, type OpeningLike, type ServicePoint, type ServiceTrade, type WallLike,
 } from '@/lib/scene/kitchenComposition';
 
 export type Pt = [number, number];
@@ -185,4 +186,17 @@ export function kitchenElevations(
     elevations.push({ key, runs: list.map((r) => r.label), run_ids: list.map((r) => r.id), width_mm: width, height_mm: height, rects, dims, heights, services: services.sort((a, b) => a.x_mm - b.x_mm) });
   }
   return elevations;
+}
+
+export interface TradeSheet { trade: ServiceTrade; title: string; letter: string; elevation: Elevation; points: ServicePoint[] }
+
+export function tradeSheets(elevations: Elevation[]): TradeSheet[] {
+  return SERVICE_TRADES.flatMap((trade) => {
+    const all = elevations.map((elevation, i) => {
+      const points = elevation.services.filter((p) => SERVICE_TRADE_OF[p.key] === trade);
+      return { trade, title: tradeTitle(trade, points), letter: String.fromCharCode(65 + i), elevation, points };
+    });
+    const drawn = all.filter((s) => s.points.length);
+    return drawn.length ? drawn : all.slice(0, 1);
+  });
 }

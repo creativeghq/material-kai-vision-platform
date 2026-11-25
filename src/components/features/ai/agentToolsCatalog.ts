@@ -3394,6 +3394,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
       { label: 'Walk Through a Room', description: 'Walk a 3D room at eye height, room to room', prompt: 'Open my latest 3D room in walk mode.', icon: 'Compass' },
       { label: 'Make an Object 3D', description: 'Turn a sofa, bed or lamp in a 3D room into a photo-real model', prompt: 'In my latest 3D room, make the sofa 3D.', icon: 'Package' },
       { label: 'Finish a Room Surface', description: 'Lay a tile, wood or paint on a floor, the walls or a ceiling of a 3D room', prompt: 'In my latest 3D room, lay Amonito on the living room floor.', icon: 'Palette' },
+      { label: 'Electrical and Plumbing', description: 'Labelled drawings for the electrician and plumber of a kitchen, with their checks', prompt: 'Make the electrical and plumbing drawings of the kitchen in my latest 3D room and tell me which checks fail.', icon: 'FileText' },
       { label: 'Price the Kitchen', description: 'Turn the kitchen in a 3D room into a priced plan you can quote', prompt: 'Price the kitchen in my latest 3D room.', icon: 'Calculator' },
       { label: 'Change an Object Material', description: 'A new fabric, colour or finish for one part of a sofa, kitchen, table or bed', prompt: 'In my latest 3D room, make the sofa upholstery dark green and the legs black.', icon: 'Palette' },
       {

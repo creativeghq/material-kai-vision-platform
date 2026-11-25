@@ -294,6 +294,7 @@ export function runShortfall(o: Pick<KitchenObject, 'kind' | 'width_mm' | 'heigh
 }
 
 export interface DrawingCheck { rule: string; ok: boolean; detail: string }
+export interface ServiceCheck extends DrawingCheck { trade: ServiceTrade }
 
 const STANDARD_APPLIANCE_MM: Record<string, number[]> = { dishwasher_housing: [450, 600], oven_base: [600], oven_housing: [600], fridge_housing: [600, 700, 900], extractor: [600, 900] };
 
@@ -348,6 +349,12 @@ export function drawingChecks(runs: Array<Pick<KitchenObject, 'kind' | 'width_mm
 }
 
 export type ServiceKey = 'socket' | 'socket_dedicated' | 'water_in' | 'waste_out' | 'gas_point' | 'duct_run' | 'carbon_filter';
+export type ServiceTrade = 'electrical' | 'plumbing';
+export const SERVICE_TRADES: readonly ServiceTrade[] = ['electrical', 'plumbing'];
+export const SERVICE_TRADE_OF: Record<ServiceKey, ServiceTrade> = {
+  socket: 'electrical', socket_dedicated: 'electrical', duct_run: 'electrical', carbon_filter: 'electrical',
+  water_in: 'plumbing', waste_out: 'plumbing', gas_point: 'plumbing',
+};
 export type ServiceTone = 'stated' | 'assumed';
 export interface ServicePoint { key: ServiceKey; x_mm: number; height_mm: number; serves: string; note: string; tone: ServiceTone; height_tone: ServiceTone }
 export interface RunServices { label: string; kind: string; width_mm: number; points: ServicePoint[] }
@@ -379,7 +386,7 @@ const serviceVariant = (m: RunModule) =>
   m.type === 'oven_base' && m.options?.fuel === 'gas' ? 'oven_base_gas'
     : m.type === 'extractor' && m.options?.extraction === 'recirculation' ? 'extractor_recirculating' : m.type;
 
-type ServiceRun = Pick<KitchenObject, 'kind' | 'width_mm' | 'height_mm' | 'kitchen_layout'> & { label: string; elevation_mm?: number };
+type ServiceRun = Pick<KitchenObject, 'kind' | 'width_mm' | 'height_mm' | 'kitchen_layout'> & { label: string; elevation_mm?: number; x_mm?: number; y_mm?: number; rotation_deg?: number };
 
 export function runServicePoints(r: ServiceRun): ServicePoint[] {
   if (!KITCHEN_KINDS.has(r.kind)) return [];
@@ -428,21 +435,28 @@ export function serviceCounts(runs: ServiceRun[]): Partial<Record<ServiceKey, nu
   return out;
 }
 
-export function serviceChecks(runs: ServiceRun[]): DrawingCheck[] {
+export function tradeTitle(trade: ServiceTrade, points: Array<Pick<ServicePoint, 'key'>>): string {
+  if (trade === 'electrical') return points.some((p) => p.key === 'duct_run' || p.key === 'carbon_filter') ? 'Electrical and Extraction' : 'Electrical';
+  return points.some((p) => p.key === 'gas_point') ? 'Plumbing and Gas' : 'Plumbing';
+}
+
+export function serviceChecks(runs: ServiceRun[]): ServiceCheck[] {
   const kitchen = runs.filter((r) => KITCHEN_KINDS.has(r.kind));
   if (!kitchen.length) return [];
-  const out: DrawingCheck[] = [];
-  const add = (rule: string, bad: string[], good: string) => out.push({ rule, ok: !bad.length, detail: bad.length ? bad.join(' ') : good });
+  const out: ServiceCheck[] = [];
+  const add = (trade: ServiceTrade, rule: string, bad: string[], good: string) => out.push({ trade, rule, ok: !bad.length, detail: bad.length ? bad.join(' ') : good });
   const cmOf = (n: number) => `${Math.round(n / 10)}`;
   const all = kitchen.map((r) => ({ r, solid: runModulesOf(r).filter((m) => !NOT_A_UNIT.has(m.type)), points: runServicePoints(r) }));
 
-  const missing = all.flatMap(({ r, solid, points }) => solid.flatMap((m) => {
-    if (m.type === 'appliance_base') return [`${r.label}: the Appliance Space at ${cmOf(m.x_mm)} cm does not say which appliance, so only a socket is drawn.`];
+  const missing = (trade: ServiceTrade) => all.flatMap(({ r, solid, points }) => solid.flatMap((m) => {
+    if (m.type === 'appliance_base') return [`${r.label}: the Appliance Space at ${cmOf(m.x_mm)} cm does not say which appliance, so ${trade === 'electrical' ? 'only a socket is drawn' : 'no water or waste is drawn'}.`];
     const label = MODULE_LABELS[m.type] ?? m.type;
-    const lacking = (SERVICE_DEFAULTS[serviceVariant(m)] ?? []).filter((rule) => !points.some((p) => p.key === rule.key && p.serves === label)).map((rule) => rule.key);
+    const lacking = (SERVICE_DEFAULTS[serviceVariant(m)] ?? [])
+      .filter((rule) => SERVICE_TRADE_OF[rule.key] === trade && !points.some((p) => p.key === rule.key && p.serves === label)).map((rule) => rule.key);
     return lacking.length ? [`${r.label}: ${label} has no ${lacking.join(', ')}.`] : [];
   }));
-  add('Every Appliance Has Its Connections', missing, 'Every appliance has its power, water, waste and extraction drawn.');
+  add('electrical', 'Every Appliance Has Its Power', missing('electrical'), 'Every appliance has its power and extraction drawn.');
+  add('plumbing', 'Every Appliance Has Its Water, Waste and Gas', missing('plumbing'), 'Every appliance has its water, waste and gas drawn.');
 
   const close = all.flatMap(({ r, solid, points }) => {
     const hot = solid.filter((m) => WET_OR_HOT.has(m.type));
@@ -450,7 +464,7 @@ export function serviceChecks(runs: ServiceRun[]): DrawingCheck[] {
       .flatMap((p) => hot.filter((m) => p.x_mm > m.x_mm - WORKTOP_SOCKETS.clear_mm && p.x_mm < m.x_mm + m.width_mm + WORKTOP_SOCKETS.clear_mm)
         .map((m) => `${r.label}: ${p.note} at ${cmOf(p.x_mm)} cm is within ${cmOf(WORKTOP_SOCKETS.clear_mm)} cm of the ${MODULE_LABELS[m.type]}.`));
   });
-  add('Sockets Clear of Sink and Hob', close, `Every socket above the worktop is at least ${cmOf(WORKTOP_SOCKETS.clear_mm)} cm from the sink and hob.`);
+  add('electrical', 'Sockets Clear of Sink and Hob', close, `Every socket above the worktop is at least ${cmOf(WORKTOP_SOCKETS.clear_mm)} cm from the sink and hob.`);
 
   const drains = all.flatMap(({ r, solid }) => solid.filter((m) => m.type === 'dishwasher_housing').flatMap((d) => {
     const sinks = solid.filter((m) => m.type === 'sink_base');
@@ -458,13 +472,68 @@ export function serviceChecks(runs: ServiceRun[]): DrawingCheck[] {
     const gap = Math.min(...sinks.map((s) => Math.max(0, s.x_mm - (d.x_mm + d.width_mm), d.x_mm - (s.x_mm + s.width_mm))));
     return gap > 600 ? [`${r.label}: the dishwasher is ${cmOf(gap)} cm from the sink; its waste should run no further than one unit.`] : [];
   }));
-  add('Dishwasher Drains Beside the Sink', drains, 'Every dishwasher sits within one unit of a sink.');
+  add('plumbing', 'Dishwasher Drains Beside the Sink', drains, 'Every dishwasher sits within one unit of a sink.');
 
   const bare = all.filter(({ r, points }) => zoneOfKind(r.kind) === 'base' && r.width_mm >= WORKTOP_SOCKETS.spacing_mm && !points.some((p) => p.serves === 'Worktop'))
     .map(({ r }) => `${r.label}: no place on the worktop is ${cmOf(WORKTOP_SOCKETS.clear_mm)} cm clear of the sink and hob for a socket.`);
-  add('Worktop Has Sockets', bare, 'Every base run has worktop sockets clear of the sink and hob.');
+  add('electrical', 'Worktop Has Sockets', bare, 'Every base run has worktop sockets clear of the sink and hob.');
 
-  const assumed = all.reduce((n, x) => n + x.points.filter((p) => p.height_tone === 'assumed').length, 0);
-  add('Heights Confirmed by a Person', assumed ? [`${assumed} service heights are trade defaults (drawn grey with ≈); expected until the electrician or plumber confirms them on site.`] : [], 'Every service height was set by a person.');
+  for (const [trade, who] of [['electrical', 'electrician'], ['plumbing', 'plumber']] as const) {
+    const assumed = all.reduce((n, x) => n + x.points.filter((p) => SERVICE_TRADE_OF[p.key] === trade && p.height_tone === 'assumed').length, 0);
+    add(trade, `${trade === 'electrical' ? 'Electrical' : 'Plumbing'} Heights Confirmed by a Person`, assumed ? [`${assumed} heights are trade defaults (drawn grey with ≈); expected until the ${who} confirms them on site.`] : [], 'Every height was set by a person.');
+  }
   return out;
+}
+
+const isKitchen = (runs: Array<{ kind: string }>) => runs.some((r) => KITCHEN_KINDS.has(r.kind) && r.kind !== 'sink');
+
+function hiddenBehindTall(runs: ServiceRun[]): string[] {
+  const placed = runs.filter((r) => KITCHEN_KINDS.has(r.kind) && r.x_mm != null && r.y_mm != null);
+  return placed.flatMap((r) => {
+    const a = ((r.rotation_deg ?? 0) * Math.PI) / 180;
+    const along = (o: ServiceRun) => o.x_mm! * Math.cos(a) + o.y_mm! * Math.sin(a);
+    const across = (o: ServiceRun) => -o.x_mm! * Math.sin(a) + o.y_mm! * Math.cos(a);
+    const tall = placed.filter((o) => o !== r && zoneOfKind(o.kind) === 'tall' && Math.abs((((o.rotation_deg ?? 0) - (r.rotation_deg ?? 0)) % 360 + 360) % 360) < 3 && Math.abs(across(o) - across(r)) < 400);
+    return runServicePoints(r).filter((p) => (p.key === 'socket' || p.key === 'socket_dedicated') && p.height_mm >= 850 && p.height_mm < 1500).flatMap((p) => {
+      const x = along(r) - r.width_mm / 2 + p.x_mm;
+      return tall.filter((o) => x > along(o) - o.width_mm / 2 && x < along(o) + o.width_mm / 2)
+        .map((o) => `${r.label}: ${p.note} (${p.serves}) falls behind ${o.label}; move it where it can be reached.`);
+    });
+  });
+}
+
+export function serviceCoverage(runs: ServiceRun[]): ServiceCheck[] {
+  const kitchen = runs.filter((r) => KITCHEN_KINDS.has(r.kind));
+  if (!isKitchen(kitchen)) return [];
+  const types = new Set(kitchen.flatMap((r) => runModulesOf(r).map((m) => m.type)));
+  const points = servicePoints(kitchen).flatMap((r) => r.points);
+  const has = (key: ServiceKey) => points.some((p) => p.key === key);
+  const cooks = types.has('oven_base') || types.has('oven_housing');
+  const hidden = hiddenBehindTall(kitchen);
+  const check = (trade: ServiceTrade, rule: string, ok: boolean, good: string, bad: string): ServiceCheck => ({ trade, rule, ok, detail: ok ? good : bad });
+  return [
+    check('electrical', 'Kitchen Has Its Electrical Layout', has('socket'), 'Sockets are drawn.', 'No socket is drawn in this kitchen.'),
+    check('electrical', 'Cooking Has Its Own Supply', cooks, 'The oven or hob has its own circuit or gas point.', 'No oven or hob is placed, so no cooker circuit is drawn.'),
+    check('electrical', 'Fridge Has a Socket', types.has('fridge_housing'), 'The fridge has a socket.', 'No fridge is placed in the units; say where it stands so its socket is drawn.'),
+    check('electrical', 'Extraction Is Drawn', !types.has('oven_base') || types.has('extractor'), types.has('oven_base') ? 'The hob has an extractor.' : 'No hob is placed in a base unit.', 'There is a hob and no extractor is placed.'),
+    check('electrical', 'Isolators Can Be Reached', !hidden.length, 'No switch or worktop socket is behind a tall unit.', hidden.join(' ')),
+    check('plumbing', 'Kitchen Has Its Plumbing Layout', has('water_in') && has('waste_out'), 'Water and waste are drawn.', 'No sink is placed, so no water or waste is drawn.'),
+    check('plumbing', 'Dishwasher Is Decided', types.has('dishwasher_housing'), 'The dishwasher has its water and waste.', 'No dishwasher is placed; confirm there is none, or its water and waste are missing.'),
+  ];
+}
+
+export interface TradeServices { title: string; points: Partial<Record<ServiceKey, number>>; checks: ServiceCheck[]; failed: string[] }
+
+export function kitchenServices(runs: ServiceRun[]): Record<ServiceTrade, TradeServices> | null {
+  if (!isKitchen(runs)) return null;
+  const points = servicePoints(runs).flatMap((r) => r.points);
+  const checks = [...serviceCoverage(runs), ...serviceChecks(runs)];
+  const of = (trade: ServiceTrade): TradeServices => {
+    const mine = points.filter((p) => SERVICE_TRADE_OF[p.key] === trade);
+    const own = checks.filter((c) => c.trade === trade);
+    const counts: TradeServices['points'] = {};
+    for (const p of mine) counts[p.key] = (counts[p.key] ?? 0) + 1;
+    return { title: tradeTitle(trade, mine), points: counts, checks: own, failed: own.filter((c) => !c.ok).map((c) => `${c.rule}: ${c.detail}`) };
+  };
+  return { electrical: of('electrical'), plumbing: of('plumbing') };
 }

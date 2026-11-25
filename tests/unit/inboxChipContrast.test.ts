@@ -360,3 +360,34 @@ describe('inbox chips are legible in all four themes', () => {
     expect(missing, `sources with an incomplete tone:\n${missing.join('\n')}`).toEqual([]);
   });
 });
+
+describe('the agent bubble is readable in every theme', () => {
+  const themes: string[][] = [
+    [':root {'], ['html.light {'],
+    [':root {', "html.dark[data-accent='blue'] {"], ['html.light {', "html.light[data-accent='blue'] {"],
+    [':root {', "html.dark[data-accent='orange'] {"], ['html.light {', "html.light[data-accent='orange'] {"],
+  ];
+  const token = (name: string, selectors: string[]): RGB => {
+    let triplet = '';
+    for (const sel of selectors) {
+      const m = new RegExp(`--${name}:\\s*([^;]+);`).exec(themeBlock(sel));
+      if (m) triplet = m[1];
+    }
+    expect(triplet, `no --${name} for ${selectors.join(' → ')}`).not.toBe('');
+    return hslTripletToRgb(triplet);
+  };
+
+  it('is a card in both modes, not an accent slab', () => {
+    expect(CSS).toMatch(/^\.msg-assistant \{\s*background-color: hsl\(var\(--card\)\);/m);
+    expect(CSS).not.toMatch(/html\.light \.msg-assistant/);
+  });
+
+  for (const sel of themes) {
+    it(`ink, muted ink and links clear AA on the bubble: ${sel.join(' → ')}`, () => {
+      const card = token('card', sel);
+      for (const name of ['foreground', 'muted-foreground', 'primary']) {
+        expect(contrast(token(name, sel), card), name).toBeGreaterThanOrEqual(AA);
+      }
+    });
+  }
+});

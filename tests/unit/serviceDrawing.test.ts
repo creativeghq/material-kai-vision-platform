@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
-import { SERVICE_DEFAULTS, WORKTOP_SOCKETS, serviceChecks, serviceCounts, servicePoints, type KitchenLayout, type RunModule } from '@/lib/scene/kitchenComposition';
-import { kitchenElevations } from '@/lib/scene/kitchenDrawings';
+import { SERVICE_DEFAULTS, SERVICE_TRADE_OF, WORKTOP_SOCKETS, kitchenServices, serviceChecks, serviceCoverage, serviceCounts, servicePoints, type KitchenLayout, type RunModule } from '@/lib/scene/kitchenComposition';
+import { kitchenElevations, tradeSheets } from '@/lib/scene/kitchenDrawings';
 import { SERVICE_YIELD_KEYS } from '@/utils/blueprintComposition';
 
 const run = (over: Partial<{ id: string; label: string; kind: string; width_mm: number; height_mm: number; elevation_mm: number; x_mm: number; kitchen_layout: KitchenLayout | null }>) => ({
@@ -64,12 +64,13 @@ describe('services drawing: where the electrician and plumber connect', () => {
 
   it('passes a well-planned kitchen except the heights nobody has confirmed', () => {
     const c = byRule(serviceChecks(kitchen));
-    expect(c['Every Appliance Has Its Connections'].ok).toBe(true);
+    expect(c['Every Appliance Has Its Power'].ok).toBe(true);
+    expect(c['Every Appliance Has Its Water, Waste and Gas'].ok).toBe(true);
     expect(c['Sockets Clear of Sink and Hob'].ok).toBe(true);
     expect(c['Dishwasher Drains Beside the Sink'].ok).toBe(true);
     expect(c['Worktop Has Sockets'].ok).toBe(true);
-    expect(c['Heights Confirmed by a Person'].ok).toBe(false);
-    expect(c['Heights Confirmed by a Person'].detail).toContain('expected until');
+    expect(c['Electrical Heights Confirmed by a Person'].detail).toContain('expected until the electrician');
+    expect(c['Plumbing Heights Confirmed by a Person'].detail).toContain('expected until the plumber');
   });
 
   it('fails an unstated appliance, a far dishwasher, an isolator over the hob and a worktop with no clear spot', () => {
@@ -79,7 +80,8 @@ describe('services drawing: where the electrician and plumber connect', () => {
       ]) }),
       run({ label: 'Hob Run', width_mm: 1500, kitchen_layout: laid([{ type: 'door1', width_mm: 300 }, { type: 'oven_base', width_mm: 600 }, { type: 'sink_base', width_mm: 600 }]) }),
     ]));
-    expect(c['Every Appliance Has Its Connections'].detail).toContain('Appliance Space');
+    expect(c['Every Appliance Has Its Power'].detail).toContain('Appliance Space');
+    expect(c['Every Appliance Has Its Water, Waste and Gas'].detail).toContain('Appliance Space');
     expect(c['Dishwasher Drains Beside the Sink'].detail).toContain('120 cm from the sink');
     expect(c['Sockets Clear of Sink and Hob'].detail).toContain('Cooker Circuit Isolator');
     expect(c['Worktop Has Sockets'].detail).toContain('Hob Run');
@@ -89,5 +91,44 @@ describe('services drawing: where the electrician and plumber connect', () => {
     const c = byRule(serviceChecks([run({ width_mm: 1200, kitchen_layout: laid([{ type: 'dishwasher_housing', width_mm: 600 }, { type: 'door2', width_mm: 600 }]) })]));
     expect(c['Dishwasher Drains Beside the Sink'].detail).toContain('no sink');
     expect(serviceChecks([run({ kind: 'sofa' })])).toEqual([]);
+  });
+
+  it('every service key belongs to exactly one trade', () => {
+    for (const k of SERVICE_YIELD_KEYS) expect(['electrical', 'plumbing']).toContain(SERVICE_TRADE_OF[k as keyof typeof SERVICE_TRADE_OF]);
+  });
+
+  it('every kitchen gets a sheet that says Electrical and a sheet that says Plumbing, even with nothing to draw', () => {
+    const titles = (runs: typeof kitchen) => tradeSheets(kitchenElevations(runs)).map((t) => t.title);
+    expect(titles(kitchen).some((t) => t === 'Electrical and Extraction')).toBe(true);
+    expect(titles(kitchen).some((t) => t === 'Plumbing')).toBe(true);
+    const dry = [run({ width_mm: 600, kitchen_layout: laid([{ type: 'door2', width_mm: 600 }]) })];
+    const sheets = tradeSheets(kitchenElevations(dry));
+    expect(new Set(sheets.map((t) => t.trade))).toEqual(new Set(['electrical', 'plumbing']));
+    for (const t of tradeSheets(kitchenElevations(kitchen))) expect(t.points.every((p) => SERVICE_TRADE_OF[p.key] === t.trade)).toBe(true);
+  });
+
+  it('asks about what nobody decided: no sink, cooker, fridge or extractor fails its trade', () => {
+    const dry = byRule(serviceCoverage([run({ kitchen_layout: laid([{ type: 'oven_base', width_mm: 600 }, { type: 'door2', width_mm: 600 }]) })]));
+    expect(dry['Kitchen Has Its Plumbing Layout']).toMatchObject({ ok: false, trade: 'plumbing' });
+    expect(dry['Fridge Has a Socket']).toMatchObject({ ok: false, trade: 'electrical' });
+    expect(dry['Extraction Is Drawn'].ok).toBe(false);
+    expect(dry['Cooking Has Its Own Supply'].ok).toBe(true);
+    expect(serviceCoverage(kitchen).every((c) => c.ok)).toBe(true);
+  });
+
+  it('fails an isolator that lands behind a tall unit on the same wall', () => {
+    const oven = run({ id: 'o', label: 'Oven', x_mm: 300, width_mm: 600, kitchen_layout: laid([{ type: 'oven_base', width_mm: 600 }]) });
+    const tall = run({ id: 't', label: 'Fridge Column', kind: 'kitchen_tall', x_mm: 900, width_mm: 600, height_mm: 2100, kitchen_layout: laid([{ type: 'fridge_housing', width_mm: 600 }]) });
+    expect(byRule(serviceCoverage([oven, tall]))['Isolators Can Be Reached'].detail).toContain('Fridge Column');
+    expect(byRule(serviceCoverage([oven, { ...tall, x_mm: 2400 }]))['Isolators Can Be Reached'].ok).toBe(true);
+    expect(byRule(serviceCoverage([oven, { ...tall, rotation_deg: 90 }]))['Isolators Can Be Reached'].ok).toBe(true);
+  });
+
+  it('the agent report splits the trades and loses no point', () => {
+    const s = kitchenServices(kitchen)!;
+    const total = (o: object) => Object.values(o).reduce((n: number, v) => n + (v as number), 0);
+    expect(total(s.electrical.points) + total(s.plumbing.points)).toBe(total(serviceCounts(kitchen)));
+    expect(s.plumbing.checks.every((c) => c.trade === 'plumbing')).toBe(true);
+    expect(kitchenServices([run({ kind: 'sofa' })])).toBeNull();
   });
 });

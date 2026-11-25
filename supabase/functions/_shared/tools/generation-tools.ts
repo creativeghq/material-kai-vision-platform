@@ -59,6 +59,12 @@ export async function withCabinetHardware(prompt: string, hardware?: CabinetHard
  * Calls MIVAA API to create generation job
  * Frontend polls database for real-time updates
  */
+const KITCHEN_DESIGN_MODES = new Set(['text-to-image', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-3d', 'floor-plan-text']);
+
+const kitchenServicesStep = (roomType?: string, prompt?: string) => (/kitchen|κουζ[ιί]ν/i.test(`${roomType ?? ''} ${prompt ?? ''}`)
+  ? { electrical_and_plumbing: 'This is a kitchen and a picture carries no electrical or plumbing drawing. If it came from the person\'s own plan, sketch or design, make them now: manage_scenes create from that design, then status, then drawing_set, and name every failing electrical and plumbing check. If it was invented from words, offer it in one sentence.' }
+  : {});
+
 export const create3DGenerationTool = (
   userId: string,
   workspaceId: string,
@@ -220,6 +226,7 @@ export const create3DGenerationTool = (
               : resolvedImageUrl
                 ? 'the most recent generated image'
                 : 'no source image — this is text-to-image',
+          ...kitchenServicesStep(roomType, prompt),
           message: `Started generating ${result.model_count} interior design variations (${modeLabel}) for your ${roomType || 'space'}${style ? ` in ${style} style` : ''}. The images will appear here as each one finishes.`,
         });
       } catch (error) {
@@ -637,6 +644,7 @@ export const createGeminiGenerationTool = (
           model: result.model,
           credits_used: result.credits_used,
           ...(edited ? { edited } : {}),
+          ...(KITCHEN_DESIGN_MODES.has(resolvedMode) ? kitchenServicesStep(roomType, prompt) : {}),
           message: edited
             ? `Edit run on ${edited.base_image_origin}.`
             : `I've ${modeLabels[resolvedMode] || 'generated the image'}! ${modelTier === 'pro' ? 'Using Gemini Pro for maximum quality.' : 'You can ask me to refine it — e.g., "change the floor to marble" or "make it warmer".'}`,
@@ -655,6 +663,7 @@ export const createGeminiGenerationTool = (
     {
       name: 'generate_gemini',
       description: `Generate or edit interior design images. Provides an immediate single result in the chat.
+An electrical or plumbing drawing is never made here: manage_scenes drawing_set draws it from the kitchen's real units and labels it.
 
 YOU CANNOT SEE THE IMAGE THIS RETURNS. You get a URL. On an edit, the result's \`edited\` block is
 your ONLY evidence about what happened — it names the image that was used as the base, where it

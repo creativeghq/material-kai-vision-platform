@@ -16,6 +16,7 @@ const { tool } = await import('npm:@langchain/core@1.2.9/tools') as {
 };
 const { z } = await import('npm:zod@3.25.76');
 
+import { kitchenServices } from '../kitchenComposition.generated.ts';
 import { computeBlueprint, resolveSelection } from '../blueprint/compute.ts';
 import {
   computeHeatPumpSizing,
@@ -191,6 +192,8 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
         .eq('project_type', KITCHEN_PROJECT_TYPE)
         .eq('is_platform_starter', true)
         .eq('status', 'active')
+        .order('created_at', { ascending: true })
+        .limit(1)
         .maybeSingle();
       if (!bp) return JSON.stringify({ success: false, error: 'The kitchen price list is not configured yet.' });
 
@@ -258,8 +261,17 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
           };
         });
 
+      const typical = kitchenServices([{ kind: 'kitchen_base', label: 'Base Run', width_mm: Math.round(run * 1000), height_mm: 900, kitchen_layout: null }]);
+      const services = typical && {
+        electrical: typical.electrical.points,
+        plumbing: typical.plumbing.points,
+        priced: allTasks.some((t) => t.selected && t.line_total > 0 && /electric|socket|plumb|water supply|waste connection/i.test(t.label)),
+      };
+      if (services) assumptions.push(`Electrical and plumbing points are counted from an automatic layout of the ${run} m run${services.priced ? '' : ' and are NOT in the price'}; the real ones come from the kitchen drawing.`);
+
       const result = {
         currency,
+        services,
         dimensions: schema.map((d) => ({ label: d.label ?? d.key, value: dims[d.key], unit: d.unit ?? null })),
         subtotal: computed.subtotal,
         chosen: allTasks.filter((t) => t.selected && t.option_group).map((t) => ({ group: t.option_group, label: t.label })),
@@ -293,7 +305,7 @@ export const createKitchenCostTool = (supabase: any, onChunk: ChunkSink) => {
         'Price an INDOOR fitted kitchen from its running metres and finishes, using the live price list. Deterministic, free, instant — no external API. '
         + 'Use when someone asks what a new kitchen costs, or to compare finishes and worktops. '
         + 'NEVER use it for an outdoor kitchen, an aluminium/stainless carcass, or a package that includes appliances: the list holds none of those, so the total would describe a different kitchen. Say there is no price list for it instead. '
-        + 'Report every entry in `assumptions` alongside the figure. '
+        + 'Report every entry in `assumptions` alongside the figure, and always the electrical and plumbing points in `services` and whether the price includes them. '
         + 'Call it FIRST with only run_length_m: the result lists every available model, worktop and add-on with what each would cost for that kitchen. Then call again with the ones the user picked — never guess a model name. '
         + 'ALWAYS check `unmatched` in the result: anything listed there was NOT applied and the standard default was priced instead, so correct the user rather than presenting the total as the spec they asked for. '
         + 'Present the figure as a ballpark excluding VAT, with appliances and sink not included, subject to a survey.',

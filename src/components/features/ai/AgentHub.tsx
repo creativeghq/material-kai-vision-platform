@@ -2544,9 +2544,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       role: 'assistant',
       content: saved.set === 'assembly'
         ? `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} for the workshop, one per distinct cabinet, each with its exploded view, panel list, edge banding and checks.`
-        : saved.project_id
-        ? `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} saved to the project. They can go on the client view and into the deck.`
-        : `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'} as a PDF. Put the room on a project to add them to the client view and the deck.`,
+        : `${saved.title}: ${saved.page_count} ${saved.page_count === 1 ? 'sheet' : 'sheets'}${saved.project_id ? ' saved to the project. They can go on the client view and into the deck.' : ' as a PDF. Put the room on a project to add them to the client view and the deck.'}${
+          saved.trades?.length ? `\n\nIt includes the **${saved.trades.join('** and the **')}** drawings, each labelled on its own sheet.` : ''}${
+          saved.failed?.length ? `\n\n**Not ready to build from yet.** These checks fail on the sheets:\n${saved.failed.map((f) => `- ${f}`).join('\n')}` : ''}`,
       timestamp: new Date(),
       agentId: 'interior-designer',
       sheetPdfData,

@@ -9,13 +9,13 @@ import { KitchenDrawings, type CutLine } from '@/components/features/scenestudio
 import { useToast } from '@/hooks/use-toast';
 import type { DrawRun } from '@/lib/scene/kitchenDrawings';
 import { cabinetAssemblies, DEFAULT_CONSTRUCTION, type BoardSlot } from '@/lib/scene/cabinetPanels';
-import { KITCHEN_KINDS, assemblyPiecesOf, drawingChecks } from '@/lib/scene/kitchenComposition';
+import { kitchenServices, KITCHEN_KINDS, assemblyPiecesOf, drawingChecks } from '@/lib/scene/kitchenComposition';
 import { projectPlansService } from '@/services/projectPlansService';
 import { publicUrl, sceneStudioService, type SceneData, type SceneObject } from '@/services/sceneStudioService';
 
 const PRINT_CLASS = 'print-kitchen-drawings';
 
-export interface DrawingSetSaved { sheet_id: string | null; title: string; project_id: string | null; pdf_path: string; page_count: number; set?: 'drawings' | 'assembly' }
+export interface DrawingSetSaved { sheet_id: string | null; title: string; project_id: string | null; pdf_path: string; page_count: number; set?: 'drawings' | 'assembly'; trades?: string[]; failed?: string[] }
 
 const WORKTOP_MM = 40;
 
@@ -108,7 +108,14 @@ export const KitchenDrawingsDialog: React.FC<{
     try {
       const { pdf, pages } = await sheetsToPdf(sheetRoot.current);
       const saved = await sceneStudioService.saveDrawingSet(data.scene, pdf, pages, assemblyView ? 'assembly' : 'drawings');
-      onSaved?.({ ...saved, page_count: pages, set: assemblyView ? 'assembly' : 'drawings' });
+      const services = assemblyView ? null : kitchenServices(runs.map((r) => ({ ...r, kitchen_layout: r.kitchen_layout ?? null })));
+      onSaved?.({
+        ...saved, page_count: pages, set: assemblyView ? 'assembly' : 'drawings',
+        ...(services ? {
+          trades: [services.electrical.title, services.plumbing.title],
+          failed: [...checks.filter((c) => !c.ok).map((c) => c.rule), ...[services.electrical, services.plumbing].flatMap((t) => t.checks.filter((c) => !c.ok).map((c) => c.rule))],
+        } : {}),
+      });
       toast({ title: assemblyView ? 'Assembly sheets saved' : 'Drawings saved', description: assemblyView ? `${pages} ${pages === 1 ? 'sheet' : 'sheets'} saved as a PDF in the conversation.` : saved.project_id ? `${pages} ${pages === 1 ? 'sheet' : 'sheets'} on the project, ready for the client view and the deck.` : `${pages} ${pages === 1 ? 'sheet' : 'sheets'} saved as a PDF in the conversation.` });
     } catch (e) {
       toast({ title: 'The drawings could not be saved', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
@@ -132,7 +139,7 @@ export const KitchenDrawingsDialog: React.FC<{
           <DialogHeader>
             <DialogTitle>{assemblyView ? 'Workshop Assembly' : 'Drawings'}</DialogTitle>
             <DialogDescription>{assemblyView ? `One sheet per distinct cabinet (${assemblies.length}): an exploded view with numbered parts, the panel list with sizes and edge banding, the hardware, and the checks before cutting. Built from the same panels as the 3D room and the cut list.` : <>
-              Floor plan with wall lengths, room areas and furniture{runs.length ? `, an elevation and a services sheet (sockets, water, waste, gas, extraction) per kitchen wall and the cut list${planId ? '' : ' (price the kitchen to add it)'}, from the same units as the 3D room and the price` : ''}.
+              Floor plan with wall lengths, room areas and furniture{runs.length ? `, an elevation per kitchen wall, the electrical and the plumbing drawings with their checks, and the cut list${planId ? '' : ' (price the kitchen to add it)'}, from the same units as the 3D room and the price` : ''}.
               {data.scene.project_id ? '' : ' The room is on no project, so saving puts the PDF in the conversation.'}
             </>}</DialogDescription>
 

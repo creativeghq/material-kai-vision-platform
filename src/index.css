@@ -1715,38 +1715,23 @@ html.light .stat-bubble {
 html.light *::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); }
 html.light *::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
 
-/* ============================================================
-   CHAT ASSISTANT BUBBLE surface (AgentHub)
-   ------------------------------------------------------------
-   The assistant bubble carries white text + white/opacity chips
-   + artifact chips, all designed for a DARK surface. On dark the
-   brand plum works; but the light theme's --primary is a mid-olive,
-   so white text sat olive-on-olive and `text-primary` accents
-   (the "In canvas" label) vanished. Keep the dark-theme look and
-   give light a warm dark-olive so every child clears AA contrast. */
-.msg-assistant { background-color: hsl(var(--primary)); }
-
-/* LIGHT theme: the dark-olive slab read heavy/cheap on the cream UI. Render the
-   assistant message as a clean ivory card (dark ink, soft border) instead, and
-   re-theme its dark-surface children generically — every child (artifact chips,
-   timestamps, rating buttons, markdown code/tables/rules) is a descendant of
-   .msg-assistant, so these scoped rules flip them all without touching each
-   component. Dark theme is unchanged (the plum bubble + white children stay). */
-html.light .msg-assistant {
+/* CHAT ASSISTANT BUBBLE (AgentHub): an ordinary card in BOTH modes; its children were written for a
+   dark slab, so their white shades map to the theme's ink here. */
+.msg-assistant {
   background-color: hsl(var(--card));
   color: hsl(var(--foreground));
   border: 1px solid hsl(var(--border));
 }
-html.light .msg-assistant [class*="text-white"] { color: hsl(var(--foreground)); }
-html.light .msg-assistant .text-white\/60,
-html.light .msg-assistant .text-white\/70,
-html.light .msg-assistant .text-white\/80,
-html.light .msg-assistant .text-white\/85,
-html.light .msg-assistant .text-white\/90 { color: hsl(var(--muted-foreground)); }
-html.light .msg-assistant [class*="bg-white"] { background-color: hsl(var(--muted)); }
-html.light .msg-assistant [class*="bg-black"] { background-color: hsl(var(--secondary)); }
-html.light .msg-assistant [class*="border-white"] { border-color: hsl(var(--border)); }
-html.light .msg-assistant a { color: hsl(var(--primary)); }
+.msg-assistant [class*="text-white"] { color: hsl(var(--foreground)); }
+.msg-assistant .text-white\/60,
+.msg-assistant .text-white\/70,
+.msg-assistant .text-white\/80,
+.msg-assistant .text-white\/85,
+.msg-assistant .text-white\/90 { color: hsl(var(--muted-foreground)); }
+.msg-assistant [class*="bg-white"] { background-color: hsl(var(--muted)); }
+.msg-assistant [class*="bg-black"] { background-color: hsl(var(--secondary)); }
+.msg-assistant [class*="border-white"] { border-color: hsl(var(--border)); }
+.msg-assistant a { color: hsl(var(--primary)); }
 
 /* ============================================================
    ARTIFACT PAGE — the modal body

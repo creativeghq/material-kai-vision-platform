@@ -13,7 +13,7 @@ import { fetchImageGuarded } from '../fetch-image.ts';
 import { emitFlowEvent } from '../flow-events.ts';
 import { SCENE_OBJECT_SLOTS, slotsForKind } from '../sceneReadSchema.generated.ts';
 import {
-  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, assemblyPiecesOf, autoLayout, drawingChecks, kitchenCompositionFromRoom, placeRun, runContext, runModulesOf, serviceChecks, serviceCounts, spansBehind, unitStated, zoneOfKind,
+  KITCHEN_KINDS, KITCHEN_MODULE_TYPES, MODULE_LABELS, assemblyPiecesOf, autoLayout, drawingChecks, kitchenCompositionFromRoom, kitchenServices, placeRun, runContext, runModulesOf, SERVICE_TRADES, spansBehind, unitStated, zoneOfKind,
   type KitchenLayout, type RoomComposition,
 } from '../kitchenComposition.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
@@ -37,6 +37,20 @@ async function kitchenRunsOf(sb: ReturnType<typeof callerDbClient>, sceneId: str
     x_mm: Number(o.x_mm) || 0, y_mm: Number(o.y_mm) || 0, rotation_deg: Number(o.rotation_deg) || 0, width_mm: Number(o.width_mm) || 0,
     depth_mm: Number(o.depth_mm) || 0, height_mm: Number(o.height_mm) || 0, elevation_mm: Number(o.elevation_mm) || 0,
   }));
+}
+
+function servicesReport(runs: KitchenRun[]) {
+  const s = kitchenServices(runs);
+  if (!s) return { out: {}, failed: 0 };
+  const trade = (t: (typeof SERVICE_TRADES)[number]) => ({ drawing: s[t].title, points: s[t].points, failed_checks: s[t].failed, passed_checks: s[t].checks.filter((c) => c.ok).map((c) => c.rule) });
+  const failed = s.electrical.failed.length + s.plumbing.failed.length;
+  return {
+    failed,
+    out: {
+      electrical: trade('electrical'), plumbing: trade('plumbing'),
+      ...(failed ? { services_warning: 'Name every failing electrical and plumbing check to the person, per trade. A check about something nobody decided (fridge, hob, dishwasher, extractor) is a question to ask, not a fault to hide.' } : {}),
+    },
+  };
 }
 
 async function drawingPage(
@@ -136,8 +150,9 @@ export const createManageScenesTool = (
       const next = mode === 'make_3d'
         ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
         : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.'
-            : mode === 'drawings' ? 'The kitchen drawings are open: floor plan with dimensions, an elevation per wall and the cut list; Print is in the dialog.' : 'The room is open on the canvas.';
-      return JSON.stringify({ success: true, scene_id, object: target, mode: intent.mode, message: next });
+            : mode === 'drawings' ? 'The kitchen drawings are open: floor plan with dimensions, an elevation per wall, the electrical and the plumbing drawings and the cut list; Print is in the dialog.' : 'The room is open on the canvas.';
+      const services = mode === 'drawings' ? servicesReport(await kitchenRunsOf(sb, scene_id)).out : {};
+      return JSON.stringify({ success: true, scene_id, object: target, mode: intent.mode, ...services, message: next });
     }
 
     if (action === 'finish') {
@@ -235,9 +250,10 @@ export const createManageScenesTool = (
         built: placed.built.map((m) => `${MODULE_LABELS[m.type] ?? m.type} ${Math.round(m.width_mm / 10)} cm${m.auto ? ' (added)' : ''}`),
         not_built: placed.rejected.map((r) => ({ unit: MODULE_LABELS[r.module.type] ?? r.module.type, reason: r.reason })),
         issues: placed.issues,
+        ...servicesReport(await kitchenRunsOf(sb, scene_id)).out,
         message: placed.rejected.length
-          ? 'Some units were refused by the placement engine; tell the user which and why. Run price_kitchen again to update the price.'
-          : 'The run is laid out in the room. Run price_kitchen again to update the price.',
+          ? 'Some units were refused by the placement engine; tell the user which and why. Once every run is laid out, drawing_set makes the electrical and plumbing drawings again from it; price_kitchen updates the price.'
+          : 'The run is laid out in the room. Once every run is laid out, drawing_set makes the electrical and plumbing drawings again from it; price_kitchen updates the price.',
       });
     }
 
@@ -401,8 +417,16 @@ export const createManageScenesTool = (
           if (linkErr) return JSON.stringify({ success: false, plan_id: plan.id, error: `The kitchen was priced but the room could not be linked to its plan: ${linkErr.message}` });
         }
         onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, project_plan_id: plan.id, intent: { mode: 'view', object_id: null, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
+        const { data: sched } = await sb.from('project_plan_items').select('label, quantity, quantity_formula').eq('plan_id', plan.id).eq('is_schedule', true);
+        const lines = (sched ?? []) as Array<{ label: string; quantity: number; quantity_formula: string | null }>;
+        const drawn = kitchenServices(await kitchenRunsOf(sb, scene_id));
+        const not_on_plan = drawn ? SERVICE_TRADES.flatMap((t) => Object.entries(drawn[t].points)
+          .filter(([key]) => !lines.some((l) => Number(l.quantity) > 0 && new RegExp(`\\btotal_${key}\\b`).test(l.quantity_formula ?? '')))
+          .map(([key, n]) => `${t}: ${n} × ${key.replace(/_/g, ' ')}`)) : [];
         return JSON.stringify({
           success: true, plan_id: plan.id, subtotal: plan.subtotal, currency: plan.source_currency,
+          ...servicesReport(await kitchenRunsOf(sb, scene_id)).out,
+          ...(not_on_plan.length ? { services_not_on_plan: not_on_plan, services_not_on_plan_note: 'These electrical or plumbing points are on the drawings and have no counted line on the plan, so the quote does not carry them. Say so.' } : {}),
           plan_link: plan.project_id ? `/projects/${plan.project_id}?tab=plan` : null,
           message: 'The kitchen is priced on its project plan. Door model and worktop are chosen in the room (Kitchen Price) or on the plan; "Create quote" there turns it into a draft quote.',
         });
@@ -453,19 +477,18 @@ export const createManageScenesTool = (
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const setRuns = action === 'drawing_set' ? await kitchenRunsOf(sb, scene_id) : [];
       const checks = drawingChecks(setRuns);
-      const service_checks = serviceChecks(setRuns);
-      const failed = checks.filter((c) => !c.ok);
-      const serviceFailed = service_checks.filter((c) => !c.ok);
+      const services = servicesReport(setRuns);
+      const failing = checks.filter((c) => !c.ok).length + services.failed;
       return JSON.stringify({
         success: true, scene_id, mode: intent.mode,
         ...(action === 'drawing_set' ? {
-          checks, service_points: serviceCounts(setRuns), service_checks,
-          ...(failed.length || serviceFailed.length ? { warning: `The set is saved with ${failed.length + serviceFailed.length} failing ${failed.length + serviceFailed.length === 1 ? 'check' : 'checks'} (drawing checks on sheet 1, service checks on each Services sheet). Name each failure to the person; the drawings are not ready to build from, and the electrician and plumber not ready to first-fix, until they pass.` } : {}),
+          checks, ...services.out,
+          ...(failing ? { warning: `The set is saved with ${failing} failing ${failing === 1 ? 'check' : 'checks'} (drawing checks on sheet 1, electrical and plumbing checks on their own sheets). Name each failure to the person; the drawings are not ready to build from, and the electrician and plumber not ready to first-fix, until they pass.` } : {}),
         } : {}),
         message: action === 'render'
           ? `The room is rendering on the canvas${style ? ` in ${style}` : ''}${roomId ? `, from eye height in ${room}` : ''}; it is charged like a render from the room and arrives in this conversation, where every image tool can take it. Do not call again.`
           : action === 'drawing_set'
-            ? 'The drawings (plan with wall lengths and areas, plus elevations and the cut list when there is a kitchen) are being saved to the project as one PDF; the link arrives in this conversation. Lay out each kitchen run first if it is not confirmed.'
+            ? 'The drawings (plan with wall lengths and areas; for a kitchen also the elevations, a sheet labelled Electrical and a sheet labelled Plumbing per wall that has points, and the cut list) are being saved to the project as one PDF; the link arrives in this conversation. Lay out each kitchen run first if it is not confirmed.'
             : 'The walkthrough of the real plan is recording on the canvas (free, about half a minute; the tab must stay in front). The video arrives in this conversation and can be shared or fed to the next step.',
       });
     }
@@ -490,8 +513,8 @@ export const createManageScenesTool = (
       if (!data) return JSON.stringify({ success: false, error: 'Scene not found.' });
       const list = await kitchenRunsOf(sb, scene_id);
       const checks = drawingChecks(list);
-      const service_checks = serviceChecks(list);
-      const failed = [...checks, ...service_checks].filter((c) => !c.ok);
+      const services = servicesReport(list);
+      const failing = checks.filter((c) => !c.ok).length + services.failed;
       const kitchen_runs = list.filter((o) => KITCHEN_KINDS.has(o.kind)).map((o) => ({
         run: o.label, kind: o.kind,
         length_cm: Math.round(Number(o.width_mm) / 10), height_cm: Math.round(Number(o.height_mm) / 10), above_floor_cm: Math.round(Number(o.elevation_mm) / 10),
@@ -501,9 +524,9 @@ export const createManageScenesTool = (
       const scene = { ...data, object_count: list.length };
       onChunk?.({ type: 'scene_studio_scene', scene, timestamp: Date.now() });
       return JSON.stringify({
-        success: true, scene, kitchen_runs, checks, service_points: serviceCounts(list), service_checks,
+        success: true, scene, kitchen_runs, checks, ...services.out,
         ...(kitchen_runs.length && data.extract_status === 'ready'
-          ? { message: `Show the person each run as read (≈ marks a width that was not printed) and the assumptions in extract_notes, ask about anything that does not add up, then layout each run with the confirmed units before opening drawings.${failed.length ? ` ${failed.length} drawing ${failed.length === 1 ? 'check fails' : 'checks fail'}: name each one; never call the drawings finished while one fails.` : ''}` }
+          ? { message: `Show the person each run as read (≈ marks a width that was not printed) and the assumptions in extract_notes, ask about anything that does not add up, then layout each run with the confirmed units and run drawing_set: a kitchen is never finished without its electrical and plumbing drawings.${(data.extract_notes as { drawings_due?: boolean } | null)?.drawings_due ? ' They have not been made for this room yet, so run drawing_set now.' : ''}${failing ? ` ${failing} ${failing === 1 ? 'check fails' : 'checks fail'} across the drawings, electrical and plumbing: name each one; never call the drawings finished while one fails.` : ''}` }
           : {}),
       });
     }
@@ -558,7 +581,7 @@ export const createManageScenesTool = (
     }
     return JSON.stringify({
       success: true, scene,
-      message: 'The 3D room is open on the canvas and the image is being read into rooms, walls and furniture (about a minute). The user rearranges it there and clicks a style to render it; renders come back into this conversation.',
+      message: 'The 3D room is open on the canvas and the image is being read into rooms, walls and furniture (about a minute). The user rearranges it there and clicks a style to render it; renders come back into this conversation. When it holds a kitchen, the electrical and plumbing drawings are made and saved to this conversation as soon as it is read; tell the user, then use status to name the checks that fail.',
     });
   },
   {
@@ -573,7 +596,7 @@ export const createManageScenesTool = (
       + 'render: renders the room photo-real on the canvas in style (a style name or free words) or after style_reference_url, from the saved view or from eye height in room; '
       + 'the render arrives in the conversation and every image tool can take it. renders: the room\'s stored renders with their URLs. '
       + 'assembly_sheets: workshop sheets, one per distinct cabinet (exploded view, panel list with sizes and edge banding, hardware), saved as a PDF into the conversation; name every failed check per cabinet. '
-        + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, a services sheet per wall for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks and service_checks, name each failure. '
+        + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, separate sheets labelled Electrical and Plumbing for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks, electrical and plumbing, name each failure. A KITCHEN MADE FROM A DESIGN (plan, sketch or render) ALWAYS GETS ITS ELECTRICAL AND PLUMBING DRAWINGS: status, layout, price_kitchen and drawing_set all return the electrical and plumbing checks; report them every time. '
       + 'walkthrough_video: records the walkthrough of the real plan as a video, free; it arrives in the conversation. '
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
       + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '

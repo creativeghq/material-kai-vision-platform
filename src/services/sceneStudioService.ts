@@ -28,7 +28,7 @@ export interface SceneRow {
   source_storage_path: string | null;
   extract_status: SceneReadStatus;
   extract_error: string | null;
-  extract_notes: { scale_basis?: string; assumptions?: string[]; read_at?: string } | null;
+  extract_notes: { scale_basis?: string; assumptions?: string[]; read_at?: string; drawings_due?: boolean } | null;
   view_camera: SceneCamera | null;
   /** CABINET_HARDWARE key; null draws bar handles. */
   cabinet_hardware: string | null;
@@ -568,6 +568,11 @@ export const sceneStudioService = {
   },
 
   /** Stores the drawing set as the project's `drawing_set` sheet; one per room, replaced on each save so a client view keeps pointing at it. */
+  async drawingsMade(sceneId: string, notes: NonNullable<SceneRow['extract_notes']>): Promise<void> {
+    const { error } = await supabase.from('floor_plans').update({ extract_notes: { ...notes, drawings_due: false } }).eq('id', sceneId);
+    if (error) throw new Error(error.message);
+  },
+
   async saveDrawingSet(
     scene: Pick<SceneRow, 'id' | 'name' | 'project_id' | 'workspace_id'>, pdf: Blob, pageCount: number, set: 'drawings' | 'assembly' = 'drawings',
   ): Promise<{ sheet_id: string | null; title: string; project_id: string | null; pdf_path: string }> {

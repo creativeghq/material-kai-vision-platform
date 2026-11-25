@@ -1,8 +1,8 @@
 /** A room's drawing set: the dimensioned plan of any room, plus an elevation per kitchen wall and the cut list when there is a kitchen; A4 landscape sheets. */
 import React, { useMemo } from 'react';
 
-import { kitchenElevations, kitchenPlan, roomPlan, type DimLine, type DrawRun, type Elevation, type Pt } from '@/lib/scene/kitchenDrawings';
-import { serviceChecks, type DrawingCheck, type ServiceKey, type ServicePoint } from '@/lib/scene/kitchenComposition';
+import { kitchenElevations, kitchenPlan, roomPlan, tradeSheets, type DimLine, type DrawRun, type Elevation, type Pt, type TradeSheet } from '@/lib/scene/kitchenDrawings';
+import { SERVICE_TRADE_OF, serviceChecks, serviceCoverage, type DrawingCheck, type ServiceKey, type ServicePoint, type ServiceTrade } from '@/lib/scene/kitchenComposition';
 import type { PlanOpening, PlanRoom, PlanWall } from '@/lib/scene/sceneGeometry';
 import { yieldMeta } from '@/utils/blueprintComposition';
 import { todayLocalISO } from '@/utils/datetime';
@@ -230,12 +230,28 @@ const Legend: React.FC<{ kitchen: boolean }> = ({ kitchen }) => {
 
 interface ScheduleRow { key: ServiceKey; label: string; count: number; unit: string }
 
-const ReadingPanel: React.FC<{ sourceUrl?: string | null; notes: string[]; checks: DrawingCheck[]; schedule?: ScheduleRow[] }> = ({ sourceUrl, notes, checks, schedule = [] }) => {
+const ReadingPanel: React.FC<{ sourceUrl?: string | null; notes: string[]; checks: DrawingCheck[]; schedule?: ScheduleRow[]; points?: { title: string; list: ServicePoint[] } }> = ({ sourceUrl, notes, checks, schedule = [], points }) => {
   const x0 = SHEET_W - MARGIN - SIDE_W + 4;
   let y = MARGIN + 4;
   const rows: React.ReactNode[] = [];
+  if (points) {
+    rows.push(<text key="pt" x={x0} y={y} fontSize={2.4} fontWeight={700}>{points.title}</text>);
+    y += 4;
+    if (!points.list.length) { rows.push(<text key="p0" x={x0} y={y} fontSize={1.9} fill={CONFLICT}>None drawn: see the checks below.</text>); y += 3.4; }
+    for (const [i, p] of points.list.entries()) {
+      rows.push(
+        <g key={`p${i}`}>
+          <text x={x0} y={y} fontSize={1.9} fontWeight={700}>{i + 1}</text>
+          <text x={x0 + 4} y={y} fontSize={1.9}>{clip(`${yieldMeta(p.key).label} · ${p.serves}${p.note ? ` · ${p.note}` : ''}`, 76)}</text>
+          <text x={x0 + SIDE_W - 8} y={y} fontSize={1.9} textAnchor="end" fill={p.height_tone === 'assumed' ? FAINT : STATED}>{p.height_tone === 'assumed' ? '≈' : ''}{Math.round(p.height_mm / 10)} cm</text>
+        </g>,
+      );
+      y += 3;
+    }
+    y += 2;
+  }
   if (schedule.length) {
-    rows.push(<text key="sh" x={x0} y={y} fontSize={2.4} fontWeight={700}>Services Schedule</text>);
+    rows.push(<text key="sh" x={x0} y={y} fontSize={2.4} fontWeight={700}>How Many</text>);
     y += 4.4;
     for (const r of schedule) {
       rows.push(<g key={`s${r.key}`}><ServiceSymbol k={r.key} x={x0 + 1.4} y={y - 0.7} /><text x={x0 + 4.5} y={y} fontSize={2}>{r.label}</text><text x={x0 + SIDE_W - 8} y={y} fontSize={2} textAnchor="end">{r.count} {r.unit}</text></g>);
@@ -299,10 +315,10 @@ const scheduleOf = (points: ServicePoint[]): ScheduleRow[] => SERVICE_ORDER
   .map((key) => ({ key, count: points.filter((p) => p.key === key).length, ...yieldMeta(key) }))
   .filter((r) => r.count > 0);
 
-const ServiceLegend: React.FC = () => {
+const ServiceLegend: React.FC<{ trade: ServiceTrade }> = ({ trade }) => {
   let x = MARGIN;
   const items = [
-    ...SERVICE_ORDER.map((k) => ({ id: k, node: <ServiceSymbol k={k} x={1.2} y={1.2} />, label: yieldMeta(k).label })),
+    ...SERVICE_ORDER.filter((k) => SERVICE_TRADE_OF[k] === trade).map((k) => ({ id: k, node: <ServiceSymbol k={k} x={1.2} y={1.2} />, label: yieldMeta(k).label })),
     { id: 'stated', node: <text y={2.2} fontSize={2.4} fill={STATED}>110</text>, label: 'Set by a Person' },
     { id: 'assumed', node: <text y={2.2} fontSize={2.4} fill={FAINT} fontStyle="italic">≈110</text>, label: 'Trade Default' },
   ];
@@ -322,7 +338,25 @@ const ServiceLegend: React.FC = () => {
   );
 };
 
-const ServicesSheet: React.FC<{ e: Elevation; checks: DrawingCheck[] }> = ({ e, checks }) => {
+const TRADE_LOOK: Record<ServiceTrade, { fill: string; who: string }> = {
+  electrical: { fill: '#b45309', who: 'For the electrician' },
+  plumbing: { fill: '#1d5f8a', who: 'For the plumber' },
+};
+
+const TradeBadge: React.FC<{ trade: ServiceTrade; title: string }> = ({ trade, title }) => {
+  const w = title.length * 3.9 + 8;
+  const y = SHEET_H - MARGIN - BLOCK_H + 8;
+  return (
+    <g fontFamily="Arial, sans-serif">
+      <rect x={MARGIN} y={y} width={w} height={9} fill={TRADE_LOOK[trade].fill} />
+      <text x={MARGIN + w / 2} y={y + 6.5} fontSize={5.4} fontWeight={700} textAnchor="middle" fill="#fff">{title.toUpperCase()}</text>
+      <text x={MARGIN + w + 3} y={y + 6} fontSize={3} fill={INK}>{TRADE_LOOK[trade].who}</text>
+    </g>
+  );
+};
+
+const ServicesSheet: React.FC<{ sheet: TradeSheet; checks: DrawingCheck[] }> = ({ sheet, checks }) => {
+  const e: Elevation = { ...sheet.elevation, services: sheet.points };
   const levels = [...new Map(e.services.map((p) => [p.height_mm, p])).values()].sort((a, b) => a.height_mm - b.height_mm);
   const along = [...new Map(e.services.map((p) => [p.x_mm, p])).values()].sort((a, b) => a.x_mm - b.x_mm);
   const pad = 500;
@@ -341,7 +375,8 @@ const ServicesSheet: React.FC<{ e: Elevation; checks: DrawingCheck[] }> = ({ e, 
   }
   return (
     <g>
-      <ServiceLegend />
+      <ServiceLegend trade={sheet.trade} />
+      <TradeBadge trade={sheet.trade} title={sheet.title} />
       <line x1={tx(-200, 0)[0]} y1={tx(0, 0)[1]} x2={tx(right + 200, 0)[0]} y2={tx(0, 0)[1]} stroke={INK} strokeWidth={0.5} />
       {e.rects.filter((r) => r.kind !== 'handle').map((r, i) => {
         const [x, y] = tx(r.x, r.y + r.h);
@@ -354,9 +389,15 @@ const ServicesSheet: React.FC<{ e: Elevation; checks: DrawingCheck[] }> = ({ e, 
       {chain.map((d, i) => <Dim key={`x${i}`} d={d} tx={dimTx} />)}
       {e.services.map((p, i) => {
         const [x, y] = tx(p.x_mm, p.height_mm);
-        return <ServiceSymbol key={i} k={p.key} x={x} y={y} />;
+        const stacked = e.services.slice(0, i).filter((q) => Math.abs(q.x_mm - p.x_mm) * s < 3 && Math.abs(q.height_mm - p.height_mm) * s < 3).length;
+        return (
+          <g key={i}>
+            <ServiceSymbol k={p.key} x={x} y={y} />
+            <text x={x + 1.7 + stacked * 2.6} y={y - 1.2} fontSize={2.1} fontWeight={700} fill={TRADE_LOOK[sheet.trade].fill} fontFamily="Arial, sans-serif">{i + 1}</text>
+          </g>
+        );
       })}
-      <ReadingPanel notes={[]} checks={checks} schedule={scheduleOf(e.services)} />
+      <ReadingPanel notes={[]} checks={checks} schedule={scheduleOf(e.services)} points={{ title: `${sheet.title} Points`, list: e.services }} />
     </g>
   );
 };
@@ -389,22 +430,24 @@ export const KitchenDrawings: React.FC<{
 }> = ({ project, rooms, walls, openings, runs, furniture = [], lines = [], company, notes = [], sourceUrl = null, checks = [] }) => {
   const side = notes.length || sourceUrl || checks.length ? SIDE_W : 0;
   const elevations = useMemo(() => kitchenElevations(runs, walls, openings), [runs, walls, openings]);
-  const sheets: Array<{ name: string; body: React.ReactNode }> = [
+  const coverage = useMemo(() => serviceCoverage(runs), [runs]);
+  const sheets: Array<{ name: string; title?: string; body: React.ReactNode }> = [
     { name: 'Floor Plan', body: <><Legend kitchen={runs.length > 0} /><PlanSheet rooms={rooms} walls={walls} openings={openings} runs={runs} furniture={furniture} side={side} />{side ? <ReadingPanel sourceUrl={sourceUrl} notes={notes} checks={checks} /> : null}</> },
     ...elevations.map((e, i) => ({
       name: `Elevation ${String.fromCharCode(65 + i)} · ${e.runs.join(', ')}`,
       body: <ElevationSheet e={e} />,
     })),
-    ...elevations.map((e, i) => ({ e, i })).filter(({ e }) => e.services.length).map(({ e, i }) => ({
-      name: `Services ${String.fromCharCode(65 + i)} · ${e.runs.join(', ')}`,
-      body: <ServicesSheet e={e} checks={serviceChecks(runs.filter((r) => e.run_ids.includes(r.id)))} />,
+    ...tradeSheets(elevations).map((t) => ({
+      name: `Wall ${t.letter} · ${t.elevation.runs.join(', ')}`,
+      title: `Kitchen · ${t.title}`,
+      body: <ServicesSheet sheet={t} checks={[...coverage, ...serviceChecks(runs.filter((r) => t.elevation.run_ids.includes(r.id)))].filter((c) => c.trade === t.trade)} />,
     })),
     ...(lines.length ? [{ name: 'Cut List', body: <CutListSheet lines={lines} /> }] : []),
   ];
   return (
     <div className="space-y-4">
       {sheets.map((sh, i) => (
-        <Sheet key={sh.name} title={runs.length ? 'Kitchen' : 'Floor Plan'} company={company} project={project} sheet={sh.name} index={i + 1} total={sheets.length} scaleNote="Dimensions in cm · not to scale">
+        <Sheet key={i} title={sh.title ?? (runs.length ? 'Kitchen' : 'Floor Plan')} company={company} project={project} sheet={sh.name} index={i + 1} total={sheets.length} scaleNote="Dimensions in cm · not to scale">
           <Hatch />
           {sh.body}
         </Sheet>

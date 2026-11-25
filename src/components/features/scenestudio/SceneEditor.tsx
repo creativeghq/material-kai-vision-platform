@@ -713,6 +713,16 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     }
   }, [intent, data]);
 
+  const dueHandled = useRef(false);
+  useEffect(() => {
+    if (reading) { dueHandled.current = false; return; }
+    if (dueHandled.current || !data?.scene.extract_notes?.drawings_due || !objects.some((o) => !o.removed_at && KITCHEN_KINDS.has(o.kind))) return;
+    dueHandled.current = true;
+    setDrawingsSet('drawings');
+    setDrawingsAutoSave(true);
+    setDrawingsOpen(true);
+  }, [reading, data, objects]);
+
   const selected = objects.find((o) => o.id === selectedId) ?? null;
   const changedSinceRender = (o: SceneObject | null) => {
     if (!o || !activeRender) return false;
@@ -1129,7 +1139,14 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
         autoSave={drawingsAutoSave}
         set={drawingsSet}
         onSetChange={setDrawingsSet}
-        onSaved={(saved) => { setDrawingsAutoSave(false); onDrawingSetSaved?.(saved); }}
+        onSaved={(saved) => {
+          setDrawingsAutoSave(false);
+          onDrawingSetSaved?.(saved);
+          const notes = data.scene.extract_notes;
+          if (saved.set !== 'drawings' || !notes?.drawings_due) return;
+          setData((d) => (d ? { ...d, scene: { ...d.scene, extract_notes: { ...notes, drawings_due: false } } } : d));
+          void sceneStudioService.drawingsMade(scene.id, notes).catch((e) => fail('The room could not be marked as drawn', e));
+        }}
       />
       <Dialog open={!!recording} onOpenChange={(o) => { if (!o) setRecording(null); }}>
         <DialogContent className="max-w-3xl">
