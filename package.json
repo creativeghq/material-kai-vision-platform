@@ -106,6 +106,7 @@
     "jspdf": "^4.2.0",
     "leva": "^0.10.1",
     "mediabunny": "^1.66.4",
+    "oidn-webgpu": "0.6.0",
     "pdfjs-dist": "^4.10.38",
     "qrcode.react": "^4.2.0",
     "react": "^18.3.1",

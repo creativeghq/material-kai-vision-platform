@@ -62,7 +62,6 @@ export interface Look {
   map: Texture | null;
   normalMap: Texture | null;
   roughnessMap: Texture | null;
-  aoMap: Texture | null;
   /** Linear factor on the map, or the plain colour itself. */
   colour: [number, number, number];
   normalScale: number;
@@ -93,13 +92,13 @@ function loadTexture(url: string, colour: boolean): Promise<Texture> {
 async function libraryLook(m: SceneMaterial, hex: string | null): Promise<Look> {
   const [map, normalMap, roughnessMap] = await Promise.all([loadTexture(m.albedoUrl, true), loadTexture(m.normalUrl, false), loadTexture(m.roughnessUrl, false)]);
   return {
-    map, normalMap, roughnessMap, aoMap: null, colour: tintFor(m, hex), normalScale: m.normalScale, roughness: m.roughnessFactor,
+    map, normalMap, roughnessMap, colour: tintFor(m, hex), normalScale: m.normalScale, roughness: m.roughnessFactor,
     tile: [m.tileM, m.tileM], reliefTile: [m.tileM, m.tileM],
   };
 }
 
 const plainLook = (hex: string, roughness: number): Look => ({
-  map: null, normalMap: null, roughnessMap: null, aoMap: null, colour: linearOfHex(hex), normalScale: 1, roughness, tile: [1, 1], reliefTile: [1, 1],
+  map: null, normalMap: null, roughnessMap: null, colour: linearOfHex(hex), normalScale: 1, roughness, tile: [1, 1], reliefTile: [1, 1],
 });
 
 const decors = new Map<string, Promise<Look>>();
@@ -115,17 +114,19 @@ function decorLook(url: string, coversM: number): Promise<Look> {
     g.imageSmoothingQuality = 'high';
     g.drawImage(img, 0, 0, side, side);
     const { normalMap, roughnessMap } = reliefMaps(luminance(g, side, side), null, side, side, { strength: 0.9, rough: 0.5, roughJoint: 0.5 });
-    return { map: tex(c, true), normalMap, roughnessMap, aoMap: null, colour: [1, 1, 1], normalScale: 1, roughness: 1, tile: [coversM, coversM], reliefTile: [coversM, coversM] };
+    return { map: tex(c, true), normalMap, roughnessMap, colour: [1, 1, 1], normalScale: 1, roughness: 1, tile: [coversM, coversM], reliefTile: [coversM, coversM] };
   });
   job.catch(() => decors.delete(url));
   decors.set(url, job);
   return job;
 }
 
-const profiles = new Map<string, { normalMap: Texture; aoMap: Texture }>();
+interface Profile { normalMap: Texture; shade: Float32Array }
+
+const profiles = new Map<string, Profile>();
 
 /** Relief that only changes across the width of a board: its flutes, and the joint with the next board. */
-function boardProfile(key: string, columns: Float32Array | null, widthM: number): { normalMap: Texture; aoMap: Texture } {
+function boardProfile(key: string, columns: Float32Array | null, widthM: number): Profile {
   const hit = profiles.get(key);
   if (hit) return hit;
   const w = 1024; const h = 4;
@@ -142,13 +143,35 @@ function boardProfile(key: string, columns: Float32Array | null, widthM: number)
   }
   const { normalMap, roughnessMap } = reliefMaps(height, null, w, h, { strength: columns ? 9 : 2.4, rough: 1, roughJoint: 1 });
   roughnessMap.dispose();
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const g = c.getContext('2d')!;
-  const img = g.createImageData(w, h);
-  for (let i = 0; i < w * h; i++) { img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = 255 * (0.45 + 0.55 * height[i]); img.data[i * 4 + 3] = 255; }
-  g.putImageData(img, 0, 0);
-  const made = { normalMap, aoMap: tex(c, false) };
+  const made = { normalMap, shade: height.slice(0, w).map((v) => 0.4 + 0.6 * v) };
   profiles.set(key, made);
+  return made;
+}
+
+const shaded = new Map<string, Texture>();
+const BOARDS = 8;
+
+/** The finish across eight boards with their grooves shaded in, so they read however the room is lit. */
+function shadedBoards(key: string, base: Look, shade: Float32Array, widthM: number): Texture {
+  const hit = shaded.get(key);
+  if (hit) return hit;
+  const c = document.createElement('canvas'); c.width = 2048; c.height = 1024;
+  const g = c.getContext('2d')!;
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, c.width, c.height);
+  const img = base.map?.image as HTMLImageElement | HTMLCanvasElement | undefined;
+  if (img) {
+    const px = (base.tile[0] / (widthM * BOARDS)) * c.width;
+    for (let x = 0; x < c.width; x += px) g.drawImage(img, x, 0, px, c.height);
+  }
+  g.globalCompositeOperation = 'multiply';
+  for (let x = 0; x < c.width; x++) {
+    const v = Math.round(255 * shade[Math.floor((((x / c.width) * BOARDS) % 1) * shade.length)]);
+    g.fillStyle = `rgb(${v}, ${v}, ${v})`;
+    g.fillRect(x, 0, 1, c.height);
+  }
+  const made = tex(c, true);
+  shaded.set(key, made);
   return made;
 }
 
@@ -217,7 +240,7 @@ function imageLook(f: Finish, img: HTMLImageElement, wood: boolean): Promise<Loo
       return tex(sc, false);
     };
     const [normalMap, roughnessMap] = await Promise.all([stored(f.normalUrl, relief.normalMap), stored(f.roughnessUrl, relief.roughnessMap)]);
-    return { map: tex(c, true), normalMap, roughnessMap, aoMap: null, colour: [1, 1, 1], normalScale: 1, roughness: 1, tile: [f.tileW, f.tileL], reliefTile: [f.tileW, f.tileL] };
+    return { map: tex(c, true), normalMap, roughnessMap, colour: [1, 1, 1], normalScale: 1, roughness: 1, tile: [f.tileW, f.tileL], reliefTile: [f.tileW, f.tileL] };
   })();
   job.catch(() => cache.delete(key));
   cache.set(key, job);
@@ -247,8 +270,10 @@ export async function buildLook(f: Finish | null, want: LookWant): Promise<Look>
   const onWall = want.role?.startsWith('surface:') ?? false;
   const fluted = swatch.columns && (f.thicknessMm ?? 0) >= FLUTED_MIN_MM ? swatch.columns : null;
   if (!fluted && !(onWall && f.jointed)) return base;
-  const p = boardProfile(`${fluted ? f.imageUrl : 'flat'}|${f.tileW}`, fluted, f.tileW);
-  return { ...base, normalMap: p.normalMap, aoMap: p.aoMap, normalScale: 1, reliefTile: [f.tileW, 1] };
+  const key = `${fluted ? f.imageUrl : 'flat'}|${f.tileW}`;
+  const p = boardProfile(key, fluted, f.tileW);
+  const map = shadedBoards(`${key}|${base.map?.uuid ?? ''}`, base, p.shade, f.tileW);
+  return { ...base, map, roughnessMap: null, normalMap: p.normalMap, roughness: 0.5, normalScale: 1, tile: [f.tileW * BOARDS, base.tile[1]], reliefTile: [f.tileW, 1] };
 }
 
 /** This mesh's own copies of the finish's textures, laid at their real size over `widthM` × `heightM`. */
@@ -278,9 +303,9 @@ export function useLook(finish: Finish | null, want: LookWant, widthM: number, h
       c.needsUpdate = true;
       return c;
     };
-    return { ...base, map: place(base.map, base.tile), roughnessMap: place(base.roughnessMap, base.tile), normalMap: place(base.normalMap, base.reliefTile), aoMap: place(base.aoMap, base.reliefTile) };
+    return { ...base, map: place(base.map, base.tile), roughnessMap: place(base.roughnessMap, base.tile), normalMap: place(base.normalMap, base.reliefTile) };
   }, [base, widthM, heightM, offsetX, offsetY]);
-  useEffect(() => () => { own?.map?.dispose(); own?.normalMap?.dispose(); own?.roughnessMap?.dispose(); own?.aoMap?.dispose(); }, [own]);
+  useEffect(() => () => { own?.map?.dispose(); own?.normalMap?.dispose(); own?.roughnessMap?.dispose(); }, [own]);
   return own;
 }
 

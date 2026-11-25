@@ -5,7 +5,6 @@ import {
   BackSide, Box3, BoxGeometry, Color, CubeCamera, DoubleSide, HalfFloatType, NoToneMapping, PMREMGenerator, SRGBColorSpace, TextureLoader, Vector2, Vector3,
   WebGLCubeRenderTarget, type BufferGeometry, type Group, type Mesh, type Object3D, type Texture, type WebGLRenderTarget,
 } from 'three';
-import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { DARK, STEEL, STONE, WHITE, objectParts } from '@/lib/scene/objectParts';
@@ -52,7 +51,7 @@ const Outdoors: React.FC<{ span: number }> = ({ span }) => {
         <sphereGeometry args={[60, 48, 24]} />
         <meshBasicMaterial map={map} side={BackSide} depthWrite={false} fog={false} />
       </mesh>
-      <mesh ref={ground} userData={{ helper: true }} raycast={() => null} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh ref={ground} userData={{ helper: true, ground: true }} raycast={() => null} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[1, 1]} />
         <meshStandardMaterial color="#8f8678" roughness={0.9} />
       </mesh>
@@ -222,14 +221,13 @@ export const FinishMaterial: React.FC<{
   const relief = useMemo(() => new Vector2(look?.normalScale ?? 1, look?.normalScale ?? 1), [look?.normalScale]);
   return (
     <meshStandardMaterial
-      key={look ? `m${look.map ? 1 : 0}${look.normalMap ? 1 : 0}${look.aoMap ? 1 : 0}` : 'n'}
+      key={look ? `m${look.map ? 1 : 0}${look.normalMap ? 1 : 0}` : 'n'}
       attach={attach}
       color={colour}
       map={look?.map ?? null}
       normalMap={look?.normalMap ?? null}
       normalScale={relief}
       roughnessMap={look?.roughnessMap ?? null}
-      aoMap={look?.aoMap ?? null}
       roughness={look?.roughness ?? rough ?? 0.8}
       metalness={metal}
       emissive={highlight ? '#3d7bff' : '#000000'}
@@ -242,15 +240,33 @@ export const FinishMaterial: React.FC<{
 
 export type SlotFinishes = Partial<Record<SceneObjectSlot, Finish | null>>;
 
+const ROUND_STEPS = 4;
+
+/** A box with rounded edges whose faces stay truly flat (three's own tilts the normals of the flat part). */
+function roundedBox(size: [number, number, number], r: number): BufferGeometry {
+  const n = ROUND_STEPS * 2 + 1;
+  const g = new BoxGeometry(1, 1, 1, n, n, n);
+  const pos = g.getAttribute('position'); const nor = g.getAttribute('normal');
+  const d = new Vector3();
+  for (let i = 0; i < pos.count; i++) {
+    const at = [pos.getX(i), pos.getY(i), pos.getZ(i)].map((c) => Math.round((c + 0.5) * n));
+    const low = at.map((k) => k <= ROUND_STEPS);
+    d.fromArray(at.map((k, axis) => Math.tan((Math.PI / 4) * (low[axis] ? k / ROUND_STEPS - 1 : (k - ROUND_STEPS - 1) / ROUND_STEPS)))).normalize();
+    nor.setXYZ(i, d.x, d.y, d.z);
+    const p = size.map((s, axis) => (low[axis] ? -1 : 1) * (s / 2 - r) + d.getComponent(axis) * r);
+    pos.setXYZ(i, p[0], p[1], p[2]);
+  }
+  return g;
+}
+
 /** A box or rounded box whose UVs are metres on every face, grain along the face's longer side. */
 export function partGeometry(size: [number, number, number], round?: number): BufferGeometry {
   const r = round ? Math.min(round, Math.min(...size) / 2 - 0.0005) : 0;
-  const g = r > 0 ? new RoundedBoxGeometry(size[0], size[1], size[2], 4, r) : new BoxGeometry(...size);
+  const g = r > 0 ? roundedBox(size, r) : new BoxGeometry(...size);
   g.clearGroups();
-  const pos = g.getAttribute('position'); const nor = g.getAttribute('normal'); const uv = g.getAttribute('uv');
+  const pos = g.getAttribute('position'); const uv = g.getAttribute('uv');
   for (let i = 0; i < pos.count; i++) {
-    const n = [Math.abs(nor.getX(i)), Math.abs(nor.getY(i)), Math.abs(nor.getZ(i))];
-    const axis = n.indexOf(Math.max(...n));
+    const axis = Math.floor(i / (pos.count / 6)) >> 1;
     const [a, b] = axis === 0 ? [2, 1] : axis === 1 ? [0, 2] : [0, 1];
     const at = [pos.getX(i), pos.getY(i), pos.getZ(i)];
     const [u, v] = size[a] > size[b] ? [b, a] : [a, b];
