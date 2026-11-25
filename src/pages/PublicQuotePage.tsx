@@ -79,6 +79,7 @@ interface IssuedDocument {
 
 import { formatMoney as money } from '@/utils/decimal';
 import { formatDate } from '@/utils/datetime';
+import { safeHref } from '@/utils/safeUrl';
 
 export default function PublicQuotePage() {
   const { token } = useParams<{ token: string }>();
@@ -286,7 +287,7 @@ export default function PublicQuotePage() {
                       <td className="p-3">
                         <div className="flex items-start gap-3">
                         {it.image_url && (
-                          <a href={it.image_url} target="_blank" rel="noreferrer" className="shrink-0">
+                          <a href={safeHref(it.image_url)} target="_blank" rel="noreferrer" className="shrink-0">
                             <img src={it.image_url} alt={it.name} loading="lazy" className="h-20 w-20 rounded-sm border border-hairline object-cover bg-surface-sunken" />
                           </a>
                         )}
