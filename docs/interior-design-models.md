@@ -18,7 +18,6 @@ The grid and the single-result path **must not both run for the same user reques
 | Model ID | Backing model | Provider | Cost (raw) | Purpose |
 |---|---|---|---|---|
 | `gemini-interior` | `gemini-nano-banana-2.1` (fast tier) via `generate-interior-gemini` edge function | Gemini | billed by edge fn (6 cr fast / 15 cr pro) | Photorealistic interior render via Gemini 3 Flash Image. Edge fn handles credits + uploads internally. |
-| `flux-2-pro` | `black-forest-labs/flux-2-pro` | Replicate | $0.05 | Production-grade 4MP photoreal text-to-image. Best overall quality for new rooms from scratch. |
 | `playground-v2.5` | `playgroundai/playground-v2.5-1024px-aesthetic` | Replicate | $0.01 | Aesthetic-tuned SD model — soft, magazine-style interiors. |
 | `sd3` | `stability-ai/stable-diffusion-3` | Replicate | $0.055 | SD 3 baseline — strong prompt adherence, neutral aesthetic. |
 
@@ -121,7 +120,6 @@ The agent (`KAI` / `Interior Designer`) picks tools per user request using these
 
 A typical text-to-image variations request runs 4 tiles in parallel:
 - `gemini-interior` (6 cr ≈ $0.04 internal)
-- `flux-2-pro` ($0.05)
 - `playground-v2.5` ($0.01)
 - `sd3` ($0.055)
 - **Replicate raw total: ~$0.115** + Gemini (6 cr) — billed at 50% markup via `MARKUP_MULTIPLIER`.

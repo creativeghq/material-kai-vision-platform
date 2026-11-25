@@ -94,7 +94,6 @@ describe('EX-7 — an image URL is validated before a provider is asked to fetch
   const DOWNLOADS_PROVIDER_OUTPUT: Array<[string, string]> = [
     ['generate-interior-video-v2/index.ts', 'fetchBinaryGuarded'],
     ['generate-social-video/index.ts', 'fetchBinaryGuarded'],
-    ['generate-social-image/index.ts', 'fetchImageGuarded'],
   ];
 
   it.each(DOWNLOADS_PROVIDER_OUTPUT)('%s downloads the output through %s', (rel, fn) => {

@@ -3,128 +3,29 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { jsonResponse } from '../_shared/http.ts';
 import { createClient } from '@supabase/supabase-js';
-import { replicateToken } from '../_shared/replicate-token.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { debitExternalServiceCredits, recordExternalServiceOutcome } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
-import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { generateImageWithGemini, generateImageWithGrok } from '../_shared/ai-client.ts';
+import { generateImageWithGemini } from '../_shared/ai-client.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-type ImageModel = 'aurora' | 'gemini' | 'flux' | 'auto';
 type ImageType = 'lifestyle' | 'product' | 'interior' | 'artistic';
 type AspectRatio = '1:1' | '4:5' | '9:16' | '16:9';
 
-const GEMINI_IMAGE_MODEL = 'gemini-nano-banana-2.1' as const;
+const IMAGE_MODEL = 'gemini-nano-banana-2.1' as const;
+const ACCEPTED_MODELS = new Set(['auto', 'gemini']);
+const CREDIT_ESTIMATE = 6;
 
-const MODEL_SERVICE_KEYS: Record<Exclude<ImageModel, 'auto'>, string> = {
-  aurora: 'xai-aurora',
-  // The key names the model that RUNS, or the credit line is another model's price.
-  gemini: GEMINI_IMAGE_MODEL,
-  flux:   'flux-2-pro',
-};
-
-const CREDIT_COSTS: Record<Exclude<ImageModel, 'auto'>, number> = {
-  aurora: 10,
-  gemini: 5,
-  flux:   6,
-};
-
-// xAI's image endpoint 400s on a `size` argument rather than ignoring it, and offers no
-// aspect-ratio control at all — so a pinned ratio routes elsewhere.
-const HONOURS_ASPECT_RATIO: Record<Exclude<ImageModel, 'auto'>, boolean> = {
-  aurora: false,
-  gemini: true,
-  flux:   true,
-};
-
-function autoSelectModel(imageType: ImageType, ratioPinned: boolean): Exclude<ImageModel, 'auto'> {
-  const preferred: Exclude<ImageModel, 'auto'> = imageType === 'product' || imageType === 'interior'
-    ? 'gemini'
-    : imageType === 'artistic' ? 'flux' : 'aurora';
-  return ratioPinned && !HONOURS_ASPECT_RATIO[preferred] ? 'gemini' : preferred;
-}
-
-
-// ── Replicate FLUX 2 Pro ──────────────────────────────────────────────────────
-async function generateWithFlux(prompt: string, aspectRatio: AspectRatio): Promise<string> {
-  const fluxAspect = aspectRatio === '9:16' ? '9:16'
-    : aspectRatio === '16:9' ? '16:9'
-    : aspectRatio === '4:5' ? '4:5'
-    : '1:1';
-
-  const token = await replicateToken();
-  const createRes = await fetch('https://api.replicate.com/v1/models/black-forest-labs/flux-2-pro/predictions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Token ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      input: {
-        prompt,
-        aspect_ratio: fluxAspect,
-        output_format: 'webp',
-        output_quality: 90,
-        num_outputs: 1,
-      },
-    }),
-  });
-
-  if (!createRes.ok) {
-    const text = await createRes.text();
-    throw new Error(`Replicate FLUX error ${createRes.status}: ${text}`);
-  }
-
-  const prediction = await createRes.json() as { id: string; urls: { get: string } };
-  const pollUrl = `https://api.replicate.com/v1/predictions/${prediction.id}`;
-
-  const maxMs = 60_000;
-  const start = Date.now();
-  while (Date.now() - start < maxMs) {
-    await new Promise(r => setTimeout(r, 2000));
-    const pollRes = await fetch(pollUrl, {
-      headers: { 'Authorization': `Token ${token}` },
-    });
-    const status = await pollRes.json() as { status: string; output?: string | string[]; error?: string };
-
-    if (status.status === 'succeeded') {
-      // A single-output Replicate model returns a bare STRING, so the old `output[0]` took the
-      // first CHARACTER: every succeeded prediction was delivered as `image_url: "h"`, billed.
-      const out = Array.isArray(status.output) ? status.output[0] : status.output;
-      if (typeof out === 'string' && out.startsWith('http')) return out;
-      throw new Error(`FLUX succeeded but returned no usable image URL: ${JSON.stringify(status.output)}`);
-    }
-    if (status.status === 'failed') throw new Error(`FLUX failed: ${status.error || 'unknown'}`);
-  }
-
-  throw new Error('FLUX generation timed out after 60s');
-}
-
-// ── Upload image URL/base64 to Supabase Storage ───────────────────────────────
+// ── Upload the base64 image to Supabase Storage ──────────────────────────────
 async function storeImage(
   supabase: DbClient,
   imageData: string,
   filename: string,
 ): Promise<string> {
-  if (imageData.startsWith('http')) {
-    // Through the shared guard (#364 EX-7): this was a bare `fetch(imageData)` with redirects
-    // followed, no `res.ok` check and no size cap, so an error page was uploaded as `image/webp`
-    // and served to the user as their generated image.
-    const { bytes } = await fetchImageGuarded(imageData, { maxBytes: 32 * 1024 * 1024 });
-    const { data, error } = await supabase.storage
-      .from('generation-images')
-      .upload(`social/${filename}`, bytes, { contentType: 'image/webp', upsert: true });
-    // Never fall back to the PROVIDER's URL: it expires within the hour, and it gets persisted.
-    if (error) throw new Error(`Storage upload failed: ${error.message}`);
-    const { data: urlData } = supabase.storage.from('generation-images').getPublicUrl(data.path);
-    return urlData.publicUrl;
-  }
-
   if (imageData.startsWith('data:')) {
     const base64Data = imageData.split(',')[1];
     const bytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
@@ -155,7 +56,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   const {
     prompt,
     image_type = 'lifestyle' as ImageType,
-    model = 'auto' as ImageModel,
+    model = 'auto',
     aspect_ratio = '1:1' as AspectRatio,
     post_id,
     // The draft below was hardcoded `instagram`, in a table whose analytics group BY platform.
@@ -211,66 +112,40 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
 
   if (!prompt) return jsonResponse({ success: false, error: 'prompt is required' }, 400);
 
-  // A ratio the CALLER named is a constraint; the default is not.
-  const ratioPinned = typeof body.aspect_ratio === 'string';
-  const resolvedModel: Exclude<ImageModel, 'auto'> = model === 'auto'
-    ? autoSelectModel(image_type, ratioPinned)
-    : model as Exclude<ImageModel, 'auto'>;
-
-  const creditCost = CREDIT_COSTS[resolvedModel];
-  const serviceKey = MODEL_SERVICE_KEYS[resolvedModel];
+  if (!ACCEPTED_MODELS.has(model)) {
+    return jsonResponse({ success: false, error: "model must be 'auto' or 'gemini'" }, 400);
+  }
 
   // ① Debit credits BEFORE the upstream image generation (invariant #10 — debit-before,
   // refund-on-failure). Never a non-atomic pre-flight read + deduct-on-success: a race
   // between the read and the charge delivers a free image.
   const operationType = body.purpose === 'article' ? 'seo_article_image' : 'social_image_generation';
   const debitResult = await debitExternalServiceCredits(
-    supabase, userId, serviceKey, operationType, 1,
-    { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id, purpose: body.purpose ?? 'social' },
+    supabase, userId, IMAGE_MODEL, operationType, 1,
+    { model: IMAGE_MODEL, image_type, aspect_ratio, workspace_id, post_id, purpose: body.purpose ?? 'social' },
     // 7th arg. Omitting it sent p_workspace_id: null, so the debit ALWAYS hit the caller's
     // personal wallet — a workspace with a funded shared pool still drained individual
     // members' credits, and the per-member monthly cap never applied. Every other generator
     // in this family passes it.
     workspace_id ?? null,
   );
-  // What was ACTUALLY charged, derived from ai_model_pricing inside the debit. `creditCost` is
-  // a pre-flight estimate and drifts from it — xai-aurora bills 10.5 and was reported as 10,
-  // flux-2-pro bills 6.0 and was reported as 5. Persisting the estimate was a second
-  // derivation of a money quantity (anti-regression rule #1).
   if (!debitResult.success) {
-    return jsonResponse({ success: false, error: debitResult.error || 'Insufficient credits', required: creditCost }, 402);
+    return jsonResponse({ success: false, error: debitResult.error || 'Insufficient credits', required: CREDIT_ESTIMATE }, 402);
   }
 
   try {
-    // ③ Generate. Through `_shared/ai-client.ts`, which holds the current model ids and logs
-    // the cost — the two hand-rolled fetches here were pinned to models retired upstream.
-    let imageUrl: string;
-    // The debit above already wrote this image's cost row, so the client logs failures only.
-    const attribution = { userId, workspaceId: workspace_id ?? undefined, task: operationType, logUsage: false };
-
-    switch (resolvedModel) {
-      case 'aurora': {
-        const img = await generateImageWithGrok(prompt, attribution);
-        imageUrl = `data:${img.mimeType};base64,${img.base64}`;
-        break;
-      }
-      case 'gemini': {
-        const img = await generateImageWithGemini(prompt, {
-          ...attribution, model: GEMINI_IMAGE_MODEL, aspectRatio: aspect_ratio,
-        });
-        imageUrl = `data:${img.mimeType};base64,${img.base64}`;
-        break;
-      }
-      case 'flux':
-        imageUrl = await generateWithFlux(prompt, aspect_ratio);
-        break;
-    }
+    // ③ Generate. The debit above already wrote this image's cost row, so the client logs failures only.
+    const img = await generateImageWithGemini(prompt, {
+      userId, workspaceId: workspace_id ?? undefined, task: operationType, logUsage: false,
+      model: IMAGE_MODEL, aspectRatio: aspect_ratio,
+    });
+    const imageUrl = `data:${img.mimeType};base64,${img.base64}`;
 
     await recordExternalServiceOutcome(supabase, debitResult.usage_log_id, true);
 
     // ④ Store in Supabase Storage
-    const filename = `${Date.now()}-${resolvedModel}.${resolvedModel === 'flux' ? 'webp' : 'png'}`;
-    const storedUrl = await storeImage(supabase, imageUrl!, filename);
+    const filename = `${Date.now()}-gemini.png`;
+    const storedUrl = await storeImage(supabase, imageUrl, filename);
 
     // ⑥ Update social_posts if post_id provided
     // `attachedPostId` is what the response reports: the caller needs to know WHICH draft now
@@ -293,7 +168,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
             image_urls: newImageUrls,
             credits_used: (existingPost.credits_used || 0) + debitResult.credits_debited,
             credits_breakdown: newBreakdown,
-            generation_model: resolvedModel,
+            generation_model: IMAGE_MODEL,
           })
           .eq('id', post_id);
       }
@@ -311,7 +186,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         status: 'draft',
         credits_used: debitResult.credits_debited,
         credits_breakdown: { image: debitResult.credits_debited },
-        generation_model: resolvedModel,
+        generation_model: IMAGE_MODEL,
         metadata: { prompt, image_type, aspect_ratio },
       }).select('id').single();
       if (postErr) {
@@ -324,13 +199,12 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
       success: true,
       image_url: storedUrl,
       post_id: attachedPostId,
-      model_used: resolvedModel,
+      model_used: IMAGE_MODEL,
       credits_used: debitResult.credits_debited,
       credits_remaining: debitResult.new_balance,
-      // What the picture IS, not what was asked for.
-      aspect_ratio: HONOURS_ASPECT_RATIO[resolvedModel] ? aspect_ratio : null,
+      aspect_ratio: aspect_ratio,
       aspect_ratio_requested: aspect_ratio,
-      aspect_ratio_enforced: HONOURS_ASPECT_RATIO[resolvedModel],
+      aspect_ratio_enforced: true,
     });
 
   } catch (err) {
@@ -342,7 +216,7 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         p_amount: debitResult.credits_debited,
         p_operation_type: 'social_image_generation_refund',
         p_description: 'Refund: social image generation failed',
-        p_metadata: { model: resolvedModel, error: String(err) },
+        p_metadata: { model: IMAGE_MODEL, error: String(err) },
         // Refund to the SAME wallet the debit came from, or the money lands in the wrong
         // place on failure.
         p_workspace_id: workspace_id ?? null,

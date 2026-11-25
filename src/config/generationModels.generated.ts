@@ -55,30 +55,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 9
   },
   {
-    "id": "gemini-3.1-flash-image",
-    "display_name": "Gemini 3.1 Flash Image",
-    "capability": "image",
-    "sub_capability": "text-or-image-to-image",
-    "provider": "google",
-    "slug": "gemini-3.1-flash-image",
-    "version": null,
-    "adapter": "gemini",
-    "input_requirements": {
-      "max_images": 2,
-      "min_images": 0,
-      "image_roles": [
-        "source",
-        "style_reference"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "gemini-3.1-flash-image",
-    "tier": "budget",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 10
-  },
-  {
     "id": "nano-banana-2.1",
     "display_name": "Nano Banana 2.1",
     "capability": "image",
@@ -230,26 +206,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 30
   },
   {
-    "id": "flux-2-pro",
-    "display_name": "FLUX.2 Pro",
-    "capability": "image",
-    "sub_capability": "text-to-image",
-    "provider": "replicate",
-    "slug": "black-forest-labs/flux-2-pro",
-    "version": null,
-    "adapter": null,
-    "input_requirements": {
-      "max_images": 0,
-      "min_images": 0,
-      "needs_prompt": true
-    },
-    "pricing_key": "flux-2-pro",
-    "tier": "premium",
-    "status": "active",
-    "enabled": true,
-    "sort_order": 40
-  },
-  {
     "id": "flux-depth-pro",
     "display_name": "FLUX Depth Pro",
     "capability": "image",
@@ -347,29 +303,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "status": "active",
     "enabled": false,
     "sort_order": 194
-  },
-  {
-    "id": "gemini-omni-1.2-flash-720p",
-    "display_name": "Gemini Omni 1.2 Flash 720p",
-    "capability": "video",
-    "sub_capability": "image-to-video",
-    "provider": "google",
-    "slug": "gemini-omni-1.2-flash",
-    "version": null,
-    "adapter": "gemini_omni",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "gemini-omni-1.2-flash-720p",
-    "tier": "standard",
-    "status": "active",
-    "enabled": true,
-    "sort_order": 196
   },
   {
     "id": "seedance-2.5-480p",
@@ -601,7 +534,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '0d1481e21aae2e0b430a69e5370fd6a6';
+export const PROJECTION_FINGERPRINT = 'c79158e893de6a7710f2d59bf1fcd18c';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

@@ -44,7 +44,7 @@ Admin Panel → /admin/social-media/* → Direct DB queries (social_posts, socia
 | `zernio-api` | Unified router (`action` selects handler): **oauth** (connect/callback/disconnect/list), **publish** (publish_now/schedule), **analytics** (get_post_analytics/get_account_insights/get_best_time) | `ZERNIO_API_KEY` |
 | `zernio-webhook-handler` | Receive Zernio webhooks (`post.published`, `post.failed`, `post.partial`, `post.cancelled`, `post.scheduled`, `account.disconnected`) | `ZERNIO_WEBHOOK_SECRET` |
 | `generate-social-content` | Claude Haiku generates 3 caption variants + hashtags | *(uses shared ANTHROPIC_API_KEY)* |
-| `generate-social-image` | Image generation — routes by type (lifestyle/product/artistic) | `XAI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `REPLICATE_API_TOKEN` |
+| `generate-social-image` | Image generation with Gemini Nano Banana 2.1 | `GOOGLE_GENERATIVE_AI_API_KEY` |
 | `generate-social-video` | Short-form reel. Delegates every model but `kling-3.0` to `generate-interior-video-v2`; attaches the result to the post. `{ action: 'status', job_id }` collects a render that outran the inline poll | none directly — credentials are resolved by the shared client it delegates to |
 | `generate-interior-video-v2` | Multi-model interior video (Veo 2 / Kling / Wan / Runway) | none directly — resolved through `_shared` provider clients |
 
@@ -83,13 +83,9 @@ Resolution is **env-first, then `platform_secrets` (DB)** — set via edge-funct
 
 ---
 
-## Image Generation Routing
+## Image Generation
 
-| `image_type` param | Model | Credits |
-|--------------------|-------|---------|
-| `lifestyle` | xAI Aurora (`grok-2-aurora`) | 10 cr |
-| `product` or `interior` | Imagen 3.0 (`imagen-3.0-generate-002`) | 5 cr |
-| `artistic` | FLUX Dev (Replicate) | 6 cr |
+Every `image_type` runs `gemini-nano-banana-2.1` (6 cr).
 
 ---
 

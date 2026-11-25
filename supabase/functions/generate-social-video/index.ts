@@ -49,7 +49,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // 'kling-1.6-pro' removed 2026-08-12 (issue #4): `klingai/kling-1.6-pro` returns 404 from
 // GET /v1/models — a read that needs no credit, so it is deleted upstream, not a symptom of
 // our unfunded account's 402. It was selectable at 15 credits and always hard-failed.
-type VideoModel = 'kling-3.0' | 'gemini-omni-1.2-flash-720p' | 'gemini-omni-1.2-flash-1080p'
+type VideoModel = 'kling-3.0' | 'gemini-omni-1.2-flash-1080p'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
   | 'h3-max-768p' | 'h3-max-480p'
@@ -60,7 +60,6 @@ type VideoModel = 'kling-3.0' | 'gemini-omni-1.2-flash-720p' | 'gemini-omni-1.2-
 // equal the generator's — pinned by tests/unit/videoCreditFloor.test.ts.
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'kling-3.0':     20,
-  'gemini-omni-1.2-flash-720p':  20,
   'gemini-omni-1.2-flash-1080p': 30,
   'wan-3.0-480p':  30,
   'wan-3.0-720p':  55,
@@ -77,7 +76,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 //: Wan exists for — 30 seconds with sound, against the 10 silent seconds this function
 //: could offer before.
 const DELEGATED_MODELS = new Set<string>([
-  'gemini-omni-1.2-flash-720p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
+  'gemini-omni-1.2-flash-1080p', 'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
   'seedance-2.5-480p', 'seedance-2.5-720p',
   'h3-max-768p', 'h3-max-480p',
   'ray-3.2-720p', 'ray-3.2-1080p',

@@ -14,8 +14,7 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 
 /** Mirrors `ai_model_pricing.cost_per_unit` where `unit_label = 'second'`. */
 const PROVIDER_USD_PER_SECOND: Record<string, number> = {
-  // Gemini Omni 1.2 Flash: $12/1M output tokens x 5,792 tok/s (720p) or 8,688 (1080p).
-  'gemini-omni-1.2-flash-720p': 0.0695,
+  // Gemini Omni 1.2 Flash: $12/1M output tokens x 8,688 tok/s at 1080p.
   'gemini-omni-1.2-flash-1080p': 0.1043,
   'kling-v3.0': 0.10,
   'runway-gen4-turbo': 0.15,
@@ -135,7 +134,7 @@ describe('every surface advertises the price the generator actually charges', ()
   });
 
   it('the agent tool description quotes the charged price', () => {
-    expect(read(TOOL)).toContain('gemini-omni-1.2-flash-720p 20cr');
+    expect(read(TOOL)).toContain('gemini-omni-1.2-flash-1080p 30cr');
   });
 });
 

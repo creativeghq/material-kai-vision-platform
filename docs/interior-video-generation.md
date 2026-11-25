@@ -21,8 +21,7 @@ The `generate-interior-video-v2` edge function routes to the optimal AI video mo
 
 | Model | Credits | Max length | Audio | Best For |
 |---|---|---|---|---|
-| `gemini-omni-1.2-flash-720p` | 20 | 15s | yes | The default while Google is the only configured provider |
-| `gemini-omni-1.2-flash-1080p` | 30 | 15s | yes | The same, upscaled |
+| `gemini-omni-1.2-flash-1080p` | 30 | 15s | yes | The default while Google is the only configured provider; Google upscales it from 720p |
 | `kling-v3.0` | 20 | 10s | yes | Product spotlights, before/after, short social reels |
 | `runway-gen4-turbo` | 40 | 10s | no | Premium quality output |
 | `wan-3.0-480p` | 30 | 30s | yes | Long clips on a budget |

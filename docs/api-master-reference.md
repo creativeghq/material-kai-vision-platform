@@ -68,7 +68,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | Function | Auth | Summary |
 |---|---|---|
 | `generate-social-content` | JWT / kai_* | Draft social post captions under the channel's writing rules |
-| `generate-social-image` | JWT / kai_* | Generate a social media image via Aurora, Gemini, or FLUX based on content type |
+| `generate-social-image` | JWT / kai_* | Generate a social media image |
 | `generate-social-video` | JWT / kai_* | Generate a short-form social video (MiniMax H3 by default; Kling, Gemini Omni, Wan3.0, Seedance 2.5 and Ray3.2 selectable) |
 | `zernio-api` _(GET + POST)_ | JWT / kai_* | Social media publishing, OAuth account management, and analytics via Zernio. |
 | `zernio-webhook-handler` | sig | Receives Zernio webhooks for social post events and WhatsApp messaging events. |
@@ -586,7 +586,7 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | `zernio-api` | GET/POST | JWT | Unified router; `action` selects handler — oauth (`connect`/`callback`/`disconnect`/`list`), publish (`publish_now`/`schedule`), analytics (`get_post_analytics`/`get_account_insights`/`get_best_time`). Publishes to 8 platforms via Zernio. | [zernio-social-api](social-media-system.md) |
 | `zernio-webhook-handler` | POST | signature (`X-Zernio-Signature`) | Receives `post.published` / `post.partial` / `post.failed` / `post.cancelled` / `post.scheduled` / `account.disconnected` | ↑ |
 | `generate-social-content` | POST | JWT | 3 caption variants + hashtags per platform | ↑ |
-| `generate-social-image` | POST | JWT | Routes to best image model (Aurora / Gemini / FLUX) by content type | ↑ |
+| `generate-social-image` | POST | JWT | Gemini Nano Banana 2.1 | ↑ |
 | `generate-social-video` | POST | JWT | Short-form video (Kling / Veo2 via Replicate) | ↑ |
 
 ### 1.12 Pinterest

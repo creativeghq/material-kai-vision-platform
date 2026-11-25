@@ -32,7 +32,7 @@ const SERVICE_KEYS = [
   'hunter-email-finder', 'hunter-domain-search',
   'zerobounce-validate', 'firecrawl-scrape',
   'zernio-publish', 'social-caption',
-  'xai-aurora', 'flux-2-pro', 'flux-dev',
+  'gemini-nano-banana-2.1', 'xai-aurora', 'flux-dev',
 ];
 
 const USAGE_ROW_CAP = 1000;

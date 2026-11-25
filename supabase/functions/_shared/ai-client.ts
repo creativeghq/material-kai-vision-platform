@@ -1560,19 +1560,14 @@ export async function generateVideoWithWan(
 const GEMINI_OMNI_MODEL_ID = 'gemini-omni-1.2-flash';
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-export type GeminiOmniResolution = '720p' | '1080p';
-
-const GEMINI_OMNI_PRICING_MODEL_ID: Record<GeminiOmniResolution, string> = {
-  '720p': 'gemini-omni-1.2-flash-720p',
-  '1080p': 'gemini-omni-1.2-flash-1080p',
-};
+const GEMINI_OMNI_RESOLUTION = '1080p';
+const GEMINI_OMNI_PRICING_KEY = 'gemini-omni-1.2-flash-1080p';
 
 export interface GeminiOmniVideoResult {
   bytes: Uint8Array;
   mimeType: string;
   model: string;
   durationSeconds: number;
-  resolution: GeminiOmniResolution;
 }
 
 function bytesToBase64(bytes: Uint8Array): string {
@@ -1589,15 +1584,12 @@ export async function generateVideoWithGeminiOmni(
     /** First frame, for image-to-video. Omit for text-to-video. */
     imageUrl?: string;
     durationSeconds?: number;
-    resolution?: GeminiOmniResolution;
     aspectRatio?: '16:9' | '9:16' | '1:1';
     timeoutMs?: number;
   },
 ): Promise<GeminiOmniVideoResult> {
   const _start = Date.now();
-  const resolution = config?.resolution ?? '720p';
   const seconds = Math.max(3, Math.min(15, Math.round(config?.durationSeconds ?? 10)));
-  const modelKey = GEMINI_OMNI_PRICING_MODEL_ID[resolution];
   const timeoutMs = config?.timeoutMs ?? 300_000;
 
   const apiKey = await _secret('GOOGLE_GENERATIVE_AI_API_KEY');
@@ -1615,7 +1607,7 @@ export async function generateVideoWithGeminiOmni(
 
   const logOmni = (units: number, errorMessage?: string) => _logUnitCall({
     task: config?.task ?? 'gemini_omni_video_generation',
-    modelKey,
+    modelKey: GEMINI_OMNI_PRICING_KEY,
     units,
     latencyMs: Date.now() - _start,
     ...(errorMessage ? { errorMessage } : {}),
@@ -1644,7 +1636,7 @@ export async function generateVideoWithGeminiOmni(
           type: 'video',
           // Omni has no 1:1; a square request is rendered landscape rather than refused.
           aspect_ratio: config?.aspectRatio === '9:16' ? '9:16' : '16:9',
-          resolution,
+          resolution: GEMINI_OMNI_RESOLUTION,
           duration: `${seconds}s`,
           delivery: 'uri',
         },
@@ -1698,7 +1690,6 @@ export async function generateVideoWithGeminiOmni(
       mimeType: video.mime_type ?? 'video/mp4',
       model: GEMINI_OMNI_MODEL_ID,
       durationSeconds: seconds,
-      resolution,
     };
   } catch (err) {
     await logOmni(0, err instanceof Error ? err.message : String(err));

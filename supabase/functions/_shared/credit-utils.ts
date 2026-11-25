@@ -53,7 +53,6 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   'zerobounce-validate':  { cost_per_unit: 0.008,  unit: 'validation',  markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'firecrawl-scrape':     { cost_per_unit: 0.001,  unit: 'credit',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'xai-aurora':           { cost_per_unit: 0.07,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
-  'flux-2-pro':           { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'flux-dev':             { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'kling-3.0':            { cost_per_unit: 0.10,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // 'kling-1.6-pro' and 'wan2.1-i2v' removed 2026-08-12 (issue #4) — both models 404 upstream,
@@ -63,7 +62,6 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   // $2.80 — by some distance the most expensive thing this platform can be asked to make. It was
   // absent here while its siblings were present, so a DB outage silently dropped Veo's cost to
   // null while Kling and Runway kept theirs (#363 follow-up).
-  'gemini-omni-1.2-flash-720p':  { cost_per_unit: 0.0695, unit: 'second', markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'gemini-omni-1.2-flash-1080p': { cost_per_unit: 0.1043, unit: 'second', markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // The 30-second models. Seedance 720p bills $6.93 for a full clip and Wan 1080p $6.00,
   // against Veo's $2.80. Both were missing here for exactly the reason the Veo note above

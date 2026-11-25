@@ -28,7 +28,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 // The budget tier stays VACANT until a replacement is verified against a funded account
 // (issue #4 Phase 5): the last occupant 404'd upstream and hard-failed every call.
-type VideoModel = 'gemini-omni-1.2-flash-720p' | 'gemini-omni-1.2-flash-1080p'
+type VideoModel = 'gemini-omni-1.2-flash-1080p'
   | 'kling-v3.0' | 'runway-gen4-turbo'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
@@ -40,7 +40,6 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 // Every price here must cover the provider bill for a MAX-LENGTH clip of that model, because
 // MAX_DURATION_SECONDS below is what the caller can actually ask for and the fee is flat.
 const CREDIT_COSTS: Record<VideoModel, number> = {
-  'gemini-omni-1.2-flash-720p':  20,
   'gemini-omni-1.2-flash-1080p': 30,
   'kling-v3.0':         20,
   'runway-gen4-turbo':  40,
@@ -57,7 +56,6 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 
 // Longest clip each model will produce.
 const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
-  'gemini-omni-1.2-flash-720p':  15,
   'gemini-omni-1.2-flash-1080p': 15,
   'kling-v3.0':         10,
   'runway-gen4-turbo':  10,
@@ -101,12 +99,6 @@ const H3MAX_RESOLUTION: Partial<Record<VideoModel, '480P' | '768P'>> = {
   'h3-max-480p': '480P',
 };
 
-/** And again for Omni (1080p is upscaled, 1.5x the 720p token cost). */
-const OMNI_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
-  'gemini-omni-1.2-flash-720p':  '720p',
-  'gemini-omni-1.2-flash-1080p': '1080p',
-};
-
 /** And again for Ray, where 720p -> 1080p is a 4x jump in rate. */
 const RAY_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
   'ray-3.2-720p':  '720p',
@@ -115,7 +107,6 @@ const RAY_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
 
 /** Which provider each model bills. Must match both the dispatch below and `generation_models.provider`. */
 const MODEL_PROVIDER: Record<VideoModel, string> = {
-  'gemini-omni-1.2-flash-720p':  'google',
   'gemini-omni-1.2-flash-1080p': 'google',
   'kling-v3.0':        'klingai',
   'runway-gen4-turbo': 'replicate',
@@ -135,15 +126,15 @@ const MODEL_PROVIDER: Record<VideoModel, string> = {
 // so every video type debited, failed at the provider and refunded, for everybody.
 const TYPE_MODEL_PREFERENCE: Record<VideoType, VideoModel[]> = {
   // An 8-second silent clip is not a walkthrough: Wan gives 30s, scored, multi-reference.
-  walkthrough:          ['wan-3.0-720p', 'gemini-omni-1.2-flash-720p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
-  floorplan_flythrough: ['wan-3.0-720p', 'gemini-omni-1.2-flash-720p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
-  product_spotlight:    ['kling-v3.0', 'h3-max-768p', 'gemini-omni-1.2-flash-720p', 'runway-gen4-turbo', 'wan-3.0-720p'],
+  walkthrough:          ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
+  floorplan_flythrough: ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
+  product_spotlight:    ['kling-v3.0', 'h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'runway-gen4-turbo', 'wan-3.0-720p'],
   // Ray3.2 is the ONLY model that interpolates first frame -> last frame, so a substitute
   // starts from the source and drifts instead of landing on `endFrameUrl`. Still better than
   // refusing, but the response says which model actually ran.
-  before_after:         ['ray-3.2-720p', 'runway-gen4-turbo', 'kling-v3.0', 'wan-3.0-720p', 'gemini-omni-1.2-flash-720p'],
+  before_after:         ['ray-3.2-720p', 'runway-gen4-turbo', 'kling-v3.0', 'wan-3.0-720p', 'gemini-omni-1.2-flash-1080p'],
   // A reel is 15s on a phone, not 30 on a monitor — H3 Max with stereo audio for 25 credits.
-  social_reel:          ['h3-max-768p', 'gemini-omni-1.2-flash-720p', 'wan-3.0-480p', 'runway-gen4-turbo', 'kling-v3.0'],
+  social_reel:          ['h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-480p', 'runway-gen4-turbo', 'kling-v3.0'],
 };
 
 const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = Object.fromEntries(
@@ -427,7 +418,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   const fiveOrTenOnly = Boolean(RAY_RESOLUTION[resolvedModel]) || resolvedModel === 'runway-gen4-turbo';
   const durationSeconds = fiveOrTenOnly
     ? (clampedDuration > 7 ? 10 : 5)
-    : OMNI_RESOLUTION[resolvedModel] ? Math.max(3, clampedDuration) : clampedDuration;
+    : resolvedModel === 'gemini-omni-1.2-flash-1080p' ? Math.max(3, clampedDuration) : clampedDuration;
 
   // `ai_model_pricing` keys differ from the model ids this function uses: the price
   // table carries `kling-3.0`, here it is `kling-v3.0`. Identity map only — no prices
@@ -531,7 +522,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
 
   try {
     // ③ Generate video
-    if (OMNI_RESOLUTION[resolvedModel]) {
+    if (resolvedModel === 'gemini-omni-1.2-flash-1080p') {
       // Gemini Omni — 3-15s with native audio, so a prompt can describe what is heard.
       const omniResult = await generateVideoWithGeminiOmni(
         prompt || 'Professional interior design showcase video, smooth camera movement',
@@ -539,7 +530,6 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
           imageUrl: source_image_url,
           aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
           durationSeconds,
-          resolution: OMNI_RESOLUTION[resolvedModel],
           task: 'interior_video_generation_v2',
           userId,
           workspaceId: workspace_id ?? undefined,
