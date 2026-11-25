@@ -1,4 +1,10 @@
 {
   "_comment": "Edge functions deployed with NO source in this repo. They cannot be read, reviewed, fixed or redeployed — only invoked or deleted. The list may only SHRINK: a new orphan fails the build. Each entry needs a reason and a way out. Regenerate with: node scripts/check-deployed-functions.mjs --write-baseline",
-  "orphans": {}
+  "orphans": {
+    "generate-vr-world": {
+      "reason": "The VR World feature was removed (World Labs retires the Marble API on 2027-01-08). Retired in place to a 410 stub that holds no secret; nothing invokes it.",
+      "version": 199,
+      "wayOut": "Supabase dashboard, Edge Functions, generate-vr-world, Delete (or: supabase functions delete generate-vr-world --project-ref \"$PROJECT_REF\"). Then remove this entry."
+    }
+  }
 }
