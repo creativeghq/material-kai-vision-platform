@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useParams } from 'react-router-dom';
-import { Building2, MapPin, BedDouble, Bath, Ruler, Zap, Loader2, CheckCircle2, ExternalLink, Rotate3D } from 'lucide-react';
+import { Building2, MapPin, BedDouble, Bath, Ruler, Zap, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
@@ -11,9 +11,6 @@ import { realEstatePublic, type PublicListing } from '@/modules/real-estate/serv
 // Public `/p/:token` listing page (anonymous). All content comes from the token-gated
 // real-estate-public edge fn's toPublic() projection; rendered via JSX only (no HTML-string assembly).
 const money = (n: number | null, ccy: string) => formatMoney(n, ccy || 'EUR', { decimals: 0, fallback: 'Price on Request' });
-
-// Lazy: the Spark/Three splat renderer loads only when the listing actually carries a VR world.
-const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
 
 import { httpUrlOrNull } from '@/utils/safeUrl';
 
@@ -96,18 +93,6 @@ export default function PublicListingPage() {
             </div>
 
             {desc && <div><h2 className="mb-2 font-semibold">Description</h2><p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{desc}</p></div>}
-
-            {data.vr_world && (data.vr_world.splat_url_100k || data.vr_world.splat_url_500k || data.vr_world.splat_url_full) && (
-              <div>
-                <h2 className="mb-2 flex items-center gap-1.5 font-semibold"><Rotate3D className="h-4 w-4" /> 3D walkthrough</h2>
-                <div className="h-[380px] overflow-hidden rounded-xl border">
-                  <React.Suspense fallback={<div className="flex h-full items-center justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>}>
-                    <WorldViewer vrWorldId="public-listing" initialStatus="completed"
-                      splatUrls={{ draft: data.vr_world.splat_url_100k ?? undefined, standard: data.vr_world.splat_url_500k ?? undefined, full: data.vr_world.splat_url_full ?? undefined }} />
-                  </React.Suspense>
-                </div>
-              </div>
-            )}
 
             {httpUrlOrNull(l.video_url) && (videoEmbedUrl(l.video_url)
               ? <div><h2 className="mb-2 font-semibold">Video</h2><iframe src={videoEmbedUrl(l.video_url)!} title="Property video" className="aspect-video w-full rounded-xl border" allow="fullscreen; picture-in-picture" sandbox="allow-scripts allow-same-origin allow-presentation" /></div>

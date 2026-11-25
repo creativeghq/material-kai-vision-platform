@@ -12,7 +12,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 5. [3D Generation Flow](#5-3d-generation-flow)
 6. [Knowledge Base Flow](#6-knowledge-base-flow)
 7. [Agent Chat Flow](#7-agent-chat-flow)
-8. [VR World Generation Flow](#8-vr-world-generation-flow) ✨ NEW
 
 ---
 
@@ -212,47 +211,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 ---
 
-## 8. VR World Generation Flow
-
-**Purpose:** Generate explorable 3D worlds from interior design images
-
-**User Journey:**
-1. User generates interior design image via Agent
-   ↓
-2. User clicks "Generate VR" button on DesignCanvas
-   ↓
-3. AgentHub calls vrWorldService.generateVRWorld()
-   ↓
-4. Edge function (generate-vr-world) orchestrates:
-   - Authenticates user
-   - Debits credits (50 mini / 200 plus)
-   - Inserts vr_worlds row (status: uploading)
-   - Uploads design image to WorldLabs (signed URL)
-   - Calls WorldLabs worlds:generate API
-   - Polls operations endpoint with backoff (2s → 10s)
-   - Extracts asset URLs (SPZ, GLB, panorama, thumbnail)
-   - Updates vr_worlds row (status: completed)
-   ↓
-5. New assistant message added to chat with WorldViewer
-   ↓
-6. WorldViewer polls vr_worlds table for status
-   ↓
-7. On completion: Spark.js loads SPZ and renders 3D scene
-   ↓
-8. User explores world:
-   - Orbit mode: drag to rotate, scroll to zoom
-   - First-person mode: WASD to move, mouse to look
-   - Quality selector: Draft / Standard / Full
-   - Fullscreen toggle
-
-**Edge Function:** `generate-vr-world`
-**Frontend Component:** `WorldViewer.tsx`
-**Service:** `vrWorldService.ts`
-**External API:** WorldLabs Marble (`marble-1.1`)
-**Documentation:** [vr-world-generation.md](vr-world-generation.md)
-
----
-
 ## 📊 Flow Summary
 
 | Flow | Entry Point | AI Models | Processing Time | Output |
@@ -262,7 +220,6 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 | 3D Generation | Text prompt | Stable Diffusion | 10-30 sec | 3D models, Images |
 | Knowledge Base | Create doc | OpenAI | <1 sec | Searchable docs |
 | Agent Chat | Send message | Claude | 1-3 sec | AI responses |
-| **VR World** ✨ | **Generate VR button** | **WorldLabs Marble** | **30s-5min** | **Explorable 3D world** |
 | **Flow Automation** ✨ | **Admin flow canvas** | **Claude (actions)** | **Real-time** | **Automated actions** |
 | **Interior Video** ✨ | **Video type + image** | **Veo-2/Kling/Wan/Runway** | **1-5 min** | **MP4 video** |
 | **Virtual Staging** ✨ | **Empty room image** | **Replicate proplabs** | **~56s** | **Furnished render** |

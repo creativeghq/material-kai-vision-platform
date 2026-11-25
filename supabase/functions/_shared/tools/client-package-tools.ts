@@ -23,10 +23,10 @@ async function resolveProject(sb: Db, workspaceId: string, project: string | und
   return exact ?? list[0];
 }
 
-const VIEW_COLUMNS = 'id, project_id, title, sheet_ids, quote_id, vr_world_id, embed_vr, embed_walkthrough, walkthrough_floor_plan_id, public_share_enabled, public_share_token, updated_at';
+const VIEW_COLUMNS = 'id, project_id, title, sheet_ids, quote_id, embed_walkthrough, walkthrough_floor_plan_id, public_share_enabled, public_share_token, updated_at';
 interface View {
-  id: string; project_id: string; title: string; sheet_ids: string[] | null; quote_id: string | null; vr_world_id: string | null;
-  embed_vr: boolean; embed_walkthrough: boolean | null; walkthrough_floor_plan_id: string | null; public_share_enabled: boolean; public_share_token: string | null;
+  id: string; project_id: string; title: string; sheet_ids: string[] | null; quote_id: string | null;
+  embed_walkthrough: boolean | null; walkthrough_floor_plan_id: string | null; public_share_enabled: boolean; public_share_token: string | null;
 }
 
 async function available(sb: Db, projectId: string) {
@@ -39,15 +39,11 @@ async function available(sb: Db, projectId: string) {
     sb.from('floor_plans').select('id, name').eq('project_id', projectId).order('updated_at', { ascending: false }).limit(20),
   ]);
   const sceneRows = (scenes.data ?? []) as Array<{ id: string; name: string }>;
-  const worlds = sceneRows.length
-    ? ((await sb.from('scene_renders').select('vr_world_id, floor_plan_id, style_label, created_at').in('floor_plan_id', sceneRows.map((s) => s.id)).not('vr_world_id', 'is', null).order('created_at', { ascending: false })).data ?? []) as Array<{ vr_world_id: string; floor_plan_id: string; style_label: string | null }>
-    : [];
   const sheetRows = (sheets.data ?? []) as Array<{ id: string; sheet_type: string; title: string }>;
   return {
     sheets: sheetRows.map((s) => ({ id: s.id, type: s.sheet_type, title: s.title })),
     quotes: ((quotes.data ?? []) as Array<{ id: string; name: string | null; quote_number: string | null; status: string | null }>).map((q) => ({ id: q.id, name: q.name ?? q.quote_number, status: q.status })),
     rooms: sceneRows,
-    worlds: [...new Map(worlds.map((w) => [w.vr_world_id, { id: w.vr_world_id, room: sceneRows.find((s) => s.id === w.floor_plan_id)?.name ?? '3D room', style: w.style_label }])).values()],
   };
 }
 
@@ -67,7 +63,6 @@ export const createManageClientViewTool = (userId: string, workspaceId: string, 
       id: v.id, title: v.title, shared: v.public_share_enabled,
       sheets: (v.sheet_ids ?? []).map((id) => pool.sheets.find((s) => s.id === id) ?? { id, type: 'unknown', title: 'A sheet you cannot see' }),
       quote: v.quote_id ? pool.quotes.find((q) => q.id === v.quote_id) ?? { id: v.quote_id } : null,
-      explorable_world: v.embed_vr && v.vr_world_id ? pool.worlds.find((w) => w.id === v.vr_world_id) ?? { id: v.vr_world_id } : null,
       walkthrough: v.embed_walkthrough && v.walkthrough_floor_plan_id ? pool.rooms.find((r) => r.id === v.walkthrough_floor_plan_id) ?? { id: v.walkthrough_floor_plan_id } : null,
     });
 
@@ -76,10 +71,9 @@ export const createManageClientViewTool = (userId: string, workspaceId: string, 
     }
 
     if (action === 'create') {
-      const worldId = pool.worlds[0]?.id ?? null;
       const { data: created, error } = await sb.from('project_client_views').insert({
         project_id: proj.id, created_by: userId, title: (title?.trim() || `${proj.name} — Client Presentation`).slice(0, 200),
-        sheet_ids: [], cover: {}, embed_vr: !!worldId, vr_world_id: worldId, quote_id: null,
+        sheet_ids: [], cover: {}, quote_id: null,
         embed_walkthrough: false, walkthrough_floor_plan_id: null, public_share_enabled: false,
       }).select(VIEW_COLUMNS).single();
       if (error || !created) return JSON.stringify({ success: false, error: error?.message ?? 'The client view could not be created.' });
@@ -104,12 +98,6 @@ export const createManageClientViewTool = (userId: string, workspaceId: string, 
       if (adding && !quote) return JSON.stringify({ success: false, error: 'That quote is not on this project.', quotes: pool.quotes });
       patch.quote_id = adding ? item_id : null;
       what = `quote ${quote?.name ?? ''}`.trim();
-    } else if (item === 'world') {
-      const world = pool.worlds.find((w) => w.id === item_id);
-      if (adding && !world) return JSON.stringify({ success: false, error: 'That explorable world was not made from a room of this project.', worlds: pool.worlds });
-      patch.vr_world_id = adding ? item_id : null;
-      patch.embed_vr = adding;
-      what = world ? `the explorable world of ${world.room}` : 'the explorable world';
     } else {
       const room = pool.rooms.find((r) => r.id === item_id);
       if (adding && !room) return JSON.stringify({ success: false, error: 'That 3D room is not on this project.', rooms: pool.rooms });
@@ -137,17 +125,17 @@ export const createManageClientViewTool = (userId: string, workspaceId: string, 
   {
     name: 'manage_client_view',
     description:
-      'The client package of a project: one client view showing its drawings, renders and sheets, the quote, the scroll walkthrough of a 3D room and an explorable world, '
+      'The client package of a project: one client view showing its drawings, renders and sheets, the quote, and the scroll walkthrough of a 3D room, '
       + 'all picked by id from what the project already holds, never re-uploaded. list: the project\'s client views and everything available to put on them '
-      + '(sheets including drawing sets, quotes, 3D rooms, explorable worlds made from those rooms). create: a draft, unshared view. '
-      + 'add/remove: one item (sheet, quote, world or walkthrough) on a view (default the latest); on a view already shared the user approves on a card first. '
+      + '(sheets including drawing sets, quotes, 3D rooms). create: a draft, unshared view. '
+      + 'add/remove: one item (sheet, quote or walkthrough) on a view (default the latest); on a view already shared the user approves on a card first. '
       + 'A render becomes a sheet first (generate_presentation_sheet), drawings come from manage_scenes drawing_set.',
     schema: z.object({
       action: z.enum(['list', 'create', 'add', 'remove']).describe('What to do.'),
       project: z.string().max(200).describe('The project, by name or id.'),
       view_id: z.string().uuid().optional().describe('add/remove: the client view; default the most recently changed one.'),
       title: z.string().max(200).optional().describe('create: the view title.'),
-      item: z.enum(['sheet', 'quote', 'world', 'walkthrough']).optional().describe('add/remove: what kind of item.'),
+      item: z.enum(['sheet', 'quote', 'walkthrough']).optional().describe('add/remove: what kind of item.'),
       item_id: z.string().uuid().optional().describe('add/remove: its id, from list (a walkthrough is the 3D room id).'),
       confirm: z.boolean().optional().describe('Leave unset; the Approve button re-invokes with confirm:true.'),
     }),

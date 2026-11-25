@@ -22,7 +22,7 @@ const DB_ENUMS: Record<string, { constraint: string; values: string[] }> = {
     values: ['bedroom', 'bathroom', 'kitchen', 'living', 'dining', 'office', 'outdoor', 'hallway', 'other'],
   },
   viewPreference: { constraint: 'moodboards_view_preference_check', values: ['grid', 'list'] },
-  mediaType: { constraint: 'moodboard_items_media_type_check', values: ['image', 'video', 'vr_world'] },
+  mediaType: { constraint: 'moodboard_items_media_type_check', values: ['image', 'video'] },
   contractContext: { constraint: 'contracts_context_check', values: ['hr', 'finance', 'project', 'realestate'] },
   projectKind: { constraint: 'projects_kind_check', values: ['general', 'design_supply', 'fit_out', 'construction'] },
   propertyType: { constraint: 'properties_property_type_check', values: ['residential', 'commercial', 'land', 'other'] },

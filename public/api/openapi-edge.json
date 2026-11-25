@@ -21,7 +21,7 @@
     },
     {
       "name": "AI Generation",
-      "description": "Image / video / 3D / VR / PBR generation (Gemini, Replicate, WorldLabs)."
+      "description": "Image / video / 3D / PBR generation (Gemini, Replicate)."
     },
     {
       "name": "Social",
@@ -8924,121 +8924,6 @@
         }
       }
     },
-    "/generate-vr-world": {
-      "post": {
-        "tags": [
-          "AI Generation"
-        ],
-        "summary": "Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble",
-        "operationId": "post_generate_vr_world",
-        "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Model: marble-1.1 (190cr, ~7min); the marble-1.0-draft tier was retired. Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.\n\n**Response:** (`application/json`)",
-        "security": [
-          {
-            "supabaseJwt": []
-          },
-          {
-            "apiKeyPartner": []
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad request (validation error)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized (missing/invalid credential)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Forbidden (role/entitlement)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        },
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "source_image_url": {
-                    "type": "string",
-                    "description": "Required. Public URL of the interior image"
-                  },
-                  "prompt": {
-                    "type": "string",
-                    "description": "Required. Scene description prompt"
-                  },
-                  "room_type": {
-                    "type": "string"
-                  },
-                  "style": {
-                    "type": "string"
-                  },
-                  "model": {
-                    "type": "string",
-                    "enum": [
-                      "marble-1.1"
-                    ],
-                    "description": "WorldLabs model; marble-1.1 is the only tier"
-                  },
-                  "is_pano": {
-                    "type": "boolean",
-                    "description": "Set true for panoramic (360°) source images"
-                  },
-                  "user_id": {
-                    "type": "string",
-                    "description": "Required when called with service-role key (server-to-server)"
-                  }
-                },
-                "required": [
-                  "source_image_url",
-                  "prompt"
-                ]
-              }
-            }
-          }
-        }
-      }
-    },
     "/health-check": {
       "get": {
         "tags": [
@@ -9046,7 +8931,7 @@
         ],
         "summary": "Check liveness and key validity of all AI providers and external services",
         "operationId": "get_health_check",
-        "description": "Requires any valid Supabase JWT (not just admin). Runs parallel checks: Claude (GET /v1/models), OpenAI (GET /v1/models), HuggingFace (whoami), Voyage AI (POST /v1/embeddings), MIVAA embeddings + AI-services health endpoints, and HEAD reachability probes for Zernio, Apollo, Hunter.io, ZeroBounce, Firecrawl, WorldLabs, Stripe, and module-gated services (e.g. Greek marketplace URLs when greek-marketplaces module is enabled).\n\n**Response:** `{ claude, openai, huggingface, voyage_ai, embeddings, ai_services, external: [{ name, category, status, latency_ms, http_status? }], timestamp }`",
+        "description": "Requires any valid Supabase JWT (not just admin). Runs parallel checks: Claude (GET /v1/models), OpenAI (GET /v1/models), HuggingFace (whoami), Voyage AI (POST /v1/embeddings), MIVAA embeddings + AI-services health endpoints, and HEAD reachability probes for Zernio, Apollo, Hunter.io, ZeroBounce, Firecrawl, Stripe, and module-gated services (e.g. Greek marketplace URLs when greek-marketplaces module is enabled).\n\n**Response:** `{ claude, openai, huggingface, voyage_ai, embeddings, ai_services, external: [{ name, category, status, latency_ms, http_status? }], timestamp }`",
         "security": [
           {
             "supabaseJwt": []
@@ -9111,7 +8996,7 @@
         ],
         "summary": "Check liveness and key validity of all AI providers and external services",
         "operationId": "post_health_check",
-        "description": "Requires any valid Supabase JWT (not just admin). Runs parallel checks: Claude (GET /v1/models), OpenAI (GET /v1/models), HuggingFace (whoami), Voyage AI (POST /v1/embeddings), MIVAA embeddings + AI-services health endpoints, and HEAD reachability probes for Zernio, Apollo, Hunter.io, ZeroBounce, Firecrawl, WorldLabs, Stripe, and module-gated services (e.g. Greek marketplace URLs when greek-marketplaces module is enabled).\n\n**Response:** `{ claude, openai, huggingface, voyage_ai, embeddings, ai_services, external: [{ name, category, status, latency_ms, http_status? }], timestamp }`",
+        "description": "Requires any valid Supabase JWT (not just admin). Runs parallel checks: Claude (GET /v1/models), OpenAI (GET /v1/models), HuggingFace (whoami), Voyage AI (POST /v1/embeddings), MIVAA embeddings + AI-services health endpoints, and HEAD reachability probes for Zernio, Apollo, Hunter.io, ZeroBounce, Firecrawl, Stripe, and module-gated services (e.g. Greek marketplace URLs when greek-marketplaces module is enabled).\n\n**Response:** `{ claude, openai, huggingface, voyage_ai, embeddings, ai_services, external: [{ name, category, status, latency_ms, http_status? }], timestamp }`",
         "security": [
           {
             "supabaseJwt": []
@@ -12519,7 +12404,7 @@
         ],
         "summary": "Public token resolver for shared presentation sheets and project client views",
         "operationId": "post_moodboard_sheet_share",
-        "description": "Resolves a share token against either moodboard_presentation_sheets (single-sheet share) or project_client_views (client view with VR/lighting/FF&E embeds). Also accepts a feedback body to write client comments/approvals to client_view_feedback.\n\n**Actions** (`action` in the body):\n- `resolve` — Resolve a share token and return sheet or client_view payload with signed PDF URL → `{sheet?:{id,sheet_type,title,status,page_count}, pdf_url, expired} OR {client_view:{id,title,project_name,cover,sheets,pdf_url,embed_vr,embed_lighting,embed_ffe,feedback_enabled,vr_world,ffe,lighting_image_url}, not_found}`\n- `feedback` — Write a client comment, approval, or change_request on a client view → `{success}`",
+        "description": "Resolves a share token against either moodboard_presentation_sheets (single-sheet share) or project_client_views (client view with VR/lighting/FF&E embeds). Also accepts a feedback body to write client comments/approvals to client_view_feedback.\n\n**Actions** (`action` in the body):\n- `resolve` — Resolve a share token and return sheet or client_view payload with signed PDF URL → `{sheet?:{id,sheet_type,title,status,page_count}, pdf_url, expired} OR {client_view:{id,title,project_name,cover,sheets,pdf_url,embed_lighting,embed_ffe,feedback_enabled,ffe,lighting_image_url}, not_found}`\n- `feedback` — Write a client comment, approval, or change_request on a client view → `{success}`",
         "security": [],
         "responses": {
           "200": {
@@ -12578,7 +12463,7 @@
                         "description": "Share token (min 32 chars) from share_token or public_share_token column"
                       }
                     },
-                    "description": "Returns: {sheet?:{id,sheet_type,title,status,page_count}, pdf_url, expired} OR {client_view:{id,title,project_name,cover,sheets,pdf_url,embed_vr,embed_lighting,embed_ffe,feedback_enabled,vr_world,ffe,lighting_image_url}, not_found}"
+                    "description": "Returns: {sheet?:{id,sheet_type,title,status,page_count}, pdf_url, expired} OR {client_view:{id,title,project_name,cover,sheets,pdf_url,embed_lighting,embed_ffe,feedback_enabled,ffe,lighting_image_url}, not_found}"
                   },
                   {
                     "type": "object",

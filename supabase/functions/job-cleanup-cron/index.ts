@@ -16,7 +16,6 @@ interface CleanupStats {
   agentCheckpoints: number;
   flowRunSteps: number;
   flowRuns: number;
-  vrWorldsFailed: number;
   generation3d: number;
   jobProgress: number;
   systemLogs: number;
@@ -63,7 +62,6 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       agentCheckpoints: 0,
       flowRunSteps: 0,
       flowRuns: 0,
-      vrWorldsFailed: 0,
       generation3d: 0,
       jobProgress: 0,
       systemLogs: 0,
@@ -181,22 +179,6 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       console.log(`[JobCleanupCron] flow_runs: ${stats.flowRuns} deleted`);
     }
 
-    // ── 9. vr_worlds (failed only) ──────────────────────────────────────────
-    {
-      const { data, error } = await supabase
-        .from('vr_worlds')
-        .delete()
-        .eq('status', 'failed')
-        .lt('created_at', sevenDaysAgo)
-        .limit(500)
-        .select('id');
-      if (error) {
-        console.error('[JobCleanupCron] vr_worlds error:', error);
-        failures.push(`vr_worlds: ${error.message}`);
-      } else stats.vrWorldsFailed = data?.length ?? 0;
-      console.log(`[JobCleanupCron] vr_worlds (failed): ${stats.vrWorldsFailed} deleted`);
-    }
-
     // ── 10. generation_3d — unsaved renders older than 15 days ───────────────
     {
       const fifteenDaysAgo = new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString();
@@ -287,7 +269,6 @@ serve(withApiLogging('job-cleanup-cron', async (req) => {
       stats.agentCheckpoints +
       stats.flowRunSteps +
       stats.flowRuns +
-      stats.vrWorldsFailed +
       stats.generation3d +
       stats.jobProgress +
       stats.systemLogs +

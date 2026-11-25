@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { User, Pencil, Save, Loader2, X, Globe, MapPin, Building2, Briefcase, Eye, Plus, Trash2, Check, Star, Tag, ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink, BarChart2, Calendar, Grid3x3, Mail, MessageCircle, FileText, Sparkles, Layers, Wrench, BadgeCheck } from 'lucide-react';
+import { User, Pencil, Save, Loader2, X, Globe, MapPin, Building2, Briefcase, Eye, Plus, Trash2, Check, Star, Tag, ChevronsUpDown, DollarSign, Link as LinkIcon, ChevronDown, ChevronUp, ExternalLink, BarChart2, Calendar, Grid3x3, Mail, MessageCircle, FileText, Layers, Wrench, BadgeCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Button } from '@/components/core/ui/button';
@@ -571,7 +571,6 @@ export const ProfileTab: React.FC = () => {
     reviewsCount: 0,
     reviewsAvg: 0,
     quotesCreated: 0,
-    vrWorldsCreated: 0,
     projectsCreated: 0,
     moodboardComments: 0,
   });
@@ -692,7 +691,6 @@ export const ProfileTab: React.FC = () => {
         { data: reviewData },
         { count: mqrCount },
         { count: quotesCount },
-        { count: vrCount },
         { count: dpCount },
       ] = await Promise.all([
         supabase.from('user_follows').select('*', { count: 'exact', head: true }).eq('following_id', user.id),
@@ -711,7 +709,6 @@ export const ProfileTab: React.FC = () => {
         supabase.from('profile_reviews').select('overall_rating').eq('to_user_id', user.id),
         supabase.from('moodboard_quote_requests').select('*', { count: 'exact', head: true }).eq('moodboard_creator_id', user.id),
         supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('vr_worlds').select('*', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'completed'),
         // `projects`, not `designer_projects` (#378 D2). The old table has 0 rows, no writer
         // anywhere and this count was its ONLY reader, so the tile could read nothing but 0
         // forever — a metric that is a hidden zero rather than a value or a stated reason there
@@ -772,7 +769,6 @@ export const ProfileTab: React.FC = () => {
         reviewsCount: revCount,
         reviewsAvg: revAvg,
         quotesCreated: quotesCount ?? 0,
-        vrWorldsCreated: vrCount ?? 0,
         projectsCreated: dpCount ?? 0,
         moodboardComments: mbComments,
       });
@@ -1450,7 +1446,6 @@ export const ProfileTab: React.FC = () => {
                 <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2">
                   {[
                     { icon: FileText,      label: 'Quotes',    value: analytics.quotesCreated },
-                    { icon: Sparkles,      label: 'VR worlds', value: analytics.vrWorldsCreated },
                     { icon: Layers,        label: 'Projects',  value: analytics.projectsCreated },
                     { icon: MessageCircle, label: 'Comments',  value: analytics.moodboardComments },
                   ].map(({ icon: Icon, label, value }) => (

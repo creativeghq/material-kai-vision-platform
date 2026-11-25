@@ -312,7 +312,7 @@ export interface MoodboardTemplatePayload {
 
 /** `moodboards_view_preference_check` / `moodboard_items_media_type_check`. */
 const viewPreference = oneOf(['grid', 'list'] as const);
-const mediaType = oneOf(['image', 'video', 'vr_world'] as const);
+const mediaType = oneOf(['image', 'video'] as const);
 
 export const moodboardAdapter: TemplateAdapter<MoodboardTemplatePayload> = {
   type: 'moodboard',

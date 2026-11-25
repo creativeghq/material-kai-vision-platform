@@ -25,7 +25,6 @@ const read = (rel: string) => codeOnly(readFileSync(join(FUNCS, rel), 'utf8'));
  */
 const PAID_GENERATORS = [
   'generate-interior-gemini/index.ts',
-  'generate-vr-world/index.ts',
   'generate-interior-video-v2/index.ts',
   'generate-region-edit/index.ts',
   'generate-virtual-staging/index.ts',
@@ -120,19 +119,11 @@ describe('EX-12/EX-13 — a failed write is never reported as a finished job', (
     expect(succeeded.slice(bail, completed), 'the credits are no longer refunded when no video arrived')
       .toContain('refundCredits');
   });
-
-  it('generate-vr-world checks the completion write before claiming success', () => {
-    const src = read('generate-vr-world/index.ts');
-    const complete = src.slice(src.indexOf("status: 'completed',"));
-    expect(complete, 'the terminal vr_worlds write discards its error again')
-      .toMatch(/completeError|error:\s*complete\w*Err/);
-  });
 });
 
 describe('EX-14 — an ai_usage_logs failure is reported, never swallowed', () => {
   const BILLED = [
     'generate-interior-gemini/index.ts',
-    'generate-vr-world/index.ts',
     'generate-interior-video-v2/index.ts',
     'generate-social-video/index.ts',
     'generate-region-edit/index.ts',

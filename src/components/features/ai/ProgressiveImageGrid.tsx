@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, ZoomIn, Globe, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun, Eraser, Box } from 'lucide-react';
+import { Loader2, ZoomIn, Scan, Package, AlertCircle, RotateCcw, ExternalLink, X, Search, Paintbrush, Download, ShoppingCart, Video, BookmarkPlus, Layers, LayoutTemplate, Camera, ChevronDown, Check, Sparkles, Pencil, Sun, Eraser, Box } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
@@ -93,8 +93,6 @@ interface ProgressiveImageGridProps {
   modelCount: number;
   models: Array<{ id: string; name: string; provider: string }>;
   onImageClick?: (imageUrl: string, modelName: string) => void;
-  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
-  vrGenerating?: boolean;
   workspaceId?: string;
   onAskJARVIS?: (segment: SegmentWithResults) => void;
   onFindMaterial?: (segment: SegmentWithResults) => void;
@@ -119,8 +117,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
   jobId,
   modelCount,
   models,
-  onGenerateVR,
-  vrGenerating,
   workspaceId = '',
   onAskJARVIS,
   onFindMaterial,
@@ -931,15 +927,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                 {/* Hover action buttons */}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/50 transition-all" />
                 <div className="absolute bottom-0 left-0 right-0 flex flex-wrap gap-1 p-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                  {onGenerateVR && (
-                    <button
-                      onClick={e => { e.stopPropagation(); onGenerateVR(edited.url, { prompt: edited.label }); }}
-                      className="flex items-center gap-1 px-2 py-1 bg-violet-600 hover:bg-violet-700 text-white text-[10px] font-medium rounded transition-colors"
-                    >
-                      <Globe className="w-3 h-3" />
-                      VR
-                    </button>
-                  )}
                   <button
                     onClick={e => {
                       e.stopPropagation();
@@ -1314,17 +1301,6 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                       >
                         {openingIn3D ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Box className="w-3.5 h-3.5" />}
                         {openingIn3D ? 'Opening in 3D…' : 'Edit in 3D'}
-                      </button>
-                    )}
-                    {onGenerateVR && (
-                      <button
-                        onClick={() => { if (!vrGenerating) onGenerateVR(selectedImage!.url, { prompt: selectedImage!.name }); }}
-                        disabled={vrGenerating}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 border border-violet-500/20 text-xs font-medium text-violet-700 dark:text-violet-300 disabled:opacity-50 transition-colors shadow-sm"
-                        title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (18 credits)'}
-                      >
-                        {vrGenerating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Globe className="w-3.5 h-3.5" />}
-                        {vrGenerating ? 'Generating VR World…' : 'Generate VR World'}
                       </button>
                     )}
                     {onGenerateVirtualStaging && selectedImage && (

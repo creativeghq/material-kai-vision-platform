@@ -35,7 +35,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 ---
 
-## 1. Supabase Edge Functions (187)
+## 1. Supabase Edge Functions (186)
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
@@ -61,7 +61,6 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-interior-video-v2` | JWT / kai_* | Multi-model interior design video generation with async polling fallback |
 | `generate-region-edit` | JWT / kai_* | Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora |
 | `generate-virtual-staging` | JWT / kai_* | AI virtual staging of an empty room via Replicate proplabs/virtual-staging |
-| `generate-vr-world` | JWT / kai_* | Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble |
 | `product-cutouts` | JWT / kai_* | Make background-removed product cut-outs for the Product in Place embed |
 
 **Social**
@@ -465,7 +464,6 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `generate-interior-video-v2` | POST | JWT | Auto-routes by video type to Veo-2, Kling v3.0, Wan 2.1, Runway Gen4. Async polling. | 12–40 | [generate-interior-video-v2-api](interior-video-generation.md) |
 | `generate-virtual-staging` | POST | JWT | Furnishes empty room photos (Replicate proplabs, 8 room types × 8 styles). | 20 | [generate-virtual-staging-api](virtual-staging.md) |
 | `generate-region-edit` | POST | JWT | Masked inpainting with Grok Aurora. SAM 2 auto-mask + Pillow fallback. | 20 | [generate-region-edit-api](segmentation-inpainting.md) |
-| `generate-vr-world` | POST | JWT | WorldLabs Marble → 3D Gaussian Splat worlds (model: `marble-1.1`). Stored in `vr_worlds`. | 190 | [vr-world-generation](vr-world-generation.md) |
 | ~~`generate-pbr-maps`~~ | — | — | **REMOVED 2026-08-11.** Never existed as source; wrote a `pbr_maps` value 0 times. Replaced by `generate-interior-gemini` `mode: material-texture` → `product_material_maps`. | — | — |
 | `generate-quote-pdf` | POST | JWT | Branded quote PDFs with cover/backcover templates from `quote-templates` storage bucket. | — | — |
 

@@ -105,7 +105,7 @@ const PAID = new Set([
 /** Never called even with --paid: irreversible, or creates a real artefact / spend. */
 const NEVER = new Set([
   'dispatch_background_task', 'generate_video', 'generate_3d', 'generate_gemini',
-  'generate_vr_world', 'virtual_staging', 'apply_lighting_preset', 'generate_presentation_sheet',
+  'virtual_staging', 'apply_lighting_preset', 'generate_presentation_sheet',
 ]);
 
 /** Plausible values by parameter name, so a required arg is realistic rather than 'test'. */

@@ -99,10 +99,10 @@ export interface TriggerVariableGroup {
 // recipient + display strings are built in the source at emit time.
 const STANDARD: TriggerVariable[] = [
   { key: 'user_id', label: 'Recipient User ID', note: 'The user who receives the notification.', example: 'a1b2c3d4-…' },
-  { key: 'title', label: 'Title', note: 'Pre-built notification/email title.', example: 'Your VR world is ready!' },
+  { key: 'title', label: 'Title', note: 'Pre-built notification/email title.', example: 'Your video is ready!' },
   { key: 'body', label: 'Body', note: 'Pre-built notification/email body text.', example: 'Your 3D environment has been generated.' },
   { key: 'action_url', label: 'Action URL', note: 'Where the notification deep-links to.', example: '/inbox?thread=…' },
-  { key: 'type', label: 'Type', note: 'Notification type / category key.', example: 'vr_world_ready' },
+  { key: 'type', label: 'Type', note: 'Notification type / category key.', example: 'video_ready' },
 ];
 
 // Helper: standard envelope + event-specific extras.
@@ -186,11 +186,6 @@ export const TRIGGER_VARIABLES: Record<string, TriggerVariable[]> = {
     { key: 'factory_user_id', label: 'Brand User ID', note: 'The verified brand user (recipient).' },
     { key: 'factory_name', label: 'Brand Name', note: 'The added brand name.' },
   ]),
-  vr_world_created: withStandard([
-    { key: 'world_id', label: 'World ID', note: 'The generated VR world.' },
-    { key: 'quality_tier', label: 'Quality Tier', note: 'The model/quality used.' },
-  ]),
-  vr_world_failed: withStandard([{ key: 'world_id', label: 'World ID', note: 'The VR world that failed.' }]),
   virtual_staging_completed: withStandard([
     { key: 'job_id', label: 'Job ID', note: 'The staging job.' },
     { key: 'room', label: 'Room', note: 'The staged room type.' },
@@ -520,8 +515,6 @@ export const TRIGGER_TITLES: Record<string, string> = {
   material_reviewed: 'Material Reviewed',
   review_submitted: 'Profile Review Received',
   preferred_factory_added: 'Preferred Brand Added',
-  vr_world_created: 'VR world ready',
-  vr_world_failed: 'VR world failed',
   virtual_staging_completed: 'Virtual Staging Ready',
   video_generation_completed: 'Video Generated',
   video_generation_failed: 'Video Failed',

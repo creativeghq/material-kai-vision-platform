@@ -16,7 +16,7 @@ Two-layer lighting simulation system:
 
 ## Layer 1: AI Lighting Variants
 
-Available on the ProgressiveImageGrid action bar (next to Generate Video, VR World, etc.).
+Available on the ProgressiveImageGrid action bar (next to Generate Video).
 
 **Presets:**
 | Preset | Description | Credits |

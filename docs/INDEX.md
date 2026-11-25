@@ -47,7 +47,6 @@ Complete documentation for Material Kai Vision Platform.
 - 3D Generation Flow
 - Knowledge Base Flow
 - Agent Chat Flow
-- VR World Generation Flow
 - Flow Automation Flow ✨ NEW
 - Social Media Publishing Flow ✨ NEW
 
@@ -201,16 +200,10 @@ Complete documentation for Material Kai Vision Platform.
 - Complete API reference and usage examples
 - Best practices and troubleshooting
 
-**[vr-world-generation.md](vr-world-generation.md)** - VR World generation with WorldLabs Marble ✨
-- WorldLabs Marble API integration (mini + plus models)
 - Spark.js Gaussian Splat renderer via `@sparkjsdev/spark` + `three@0.178` (code-split, ~496KB)
 - Orbit + First-person (WASD + mouse look + Shift speed boost) navigation with toggle
 - 3 quality levels (100k/500k/full SPZ)
 - Credit-based pricing (50 credits mini ~30-45s, 200 credits plus ~5min) with refund on failure
-- Edge function orchestration (upload → generate → poll → store in `vr_worlds` table)
-- WorldViewer component with adaptive status polling
-- Integrated into Interior Designer agent chat via DesignCanvas "Generate VR" button
-- Requires `WORLDLABS_API_KEY` in Supabase Edge Function secrets
 
 **[search-strategies.md](search-strategies.md)** - Complete search system guide ✨ UPDATED
 - 6 search strategies (100% implemented)
@@ -402,7 +395,6 @@ Complete documentation for Material Kai Vision Platform.
 - Modal: PaddleOCR-VL 1.6 (0.9B, PP-DocLayoutV3 detector + VLM) — layout + OCR backbone, structure-first
 - Modal: SLIG SigLIP2 (5 visual embedding types, 768D each — `siglip2-base-patch16-512`, native 768D; migrated off HuggingFace 2026-06-14, so HuggingFace now hosts nothing)
 - OpenAI: GPT-4o, GPT-5 (optional alternatives — NOT vision)
-- WorldLabs Marble: 3D Gaussian Splat generation
 - PaddleOCR-VL replaced Surya-2 (2026-06-13), which had replaced YOLO + Chandra;
 - 7 embedding types (text, visual, understanding, color, texture, style, material) — halfvec float16
 - Model usage by pipeline stage
@@ -718,7 +710,7 @@ Complete documentation for Material Kai Vision Platform.
 
 - **5,000+** users in production
 - **99.5%+** uptime SLA
-- **20+** AI models across 8 providers (Anthropic, OpenAI, Voyage AI, Modal, WorldLabs, Replicate, Google Gemini, xAI)
+- **20+** AI models across 8 providers (Anthropic, OpenAI, Voyage AI, Modal, Replicate, Google Gemini, xAI)
 - **14** processing pipeline stages
 - **170+** API endpoints (20 categories)
 - **60+** Supabase Edge Functions
@@ -735,7 +727,7 @@ Complete documentation for Material Kai Vision Platform.
 **Frontend**: React 18, TypeScript, Vite, Shadcn/ui, Cloudflare Workers
 **Backend**: FastAPI, Python 3.11, Uvicorn, self-hosted
 **Database**: PostgreSQL 15 + pgvector 0.8.0 (halfvec), Supabase
-**AI**: Claude (Opus 5 vision tool use + Sonnet 5 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (Modal, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision), WorldLabs Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
+**AI**: Claude (Opus 5 vision tool use + Sonnet 5 chunking + Haiku 4.5 classifiers), Voyage AI (voyage-4 sole text + understanding embedder), PaddleOCR-VL 1.6 (Modal — layout + OCR backbone), SLIG SigLIP2 (Modal, 5×768D visual), GPT-4o/GPT-5 (optional alternatives — not vision) Marble, Google Gemini, xAI Aurora (Grok), Kling, Replicate models
 
 ### API Categories
 
@@ -823,7 +815,6 @@ All documentation follows these standards:
 - ✨ **NEW**: Billing & Credits — Stripe subscriptions + credit packages (`billing-credits-system.md`)
 - ✨ **NEW**: CRM System — Contacts, companies, users (`crm-system.md`)
 - ✨ **UPDATED** (2026-02-19): Unified JARVIS Agent — Search + Insights + SEO merged
-- ✨ **NEW** (2026-02-10): VR World Generation — WorldLabs Marble + Spark.js
 - ✨ **UPDATED** (2026-02-07): halfvec migration — all vector columns float16
 - ✨ **NEW**: Understanding embeddings, query-adaptive weight profiles, B2B web search
 

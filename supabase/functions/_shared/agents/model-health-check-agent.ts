@@ -5,7 +5,7 @@ import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../replicate-to
 import { resolveSecret } from '../secrets.ts';
 
 /**
- * Only Replicate is probed today. The other providers (Google, xAI, WorldLabs, Kling, proplabs) each
+ * Only Replicate is probed today. The other providers (Google, xAI, Kling, proplabs) each
  * need their own auth and submit shape, and a half-probe that reported "unknown" for them would be
  * worse than an honest absence — it would look like coverage. Add a provider here only with a real
  * request for it.
@@ -35,7 +35,6 @@ const PROVIDER_KEYS: Record<string, string[]> = {
   luma:      ['LUMA_API_KEY'],
   klingai:   ['KLINGAI_ACCESS_KEY', 'KLINGAI_SECRET_KEY'],
   minimax:   ['MINIMAX_API_KEY'],
-  worldlabs: ['WORLDLABS_API_KEY'],
   proplabs:  ['PROPLABS_API_KEY'],
   xai:       ['XAI_API_KEY'],
   openai:    ['OPENAI_API_KEY'],

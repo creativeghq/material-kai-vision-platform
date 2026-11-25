@@ -360,7 +360,7 @@ export function toPublic(p: any): Record<string, unknown> {
     // energy (public/facet); compliance ids (electronic_building_id, atak) stay internal
     energy_class: p.energy_class, heating_type: p.heating_type,
     // media
-    virtual_tour_url: p.virtual_tour_url, video_url: p.video_url, vr_world_id: p.vr_world_id,
+    virtual_tour_url: p.virtual_tour_url, video_url: p.video_url,
     // agent (public)
     agent_license_no: p.agent_license_no, agency_logo_url: p.agency_logo_url,
     agent_name: p.agent_name, agent_phone: p.agent_phone, agent_email: p.agent_email, agent_website: p.agent_website,

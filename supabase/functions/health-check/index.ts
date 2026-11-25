@@ -186,7 +186,6 @@ const EXTERNAL_SERVICES = [
   { name: 'Hunter.io',   url: 'https://api.hunter.io/v2',      category: 'b2b',       icon: '📧' },
   { name: 'ZeroBounce',  url: 'https://api.zerobounce.net/v2', category: 'b2b',       icon: '✉️' },
   { name: 'Firecrawl',   url: 'https://api.firecrawl.dev',     category: 'scraping',  icon: '🕷️' },
-  { name: 'WorldLabs',   url: 'https://api.worldlabs.ai',      category: 'vr',        icon: '🌐' },
   { name: 'Stripe',      url: 'https://api.stripe.com/v1',     category: 'payments',  icon: '💳' },
   { name: 'Zernio',      url: 'https://zernio.com',            category: 'social',    icon: '📲' },
   { name: 'xAI Aurora',  url: 'https://api.x.ai',              category: 'social',    icon: '✨' },

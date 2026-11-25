@@ -98,7 +98,6 @@ There are **3 active agents**. Legacy agent IDs (`search`, `insights`, `seo`) ar
 
 **Special Behavior**: Material search is only injected when user message contains keywords like "find materials", "search for materials", etc.
 
-**VR Integration**: After generating a 3D design, users can trigger VR world generation via the "Generate VR" button in DesignCanvas. The `generate-vr-world` edge function handles the WorldLabs Marble API call.
 
 ---
 
@@ -286,7 +285,6 @@ Source: [`supabase/functions/_shared/skills/`](../supabase/functions/_shared/ski
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MIVAA_GATEWAY_URL` | `https://v1api.materialshub.gr` | MIVAA API endpoint |
-| `WORLDLABS_API_KEY` | - | VR world generation (Interior Designer agent) |
 | `FIRECRAWL_API_KEY` | - | Website scraping (B2B, admin/owner only) |
 | `APOLLO_API_KEY` | - | Company enrichment + email finder fallback |
 | `HUNTER_API_KEY` | - | Domain search + person email finder |
@@ -367,7 +365,6 @@ All requests require:
 - **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, conversation state, memory, situational context, daily brief
 - **[agent-system.md](agent-system.md)** - Full API reference
 - **[ai-models-guide.md](ai-models-guide.md)** - Model configurations
-- **[vr-world-generation.md](vr-world-generation.md)** - VR World generation
 
 ---
 

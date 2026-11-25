@@ -109,23 +109,6 @@ export const StagingInspector: React.FC<{ data: any }> = ({ data }) => (
   </Shell>
 );
 
-export const WorldInspector: React.FC<{ data: any }> = ({ data }) => (
-  <Shell kicker="3D / VR world" title={data.caption || data.prompt || 'VR world'}>
-    <div>
-      <SectionH>Details</SectionH>
-      {data.status && <Field k="Status" v={humanize(data.status)} />}
-      <Field k="Collider" v={data.colliderGlbUrl ? 'Included' : '—'} />
-      <Field k="Quality tiers" v={[data.splatUrl100k && 'draft', data.splatUrl500k && 'standard', data.splatUrlFull && 'full'].filter(Boolean).join(' · ') || '—'} />
-    </div>
-    {data.prompt && (
-      <div>
-        <SectionH>Prompt</SectionH>
-        <p className="text-[13px] leading-relaxed text-muted-foreground">{data.prompt}</p>
-      </div>
-    )}
-  </Shell>
-);
-
 export const RenderInspector: React.FC<{ data: any }> = ({ data }) => {
   const models: any[] = Array.isArray(data?.models) ? data.models : [];
   return (
@@ -152,7 +135,7 @@ export const RenderInspector: React.FC<{ data: any }> = ({ data }) => {
         <SectionH>Per-image actions</SectionH>
         <p className="text-[12px] leading-relaxed text-muted-foreground">
           Click any image in the grid to save to a moodboard, find materials, edit, or generate a
-          VR world, video, or virtual staging from it.
+          video or virtual staging from it.
         </p>
       </div>
     </Shell>

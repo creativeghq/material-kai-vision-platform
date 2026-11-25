@@ -453,17 +453,6 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       const { data } = await supabase.storage.from('property-media').createSignedUrl(ph.storage_path, 3600);
       return { id: ph.id, kind: ph.kind, caption: ph.caption, is_cover: ph.is_cover, url: data?.signedUrl ?? null };
     }));
-    // VR walkthrough: expose ONLY a completed world's public WorldLabs asset URLs — the anon
-    // page cannot read vr_worlds itself, and an incomplete/failed world stays invisible.
-    let vrWorld: Record<string, unknown> | null = null;
-    if (property.vr_world_id) {
-      const { data: w } = await supabase.from('vr_worlds')
-        .select('status, splat_url_100k, splat_url_500k, splat_url_full, panorama_url, caption')
-        .eq('id', property.vr_world_id).maybeSingle();
-      if (w?.status === 'completed') {
-        vrWorld = { splat_url_100k: w.splat_url_100k, splat_url_500k: w.splat_url_500k, splat_url_full: w.splat_url_full, panorama_url: w.panorama_url, caption: w.caption };
-      }
-    }
     // Delivery trail (the source the listing list reads) + the legacy counter the
     // property UI still renders. Both fire-and-forget; neither blocks the render.
     recordPageEvent(supabase, req, 'viewed', {
@@ -473,7 +462,7 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       metadata: { surface: 'public_listing' },
     }).catch(() => {});
     supabase.rpc('increment_property_view_count', { p_property_id: property.id }).then(() => {}, () => {});
-    return json({ listing: toPublic(property), photos: signed, vr_world: vrWorld });
+    return json({ listing: toPublic(property), photos: signed });
   }
 
   if (action === 'inquire') {

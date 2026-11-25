@@ -8,7 +8,7 @@ import {
 } from '@/components/core/ui/dialog';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
-import { X, Package, Globe, Loader2, BookmarkPlus } from 'lucide-react';
+import { X, Package, BookmarkPlus } from 'lucide-react';
 import ProductDetailModal from '@/components/features/products/ProductDetailModal';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 
@@ -26,9 +26,7 @@ interface Design3DModalProps {
     materials_used: any[];
   } | null;
   isOpen: boolean;
-  onClose: () => void;
-  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
-  vrGenerating?: boolean;
+  onClose: () => void;
 }
 
 // Helper to extract string value from potential {value, confidence} wrapper
@@ -74,7 +72,7 @@ const categoryColors: Record<string, string> = {
   flooring: CAT_COLORS.wood,
 };
 
-const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, onGenerateVR, vrGenerating }) => {
+const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose }) => {
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
 
@@ -151,30 +149,7 @@ const Design3DModal: React.FC<Design3DModalProps> = ({ design, isOpen, onClose, 
                     <BookmarkPlus className="h-3.5 w-3.5" />
                     Save to Moodboard
                   </button>
-                </MoodboardSavePopover>
-                {onGenerateVR && (
-                  <button
-                    onClick={() => {
-                      if (!vrGenerating) {
-                        onGenerateVR(design.image.url, {
-                          roomType: design.room_type,
-                          style: design.style,
-                          prompt: design.description,
-                        });
-                      }
-                    }}
-                    disabled={vrGenerating}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-xs font-medium text-violet-700 disabled:opacity-50 transition-colors shadow-sm"
-                    title={vrGenerating ? 'VR world is being generated...' : 'Generate explorable VR world (18 credits)'}
-                  >
-                    {vrGenerating ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Globe className="w-3.5 h-3.5" />
-                    )}
-                    {vrGenerating ? 'Generating VR...' : 'Generate VR'}
-                  </button>
-                )}
+                </MoodboardSavePopover>
               </div>
             </div>
 

@@ -15,7 +15,6 @@ Cleanup is performed by two mechanisms:
 | `background_jobs` | 5 days | completed or failed | Short-lived job records; no value after completion. Note: `stage_history`, `recovery_history`, and `last_checkpoint` JSONB columns on this table supersede the dropped `job_checkpoints` and `job_progress` tables (both dropped 2026-04-25). |
 | `scraping_sessions` | 5 days | completed or failed | Temporary session state; content is already in products |
 | `data_import_jobs` | 5 days | completed/failed + non-scheduled | One-off import runs; scheduled jobs are kept |
-| `vr_worlds` (failed only) | 7 days | status = failed | Failed renders have no asset URLs; safe to discard |
 | `generation_3d` (unsaved) | 15 days | not saved to moodboard | Unsaved renders are temp workspace; storage files also deleted |
 | `data_import_history` | 30 days | age | Import audit trail useful short-term; not needed long-term |
 | `agent_checkpoints` | 30 days | age | Conversation state snapshots; stale after a month |
@@ -37,7 +36,6 @@ Cleanup is performed by two mechanisms:
 | `products` | Core product catalogue. Never cleaned automatically. |
 | `user_credits` | Credit balances. Financial data, never deleted. |
 | `credit_transactions` | Credit debit/top-up history. Financial audit trail, never deleted. |
-| `vr_worlds` (non-failed) | Saved 3D world assets. Tied to user work; only failed ones are cleaned. |
 | `generation_3d` (saved) | 3D renders saved to moodboard by the user. User-owned content. |
 | `flow_definitions` | Automation flow blueprints. Configuration data, not transient. |
 | `data_import_jobs` (scheduled) | Recurring import jobs. Kept because they run repeatedly on a schedule. |

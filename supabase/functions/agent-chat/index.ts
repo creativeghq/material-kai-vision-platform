@@ -980,7 +980,7 @@ function getModelNameForAgent(agentId: string, modelOverride?: string | null): s
 // are routable (sandbox agents developer/qa-reviewer are not chat-executable here).
 const ORCHESTRATOR_IDS = new Set(['orchestrator', 'jarvis', 'auto']);
 const ROUTABLE_SPECIALISTS: { slug: string; name: string; blurb: string }[] = [
-  { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, designing a kitchen, bathroom or outdoor space from a written spec (dimensions, module layout, finishes) — even when it also asks for suppliers, room redesign, image or 3D generation, virtual staging, lighting, VR worlds, moodboards, presentation sheets' },
+  { slug: 'interior-designer', name: 'Vision', blurb: 'interior design, designing a kitchen, bathroom or outdoor space from a written spec (dimensions, module layout, finishes) — even when it also asks for suppliers, room redesign, image or 3D generation, virtual staging, lighting, moodboards, presentation sheets' },
   // The knowledge-base clause is not padding: nearly every published kb_doc is product-as-
   // PRACTICE (discovery, roadmaps, JTBD) while every other blurb here says product-as-GOODS, so
   // without it "what is product discovery?" matches no specialist and is answered unsearched.
@@ -1204,12 +1204,12 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'list_assessment_actions', 'apply_assessment_action',
       // Quotes (all users; 0 cr — creates real quotes + branded PDF, opens on canvas)
       'create_quote', 'generate_quote_pdf', 'list_my_quotes', 'raise_quote_request', 'convert_quote_to_order',
-      // Generation / design (so JARVIS handles 3D renders, lighting, and VR inline —
+      // Generation / design (so JARVIS handles 3D renders and lighting inline —
       // no "switch to another agent". Interior-designer remains the specialist.)
       // generate_gemini + virtual_staging are instantiated by the `generate_3d` branch
       // in registerTools; listing them here is what makes the toolkit filter and
       // load_toolkit agree with what the agent can actually call.
-      'generate_3d', 'generate_gemini', 'virtual_staging', 'apply_lighting_preset', 'generate_vr_world',
+      'generate_3d', 'generate_gemini', 'virtual_staging', 'apply_lighting_preset',
       'visualize_on_surface', 'manage_scenes', 'generate_presentation_sheet', 'manage_client_view', 'save_to_moodboard',
       // The read half of the generation kit. Unlisted and unclustered until 2026-08-26, so an
       // agent could start a render and had no way to report whether it had finished.
@@ -1289,7 +1289,7 @@ const AGENT_CONFIGS: Record<string, AgentConfig> = {
       'calculate_heat_pump_sizing', 'calculate_heating_cost_comparison', 'calculate_kitchen_cost',
       'plan_tile_installation', 'estimate_project_plan',
       // Image-driven post-processing tools (require an existing room image in the conversation)
-      'apply_lighting_preset', 'generate_vr_world', 'generate_video',
+      'apply_lighting_preset', 'generate_video',
       // Deterministic surface preview: exact product, exact format, no credits (#447).
       'visualize_on_surface',
       'manage_scenes',
@@ -2340,7 +2340,6 @@ async function executeAgent(
   const createVirtualStagingTool = generationMod?.createVirtualStagingTool;
   const createGenerationStatusTool = generationMod?.createGenerationStatusTool;
   const createApplyLightingPresetTool = generationMod?.createApplyLightingPresetTool;
-  const createGenerateVRWorldTool = generationMod?.createGenerateVRWorldTool;
   const createVisualizeOnSurfaceTool = generationMod?.createVisualizeOnSurfaceTool;
   const createCheckServerHealthTool = opsMod?.createCheckServerHealthTool;
   const createQuerySentryTool = opsMod?.createQuerySentryTool;
@@ -3245,11 +3244,6 @@ async function executeAgent(
   // Lighting variants — re-render an existing room under a different lighting preset
   if (config.tools.includes('apply_lighting_preset') && createApplyLightingPresetTool) {
     tools.push(createApplyLightingPresetTool(userId, workspaceId, conversationImages, onChunk, conversation_id ?? undefined, toolImages));
-  }
-
-  // VR world generation — turn a room image into an explorable 3D Gaussian Splat
-  if (config.tools.includes('generate_vr_world') && createGenerateVRWorldTool) {
-    tools.push(createGenerateVRWorldTool(userId, workspaceId, conversationImages, onChunk, toolImages, conversation_id ?? undefined));
   }
 
   // Deterministic surface preview — the browser draws it from the chunk; no model, no credits (#447).
@@ -4219,7 +4213,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // user_id: string | null — only honored when the caller authenticates with
     // the platform sb_secret_* admin key (server-to-server "act on behalf of"
     // pattern, same as generate-interior-gemini / generate-region-edit /
-    // generate-vr-world / crm-*-api). Ignored for user-JWT and kai_* partner
+    // crm-*-api). Ignored for user-JWT and kai_* partner
     // calls — those already carry the effective user identity.
 
 
@@ -4237,7 +4231,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     const user = auth.user;
     // userId is mutable so the sb_secret_* admin-secret "act on behalf of"
     // branch below can reassign it from body.user_id — same pattern used by
-    // generate-interior-gemini / generate-region-edit / generate-vr-world.
+    // generate-interior-gemini / generate-region-edit.
     let userId = auth.userId;
 
     // Model pin, for measurement only. Honoured for the service-role/admin-secret path and
@@ -4328,7 +4322,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
 
     // ── Admin-secret "act on behalf of user_id" (platform-wide convention) ──
     // Same shape as generate-interior-gemini / generate-region-edit /
-    // generate-vr-world / crm-*-api: the sb_secret_* admin key is accepted
+    // crm-*-api: the sb_secret_* admin key is accepted
     // for trusted server-to-server callers, and the request body carries
     // `user_id` to identify which user the operation runs as.
     const isAdmin = isAdminAccess(auth);

@@ -5,7 +5,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { getOptimizedImageUrl } from '@/utils/imageUrl';
-import { Package, Replace, Pin, Boxes, Video, Box, Wand2, MoreHorizontal } from 'lucide-react';
+import { Package, Replace, Pin, Video, Box, Wand2, MoreHorizontal } from 'lucide-react';
 import { Badge } from '@/components/core/ui/badge';
 import {
   DropdownMenu,
@@ -34,7 +34,6 @@ interface ProductStripProps {
   /** Attach the product's photo as the material reference for an edit of the user's own room. */
   onTestInRoom?: (product: { id: string; name: string; imageUrl: string }) => void;
   onPinMaterial?: (product: { id: string; name: string; imageUrl?: string }) => void;
-  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
   onUseIn3DScene?: (imageUrl: string, productName: string) => void;
 }
@@ -91,7 +90,6 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
   onReplaceInImage,
   onTestInRoom,
   onPinMaterial,
-  onGenerateVR,
   onGenerateVideo,
   onUseIn3DScene,
 }) => {
@@ -171,7 +169,6 @@ export const ProductStrip: React.FC<ProductStripProps> = ({
             onReplaceInImage && { label: 'Replace in image', icon: Replace, run: () => onReplaceInImage(product) },
             onTestInRoom && img && { label: 'Test in a room', icon: Wand2, run: () => onTestInRoom({ id: product.id, name: product.name, imageUrl: img }) },
             onPinMaterial && { label: 'Pin to design tray', icon: Pin, run: () => onPinMaterial({ id: product.id, name: product.name, imageUrl: img }) },
-            onGenerateVR && img && { label: 'Generate VR', icon: Boxes, run: () => onGenerateVR(img, { prompt: product.name }) },
             onGenerateVideo && img && { label: 'Generate video', icon: Video, run: () => onGenerateVideo(img) },
             onUseIn3DScene && img && { label: 'Use in 3D scene', icon: Box, run: () => onUseIn3DScene(img, product.name) },
           ].filter(Boolean) as Array<{ label: string; icon: React.ComponentType<{ className?: string }>; run: () => void }>;

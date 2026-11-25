@@ -21453,7 +21453,6 @@ export type Database = {
           embed_ffe: boolean
           embed_lighting: boolean
           embed_room_plan: boolean
-          embed_vr: boolean
           error_message: string | null
           feedback_enabled: boolean
           files_purged_at: string | null
@@ -21472,7 +21471,6 @@ export type Database = {
           sheet_ids: string[]
           title: string
           updated_at: string
-          vr_world_id: string | null
         }
         Insert: {
           cover?: Json
@@ -21481,7 +21479,6 @@ export type Database = {
           embed_ffe?: boolean
           embed_lighting?: boolean
           embed_room_plan?: boolean
-          embed_vr?: boolean
           error_message?: string | null
           feedback_enabled?: boolean
           files_purged_at?: string | null
@@ -21500,7 +21497,6 @@ export type Database = {
           sheet_ids?: string[]
           title?: string
           updated_at?: string
-          vr_world_id?: string | null
         }
         Update: {
           cover?: Json
@@ -21509,7 +21505,6 @@ export type Database = {
           embed_ffe?: boolean
           embed_lighting?: boolean
           embed_room_plan?: boolean
-          embed_vr?: boolean
           error_message?: string | null
           feedback_enabled?: boolean
           files_purged_at?: string | null
@@ -21528,7 +21523,6 @@ export type Database = {
           sheet_ids?: string[]
           title?: string
           updated_at?: string
-          vr_world_id?: string | null
         }
         Relationships: [
           {
@@ -21557,13 +21551,6 @@ export type Database = {
             columns: ["room_layout_id"]
             isOneToOne: false
             referencedRelation: "room_layouts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "project_client_views_vr_world_id_fkey"
-            columns: ["vr_world_id"]
-            isOneToOne: false
-            referencedRelation: "vr_worlds"
             referencedColumns: ["id"]
           },
         ]
@@ -23434,7 +23421,6 @@ export type Database = {
           view_count: number
           view_types: string[] | null
           virtual_tour_url: string | null
-          vr_world_id: string | null
           wc: number | null
           wc_count: number | null
           within_settlement: boolean | null
@@ -23607,7 +23593,6 @@ export type Database = {
           view_count?: number
           view_types?: string[] | null
           virtual_tour_url?: string | null
-          vr_world_id?: string | null
           wc?: number | null
           wc_count?: number | null
           within_settlement?: boolean | null
@@ -23780,7 +23765,6 @@ export type Database = {
           view_count?: number
           view_types?: string[] | null
           virtual_tour_url?: string | null
-          vr_world_id?: string | null
           wc?: number | null
           wc_count?: number | null
           within_settlement?: boolean | null
@@ -32320,84 +32304,6 @@ export type Database = {
         }
         Relationships: []
       }
-      vr_worlds: {
-        Row: {
-          caption: string | null
-          collider_glb_url: string | null
-          completed_at: string | null
-          created_at: string | null
-          credits_charged: number | null
-          display_name: string | null
-          error_message: string | null
-          id: string
-          metadata: Json | null
-          model: string | null
-          operation_id: string | null
-          panorama_url: string | null
-          source_image_url: string
-          source_prompt: string | null
-          splat_url_100k: string | null
-          splat_url_500k: string | null
-          splat_url_full: string | null
-          status: string | null
-          thumbnail_url: string | null
-          updated_at: string | null
-          user_id: string | null
-          workspace_id: string | null
-          world_id: string | null
-        }
-        Insert: {
-          caption?: string | null
-          collider_glb_url?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          credits_charged?: number | null
-          display_name?: string | null
-          error_message?: string | null
-          id?: string
-          metadata?: Json | null
-          model?: string | null
-          operation_id?: string | null
-          panorama_url?: string | null
-          source_image_url: string
-          source_prompt?: string | null
-          splat_url_100k?: string | null
-          splat_url_500k?: string | null
-          splat_url_full?: string | null
-          status?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string | null
-          world_id?: string | null
-        }
-        Update: {
-          caption?: string | null
-          collider_glb_url?: string | null
-          completed_at?: string | null
-          created_at?: string | null
-          credits_charged?: number | null
-          display_name?: string | null
-          error_message?: string | null
-          id?: string
-          metadata?: Json | null
-          model?: string | null
-          operation_id?: string | null
-          panorama_url?: string | null
-          source_image_url?: string
-          source_prompt?: string | null
-          splat_url_100k?: string | null
-          splat_url_500k?: string | null
-          splat_url_full?: string | null
-          status?: string | null
-          thumbnail_url?: string | null
-          updated_at?: string | null
-          user_id?: string | null
-          workspace_id?: string | null
-          world_id?: string | null
-        }
-        Relationships: []
-      }
       warehouse_coverage: {
         Row: {
           country_code: string | null
@@ -39495,7 +39401,6 @@ export type Database = {
         Returns: undefined
       }
       reconcile_stuck_generation_videos: { Args: never; Returns: number }
-      reconcile_stuck_vr_worlds: { Args: never; Returns: number }
       record_agent_memory_recall: {
         Args: { p_conversation_id?: string; p_memory_ids: string[] }
         Returns: number

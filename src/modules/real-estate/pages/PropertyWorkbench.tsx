@@ -136,9 +136,7 @@ const DocumentsTab: React.FC<{ ws: string | null; propertyId: string; canManage:
   );
 };
 
-// Lazy: the Spark/Three splat renderer only loads when a listing actually shows a VR world.
 import { ListingSocialPostsCard } from '@/modules/real-estate/components/ListingSocialPostsCard';
-const WorldViewer = React.lazy(() => import('@/components/features/ai/WorldViewer').then((m) => ({ default: m.WorldViewer })));
 import { PROPERTY_TYPES } from '../realEstateVocabulary'; // one source (#391)
 const TRANSACTION_TYPES = ['sale', 'rent', 'short_let', 'business_transfer', 'auction'];
 const LISTING_STATUSES = ['draft', 'active', 'under_offer', 'sold', 'rented', 'withdrawn', 'archived'];
@@ -321,34 +319,6 @@ export default function PropertyWorkbench() {
     try { await realEstateService.reorderPhotos(ws, next.map((p) => p.id)); await load(); }
     catch (err) { toast({ title: 'Could not reorder', description: (err as Error).message, variant: 'destructive' }); await load(); }
     finally { setBusy(false); }
-  };
-
-  /**
-   * Start (or re-start) the VR walkthrough from the cover photo.
-   *
-   * One function for Create and Retry, because they are the same act: the world is generated from
-   * the cover photo either way, and a failed run has already had its credits refunded. Splitting
-   * them is how the two drift — and it is why `WorldViewer`'s Retry button existed in the agent
-   * chat and nowhere else (#378 F5).
-   */
-  const startWalkthrough = async () => {
-    if (!ws || !property) return;
-    setBusy(true);
-    try {
-      const cover = photos.find((p) => p.is_cover) ?? photos[0];
-      if (!cover) throw new Error('Upload a photo first — the walkthrough is generated from the cover photo.');
-      const { supabase } = await import('@/integrations/supabase/client');
-      const { data: signed } = await supabase.storage.from('property-media').createSignedUrl(cover.storage_path, 3600);
-      if (!signed?.signedUrl) throw new Error('Could not access the cover photo');
-      const { vrWorldService } = await import('@/services/vrWorldService');
-      const prompt = [property.title, property.property_type, property.town].filter(Boolean).join(', ') || 'Property interior';
-      const r = await vrWorldService.generateVRWorld({ sourceImageUrl: signed.signedUrl, prompt });
-      await realEstateService.updateProperty(ws, id, { vr_world_id: r.vrWorldId });
-      await load();
-      toast({ title: 'VR walkthrough started', description: 'It renders here (and on the public page) when ready.' });
-    } catch (e) {
-      toast({ title: 'VR generation failed', description: (e as Error).message, variant: 'destructive' });
-    } finally { setBusy(false); }
   };
 
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -844,38 +814,6 @@ export default function PropertyWorkbench() {
                 ))}
               </div>
             )}
-
-            {/* ── VR walkthrough (WorldLabs Marble from the cover photo) ── */}
-            <div className="mt-6">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Globe className="h-4 w-4" /> VR walkthrough</h3>
-              {property.vr_world_id ? (
-                <div className="space-y-2">
-                  <div className="h-[420px] overflow-hidden rounded-xl border">
-                    <React.Suspense fallback={<Skeleton className="h-full w-full" />}>
-                      <WorldViewer
-                        vrWorldId={property.vr_world_id}
-                        onRetry={editable ? () => void startWalkthrough() : undefined}
-                      />
-                    </React.Suspense>
-                  </div>
-                  {editable && (
-                    <Button variant="outline" size="sm" className="text-xs" disabled={busy}
-                      onClick={async () => { await realEstateService.updateProperty(ws!, id, { vr_world_id: null }); await load(); }}>
-                      <Trash2 className="mr-1 h-3.5 w-3.5" /> Remove walkthrough
-                    </Button>
-                  )}
-                </div>
-              ) : editable ? (
-                photos.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Upload at least one photo first — the walkthrough is generated from the cover photo.</p>
-                ) : (
-                  <div>
-                    <Button variant="outline" disabled={busy} onClick={() => void startWalkthrough()}><Sparkles className="mr-2 h-4 w-4" /> Create VR walkthrough from cover photo</Button>
-                    <p className="mt-1 text-[11px] text-muted-foreground">Explorable 3D world (WorldLabs Marble) generated from the cover photo. 18 credits.</p>
-                  </div>
-                )
-              ) : null}
-            </div>
           </TabsContent>
 
           {/* ── Leads / inquiries ── */}

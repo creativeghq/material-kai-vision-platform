@@ -156,7 +156,6 @@ A **two-stage** document parser run in-process on **Modal**: PP-DocLayoutV3 (RT-
 | Perplexity Sonar / Sonar-Pro | Perplexity | Price discovery (web search with deep page reading) |
 | DataForSEO Merchant | DataForSEO | Google Shopping merchant discovery |
 | Firecrawl | Firecrawl | URL scrape + Pydantic-extracted price verification |
-| WorldLabs Marble | WorldLabs | 3D Gaussian Splat world generation from images |
 | Anthropic `web_search_20250305` | Anthropic | B2B manufacturer search (claude-haiku-4-5 + web-search beta) |
 
 ---

@@ -295,13 +295,6 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
         </div>
       );
 
-    case 'vr_world_created':
-      return (
-        <div className="text-xs text-muted-foreground">
-          Fires when a VR world is generated. Available data: world ID, source image, quality tier.
-        </div>
-      );
-
     case 'agent_search_completed': {
       const cfg = config as AgentSearchCompletedTriggerConfig;
       return (
@@ -514,7 +507,6 @@ export function TriggerConfigForm({ data, onChange, flowId }: TriggerConfigFormP
     case 'appointment_cancelled':
     case 'svbrdf_extraction_complete':
     case 'virtual_staging_completed':
-    case 'vr_world_failed':
     case 'video_generation_completed':
     case 'video_generation_failed':
     case 'background_agent_failed':

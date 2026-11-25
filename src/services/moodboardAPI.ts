@@ -49,7 +49,7 @@ export interface AddMoodBoardItemData {
   notes?: string;
   position?: number;
   media_url?: string;
-  media_type?: 'image' | 'video' | 'vr_world';
+  media_type?: 'image' | 'video';
   media_title?: string;
 }
 
@@ -493,7 +493,7 @@ class MoodBoardAPI {
   async addMediaFromChat(params: {
     moodboard_id: string;
     source_url: string;
-    media_type: 'image' | 'video' | 'vr_world';
+    media_type: 'image' | 'video';
     media_title?: string;
     notes?: string;
   }): Promise<MoodBoardItem> {

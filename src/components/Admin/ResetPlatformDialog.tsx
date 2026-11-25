@@ -123,7 +123,7 @@ export const ResetPlatformDialog: React.FC<ResetPlatformDialogProps> = ({ trigge
             <li>Appointments &amp; availability; connected websites &amp; crawled pages</li>
             <li>Agent Fabric runtime (run artifacts &amp; agent inbox) — project definitions, projects &amp; secrets are kept</li>
             <li>Derived logs (system logs, email send/event/analytics logs, AI-pricing-update log, social insights, facet-merge log)</li>
-            <li>3D / Video / VR generation history (incl. WorldLabs VR worlds)</li>
+            <li>3D / video generation history</li>
             <li>Analytics (events, manufacturer analytics, quality &amp; recommendation metrics)</li>
             <li>User behavior profiles &amp; personalization state</li>
             <li>Search caches &amp; derived state (suggestions, trending, query understanding, similarity cache, duplicate detection)</li>

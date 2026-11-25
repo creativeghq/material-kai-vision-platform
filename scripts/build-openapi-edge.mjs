@@ -372,7 +372,7 @@ const TAG_ORDER = [
 ];
 const TAG_DESCRIPTIONS = {
   'AI Agents': 'KAI multi-agent chat (LangGraph + Claude), SSE streaming, tool gating.',
-  'AI Generation': 'Image / video / 3D / VR / PBR generation (Gemini, Replicate, WorldLabs).',
+  'AI Generation': 'Image / video / 3D / PBR generation (Gemini, Replicate).',
   'Social': 'Social publishing + AI content/image/video generation (Zernio).',
   'Search': 'Search re-ranking and relevance.',
   'MIVAA Gateway': 'Proxy to the MIVAA Python backend (RAG, search, AI services).',

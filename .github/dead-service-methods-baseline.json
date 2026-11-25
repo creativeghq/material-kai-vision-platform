@@ -175,10 +175,6 @@
     "src/services/userWebsitesService.ts": [
       "reportRunPayload",
       "retireAutoKeywords"
-    ],
-    "src/services/vrWorldService.ts": [
-      "getVRWorld",
-      "listVRWorlds"
     ]
   }
 }

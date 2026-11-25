@@ -638,7 +638,7 @@ export const MoodBoardDetailPage: React.FC = () => {
               const isMedia = !item.material_id && !!item.media_url;
               const { media_url: mediaUrl, media_type: mediaType, media_title: mediaTitle } = item;
 
-              const MediaTypeIcon = mediaType === 'video' ? Video : mediaType === 'vr_world' ? Globe : Image;
+              const MediaTypeIcon = mediaType === 'video' ? Video : Image;
 
               return (
                 <div key={item.id} className="group relative rounded-xl overflow-hidden bg-muted aspect-square shadow-sm">
@@ -660,7 +660,7 @@ export const MoodBoardDetailPage: React.FC = () => {
                     ) : (
                       <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-violet-50 to-purple-100 gap-2">
                         <MediaTypeIcon className="h-10 w-10 text-violet-400" />
-                        <span className="text-xs text-violet-600 font-medium">VR World</span>
+                        <span className="text-xs text-violet-600 font-medium">No preview</span>
                       </div>
                     )
                   ) : item.material?.thumbnail_url ? (
@@ -679,7 +679,7 @@ export const MoodBoardDetailPage: React.FC = () => {
                   {isMedia && mediaType && (
                     <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-medium">
                       <MediaTypeIcon className="h-3 w-3" />
-                      {mediaType === 'vr_world' ? 'VR' : mediaType === 'video' ? 'Video' : 'Image'}
+                      {mediaType === 'video' ? 'Video' : 'Image'}
                     </div>
                   )}
 

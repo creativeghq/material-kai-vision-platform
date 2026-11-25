@@ -7,12 +7,12 @@
 
 ## Executive Summary
 
-Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/WorldLabs/Kling for generation.
+Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/Kling for generation.
 
 The platform serves **5,000+ active users** across three professional groups: buyers (architects, designers, sourcing agents), suppliers (manufacturers, brands), and platform operations. It is live in production at **materialshub.gr** with 99.5%+ uptime, 10,000+ cataloged products, and 1,000+ processed PDFs.
 
 **Core value propositions:**
-- For **buyers**: Find the exact material — by look, feel, specification, image, or natural language — in seconds instead of hours. Then visualize it in a 3D interior design, walk through a VR version of the room, and request a quote — all within one platform.
+- For **buyers**: Find the exact material — by look, feel, specification, image, or natural language — in seconds instead of hours. Then visualize it in a 3D interior design, and request a quote — all within one platform.
 - For **suppliers/manufacturers**: Automatically digitize your entire catalog from a single PDF upload. Get real-time visibility into who is searching for your products, what the market trends are, and receive qualified enquiries directly.
 - For **the platform**: A credit-based consumption model tied directly to AI feature usage, Stripe-powered with volume discounts, layered over a marketplace that creates strong network effects as both sides grow.
 
@@ -51,7 +51,6 @@ AI agents explain, compare & recommend materials from the catalog
           ↓
 Interior Designer agent generates room visualizations using those materials
           ↓
-VR generation turns any design into a walkable 3D world (in-browser)
           ↓
 Buyer saves materials to Moodboards → builds a Quote → tracks the project
           ↓
@@ -105,7 +104,6 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Replicate | proplabs/virtual-staging | AI room staging from empty photos | 20 credits/run |
 | Replicate | Wan 2.1 i2v 720p, Runway Gen4 Turbo | Interior video generation (budget + premium) | 12/40 credits |
 | Replicate | meta/sam-2, ali-vilab/anydoor | Pixel-precise mask generation, product placement | Per use |
-| WorldLabs | Marble mini + plus | 3D Gaussian Splat VR world generation | 50/200 credits per world |
 | Google Gemini | gemini-3.1-flash-image, gemini-3-pro-image | Interior image generation (4 modes) | 6/15 credits |
 | xAI (Grok) | grok-2-aurora | Masked inpainting for region editing, social images | 10–20 credits |
 | Kling | kling-v3.0 | Interior + social video generation | 20 credits |
@@ -213,7 +211,6 @@ Model: Claude Opus 5 | Focused on spatial design and visualization
 - Generates interior design images (text prompt or image reference) — see Feature 4
 - Matches generated designs back to real catalog materials using 7-vector search
 - Estimates project costs based on matched materials and dimensions
-- Generates explorable 3D VR worlds from any design image — see Feature 5
 - `analyze_inspiration_url` — paste a design URL to extract materials, colors, and styles and find matching catalog products
 
 **Demo Agent**
@@ -263,7 +260,7 @@ Users paint a zone over any room image using the `RegionEditCanvas` tool. SAM 2 
 3. All outputs permanently stored in Supabase Storage
 4. Agent runs 7-vector material matching on generated image — surfacing real catalog products that match
 5. Agent presents cost estimates based on matched materials and room dimensions
-6. User can: generate VR world, create video walkthrough, stage an empty room, or region-edit any element
+6. User can: create video walkthrough, stage an empty room, or region-edit any element
 7. All generations are credit-billed per operation
 
 **E. Interior Video Generation**
@@ -278,45 +275,6 @@ Any design image can become a video via four AI models:
 | Runway Gen4 Turbo | 40 | Premium quality |
 
 Video type auto-selects the optimal model. Supports 16:9, 9:16, 1:1 aspect ratios. Async polling for long renders (Veo, Runway) with `job_id` polling pattern.
-
----
-
-### Feature 5 — VR World Generation (WorldLabs Marble + Spark.js)
-
-Any interior design image — AI-generated or user-uploaded — can be turned into a fully **explorable 3D world** inside the browser. No app, no plugin, no external tool required.
-
-**End-to-end flow:**
-1. User clicks "Generate VR" on any design image in the agent chat
-2. Selects model tier (mini for quick preview, plus for high-fidelity final)
-3. Supabase Edge Function uploads the image to WorldLabs Marble API and triggers world generation
-4. Platform polls for completion status, stores all asset URLs in the `vr_worlds` database table
-5. WorldViewer component renders the 3D Gaussian Splat inline in the chat via Spark.js (Three.js-based, code-split, ~496KB)
-6. The world persists in the database — reloads instantly in future sessions
-
-**Model tiers:**
-
-| Model | Credits | Generation Time | Best For |
-|-------|---------|----------------|---------|
-| marble-1.1 | 190 credits | ~5 minutes | High-fidelity final walkthroughs |
-
-Credits are refunded automatically on generation failure.
-
-**Output assets per world:**
-- Gaussian Splat SPZ files at 3 quality levels: 100k (draft), 500k (standard), full
-- Collider GLB (collision mesh for first-person physics)
-- 360° panorama equirectangular image
-- Thumbnail preview
-- AI-generated scene caption
-
-**Navigation controls:**
-
-| Mode | Controls |
-|------|---------|
-| Orbit (default) | Drag to rotate · Scroll to zoom · Right-click drag to pan |
-| Walk (first-person) | WASD to move · Mouse look · Shift for speed boost |
-
-**Business value of VR worlds:**
-An architect can go from finding a tile in the catalog → generating a room design with that tile → walking through a VR version of that room → requesting a quote — all in one session on one platform. No competitor offers this workflow. VR generation is also a strong upsell moment: mini worlds generate impulse purchases, plus worlds are high-margin repeat purchases for client presentations.
 
 ---
 
@@ -450,7 +408,7 @@ Document-level intelligence beyond product catalogs:
 
 **Flow Builder** — visual no-code automation engine:
 
-Trigger events include: `hire_me_received`, `profile_followed`, `profile_published`, `quote_requested`, `quote_approved`, `moodboard_shared`, `moodboard_commented`, `material_reviewed`, `user_signup`, `search_executed`, `model_3d_created`, `vr_world_created`, and scheduled (cron).
+Trigger events include: `hire_me_received`, `profile_followed`, `profile_published`, `quote_requested`, `quote_approved`, `moodboard_shared`, `moodboard_commented`, `material_reviewed`, `user_signup`, `search_executed`, `model_3d_created`, and scheduled (cron).
 
 Actions: send email (Resend), Slack notification, call webhook, trigger AI agent, create CRM record.
 
@@ -552,7 +510,7 @@ A multi-tenant finance and business operations stack layered on the core AI cata
 
 | Group | Who | Key Privileges |
 |-------|-----|----------------|
-| **Standard (Buyers)** | Designers, Interior Designers, Architects, Sourcing Agents, Consultants, Other | Full search, agents, 3D generation, VR, moodboards, quotes, marketplace |
+| **Standard (Buyers)** | Designers, Interior Designers, Architects, Sourcing Agents, Consultants, Other | Full search, agents, 3D generation, moodboards, quotes, marketplace |
 | **Verified Factory (Suppliers)** | Manufacturers, Brands, Suppliers with `factory_verified=true` | All above + Factory Analytics (own data + market trends) |
 | **Admin / Owner** | `workspace_members.role` = admin or owner | All above + admin panel, B2B tools, SEO pipeline, sub-agents, cross-workspace analytics |
 | **Unauthenticated** | Not logged in | Public profiles (`/u/:id`) only |
@@ -566,7 +524,6 @@ A multi-tenant finance and business operations stack layered on the core AI cata
 | Jarvis agent (material + KB) | ✅ | ✅ | ✅ |
 | Interior Designer agent | ✅ | ✅ | ✅ |
 | 3D design generation | ✅ | ✅ | ✅ |
-| VR world generation | ✅ | ✅ | ✅ |
 | Moodboards | ✅ | ✅ | ✅ |
 | Quotes & project tracking | ✅ | ✅ | ✅ |
 | Discover directory | ✅ | ✅ | ✅ |
@@ -626,7 +583,6 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Claude Haiku (1K tokens) | ~$0.0008–0.004 | 1–5 credits | 50–80%+ |
 | GPT-4o-mini (query parsing) | ~$0.0002 | 1 credit | 50x+ |
 | Voyage AI text embedding (1K tokens) | ~$0.00006 | Bundled into search | High |
-| VR World — quality (marble-1.1) | WorldLabs | 190 credits | Pass-through + platform overhead |
 | Interior design (Replicate) | Replicate variable | Credits per image | Variable |
 | Gemini interior (flash) | ~$0.02 | 6 credits | 3x markup |
 | Gemini interior (pro/4K) | ~$0.06 | 15 credits | 2.5x markup |
@@ -638,7 +594,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Social caption (Claude) | ~$0.002 | 2 credits | 10x+ markup |
 | Web scraping (per Firecrawl credit) | ~$0.001 | ~0.1 platform credits | Variable |
 
-**Blended gross margin target on AI costs: 60–70%.** Highest margin on high-frequency, low-cost operations (query parsing, embeddings). Thinner margins on high-cost generation (VR, image gen) where pass-through pricing builds user trust.
+**Blended gross margin target on AI costs: 60–70%.** Highest margin on high-frequency, low-cost operations (query parsing, embeddings). Thinner margins on high-cost generation (image gen) where pass-through pricing builds user trust.
 
 **Fixed infrastructure costs:**
 - Cloudflare Workers: static assets free and unmetered; only Worker invocations (non-static paths) count
@@ -646,7 +602,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
 - Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. vision is now Anthropic-only via Claude Opus 5 tool use.
 - Modal (PaddleOCR-VL): layout + OCR backbone (GPU A10G, scale-to-zero → $0 idle, `max_containers=8`). Replaced the Surya-2 backbone 2026-06-13. Sole required runtime secret: `PADDLEOCR_MODAL_API_KEY`.
-- Variable: Anthropic, OpenAI, Voyage AI, WorldLabs, Replicate — fully usage-based
+- Variable: Anthropic, OpenAI, Voyage AI, Replicate — fully usage-based
 
 ---
 
@@ -692,7 +648,7 @@ This analytics layer is a significant standalone upsell — providing market int
 | Search response time | 200–800ms |
 | Concurrent query capacity | 1,000+/minute |
 | API endpoints | 170+ |
-| AI models integrated | Anthropic (Opus 5 / Sonnet 5 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, WorldLabs, Kling, Zernio |
+| AI models integrated | Anthropic (Opus 5 / Sonnet 5 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, Kling, Zernio |
 | Edge functions deployed | 60+ |
 | Database tables | 40+ |
 
@@ -707,7 +663,7 @@ Most platforms use one or two embedding types. Fusing 7 specialized vectors with
 Claude Opus 5 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. This is a proprietary architecture not seen replicated elsewhere.
 
 **3. Full Vertical Integration**
-Ingestion + enrichment + search + design generation + VR visualization + quote management + marketplace in one product. Each layer creates switching costs. A user with their catalog ingested, moodboards saved, and project quotes tracked is not going to migrate to a competitor easily.
+Ingestion + enrichment + search + design generation + 3D visualization + quote management + marketplace in one product. Each layer creates switching costs. A user with their catalog ingested, moodboards saved, and project quotes tracked is not going to migrate to a competitor easily.
 
 **4. 14-Stage Pipeline with Checkpoint Recovery**
 Enterprise-grade PDF processing at 95%+ accuracy with a structure-first PaddleOCR-VL layout + OCR backbone (RT-DETR region detection, dedicated reading-order prediction, table/formula extraction) and 9-stage checkpoint recovery. This took significant engineering and handles everything from scanned PDFs to complex multi-product catalogs.
@@ -722,7 +678,7 @@ Event-driven flows and autonomous background agents keep improving product data 
 Every interior design created on the platform can be published directly to Instagram, LinkedIn, TikTok, etc. via the built-in social media suite. This turns users into organic distributors of platform-created content, each post pointing back to a professional profile on materialshub.gr. No competitor offers this closed loop from design → social publication.
 
 **8. Full Vertical Integration of the Design Workflow**
-No competitor currently offers: ingestion → AI search → agent interaction → 3D generation → virtual staging → region editing → interior video → VR walkthrough → social publication → quote → project tracking — all in one product. Each feature layer increases switching costs. A user who has cataloged products, built moodboards, generated designs, and tracked a project on this platform has strong reasons to stay.
+No competitor currently offers: ingestion → AI search → agent interaction → 3D generation → virtual staging → region editing → interior video → social publication → quote → project tracking — all in one product. Each feature layer increases switching costs. A user who has cataloged products, built moodboards, generated designs, and tracked a project on this platform has strong reasons to stay.
 
 ---
 
@@ -738,7 +694,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 | BIM tools (Revit, ArchiCAD) | Design software | Complementary discovery layer — not competing |
 | Spec platforms (NBS, Arcom) | Technical specification databases | Richer visual and AI-assisted discovery, broader product coverage, integrated procurement |
 
-**The defensible position:** No competitor currently offers the combination of auto-ingestion + multi-modal AI search + AI design generation + VR visualization + marketplace in one product. Each element alone is replicable; the vertical integration combined with 7-vector search and the understanding embedding architecture creates a meaningful moat.
+**The defensible position:** No competitor currently offers the combination of auto-ingestion + multi-modal AI search + AI design generation + 3D visualization + marketplace in one product. Each element alone is replicable; the vertical integration combined with 7-vector search and the understanding embedding architecture creates a meaningful moat.
 
 ---
 
@@ -759,7 +715,6 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 - Region editing / masked inpainting (SAM 2 + Grok Aurora, 20cr)
 - Interior video generation (4 models: Veo-2 30cr, Kling v3.0 20cr, Wan 2.1 12cr, Runway 40cr)
 - Social media suite (caption/image/video generation + Zernio publishing across 8 platforms)
-- VR world generation (WorldLabs Marble + Spark.js, orbit + first-person walk navigation)
 - Professional marketplace (profiles, services, Hire Me, Discover directory)
 - Moodboards (private + public, comments, featured board)
 - Quotes system (buyer + supplier workflow, upsells, project timeline)

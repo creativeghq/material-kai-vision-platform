@@ -13,7 +13,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **Key Metrics:**
 - **5,000+ users** in production
 - **99.5%+ uptime** SLA
-- **AI stack**: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings (SLIG on Modal), PaddleOCR-VL structural layout + OCR backbone (on Modal) — plus Replicate, Gemini, xAI, WorldLabs, Kling for generation
+- **AI stack**: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI voyage-4 embeddings (text + understanding, 1024D), SigLIP2 768D visual embeddings (SLIG on Modal), PaddleOCR-VL structural layout + OCR backbone (on Modal) — plus Replicate, Gemini, xAI, Kling for generation
 - **170+ API endpoints** across 20 categories
 - **3 ingestion methods** (PDF, Web Scraping, XML)
 - **14-stage PDF processing pipeline**
@@ -26,9 +26,8 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 **New Capabilities (2026):**
 - 🌐 **Web Scraping**: Automatic product discovery from websites
 - 💰 **Price Monitoring**: Competitive price tracking across sources
-- 🎨 **Interior Design**: 20+ AI generation modes (image, video, VR, staging, region edit)
+- 🎨 **Interior Design**: 20+ AI generation modes (image, video, staging, region edit)
 - 🔍 **Smart Search Management**: AI-powered search deduplication + re-ranking
-- 🥽 **VR World Generation**: WorldLabs Marble 3D Gaussian Splat worlds from interior images
 - 🤖 **Unified JARVIS Agent**: Merged Search + Insights + SEO into one intelligent agent
 - 🔍 **B2B Manufacturer Search**: Claude built-in web search (no separate API key)
 - ⚡ **Flow Engine**: Visual drag-and-drop workflow automation (triggers, conditions, actions)
@@ -72,7 +71,6 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on Modal — two-stage structural layout (PP-DocLayoutV3) + OCR backbone (replaced Surya-2 2026-06-13)
 - OpenAI (GPT-4o, GPT-5 — optional alternative for product discovery / agents; NOT vision)
 - Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
-- WorldLabs Marble (3D Gaussian Splat VR world generation)
 - Google Gemini (gemini-3.1-flash-image, gemini-3-pro-image — interior generation)
 - xAI Aurora (grok-2-aurora — region edit inpainting, social image generation)
 - Kling (kling-v3.0 — interior and social video generation)
@@ -430,7 +428,7 @@ The platform uses **7 embedding types** for comprehensive search:
 
 **Supabase Edge Functions** (60+ total):
 - Agent & AI: `agent-chat`, `ai-rerank`, `background-agent-runner`, `mivaa-gateway`
-- Interior Design: `generate-interior-gemini`, `generate-interior-video-v2`, `generate-region-edit`, `generate-virtual-staging`, `generate-vr-world`, `generate-quote-pdf`, `generate-social-content`, `generate-social-image`, `generate-social-video`
+- Interior Design: `generate-interior-gemini`, `generate-interior-video-v2`, `generate-region-edit`, `generate-virtual-staging`, `generate-quote-pdf`, `generate-social-content`, `generate-social-image`, `generate-social-video`
 - Social: `zernio-api`, `zernio-webhook-handler`
 - CRM & Billing: `crm-companies-api`, `crm-contacts-api`, `crm-users-api`, `stripe-api`, `crm-api`, `stripe-webhooks`
 - Automation: `flow-engine`, `flow-scheduler-cron`, `flow-webhook`
@@ -535,7 +533,6 @@ The platform uses **7 embedding types** for comprehensive search:
 - ✨ Billing & Credits — Stripe subscriptions + credit packages (2026-03)
 - ✨ CRM System — Contacts, companies, user management (2026-02)
 - ✨ Unified JARVIS Agent — Search + Insights + SEO merged into one agent (2026-02-19)
-- ✨ VR World Generation — WorldLabs Marble + Spark.js 3D Gaussian Splat viewer (2026-02-10)
 - ✨ halfvec migration — All vector columns float16, 50% storage savings (2026-02-07)
 - ✨ 7-vector fusion search with query-adaptive weight profiles
 - ✨ Understanding embeddings — Claude Opus 5 vision_analysis (tool-use schema-locked) → Voyage AI 1024D embedding

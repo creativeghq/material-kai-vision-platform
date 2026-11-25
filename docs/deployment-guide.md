@@ -314,12 +314,6 @@ modal app stop paddleocr-vl     # tear down
 >
 > **Retired — do NOT re-add**: `MINIMAX_API_KEY` (direct MiniMax H3) was removed on 2026-08-30 (#396); H3 Max on fal (`FAL_KEY`) replaced it — same model lineage, cheaper vendor. It is gone from the code's env sync and from `platform_secrets`.
 
-#### **VR World Generation**
-
-| Secret Name | Type | Used By Edge Functions | Description | Example/Format |
-|------------|------|----------------------|-------------|----------------|
-| `WORLDLABS_API_KEY` | **Secret** | `generate-vr-world` | WorldLabs Marble API key for 3D Gaussian Splat world generation | `wl_xxxxxxxxxxxxxxxx` |
-
 #### **Social Media (Zernio)**
 
 | Secret Name | Type | Used By Edge Functions | Description | Example/Format |
@@ -512,7 +506,7 @@ The Material Kai Vision Platform uses a multi-service deployment strategy:
 1. **Frontend**: Cloudflare Worker `materialshub-app` with static assets (`app.materialshub.gr`)
 2. **MIVAA Service**: Systemd service with UV (Self-hosted server)
 3. **Database**: Supabase (Managed PostgreSQL)
-4. **External APIs**: Third-party services (OpenAI, Anthropic, Voyage AI, Modal, Replicate, WorldLabs)
+4. **External APIs**: Third-party services (OpenAI, Anthropic, Voyage AI, Modal, Replicate)
 
 ## 🏗️ Infrastructure Overview
 
@@ -1258,21 +1252,6 @@ Static asset requests are free and unmetered; only Worker invocations (non-stati
 
 ---
 
-### 🌍 WorldLabs Marble (VR World Generation)
-
-**Role**: Generates 3D Gaussian Splat worlds from product images for VR/AR preview features.
-
-**Dashboard**: https://worldlabs.ai
-**Pricing**: Credit-based
-
-| World Quality | Credits | Time |
-|--------------|---------|------|
-| `marble-1.1` | 190 credits | ~5 minutes |
-
-Credits are refunded on generation failure.
-
----
-
 ### 📈 Monthly Cost Estimate (Typical Production)
 
 | Service | Estimated Monthly Cost | Notes |
@@ -1289,7 +1268,6 @@ Credits are refunded on generation failure.
 | **DataForSEO** | $10–$50 | Depends on SEO pipeline usage |
 | **Zernio** | Subscription + per-message | WhatsApp messaging + social publishing |
 | **Novus** | Per-transmission | Greek AADE/myDATA e-invoicing provider |
-| **WorldLabs** | Variable | Per-credit, on-demand |
 | **Total (est.)** | **~$160–$600/month** | Scales with usage |
 
 > **Cost optimization tips:**
@@ -1310,9 +1288,9 @@ The "Reset Platform" admin action wipes the platform back to a clean install sta
 
 ### What gets wiped
 
-The function clears every table that holds derived/AI-produced/cached data, in FK-safe order. The list is the source of truth in `TABLES_TO_CLEAR`. Categories include: agent chat history, document/PDF processing artefacts, embeddings rows on `document_images` / `products` / `document_vectors`, image variants, generated 3D/VR worlds, virtual-staging outputs, manufacturer analytics, search analytics, audit logs, and the entire VECS image embedding collections (`image_slig_embeddings`, `image_color/texture/style/material_embeddings`, `image_understanding_embeddings`).
+The function clears every table that holds derived/AI-produced/cached data, in FK-safe order. The list is the source of truth in `TABLES_TO_CLEAR`. Categories include: agent chat history, document/PDF processing artefacts, embeddings rows on `document_images` / `products` / `document_vectors`, image variants, generated 3D/virtual-staging outputs, manufacturer analytics, search analytics, audit logs, and the entire VECS image embedding collections (`image_slig_embeddings`, `image_color/texture/style/material_embeddings`, `image_understanding_embeddings`).
 
-Storage buckets cleared: `pdf-extracted-images`, `generated-images`, `vr-worlds`, `staging-outputs`, etc. (anything the platform produces; `quote-templates`, `profile-avatars`, and `pdf-documents` are preserved).
+Storage buckets cleared: `pdf-extracted-images`, `generated-images`, `staging-outputs`, etc. (anything the platform produces; `quote-templates`, `profile-avatars`, and `pdf-documents` are preserved).
 
 ### What is preserved
 

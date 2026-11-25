@@ -26,7 +26,6 @@ export type TriggerType =
   | 'contract_signed'
   | 'search_executed'
   | 'model_3d_created'
-  | 'vr_world_created'
   | 'agent_search_completed'
   | 'daily_brief'
   | 'product_added_to_quote'
@@ -52,7 +51,6 @@ export type TriggerType =
   | 'appointment_cancelled'
   | 'svbrdf_extraction_complete'
   | 'virtual_staging_completed'
-  | 'vr_world_failed'
   | 'video_generation_completed'
   | 'video_generation_failed'
   | 'background_agent_failed'
@@ -504,7 +502,6 @@ export interface SearchExecutedTriggerConfig {
 }
 
 export interface Model3DCreatedTriggerConfig {}
-export interface VRWorldCreatedTriggerConfig {}
 
 export interface AgentSearchCompletedTriggerConfig {
   filter_agent?: string;
@@ -565,7 +562,6 @@ export interface AppointmentConfirmedTriggerConfig {}
 export interface AppointmentCancelledTriggerConfig {}
 export interface SvbrdfExtractionCompleteTriggerConfig {}
 export interface VirtualStagingCompletedTriggerConfig {}
-export interface VRWorldFailedTriggerConfig {}
 export interface VideoGenerationCompletedTriggerConfig {}
 export interface VideoGenerationFailedTriggerConfig {}
 export interface BackgroundAgentFailedTriggerConfig {}
@@ -594,7 +590,6 @@ export type TriggerConfigMap = {
   contract_signed: ContractSignedTriggerConfig;
   search_executed: SearchExecutedTriggerConfig;
   model_3d_created: Model3DCreatedTriggerConfig;
-  vr_world_created: VRWorldCreatedTriggerConfig;
   agent_search_completed: AgentSearchCompletedTriggerConfig;
   daily_brief: Record<string, never>;
   product_added_to_quote: ProductAddedToQuoteTriggerConfig;
@@ -619,7 +614,6 @@ export type TriggerConfigMap = {
   appointment_cancelled: AppointmentCancelledTriggerConfig;
   svbrdf_extraction_complete: SvbrdfExtractionCompleteTriggerConfig;
   virtual_staging_completed: VirtualStagingCompletedTriggerConfig;
-  vr_world_failed: VRWorldFailedTriggerConfig;
   video_generation_completed: VideoGenerationCompletedTriggerConfig;
   video_generation_failed: VideoGenerationFailedTriggerConfig;
   background_agent_failed: BackgroundAgentFailedTriggerConfig;

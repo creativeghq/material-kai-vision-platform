@@ -72,7 +72,7 @@ import {
   type CanvasArtifact, type CanvasArtifactGroup,
 } from './CanvasPanel';
 import {
-  SheetInspector, StagingInspector, ProductsInspector, WorldInspector, BoardInspector, RenderInspector,
+  SheetInspector, StagingInspector, ProductsInspector, BoardInspector, RenderInspector,
   JobFindingsInspector, SourcingInspector, OrderInspector, MentionSummaryInspector, MentionFeedInspector,
   LlmVisibilityInspector, CatalogInspector, QuoteInspector,
 } from './ArtifactInspector';
@@ -140,21 +140,12 @@ import type { SheetType } from '@/services/moodboardSheetsService';
 // No agent response caching (see the send handler) — it replays stale
 // full-text answers and short-circuited the live agent. Do not reintroduce for KAI.
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
-/**
- * Lazy. WorldViewer statically imports `three` and `@sparkjsdev/spark`, so a plain import pulled
- * the entire 3D runtime (1.4 MB raw) into the Agent Hub chunk — loaded whenever anyone opens
- * /agents, whether or not a world is ever viewed. It renders at exactly two call sites, both
- * behind a flow most sessions never reach. Sibling components already do this
- * (LightingPreviewModal, ProductCard).
- */
-const WorldViewer = lazy(() => import('./WorldViewer').then((m) => ({ default: m.WorldViewer })));
 const SceneEditor = lazy(() => import('@/components/features/scenestudio/SceneEditor'));
 import { sceneStudioService, type SceneProduct } from '@/services/sceneStudioService';
 import { sceneSourceLabel as formatSceneSource } from '@/lib/scene/sceneLabels';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import type { SceneIntent, SceneRenderedEvent } from '@/components/features/scenestudio/SceneEditor';
 import type { DrawingSetSaved } from '@/components/features/scenestudio/KitchenDrawingsDialog';
-import { vrWorldService } from '@/services/vrWorldService';
 import { MoodboardSavePopover } from '@/components/business/moodboard/MoodboardSavePopover';
 import { moodboardAPI } from '@/services/moodboardAPI';
 import { ActiveMoodboardProvider, type ActiveMoodboard } from '@/contexts/ActiveMoodboardContext';
@@ -678,19 +669,6 @@ interface Message {
     room_type?: string;
     style?: string;
   }; // Async 3D generation job info for progressive loading
-  worldData?: {
-    vrWorldId: string;
-    status: 'pending' | 'uploading' | 'generating' | 'completed' | 'failed';
-    splatUrl100k?: string;
-    splatUrl500k?: string;
-    splatUrlFull?: string;
-    colliderGlbUrl?: string;
-    panoramaUrl?: string;
-    thumbnailUrl?: string;
-    caption?: string;
-    sourceImageUrl?: string;
-    prompt?: string;
-  }; // VR world data from WorldLabs Marble
   articleData?: {
     article_id: string;
     topic: string;
@@ -2268,72 +2246,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     (agent) => agent.comingSoon && roleHierarchy[userRole] >= roleHierarchy[agent.requiredRole],
   );
 
-  // Handle VR world generation from a generated room image (ProgressiveImageGrid actions).
-  const handleGenerateVR = useCallback(async (
-    imageUrl: string,
-    context: { prompt?: string; roomType?: string; style?: string; sceneRenderId?: string },
-    _sourceMessage: Message,
-  ) => {
-    try {
-      // Trigger VR generation via edge function (synchronous — awaits full WorldLabs generation)
-      const vrResult = await vrWorldService.generateVRWorld({
-        sourceImageUrl: imageUrl,
-        prompt: context.prompt || `Interior design: ${context.roomType || 'room'} in ${context.style || 'modern'} style`,
-        roomType: context.roomType,
-        style: context.style,
-        conversationId: conversationIdRef.current ?? undefined,
-      });
-
-      if (context.sceneRenderId && vrResult.vrWorldId) {
-        await sceneStudioService.linkRenderWorld(context.sceneRenderId, vrResult.vrWorldId)
-          .catch((e) => toast({ title: 'The world is ready but not linked to its room', description: e instanceof Error ? e.message : String(e), variant: 'destructive' }));
-      }
-      // World is already completed — pass all splat URLs directly to WorldViewer (no polling needed)
-      const vrMessage: Message = {
-        id: `vr-${Date.now()}`,
-        role: 'assistant',
-        content: 'Your explorable VR world is ready! Use orbit controls to look around, or switch to first-person (WASD) to walk through.',
-        timestamp: new Date(),
-        agentId: 'interior-designer',
-        worldData: {
-          vrWorldId: vrResult.vrWorldId,
-          status: (vrResult.status as 'pending' | 'uploading' | 'generating' | 'completed' | 'failed') || 'completed',
-          splatUrl100k: vrResult.splatUrl100k,
-          splatUrl500k: vrResult.splatUrl500k,
-          splatUrlFull: vrResult.splatUrlFull,
-          colliderGlbUrl: vrResult.colliderGlbUrl,
-          caption: vrResult.caption,
-          sourceImageUrl: imageUrl,
-          prompt: context.prompt,
-        },
-      };
-
-      setMessages((prev) => [...prev, vrMessage]);
-
-      // Save to DB
-      if (currentConversationId) {
-        await saveAndLinkMessage(vrMessage.id, {
-          conversationId: currentConversationId,
-          role: 'assistant',
-          content: vrMessage.content,
-          metadata: { worldData: vrMessage.worldData },
-        });
-      }
-
-      toast({
-        title: 'VR World Ready',
-        description: 'Your 3D world has been generated successfully.',
-      });
-    } catch (error: any) {
-      console.error('VR generation error:', error);
-      toast({
-        title: 'VR Generation Failed',
-        description: error.message || 'Failed to start VR world generation',
-        variant: 'destructive',
-      });
-    }
-  }, [currentConversationId, toast]);
-
   // Generate video from a Gemini-generated image
   const handleGenerateVideo = useCallback(async (
     imageUrl: string,
@@ -3185,7 +3097,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 };
                 // Don't add a message here — it will be merged into the final assistant message
                 // so the agent's explanation text and the image appear in a single bubble.
-              // Handle vr_world_ready — agent-triggered VR world generation
               } else if (chunk.type === 'visualizer_render') {
                 const vizMsg: Message = {
                   id: `msg-visualizer-${Date.now()}`,
@@ -3209,41 +3120,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   },
                 };
                 setMessages(prev => [...prev, vizMsg]);
-              } else if (chunk.type === 'vr_world_ready') {
-                const vrMsg: Message = {
-                  id: `msg-vr-${Date.now()}`,
-                  role: 'assistant',
-                  content: 'Your explorable VR world is ready! Use orbit controls to look around, or switch to first-person (WASD) to walk through.',
-                  timestamp: new Date(),
-                  agentId: selectedAgent,
-                  model: selectedModel,
-                  worldData: {
-                    vrWorldId: chunk.vr_world_id,
-                    status: (chunk.status as 'pending' | 'uploading' | 'generating' | 'completed' | 'failed') || 'completed',
-                    splatUrl100k: chunk.splat_url_100k,
-                    splatUrl500k: chunk.splat_url_500k,
-                    splatUrlFull: chunk.splat_url_full,
-                    colliderGlbUrl: chunk.collider_glb_url,
-                    caption: chunk.caption,
-                    sourceImageUrl: chunk.source_image_url,
-                    prompt: chunk.prompt,
-                  },
-                };
-                setMessages(prev => [...prev, vrMsg]);
-                if (conversationId) {
-                  await saveAndLinkMessage(vrMsg.id, {
-                    conversationId,
-                    role: 'assistant',
-                    content: vrMsg.content,
-                    metadata: { agentId: selectedAgent, model: selectedModel, worldData: vrMsg.worldData },
-                  });
-                }
-                finalResult = {
-                  type: 'final_result',
-                  text: vrMsg.content,
-                  agentId: selectedAgent,
-                  model: selectedModel,
-                };
               // Handle video_generated — agent-produced video → the rich player card (was falling
               // through to the generic JSON card because video_generated was in AGENT_RESULT_TITLES).
               } else if (chunk.type === 'video_generated' && chunk.video_url) {
@@ -3671,7 +3547,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   const sceneData = { scene_id: sc.id as string, name: (sc.name as string) || '3D room', source_kind: (sc.source_kind as string) || 'photo', ...(intent ? { intent } : {}) };
                   const opened = intent?.mode === 'walk' ? 'is open in walk mode: WASD or arrows to walk, drag to look.'
                     : intent?.mode === 'make_3d' ? 'is open with the object selected. Press Make 3D to confirm (10 credits).'
-                      : intent?.mode === 'photo_walk' ? 'is open. Confirm the photo-real walk there.'
                         : intent?.mode === 'render' ? `is rendering${intent.style ? ` in ${intent.style}` : ''}; the render arrives here.`
                           : intent?.mode === 'record_walkthrough' ? 'is recording its walkthrough video; keep this tab in front.'
                             : intent?.mode === 'drawings' ? (intent.set === 'assembly' ? (intent.save ? 'is saving its workshop assembly sheets.' : 'has its workshop assembly sheets open.') : intent.save ? 'is saving its drawings to the project.' : 'has its drawings open.')
@@ -4789,7 +4664,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           materialData: msg.metadata?.materialData as any | undefined,
           generation_job: msg.metadata?.generation_job as any | undefined,
           geminiImageData: msg.metadata?.geminiImageData as any | undefined,
-          worldData: msg.metadata?.worldData as any | undefined,
           videoData: msg.metadata?.videoData as any | undefined,
           articleData: msg.metadata?.articleData as any | undefined,
           virtualStagingData: msg.metadata?.virtualStagingData as any | undefined,
@@ -4986,7 +4860,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       };
     }
     if (m.generation_job) return { id: m.id, kind: 'render', title: m.generation_job.room_type ? `Room · ${m.generation_job.room_type}` : 'Room generation' };
-    if (m.worldData) return { id: m.id, kind: 'world', title: m.worldData.caption || m.worldData.prompt || 'VR world' };
     if (m.materialsBoardData) return { id: m.id, kind: 'board', title: 'Materials board', preview: m.materialsBoardData.image_url };
     // Video WINS when a message carries both. `renderCanvasArtifact` draws a `<video>` for a
     // gemini message that also has `videoData` — the image was animated — so naming it
@@ -5276,7 +5149,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       workspaceId={workspaceId}
       roomType={message.generation_job.room_type}
       onImageClick={(url, name) => setLightboxImage({ url, name })}
-      onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
       onOpenIn3D={can3D ? (imageUrl) => void handleOpenIn3D(imageUrl, 'render') : undefined}
       openingIn3D={openingIn3D}
       onGenerateVideo={(imageUrl, videoType, vm) => handleGenerateVideo(imageUrl, message, videoType, vm ?? videoModel)}
@@ -5840,7 +5712,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       return (
         <DemoAgentResults
           result={message.demoData}
-          onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
           onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
         />
       );
@@ -5901,7 +5772,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             sceneId={message.sceneData.scene_id}
             pinned={scenePinned}
             onRendered={(ev) => handleSceneRendered(ev, message.sceneData!.name)}
-            onWalkThrough={(imageUrl, prompt, renderId) => handleGenerateVR(imageUrl, { prompt, sceneRenderId: renderId }, message)}
             onDrawingSetSaved={(saved) => void handleDrawingSetSaved(saved)}
             onWalkthroughVideo={(video) => handleWalkthroughVideo(video)}
             intent={message.sceneData.intent}
@@ -5986,44 +5856,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
             // `DemoAgentResults`, which the stream drew when the canvas pane was hidden — so in
             // practice never, the pane being open by default. They belong on the product, and
             // this is the surface that shows products.
-            onGenerateVR={(imageUrl, context) => handleGenerateVR(imageUrl, context, message)}
             onGenerateVideo={(imageUrl) => handleGenerateVideo(imageUrl, message)}
             onUseIn3DScene={handleUseProductIn3DScene}
           />
-        </div>
-      );
-    }
-    if (message.worldData) {
-      return (
-        <div className="space-y-4">
-          {/* A lazy component MUST have a Suspense boundary above it. */}
-          <Suspense fallback={<div className="flex h-64 items-center justify-center rounded-md border border-border/60 bg-muted/20 text-xs text-muted-foreground">Loading 3D viewer…</div>}>
-            <WorldViewer
-              vrWorldId={message.worldData.vrWorldId}
-              initialStatus={message.worldData.status}
-              splatUrls={{
-                draft: message.worldData.splatUrl100k,
-                standard: message.worldData.splatUrl500k,
-                full: message.worldData.splatUrlFull,
-              }}
-              colliderUrl={message.worldData.colliderGlbUrl}
-              caption={message.worldData.caption}
-              onRetry={() => {
-                if (message.worldData?.sourceImageUrl) {
-                  handleGenerateVR(message.worldData.sourceImageUrl, { prompt: message.worldData.prompt }, message);
-                }
-              }}
-            />
-          </Suspense>
-          {message.worldData.splatUrl100k && (
-            <div className="flex justify-end">
-              <MoodboardSavePopover
-                mediaUrl={message.worldData.splatUrl100k}
-                mediaType="vr_world"
-                mediaTitle={message.worldData.caption || message.worldData.prompt || 'VR World'}
-              />
-            </div>
-          )}
         </div>
       );
     }
@@ -6133,7 +5968,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.materialData?.products && message.materialData.products.length > 0) {
       return <ProductsInspector data={message.materialData} />;
     }
-    if (message.worldData) return <WorldInspector data={message.worldData} />;
     if (message.materialsBoardData) return <BoardInspector data={message.materialsBoardData} />;
     if (message.jobFindingsData) return <JobFindingsInspector data={message.jobFindingsData} />;
     if (message.sourcingOptionsData) return <SourcingInspector data={message.sourcingOptionsData} />;
@@ -7683,10 +7517,6 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           workspaceId={workspaceId}
           onOpenIn3D={can3D ? (imageUrl) => void handleOpenIn3D(imageUrl, geminiModalImage.kind === 'uploaded' ? 'photo' : 'render') : undefined}
           openingIn3D={openingIn3D}
-          onGenerateVR={(imageUrl, context) => {
-            const ownerMsg = messages.find(m => m.geminiImageData?.image_url === imageUrl) ?? messages[messages.length - 1];
-            handleGenerateVR(imageUrl, context, ownerMsg);
-          }}
           onGenerateVideo={(imageUrl, videoType, vm) => {
             const ownerMsg = messages.find(m => m.geminiImageData?.image_url === imageUrl) ?? messages[messages.length - 1];
             handleGenerateVideo(imageUrl, ownerMsg, videoType, vm ?? videoModel);

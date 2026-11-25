@@ -38,13 +38,6 @@ const ID_SOURCES: { file: string; extract: (src: string) => string[] }[] = [
     },
   },
   {
-    file: 'supabase/functions/generate-vr-world/index.ts',
-    extract: (src) => {
-      const block = src.match(/CREDIT_COSTS:\s*Record<string, number>\s*=\s*\{([\s\S]*?)\}/)?.[1] ?? '';
-      return [...block.matchAll(/'([^']+)'\s*:/g)].map((m) => m[1]);
-    },
-  },
-  {
     // The video model dropdown — the exact surface that offered a 404 model at 12 credits.
     // Anchored on the VIDEO_MODEL_OPTIONS declaration rather than on the JSX: the list was
     // hoisted out of the render when the picker and the generator's CREDIT_COSTS had to be

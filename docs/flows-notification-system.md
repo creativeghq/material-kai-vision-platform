@@ -132,7 +132,7 @@ Defined in `src/services/flows/types.ts` (`TriggerType`). Beyond the originals
 
 `quote_pdf_generated`, `factory_approved`, `factory_rejected`,
 `appointment_booked/confirmed/cancelled`, `svbrdf_extraction_complete`,
-`virtual_staging_completed`, `vr_world_failed`,
+`virtual_staging_completed`, 
 `video_generation_completed/failed`, `background_agent_failed`,
 `role_upgrade_request_submitted/approved/rejected`,
 `stripe_payment_succeeded/failed`, `project_invitation_sent/resent`.
@@ -252,7 +252,6 @@ emits an enriched payload (`user_id`/recipient, `title`, `body`, `action_url`,
 | `profile_followed` | `FollowButton.tsx` | Create Notification |
 | `material_reviewed` | `MaterialReviews.tsx` | Create Notification (owner) |
 | `preferred_factory_added` | `AmbassadorTab.tsx` | Create Notification (brand) |
-| `vr_world_created` / `vr_world_failed` | `generate-vr-world` | Create Notification |
 | `virtual_staging_completed` | `generate-virtual-staging` | Create Notification |
 | `video_generation_completed` / `_failed` | `generate-interior-video-v2` | Create Notification |
 | `svbrdf_extraction_complete` | `svbrdfExtractionAPI.ts` | Create Notification |

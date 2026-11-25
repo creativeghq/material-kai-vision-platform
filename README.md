@@ -33,7 +33,7 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 - **Search Accuracy**: 85%+
 - **Uptime**: 99.5%+
 - **API Endpoints**: 150+
-- **AI Models**: 12+ across 5 providers (Anthropic, OpenAI, Voyage AI, Modal, WorldLabs)
+- **AI Models**: 12+ across 5 providers (Anthropic, OpenAI, Voyage AI, Modal)
 
 ---
 
@@ -69,7 +69,6 @@ The **Material Kai Vision Platform** is a production-grade AI system that transf
 4. **Voyage AI**: voyage-4 (primary text + understanding embeddings, 1024D)
 5. **SLIG / SigLIP2 (Modal)**: `google/siglip2-base-patch16-512` — the visual encoder (768D `visual` vector) plus zero-shot + text→visual query embedding. Moved off HuggingFace onto Modal 2026-06-14; the 4 aspect vectors (color, texture, style, material — 1024D each) are Voyage-embedded from the vision analysis, not SLIG
 6. **Replicate**: 14 interior design models (FLUX, SDXL, Stable Diffusion 3, etc.)
-7. **WorldLabs Marble**: 3D Gaussian Splat world generation (mini + plus models)
 
 ### **System Diagram**
 ```
@@ -188,7 +187,6 @@ LOG_LEVEL=ERROR
 #### **Supabase Edge Function Secrets**
 ```bash
 ANTHROPIC_API_KEY=your_anthropic_key
-WORLDLABS_API_KEY=your_worldlabs_key   # Required for VR world generation
 FIRECRAWL_API_KEY=your_firecrawl_key   # Required for B2B company scraping
 APOLLO_API_KEY=your_apollo_key          # Required for B2B company enrichment
 HUNTER_API_KEY=your_hunter_key          # Required for B2B contact discovery
@@ -325,7 +323,6 @@ curl https://v1api.materialshub.gr/docs
 
 ### **3. AI Agents & Chat**
 - **Jarvis Agent** (unified): Material search, knowledge base, visual search, B2B manufacturer discovery, SEO — all users; B2B/SEO tools gated to admin/owner
-- **Interior Designer Agent**: Room design, spatial analysis, VR world generation
 - **Demo Agent**: Platform showcase with pre-defined responses
 - **LangChain.js + LangGraph**: StateGraph orchestration, tool calling, long-term memory
 - **Database-Driven Prompts**: Real-time prompt updates without deployment
@@ -338,13 +335,6 @@ curl https://v1api.materialshub.gr/docs
 - Permanent storage in Supabase
 - Credit-based billing system
 - Models: FLUX, SDXL, Stable Diffusion 3, Playground, ComfyUI
-
-### **5b. VR World Generation**
-- WorldLabs Marble API: generates explorable 3D Gaussian Splat worlds from interior images
-- Spark.js renderer (Three.js-based) with orbit + WASD first-person navigation
-- 3 quality levels (Draft 100k / Standard 500k / Full SPZ)
-- Credit-based: 50 credits (mini, ~30-45s) or 200 credits (plus, ~5min)
-- Persists across sessions; stored in `vr_worlds` table
 
 ### **6. Price Monitoring**
 - Competitive price tracking across sources
@@ -509,7 +499,6 @@ This project is proprietary software owned by Creative GHQ.
 - **Anthropic**: Claude 4.5 models + built-in web search
 - **Modal**: PaddleOCR-VL layout + OCR backbone; SLIG SigLIP2 visual embeddings
 - **Voyage AI**: voyage-4 text embeddings
-- **WorldLabs**: Marble 3D Gaussian Splat generation
 - **Supabase**: Database and backend infrastructure
 - **Cloudflare Workers**: Frontend hosting and deployment (`cloudflare/app-worker`)
 

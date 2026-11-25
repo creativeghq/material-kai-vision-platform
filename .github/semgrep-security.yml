@@ -460,7 +460,7 @@ rules:
   # every one of the nine sites was doing.
   #
   # `assertSafeUrl` is a sanitizer, so guarding the URL first clears the finding — which is why
-  # the correctly-guarded sites (generate-vr-world, pinterest-api, workspace-webhook-dispatcher)
+  # the correctly-guarded sites (pinterest-api, workspace-webhook-dispatcher)
   # do not fire and did not need annotating.
   #
   # The fix is `fetchImageGuarded` / `fetchBinaryGuarded` from `_shared/fetch-image.ts`, which

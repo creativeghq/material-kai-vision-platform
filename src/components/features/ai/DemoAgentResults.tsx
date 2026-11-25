@@ -17,9 +17,7 @@ import { useShowPrices } from '@/hooks/useShowPrices';
 interface DemoAgentResultsProps {
   result: any;
   categoryColors?: Record<string, string>;
-  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
-  vrGenerating?: boolean;
 }
 
 const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
@@ -34,9 +32,7 @@ const DEFAULT_CATEGORY_COLORS: Record<string, string> = {
 export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
   result,
   categoryColors = DEFAULT_CATEGORY_COLORS,
-  onGenerateVR,
   onGenerateVideo,
-  vrGenerating,
 }) => {
   const { showPrices } = useShowPrices();
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -88,9 +84,7 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           product={selectedProduct}
           isOpen={isModalOpen}
           onClose={handleCloseModal}
-          onGenerateVR={onGenerateVR}
           onGenerateVideo={onGenerateVideo}
-          vrGenerating={vrGenerating}
         />
       </div>
     );
@@ -152,8 +146,6 @@ export const DemoAgentResults: React.FC<DemoAgentResultsProps> = ({
           design={selected3DDesign}
           isOpen={is3DModalOpen}
           onClose={handle3DModalClose}
-          onGenerateVR={onGenerateVR}
-          vrGenerating={vrGenerating}
         />
       </>
     );

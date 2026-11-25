@@ -192,7 +192,7 @@ Partners run as the `member` role. Available tools:
 - `seo_research_keyword` — research card for a keyword (DataForSEO + opportunity engine)
 - Most SEO toolkit tools (keyword difficulty, SERP audit, domain snapshot, ranked keywords, backlinks, trends, YouTube/Reddit/Pinterest/Amazon/Trustpilot search) — 0-credit user-facing wrappers around DataForSEO
 - Mention monitoring tools — `track_product_mentions`, `get_mention_summary`, `check_llm_visibility`, `find_negative_mentions`
-- `interior-designer` only — `generate_3d`, `apply_lighting_preset`, `generate_vr_world`
+- `interior-designer` only — `generate_3d`, `apply_lighting_preset`
 
 **Blocked for partner keys** (admin/owner-only — server-side gating via the `member` role lock)
 - `b2b_manufacturer_search`, `company_website_scrape`, `company_enrichment`, `contact_discovery`, `email_validate`, `save_to_crm`
@@ -211,7 +211,7 @@ If your integration needs anything in the blocked list, contact us — we can ei
 
 - **Rate limit**: `rate_limit_override` on the api_keys row caps requests/minute (default 60, max 600). 429 is enforced upstream at the Supabase function gateway, not in this function.
 - **Conversation memory**: agent-chat persists conversation history server-side keyed by `conversation_id` (Supabase `conversations` + `conversation_messages` tables). If you pass the same `conversation_id` across turns, the agent will see prior context automatically — you don't need to replay every prior message in `messages`. If you don't pass it (or pass `null`), no server-side memory is written for that thread; you're responsible for sending the full message history yourself.
-- **Long-running tools**: some tools (3D generation, VR world generation, full-deck PDF) can take 30s–5min. The agent emits `generation_job_created` immediately with a `job_id` and returns; you poll a separate job-status endpoint for completion. This pattern keeps the agent turn snappy and your HTTP connection from timing out.
+- **Long-running tools**: some tools (3D generation, full-deck PDF) can take 30s–5min. The agent emits `generation_job_created` immediately with a `job_id` and returns; you poll a separate job-status endpoint for completion. This pattern keeps the agent turn snappy and your HTTP connection from timing out.
 - **Multimodal**: pass images as `data:image/jpeg;base64,...` data URLs in the `images` array (forwarded as `image_url` blocks on the last user message) and PDFs the same way in `documents` (forwarded as native document blocks). The per-turn limits are **enforced, not advisory** — 12 images, 6 documents, and ~32MB of base64 across both. Over any of them the call is refused with **413** before any model work, body `{ "error": "<sentence>", "code": "too_many_images" | "too_many_documents" | "attachments_too_large" }`. Split the turn rather than retrying; the limits are a cost guard (attachments are billed as input tokens against a flat per-turn fee) and are declared once in `src/config/agentAttachmentLimits.ts`.
 - **No automatic background calls**: agent-chat is purely on-demand. Partners are never billed for cron-driven refreshes of agent state.
 

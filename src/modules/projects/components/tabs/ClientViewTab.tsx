@@ -42,7 +42,6 @@ interface ClientViewTabProps {
 
 type AvailableSheet = Awaited<ReturnType<typeof projectsService.listProjectSheets>>[number];
 type ProjectQuote = { id: string; name: string | null; quote_number: string | null; status: string | null; grand_total: number | null; currency: string | null };
-type VrWorld = { id: string; display_name: string | null; thumbnail_url: string | null; from_project_room?: boolean };
 
 const STATUS_TONE: Record<string, string> = {
   draft: 'bg-muted text-muted-foreground border-border',
@@ -58,12 +57,10 @@ interface FormState {
   clientName: string;
   date: string;
   selectedSheetIds: string[];
-  embedVr: boolean;
   embedLighting: boolean;
   embedFfe: boolean;
   feedbackEnabled: boolean;
   quoteId: string;
-  vrWorldId: string;
   embedRoomPlan: boolean;
   roomLayoutId: string;
   embedWalkthrough: boolean;
@@ -77,12 +74,10 @@ const emptyForm = (): FormState => ({
   clientName: '',
   date: todayLocalISO(),
   selectedSheetIds: [],
-  embedVr: true,
   embedLighting: true,
   embedFfe: true,
   feedbackEnabled: true,
   quoteId: '',
-  vrWorldId: '',
   embedRoomPlan: false,
   roomLayoutId: '',
   embedWalkthrough: false,
@@ -95,7 +90,6 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const [views, setViews] = useState<ClientView[]>([]);
   const [sheets, setSheets] = useState<AvailableSheet[]>([]);
   const [quotes, setQuotes] = useState<ProjectQuote[]>([]);
-  const [vrWorlds, setVrWorlds] = useState<VrWorld[]>([]);
   const [roomLayouts, setRoomLayouts] = useState<Array<{ id: string; name: string }>>([]);
   const [layoutsFailed, setLayoutsFailed] = useState(false);
   const [scenes, setScenes] = useState<Array<{ id: string; name: string }>>([]);
@@ -112,11 +106,10 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const load = useCallback(async () => {
     try {
       setLoading(true);
-      const [v, s, q, w, plans] = await Promise.all([
+      const [v, s, q, plans] = await Promise.all([
         clientViewsService.listForProject(projectId),
         projectsService.listProjectSheets(projectId),
         projectsService.listProjectQuotes(projectId),
-        clientViewsService.listVrWorlds(projectId),
         // Room plans are workspace-scoped, not project-scoped — `room_layouts` has no project_id —
         // so this offers the workspace's plans rather than pretending there is a narrower set.
         activeWorkspaceId
@@ -129,7 +122,6 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       void fetchDeliveryTrails('client_view', v.map((x) => x.id)).then(setTrails).catch(() => setTrails({}));
       setSheets(s);
       setQuotes((q || []).map((x: any) => ({ id: x.id, name: x.name, quote_number: x.quote_number, status: x.status ?? null, grand_total: x.grand_total ?? null, currency: x.currency ?? null })));
-      setVrWorlds(w);
       setRoomLayouts((plans ?? []).map((l) => ({ id: l.id, name: l.name ?? 'Untitled room' })));
       if (activeWorkspaceId) {
         const { data: fp } = await supabase.from('floor_plans').select('id, name, project_id').eq('workspace_id', activeWorkspaceId)
@@ -160,8 +152,7 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
   const sheetById = useMemo(() => new Map(sheets.map((s) => [s.id, s])), [sheets]);
 
   const openCreate = () => {
-    const ownWorld = vrWorlds.find((w) => w.from_project_room);
-    setForm({ ...emptyForm(), title: `${projectName} — Client Presentation`, clientName: clientDisplayName, ...(ownWorld ? { vrWorldId: ownWorld.id } : {}) });
+    setForm({ ...emptyForm(), title: `${projectName} — Client Presentation`, clientName: clientDisplayName });
     setEditorOpen(true);
   };
 
@@ -173,12 +164,10 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       clientName: view.cover?.client_name || '',
       date: view.cover?.date ? view.cover.date.slice(0, 10) : todayLocalISO(),
       selectedSheetIds: [...(view.sheet_ids || [])],
-      embedVr: view.embed_vr,
       embedLighting: view.embed_lighting,
       embedFfe: view.embed_ffe,
       feedbackEnabled: view.feedback_enabled,
       quoteId: view.quote_id || '',
-      vrWorldId: view.vr_world_id || '',
       embedRoomPlan: view.embed_room_plan ?? false,
       roomLayoutId: view.room_layout_id || '',
       embedWalkthrough: view.embed_walkthrough ?? false,
@@ -219,12 +208,10 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
       client_name: form.clientName.trim() || undefined,
       date: new Date(form.date).toISOString(),
     },
-    embed_vr: form.embedVr,
     embed_lighting: form.embedLighting,
     embed_ffe: form.embedFfe,
     feedback_enabled: form.feedbackEnabled,
     quote_id: form.quoteId || null,
-    vr_world_id: form.vrWorldId || null,
     embed_room_plan: form.embedRoomPlan,
     room_layout_id: form.roomLayoutId || null,
     embed_walkthrough: form.embedWalkthrough,
@@ -439,7 +426,6 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
 
             {/* Online embeds */}
             <div className="grid sm:grid-cols-2 gap-3">
-              <ToggleRow label="Explorable World (Marble)" desc="Embed an explorable 3D world in the online version" checked={form.embedVr} onChange={(v) => setForm({ ...form, embedVr: v })} />
               <ToggleRow label="Lighting Moods" desc="Let the client preview the render under different lighting" checked={form.embedLighting} onChange={(v) => setForm({ ...form, embedLighting: v })} />
               <ToggleRow label="Live FF&E Pricing" desc="Show an interactive FF&E table from a quote" checked={form.embedFfe} onChange={(v) => setForm({ ...form, embedFfe: v })} />
               <ToggleRow label="Client Feedback" desc="Allow inline approve / comment on the online page" checked={form.feedbackEnabled} onChange={(v) => setForm({ ...form, feedbackEnabled: v })} />
@@ -469,20 +455,6 @@ export const ClientViewTab: React.FC<ClientViewTabProps> = ({ projectId, project
                     }
                     return null;
                   })()}
-                </div>
-              )}
-              {form.embedVr && (
-                <div className="space-y-1.5">
-                  <Label>3D world</Label>
-                  <Select value={form.vrWorldId || '__none__'} onValueChange={(v) => setForm({ ...form, vrWorldId: v === '__none__' ? '' : v })}>
-                    <SelectTrigger><SelectValue placeholder="— none —" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">— none —</SelectItem>
-                      {vrWorlds.map((w) => (
-                        <SelectItem key={w.id} value={w.id}>{w.display_name || w.id.slice(0, 8)}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               )}
               {/* Room plan (#259 Ph4). The planner was private to whoever drew it — a designer

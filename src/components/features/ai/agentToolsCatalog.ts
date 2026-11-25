@@ -1207,14 +1207,6 @@ const INTERIOR_DESIGNER_TOOLS: AgentToolEntry[] = [
     ],
   },
   {
-    id: 'generate_vr_world', name: 'VR World', category: 'Generation',
-    imageRequired: true, credits: 18,
-    desc: 'Generate an explorable 3D Gaussian Splat world from a room image (WorldLabs Marble).',
-    examples: [
-      'Build a VR world for this room (draft model)',
-    ],
-  },
-  {
     id: 'generate_video', name: 'Interior Video', category: 'Generation',
     imageRequired: true, credits: 20,
     desc: 'Animate a room image into a video — walkthrough, product spotlight, before/after, floorplan flythrough or a 9:16 social reel. 12–40 credits depending on model.',
@@ -1241,7 +1233,7 @@ const INTERIOR_DESIGNER_TOOLS: AgentToolEntry[] = [
   },
   {
     id: 'manage_client_view', name: 'Client Package', category: 'Generation',
-    desc: 'Put a project\'s drawings, sheets, quote, walkthrough and explorable world on one client view, by id.',
+    desc: 'Put a project\'s drawings, sheets, quote and walkthrough on one client view, by id.',
     examples: [
       'Add the kitchen drawings and the accepted quote to the client view of the Papadopoulos project',
     ],
@@ -1390,7 +1382,7 @@ export interface ToolkitQuickStartGeneration {
    * Generation pipeline to force as `selectedGenerationMode` on the send:
    * 'image-edit' | 'redesign' | 'copy-style' | 'floor-plan-render'. Omit to let
    * the interior agent route from the rendered prompt (used by re-light → the
-   * lighting tool, and VR world → the VR tool).
+   * lighting tool).
    */
   mode?: string;
   /**
@@ -3374,10 +3366,10 @@ export const TOOLKITS: ToolkitDefinition[] = [
     id: 'generation',
     capability: ['moodboards.use', 'projects.use', 'quotes.use', 'marketing.seo', 'realestate.listings.manage'],
     name: 'Interior Design',
-    description: 'Design a room, test a material on your photo, stage, re-light, render a floor plan, build a VR world — each is a guided process, not a blank prompt.',
+    description: 'Design a room, test a material on your photo, stage, re-light, render a floor plan — each is a guided process, not a blank prompt.',
     icon: 'Sparkles',
     tool_ids: [
-      'generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video',
+      'generate_3d', 'apply_lighting_preset', 'generate_video',
       // Both drive quick-starts in this cluster already (the gemini-edit canvas and
       // the staging wizard) — they were simply never listed, so the picker undercounted
       // the kit and load_toolkit could not bind them.
@@ -3401,7 +3393,6 @@ export const TOOLKITS: ToolkitDefinition[] = [
       },
       { label: 'Walk Through a Room', description: 'Walk a 3D room at eye height, room to room', prompt: 'Open my latest 3D room in walk mode.', icon: 'Compass' },
       { label: 'Make an Object 3D', description: 'Turn a sofa, bed or lamp in a 3D room into a photo-real model', prompt: 'In my latest 3D room, make the sofa 3D.', icon: 'Package' },
-      { label: 'Photo-Real Walk', description: 'A walkable photo-real world of one space', prompt: 'Give me a photo-real walk of the living room in my latest 3D room.', icon: 'Globe' },
       { label: 'Finish a Room Surface', description: 'Lay a tile, wood or paint on a floor, the walls or a ceiling of a 3D room', prompt: 'In my latest 3D room, lay Amonito on the living room floor.', icon: 'Palette' },
       { label: 'Price the Kitchen', description: 'Turn the kitchen in a 3D room into a priced plan you can quote', prompt: 'Price the kitchen in my latest 3D room.', icon: 'Calculator' },
       { label: 'Change an Object Material', description: 'A new fabric, colour or finish for one part of a sofa, kitchen, table or bed', prompt: 'In my latest 3D room, make the sofa upholstery dark green and the legs black.', icon: 'Palette' },
@@ -3628,28 +3619,9 @@ export const TOOLKITS: ToolkitDefinition[] = [
         ],
       },
       {
-        label: 'VR world',
-        description: 'Build an explorable Gaussian Splat world from a room image',
-        icon: 'Globe',
-        imageRequired: true,
-        prompt: 'Build a VR world from this room image.',
-        promptTemplate: 'Turn this room image into an explorable VR world using the {{model}} model.',
-        // No forced mode — the interior agent routes to the VR tool.
-        generation: { imageKeys: ['photo'] },
-        form: [
-          { key: 'photo', label: 'Room Image', kind: 'image', required: true },
-          // Values are generate_vr_world's `model` z.enum, not the invented
-          // 'draft' / 'high-quality' pair they used to be — those matched no enum
-          // member, so the agent had to guess the mapping on every single run.
-          { key: 'model', label: 'Quality', kind: 'select', default: 'marble-1.1', options: [
-            { value: 'marble-1.1', label: 'High Quality (190 Credits)' },
-          ] },
-        ],
-      },
-      {
         // generate_video sat in this cluster's tool_ids with NO quick-start at all,
-        // so five video types and four models lived only in the schema. Same rail as
-        // the VR world flow: capture the photo, let the interior agent route to the
+        // so five video types and four models lived only in the schema. Capture
+        // the photo, let the interior agent route to the
         // tool with the pipeline's public image URL.
         label: 'Make a video',
         description: 'Animate a room image into a walkthrough, reel, or before/after',
@@ -3670,8 +3642,8 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // The promptTemplate has always interpolated {{model}} and the form never
           // collected it, so every rendered sentence read "using the  model" and the
           // four models lived only in the schema. Values are generate_video's `model`
-          // z.enum — the drift guard resolves this key against it, not against
-          // generate_vr_world.model, by matching the offered values.
+          // z.enum — the drift guard resolves this key against it, by matching
+          // the offered values.
           { key: 'model', label: 'Model', kind: 'select', default: 'gemini-omni-1.2-flash-720p', options: [
             { value: 'gemini-omni-1.2-flash-720p', label: 'Gemini Omni 720p — 15s with audio, 20 credits' },
             { value: 'gemini-omni-1.2-flash-1080p', label: 'Gemini Omni 1080p — 15s with audio, 30 credits' },

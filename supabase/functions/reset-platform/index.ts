@@ -118,7 +118,6 @@ const TABLES_TO_CLEAR = [
   'generation_3d_segments',        // 3D generation segments (child of generation_3d)
   'generation_3d',                 // 3D generation history
   'generation_videos',             // Video generation history
-  'vr_worlds',                     // WorldLabs Marble VR worlds
 
   // ── Analytics (user-generated + derived metrics) ────────────────────
   'analytics_events',              // Analytics events

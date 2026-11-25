@@ -21,18 +21,10 @@ const EXEMPT: Record<string, string> = {
   'OrderLinkPicker.allowProperty':
     'Same per-control design, plus: `invoices` has no `property_id`, so InvoiceActionsMenu offering '
     + 'the group would ship a row that silently does nothing — the failure the picker exists to avoid.',
-  'ProductDetailModal.onGenerateVR':
-    'Both of these SPEND CREDITS and their output has nowhere to land outside the agent chat yet '
+  'ProductDetailModal.onGenerateVideo':
+    'It SPENDS CREDITS and its output has nowhere to land outside the agent chat yet '
     + '(#378 F4 / N7 — `generation_videos` links to no product, project or moodboard). A button '
-    + 'that starts a paid job with no surface to show the result is worse than no button. The '
-    + 'third action of that row, "place it in a room", needed no prop at all in the end: the Room '
-    + 'Planner already accepts `?product=`, so the modal does it BY DEFAULT and the handler is '
-    + 'only an override.',
-  'ProductDetailModal.onGenerateVideo': 'See onGenerateVR — same credits, same missing surface.',
-  'WorldViewer.onRetry':
-    'PublicListingPage withholds it BECAUSE retrying spends 18 credits and an anonymous visitor '
-    + 'must not be able to. PropertyWorkbench was the real gap and now passes it, gated on '
-    + '`editable`, running the same `startWalkthrough` the Create button runs (#378 F5).',
+    + 'that starts a paid job with no surface to show the result is worse than no button.',
   'ProgressiveImageGrid.onZoneSelectedForReplacement':
     'The second mount is the direct-image modal (`jobId=""`, `modelCount={0}`), which shows one '
     + 'finished image rather than a job grid — there are no zones to select.',

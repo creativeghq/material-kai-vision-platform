@@ -9,7 +9,6 @@ Subscription plans and credit-based usage billing via Stripe.
 The platform uses a two-track billing model:
 
 1. **Subscriptions** — Monthly/annual plans that include a credit allowance and feature access
-2. **Credits** — Consumable units spent on AI generation features (images, video, VR worlds, etc.)
 
 **Frontend Routes:**
 - `/billing/subscriptions` — Manage subscription plan
@@ -44,8 +43,6 @@ Credits are workspace-scoped. Each generation feature deducts a fixed amount.
 | Interior video (Kling v3.0) | 20 | `generate-interior-video-v2` |
 | Interior video (Veo-2) | 30 | `generate-interior-video-v2` |
 | Interior video (Runway Gen4 Turbo) | 40 | `generate-interior-video-v2` |
-| VR World (Marble mini) | 50 | `generate-vr-world` |
-| VR World (Marble plus) | 200 | `generate-vr-world` |
 | AI search re-ranking | Usage-based | `ai-rerank` |
 
 ### Credit Balance

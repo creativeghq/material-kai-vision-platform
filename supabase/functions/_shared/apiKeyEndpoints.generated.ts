@@ -45,7 +45,6 @@ export const API_KEY_ENDPOINTS: ReadonlySet<string> = new Set([
   'generate-social-image',
   'generate-social-video',
   'generate-virtual-staging',
-  'generate-vr-world',
   'gsc-api',
   'hr-api',
   'inbound-structured-fetch',

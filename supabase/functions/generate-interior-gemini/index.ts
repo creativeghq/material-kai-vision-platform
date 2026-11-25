@@ -508,7 +508,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
   // ── What may be edited (see _shared/image-edit-gate.ts) ──────────────────────────────
   // This function is the chokepoint for every image the platform alters: the agent's
   // generate_gemini tool, AgentHub's edit modal, projectsService, productMaterialMapsService
-  // and generate-vr-world all land here. The gate goes HERE and not in the agent's prompt
+  // all land here. The gate goes HERE and not in the agent's prompt
   // because three of those five callers never involve a model turn at all.
   const EDIT_MODES: GenerationMode[] = ['image-edit', 'redesign', 'copy-style', 'floor-plan-render', 'floor-plan-3d', 'unstage', 'scene-render'];
   const gatedSources = EDIT_MODES.includes(mode)

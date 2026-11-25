@@ -195,14 +195,6 @@ async function renderKaiBlock(
       return layout === 'list' ? listHtml(items) : gridHtml(items, Math.max(1, Math.min(cols, 3)));
     }
 
-    if (type === 'vr3d') {
-      const { data: worlds } = await supabase.from('vr_worlds')
-        .select('id, status, panorama_url, thumbnail_url').eq('status', 'completed')
-        .order('created_at', { ascending: false }).limit(count);
-      if (!worlds?.length) return '<!-- KAI block: no completed 3D worlds found -->';
-      const items = worlds.map(w => ({ image: w.panorama_url || w.thumbnail_url || '', title: 'Material World', subtitle: 'Explore in 3D', url: '#' }));
-      return layout === 'list' ? listHtml(items) : gridHtml(items, Math.max(1, Math.min(cols, 3)));
-    }
   } catch (err) {
     console.error('MH block render error:', err);
   }
@@ -384,7 +376,7 @@ async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
       '</td></tr></table>',
   });
 
-  // ── Shared layout traits (used by top_week, top_month, moodboard, vr3d) ──
+  // ── Shared layout traits (used by top_week, top_month, moodboard) ──
   const layoutTraits = [
     { type: 'number', label: 'Items to Show', name: 'data-count', min: 1, max: 12 },
     { type: 'select', label: 'Layout', name: 'data-layout',
@@ -447,15 +439,6 @@ async function addMhBlocks(editor: GrapesEditor, isPlatformOperator: boolean) {
       blockId: 'moodboard',
       label: 'Latest Moodboards',
       iconKey: 'image',
-      category: CAT_INSPIRATION,
-      defaultCount: 3,
-      defaultCols: 3,
-      traits: layoutTraits,
-    },
-    {
-      blockId: 'vr3d',
-      label: 'Latest 3D Worlds',
-      iconKey: 'cube',
       category: CAT_INSPIRATION,
       defaultCount: 3,
       defaultCols: 3,

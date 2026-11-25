@@ -1854,46 +1854,6 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     }
   },
   {
-    "name": "generate-vr-world",
-    "tag": "AI Generation",
-    "methods": [
-      "POST"
-    ],
-    "summary": "Generate explorable 3D Gaussian Splat VR world from an interior image via WorldLabs Marble",
-    "description": "Uploads source image to WorldLabs, triggers Marble world generation, polls for completion, stores splat URLs in the vr_worlds table. Model: marble-1.1 (190cr, ~7min); the marble-1.0-draft tier was retired. Set is_pano=true for 360° panoramic source images. Accepts service-role key for agent-chat internal calls.",
-    "fields": {
-      "source_image_url": {
-        "type": "string",
-        "description": "Required. Public URL of the interior image"
-      },
-      "prompt": {
-        "type": "string",
-        "description": "Required. Scene description prompt"
-      },
-      "room_type": {
-        "type": "string"
-      },
-      "style": {
-        "type": "string"
-      },
-      "model": {
-        "type": "string",
-        "enum": [
-          "marble-1.1"
-        ],
-        "description": "WorldLabs model; marble-1.1 is the only tier"
-      },
-      "is_pano": {
-        "type": "boolean",
-        "description": "Set true for panoramic (360°) source images"
-      },
-      "user_id": {
-        "type": "string",
-        "description": "Required when called with service-role key (server-to-server)"
-      }
-    }
-  },
-  {
     "name": "gsc-api",
     "tag": "SEO",
     "methods": [
@@ -1930,7 +1890,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Check liveness and key validity of all AI providers and external services",
-    "description": "Requires any valid Supabase JWT (not just admin). Runs parallel checks: Claude (GET /v1/models), OpenAI (GET /v1/models), HuggingFace (whoami), Voyage AI (POST /v1/embeddings), MIVAA embeddings + AI-services health endpoints, and HEAD reachability probes for Zernio, Apollo, Hunter.io, ZeroBounce, Firecrawl, WorldLabs, Stripe, and module-gated services (e.g. Greek marketplace URLs when greek-market"
+    "description": "Requires any valid Supabase JWT (not just admin). Runs parallel checks: Claude (GET /v1/models), OpenAI (GET /v1/models), HuggingFace (whoami), Voyage AI (POST /v1/embeddings), MIVAA embeddings + AI-services health endpoints, and HEAD reachability probes for Zernio, Apollo, Hunter.io, ZeroBounce, Firecrawl, Stripe, and module-gated services (e.g. Greek marketplace URLs when greek-marketplaces modu"
   },
   {
     "name": "hr-api",

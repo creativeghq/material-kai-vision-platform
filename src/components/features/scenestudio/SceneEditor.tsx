@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Box, Eye, FileText, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
-  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Globe, Aperture, Eraser, Film,
+  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Aperture, Eraser, Film,
 } from 'lucide-react';
 
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
@@ -16,7 +16,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/core/ui/to
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/core/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
-import { VR_CREDIT_COSTS } from '@/services/vrWorldService';
 import {
   publicUrl, sceneStudioService,
   type LayoutEntry, type SceneData, type SceneObject, type SceneObjectFinish, type SceneProduct, type SceneRender, type SceneSurface,
@@ -68,14 +67,13 @@ export interface SceneEditorProps {
   sceneId: string;
   pinned?: SceneProduct[];
   onRendered?(event: SceneRenderedEvent): void;
-  onWalkThrough?(imageUrl: string, prompt: string, renderId: string): void;
   onDrawingSetSaved?(saved: DrawingSetSaved): void;
   onWalkthroughVideo?(video: { id: string; video_url: string; label: string }): void;
   intent?: SceneIntent;
 }
 
 export interface SceneIntent {
-  mode: 'view' | 'walk' | 'make_3d' | 'photo_walk' | 'drawings' | 'render' | 'record_walkthrough';
+  mode: 'view' | 'walk' | 'make_3d' | 'drawings' | 'render' | 'record_walkthrough';
   object_id: string | null;
   room_id?: string | null;
   fronts?: FrontsState;
@@ -153,7 +151,7 @@ const DockButton: React.FC<{ label: string; hint?: string; active?: boolean; dis
   </Tooltip>
 );
 
-const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen(): void; onStand?(): void; onPhotoWalk?(): void }> = ({ title, meta, active, onOpen, onStand, onPhotoWalk }) => (
+const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen(): void; onStand?(): void }> = ({ title, meta, active, onOpen, onStand }) => (
   <div className={`flex w-48 shrink-0 items-stretch overflow-hidden rounded-md border bg-card ${active ? 'border-primary ring-1 ring-primary' : 'border-hairline'}`}>
     <button type="button" onClick={onOpen} className="min-w-0 flex-1 px-3 py-2 text-left hover:bg-surface-sunken">
       <span className="block truncate text-sm font-medium">{title}</span>
@@ -164,11 +162,6 @@ const SpaceCard: React.FC<{ title: string; meta: string; active: boolean; onOpen
         <Footprints className="h-4 w-4" />
       </button>
     )}
-    {onPhotoWalk && (
-      <button type="button" onClick={onPhotoWalk} className="flex items-center border-l border-hairline px-2.5 text-muted-foreground hover:bg-surface-sunken hover:text-foreground" title="Photo-real walk" aria-label={`Photo-real walk of ${title}`}>
-        <Globe className="h-4 w-4" />
-      </button>
-    )}
   </div>
 );
 
@@ -176,7 +169,7 @@ const hasWebGL2 = () => {
   try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
 };
 
-export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWalkThrough, onDrawingSetSaved, onWalkthroughVideo, intent }: SceneEditorProps) {
+export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDrawingSetSaved, onWalkthroughVideo, intent }: SceneEditorProps) {
   const { toast } = useToast();
   const canvasRef = useRef<SceneCanvasHandle>(null);
 
@@ -672,26 +665,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
     }
   };
 
-  const [photoWalkRoom, setPhotoWalkRoom] = useState<string | null>(null);
-  const [photoWalking, setPhotoWalking] = useState(false);
-  const runPhotoWalk = async (roomId: string) => {
-    if (!onWalkThrough || !data) return;
-    setPhotoWalkRoom(null);
-    setPhotoWalking(true);
-    try {
-      setWalkRoomId(undefined);
-      setFocusRoomId(roomId);
-      setEyeLevel(true);
-      canvasRef.current?.focusRoom(roomId, true);
-      await new Promise((r) => setTimeout(r, 1300));
-      const saved = await render(styleChoice);
-      const roomName = data.rooms.find((r) => r.id === roomId)?.name ?? scene.name;
-      if (saved) onWalkThrough(saved.image_url, `${roomName}${saved.style_label ? ` — ${saved.style_label}` : ''}`, saved.id);
-    } finally {
-      setPhotoWalking(false);
-    }
-  };
-
   const setHardware = async (hardware: string) => {
     if (!data) return;
     const previous = data.scene.cabinet_hardware;
@@ -733,7 +706,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
       return;
     }
     if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
-    if (intent.mode === 'photo_walk') { setPhotoWalkRoom(roomId ?? data.rooms[0]?.id ?? null); return; }
     if (roomId) goToRoom(roomId, false);
     if (obj) setSelectedId(obj.id);
     if (intent.mode === 'make_3d' && obj) {
@@ -1138,11 +1110,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
           <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setShowRender(false)}><Layers className="h-3.5 w-3.5" />Back to 3D</Button>
           <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => { setShowRender(false); canvasRef.current?.setPose(viewingRender.camera as unknown as Parameters<SceneCanvasHandle['setPose']>[0]); }}><Eye className="h-3.5 w-3.5" />Edit from this view</Button>
           <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setAreaEditing(true)}><Paintbrush className="h-3.5 w-3.5" />Change an area</Button>
-          {onWalkThrough && (
-          <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onWalkThrough(viewingRender.image_url, `${scene.name}${viewingRender.style_label ? ` — ${viewingRender.style_label}` : ''}`, viewingRender.id)}>
-          <Footprints className="h-3.5 w-3.5" />Walk through ({VR_CREDIT_COSTS['marble-1.1']} credits)
-          </Button>
-          )}
           <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => setDrawingsOpen(true)}><FileText className="h-3.5 w-3.5" />Drawings</Button>
           <a className="px-2 py-1.5 text-xs text-muted-foreground underline" href={viewingRender.image_url} target="_blank" rel="noreferrer">Full size</a>
         </>
@@ -1344,7 +1311,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
                 active={focusRoomId === r.id}
                 onOpen={() => { setEyeLevel(false); goToRoom(r.id, false); }}
                 onStand={() => startWalk(r.id)}
-                onPhotoWalk={onWalkThrough ? () => setPhotoWalkRoom(r.id) : undefined}
               />
             ))}
           </div>
@@ -1370,21 +1336,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onWa
             <DialogFooter>
               <Button variant="outline" onClick={() => setBatchOpen(false)}>Cancel</Button>
               <Button className="gap-1.5" onClick={() => void runBatch()}><BoxIcon className="h-4 w-4" />Make {batchReady.length} pieces 3D</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-        <Dialog open={!!photoWalkRoom} onOpenChange={(o) => { if (!o) setPhotoWalkRoom(null); }}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Photo-Real Walk of {data.rooms.find((r) => r.id === photoWalkRoom)?.name ?? 'this space'}</DialogTitle>
-              <DialogDescription>
-                The space is rendered photo-real from eye height{styleChoice ? ` in ${styleChoice.label}` : ''}, then turned into a world you can walk around. It costs one render plus {VR_CREDIT_COSTS['marble-1.1']} credits and takes a few minutes; the world appears in the conversation.
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setPhotoWalkRoom(null)}>Cancel</Button>
-              <Button className="gap-1.5" disabled={photoWalking || rendering} onClick={() => photoWalkRoom && void runPhotoWalk(photoWalkRoom)}><Globe className="h-4 w-4" />Make the walk</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -135,9 +135,7 @@ export const createManageScenesTool = (
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const next = mode === 'make_3d'
         ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
-        : mode === 'photo_walk'
-          ? 'The room is open with the photo-real walk offer; the user confirms it there (a render plus 190 credits).'
-          : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.'
+        : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.'
             : mode === 'drawings' ? 'The kitchen drawings are open: floor plan with dimensions, an elevation per wall and the cut list; Print is in the dialog.' : 'The room is open on the canvas.';
       return JSON.stringify({ success: true, scene_id, object: target, mode: intent.mode, message: next });
     }
@@ -474,13 +472,13 @@ export const createManageScenesTool = (
 
     if (action === 'renders') {
       if (!scene_id) return JSON.stringify({ success: false, error: 'renders needs scene_id.' });
-      const { data, error } = await sb.from('scene_renders').select('id, kind, style_label, image_url, vr_world_id, created_at')
+      const { data, error } = await sb.from('scene_renders').select('id, kind, style_label, image_url, created_at')
         .eq('floor_plan_id', scene_id).order('created_at', { ascending: false }).limit(20);
       if (error) return JSON.stringify({ success: false, error: error.message });
-      const renders = (data ?? []) as Array<{ id: string; kind: string; style_label: string | null; image_url: string; vr_world_id: string | null; created_at: string }>;
+      const renders = (data ?? []) as Array<{ id: string; kind: string; style_label: string | null; image_url: string; created_at: string }>;
       return JSON.stringify({
         success: true, count: renders.length,
-        renders: renders.map((r) => ({ id: r.id, kind: r.kind, style: r.style_label, image_url: r.image_url, explorable_world: !!r.vr_world_id, created_at: r.created_at })),
+        renders: renders.map((r) => ({ id: r.id, kind: r.kind, style: r.style_label, image_url: r.image_url, created_at: r.created_at })),
         message: renders.length ? 'Any image_url here can be the source of the next generator (video, staging, lighting, a sheet).' : 'No renders yet; render the room first.',
       });
     }
@@ -581,7 +579,7 @@ export const createManageScenesTool = (
       + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '
       + 'layout each run with the confirmed units, then open mode drawings. '
       + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
-      + 'for Make 3D (10 credits, the user confirms), mode photo_walk offers a photo-real walk the user confirms. '
+      + 'for Make 3D (10 credits, the user confirms). '
       + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space, '
       + 'or on one part of an object (object + part, e.g. the sofa upholstery or the kitchen fronts); free. '
       + 'price_kitchen: prices the kitchen units standing in the room on a project plan from the kitchen blueprint '
@@ -600,7 +598,7 @@ export const createManageScenesTool = (
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),
-      mode: z.enum(['view', 'walk', 'make_3d', 'photo_walk', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
+      mode: z.enum(['view', 'walk', 'make_3d', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
       room: z.string().max(120).optional().describe('open/finish/render: the space, by name (e.g. living room).'),
       area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
       part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),

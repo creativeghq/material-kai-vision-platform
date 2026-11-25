@@ -346,7 +346,6 @@ describe('every media tool on the agent, not just the one that broke', () => {
     'generate_gemini',
     'virtual_staging',
     'apply_lighting_preset',
-    'generate_vr_world',
   ] as const;
 
   it('every one of them tells the model it cannot see what it produced', () => {
@@ -370,7 +369,7 @@ describe('every media tool on the agent, not just the one that broke', () => {
     for (const marker of [
       'source_image_url: resolvedImageUrl ?? null',   // generate_3d
       'base_image_url: result.source_image_url',      // generate_gemini
-      'source_image_url: resolvedImageUrl,',          // staging / lighting / VR
+      'source_image_url: resolvedImageUrl,',          // staging / lighting
       'source_image_origin: picked.origin,',
     ]) {
       expect(tools).toContain(marker);
@@ -388,7 +387,6 @@ describe('every media tool on the agent, not just the one that broke', () => {
     for (const factory of [
       'createVirtualStagingTool',
       'createApplyLightingPresetTool',
-      'createGenerateVRWorldTool',
       'createInteriorVideoV2Tool',
     ]) {
       const call = agentChat.slice(agentChat.indexOf(`tools.push(${factory}(`));

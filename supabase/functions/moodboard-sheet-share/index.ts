@@ -146,7 +146,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
   // ---------- 1. CLIENT VIEW token? ----------
   const { data: view } = await supabase
     .from('project_client_views')
-    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, public_share_enabled, share_expires_at, embed_vr, embed_lighting, embed_ffe, feedback_enabled, vr_world_id, quote_id, embed_room_plan, room_layout_id, embed_walkthrough, walkthrough_floor_plan_id')
+    .select('id, project_id, created_by, title, cover, sheet_ids, pdf_storage_path, public_share_enabled, share_expires_at, embed_lighting, embed_ffe, feedback_enabled, quote_id, embed_room_plan, room_layout_id, embed_walkthrough, walkthrough_floor_plan_id')
     .eq('public_share_token', token)
     .maybeSingle();
 
@@ -308,20 +308,6 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       if (!viewWorkspaceId) return false;
       return row.workspace_id === viewWorkspaceId;
     };
-
-    let vr_world: any = null;
-    if (view.embed_vr && view.vr_world_id) {
-      const { data: w } = await supabase
-        .from('vr_worlds')
-        .select('id, status, workspace_id, splat_url_100k, splat_url_500k, splat_url_full, panorama_url, thumbnail_url')
-        .eq('id', view.vr_world_id).maybeSingle();
-      if (w && w.status === 'completed' && belongsToView(w)) {
-        const { workspace_id: _ws, ...safe } = w as Record<string, unknown>;
-        vr_world = safe;
-      } else if (w && !belongsToView(w)) {
-        console.error(`[moodboard-sheet-share] vr_world ${view.vr_world_id} is not in the view's workspace — withheld`);
-      }
-    }
 
     let ffe: any = null;
     if (view.embed_ffe && view.quote_id) {
@@ -538,11 +524,9 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
         cover: view.cover ?? {},
         sheets,
         pdf_url,
-        embed_vr: view.embed_vr,
         embed_lighting: view.embed_lighting,
         embed_ffe: view.embed_ffe,
         feedback_enabled: view.feedback_enabled,
-        vr_world,
         ffe,
         lighting_image_url: view.embed_lighting ? lightingImageUrl : null,
         room_plan,

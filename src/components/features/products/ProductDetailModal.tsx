@@ -19,7 +19,7 @@ import { ModuleTabGate } from '@/components/core/ModuleTabGate';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/core/ui/dropdown-menu';
-import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Globe, Video, Search, Palette, Package, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3, ChevronDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Factory, Info, Activity, Loader2, BookOpen, Database, Sparkles, Video, Search, Palette, Package, Settings2, Star, Wrench, Droplets, ShoppingCart, Ruler, Layers, ShieldCheck, Wand2, Grid3x3, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { buildTestOnRoomUrl, buildProductStudioUrl } from '@/utils/testOnRoom';
 import { Product } from './types';
@@ -90,9 +90,7 @@ interface ProductDetailModalProps {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
-  onGenerateVR?: (imageUrl: string, context: { prompt?: string; roomType?: string; style?: string }) => void;
   onGenerateVideo?: (imageUrl: string) => void;
-  vrGenerating?: boolean;
 }
 
 // Helper to extract value from {value, confidence} objects or plain values
@@ -239,9 +237,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   product: passedProduct,
   isOpen,
   onClose,
-  onGenerateVR,
   onGenerateVideo,
-  vrGenerating,
 }) => {
   // Callers pass partial products (an agent result carries scalar metadata only), so the record
   // fills every key the caller left out: sizes, colours and the format lines come from it.
@@ -2505,35 +2501,19 @@ It becomes searchable from this product and by the agents. Its visibility stays 
                 quote-based platform, retail/wholesale/stock aren't tracked.
                 Quick quote/moodboard actions live in the DialogHeader. */}
 
-            {/* VR / Video — still handler-gated: both SPEND CREDITS and their output has nowhere
-                to land outside the agent chat yet. Exempted by name in gatedPropParity.test.ts
-                rather than passed everywhere, because a button that starts a paid job with no
-                surface to show the result is worse than no button. */}
-            {(onGenerateVR || onGenerateVideo) && currentImage?.url && (
+            {/* Video — still handler-gated: it SPENDS CREDITS and its output has nowhere to land
+                outside the agent chat yet. Exempted by name in gatedPropParity.test.ts. */}
+            {onGenerateVideo && currentImage?.url && (
               <div className="flex flex-wrap gap-2">
-                {onGenerateVR && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1.5 text-xs"
-                    disabled={vrGenerating}
-                    onClick={() => { onGenerateVR(currentImage.url, { prompt: product.name }); onClose(); }}
-                  >
-                    <Globe className="h-3.5 w-3.5" />
-                    {vrGenerating ? 'Generating...' : 'VR World'}
-                  </Button>
-                )}
-                {onGenerateVideo && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex items-center gap-1.5 text-xs"
-                    onClick={() => { onGenerateVideo(currentImage.url); onClose(); }}
-                  >
-                    <Video className="h-3.5 w-3.5" />
-                    Generate video
-                  </Button>
-                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-1.5 text-xs"
+                  onClick={() => { onGenerateVideo(currentImage.url); onClose(); }}
+                >
+                  <Video className="h-3.5 w-3.5" />
+                  Generate video
+                </Button>
               </div>
             )}
 

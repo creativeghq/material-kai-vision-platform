@@ -210,7 +210,7 @@ export const TOOLKIT_CLUSTERS: Record<string, ToolkitCluster> = {
   },
   'generation': {
     capability: ['moodboards.use', 'projects.use', 'quotes.use', 'marketing.seo', 'realestate.listings.manage'],
-    tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_vr_world', 'generate_video', 'generate_gemini', 'virtual_staging', 'check_generation_status', 'visualize_on_surface', 'manage_scenes'],
+    tool_ids: ['generate_3d', 'apply_lighting_preset', 'generate_video', 'generate_gemini', 'virtual_staging', 'check_generation_status', 'visualize_on_surface', 'manage_scenes'],
   },
   'seo-research': {
     capability: ['marketing.seo'],

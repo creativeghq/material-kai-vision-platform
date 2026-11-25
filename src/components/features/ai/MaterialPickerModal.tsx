@@ -38,7 +38,7 @@ import { SegmentWithResults } from '@/hooks/useSegmentation';
 import { supabase } from '@/integrations/supabase/client';
 import {
   INPAINTING_MODEL_LABELS, InpaintingModel, INPAINT_PRICING_FALLBACK, loadInpaintPricing, type InpaintPricing,
-} from '@/services/vrWorldService';
+} from '@/services/inpaintPricing';
 import {
   getMaterialCategory,
   getProductImageUrl,

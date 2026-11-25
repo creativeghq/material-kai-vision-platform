@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
  * /cv/:token — public, unauthenticated viewer for a shared project Client View.
  *
  * Renders the deck PDF (the static sheets) plus the interactive blocks the PDF
- * can't carry: a live 3D walkthrough (Marble), CSS lighting moods over the hero
+ * can't carry: the scroll walkthrough, CSS lighting moods over the hero
  * render, a live FF&E table with pricing, and an inline approve/comment box.
  * Data + a fresh signed PDF URL come from the `client-view-public-share` edge
  * function, which validates the token and enforces public_share_enabled.
@@ -19,7 +19,6 @@ import { supabase } from '@/integrations/supabase/client';
 interface CvSheet { id: string; sheet_type: string; title: string; }
 interface CvFfeItem { room: string | null; name: string; dimensions: string | null; quantity: number; unit_price: number | null; line_total: number | null; }
 interface CvFfe { currency: string; subtotal: number | null; vat_rate: number | null; vat_amount: number | null; grand_total: number | null; items: CvFfeItem[]; }
-interface CvVrWorld { id: string; status: string; splat_url_100k: string | null; splat_url_500k: string | null; splat_url_full: string | null; panorama_url: string | null; thumbnail_url: string | null; }
 /** WS4 #285 — handover snag list. The edge function sends only `client_visible` snags. */
 interface CvSnag { id: string; title: string; status: string; room: string | null; resolved: boolean; photo_urls: string[]; }
 
@@ -30,7 +29,6 @@ interface ClientViewData {
   cover: { title?: string; subtitle?: string; client_name?: string; cover_image_url?: string; date?: string };
   sheets: CvSheet[];
   pdf_url: string | null;
-  embed_vr: boolean;
   /**
    * The arranged room, if the designer chose to show it (#259 Ph4).
    *
@@ -49,7 +47,6 @@ interface ClientViewData {
   embed_lighting: boolean;
   embed_ffe: boolean;
   feedback_enabled: boolean;
-  vr_world: CvVrWorld | null;
   ffe: CvFfe | null;
   lighting_image_url: string | null;
   snags?: CvSnag[];
@@ -160,8 +157,6 @@ export default function PublicClientViewPage() {
   }
 
   const coverTitle = view.cover?.title || view.title;
-  const vr = view.vr_world;
-  const vrUrl = vr?.splat_url_full || vr?.splat_url_500k || vr?.splat_url_100k || vr?.panorama_url || null;
 
   return (
     <div className="min-h-screen bg-background">
@@ -303,25 +298,6 @@ export default function PublicClientViewPage() {
         )}
 
         {/* 3D walkthrough */}
-        {view.embed_vr && vr && vrUrl && (
-          <section>
-            <h2 className="text-lg font-semibold flex items-center gap-2 mb-3"><Box className="h-5 w-5 text-primary" /> Explore the space in 3D</h2>
-            <Card className="dashboard-card p-4 flex flex-col sm:flex-row gap-4 items-center">
-              {vr.thumbnail_url && (
-                <img src={vr.thumbnail_url} alt="3D world preview" className="w-full sm:w-56 rounded-md object-cover" />
-              )}
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-3">
-                  Walk through an explorable 3D reconstruction of the design.
-                </p>
-                <Button asChild>
-                  <a href={vrUrl} target="_blank" rel="noreferrer">Open the explorable world</a>
-                </Button>
-              </div>
-            </Card>
-          </section>
-        )}
-
         {/* Lighting moods */}
         {view.embed_lighting && view.lighting_image_url && (
           <section>

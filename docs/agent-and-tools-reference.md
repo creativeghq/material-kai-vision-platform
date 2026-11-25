@@ -170,7 +170,6 @@ pair could not be recorded and validation is unavailable for that run — stated
 - `material_search`, `analyze_inspiration_url`
 - `generate_3d` — Replicate/Gemini 3D render (async)
 - `apply_lighting_preset` — re-render under different lighting (image required)
-- `generate_vr_world` — WorldLabs Marble 3D Gaussian Splat (image required, 18 cr draft / 190 cr v1.1)
 - `generate_presentation_sheet`
 - `seo_research_keyword`
 

@@ -113,7 +113,6 @@ export interface SceneRender {
   colour_plan?: Array<{ role: string; hex: string }> | null;
   instruction: string | null;
   image_url: string;
-  vr_world_id: string | null;
   layout_snapshot: Record<string, LayoutEntry>;
   created_at: string;
 }
@@ -148,7 +147,7 @@ const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, defa
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish, kitchen_layout';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex';
 const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex, decor_brand, decor_code, decor_name';
-const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, colour_plan, instruction, image_url, vr_world_id, layout_snapshot, created_at';
+const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, colour_plan, instruction, image_url, layout_snapshot, created_at';
 
 const num = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 
@@ -597,11 +596,6 @@ export const sceneStudioService = {
     return { sheet_id: (data as { id: string }).id, title, project_id: scene.project_id, pdf_path: path };
   },
 
-  async linkRenderWorld(renderId: string, vrWorldId: string): Promise<void> {
-    const { error } = await supabase.from('scene_renders').update({ vr_world_id: vrWorldId }).eq('id', renderId);
-    if (error) throw new Error(error.message);
-  },
-
   /** A recorded walkthrough becomes a `generation_videos` row, so it joins the conversation's media like any generated video. */
   async saveWalkthroughVideo(scene: Pick<SceneRow, 'id' | 'workspace_id' | 'name'>, video: Blob): Promise<{ id: string; video_url: string }> {
     const ext = video.type.includes('mp4') ? 'mp4' : 'webm';
@@ -618,7 +612,7 @@ export const sceneStudioService = {
     return { id: (data as { id: string }).id, video_url: url };
   },
 
-  async saveRender(row: Omit<SceneRender, 'id' | 'created_at' | 'vr_world_id'>): Promise<SceneRender> {
+  async saveRender(row: Omit<SceneRender, 'id' | 'created_at'>): Promise<SceneRender> {
     const { data, error } = await supabase.from('scene_renders').insert(row).select(RENDER_COLUMNS).single();
     if (error) throw new Error(`The render was made but could not be saved to the scene: ${error.message}`);
     return data as SceneRender;

@@ -381,7 +381,7 @@ export interface MoodBoardItem {
   added_at: string;
   // Media fields (set when material_id is null)
   media_url?: string;
-  media_type?: 'image' | 'video' | 'vr_world';
+  media_type?: 'image' | 'video';
   media_title?: string;
   material?: {
     id: string;

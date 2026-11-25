@@ -9,7 +9,7 @@ import type { MoodBoard } from '@/types/materials';
 
 interface MoodboardSavePopoverProps {
   mediaUrl: string;
-  mediaType: 'image' | 'video' | 'vr_world';
+  mediaType: 'image' | 'video';
   mediaTitle?: string;
   /**
    * The `generation_3d` row this media came from, when it came from one (#378 N7).

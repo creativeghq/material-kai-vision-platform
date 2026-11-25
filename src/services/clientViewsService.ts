@@ -23,11 +23,9 @@ export interface ClientView {
   title: string;
   sheet_ids: string[];
   cover: ClientViewCover;
-  embed_vr: boolean;
   embed_lighting: boolean;
   embed_ffe: boolean;
   feedback_enabled: boolean;
-  vr_world_id: string | null;
   quote_id: string | null;
   /** Room plan shown to the client (#259 Ph4). Attachment and visibility are separate. */
   room_layout_id: string | null;
@@ -55,11 +53,9 @@ export interface CreateClientViewInput {
   title: string;
   sheet_ids?: string[];
   cover?: ClientViewCover;
-  embed_vr?: boolean;
   embed_lighting?: boolean;
   embed_ffe?: boolean;
   feedback_enabled?: boolean;
-  vr_world_id?: string | null;
   quote_id?: string | null;
   room_layout_id?: string | null;
   embed_room_plan?: boolean;
@@ -71,11 +67,9 @@ export interface UpdateClientViewInput {
   title?: string;
   sheet_ids?: string[];
   cover?: ClientViewCover;
-  embed_vr?: boolean;
   embed_lighting?: boolean;
   embed_ffe?: boolean;
   feedback_enabled?: boolean;
-  vr_world_id?: string | null;
   quote_id?: string | null;
   room_layout_id?: string | null;
   embed_room_plan?: boolean;
@@ -126,11 +120,9 @@ class ClientViewsService {
         title: input.title,
         sheet_ids: input.sheet_ids ?? [],
         cover: input.cover ?? {},
-        embed_vr: input.embed_vr ?? true,
         embed_lighting: input.embed_lighting ?? true,
         embed_ffe: input.embed_ffe ?? true,
         feedback_enabled: input.feedback_enabled ?? true,
-        vr_world_id: input.vr_world_id ?? null,
         quote_id: input.quote_id ?? null,
         room_layout_id: input.room_layout_id ?? null,
         embed_room_plan: input.embed_room_plan ?? false,
@@ -217,28 +209,6 @@ class ClientViewsService {
       .update({ public_share_enabled: false })
       .eq('id', id);
     if (error) throw error;
-  }
-
-  /** Completed 3D worlds the current user can embed; those made from a 3D room of `projectId` come first, named after the room. */
-  async listVrWorlds(projectId?: string): Promise<{ id: string; display_name: string | null; thumbnail_url: string | null; from_project_room: boolean }[]> {
-    const { data, error } = await supabase
-      .from('vr_worlds')
-      .select('id, display_name, thumbnail_url, status, created_at')
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })
-      .limit(50);
-    if (error) return [];
-    const rooms = new Map<string, string>();
-    if (projectId) {
-      const { data: links } = await supabase.from('scene_renders').select('vr_world_id, floor_plans!inner(name, project_id)')
-        .eq('floor_plans.project_id', projectId).not('vr_world_id', 'is', null);
-      for (const l of (links ?? []) as unknown as Array<{ vr_world_id: string; floor_plans: { name: string } }>) rooms.set(l.vr_world_id, l.floor_plans.name);
-    }
-    const worlds = (data || []).map((w: any) => ({
-      id: w.id as string, thumbnail_url: w.thumbnail_url as string | null, from_project_room: rooms.has(w.id),
-      display_name: rooms.has(w.id) ? `${rooms.get(w.id)} — photo-real walk` : (w.display_name as string | null),
-    }));
-    return [...worlds.filter((w) => w.from_project_room), ...worlds.filter((w) => !w.from_project_room)];
   }
 
   async listFeedback(id: string): Promise<ClientViewFeedback[]> {

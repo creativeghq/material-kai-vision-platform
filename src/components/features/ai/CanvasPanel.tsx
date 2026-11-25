@@ -4,7 +4,7 @@
  */
 import React from 'react';
 import {
-  FileText, Package, Camera, Globe, LayoutGrid, Image as ImageIcon, Video,
+  FileText, Package, Camera, LayoutGrid, Image as ImageIcon, Video,
   ArrowUpRight, Sparkles, Radar, ClipboardList,
   Briefcase, Boxes, PackageCheck, MessageSquare, Bot, TrendingUp, Images,
   Wand2, Calculator, MessageSquareQuote, ShieldQuestion, MoreHorizontal, X, Trash2,
@@ -26,7 +26,7 @@ import {
 import { cn } from '@/lib/utils';
 
 export type CanvasArtifactKind =
-  | 'sheet' | 'staging' | 'products' | 'world' | 'board' | 'image' | 'video' | 'render'
+  | 'sheet' | 'staging' | 'products' | 'board' | 'image' | 'video' | 'render'
   | 'inspiration' | 'radar' | 'result' | 'quote'
   | 'jobs' | 'sourcing' | 'order' | 'mentions' | 'llm' | 'seo' | 'catalog'
   | 'demo' | 'calc' | 'clarify' | 'confirm' | 'scene' | 'run';
@@ -69,7 +69,6 @@ const KIND_ICON: Record<CanvasArtifactKind, React.ComponentType<{ className?: st
   sheet: FileText,
   staging: Camera,
   products: Package,
-  world: Globe,
   board: LayoutGrid,
   image: ImageIcon,
   video: Video,
@@ -103,7 +102,6 @@ const KIND_LABEL: Record<CanvasArtifactKind, string> = {
   sheet: 'Presentation sheet',
   staging: 'Virtual staging',
   products: 'Product results',
-  world: '3D / VR world',
   board: 'Materials board',
   image: 'Generated image',
   video: 'Generated video',

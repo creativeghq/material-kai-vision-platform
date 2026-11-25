@@ -1035,29 +1035,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "status": "active",
     "enabled": true,
     "sort_order": 220
-  },
-  {
-    "id": "marble-1.1",
-    "display_name": "Marble 1.1",
-    "capability": "3d",
-    "sub_capability": "image-to-world",
-    "provider": "worldlabs",
-    "slug": "marble-1.1",
-    "version": null,
-    "adapter": "worldlabs",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": false
-    },
-    "pricing_key": "marble-1.1",
-    "tier": "premium",
-    "status": "active",
-    "enabled": true,
-    "sort_order": 310
   }
 ] as const;
 
@@ -1074,7 +1051,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '69b1758839dc1ff9640d65236ff017a8';
+export const PROJECTION_FINGERPRINT = 'd41ace98d117ca75f8f761de7230c5d9';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(
