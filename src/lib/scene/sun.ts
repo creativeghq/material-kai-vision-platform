@@ -1,4 +1,3 @@
-/** Where the sun stands at `hour` (6–20): rising in the east, highest at 13:00, warm and low at the ends of the day. */
 export function sunAt(hour: number, span: number): { position: [number, number, number]; colour: string; intensity: number; sky: number } {
   const t = Math.min(1, Math.max(0, (hour - 6) / 14));
   const el = (Math.PI / 3) * Math.sin(Math.PI * t);
