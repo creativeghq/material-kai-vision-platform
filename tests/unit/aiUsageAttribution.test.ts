@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { stripComments } from '../helpers/stripComments';
 
 const ROOT = process.cwd();
 const FN_DIR = join(ROOT, 'supabase', 'functions');
@@ -140,6 +141,27 @@ describe('ai-client books what it spends', () => {
     // 25 of 25 avatar renders were lost this way, with no warning on any of them.
     expect(CLIENT).not.toMatch(/void _logUnitCall\(/);
     expect((CLIENT.match(/await _logUnitCall\(/g) ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('never sends NULL into the NOT NULL cost columns, and reads the insert error', () => {
+    const code = stripComments(CLIENT);
+    expect(code).not.toMatch(/(input|output)_cost_usd:[^\n]*null/);
+    expect(code).not.toMatch(/^\s*await _log\.from\('ai_usage_logs'\)\.insert/m);
+    expect((code.match(/if \(usageErr\) await _reportLostUsageRow\(/g) ?? []).length).toBe(2);
+    expect(code).not.toMatch(/void log(Grok|OpenAI|Omni)\(/);
+  });
+
+  it.each([
+    ['generate-interior-gemini', '_generateImageWithGemini(p, { ...c, ...ownRow() })'],
+    ['generate-interior-gemini', '_generateImageWithOpenAI(p, { ...c, ...ownRow() })'],
+    ['generate-interior-gemini', "task: 'interior_design_generation', userId: resolvedUserId, workspaceId: body.workspace_id, logUsage: false"],
+    ['generate-region-edit', "task: 'region_edit', userId, workspaceId: body.workspace_id ?? undefined, logUsage: false"],
+    ['generate-virtual-staging', "task: 'virtual_staging', ...owner, logUsage: false"],
+    ['generate-social-image', 'task: operationType, logUsage: false'],
+    ['object-3d', 'chargedSeparately: true'],
+    ['surface-texture', 'chargedSeparately: true'],
+  ])('%s does not count one image twice', (fn, needle) => {
+    expect(stripComments(readFileSync(join(FN_DIR, fn, 'index.ts'), 'utf8'))).toContain(needle);
   });
 
   it('builds the logging client lazily, not at module load', () => {

@@ -91,7 +91,7 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
     }
     const shot = await generateImageWithGemini(
       { text: prompt, images },
-      { task: 'object-3d-clean-shot', userId: charge.uid, workspaceId: charge.workspaceId },
+      { task: 'object-3d-clean-shot', userId: charge.uid, workspaceId: charge.workspaceId, chargedSeparately: true },
     );
     const stamp = Date.now();
     const cleanPath = `${t.folder}/${stamp}-clean.png`;

@@ -62,6 +62,7 @@ import { CLAUDE_OPUS, aiSdkClaudeOptions, markStablePrefix, shapeClaudeRequest }
 import { GEMINI_TEXT, geminiThinkingConfig } from './gemini-models.ts';
 import { fetchImageGuarded, readCapped } from './fetch-image.ts';
 import { resolveSecret } from './secrets.ts';
+import { captureException } from './sentry.ts';
 import { assertTransferAllowed, isEeaEndpoint } from './residency-gate.ts';
 
 // ── Background AI-call logger ────────────────────────────────────────────────
@@ -112,6 +113,15 @@ async function _secret(key: string): Promise<string | null | undefined> {
   return (await resolveSecret(sb, key)).value;
 }
 
+async function _reportLostUsageRow(task: string, model: string, message: string): Promise<void> {
+  console.error(`[ai-client] ai_usage_logs insert FAILED for ${task} (${model}): ${message}`);
+  await captureException(new Error(`ai_usage_logs insert failed: ${message}`), {
+    tags: { area: 'billing', operation: task },
+    extra: { model },
+    fingerprint: ['ai-usage-log-write-failed', task],
+  });
+}
+
 async function _logTrackedCall(opts: {
   task: string;
   model: string;
@@ -156,7 +166,7 @@ async function _logTrackedCall(opts: {
     //
     // `ai_call_logs` above deliberately gets neither id: it has no such columns and is the
     // developer-facing latency/fallback trace, not the billing record. This is the billing record.
-    await _log.from('ai_usage_logs').insert({
+    const { error: usageErr } = await _log.from('ai_usage_logs').insert({
       user_id: opts.userId ?? null,
       workspace_id: opts.workspaceId ?? null,
       agent_run_id: opts.agentRunId ?? null,
@@ -167,8 +177,9 @@ async function _logTrackedCall(opts: {
       raw_cost_usd: rawCost,
       billed_cost_usd: billedCost,
       markup_multiplier: markup,
-      input_cost_usd: parts ? parts.input * markup : null,
-      output_cost_usd: parts ? parts.output * markup : null,
+      // NOT NULL columns: an unpriced call says so in raw_cost_usd.
+      input_cost_usd: parts ? parts.input * markup : 0,
+      output_cost_usd: parts ? parts.output * markup : 0,
       // DECLARE THE OUTCOME. `ops.silent_zero_provider` judges a provider only on rows
       // carrying `success`, and skips any row without it — correctly, since a row that
       // never claimed to succeed is not evidence that it failed. This chokepoint set it
@@ -182,6 +193,7 @@ async function _logTrackedCall(opts: {
         cache_creation_input_tokens: cache.write,
       },
     });
+    if (usageErr) await _reportLostUsageRow(opts.task, opts.model, usageErr.message);
   } catch (e) {
     console.warn('[ai-client] _logTrackedCall failed (non-fatal):', e);
   }
@@ -205,6 +217,7 @@ async function _logUnitCall(opts: {
   errorMessage?: string;
   userId?: string;
   workspaceId?: string;
+  chargedSeparately?: boolean;
 }): Promise<void> {
   const _log = _logClient();
   if (!_log) return;
@@ -218,9 +231,9 @@ async function _logUnitCall(opts: {
     const billableUnits = opts.errorMessage ? 0 : opts.units;
     const rawCost = price ? price.perUnit * billableUnits : null;
     const markup = price?.markup ?? _MARKUP;
-    const billedCost = rawCost === null ? null : rawCost * markup;
+    const billedCost = opts.chargedSeparately ? 0 : rawCost === null ? null : rawCost * markup;
 
-    await _log.from('ai_usage_logs').insert({
+    const { error: usageErr } = await _log.from('ai_usage_logs').insert({
       user_id: opts.userId ?? null,
       workspace_id: opts.workspaceId ?? null,
       operation_type: opts.task,
@@ -230,8 +243,9 @@ async function _logUnitCall(opts: {
       raw_cost_usd: rawCost,
       billed_cost_usd: billedCost,
       markup_multiplier: markup,
-      input_cost_usd: null,
-      output_cost_usd: null,
+      unbilled_reason: opts.chargedSeparately ? 'charged_separately' : null,
+      input_cost_usd: 0,
+      output_cost_usd: 0,
       metadata: {
         billing_type: 'per_unit',
         units: billableUnits,
@@ -241,9 +255,10 @@ async function _logUnitCall(opts: {
         // either way — a key that only appears on failure is a key that never appears
         // when the provider is healthy, which is indistinguishable from silence.
         success: !opts.errorMessage,
-        ...(opts.errorMessage ? { error_message: opts.errorMessage } : {}),
+        ...(opts.errorMessage ? { error: opts.errorMessage.slice(0, 240) } : {}),
       },
     });
+    if (usageErr) await _reportLostUsageRow(opts.task, opts.modelKey, usageErr.message);
   } catch (e) {
     console.warn('[ai-client] _logUnitCall failed (non-fatal):', e);
   }
@@ -1046,6 +1061,10 @@ export interface UnitBillingConfig {
   task?: string;
   userId?: string;
   workspaceId?: string;
+  /** false when the caller writes its own success row; a failure is always logged here. */
+  logUsage?: boolean;
+  /** The user's price is on another row: record what we paid and bill nothing here. */
+  chargedSeparately?: boolean;
 }
 
 export async function generateImageWithGemini(
@@ -1078,13 +1097,14 @@ export async function generateImageWithGemini(
       aspectRatio: config?.aspectRatio ?? '16:9',
     });
 
-    await _logUnitCall({
+    if (config?.logUsage !== false) await _logUnitCall({
       task: config?.task ?? 'gemini_image_generation',
       modelKey: modelId,
       units: 1,
       latencyMs: Date.now() - _start,
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
 
     return {
@@ -1101,6 +1121,7 @@ export async function generateImageWithGemini(
       errorMessage: err instanceof Error ? err.message : String(err),
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
     throw err;
   }
@@ -1214,6 +1235,7 @@ async function generateMultiImageWithGemini(
       errorMessage: `HTTP ${response.status}`,
       userId: config.userId,
       workspaceId: config.workspaceId,
+      chargedSeparately: config.chargedSeparately,
     });
     throw new Error(`Gemini multi-image generation failed: ${err}`);
   }
@@ -1233,6 +1255,16 @@ async function generateMultiImageWithGemini(
     const cand = result.candidates?.[0];
     const reason = cand?.finishReason ?? 'unknown';
     const blocked = result.promptFeedback?.blockReason;
+    await _logUnitCall({
+      task: config.task ?? 'gemini_image_generation',
+      modelKey: config.model,
+      units: 0,
+      latencyMs: Date.now() - _start,
+      errorMessage: `no image (${reason})`,
+      userId: config.userId,
+      workspaceId: config.workspaceId,
+      chargedSeparately: config.chargedSeparately,
+    });
     throw new Error(
       `Gemini multi-image: no image in response (finishReason=${reason}` +
       `${blocked ? `, blockReason=${blocked}` : ''})` +
@@ -1242,13 +1274,14 @@ async function generateMultiImageWithGemini(
     );
   }
 
-  await _logUnitCall({
+  if (config.logUsage !== false) await _logUnitCall({
     task: config.task ?? 'gemini_image_generation',
     modelKey: config.model,
     units: 1,
     latencyMs: Date.now() - _start,
     userId: config.userId,
     workspaceId: config.workspaceId,
+    chargedSeparately: config.chargedSeparately,
   });
 
   return {
@@ -1310,13 +1343,14 @@ export async function generateVideoWithKling(
     // KLING_PRICING_MODEL_ID, not `modelId`: the string this client hands the KlingAI SDK
     // ('kling-v3.0-i2v') is neither the generation_models id nor an ai_model_pricing key, and
     // resolution here is exact on purpose — `kling-3.0` and `kling-1.6-pro` are different rates.
-    await _logUnitCall({
+    if (config?.logUsage !== false) await _logUnitCall({
       task: config?.task ?? 'kling_video_generation',
       modelKey: KLING_PRICING_MODEL_ID,
       units: seconds,
       latencyMs: Date.now() - _start,
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
 
     return {
@@ -1333,6 +1367,7 @@ export async function generateVideoWithKling(
       errorMessage: err instanceof Error ? err.message : String(err),
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
     throw err;
   }
@@ -1395,8 +1430,6 @@ export async function generateVideoWithWan(
     /** Wan scores the clip in the same pass. Default true — a silent reel is the bug. */
     generateAudio?: boolean;
     pollTimeoutMs?: number;
-    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
-    logUsage?: boolean;
   },
 ): Promise<WanVideoResult> {
   const _start = Date.now();
@@ -1493,6 +1526,7 @@ export async function generateVideoWithWan(
       latencyMs: Date.now() - _start,
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
 
     return {
@@ -1514,6 +1548,7 @@ export async function generateVideoWithWan(
       errorMessage: err instanceof Error ? err.message : String(err),
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
     throw err;
   }
@@ -1557,8 +1592,6 @@ export async function generateVideoWithGeminiOmni(
     resolution?: GeminiOmniResolution;
     aspectRatio?: '16:9' | '9:16' | '1:1';
     timeoutMs?: number;
-    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
-    logUsage?: boolean;
   },
 ): Promise<GeminiOmniVideoResult> {
   const _start = Date.now();
@@ -1588,6 +1621,7 @@ export async function generateVideoWithGeminiOmni(
     ...(errorMessage ? { errorMessage } : {}),
     userId: config?.userId,
     workspaceId: config?.workspaceId,
+    chargedSeparately: config?.chargedSeparately,
   });
 
   try {
@@ -1727,11 +1761,6 @@ export async function generateVideoWithSeedance(
     /** Seedance scores the clip in the same pass. Default true — a silent reel is the bug. */
     generateAudio?: boolean;
     pollTimeoutMs?: number;
-    /**
-     * Write the `ai_usage_logs` row from here. Default true, and every direct caller
-     * should leave it there.
-     */
-    logUsage?: boolean;
   },
 ): Promise<SeedanceVideoResult> {
   const _start = Date.now();
@@ -1804,6 +1833,7 @@ export async function generateVideoWithSeedance(
       latencyMs: Date.now() - _start,
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
 
     return {
@@ -1825,6 +1855,7 @@ export async function generateVideoWithSeedance(
       errorMessage: err instanceof Error ? err.message : String(err),
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
     throw err;
   }
@@ -1863,8 +1894,6 @@ export async function generateVideoWithRay(
     resolution?: RayResolution;
     aspectRatio?: '16:9' | '9:16' | '1:1';
     pollTimeoutMs?: number;
-    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
-    logUsage?: boolean;
   },
 ): Promise<RayVideoResult> {
   const _start = Date.now();
@@ -1932,6 +1961,7 @@ export async function generateVideoWithRay(
           latencyMs: Date.now() - _start,
           userId: config?.userId,
           workspaceId: config?.workspaceId,
+          chargedSeparately: config?.chargedSeparately,
         });
         return {
           url,
@@ -1960,6 +1990,7 @@ export async function generateVideoWithRay(
       errorMessage: err instanceof Error ? err.message : String(err),
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
     throw err;
   }
@@ -2005,8 +2036,6 @@ export async function generateVideoWithH3Max(
     /** Passed by callers that also feed reference-taking models. Always dropped. */
     referenceUrls?: string[];
     pollTimeoutMs?: number;
-    /** See generateVideoWithSeedance — false when the caller writes its own richer row. */
-    logUsage?: boolean;
   },
 ): Promise<H3MaxVideoResult> {
   const _start = Date.now();
@@ -2101,6 +2130,7 @@ export async function generateVideoWithH3Max(
         latencyMs: Date.now() - _start,
         userId: config?.userId,
         workspaceId: config?.workspaceId,
+        chargedSeparately: config?.chargedSeparately,
       });
 
       return {
@@ -2123,6 +2153,7 @@ export async function generateVideoWithH3Max(
       errorMessage: err instanceof Error ? err.message : String(err),
       userId: config?.userId,
       workspaceId: config?.workspaceId,
+      chargedSeparately: config?.chargedSeparately,
     });
     throw err;
   }
@@ -2311,6 +2342,7 @@ export async function generateImageWithGrok(
     ...(errorMessage ? { errorMessage } : {}),
     userId: config?.userId,
     workspaceId: config?.workspaceId,
+    chargedSeparately: config?.chargedSeparately,
   });
 
   const response = await fetch('https://api.x.ai/v1/images/generations', {
@@ -2329,18 +2361,18 @@ export async function generateImageWithGrok(
 
   if (!response.ok) {
     const err = await response.text();
-    void logGrok(0, `HTTP ${response.status}`);
+    await logGrok(0, `HTTP ${response.status}`);
     throw new Error(`Grok image generation failed (${response.status}): ${err}`);
   }
 
   const data = await response.json();
   const b64 = data.data?.[0]?.b64_json;
   if (!b64) {
-    void logGrok(0, 'no image in generation response');
+    await logGrok(0, 'no image in generation response');
     throw new Error('Grok: no image in generation response');
   }
 
-  void logGrok(1);
+  if (config?.logUsage !== false) await logGrok(1);
   return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
@@ -2375,6 +2407,7 @@ export async function editImageWithGrok(
     ...(errorMessage ? { errorMessage } : {}),
     userId: config?.userId,
     workspaceId: config?.workspaceId,
+    chargedSeparately: config?.chargedSeparately,
   });
 
   const form = new FormData();
@@ -2396,18 +2429,18 @@ export async function editImageWithGrok(
 
   if (!response.ok) {
     const err = await response.text();
-    void logGrok(0, `HTTP ${response.status}`);
+    await logGrok(0, `HTTP ${response.status}`);
     throw new Error(`Grok image edit failed (${response.status}): ${err}`);
   }
 
   const data = await response.json();
   const b64 = data.data?.[0]?.b64_json;
   if (!b64) {
-    void logGrok(0, 'no image in edit response');
+    await logGrok(0, 'no image in edit response');
     throw new Error('Grok: no image in edit response');
   }
 
-  void logGrok(1);
+  if (config?.logUsage !== false) await logGrok(1);
   return { base64: b64, mimeType: 'image/png', model: modelId };
 }
 
@@ -2453,6 +2486,7 @@ export async function generateImageWithOpenAI(
     ...(errorMessage ? { errorMessage } : {}),
     userId: config?.userId,
     workspaceId: config?.workspaceId,
+    chargedSeparately: config?.chargedSeparately,
   });
 
   const response = await fetch('https://api.openai.com/v1/images/generations', {
@@ -2473,18 +2507,18 @@ export async function generateImageWithOpenAI(
 
   if (!response.ok) {
     const err = await response.text();
-    void logOpenAI(0, `HTTP ${response.status}`);
+    await logOpenAI(0, `HTTP ${response.status}`);
     throw new Error(`OpenAI image generation failed (${response.status}): ${err}`);
   }
 
   const data = await response.json();
   const b64 = data.data?.[0]?.b64_json;
   if (!b64) {
-    void logOpenAI(0, 'no image in generation response');
+    await logOpenAI(0, 'no image in generation response');
     throw new Error('OpenAI: no image in generation response');
   }
 
-  void logOpenAI(1);
+  if (config?.logUsage !== false) await logOpenAI(1);
   return { base64: b64, mimeType: 'image/png', model: modelId, cost: await openAiImageCost(data.usage) };
 }
 
@@ -2518,6 +2552,7 @@ export async function editImageWithOpenAI(
     ...(errorMessage ? { errorMessage } : {}),
     userId: config?.userId,
     workspaceId: config?.workspaceId,
+    chargedSeparately: config?.chargedSeparately,
   });
 
   const form = new FormData();
@@ -2539,18 +2574,18 @@ export async function editImageWithOpenAI(
 
   if (!response.ok) {
     const err = await response.text();
-    void logOpenAI(0, `HTTP ${response.status}`);
+    await logOpenAI(0, `HTTP ${response.status}`);
     throw new Error(`OpenAI image edit failed (${response.status}): ${err}`);
   }
 
   const data = await response.json();
   const b64 = data.data?.[0]?.b64_json;
   if (!b64) {
-    void logOpenAI(0, 'no image in edit response');
+    await logOpenAI(0, 'no image in edit response');
     throw new Error('OpenAI: no image in edit response');
   }
 
-  void logOpenAI(1);
+  if (config?.logUsage !== false) await logOpenAI(1);
   return { base64: b64, mimeType: 'image/png', model: modelId, cost: await openAiImageCost(data.usage) };
 }
 

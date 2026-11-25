@@ -86,7 +86,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
       .split('{format}').join(formatText(product.attributes as Record<string, unknown> | null, product.metadata as Record<string, unknown> | null));
     const out = await generateImageWithGemini(
       { text: prompt, images: [source.bytes] },
-      { task: 'surface-texture-albedo', userId: uid, workspaceId: ws },
+      { task: 'surface-texture-albedo', userId: uid, workspaceId: ws, chargedSeparately: true },
     );
     const path = `material-maps/products/${product.id}/${Date.now()}-albedo.png`;
     const bytes = Uint8Array.from(atob(out.base64), (c) => c.charCodeAt(0));

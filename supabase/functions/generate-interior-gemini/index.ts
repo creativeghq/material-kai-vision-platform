@@ -7,10 +7,10 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveReplicateToken, REPLICATE_NOT_CONFIGURED } from '../_shared/replicate-token.ts';
 import { resolveOutputPath, isPlatformGeneratedImage, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import {
-  generateImageWithGemini,
+  generateImageWithGemini as _generateImageWithGemini,
   generateWithGemini,
-  generateImageWithGrok,
-  editImageWithGrok,
+  generateImageWithGrok as _generateImageWithGrok,
+  editImageWithGrok as _editImageWithGrok,
   generateImageWithOpenAI as _generateImageWithOpenAI,
   editImageWithOpenAI as _editImageWithOpenAI,
   type OpenAIImageResult,
@@ -398,8 +398,13 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     openAiCost = openAiCost && r.cost ? { rawUsd: openAiCost.rawUsd + r.cost.rawUsd, markup: r.cost.markup } : null;
     return r;
   };
-  const generateImageWithOpenAI = async (...a: Parameters<typeof _generateImageWithOpenAI>) => tallyOpenAi(await _generateImageWithOpenAI(...a));
-  const editImageWithOpenAI = async (...a: Parameters<typeof _editImageWithOpenAI>) => tallyOpenAi(await _editImageWithOpenAI(...a));
+  // This function writes its own success row; the client logs only failures, under the same operation.
+  const ownRow = () => ({ task: 'interior_design_generation', userId: resolvedUserId, workspaceId: body.workspace_id, logUsage: false });
+  const generateImageWithGemini = (...[p, c]: Parameters<typeof _generateImageWithGemini>) => _generateImageWithGemini(p, { ...c, ...ownRow() });
+  const generateImageWithGrok = (...[p, c]: Parameters<typeof _generateImageWithGrok>) => _generateImageWithGrok(p, { ...c, ...ownRow() });
+  const editImageWithGrok = (...[p, i, c]: Parameters<typeof _editImageWithGrok>) => _editImageWithGrok(p, i, { ...c, ...ownRow() });
+  const generateImageWithOpenAI = async (...[p, c]: Parameters<typeof _generateImageWithOpenAI>) => tallyOpenAi(await _generateImageWithOpenAI(p, { ...c, ...ownRow() }));
+  const editImageWithOpenAI = async (...[p, i, c]: Parameters<typeof _editImageWithOpenAI>) => tallyOpenAi(await _editImageWithOpenAI(p, i, { ...c, ...ownRow() }));
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

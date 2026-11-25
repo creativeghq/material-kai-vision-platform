@@ -61,7 +61,7 @@ async function uploadToStorage(
   return data.publicUrl;
 }
 
-async function stageRoom(supabase: DbClient, imageUrl: string, room: string, furnitureStyle: string, furnitureItems?: string) {
+async function stageRoom(supabase: DbClient, imageUrl: string, room: string, furnitureStyle: string, furnitureItems: string | undefined, owner: { userId: string; workspaceId?: string }) {
   const prompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_virtual_staging'), {
     room,
     furniture_style: furnitureStyle === DEFAULT_STYLE ? 'whatever suits the room best' : furnitureStyle,
@@ -70,7 +70,7 @@ async function stageRoom(supabase: DbClient, imageUrl: string, room: string, fur
   const { bytes } = await fetchImageGuarded(imageUrl);
   return await generateImageWithGemini(
     { text: prompt, images: [bytes] },
-    { model: MODEL, aspectRatio: aspectRatioOfImage(bytes, IMAGE_ASPECT_RATIOS) ?? undefined },
+    { model: MODEL, task: 'virtual_staging', ...owner, logUsage: false, aspectRatio: aspectRatioOfImage(bytes, IMAGE_ASPECT_RATIOS) ?? undefined },
   );
 }
 
@@ -178,7 +178,7 @@ async function handleRequest(
   }
 
   try {
-    const staged = await stageRoom(supabase, body.source_image_url, room, furnitureStyle, body.furniture_items);
+    const staged = await stageRoom(supabase, body.source_image_url, room, furnitureStyle, body.furniture_items, { userId, workspaceId: body.workspace_id ?? undefined });
     const imageUrl = await uploadToStorage(supabase, staged.base64, staged.mimeType, jobId, { userId, conversationId: body.conversation_id });
 
     // USD cost from `ai_model_pricing` (this insert previously set credits only, so every
@@ -204,7 +204,7 @@ async function handleRequest(
         raw_cost_usd: rawCostUsd,
         billed_cost_usd: billedCostUsd,
         markup_multiplier: stagingPricing?.markup_multiplier ?? null,
-        metadata: { room, furniture_style: furnitureStyle, billing_type: 'per_unit', units: 1 },
+        metadata: { success: true, room, furniture_style: furnitureStyle, billing_type: 'per_unit', units: 1 },
       });
       if (usageErr) throw usageErr;
     } catch (usageErr) {

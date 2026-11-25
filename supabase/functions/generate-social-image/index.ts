@@ -6,7 +6,7 @@ import { createClient } from '@supabase/supabase-js';
 import { replicateToken } from '../_shared/replicate-token.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
-import { debitExternalServiceCredits } from '../_shared/credit-utils.ts';
+import { debitExternalServiceCredits, recordExternalServiceOutcome } from '../_shared/credit-utils.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
@@ -223,8 +223,9 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
   // ① Debit credits BEFORE the upstream image generation (invariant #10 — debit-before,
   // refund-on-failure). Never a non-atomic pre-flight read + deduct-on-success: a race
   // between the read and the charge delivers a free image.
+  const operationType = body.purpose === 'article' ? 'seo_article_image' : 'social_image_generation';
   const debitResult = await debitExternalServiceCredits(
-    supabase, userId, serviceKey, body.purpose === 'article' ? 'seo_article_image' : 'social_image_generation', 1,
+    supabase, userId, serviceKey, operationType, 1,
     { model: resolvedModel, image_type, aspect_ratio, workspace_id, post_id, purpose: body.purpose ?? 'social' },
     // 7th arg. Omitting it sent p_workspace_id: null, so the debit ALWAYS hit the caller's
     // personal wallet — a workspace with a funded shared pool still drained individual
@@ -244,7 +245,8 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
     // ③ Generate. Through `_shared/ai-client.ts`, which holds the current model ids and logs
     // the cost — the two hand-rolled fetches here were pinned to models retired upstream.
     let imageUrl: string;
-    const attribution = { userId, workspaceId: workspace_id ?? undefined, task: 'social_image_generation' };
+    // The debit above already wrote this image's cost row, so the client logs failures only.
+    const attribution = { userId, workspaceId: workspace_id ?? undefined, task: operationType, logUsage: false };
 
     switch (resolvedModel) {
       case 'aurora': {
@@ -263,6 +265,8 @@ Deno.serve(withApiLogging('generate-social-image', async (req) => {
         imageUrl = await generateWithFlux(prompt, aspect_ratio);
         break;
     }
+
+    await recordExternalServiceOutcome(supabase, debitResult.usage_log_id, true);
 
     // ④ Store in Supabase Storage
     const filename = `${Date.now()}-${resolvedModel}.${resolvedModel === 'flux' ? 'webp' : 'png'}`;

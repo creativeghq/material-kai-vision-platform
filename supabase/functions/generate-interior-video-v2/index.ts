@@ -463,7 +463,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         billed_cost_usd: rawCostUsd === null ? null : rawCostUsd * pricing!.markup_multiplier,
         markup_multiplier: pricing?.markup_multiplier ?? null,
         metadata: {
-          model: resolvedModel, video_type, billing_type: 'per_unit',
+          success: true, model: resolvedModel, video_type, billing_type: 'per_unit',
           units, unit: pricing?.unit ?? null,
         },
       });
@@ -829,6 +829,10 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         durationSeconds: klingDuration as 5 | 10,
         aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
         mode: 'pro',
+        task: 'interior_video_generation_v2',
+        userId,
+        workspaceId: workspace_id ?? undefined,
+        logUsage: false,
       });
 
       const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true, uploadCtx);

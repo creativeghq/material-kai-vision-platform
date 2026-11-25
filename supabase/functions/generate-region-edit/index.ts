@@ -142,6 +142,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
       { text: prompt, images: [body.mask_data_url, imageBytes] },
       {
         model: MODEL,
+        task: 'region_edit', userId, workspaceId: body.workspace_id ?? undefined, logUsage: false,
         aspectRatio: aspectRatioOfImage(imageBytes, IMAGE_ASPECT_RATIOS) ?? undefined,
         imageLabels: ['MASK (white = the only area to change, black = keep exactly as it is):', 'PHOTO TO EDIT:'],
       },
@@ -169,7 +170,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
         raw_cost_usd: rawCostUsd,
         billed_cost_usd: billedCostUsd,
         markup_multiplier: editPricing?.markup_multiplier ?? null,
-        metadata: { provider_model: result.model, billing_type: 'per_unit', units: 1 },
+        metadata: { success: true, provider_model: result.model, billing_type: 'per_unit', units: 1 },
       });
       if (usageErr) throw usageErr;
     } catch (usageErr) {
