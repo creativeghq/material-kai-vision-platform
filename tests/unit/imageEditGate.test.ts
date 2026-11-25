@@ -175,4 +175,11 @@ describe('region edit is gated like every other edit (#483 H1)', () => {
     expect(gateAt).toBeGreaterThan(-1);
     expect(debitAt).toBeGreaterThan(gateAt);
   });
+
+  it('saves the composited edit outside the folders that vouch for an image', () => {
+    const src = stripComments(readFileSync(join(__dirname, '..', '..', 'src', 'components', 'features', 'ai', 'regionEdit.ts'), 'utf8'));
+    const path = /const path = `([^`]+)`/.exec(src)?.[1] ?? '';
+    expect(path).toMatch(/^u\/\$\{userId\}\/region-edit\//);
+    expect(path).not.toMatch(/sessions|\/gen\//);
+  });
 });

@@ -7,11 +7,12 @@ export const REGION_EDIT_CREDITS = 6;
 
 /** The model redraws the whole photo, so the edit is laid back over the original inside the painted area only. */
 export async function keepOnlyMarkedArea(
-  edit: RegionEditResult, editedUrl: string, userId: string, conversationId: string | null | undefined,
+  edit: RegionEditResult, editedUrl: string, userId: string,
 ): Promise<string> {
   const [base, edited, maskImage] = await Promise.all([loadImage(edit.imageUrl), loadImage(editedUrl), loadImage(edit.maskDataUrl)]);
   const blob = await compositeMasked(base, edited, paintedMask(maskImage).canvas, 4);
-  const path = `u/${userId}/${conversationId ? `sessions/${conversationId}/gen` : 'region-edit'}/${crypto.randomUUID()}.jpg`;
+  // Never `sessions/*/gen/`: storage refuses a client write there, because that folder vouches for the image.
+  const path = `u/${userId}/region-edit/${crypto.randomUUID()}.jpg`;
   const { error } = await supabase.storage.from('generation-images').upload(path, blob, { contentType: 'image/jpeg', upsert: false });
   if (error) throw new Error(`The edit could not be saved: ${error.message}`);
   return supabase.storage.from('generation-images').getPublicUrl(path).data.publicUrl;

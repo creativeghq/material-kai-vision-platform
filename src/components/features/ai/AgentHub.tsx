@@ -7723,7 +7723,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 return;
               }
 
-              const editedUrl = await keepOnlyMarkedArea(result, data.image_url, session.user.id, conversationIdRef.current);
+              const editedUrl = await keepOnlyMarkedArea(result, data.image_url, session.user.id);
               // Success — close canvas and emit result into chat
               setRegionEditImageUrl(null);
               const regionGeminiImageData = {
