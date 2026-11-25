@@ -4,6 +4,8 @@ const MAX_STRETCH = 1.8;
 
 export const MODEL_FRONT_TURN_DEG = -90;
 
+export const isMeshModel = (url: string): boolean => /\.glb(?:[?#]|$)/i.test(url);
+
 export function fitModel(e: Extent, w: number, d: number, h: number): [number, number, number] {
   const sx = Math.max(e.z, 1e-6);
   const sz = Math.max(e.x, 1e-6);

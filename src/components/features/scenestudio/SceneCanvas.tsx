@@ -1,5 +1,5 @@
 /** The editable Scene Studio room (#564): walls cut around openings, floors, and every object as a true-size stand-in. */
-import React, { createContext, forwardRef, useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { forwardRef, useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
 import {
@@ -13,9 +13,11 @@ import { ToneMappingMode } from 'postprocessing';
 import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, oakFloorTexture, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
 import { canvasRelief, finishTone } from '@/components/features/scenestudio/surfaceMaps';
 import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
-import { MODEL_FRONT_TURN_DEG, MAX_MODEL_SPLATS, crowded, fitModel, thinSplats } from '@/lib/scene/splatFit';
+import { MODEL_FRONT_TURN_DEG, MAX_MODEL_SPLATS, crowded, fitModel, isMeshModel, thinSplats } from '@/lib/scene/splatFit';
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
+import { AssetContext } from '@/components/features/scenestudio/assetContext';
+import { MeshModel } from '@/components/features/scenestudio/meshModel';
 import { drawSplatsOver, isSplat, splatShown, splatsSettled } from '@/components/features/scenestudio/splatOverlay';
 import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
 import type { Pose } from '@/lib/scene/walkthroughTimeline';
@@ -86,6 +88,7 @@ interface Props {
   onFocusRoom?(roomId: string): void;
   walkRoomId?: string | null;
   onWalkEnd?(): void;
+  /** A generated model per object: a .glb is drawn as a mesh, anything else as splats. */
   modelUrls?: Record<string, string>;
   staleModels?: Set<string>;
   /** Kitchen fronts: 0 closed … 1 open. */
@@ -118,8 +121,6 @@ const ScriptDriver: React.FC<{ script: React.MutableRefObject<ScriptFrame | null
   });
   return null;
 };
-
-const AssetContext = createContext<(key: string, loading: boolean) => void>(() => undefined);
 
 /** Swaps the drawn room for its photoreal version while the camera is inside it, and back outside. */
 const PhotorealRooms: React.FC<{
@@ -594,6 +595,7 @@ const ObjectMesh: React.FC<{
   const body = (() => {
     const edges = selected ? <Edges userData={{ helper: true }} color={SELECT_COLOUR} lineWidth={2} /> : null;
     const common = { castShadow: true, receiveShadow: true, userData: { objectId: obj.id, idHex } };
+    const shape = <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} layout={obj.kitchen_layout} />;
     return (
       <group>
         <mesh userData={common.userData} position={[0, h / 2, 0]}>
@@ -601,9 +603,11 @@ const ObjectMesh: React.FC<{
           <meshBasicMaterial visible={false} />
           {edges}
         </mesh>
-        {modelUrl
+        {modelUrl && !isMeshModel(modelUrl)
           ? <SplatShadow kind={obj.kind} w={w} d={d} h={h} onFloor={elev < 0.05} />
-          : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} layout={obj.kitchen_layout} />}
+          : modelUrl && !wireframe
+            ? <MeshModel url={modelUrl} w={w} d={d} h={h} objectId={obj.id} idHex={idHex}>{shape}</MeshModel>
+            : shape}
       </group>
     );
   })();
@@ -925,7 +929,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
   const wallsGroup = useRef<Group>(null);
   const objectsGroup = useRef<Group>(null);
   const cabinetView = useMemo(() => ({ open: frontsOpen, hardware: cabinetHardware ?? 'bar_handles' }), [frontsOpen, cabinetHardware]);
-  const hasModels = Object.keys(modelUrls).length > 0;
+  const hasSplats = Object.values(modelUrls).some((u) => !isMeshModel(u));
   const bounds = useMemo(() => planBounds(rooms, walls), [rooms, walls]);
   const frame = useMemo(() => planFrame(bounds), [bounds]);
   const walkPose = useMemo(() => {
@@ -1069,7 +1073,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       <RoomLighting span={span} sunHour={sunHour} />
       {!wireframe && windowLights.map((l) => <WindowLight key={l.id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
-      {(hasModels || worlds.length > 0) && <SparkLayer />}
+      {(hasSplats || worlds.length > 0) && <SparkLayer />}
       <AssetContext.Provider value={track}>
       <group ref={drawn}>
       <group userData={{ splat: true }}>
@@ -1207,7 +1211,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         />
       ))}
       </group>
-      {objects.filter((o) => !o.removed_at && modelUrls[o.id]).map((o) => (
+      {objects.filter((o) => !o.removed_at && modelUrls[o.id] && !isMeshModel(modelUrls[o.id])).map((o) => (
         <ObjectModel
           key={o.id}
           obj={o}
@@ -1235,7 +1239,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
-      {!wireframe && !photo && (hasModels || worlds.length > 0) && <SplatsAfterComposer script={script} />}
+      {!wireframe && !photo && (hasSplats || worlds.length > 0) && <SplatsAfterComposer script={script} />}
       {!wireframe && !photo && (
         <EffectComposer multisampling={4}>
           <N8AO aoRadius={0.5} distanceFalloff={0.6} intensity={2.2} halfRes quality="medium" />

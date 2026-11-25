@@ -20,6 +20,7 @@ export interface SceneWorld {
   id: string;
   room_id: string;
   quality: WorldQuality;
+  engine: 'atlas' | 'ray_trace';
   status: 'views' | 'building' | 'ready' | 'failed';
   splat_path: string | null;
   poster_path: string | null;
@@ -441,7 +442,7 @@ export const sceneStudioService = {
 
   async listWorlds(sceneId: string): Promise<SceneWorld[]> {
     const { data, error } = await supabase.from('scene_worlds')
-      .select('id, room_id, quality, status, splat_path, poster_path, layout_snapshot, error, created_at')
+      .select('id, room_id, quality, engine, status, splat_path, poster_path, layout_snapshot, error, created_at')
       .eq('floor_plan_id', sceneId).order('created_at', { ascending: false }).limit(60);
     if (error) throw new Error(error.message);
     return (data ?? []) as unknown as SceneWorld[];

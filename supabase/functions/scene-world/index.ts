@@ -218,7 +218,7 @@ async function advance(admin: DbClient, key: string, w: World): Promise<void> {
 async function advanceClaimed(admin: DbClient, key: string, ids?: string[]): Promise<number> {
   const before = new Date(Date.now() - CLAIM_MS).toISOString();
   let q = admin.from('scene_worlds').update({ advance_claimed_at: new Date().toISOString() })
-    .in('status', ['views', 'building']).or(`advance_claimed_at.is.null,advance_claimed_at.lt.${before}`);
+    .eq('engine', 'atlas').in('status', ['views', 'building']).or(`advance_claimed_at.is.null,advance_claimed_at.lt.${before}`);
   if (ids) q = q.in('id', ids);
   const { data, error } = await q.select('*');
   if (error) throw new Error(error.message);
@@ -281,7 +281,7 @@ Deno.serve(withApiLogging(FN, async (req: Request) => {
   if (!debit.success) return json({ success: false, error: debit.error ?? 'Insufficient credits', credits_required: debit.credits_debited, service }, 402);
 
   const { data: world, error } = await admin.from('scene_worlds').insert({
-    workspace_id: plan.workspace_id, floor_plan_id: plan.id, room_id: room.id, quality, views, style_render_id: styleId, prompt,
+    workspace_id: plan.workspace_id, floor_plan_id: plan.id, room_id: room.id, engine: 'atlas', quality, views, style_render_id: styleId, prompt,
     layout_snapshot: body.layout_snapshot && typeof body.layout_snapshot === 'object' ? body.layout_snapshot : null,
     credits_charged: debit.credits_debited, transaction_id: debit.transaction_id ?? null, created_by: uid,
   }).select('*').single();
