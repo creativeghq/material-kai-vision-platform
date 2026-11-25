@@ -75,13 +75,6 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 // inside the request handler are picked up. Used by the raw-fetch Gemini multi-image
 // path (the AI SDK `google` proxy covers the single-image path separately).
 const GOOGLE_API_KEY = () => Deno.env.get('GOOGLE_GENERATIVE_AI_API_KEY') || '';
-// Lazy getter (same rationale as GOOGLE_API_KEY) for the xAI Grok/Aurora image
-// + edit + masked-inpaint paths (generateImageWithGrok / editImageWithGrok).
-const XAI_API_KEY = () => Deno.env.get('XAI_API_KEY') || '';
-// Images ONLY. OpenAI was removed from the platform on 2026-08-23; its image model came back on
-// 2026-09-05 for the interior grid (text-to-image and image edit) through this chokepoint,
-// the same way Grok's OpenAI-compatible endpoint did. No SDK, no text models here.
-const OPENAI_API_KEY = () => Deno.env.get('OPENAI_API_KEY') || '';
 /**
  * The client that writes the BILLING rows — built lazily, on first use.
  *
@@ -264,7 +257,6 @@ async function _logUnitCall(opts: {
 
 let _google: ReturnType<typeof createGoogleGenerativeAI> | null = null;
 let _anthropic: ReturnType<typeof createAnthropic> | null = null;
-let _klingai: ReturnType<typeof createKlingAI> | null = null;
 
 function _ensureGoogle() {
   if (!_google) {
@@ -280,16 +272,6 @@ function _ensureAnthropic() {
   }
   return _anthropic;
 }
-function _ensureKlingai() {
-  if (!_klingai) {
-    _syncEnvIntoPolyfill();
-    _klingai = createKlingAI({
-      accessKey: Deno.env.get('KLINGAI_ACCESS_KEY') || '',
-      secretKey: Deno.env.get('KLINGAI_SECRET_KEY') || '',
-    });
-  }
-  return _klingai;
-}
 
 // Proxies preserve the exact existing surface: callable as `google(modelId)` AND attribute-access
 // like `google.image(modelId)` / `google.video(modelId)`.
@@ -302,11 +284,6 @@ const anthropic = new Proxy(function () {}, {
   apply: (_t, _thisArg, args) => (_ensureAnthropic() as unknown as (...a: unknown[]) => unknown)(...args),
   get: (_t, prop) => (_ensureAnthropic() as unknown as Record<string | symbol, unknown>)[prop],
 }) as unknown as ReturnType<typeof createAnthropic>;
-
-const klingai = new Proxy(function () {}, {
-  apply: (_t, _thisArg, args) => (_ensureKlingai() as unknown as (...a: unknown[]) => unknown)(...args),
-  get: (_t, prop) => (_ensureKlingai() as unknown as Record<string | symbol, unknown>)[prop],
-}) as unknown as ReturnType<typeof createKlingAI>;
 
 // ── Default models ──
 const DEFAULT_GEMINI_MODEL = GEMINI_TEXT;
@@ -1076,6 +1053,8 @@ export async function generateImageWithGemini(
   config?: UnitBillingConfig & {
     model?: GeminiImageModel;
     aspectRatio?: ImageAspectRatio;
+    /** What each image is, in order. Default: style reference, then room. */
+    imageLabels?: string[];
   },
 ): Promise<GeminiImageResult> {
   const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image';
@@ -1136,7 +1115,7 @@ export async function generateImageWithGemini(
  */
 async function generateMultiImageWithGemini(
   prompt: { text: string; images: (Uint8Array | string)[] },
-  config: UnitBillingConfig & { model: GeminiImageModel; aspectRatio?: ImageAspectRatio },
+  config: UnitBillingConfig & { model: GeminiImageModel; aspectRatio?: ImageAspectRatio; imageLabels?: string[] },
 ): Promise<GeminiImageResult> {
   if (!GOOGLE_API_KEY()) throw new Error('GOOGLE_GENERATIVE_AI_API_KEY not set');
   const _start = Date.now();
@@ -1175,14 +1154,14 @@ async function generateMultiImageWithGemini(
   // exactly which is the layout donor and which is the design donor.
   // Structure: label → image → [label → image] → instruction text
   const isSingleImage = prompt.images.length === 1;
-  const IMAGE_LABELS = isSingleImage
+  const IMAGE_LABELS = config.imageLabels ?? (isSingleImage
     ? [
         'ROOM TO EDIT (this is the room photo you are editing — all fixture positions, walls, doors, windows stay exactly where they are):',
       ]
     : [
         'STYLE REFERENCE IMAGE (first image — mood board only, extract colors/materials/finishes, ignore its spatial layout entirely):',
         'ROOM TO EDIT (second image — this is the room you are editing, all positions and fixtures stay exactly where they are):',
-      ];
+      ]);
 
   const parts: any[] = [];
   for (let i = 0; i < prompt.images.length; i++) {
@@ -1309,6 +1288,10 @@ export async function generateVideoWithKling(
     : prompt;
 
   try {
+    const [accessKey, secretKey] = await Promise.all([_secret('KLINGAI_ACCESS_KEY'), _secret('KLINGAI_SECRET_KEY')]);
+    if (!accessKey || !secretKey) throw new Error('KLINGAI_ACCESS_KEY / KLINGAI_SECRET_KEY are not configured');
+    _syncEnvIntoPolyfill();
+    const klingai = createKlingAI({ accessKey, secretKey });
     const { video } = await generateVideo({
       // KlingAIProvider is NOT callable — it exposes video()/videoModel(). Calling it
       // directly (klingai(modelId)) threw a TypeError on every invocation.
@@ -2314,7 +2297,8 @@ export async function generateImageWithGrok(
   prompt: string,
   config?: UnitBillingConfig & { model?: string },
 ): Promise<GrokImageResult> {
-  if (!XAI_API_KEY()) throw new Error('XAI_API_KEY not set');
+  const apiKey = await _secret('XAI_API_KEY');
+  if (!apiKey) throw new Error('XAI_API_KEY is not configured');
 
   const modelId = config?.model ?? GROK_IMAGE_MODEL;
   const _start = Date.now();
@@ -2331,7 +2315,7 @@ export async function generateImageWithGrok(
   const response = await fetch('https://api.x.ai/v1/images/generations', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${XAI_API_KEY()}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -2376,7 +2360,8 @@ export async function editImageWithGrok(
     imageMimeType?: string;
   },
 ): Promise<GrokImageResult> {
-  if (!XAI_API_KEY()) throw new Error('XAI_API_KEY not set');
+  const apiKey = await _secret('XAI_API_KEY');
+  if (!apiKey) throw new Error('XAI_API_KEY is not configured');
 
   const modelId = config?.model ?? GROK_IMAGE_MODEL;
   const mimeType = config?.imageMimeType ?? 'image/jpeg';
@@ -2404,7 +2389,7 @@ export async function editImageWithGrok(
 
   const response = await fetch('https://api.x.ai/v1/images/edits', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${XAI_API_KEY()}` },
+    headers: { 'Authorization': `Bearer ${apiKey}` },
     body: form,
   });
 
@@ -2454,7 +2439,8 @@ export async function generateImageWithOpenAI(
   prompt: string,
   config?: UnitBillingConfig & { model?: string; size?: '1024x1024' | '1536x1024' | '1024x1536' | 'auto'; quality?: 'low' | 'medium' | 'high' },
 ): Promise<OpenAIImageResult> {
-  if (!OPENAI_API_KEY()) throw new Error('OPENAI_API_KEY not set');
+  const apiKey = await _secret('OPENAI_API_KEY');
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
 
   const modelId = config?.model ?? OPENAI_IMAGE_MODEL;
   const _start = Date.now();
@@ -2471,7 +2457,7 @@ export async function generateImageWithOpenAI(
   const response = await fetch('https://api.openai.com/v1/images/generations', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${OPENAI_API_KEY()}`,
+      'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -2517,7 +2503,8 @@ export async function editImageWithOpenAI(
     quality?: 'low' | 'medium' | 'high';
   },
 ): Promise<OpenAIImageResult> {
-  if (!OPENAI_API_KEY()) throw new Error('OPENAI_API_KEY not set');
+  const apiKey = await _secret('OPENAI_API_KEY');
+  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
 
   const modelId = config?.model ?? OPENAI_IMAGE_MODEL;
   const mimeType = config?.imageMimeType ?? 'image/jpeg';
@@ -2545,7 +2532,7 @@ export async function editImageWithOpenAI(
 
   const response = await fetch('https://api.openai.com/v1/images/edits', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${OPENAI_API_KEY()}` },
+    headers: { 'Authorization': `Bearer ${apiKey}` },
     body: form,
   });
 

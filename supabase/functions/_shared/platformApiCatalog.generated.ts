@@ -1623,8 +1623,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora",
-    "description": "Accepts a room image URL, a binary PNG mask data URL (white=regenerate, black=keep), and a prompt. Calls Grok Aurora's /v1/images/edits endpoint with an explicit binary mask. Costs 20 credits. Accepts service-role key for agent-chat internal calls.",
+    "summary": "Edit only the painted area of a room image with Gemini",
+    "description": "Accepts a room image URL, a PNG mask data URL (white=change, black=keep) and a prompt. Gemini redraws the photo with the change inside the white area; composite the result through your own mask to guarantee the rest is untouched. Costs 6 credits. Accepts service-role key for agent-chat internal calls.",
     "fields": {
       "image_url": {
         "type": "string",
@@ -1822,8 +1822,8 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
     "methods": [
       "POST"
     ],
-    "summary": "AI virtual staging of an empty room via Replicate proplabs/virtual-staging",
-    "description": "Takes an empty room image, room type, and optional furniture style/items. Calls proplabs/virtual-staging on Replicate with Prefer: wait polling (~56s, 20 credits). Emits virtual_staging_completed flow event on success. Accepts service-role key for agent-chat internal calls.",
+    "summary": "AI virtual staging of an empty room with Gemini",
+    "description": "Takes an empty room image, room type, and optional furniture style/items. Gemini 3 Pro Image adds the furniture and keeps the room itself (15 credits). Emits virtual_staging_completed flow event on success. Accepts service-role key for agent-chat internal calls.",
     "fields": {
       "source_image_url": {
         "type": "string",

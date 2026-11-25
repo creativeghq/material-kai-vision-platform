@@ -222,7 +222,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 | Agent Chat | Send message | Claude | 1-3 sec | AI responses |
 | **Flow Automation** ✨ | **Admin flow canvas** | **Claude (actions)** | **Real-time** | **Automated actions** |
 | **Interior Video** ✨ | **Video type + image** | **Veo-2/Kling/Wan/Runway** | **1-5 min** | **MP4 video** |
-| **Virtual Staging** ✨ | **Empty room image** | **Replicate proplabs** | **~56s** | **Furnished render** |
+| **Virtual Staging** ✨ | **Empty room image** | **Gemini 3 Pro** | **~30s** | **Furnished render** |
 | **Social Publish** ✨ | **Post content + account** | **Claude + Zernio** | **<5s** | **Published post** |
 | **Background Agent** ✨ | **Cron / event / manual** | **Claude + MIVAA API** | **Varies** | **Enriched data** |
 

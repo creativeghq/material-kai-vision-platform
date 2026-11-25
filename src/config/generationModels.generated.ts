@@ -31,6 +31,30 @@ export interface GenerationModelRow {
 
 export const GENERATION_MODELS: readonly GenerationModelRow[] = [
   {
+    "id": "gemini-nano-banana-2.1",
+    "display_name": "Gemini Nano Banana 2.1",
+    "capability": "image",
+    "sub_capability": "text-or-image-to-image",
+    "provider": "google",
+    "slug": "gemini-nano-banana-2.1",
+    "version": null,
+    "adapter": "gemini",
+    "input_requirements": {
+      "max_images": 2,
+      "min_images": 0,
+      "image_roles": [
+        "source",
+        "style_reference"
+      ],
+      "needs_prompt": true
+    },
+    "pricing_key": "gemini-nano-banana-2.1",
+    "tier": "budget",
+    "status": "active",
+    "enabled": true,
+    "sort_order": 9
+  },
+  {
     "id": "gemini-3.1-flash-image",
     "display_name": "Gemini 3.1 Flash Image",
     "capability": "image",
@@ -226,365 +250,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 40
   },
   {
-    "id": "seedream-4",
-    "display_name": "Seedream 4",
-    "capability": "image",
-    "sub_capability": "text-or-image-to-image",
-    "provider": "replicate",
-    "slug": "bytedance/seedream-4",
-    "version": null,
-    "adapter": "seedream",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 0,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "seedream-4",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 45
-  },
-  {
-    "id": "playground-v2.5",
-    "display_name": "Playground v2.5",
-    "capability": "image",
-    "sub_capability": "text-to-image",
-    "provider": "replicate",
-    "slug": "playgroundai/playground-v2.5-1024px-aesthetic",
-    "version": "a45f82a1382bed5c7aeb861dac7c7d191b0fdf74d8d57c4a0e6ed7d4d0bf7d24",
-    "adapter": "playground_v25",
-    "input_requirements": {
-      "max_images": 0,
-      "min_images": 0,
-      "needs_prompt": true
-    },
-    "pricing_key": "playground-v2.5",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 50
-  },
-  {
-    "id": "z-image-turbo",
-    "display_name": "Z-Image Turbo",
-    "capability": "image",
-    "sub_capability": "text-to-image",
-    "provider": "replicate",
-    "slug": "prunaai/z-image-turbo",
-    "version": null,
-    "adapter": "z_image",
-    "input_requirements": {
-      "max_images": 0,
-      "min_images": 0,
-      "needs_prompt": true
-    },
-    "pricing_key": "z-image-turbo",
-    "tier": "budget",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 55
-  },
-  {
-    "id": "sd3",
-    "display_name": "Stable Diffusion 3",
-    "capability": "image",
-    "sub_capability": "text-to-image",
-    "provider": "replicate",
-    "slug": "stability-ai/stable-diffusion-3",
-    "version": null,
-    "adapter": null,
-    "input_requirements": {
-      "max_images": 0,
-      "min_images": 0,
-      "needs_prompt": true
-    },
-    "pricing_key": "stable-diffusion-3",
-    "tier": "standard",
-    "status": "dead",
-    "enabled": false,
-    "sort_order": 60
-  },
-  {
-    "id": "adirik-interior-design",
-    "display_name": "Adirik Interior Design",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "adirik/interior-design",
-    "version": "76604baddc85b1b4616e1c6475eca080da339c8875bd4996705440484a6eac38",
-    "adapter": "adirik_interior",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "adirik-interior-design",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 70
-  },
-  {
-    "id": "comfyui-interior-remodel",
-    "display_name": "ComfyUI Interior Remodel",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "jschoormans/comfyui-interior-remodel",
-    "version": "2a360362540e1f6cfe59c9db4aa8aa9059233d40e638aae0cdeb6b41f3d0dcce",
-    "adapter": "comfyui_interior",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "comfyui-interior-remodel",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 80
-  },
-  {
-    "id": "interior-v2",
-    "display_name": "Interior V2",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "jschoormans/interior-v2",
-    "version": "8372bd24c6011ea957a0861f0146671eed615e375f038c13259c1882e3c8bac7",
-    "adapter": "interior_v2",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "interior-v2",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 90
-  },
-  {
-    "id": "interiorly-gen1-dev",
-    "display_name": "Interiorly Gen1 Dev",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "julian-at/interiorly-gen1-dev",
-    "version": "5e3080d1b308e80197b32f0ce638daa8a329d0cf42068739723d8259e44b445e",
-    "adapter": "flux_lora_interior",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "interiorly-gen1-dev",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 100
-  },
-  {
-    "id": "designer-architecture",
-    "display_name": "Designer Architecture",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "davisbrown/designer-architecture",
-    "version": "0d6f0893b05f14500ce03e45f54290cbffb907d14db49699f2823d0fd35def46",
-    "adapter": null,
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "designer-architecture",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 110
-  },
-  {
-    "id": "erayyavuz-interior-ai",
-    "display_name": "Interior AI",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "erayyavuz/interior-ai",
-    "version": "e299c531485aac511610a878ef44b554381355de5ee032d109fcae5352f39fa9",
-    "adapter": "interior_ai",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "erayyavuz-interior-ai",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 120
-  },
-  {
-    "id": "interor-2",
-    "display_name": "Interior 2 (Flux)",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "doobls-ai/interor-2",
-    "version": "91f2ef63c76a73d2ec4c67cf7b2a9672e074046cf4fde1d98e46a5829f7ea68b",
-    "adapter": "flux_lora_interior",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "interor-2",
-    "tier": "budget",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 130
-  },
-  {
-    "id": "colourful-interiors",
-    "display_name": "Colourful Interiors (Flux)",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "rihan-a/colourful_interiors",
-    "version": "ba0425bc2e4bebafa8bd918519fdf3b5a022969a6a7c8ba0746b807bb5b541a3",
-    "adapter": "flux_lora_interior",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "colourful-interiors",
-    "tier": "budget",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 140
-  },
-  {
-    "id": "stable-interiors-v2-pb",
-    "display_name": "Stable Interiors V2",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "pointblack/stable-interiors-v2",
-    "version": "569b1bd6e4df6c9c900ad932d4a3a9f05585fac957dc6bc627aa1654853a97b5",
-    "adapter": "stable_interiors",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "stable-interiors-v2-pb",
-    "tier": "budget",
-    "status": "dead",
-    "enabled": false,
-    "sort_order": 150
-  },
-  {
-    "id": "stabledesign-interior",
-    "display_name": "StableDesign",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "melgor/stabledesign_interiordesign",
-    "version": "5e13482ea317670bfc797bb18bace359860a721a39b5bbcaa1ffcd241d62bca0",
-    "adapter": "stabledesign",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "stabledesign-interior",
-    "tier": "budget",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 155
-  },
-  {
-    "id": "stable-interiors-v2-yz",
-    "display_name": "Stable Interiors V2 (Fast)",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "youzu/stable-interiors-v2",
-    "version": "4836eb257a4fb8b87bac9eacbef9292ee8e1a497398ab96207067403a4be2daf",
-    "adapter": "stable_interiors",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "stable-interiors-v2-yz",
-    "tier": "budget",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 160
-  },
-  {
-    "id": "interior-design-sdxl",
-    "display_name": "Interior Design SDXL",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "replicate",
-    "slug": "rocketdigitalai/interior-design-sdxl",
-    "version": "a3c091059a25590ce2d5ea13651fab63f447f21760e50c358d4b850e844f59ee",
-    "adapter": "sdxl_interior",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "interior-design-sdxl",
-    "tier": "premium",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 170
-  },
-  {
     "id": "flux-depth-pro",
     "display_name": "FLUX Depth Pro",
     "capability": "image",
@@ -607,29 +272,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "status": "active",
     "enabled": true,
     "sort_order": 180
-  },
-  {
-    "id": "proplabs-virtual-staging",
-    "display_name": "Virtual Staging",
-    "capability": "image",
-    "sub_capability": "image-to-image",
-    "provider": "proplabs",
-    "slug": "virtual-staging",
-    "version": null,
-    "adapter": "virtual_staging",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": false
-    },
-    "pricing_key": "proplabs-virtual-staging",
-    "tier": "standard",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 190
   },
   {
     "id": "wan-3.0-480p",
@@ -707,29 +349,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 194
   },
   {
-    "id": "gemini-omni-1.1-flash-360p",
-    "display_name": "Gemini Omni 1.1 Flash 360p",
-    "capability": "video",
-    "sub_capability": "image-to-video",
-    "provider": "google",
-    "slug": "gemini-omni-1.1-flash",
-    "version": null,
-    "adapter": "gemini_omni",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "gemini-omni-1.1-flash-360p",
-    "tier": "budget",
-    "status": "dead",
-    "enabled": false,
-    "sort_order": 196
-  },
-  {
     "id": "gemini-omni-1.2-flash-720p",
     "display_name": "Gemini Omni 1.2 Flash 720p",
     "capability": "video",
@@ -776,29 +395,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "status": "active",
     "enabled": false,
     "sort_order": 196
-  },
-  {
-    "id": "gemini-omni-1.1-flash-720p",
-    "display_name": "Gemini Omni 1.1 Flash 720p",
-    "capability": "video",
-    "sub_capability": "image-to-video",
-    "provider": "google",
-    "slug": "gemini-omni-1.1-flash",
-    "version": null,
-    "adapter": "gemini_omni",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "gemini-omni-1.1-flash-720p",
-    "tier": "standard",
-    "status": "dead",
-    "enabled": false,
-    "sort_order": 197
   },
   {
     "id": "gemini-omni-1.2-flash-1080p",
@@ -848,29 +444,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 197
   },
   {
-    "id": "gemini-omni-1.1-flash-1080p",
-    "display_name": "Gemini Omni 1.1 Flash 1080p",
-    "capability": "video",
-    "sub_capability": "image-to-video",
-    "provider": "google",
-    "slug": "gemini-omni-1.1-flash",
-    "version": null,
-    "adapter": "gemini_omni",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "gemini-omni-1.1-flash-1080p",
-    "tier": "premium",
-    "status": "dead",
-    "enabled": false,
-    "sort_order": 198
-  },
-  {
     "id": "seedance-2.5-720p",
     "display_name": "Seedance 2.5 720P",
     "capability": "video",
@@ -918,29 +491,6 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "status": "active",
     "enabled": false,
     "sort_order": 199
-  },
-  {
-    "id": "veo-2",
-    "display_name": "Veo 2",
-    "capability": "video",
-    "sub_capability": "image-to-video",
-    "provider": "google",
-    "slug": "veo-2",
-    "version": null,
-    "adapter": "veo",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "veo-2",
-    "tier": "premium",
-    "status": "dead",
-    "enabled": false,
-    "sort_order": 200
   },
   {
     "id": "ray-3.2-720p",
@@ -1051,7 +601,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = 'd41ace98d117ca75f8f761de7230c5d9';
+export const PROJECTION_FINGERPRINT = '44a07c88b012708479438168a770c083';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

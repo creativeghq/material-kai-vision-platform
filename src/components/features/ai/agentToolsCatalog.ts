@@ -3666,7 +3666,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: '9:16', label: '9:16 — social reel' },
             { value: '1:1', label: '1:1 — square' },
           ] },
-          { key: 'duration_seconds', label: 'Duration (Seconds)', kind: 'number', default: '8', help: '4–30 seconds; clamped to the model ceiling (Veo 8s, Kling 10s, H3 Max 15s, Wan/Seedance 30s)' },
+          { key: 'duration_seconds', label: 'Duration (Seconds)', kind: 'number', default: '8', help: '4–30 seconds; clamped to the model ceiling (Runway/Kling 10s, Omni/H3 Max 15s, Wan/Seedance 30s)' },
           { key: 'notes', label: 'Anything to Emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. slow pan across the kitchen island' },
         ],
       },

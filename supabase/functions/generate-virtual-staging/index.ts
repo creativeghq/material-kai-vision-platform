@@ -1,23 +1,17 @@
-/**
- * generate-virtual-staging
- *
- * AI-powered virtual staging using proplabs/virtual-staging on Replicate.
- * Takes an empty room image + room type + style, returns a furnished staged image.
- *
- * Model: proplabs/virtual-staging (~56s, $0.16/run)
- * Credits: 20
- *
- * Requires: REPLICATE_API_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- */
+/** generate-virtual-staging — furnishes an empty room photo with Gemini, keeping the room itself. */
 
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
-import { replicateToken, REPLICATE_NOT_CONFIGURED } from '../_shared/replicate-token.ts';
+import { generateImageWithGemini, IMAGE_ASPECT_RATIOS } from '../_shared/ai-client.ts';
+import { GENERATION_CREDIT_COSTS } from '../_shared/generation-routing.ts';
+import { aspectRatioOfImage } from '../_shared/image-dimensions.ts';
+import { assertEditableSource } from '../_shared/image-edit-gate.ts';
+import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
-import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
+import { resolveOutputPath, isPlatformGeneratedImage, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
@@ -27,12 +21,10 @@ import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const CREDIT_COST = 20;
-const MODEL = 'proplabs/virtual-staging';
-// `ai_model_pricing.model_key` for MODEL, slug-derived to match the table's convention
-// (`adirik/interior-design` -> `adirik-interior-design`). Also what we log as model_name,
-// so the usage row and the price row are keyed by the same string.
-const PRICING_KEY = 'proplabs-virtual-staging';
+const MODEL = 'gemini-3-pro-image' as const;
+const CREDIT_COST = GENERATION_CREDIT_COSTS[MODEL];
+const PRICING_KEY = MODEL;
+const DEFAULT_STYLE = 'Default (AI decides)';
 
 interface VirtualStagingRequest {
   source_image_url: string;
@@ -53,92 +45,33 @@ function jsonResponse(body: unknown, status = 200) {
 
 async function uploadToStorage(
   supabase: DbClient,
-  imageUrl: string,
+  base64: string,
+  mimeType: string,
   jobId: string,
   ctx: Partial<SessionPathCtx> = {},
 ): Promise<string> {
-  // Was a bare fetch(imageUrl): no SSRF guard, redirects followed, unbounded read.
-  const { bytes, mimeType: contentType } = await fetchImageGuarded(imageUrl);
-  const ext = contentType.includes('png') ? 'png' : 'jpg';
-  const path = resolveOutputPath(ctx, 'virtual-staging', `${jobId}.${ext}`);
-
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  const path = resolveOutputPath(ctx, 'virtual-staging', `${jobId}.${mimeType.includes('png') ? 'png' : 'jpg'}`);
   const { error } = await supabase.storage
     .from('generation-images')
-    .upload(path, bytes, { contentType, upsert: true });
+    .upload(path, bytes, { contentType: mimeType, upsert: true });
   if (error) throw new Error(`Storage upload failed: ${error.message}`);
 
   const { data } = supabase.storage.from('generation-images').getPublicUrl(path);
   return data.publicUrl;
 }
 
-async function runReplicate(
-  imageUrl: string,
-  room: string,
-  furnitureStyle: string,
-  furnitureItems?: string,
-): Promise<string> {
-  const token = await replicateToken();
-  const createResp = await fetch(`https://api.replicate.com/v1/models/${MODEL}/predictions`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'wait',
-    },
-    body: JSON.stringify({
-      input: {
-        image: imageUrl,
-        room,
-        furniture_style: furnitureStyle,
-        furniture_items: furnitureItems || 'Default (AI decides)',
-      },
-    }),
+async function stageRoom(supabase: DbClient, imageUrl: string, room: string, furnitureStyle: string, furnitureItems?: string) {
+  const prompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_virtual_staging'), {
+    room,
+    furniture_style: furnitureStyle === DEFAULT_STYLE ? 'whatever suits the room best' : furnitureStyle,
+    furniture_items: furnitureItems?.trim() || 'the furniture this kind of room normally needs',
   });
-
-  if (!createResp.ok) {
-    const err = await createResp.text();
-    throw new Error(`Replicate create failed (${createResp.status}): ${err}`);
-  }
-
-  const prediction = await createResp.json();
-
-  // If Prefer: wait resolved it immediately
-  if (prediction.status === 'succeeded') {
-    const output = prediction.output;
-    if (typeof output === 'string') return output;
-    if (Array.isArray(output) && output.length > 0) return output[0];
-  }
-
-  if (prediction.status === 'failed') {
-    throw new Error(`Replicate prediction failed: ${prediction.error}`);
-  }
-
-  const predictionId = prediction.id;
-
-  // Poll for completion
-  for (let i = 0; i < 45; i++) {
-    await new Promise((r) => setTimeout(r, 4000));
-
-    const statusResp = await fetch(`https://api.replicate.com/v1/predictions/${predictionId}`, {
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
-
-    if (!statusResp.ok) continue;
-    const status = await statusResp.json();
-
-    if (status.status === 'succeeded') {
-      const output = status.output;
-      if (typeof output === 'string') return output;
-      if (Array.isArray(output) && output.length > 0) return output[0];
-      throw new Error('Unexpected output format from Replicate');
-    }
-
-    if (status.status === 'failed') {
-      throw new Error(`Replicate prediction failed: ${status.error}`);
-    }
-  }
-
-  throw new Error('Virtual staging timed out after 3 minutes');
+  const { bytes } = await fetchImageGuarded(imageUrl);
+  return await generateImageWithGemini(
+    { text: prompt, images: [bytes] },
+    { model: MODEL, aspectRatio: aspectRatioOfImage(bytes, IMAGE_ASPECT_RATIOS) ?? undefined },
+  );
 }
 
 Deno.serve(withApiLogging('generate-virtual-staging', async (req) => {
@@ -205,9 +138,7 @@ async function handleRequest(
   if (!body.source_image_url) {
     return jsonResponse({ success: false, error: 'source_image_url is required' }, 400);
   }
-  // Invariant 7 (#364 EX-7). `source_image_url` is handed to Replicate, which fetches it from
-  // THEIR network — the same primitive as fetching it here, so it is validated before it leaves
-  // rather than only where we happen to download the output.
+  // Invariant 7: refused before the image gate and the debit, not only at download.
   try {
     await assertSafeUrl(body.source_image_url, { allowSchemes: ['https:'] });
   } catch (e) {
@@ -219,17 +150,21 @@ async function handleRequest(
   if (!body.room) {
     return jsonResponse({ success: false, error: 'room is required' }, 400);
   }
-  if (!(await replicateToken())) {
-    return jsonResponse({ success: false, error: REPLICATE_NOT_CONFIGURED }, 500);
+
+  // Invariant 9b: the source artefact is gated before any debit.
+  const gate = await assertEditableSource(
+    supabase, body.source_image_url, `Furnish this empty ${body.room}`,
+    isPlatformGeneratedImage(body.source_image_url), userId, body.workspace_id ?? null,
+  );
+  if (!gate.allowed) {
+    return jsonResponse({ success: false, error: gate.message, refused: true }, 422);
   }
 
   const jobId = crypto.randomUUID();
   const room = body.room;
-  const furnitureStyle = body.furniture_style || 'Default (AI decides)';
+  const furnitureStyle = body.furniture_style || DEFAULT_STYLE;
 
-  // Debit credits BEFORE the expensive Replicate call (invariant #10 — debit-before,
-  // refund-on-failure). The old non-atomic balance pre-read let a race deliver a free
-  // staging; a real debit gates the caller and is refunded if generation fails.
+  // Invariant 10: debit first, refund on failure.
   const { data: debitData, error: debitError } = await supabase.rpc('debit_credits', {
     p_user_id: userId,
     p_amount: CREDIT_COST,
@@ -243,8 +178,8 @@ async function handleRequest(
   }
 
   try {
-    const tempUrl = await runReplicate(body.source_image_url, room, furnitureStyle, body.furniture_items);
-    const imageUrl = await uploadToStorage(supabase, tempUrl, jobId, { userId, conversationId: body.conversation_id });
+    const staged = await stageRoom(supabase, body.source_image_url, room, furnitureStyle, body.furniture_items);
+    const imageUrl = await uploadToStorage(supabase, staged.base64, staged.mimeType, jobId, { userId, conversationId: body.conversation_id });
 
     // USD cost from `ai_model_pricing` (this insert previously set credits only, so every
     // virtual_staging row carried a NULL cost). `model_name` is the pricing key, not a

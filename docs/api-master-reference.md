@@ -59,8 +59,8 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `dashboard-insights` | JWT / kai_* | Generate cached AI insights for the home dashboard |
 | `generate-interior-gemini` | JWT / kai_* | Multi-mode interior design image generation (Gemini, FLUX, Grok) |
 | `generate-interior-video-v2` | JWT / kai_* | Multi-model interior design video generation with async polling fallback |
-| `generate-region-edit` | JWT / kai_* | Masked inpainting: regenerate a user-painted area of a room image via Grok Aurora |
-| `generate-virtual-staging` | JWT / kai_* | AI virtual staging of an empty room via Replicate proplabs/virtual-staging |
+| `generate-region-edit` | JWT / kai_* | Edit only the painted area of a room image with Gemini |
+| `generate-virtual-staging` | JWT / kai_* | AI virtual staging of an empty room with Gemini |
 | `product-cutouts` | JWT / kai_* | Make background-removed product cut-outs for the Product in Place embed |
 
 **Social**

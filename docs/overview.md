@@ -33,7 +33,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - ⚡ **Flow Engine**: Visual drag-and-drop workflow automation (triggers, conditions, actions)
 - 🎬 **Interior Video Generation**: 4 AI models — Veo-2, Kling, Wan, Runway Gen4
 - 🛋️ **Virtual Staging**: AI-furnished room renders from empty photos (Replicate, 20cr)
-- ✏️ **Region Editing**: Pixel-precise inpainting with SAM 2 masks + Grok Aurora
+- ✏️ **Region Editing**: Edit only the painted area, with Gemini
 - 📱 **Social Media Suite**: Generate captions, images, videos + publish via Zernio
 - 🤖 **Background Agents**: Scheduled autonomous agents with chain triggers + auto-recovery
 - 💳 **Billing & Credits**: Stripe subscriptions + credit packages
@@ -72,7 +72,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - OpenAI (GPT-4o, GPT-5 — optional alternative for product discovery / agents; NOT vision)
 - Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
 - Google Gemini (gemini-3.1-flash-image, gemini-3-pro-image — interior generation)
-- xAI Aurora (grok-2-aurora — region edit inpainting, social image generation)
+- xAI Aurora (grok-2-aurora — social image generation)
 - Kling (kling-v3.0 — interior and social video generation)
 - Zernio (social media OAuth broker + publishing platform)
 

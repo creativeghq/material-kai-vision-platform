@@ -739,7 +739,7 @@ a call that will be refused.`,
 /**
  * LangChain Tool: Virtual Staging
  *
- * Stages an empty room with AI-generated furniture using proplabs/virtual-staging.
+ * Stages an empty room with AI-generated furniture.
  * Use when the user wants to see how an empty room would look furnished.
  */
 export const createVirtualStagingTool = (

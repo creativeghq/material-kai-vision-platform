@@ -32,7 +32,7 @@ Credits are workspace-scoped. Each generation feature deducts a fixed amount.
 |---|---|---|
 | Interior image (Gemini flash) | 6 | `generate-interior-gemini` |
 | Interior image (Gemini pro / 4K) | 15 | `generate-interior-gemini` |
-| Region edit (Grok inpainting) | 20 | `generate-region-edit` |
+| Region edit (Gemini) | 6 | `generate-region-edit` |
 | Virtual staging | 20 | `generate-virtual-staging` |
 | Social caption generation | 2 | `generate-social-content` |
 | Social image (Gemini) | 5 | `generate-social-image` |

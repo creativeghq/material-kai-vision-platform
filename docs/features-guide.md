@@ -638,8 +638,8 @@ Complete reference of all platform features and capabilities.
 
 **Documentation**: [virtual-staging.md](virtual-staging.md)
 
-- ✅ Replicate `proplabs/virtual-staging` model (~56s)
-- ✅ 20 credits per generation
+- ✅ Gemini 3 Pro Image
+- ✅ 15 credits per generation
 - ✅ Room types: living_room, bedroom, dining_room, kitchen, bathroom, home_office, kids_room, outdoor
 - ✅ Styles: modern, scandinavian, industrial, traditional, bohemian, minimalist, luxury, rustic
 - ✅ Optional free-text `furniture_items` override
@@ -656,7 +656,7 @@ Complete reference of all platform features and capabilities.
 **Documentation**: [segmentation-inpainting.md](segmentation-inpainting.md)
 
 - ✅ `RegionEditCanvas.tsx` — brush paint / erase mask tool
-- ✅ `generate-region-edit` edge function — Grok Aurora masked inpainting (20cr)
+- ✅ `generate-region-edit` edge function — Gemini, composited through the mask (6cr)
 - ✅ SAM 2 via Replicate for pixel-perfect mask generation (`/api/segment/mask`)
 - ✅ Pillow bbox/ellipse fallback (instant, zero cost)
 - ✅ AnyDoor for reference-image product placement

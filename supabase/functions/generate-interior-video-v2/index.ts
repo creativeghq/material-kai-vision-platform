@@ -3,6 +3,7 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { replicateToken } from '../_shared/replicate-token.ts';
+import { probeReplicateAccount } from '../_shared/replicate-account.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   generateVideoWithGeminiOmni,
@@ -149,9 +150,8 @@ const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = Object.fromEntries(
   Object.entries(TYPE_MODEL_PREFERENCE).map(([type, models]) => [type, models[0]]),
 ) as Record<VideoType, VideoModel>;
 
-/** A probe verdict that means the credential is deployed. `ok` is verified; the other is unverified
- *  but has a key, and excluding it would drop Google, whose submit shape simply has no probe. */
-const USABLE_PROBE_STATUS = new Set(['ok', 'no_probe_implemented']);
+/** Verdicts that mean a call cannot succeed. A timeout or a provider 5xx is not one: that call is tried and refunded. */
+const BLOCKING_PROBE_STATUS = new Set(['not_configured', 'auth_failed', 'credit_exhausted', 'not_found']);
 
 /** Providers whose credential is deployed, read from the registry the health agent already stamps.
  *  On a read failure every provider is treated as usable: the registry must never become a
@@ -165,8 +165,20 @@ async function usableVideoProviders(db: DbClient): Promise<Set<string> | null> {
       .eq('enabled', true);
     if (error || !data?.length) return null;
     const usable = new Set<string>();
-    for (const row of data as Array<{ provider: string; last_probe_status: string | null }>) {
-      if (row.last_probe_status && USABLE_PROBE_STATUS.has(row.last_probe_status)) usable.add(row.provider);
+    const rows = data as Array<{ provider: string; last_probe_status: string | null }>;
+    for (const row of rows) {
+      if (row.last_probe_status && !BLOCKING_PROBE_STATUS.has(row.last_probe_status)) usable.add(row.provider);
+    }
+    // The stored verdict is up to an hour old, and an account topped up since is not exhausted: ask again.
+    if (!usable.has('replicate') && rows.some((r) => r.provider === 'replicate' && r.last_probe_status === 'credit_exhausted')) {
+      const verdict = await probeReplicateAccount(await replicateToken());
+      if (!verdict || !BLOCKING_PROBE_STATUS.has(verdict.status)) usable.add('replicate');
+      if (verdict?.status === 'ok') {
+        const { error: healErr } = await db.from('generation_models')
+          .update({ last_probe_at: new Date().toISOString(), last_probe_status: 'ok', last_probe_error: null })
+          .eq('provider', 'replicate').eq('last_probe_status', 'credit_exhausted');
+        if (healErr) console.warn('[generate-interior-video-v2] could not clear the stale credit verdict:', healErr.message);
+      }
     }
     return usable;
   } catch {

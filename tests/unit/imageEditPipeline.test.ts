@@ -240,7 +240,6 @@ describe('an edit comes back the shape it went in', () => {
     for (const marker of [
       'const editAspectRatio = aspectRatioForSource(sourceBuffer)',        // image-edit
       'aspectRatio: aspectRatioForSource(sourceBuffer) }',                 // unstage
-      'const measured = await measureSource(body.reference_image_url)',    // redesign
       'const measuredRoom = await measureSource(body.reference_image_url)', // copy-style
     ]) {
       expect(fn).toContain(marker);

@@ -80,7 +80,7 @@ describe('EX-7 — an image URL is validated before a provider is asked to fetch
   const HANDS_URL_TO_A_PROVIDER = [
     'generate-interior-gemini/index.ts',   // reference_image_url -> callFluxDepthPro
     'generate-interior-video-v2/index.ts', // source_image_url -> Replicate / Veo / Kling
-    'generate-virtual-staging/index.ts',   // source_image_url -> Replicate
+    'generate-virtual-staging/index.ts',   // source_image_url -> fetched here, then Gemini
     'generate-social-video/index.ts',      // source_image_url -> Replicate
   ];
 

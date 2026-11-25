@@ -173,6 +173,7 @@ import {
 import { CreditTopUpDialog, type CreditTopUpRequest } from '@/components/core/CreditTopUpDialog';
 import { safeHref } from '@/utils/safeUrl';
 import { GENERATION_MODELS } from '@/config/generationModels.generated';
+import { keepOnlyMarkedArea, REGION_EDIT_CREDITS } from './regionEdit';
 // Agent definitions with RBAC and default models
 interface AgentDefinition {
   id: string;
@@ -7711,7 +7712,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   // Out of credits is an OFFER, not a destructive toast. The canvas stays open
                   // behind the dialog, so buying and then pressing the same button is the whole
                   // recovery — the mask and the prompt are still there.
-                  setTopUpRequest({ action: 'edit this area', required: 20, balance: data.balance ?? null });
+                  setTopUpRequest({ action: 'edit this area', required: REGION_EDIT_CREDITS, balance: data.balance ?? null });
                   return;
                 }
                 toast({
@@ -7722,10 +7723,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 return;
               }
 
+              const editedUrl = await keepOnlyMarkedArea(result, data.image_url, session.user.id, conversationIdRef.current);
               // Success — close canvas and emit result into chat
               setRegionEditImageUrl(null);
               const regionGeminiImageData = {
-                image_url: data.image_url,
+                image_url: editedUrl,
                 mode: 'image-edit',
                 model: data.model,
                 job_id: data.job_id,

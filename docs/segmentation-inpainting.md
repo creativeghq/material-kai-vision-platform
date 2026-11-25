@@ -66,9 +66,9 @@ Content-Type: application/json
 | `workspace_id` | string | No | Workspace ID for credit deduction |
 | `user_id` | string | No | Required for server-to-server calls |
 
-**Credits:** 20 per call (Grok Aurora inpainting)
+**Credits:** 6 per call
 
-**Model:** Grok Aurora (`/v1/images/edits` endpoint) for mask-guided inpainting.
+**Model:** `gemini-nano-banana-2.1` with the mask as a second image; the client composites the result through the mask, so nothing outside the painted area changes.
 
 ### Response
 

@@ -322,7 +322,7 @@ export const VirtualStagingModal: React.FC<VirtualStagingModalProps> = ({
                     <>
                       <Sparkles className="w-4 h-4" />
                       Accept &amp; Generate
-                      <span className="text-primary-foreground/60 text-xs ml-1">20 credits</span>
+                      <span className="text-primary-foreground/60 text-xs ml-1">15 credits</span>
                     </>
                   )}
                 </Button>

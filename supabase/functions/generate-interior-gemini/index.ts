@@ -155,13 +155,11 @@ async function buildFluxCopyStylePrompt(supabase: DbClient, designSpec: string, 
  *
  * @param controlImageUrl Public URL of the room image (structure donor)
  * @param prompt          Style description to apply
- * @param aspectRatio     Output aspect ratio
  * @returns               Replicate output image URL (temporary)
  */
 async function callFluxDepthPro(
   controlImageUrl: string,
   prompt: string,
-  aspectRatio: ImageAspectRatio = '16:9',
 ): Promise<string> {
   const { token: replicateToken } = await resolveReplicateToken();
   if (!replicateToken) throw new Error(REPLICATE_NOT_CONFIGURED);
@@ -171,15 +169,13 @@ async function callFluxDepthPro(
       control_image: controlImageUrl,
       prompt,
       guidance: 15,
-      num_inference_steps: 28,
-      output_format: 'webp',
-      aspect_ratio: aspectRatio,
+      steps: 28,
+      output_format: 'jpg',
     },
   };
 
   console.log('[flux-depth-pro] control_image:', controlImageUrl);
   console.log('[flux-depth-pro] prompt length:', prompt.length);
-  console.log('[flux-depth-pro] aspect_ratio:', aspectRatio);
 
   const createRes = await fetch(
     'https://api.replicate.com/v1/models/black-forest-labs/flux-depth-pro/predictions',
@@ -824,15 +820,13 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
       }
 
       const fluxPrompt = buildFluxRedesignPrompt(body.style, body.room_type, body.edit_instruction ?? body.prompt);
-      // Flux takes its own aspect ratio, so the crop is decided here too: a portrait room
-      // redesigned at the 16:9 default came back with its top and bottom cut off.
-      const measured = await measureSource(body.reference_image_url);
-      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, measured.aspectRatio);
+      // The output takes its shape from the control image; the model has no aspect_ratio input.
+      const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt);
 
       // Download from Replicate (temp URL) and persist to Supabase Storage
       const imgBuffer = await fetchImageBuffer(replicateUrl);
       const base64 = toBase64(imgBuffer);
-      imageUrl = await uploadToStorage(supabase, base64, 'image/webp', jobId, uploadCtx);
+      imageUrl = await uploadToStorage(supabase, base64, 'image/jpeg', jobId, uploadCtx);
     }
 
     // ── Mode 4: copy-style ─────────────────────────────────────────────────
@@ -881,10 +875,10 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
         }
 
         try {
-          const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt, roomAspectRatio);
+          const replicateUrl = await callFluxDepthPro(body.reference_image_url, fluxPrompt);
           if (!replicateUrl) throw new Error('Flux returned empty output URL');
           const imgBuffer = await fetchImageBuffer(replicateUrl);
-          imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/webp', jobId, uploadCtx);
+          imageUrl = await uploadToStorage(supabase, toBase64(imgBuffer), 'image/jpeg', jobId, uploadCtx);
         } catch (fluxErr) {
           console.warn('[copy-style] Flux failed, falling back to Gemini:', String(fluxErr));
           // Only the Gemini fallbacks genuinely need the pixels — if the measuring fetch failed,

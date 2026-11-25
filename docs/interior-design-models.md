@@ -97,7 +97,7 @@ These are called by the agent independently and do **not** participate in the va
 
 | Tool | Backing model | Cost | Purpose |
 |---|---|---|---|
-| `virtual_staging` | `proplabs/virtual-staging` | per-generation Replicate billing | Stage an empty room with AI furniture (uses `room` + `furniture_style` enums). Triggered when the user has an empty room photo. |
+| `virtual_staging` | `gemini-3-pro-image` | 15 cr | Stage an empty room with AI furniture (uses `room` + `furniture_style` enums). Triggered when the user has an empty room photo. |
 | ~~`generate_pbr_maps`~~ | — | — | **REMOVED.** The edge function was deleted and `products.metadata.pbr_maps` has never been written for any product, so this tool charged nobody and produced nothing. `ARPreviewModal` falls back to the plain product image — its `normalMap`/`roughnessMap`/`metalnessMap` slots are wired and simply never receive anything. Rebuilding the producer is audit #310 item 2. (audit #286 doc drift) |
 | Lighting Variants (in ProgressiveImageGrid) | Gemini (same edit pipeline) | per-edit | Re-renders the same room under 6 lighting presets (Natural Daylight, Golden Hour, Overcast, Showroom Spots, Warm Evening, Night). |
 

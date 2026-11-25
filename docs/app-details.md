@@ -101,11 +101,11 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Modal | SLIG SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Modal endpoint (scale-to-zero; moved off HuggingFace 2026-06-14) |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
 | Replicate | ComfyUI Interior Remodel, Interiorly Gen1 Dev, Designer Architecture + 4 others | Image-to-image interior transformation | Per image |
-| Replicate | proplabs/virtual-staging | AI room staging from empty photos | 20 credits/run |
+| Google Gemini | gemini-3-pro-image | AI room staging from empty photos | 15 credits/run |
 | Replicate | Wan 2.1 i2v 720p, Runway Gen4 Turbo | Interior video generation (budget + premium) | 12/40 credits |
 | Replicate | meta/sam-2, ali-vilab/anydoor | Pixel-precise mask generation, product placement | Per use |
 | Google Gemini | gemini-3.1-flash-image, gemini-3-pro-image | Interior image generation (4 modes) | 6/15 credits |
-| xAI (Grok) | grok-2-aurora | Masked inpainting for region editing, social images | 10–20 credits |
+| xAI (Grok) | grok-2-aurora | Social images | 10 credits |
 | Kling | kling-v3.0 | Interior + social video generation | 20 credits |
 
 ### 7-Vector Embedding Fusion — The Search Backbone
@@ -244,13 +244,13 @@ The Gemini system uses a two-step style-transfer pipeline — an inspiration ima
 
 **C. Virtual Staging (with Before/After QA)**
 
-Empty room photos → furnished renders via Replicate `proplabs/virtual-staging` (~56 seconds). 8 room types, 8 furniture styles. 20 credits per run. Accessible as both a standalone tool and a JARVIS agent tool.
+Empty room photos → furnished renders via Gemini 3 Pro Image. 8 room types, 8 furniture styles. 20 credits per run. Accessible as both a standalone tool and a JARVIS agent tool.
 
 Virtual staging results now include a **before/after comparison viewer** (`VirtualStagingViewer` component) with an interactive slider that lets users drag between the original empty room and the staged result. An "Analyze Quality" button triggers a Claude Vision assessment of the staging quality — evaluating lighting consistency, perspective accuracy, furniture scale, material realism, and edge blending — each scored 1–10.
 
 **D. Region Editing (Masked Inpainting)**
 
-Users paint a zone over any room image using the `RegionEditCanvas` tool. SAM 2 (Replicate `meta/sam-2`) generates a pixel-perfect binary mask from drawn hints. Grok Aurora then regenerates only the painted area based on a text prompt (20 credits). For product-specific placement, AnyDoor (`ali-vilab/anydoor`) places a real product photo into the masked zone with accurate lighting adaptation.
+Users paint a zone over any room image using the `RegionEditCanvas` tool. Gemini edits the photo from a text prompt and the client keeps the change inside the painted area only (6 credits). For product-specific placement, AnyDoor (`ali-vilab/anydoor`) places a real product photo into the masked zone with accurate lighting adaptation.
 
 ---
 
@@ -586,10 +586,10 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Interior design (Replicate) | Replicate variable | Credits per image | Variable |
 | Gemini interior (flash) | ~$0.02 | 6 credits | 3x markup |
 | Gemini interior (pro/4K) | ~$0.06 | 15 credits | 2.5x markup |
-| Virtual staging | ~$0.16 Replicate | 20 credits ($0.20) | 1.25x + overhead |
+| Virtual staging | ~$0.134 Google | 15 credits ($0.15) | 1.1x |
 | Interior video (Kling v3.0) | ~$0.12 | 20 credits ($0.20) | 1.7x markup |
 | Interior video (Veo-2) | ~$0.25 | 30 credits ($0.30) | 1.2x + overhead |
-| Region edit (Grok Aurora) | ~$0.08 xAI | 20 credits ($0.20) | 2.5x markup |
+| Region edit (Gemini) | ~$0.034 Google | 6 credits ($0.06) | 1.8x |
 | Social image (Aurora) | ~$0.04 | 10 credits | 2.5x markup |
 | Social caption (Claude) | ~$0.002 | 2 credits | 10x+ markup |
 | Web scraping (per Firecrawl credit) | ~$0.001 | ~0.1 platform credits | Variable |
@@ -711,8 +711,8 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 - Interior Designer agent (room analysis, 3D generation, material matching, cost estimation)
 - 14 Replicate generation models (7 text-to-image, 7 image-to-image)
 - Gemini interior generation (4 modes: text-to-image, image-edit, floor-plan-render, floor-plan-text)
-- Virtual staging (AI-furnished rooms from empty photos — Replicate proplabs, 20cr)
-- Region editing / masked inpainting (SAM 2 + Grok Aurora, 20cr)
+- Virtual staging (AI-furnished rooms from empty photos — Gemini 3 Pro, 15cr)
+- Region editing / masked inpainting (Gemini, 6cr)
 - Interior video generation (4 models: Veo-2 30cr, Kling v3.0 20cr, Wan 2.1 12cr, Runway 40cr)
 - Social media suite (caption/image/video generation + Zernio publishing across 8 platforms)
 - Professional marketplace (profiles, services, Hire Me, Discover directory)

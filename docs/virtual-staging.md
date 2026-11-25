@@ -6,11 +6,11 @@ AI-powered room staging that transforms empty room photos into fully furnished i
 
 ## Overview
 
-Virtual staging uses Replicate's `proplabs/virtual-staging` model to place realistic furniture and décor into empty room photos. Users provide a room image, select a room type and furniture style, and receive a furnished render within ~56 seconds.
+Virtual staging uses Gemini 3 Pro Image to place realistic furniture and décor into empty room photos. Users provide a room image, select a room type and furniture style, and receive a furnished render in about 30 seconds.
 
 **Edge Function:** `generate-virtual-staging`
-**Credit Cost:** 20 credits per generation
-**Model:** `proplabs/virtual-staging` via Replicate (~56s average)
+**Credit Cost:** 15 credits per generation
+**Model:** `gemini-3-pro-image` (prompt: `interior_virtual_staging`)
 
 ---
 
@@ -18,9 +18,9 @@ Virtual staging uses Replicate's `proplabs/virtual-staging` model to place reali
 
 1. User provides a public image URL of an empty room
 2. User selects room type (bedroom, living room, kitchen, etc.) and furniture style
-3. Edge function calls Replicate API with the image + parameters
-4. Replicate runs the `proplabs/virtual-staging` model (~56s)
-5. Result image is downloaded and re-uploaded to Supabase Storage (`generation-images` bucket)
+3. The image gate checks the source, then credits are debited
+4. Gemini adds the furniture and keeps the room
+5. The result is stored in Supabase Storage (`generation-images` bucket)
 6. Permanent public URL returned to caller
 
 ---
@@ -58,7 +58,7 @@ Content-Type: application/json
 {
   "success": true,
   "image_url": "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/generation-images/virtual-staging/job-uuid.jpg",
-  "credits_used": 20
+  "credits_used": 15
 }
 ```
 
@@ -68,7 +68,7 @@ Content-Type: application/json
 {
   "success": false,
   "error": "Insufficient credits",
-  "credits_required": 20,
+  "credits_required": 15,
   "credits_available": 5
 }
 ```
@@ -77,9 +77,9 @@ Content-Type: application/json
 
 ## Credit Handling
 
-- Credits are checked **before** the Replicate call
+- Credits are checked **before** the Gemini call
 - Credits are debited on **success only** — failed generations are not charged
-- Minimum 20 credits required in workspace balance
+- Minimum 15 credits required in workspace balance
 
 ---
 

@@ -3,11 +3,14 @@
 import type { DbClient } from '../_shared/supabase-client.ts';
 import { createClient } from '@supabase/supabase-js';
 import { corsHeaders } from '../_shared/cors.ts';
-import { editImageWithGrok } from '../_shared/ai-client.ts';
+import { generateImageWithGemini, IMAGE_ASPECT_RATIOS } from '../_shared/ai-client.ts';
 import { withApiLogging } from '../_shared/api-logger.ts';
 import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { resolveOutputPath, isPlatformGeneratedImage, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { assertEditableSource } from '../_shared/image-edit-gate.ts';
+import { GENERATION_CREDIT_COSTS } from '../_shared/generation-routing.ts';
+import { aspectRatioOfImage } from '../_shared/image-dimensions.ts';
+import { getGenerationPrompt, renderPromptTemplate } from '../_shared/prompt-utils.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
 import { captureException } from '../_shared/sentry.ts';
 import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
@@ -16,35 +19,15 @@ import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const CREDITS_REQUIRED = 20;
-// Grok masked inpainting runs on xAI Aurora — same `ai_model_pricing` row the other
-// Grok image paths bill against. Logged as model_name so usage and price share a key.
-const PRICING_KEY = 'xai-aurora';
+const MODEL = 'gemini-3.1-flash-image' as const;
+const CREDITS_REQUIRED = GENERATION_CREDIT_COSTS[MODEL];
+const PRICING_KEY = MODEL;
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
-}
-
-/** Fetch a remote image and return raw bytes + detected mime type. */
-/** Guarded AND bounded. This one already called assertSafeUrl and refused
- *  redirects; what it lacked was a size cap, so an attacker-chosen URL could still
- *  stream unbounded bytes into the isolate. */
-async function fetchImageBytes(url: string): Promise<{ bytes: Uint8Array; mimeType: string }> {
-  return await fetchImageGuarded(url);
-}
-
-/** Decode a PNG data URL into raw bytes */
-function decodeDataUrl(dataUrl: string): Uint8Array {
-  const commaIdx = dataUrl.indexOf(',');
-  if (commaIdx < 0) throw new Error('Invalid data URL');
-  const base64 = dataUrl.slice(commaIdx + 1);
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
 }
 
 /** Upload base64 image to Supabase Storage, return permanent public URL */
@@ -138,7 +121,7 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
     p_user_id: userId,
     p_amount: CREDITS_REQUIRED,
     p_operation_type: 'region_edit',
-    p_description: `Region edit (Grok Aurora inpainting)`,
+    p_description: 'Region edit (Gemini)',
     p_metadata: { workspace_id: body.workspace_id, job_id: jobId },
     p_workspace_id: body.workspace_id ?? null,
   });
@@ -151,23 +134,21 @@ Deno.serve(withApiLogging('generate-region-edit', async (req) => {
   }
 
   try {
-    // Fetch room image bytes
-    const { bytes: imageBytes, mimeType: imageMimeType } = await fetchImageBytes(body.image_url);
+    const prompt = renderPromptTemplate(await getGenerationPrompt(supabase, 'interior_region_edit'), { instruction: body.prompt.trim() });
+    const { bytes: imageBytes } = await fetchImageGuarded(body.image_url);
 
-    // Decode mask from data URL
-    const maskBytes = decodeDataUrl(body.mask_data_url);
-
-    // Call Grok with mask inpainting
-    const result = await editImageWithGrok(body.prompt, imageBytes, {
-      maskBytes,
-      imageMimeType,
-    });
+    // Gemini has no mask input: the caller composites the result back through its own mask.
+    const result = await generateImageWithGemini(
+      { text: prompt, images: [body.mask_data_url, imageBytes] },
+      {
+        model: MODEL,
+        aspectRatio: aspectRatioOfImage(imageBytes, IMAGE_ASPECT_RATIOS) ?? undefined,
+        imageLabels: ['MASK (white = the only area to change, black = keep exactly as it is):', 'PHOTO TO EDIT:'],
+      },
+    );
 
     const imageUrl = await uploadResult(supabase, result.base64, result.mimeType, jobId, { userId, conversationId: body.conversation_id });
 
-    // This function debited 20 credits per edit but wrote NO ai_usage_logs row at all,
-    // so region edits were entirely absent from usage and cost reporting — not a null
-    // cost, no row. Grok inpainting bills as one xai-aurora image.
     const editPricing = await getServicePricing(supabase, PRICING_KEY);
     if (!editPricing) {
       console.warn(`[generate-region-edit] no ai_model_pricing row for "${PRICING_KEY}" — cost logged as null`);

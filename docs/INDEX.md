@@ -130,7 +130,7 @@ Complete documentation for Material Kai Vision Platform.
 - Admin UI at `/admin/background-agents`
 
 **[virtual-staging.md](virtual-staging.md)** - Virtual Staging ✨ NEW
-- Replicate proplabs model, 20 credits, ~56s
+- Gemini 3 Pro Image, 15 credits
 - 8 room types, 8 furniture styles
 
 **[gemini-image-generation.md](gemini-image-generation.md)** - Gemini image generation patterns ✨ NEW (2026-05-02)
@@ -164,7 +164,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[segmentation-inpainting.md](segmentation-inpainting.md)** - Segmentation & Inpainting ✨ NEW
 - SAM 2 pixel-perfect masks + Pillow fallback
-- Grok Aurora region edit (20cr), AnyDoor product placement, FLUX Fill Pro
+- Gemini region edit (6cr), AnyDoor product placement, FLUX Fill Pro
 - `/api/segment/mask` and `generate-region-edit` edge function
 
 **[billing-credits-system.md](billing-credits-system.md)** - Billing & Credits System ✨ NEW

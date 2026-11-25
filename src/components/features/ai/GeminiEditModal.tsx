@@ -26,6 +26,7 @@ import {
   Bot,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { REGION_EDIT_CREDITS } from './regionEdit';
 
 // ── Categories ──────────────────────────────────────────────────────────────
 
@@ -38,10 +39,10 @@ const EDIT_CATEGORIES = [
   { id: 'style',     label: 'Overall Style',    icon: Sparkles,   description: 'Retheme the whole design' },
   { id: 'furniture', label: 'Furniture',        icon: Sofa,       description: 'Add, swap or remove pieces' },
   // Region Edit skips steps 2+3, so the user never reaches the 6/15/15 model-tier
-  // picker — it goes straight to generate-region-edit, which is a fixed 20-credit
+  // picker — it goes straight to generate-region-edit, which is a fixed-price
   // inpaint. The card must state that price, or it is invisible until the failure
   // toast quotes it.
-  { id: 'region',    label: 'Region Edit',      icon: Crop,       description: 'Draw on image & change that area — 20 credits' },
+  { id: 'region',    label: 'Region Edit',      icon: Crop,       description: `Draw on image & change that area — ${REGION_EDIT_CREDITS} credits` },
   { id: 'custom',    label: 'Custom Edit',      icon: PencilLine, description: 'Describe anything freely' },
 ] as const;
 
@@ -331,7 +332,7 @@ export const GeminiEditModal: React.FC<GeminiEditModalProps> = ({
     // Region edit bypasses steps 2+3 — goes straight to canvas mode. `modelTier` is
     // therefore always the untouched 'fast' default here (the picker lives on step 3),
     // and AgentHub's regionEdit branch discards it: generate-region-edit is a fixed
-    // 20-credit inpaint with no tier. Passed only to satisfy the shared onApply
+    // fixed-price edit with no tier. Passed only to satisfy the shared onApply
     // contract — do not add a tier UI to this path without also plumbing it through
     // generate-region-edit's CREDITS_REQUIRED.
     if (id === 'region') {

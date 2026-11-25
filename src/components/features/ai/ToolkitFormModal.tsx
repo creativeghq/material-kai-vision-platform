@@ -24,6 +24,11 @@ import {
   type ToolkitQuickStart, type ToolkitDefinition, type ToolkitFormField,
 } from './agentToolsCatalog';
 import { deriveAutoFields, deriveCoercions } from './toolAutoFields';
+import { GENERATION_MODEL_IDS, selectableModels } from '@/config/generationModels.generated';
+
+const SELECTABLE_MODEL_IDS = new Set(selectableModels().map((m) => m.id));
+/** A generation model the registry says cannot run is not offered; any other option always is. */
+const isOfferable = (value: string) => !GENERATION_MODEL_IDS.has(value) || SELECTABLE_MODEL_IDS.has(value);
 
 export type ToolkitFormModalState = {
   quickStart: ToolkitQuickStart;
@@ -384,7 +389,7 @@ export const FieldInput: React.FC<{
         <Select value={value} onValueChange={onChange}>
           <SelectTrigger><SelectValue placeholder={field.placeholder || 'Select…'} /></SelectTrigger>
           <SelectContent>
-            {(field.options ?? []).map((o) => (
+            {(field.options ?? []).filter((o) => isOfferable(o.value)).map((o) => (
               <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
             ))}
           </SelectContent>
