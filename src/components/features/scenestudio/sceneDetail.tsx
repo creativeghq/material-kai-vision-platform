@@ -12,7 +12,7 @@ import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import type { Finish } from '@/lib/scene/sceneSurfaces';
 import { useLook } from '@/components/features/scenestudio/surfaceMaps';
 import { isSplat } from '@/components/features/scenestudio/splatOverlay';
-import { pointInPolygon } from '@/lib/scene/sceneGeometry';
+import { litRoomAt, type LitRoom } from '@/lib/scene/roomLight';
 import { sunAt } from '@/lib/scene/sun';
 import { KITCHEN_KINDS, type KitchenLayout } from '@/lib/scene/kitchenComposition';
 import type { BoardSlot } from '@/lib/scene/cabinetPanels';
@@ -58,8 +58,6 @@ const Outdoors: React.FC<{ span: number }> = ({ span }) => {
     </group>
   );
 };
-
-export interface LitRoom { id: string; outline: Array<[number, number]>; centre: [number, number]; height: number }
 
 const PROBE_AGES_S = [0.5, 3, 8];
 
@@ -139,12 +137,12 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, 
     if (lit) lit.current = true;
     if (scene.environment && !own.current.has(scene.environment)) return;
     const s = state.current;
-    if (s.version !== version) { s.version = version; s.since = null; s.shot = 0; }
+    const changed = s.version !== version;
+    if (changed) { s.version = version; s.since = null; s.shot = 0; }
     const { x, y, z } = camera.position;
-    const room = rooms.find((r) => y > 0 && y < r.height && pointInPolygon(x, z, r.outline)) ?? null;
+    const room = litRoomAt(rooms, s.room, x, y, z);
     const id = room?.id ?? null;
-    const entered = id !== s.room;
-    if (entered) { s.room = id; showWindowsOf(scene, id); }
+    if (id !== s.room || changed) { s.room = id; showWindowsOf(scene, id); }
     if (room && solid()) {
       s.since ??= clock.elapsedTime;
       const due = s.shot < PROBE_AGES_S.length && clock.elapsedTime - s.since >= PROBE_AGES_S[s.shot];
