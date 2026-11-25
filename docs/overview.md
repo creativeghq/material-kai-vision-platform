@@ -71,7 +71,7 @@ Material Kai Vision Platform is an enterprise AI system that automatically extra
 - PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) on Modal — two-stage structural layout (PP-DocLayoutV3) + OCR backbone (replaced Surya-2 2026-06-13)
 - OpenAI (GPT-4o, GPT-5 — optional alternative for product discovery / agents; NOT vision)
 - Replicate (virtual staging, Wan video, Runway Gen4, FLUX Dev, SAM 2, AnyDoor)
-- Google Gemini (gemini-3.1-flash-image, gemini-3-pro-image — interior generation)
+- Google Gemini (gemini-nano-banana-2.1, gemini-3-pro-image — interior generation)
 - xAI Aurora (grok-2-aurora — social image generation)
 - Kling (kling-v3.0 — interior and social video generation)
 - Zernio (social media OAuth broker + publishing platform)

@@ -2,11 +2,11 @@
 
 export type GenerationTier = 'fast' | 'pro' | 'grok' | 'chatgpt';
 export type RoutedProvider = 'gemini' | 'grok' | 'flux' | 'openai';
-export type GeminiImageModelId = 'gemini-3.1-flash-image' | 'gemini-3-pro-image';
+export type GeminiImageModelId = 'gemini-nano-banana-2.1' | 'gemini-3-pro-image';
 
 /** The ONLY place a credit figure for image generation is written. */
 export const GENERATION_CREDIT_COSTS: Record<string, number> = {
-  'gemini-3.1-flash-image': 6,
+  'gemini-nano-banana-2.1': 6,
   'gemini-3-pro-image': 15,
   'flux-depth-pro': 20,
   'grok-aurora': 15,
@@ -89,7 +89,7 @@ export function resolveGenerationRouting(
   const useGrok = tier === 'grok' && singleImageProviderCanServe;
   const useOpenAI = tier === 'chatgpt' && singleImageProviderCanServe;
   const geminiModel: GeminiImageModelId =
-    tier === 'pro' ? 'gemini-3-pro-image' : 'gemini-3.1-flash-image';
+    tier === 'pro' ? 'gemini-3-pro-image' : 'gemini-nano-banana-2.1';
 
   // `usesFlux` is asked about Grok only: copy-style stays on the Gemini+Flux pipeline for
   // the ChatGPT tier, because the one-step "image 1 is the style, image 2 is the room"

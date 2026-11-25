@@ -1021,9 +1021,9 @@ export async function callClaudeMessages(
 }
 
 // ── Gemini: Image generation + editing ──
-// GA image models (Nano Banana 2 / Pro). The `-preview` aliases were deprecated
+// GA image models (Nano Banana 2.1 / Pro). The `-preview` aliases were deprecated
 // and shut down; the GA ids use the identical generateContent API.
-export type GeminiImageModel = 'gemini-3.1-flash-image' | 'gemini-3-pro-image';
+export type GeminiImageModel = 'gemini-nano-banana-2.1' | 'gemini-3-pro-image';
 /**
  * The output shapes the image models accept. Declared ONCE as values: `nearestAspectRatio`
  * (_shared/image-dimensions.ts) is handed this list to match a source photo against, rather than
@@ -1057,7 +1057,7 @@ export async function generateImageWithGemini(
     imageLabels?: string[];
   },
 ): Promise<GeminiImageResult> {
-  const modelId: GeminiImageModel = config?.model ?? 'gemini-3.1-flash-image';
+  const modelId: GeminiImageModel = config?.model ?? 'gemini-nano-banana-2.1';
   const _start = Date.now();
 
   // Any prompt with images must go through the raw Gemini generateContent API.
@@ -1615,7 +1615,8 @@ export async function generateVideoWithGeminiOmni(
           delivery: 'uri',
         },
         background: false,
-        store: false,
+        // Google refuses delivery:'uri' without it, and inline delivery stops at 4MB.
+        store: true,
         stream: false,
       }),
     });

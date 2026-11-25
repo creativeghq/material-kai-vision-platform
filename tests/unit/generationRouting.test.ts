@@ -39,7 +39,7 @@ describe('generation routing', () => {
 
   it('gives the product modes real Gemini tiers', () => {
     for (const mode of PRODUCT_MODES) {
-      expect(resolveGenerationRouting(mode, 'fast').modelLabel).toBe('gemini-3.1-flash-image');
+      expect(resolveGenerationRouting(mode, 'fast').modelLabel).toBe('gemini-nano-banana-2.1');
       expect(resolveGenerationRouting(mode, 'fast').credits).toBe(6);
       expect(resolveGenerationRouting(mode, 'pro').modelLabel).toBe('gemini-3-pro-image');
       expect(resolveGenerationRouting(mode, 'pro').credits).toBe(15);
@@ -88,7 +88,7 @@ describe('generation routing', () => {
   it('defaults to the cheap Gemini tier when no tier is given', () => {
     const r = resolveGenerationRouting('product-shot', undefined);
     expect(r.provider).toBe('gemini');
-    expect(r.modelLabel).toBe('gemini-3.1-flash-image');
+    expect(r.modelLabel).toBe('gemini-nano-banana-2.1');
     expect(r.credits).toBe(6);
   });
 

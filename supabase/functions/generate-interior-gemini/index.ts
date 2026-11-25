@@ -576,7 +576,7 @@ Deno.serve(withApiLogging('generate-interior-gemini', async (req) => {
     // at debit time, so concurrent over-cap requests can't all run paid compute before a debit lands.
     // Refunded in the catch below if generation fails.
     // `modelLabel`, not `model`: `model` is only meaningful when the provider IS Gemini, so a
-    // Grok or Flux run wrote a ledger line reading "gemini-3.1-flash-image" beside the Grok
+    // Grok or Flux run wrote a ledger line reading "gemini-nano-banana-2.1" beside the Grok
     // charge.
     await deductCredits(supabase, resolvedUserId, credits, `Interior design generation (${modelLabel}, ${mode})`, body.workspace_id);
     debited = true;
@@ -1170,7 +1170,7 @@ VIEW OVERRIDE — the camera position above is replaced. Photograph this specifi
       job_id: jobId,
       mode,
       board_mode: body.board_mode,
-      model,
+      model: modelLabel,
       image_url: imageUrl,
       credits_used: credits,
       // What ran, so the caller can SAY what ran instead of guessing at it. Null on the modes

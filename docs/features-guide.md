@@ -680,7 +680,7 @@ Complete reference of all platform features and capabilities.
 | `floor-plan-text` | Text description → 2D floor plan | 6/15 |
 
 - ✅ Two-step style-transfer pipeline (inspiration → design spec → edit)
-- ✅ Models: gemini-3.1-flash-image (6cr) and gemini-3-pro-image (15cr)
+- ✅ Models: gemini-nano-banana-2.1 (6cr) and gemini-3-pro-image (15cr)
 
 ---
 

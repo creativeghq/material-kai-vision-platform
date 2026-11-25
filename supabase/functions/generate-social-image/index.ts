@@ -19,7 +19,7 @@ type ImageModel = 'aurora' | 'gemini' | 'flux' | 'auto';
 type ImageType = 'lifestyle' | 'product' | 'interior' | 'artistic';
 type AspectRatio = '1:1' | '4:5' | '9:16' | '16:9';
 
-const GEMINI_IMAGE_MODEL = 'gemini-3.1-flash-image' as const;
+const GEMINI_IMAGE_MODEL = 'gemini-nano-banana-2.1' as const;
 
 const MODEL_SERVICE_KEYS: Record<Exclude<ImageModel, 'auto'>, string> = {
   aurora: 'xai-aurora',

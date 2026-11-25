@@ -19,7 +19,7 @@ import { fetchImageGuarded } from '../_shared/fetch-image.ts';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
-const MODEL = 'gemini-3.1-flash-image' as const;
+const MODEL = 'gemini-nano-banana-2.1' as const;
 const CREDITS_REQUIRED = GENERATION_CREDIT_COSTS[MODEL];
 const PRICING_KEY = MODEL;
 

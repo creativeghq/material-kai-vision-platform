@@ -75,7 +75,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "gemini-3.1-flash-image",
     "tier": "budget",
     "status": "active",
-    "enabled": true,
+    "enabled": false,
     "sort_order": 10
   },
   {
@@ -601,7 +601,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '44a07c88b012708479438168a770c083';
+export const PROJECTION_FINGERPRINT = '0d1481e21aae2e0b430a69e5370fd6a6';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

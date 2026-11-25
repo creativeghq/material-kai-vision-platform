@@ -104,7 +104,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Google Gemini | gemini-3-pro-image | AI room staging from empty photos | 15 credits/run |
 | Replicate | Wan 2.1 i2v 720p, Runway Gen4 Turbo | Interior video generation (budget + premium) | 12/40 credits |
 | Replicate | meta/sam-2, ali-vilab/anydoor | Pixel-precise mask generation, product placement | Per use |
-| Google Gemini | gemini-3.1-flash-image, gemini-3-pro-image | Interior image generation (4 modes) | 6/15 credits |
+| Google Gemini | gemini-nano-banana-2.1, gemini-3-pro-image | Interior image generation (4 modes) | 6/15 credits |
 | xAI (Grok) | grok-2-aurora | Social images | 10 credits |
 | Kling | kling-v3.0 | Interior + social video generation | 20 credits |
 
