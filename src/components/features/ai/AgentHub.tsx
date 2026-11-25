@@ -62,7 +62,7 @@ import { transcribeRecording } from '@/services/voiceDictationService';
 import { useToast } from '@/hooks/use-toast';
 import { DemoAgentResults } from './DemoAgentResults';
 import { AgentResultCard, primaryListCount } from './AgentResultCard';
-import { ARTIFACT_PLACEHOLDER, INTERNAL_RESULT_TYPES, isResultCardRow, layoutTurns, type TurnMessage } from './agentTurnShape';
+import { ARTIFACT_PLACEHOLDER, INTERNAL_RESULT_TYPES, isResultCardRow, dropRepeats, layoutTurns, type TurnMessage } from './agentTurnShape';
 import { FlightOffersCard } from './FlightOffersCard';
 import { PriceLookupSources, PriceResolutionTable } from '@/components/features/pricing/PriceLookupChatCards';
 import { useRecordLinkAccess } from '@/hooks/useRecordLinkAccess';
@@ -794,6 +794,8 @@ interface Message {
    */
   /** True when JARVIS routed this turn to a specialist; drives the "· routed by JARVIS" label. */
   routed?: boolean;
+  turnId?: string;
+  recovered?: boolean;
   inputRequestData?: InputRequestData;
   sheetPdfData?: {
     sheet_id: string;
@@ -4365,6 +4367,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         timestamp: new Date(),
         agentId: data.agentId || selectedAgent,
         routed: data.routed ?? undefined,
+        turnId: data.turn_id ?? streamTurnId ?? undefined,
         model: data.model || selectedModel,
         demoData,
         materialData,
@@ -4770,7 +4773,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       }
       setJustEnabledToolkitId(null);
       const msgs = await agentChatHistoryService.getConversationMessages(conversationId);
-      setMessages(
+      setMessages(dropRepeats(
         msgs.map((msg) => ({
           id: msg.id,
           // A restored message IS its row, but say so explicitly rather than letting
@@ -4829,6 +4832,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           sheetCanvasData: msg.metadata?.sheetCanvasData as any | undefined,
           actionConfirmationData: msg.metadata?.actionConfirmationData as any | undefined,
           routed: msg.metadata?.routed as boolean | undefined,
+          turnId: msg.metadata?.turn_id as string | undefined,
+          recovered: msg.metadata?.recovered_by_server === true,
           inputRequestData: msg.metadata?.inputRequestData as InputRequestData | undefined,
           sheetPdfData: msg.metadata?.sheetPdfData as any | undefined,
           quoteData: msg.metadata?.quoteData as any | undefined,
@@ -4838,7 +4843,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           catalogExtractionData: msg.metadata?.catalogExtractionData as any | undefined,
           catalogImageCandidatesData: msg.metadata?.catalogImageCandidatesData as any | undefined,
         })),
-      );
+      ));
     },
     [],
   );
@@ -5818,6 +5823,17 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     );
   };
 
+  const renderTurnCards = (reply: Message): React.ReactNode => {
+    if (reply.role !== 'assistant') return null;
+    const cards = [reply, ...(turnLayout.attached.get(reply.id) ?? [])].filter((m) => getCanvasArtifact(m));
+    if (cards.length === 0) return null;
+    return (
+      <div className="mt-3 flex flex-col items-start gap-2">
+        {cards.map((message) => <React.Fragment key={message.id}>{renderArtifactCard(message)}</React.Fragment>)}
+      </div>
+    );
+  };
+
   const renderCanvasArtifact = (message: Message): React.ReactNode => {
     if (message.generation_job) return renderGenerationGrid(message);
     if (message.demoData) {
@@ -6748,6 +6764,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
 
                       </div>
                     )}
+                    {renderTurnCards(message)}
                     {message.role === 'assistant' && renderFollowUps(message)}
                     <div className="flex items-center justify-between mt-2">
                       <p className="text-xs text-white/60">
@@ -6792,26 +6809,15 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   )}
                 </div>
                 )}
-                {/*
-                  * The turn's artifact, OUTSIDE the bubble.
-                  * It used to sit inside, which is why it could not be seen: `.msg-assistant` is
-                  * `--primary` on the dark themes and `--card` on the light ones, so a card drawn
-                  * in `bg-card` was a dark box on magenta in one and the bubble's own colour in
-                  * the other. Out here it is an ordinary panel on the page ground, and the
-                  * three-surface ladder works the way it does everywhere else.
-                  */}
-                {(() => {
-                  const card = renderArtifactCard(message);
-                  if (!card) return null;
-                  // Indented past the avatar column so it lines up with the message text rather
-                  // than sticking out to the left of every bubble in the thread: the avatar is
-                  // `w-8` and the row gap is `gap-3`, i.e. 32px + 12px. The card sizes itself —
-                  // a width imposed here is what stretched it into a full-bleed bar.
-                  return <div className="flex justify-start pl-11">{card}</div>;
-                })()}
-                {turnLayout.attached.get(message.id)?.map((cardMsg) => (
-                  <div key={cardMsg.id} className="flex justify-start pl-11">{renderArtifactCard(cardMsg)}</div>
-                ))}
+                {bubbleRepeatsTheCard(message) && (
+                  <div className="flex justify-start gap-3">
+                    {(() => {
+                      const ma = agentForMessage(message);
+                      return <AgentAvatar agentId={ma?.id} className={cn('w-8 h-8', ma?.color)} />;
+                    })()}
+                    <div className="min-w-0 flex-1 [&>div]:mt-0">{renderTurnCards(message)}</div>
+                  </div>
+                )}
                 {/* The turn's run, under the user message that started it — live or finished.
                     A finished run with no steps draws nothing: that turn answered in words. */}
                 {(() => {

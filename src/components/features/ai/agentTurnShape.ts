@@ -8,6 +8,10 @@ export interface TurnMessage {
   id: string;
   role: string;
   content?: unknown;
+  /** Set on the model's own reply, never on a card a tool posted. */
+  turnId?: string;
+  recovered?: boolean;
+  sceneData?: { scene_id: string; intent?: unknown };
   agentResultData?: { title?: string };
   seoGenericData?: unknown;
   actionConfirmationData?: unknown;
@@ -38,8 +42,8 @@ export function isResultCardRow(m: TurnMessage): boolean {
 const awaitsUser = (m: TurnMessage) => !!m.actionConfirmationData || !!m.inputRequestData;
 
 /**
- * Which cards attach under which reply. `artifactTitle` answers "is this a canvas artifact, and
- * what is it called" — null for plain prose.
+ * Which cards attach under which reply: the one their own tool call led to, never a later
+ * message of the same turn. `artifactTitle` is null for plain prose.
  */
 export function layoutTurns<M extends TurnMessage>(
   messages: readonly M[],
@@ -48,20 +52,26 @@ export function layoutTurns<M extends TurnMessage>(
   const attached = new Map<string, M[]>();
   const absorbed = new Set<string>();
   let turn: M[] = [];
+  const speaks = (m: M) => {
+    if (awaitsUser(m) || isResultCardRow(m)) return false;
+    const prose = proseOf(m.content);
+    const title = artifactTitle(m);
+    return prose !== '' && (title === null || prose !== title.trim());
+  };
   const close = () => {
-    const reply = [...turn].reverse().find((m) => {
-      if (awaitsUser(m) || isResultCardRow(m)) return false;
-      const prose = proseOf(m.content);
-      const title = artifactTitle(m);
-      return prose !== '' && (title === null || prose !== title.trim());
+    const isReply = turn.map((m) => speaks(m) && (!!m.turnId || artifactTitle(m) === null));
+    const spoke = turn.map(speaks);
+    const firstReply = isReply.indexOf(true);
+    turn.forEach((m, i) => {
+      if (isReply[i] || awaitsUser(m) || artifactTitle(m) === null) return;
+      const host = spoke[i]
+        ? (i < firstReply ? firstReply : -1)
+        : [isReply.indexOf(true, i + 1), isReply.lastIndexOf(true, i), spoke.indexOf(true, i + 1)].find((x) => x >= 0) ?? -1;
+      if (host < 0) return;
+      const id = turn[host].id;
+      attached.set(id, [...(attached.get(id) ?? []), m]);
+      absorbed.add(m.id);
     });
-    if (reply) {
-      const cards = turn.filter((m) => m !== reply && artifactTitle(m) !== null && !awaitsUser(m));
-      if (cards.length > 0) {
-        attached.set(reply.id, cards);
-        cards.forEach((m) => absorbed.add(m.id));
-      }
-    }
     turn = [];
   };
   for (const m of messages) {
@@ -70,4 +80,18 @@ export function layoutTurns<M extends TurnMessage>(
   }
   close();
   return { attached, absorbed };
+}
+
+/** A saved conversation can hold one reply twice (server rescue + client save) or one room's card several times. */
+export function dropRepeats<M extends TurnMessage>(messages: readonly M[]): M[] {
+  const savedByClient = new Set(messages.filter((m) => m.turnId && !m.recovered).map((m) => m.turnId));
+  let rooms = new Set<string>();
+  return messages.filter((m) => {
+    if (m.role === 'user') { rooms = new Set(); return true; }
+    if (m.recovered && savedByClient.has(m.turnId)) return false;
+    if (!m.sceneData || m.sceneData.intent || m.turnId) return true;
+    if (rooms.has(m.sceneData.scene_id)) return false;
+    rooms.add(m.sceneData.scene_id);
+    return true;
+  });
 }

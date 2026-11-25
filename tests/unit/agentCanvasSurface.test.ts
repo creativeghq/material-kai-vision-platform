@@ -51,17 +51,13 @@ describe('an artifact is named once', () => {
     expect(canvas).toMatch(/KIND_LABEL\[artifact\.kind\]/);
   });
 
-  it('the card is rendered ONCE, and outside the message bubble', () => {
-    /**
-     * Inside the bubble it could not be seen, and that is a property of the bubble rather than
-     * of the card: `.msg-assistant` is `--primary` on the dark themes and `--card` on the light
-     * ones, so a card drawn in `bg-card` was a dark box on magenta in one and EXACTLY the
-     * bubble's own colour in the other. The bubble also re-themes its children by attribute
-     * selector (`html.light .msg-assistant [class*="bg-white"]`, …), so anything in there is
-     * styled by where it sits instead of by what it is.
-     */
+  it('the card is rendered ONCE, inside the message it belongs to, on its own ground', () => {
     const calls = hub.split('renderArtifactCard(message)').length - 1;
-    expect(calls, 'the artifact card must have exactly one placement in the stream').toBe(1);
+    expect(calls, 'the artifact card must have exactly one placement').toBe(1);
+    expect(between(hub, 'const renderTurnCards', 'const renderCanvasArtifact')).toContain('renderArtifactCard(message)');
+    // The light bubble IS `--card`, so a `bg-card` card inside it is the bubble's own colour.
+    const card = canvas.slice(canvas.indexOf('export const ArtifactCard'));
+    expect(card).toContain('rounded-md border bg-background');
 
     // The bubble's ACTUAL closing tag, by matching `<div>` depth from its opening tag. Anchoring
     // on the first `</div>` after `msg-assistant` looked equivalent and was not: that one closes
@@ -84,10 +80,9 @@ describe('an artifact is named once', () => {
     }
     expect(bubbleClose, 'could not match the bubble’s closing tag — re-point this guard')
       .toBeGreaterThan(bubbleOpen);
-    expect(
-      hub.indexOf('renderArtifactCard(message)'),
-      'the card renders inside the message bubble again, where it cannot be seen',
-    ).toBeGreaterThan(bubbleClose);
+    const placed = hub.indexOf('{renderTurnCards(message)}');
+    expect(placed, 'the cards left the message they belong to').toBeGreaterThan(bubbleOpen);
+    expect(placed, 'the cards left the message they belong to').toBeLessThan(bubbleClose);
   });
 
   it('a bubble that would only repeat its card is not drawn', () => {
@@ -112,11 +107,10 @@ describe('an artifact is named once', () => {
      * text; a card has nothing to fill it with.
      */
     expect(canvas, 'the card must carry its own max width').toMatch(/max-w-lg' : 'w-full max-w-md/);
-    const placement = between(hub, 'const card = renderArtifactCard(message)', '})()}');
+    const placement = between(hub, 'const renderTurnCards', 'const renderCanvasArtifact');
     expect(placement, 'a width imposed by the stream is what stretched it into a bar')
       .not.toMatch(/max-w-\[88%\]|sm:max-w-\[75%\]/);
-    // …and lined up with the message text rather than sticking out to the left of every bubble.
-    expect(placement).toContain('pl-11');
+    expect(placement).toContain('items-start');
   });
 
   it('a question that BLOCKS the turn does not look like a finished result', () => {

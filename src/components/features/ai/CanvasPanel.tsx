@@ -469,11 +469,8 @@ interface ArtifactCardProps {
 }
 
 /**
- * The artifact, as it appears in the conversation: a card you click to open it.
- *
- * It lives OUTSIDE the message bubble. `.msg-assistant` is `--primary` on the dark themes and
- * `--card` on the light ones, so a card drawn in `bg-card` was invisible in one of them; out here
- * the ordinary three-surface ladder applies and one treatment is right in all four.
+ * The artifact, as it appears in the conversation: a card you click to open it, inside the
+ * message it belongs to. `bg-background`, not `bg-card`: the light bubble IS `--card`.
  */
 export const ArtifactCard: React.FC<ArtifactCardProps> = ({
   artifact, active, onOpen, onCloseArtifact, onDeleteArtifact,
@@ -492,7 +489,7 @@ export const ArtifactCard: React.FC<ArtifactCardProps> = ({
     // invalid markup and unclickable.
     <div
       className={cn(
-        'panel-interactive group flex items-stretch rounded-md border bg-card transition-colors',
+        'panel-interactive group flex items-stretch rounded-md border bg-background transition-colors',
         showPreview ? 'w-full max-w-lg' : 'w-full max-w-md',
         active ? 'border-primary' : pending ? 'border-primary/40' : 'border-hairline',
       )}

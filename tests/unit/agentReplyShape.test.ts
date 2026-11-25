@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { stripComments } from '../helpers/stripComments';
-import { INTERNAL_RESULT_TYPES, isResultCardRow, layoutTurns, type TurnMessage } from '../../src/components/features/ai/agentTurnShape';
+import { dropRepeats, INTERNAL_RESULT_TYPES, isResultCardRow, layoutTurns, type TurnMessage } from '../../src/components/features/ai/agentTurnShape';
 import { MODEL_RESULT_LIMITS, shapeForModel } from '../../supabase/functions/_shared/tool-result-shape.ts';
 
 const ROOT = join(__dirname, '..', '..');
@@ -31,6 +31,41 @@ describe('a turn reads as one reply', () => {
   it('a direct run with no prose keeps its card in place', () => {
     const { absorbed } = layoutTurns(turn.slice(0, 2), titleOf);
     expect(absorbed.size).toBe(0);
+  });
+
+  it('a card stays with the reply its tool led to, not with a later message of the same turn', () => {
+    const { attached, absorbed } = layoutTurns([
+      { id: 'u', role: 'user', content: 'generate again' },
+      { id: 'room', role: 'assistant', content: 'Kitchen is open on the canvas.', card: 'Kitchen' },
+      { id: 'reply', role: 'assistant', content: 'I have not made a third drawing.', turnId: 't1' },
+      { id: 'render', role: 'assistant', content: 'Kitchen, rendered in Scandinavian.', card: 'Generated image' },
+      { id: 'drawings', role: 'assistant', content: 'The drawings, rebuilt from your sketch.', card: 'Kitchen from sketch' },
+    ], titleOf);
+    expect(attached.get('reply')?.map((m) => m.id)).toEqual(['room']);
+    expect([...absorbed]).toEqual(['room']);
+  });
+
+  it('a reply that carries its own image is still the reply', () => {
+    const { attached } = layoutTurns([
+      { id: 'room', role: 'assistant', content: 'Kitchen is open on the canvas.', card: 'Kitchen' },
+      { id: 'reply', role: 'assistant', content: 'Here is the drawing.', turnId: 't1', card: 'Generated image' },
+    ], titleOf);
+    expect(attached.get('reply')?.map((m) => m.id)).toEqual(['room']);
+  });
+
+  it('a card saved after the reply attaches back to it', () => {
+    const { attached } = layoutTurns([turn[3], turn[1]], titleOf);
+    expect(attached.get('r1')?.map((m) => m.id)).toEqual(['c1']);
+  });
+
+  it('a reloaded conversation shows a reply saved twice, and one room saved three times, once', () => {
+    const room = (id: string) => ({ id, role: 'assistant', content: 'Open.', sceneData: { scene_id: 's' } });
+    expect(dropRepeats([
+      { id: 'a', role: 'assistant', content: 'x', turnId: 't', recovered: true },
+      { id: 'b', role: 'assistant', content: 'x', turnId: 't' },
+      { id: 'only', role: 'assistant', content: 'y', turnId: 't2', recovered: true },
+      room('r1'), room('r2'), { id: 'u', role: 'user', content: 'again' }, room('r3'),
+    ]).map((m) => m.id)).toEqual(['b', 'only', 'r1', 'u', 'r3']);
   });
 
   it('an approval or a question waiting on the user is never folded away', () => {

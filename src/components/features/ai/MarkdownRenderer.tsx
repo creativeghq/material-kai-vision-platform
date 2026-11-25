@@ -3,11 +3,12 @@
  * Renders markdown content with proper formatting and styling
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Link, useInRouterContext } from 'react-router-dom';
 
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/core/ui/dialog';
 import { linkifyDestinations } from '@/utils/linkifyDestinations';
 import { safeHref } from '@/utils/safeUrl';
 
@@ -28,12 +29,27 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   linkifyRoutes = true,
 }) => {
   const inRouter = useInRouterContext();
+  const [open, setOpen] = useState<{ src: string; alt: string } | null>(null);
   const source = linkifyRoutes ? linkifyDestinations(content) : content;
   return (
     <div className={`markdown-content text-sm leading-relaxed ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
+          img: ({ src, alt }) => {
+            if (typeof src !== 'string' || !src) return null;
+            return (
+              <button
+                type="button"
+                title={alt ? `Open ${alt}` : 'Open the image'}
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen({ src, alt: alt ?? '' }); }}
+                className="mb-1.5 mr-1.5 inline-flex cursor-zoom-in flex-col overflow-hidden rounded-sm border border-hairline bg-background align-top focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <img src={src} alt={alt ?? ''} loading="lazy" className="block h-20 w-auto max-w-[7.5rem] object-contain sm:h-32 sm:max-w-[12rem]" />
+                {alt && <span className="block max-w-[7.5rem] truncate px-2 sm:max-w-[12rem] py-1 text-left text-[11px] text-muted-foreground">{alt}</span>}
+              </button>
+            );
+          },
           // Headings — inherit color from parent bubble
           // A heading opens a SECTION, so the space belongs above it — and never above the
           // first one, where it is a gap between the bubble's edge and its own first line.
@@ -124,6 +140,18 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       >
         {source}
       </ReactMarkdown>
+      <Dialog open={!!open} onOpenChange={(o) => { if (!o) setOpen(null); }}>
+        <DialogContent className="w-[96vw] max-w-6xl gap-3 p-4">
+          <DialogTitle className="pr-8 text-sm">{open?.alt || 'Image'}</DialogTitle>
+          <DialogDescription className="sr-only">The image at full size</DialogDescription>
+          {open && (
+            <>
+              <img src={open.src} alt={open.alt} className="max-h-[78dvh] w-full object-contain" />
+              <a href={safeHref(open.src)} target="_blank" rel="noopener noreferrer" className="text-xs text-muted-foreground underline">Open the original in a new tab</a>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
