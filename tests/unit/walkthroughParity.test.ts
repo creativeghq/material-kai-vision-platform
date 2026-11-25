@@ -44,6 +44,19 @@ describe('the recorded walkthrough shows what the client sees', () => {
   });
 });
 
+describe('a photoreal room', () => {
+  it('replaces the drawn room as soon as its splat is on screen, even while the camera moves', () => {
+    const canvas = read('src/components/features/scenestudio/SceneCanvas.tsx');
+    const body = canvas.slice(canvas.indexOf('const PhotorealRooms'), canvas.indexOf('const SPLAT_TURN'));
+    expect(body).toMatch(/drawn\.current\.visible = !room \|\| !splatShown\(scene, loaded\[room\.id\]\)/);
+    expect(body).not.toContain('splatsSettled');
+  });
+
+  it('is walked from an open spot, not from the render camera', () => {
+    expect(read('src/components/features/scenestudio/ScrollWalkthrough.tsx')).toMatch(/shot: real \? null : shot\?\.camera \?\? null, start: real \? openSpot\(/);
+  });
+});
+
 describe('public walkthrough', () => {
   it('both public pages use the one builder, which withholds a room or product of another workspace', () => {
     const builder = read('supabase/functions/_shared/scene-walkthrough.ts');

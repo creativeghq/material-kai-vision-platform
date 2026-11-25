@@ -13,10 +13,10 @@ import { ToneMappingMode } from 'postprocessing';
 import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, oakFloorTexture, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
 import { canvasRelief, finishTone } from '@/components/features/scenestudio/surfaceMaps';
 import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
-import { MODEL_FRONT_TURN_DEG, fitModel, thinSplats } from '@/lib/scene/splatFit';
+import { MODEL_FRONT_TURN_DEG, MAX_MODEL_SPLATS, crowded, fitModel, thinSplats } from '@/lib/scene/splatFit';
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
-import { drawSplatsOver, isSplat, splatsSettled } from '@/components/features/scenestudio/splatOverlay';
+import { drawSplatsOver, isSplat, splatShown, splatsSettled } from '@/components/features/scenestudio/splatOverlay';
 import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
 import type { Pose } from '@/lib/scene/walkthroughTimeline';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
@@ -147,14 +147,11 @@ const PhotorealRooms: React.FC<{
     })();
     return () => { gone = true; worlds.forEach((w) => track(w.url, false)); setLoaded({}); made.forEach((m) => m.dispose()); if (drawn.current) drawn.current.visible = true; };
   }, [key]);
-  const inside = useRef<string | null>(null);
   useFrame(({ camera, scene }) => {
     const [x, y] = toPlan(camera.position.x, camera.position.z, frame);
     const room = camera.position.y < heightM ? rooms.find((r) => loaded[r.id] && pointInPolygon(x, y, r.outline)) : undefined;
     for (const [id, mesh] of Object.entries(loaded)) mesh.visible = id === room?.id;
-    if (!drawn.current) return;
-    if ((room?.id ?? null) !== inside.current) { inside.current = room?.id ?? null; drawn.current.visible = true; }
-    else if (room && drawn.current.visible && splatsSettled(scene)) drawn.current.visible = false;
+    if (drawn.current) drawn.current.visible = !room || !splatShown(scene, loaded[room.id]);
   });
   return <group>{Object.entries(loaded).map(([id, mesh]) => <primitive key={id} object={mesh} />)}</group>;
 };
@@ -189,9 +186,11 @@ const SplatModel: React.FC<{
       if (!live) return;
       const xs: number[] = []; const ys: number[] = []; const zs: number[] = [];
       const opacities = new Float32Array(full.packedSplats.numSplats);
+      const centres = new Float32Array(full.packedSplats.numSplats * 3);
       const v = new Vector3();
       full.packedSplats.forEachSplat((i, center, _s, _q, opacity) => {
         opacities[i] = opacity;
+        centres[i * 3] = center.x; centres[i * 3 + 1] = center.y; centres[i * 3 + 2] = center.z;
         if (opacity < 0.2) return;
         v.copy(center).applyQuaternion(SPLAT_TURN);
         xs.push(v.x); ys.push(v.y); zs.push(v.z);
@@ -208,7 +207,7 @@ const SplatModel: React.FC<{
       const stretch = new Vector3(k[0], k[1], k[2]);
       const rot = new Quaternion(); const basis = new Matrix4(); const sc = new Vector3();
       const ax = [new Vector3(), new Vector3(), new Vector3()];
-      const { keep, grow } = thinSplats(opacities);
+      const { keep, grow } = thinSplats(opacities, MAX_MODEL_SPLATS, crowded(centres, opacities));
       const kept = new Uint8Array(opacities.length);
       for (const i of keep) kept[i] = 1;
       const packed = new PackedSplats({ maxSplats: keep.length });

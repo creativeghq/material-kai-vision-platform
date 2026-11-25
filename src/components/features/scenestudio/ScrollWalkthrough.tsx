@@ -6,7 +6,7 @@ import { Button } from '@/components/core/ui/button';
 
 import { planBounds, planFrame, pointInPolygon, polygonCentroid, toScene, type PlanOpening, type PlanRoom, type PlanWall } from '@/lib/scene/sceneGeometry';
 import { fitFov, walkthroughStage, type Pose, type WalkRoom } from '@/lib/scene/walkthroughTimeline';
-import { roomSignature } from '@/lib/scene/worldViews';
+import { freeSpots, roomSignature } from '@/lib/scene/worldViews';
 import type { SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 import type { ScriptFrame } from '@/components/features/scenestudio/SceneCanvas';
 
@@ -38,8 +38,25 @@ type Shot = { image_url: string; camera: Pose };
 
 const noop = () => undefined;
 
+/** The open spot furthest from the furniture's middle: a photoreal room is only sharp from where its views were taken. */
+function openSpot(outline: Array<[number, number]>, inside: SceneObject[], f: ReturnType<typeof planFrame>): [number, number] | null {
+  const { free } = freeSpots(outline, inside.map((o) => ({ x_mm: o.x_mm, y_mm: o.y_mm, width_mm: o.width_mm, depth_mm: o.depth_mm, rotation_deg: o.rotation_deg, top_mm: (o.elevation_mm ?? 0) + o.height_mm })));
+  const [gx, gy] = inside.length
+    ? [inside.reduce((s, o) => s + o.x_mm, 0) / inside.length, inside.reduce((s, o) => s + o.y_mm, 0) / inside.length]
+    : polygonCentroid(outline);
+  const xs = outline.map((p) => p[0]);
+  const ys = outline.map((p) => p[1]);
+  let best: [number, number] | null = null;
+  for (let x = Math.min(...xs); x <= Math.max(...xs); x += 150) {
+    for (let y = Math.min(...ys); y <= Math.max(...ys); y += 150) {
+      if (free(x, y) && (!best || Math.hypot(x - gx, y - gy) > Math.hypot(best[0] - gx, best[1] - gy))) best = [x, y];
+    }
+  }
+  return best ? toScene(best[0], best[1], f) : null;
+}
+
 export function walkPlanOf(
-  ordered: PlanRoom[], walls: PlanWall[], objects: SceneObject[], renders: Shot[] = [],
+  ordered: PlanRoom[], walls: PlanWall[], objects: SceneObject[], renders: Shot[] = [], photoreal: ReadonlySet<string> = new Set(),
 ): { span: number; walk: WalkRoom[]; shots: Array<Shot | null> } {
   const b = planBounds(ordered, walls);
   const f = planFrame(b);
@@ -53,7 +70,11 @@ export function walkPlanOf(
     const focus = inside.length
       ? toScene(inside.reduce((s, o) => s + o.x_mm, 0) / inside.length, inside.reduce((s, o) => s + o.y_mm, 0) / inside.length, f)
       : null;
-    return { centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus, corners: r.outline.map((p) => toScene(p[0], p[1], f)), shot: shot?.camera ?? null };
+    const real = photoreal.has(r.id);
+    return {
+      centre: toScene(cx, cy, f), far: toScene(far[0], far[1], f), focus, corners: r.outline.map((p) => toScene(p[0], p[1], f)),
+      shot: real ? null : shot?.camera ?? null, start: real ? openSpot(r.outline, inside, f) : null,
+    };
   });
   return { span: Math.max((b.maxX - b.minX) / 1000, (b.maxY - b.minY) / 1000, 2), walk, shots };
 }
@@ -62,8 +83,10 @@ export function walkPlanOf(
 export function useWalkthrough(data: WalkthroughPayload) {
   return useMemo(() => {
     const ordered = [...data.rooms].sort((a, b) => (a.walk_order ?? 0) - (b.walk_order ?? 0)).filter((r) => r.outline.length >= 3);
-    const { span, walk, shots } = walkPlanOf(ordered, data.walls, data.objects, (data.renders ?? []).filter((r): r is Shot => !!r.camera?.position));
     const worlds = currentWorlds(data);
+    const { span, walk, shots } = walkPlanOf(
+      ordered, data.walls, data.objects, (data.renders ?? []).filter((r): r is Shot => !!r.camera?.position), new Set(worlds.map((w) => w.roomId)),
+    );
     const heroInRoom = !!data.render && shots.some((x) => x?.image_url === data.render!.image_url);
     return {
       ordered, span, walk, shots, worlds, heroInRoom,

@@ -17,6 +17,13 @@ export function splatsSettled(scene: Scene): boolean {
   return view.display.accumulator.mapping.reduce((n, m) => n + m.count, 0) === visible;
 }
 
+/** True once Spark's picture contains this splat, whatever it is still sorting. */
+export function splatShown(scene: Scene, mesh: SplatMesh): boolean {
+  const spark = scene.children.find((o): o is SparkRenderer => o instanceof SparkRenderer);
+  const view = spark?.defaultView as unknown as { display: { accumulator: { mapping: Array<{ node: Object3D; count: number }> } } | null } | undefined;
+  return !!view?.display?.accumulator.mapping.some((m) => m.node === mesh && m.count > 0);
+}
+
 /** Draws the splats over the picture already on screen, hidden where the solid room stands in front of them. */
 export function drawSplatsOver(renderer: WebGLRenderer, scene: Scene, camera: Camera, depthOnly: MeshBasicMaterial, veiled = false) {
   let any = false;
