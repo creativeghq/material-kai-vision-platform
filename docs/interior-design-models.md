@@ -138,7 +138,6 @@ Single inline (`generate_gemini`) is always cheapest: 6 cr (fast), 10 cr (chatgp
 - [docs/interior-design-data-flow.md](interior-design-data-flow.md) — request lifecycle through the system
 - [docs/interior-design-models.md](interior-design-models.md) — Gemini edge function API spec
 - [docs/virtual-staging.md](virtual-staging.md) — virtual staging tool
-- [docs/ar-material-preview.md](ar-material-preview.md) — PBR generation + AR
 - [docs/lighting-simulation.md](lighting-simulation.md) — lighting variants + 3D viewer
 - [docs/billing-credits-system.md](billing-credits-system.md) — credit/markup model and `ai_usage_logs`
 - [docs/ai-models-complete-list.md](ai-models-complete-list.md) — cross-platform AI model inventory

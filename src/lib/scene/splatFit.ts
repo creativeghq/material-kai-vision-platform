@@ -14,3 +14,15 @@ export function fitModel(e: Extent, w: number, d: number, h: number): [number, n
   const u = Math.min(w / (sx * k[0]), h / (sy * k[1]), d / (sz * k[2]));
   return [k[0] * u, k[1] * u, k[2] * u];
 }
+
+export const MAX_MODEL_SPLATS = 100_000;
+const MIN_OPACITY = 0.1;
+
+export function thinSplats(opacity: ArrayLike<number>, max = MAX_MODEL_SPLATS): { keep: Uint32Array; grow: number } {
+  const solid: number[] = [];
+  for (let i = 0; i < opacity.length; i++) if (opacity[i] >= MIN_OPACITY) solid.push(i);
+  if (solid.length <= max) return { keep: Uint32Array.from(solid), grow: 1 };
+  const step = solid.length / max;
+  const keep = Uint32Array.from({ length: max }, (_, i) => solid[Math.floor(i * step)]);
+  return { keep, grow: Math.sqrt(step) };
+}

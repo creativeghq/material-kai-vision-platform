@@ -9,7 +9,9 @@ import {
   Contact, CalendarClock, Image as ImageIcon, Gavel, Check, X, FileSignature,
   KeyRound, Wrench, Receipt, LineChart, RotateCw, Layers, Gauge, MoreHorizontal, BedDouble, Bath,
 } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/core/ui/select';
 import { useWorkspace } from '@/contexts/WorkspaceContext';
+import { sceneStudioService } from '@/services/sceneStudioService';
 import { usePermissions } from '@/hooks/usePermissions';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import { useToast } from '@/hooks/use-toast';
@@ -183,7 +185,7 @@ const FORM_FIELDS = [
   'max_guests', 'bed_config', 'min_stay_nights', 'check_in_time', 'check_out_time', 'cleaning_fee', 'deposit',
   'instant_book', 'cancellation_policy', 'house_rules', 'smoking_allowed', 'events_allowed',
   // content & agent
-  'features', 'amenities', 'description_i18n', 'virtual_tour_url', 'video_url', 'agent_name', 'agent_phone', 'agent_email', 'agent_website',
+  'features', 'amenities', 'description_i18n', 'virtual_tour_url', 'video_url', 'walkthrough_floor_plan_id', 'agent_name', 'agent_phone', 'agent_email', 'agent_website',
 ] as const;
 
 const ARRAY_FIELDS = new Set(['features', 'amenities', 'utilities_available', 'legal_clearances', 'view_types', 'suitable_for']);
@@ -229,6 +231,13 @@ export default function PropertyWorkbench() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const ws = activeWorkspaceId;
+  const [rooms3d, setRooms3d] = useState<Array<{ id: string; name: string }>>([]);
+  useEffect(() => {
+    if (!ws) return;
+    let alive = true;
+    void sceneStudioService.walkable(ws).then((r) => { if (alive) setRooms3d(r); }).catch(() => { if (alive) setRooms3d([]); });
+    return () => { alive = false; };
+  }, [ws]);
 
   const load = useCallback(async () => {
     if (!ws || !id) return;
@@ -753,6 +762,16 @@ export default function PropertyWorkbench() {
                   <F label="Amenities Notes (Comma-Separated)" wide><Input value={form.amenities ?? ''} onChange={(e) => set('amenities', e.target.value)} /></F>
                   <F label="Virtual Tour URL"><Input type="url" value={form.virtual_tour_url ?? ''} onChange={(e) => set('virtual_tour_url', e.target.value)} placeholder="https://my.matterport.com/…" /></F>
                   <F label="Video URL (YouTube / Vimeo)"><Input type="url" value={form.video_url ?? ''} onChange={(e) => set('video_url', e.target.value)} placeholder="https://youtu.be/…" /></F>
+                  <F label="3D Walkthrough">
+                    <Select value={form.walkthrough_floor_plan_id || 'none'} onValueChange={(v) => set('walkthrough_floor_plan_id', v === 'none' ? null : v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        {rooms3d.map((r) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <p className="mt-1 text-xs text-muted-foreground">Buyers scroll through this 3D room on the public listing. Make one in the Interior Designer.</p>
+                  </F>
                 </FormSection>
                 <FormSection title="Listing Agent" icon={Contact}>
                   <F label="Agent Name"><Input value={form.agent_name ?? ''} onChange={(e) => set('agent_name', e.target.value)} /></F>

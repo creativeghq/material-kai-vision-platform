@@ -91,9 +91,6 @@ const StartHerePage = lazy(() => import('./pages/StartHere/StartHerePage'));
 const MoodBoardPage = lazy(() => import('./components/business/moodboard/MoodBoardPage').then(m => ({ default: m.MoodBoardPage })));
 const MoodBoardDetailPage = lazy(() => import('./components/business/moodboard/MoodBoardDetailPage').then(m => ({ default: m.MoodBoardDetailPage })));
 
-// AR Preview (standalone page for QR handoff)
-const ARPage = lazy(() => import('./components/features/ar/ARPage').then(m => ({ default: m.default })).catch(() => ({ default: () => null })));
-
 // Billing & quotes (customer-facing)
 const SubscriptionPlansPage = lazy(() => import('./components/business/billing/SubscriptionPlansPage').then(m => ({ default: m.SubscriptionPlansPage })));
 const CreditPackagesPage = lazy(() => import('./components/business/billing/CreditPackagesPage').then(m => ({ default: m.CreditPackagesPage })));
@@ -1146,9 +1143,6 @@ const App = () => (
                 <Route path="/ready" element={<AuthGuard><HealthPage /></AuthGuard>} />
                 <Route path="/coverage" element={<AuthGuard><CoveragePage /></AuthGuard>} />
                 <Route path="/coverage/*" element={<AuthGuard><CoveragePage /></AuthGuard>} />
-                {/* AR Material Preview (public, no layout — for QR handoff from desktop) */}
-                <Route path="/ar/:productId" element={<PageErrorBoundary name="AR Preview"><ARPage /></PageErrorBoundary>} />
-
                 {/* Public Presentation Catalog (email-gated, no layout) */}
                 {/* A catalog slug is unique within its WORKSPACE, so the handle is part of the
                     address. The one-segment form is every link shared before that was true: the

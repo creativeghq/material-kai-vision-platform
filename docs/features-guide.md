@@ -762,27 +762,6 @@ Complete reference of all platform features and capabilities.
 
 ---
 
-### 28. AR Material Preview
-
-**Purpose**: View materials applied to real-world surfaces using AR, or preview them as 3D textured swatches with interactive rotation
-
-**Status:** ✅ Complete (Production Ready)
-
-**Documentation**: [ar-material-preview.md](ar-material-preview.md)
-
-**Key Features**:
-- ✅ WebXR AR on Android Chrome (camera-based surface detection)
-- ✅ 3D swatch viewer fallback on iOS and desktop
-- ✅ QR code handoff from desktop to mobile (`/ar/:productId`)
-- ✅ PBR map generation via Replicate (albedo, normal, roughness, metalness)
-- ✅ Device capability detection via `useARSupport()` hook
-- ✅ Credit cost: 8 credits for PBR generation, viewing is free
-
-**Components**: `src/components/features/ar/` — ARPreviewModal, ViewInARButton, ARPage, useARSupport
-**Edge Function**: `generate-pbr-maps/index.ts`
-
----
-
 ### 29. Lighting Simulation
 
 **Purpose**: Preview how materials look under different lighting conditions with real-time 3D rendering and AI-powered room re-lighting

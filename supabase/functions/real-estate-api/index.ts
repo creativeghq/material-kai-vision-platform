@@ -403,6 +403,7 @@ Deno.serve(withApiLogging('real-estate-api', async (req) => {
         // an id from the body that is not ours would come back on the next joined read.
         await assertSameWorkspace(supabase, 'crm_contacts', payload.vendor_contact_id as string | null, workspaceId, 'contact');
         await assertSameWorkspace(supabase, 'crm_companies', payload.vendor_company_id as string | null, workspaceId, 'company');
+        await assertSameWorkspace(supabase, 'floor_plans', payload.walkthrough_floor_plan_id as string | null, workspaceId, '3D room');
         if (payload.vendor_contact_id && payload.vendor_company_id) {
           return json({ error: 'A vendor is either a company or a person, not both.' }, 400);
         }

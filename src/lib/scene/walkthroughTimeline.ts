@@ -86,3 +86,16 @@ export function walkthroughFrame(p: number, span: number, rooms: WalkRoom[], fin
   const t = (p - 0.85) / 0.15;
   return { pose: end, walls: 1, objects: 1, dip: clamp01(1 - t / 0.25), room: rooms.length, render: finalPose ? span01(p, 0.9, 1) : 0, shot: 0 };
 }
+
+export interface WalkthroughStage { frame: WalkFrame; caption: string; dip: number; hero: number; shotRoom: number; shotOpacity: number }
+
+export function walkthroughStage(
+  p: number, plan: { span: number; walk: WalkRoom[]; names: string[]; photoreal: boolean[]; finalPose: Pose | null },
+): WalkthroughStage {
+  const frame = walkthroughFrame(p, plan.span, plan.walk, plan.finalPose);
+  const inRoom = frame.room >= 0 && frame.room < plan.walk.length;
+  const caption = frame.room < 0 ? (p < 0.12 ? 'The plan' : 'Your rooms, to scale')
+    : frame.room < plan.names.length ? plan.names[frame.room] : plan.finalPose ? 'The finished design' : 'Your home';
+  const showsShot = inRoom && !!plan.walk[frame.room].shot && !plan.photoreal[frame.room];
+  return { frame, caption, dip: frame.dip, hero: frame.render, shotRoom: showsShot ? frame.room : -1, shotOpacity: showsShot ? frame.shot : 0 };
+}

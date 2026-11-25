@@ -291,12 +291,6 @@ Complete documentation for Material Kai Vision Platform.
 - ΑΑΔΕ enrichment for Greek users (see myAADE above)
 - Role `manager` removed (collapsed: user → dealer → factory → admin)
 
-**[ar-material-preview.md](ar-material-preview.md)** - AR Material Preview ✨ NEW
-- WebXR AR on Android, 3D swatch viewer on iOS/desktop
-- PBR map generation (albedo, normal, roughness, metalness)
-- QR code handoff for desktop-to-mobile AR
-- 8 credits per PBR generation, viewing free
-
 **[lighting-simulation.md](lighting-simulation.md)** - Lighting Simulation ✨ NEW
 - AI room re-lighting (6 presets via Gemini edit)
 - 3D PBR material viewer with time-of-day and orientation controls
@@ -796,7 +790,6 @@ All documentation follows these standards:
 - ✨ **CHANGED**: Frontend module file paths — Email moved to `src/modules/email/`, Messaging to `src/modules/messaging/`, CRM to `src/modules/crm/`, Quotes to `src/modules/quotes/`, In-App Notifications panel to `src/modules/notifications/`, Social Media admin UI + the 11 JARVIS agent tools + 2 background agents to `src/modules/social-media/` and `supabase/functions/_shared/modules/social-media/`. Old paths under `src/services/email/`, `src/services/messaging/`, `src/components/Admin/{CRMManagement,EmailManagement,MessagingManagement,SocialMedia}/`, etc. are deleted.
 
 **Recent Changes (2026-04):**
-- ✨ **NEW**: AR Material Preview — WebXR + 3D swatch + PBR maps (`ar-material-preview.md`)
 - ✨ **NEW**: Lighting Simulation — AI re-lighting + 3D PBR viewer (`lighting-simulation.md`)
 - ✨ **NEW**: Pinterest Integration — Pin import + OAuth board browsing (`pinterest-integration.md`)
 - ✨ **NEW**: Manufacturer Analytics — Enhanced tracking + tiered dashboard (`manufacturer-analytics.md`)

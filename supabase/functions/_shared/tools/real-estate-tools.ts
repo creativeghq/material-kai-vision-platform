@@ -51,7 +51,7 @@ export const createManageRealEstateTool = (
   onChunk?: (chunk: any) => void,
 ) => {
   return tool(
-    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id, work_order_title, work_order_description, sale_price, commission_pct, deal_id, stage, deal_value, buyer_contact_id, area, crm_contact_id }) => {
+    async ({ action, status, property_type, transaction_type, title, price, town, scheduled_at, property_id, work_order_title, work_order_description, sale_price, commission_pct, deal_id, stage, deal_value, buyer_contact_id, area, crm_contact_id, scene_id }) => {
       if (!workspaceId) return JSON.stringify({ success: false, error: 'No active workspace.' });
       if (!jwt) return JSON.stringify({ success: false, error: 'Real Estate tools require an authenticated session.' });
       if (!await moduleEnabled()) return JSON.stringify({ success: false, error: 'The Real Estate module is not enabled on this platform.' });
@@ -96,6 +96,12 @@ export const createManageRealEstateTool = (
           // real-estate-api returns a 422 { code:'publish_blocked', errors } — surfaced via res.error above.
           onChunk?.({ type: 'real_estate_listing_published', property: res.data?.property, warnings: res.data?.warnings ?? [], timestamp: Date.now() });
           return JSON.stringify({ success: true, published: true, warnings: res.data?.warnings ?? [] });
+        }
+        case 'set_walkthrough': {
+          if (!property_id) return JSON.stringify({ success: false, error: 'property_id is required' });
+          const res = await callApi(jwt, workspaceId, 'update-property', { property_id, walkthrough_floor_plan_id: scene_id ?? null });
+          if (!res.ok) return JSON.stringify({ success: false, error: res.error });
+          return JSON.stringify({ success: true, property_id, walkthrough: scene_id ?? null, note: scene_id ? 'The 3D walkthrough shows on the public listing page whenever the listing is live.' : 'The walkthrough is off this listing.' });
         }
         case 'schedule_viewing': {
           if (!property_id || !scheduled_at) return JSON.stringify({ success: false, error: 'property_id and scheduled_at (ISO datetime) are required' });
@@ -308,6 +314,7 @@ export const createManageRealEstateTool = (
         'Writes:',
         '  • create_listing   — create a DRAFT listing (title + property_type + transaction_type; optional price, town). Returns the id to finish in the workbench.',
         '  • publish_listing  — take a listing live (needs property_id). Fails with the missing fields if compliance requirements aren’t met (GR: energy class + Electronic Building ID, short-let: ΑΜΑ).',
+        '  • set_walkthrough  — show the scroll walkthrough of a 3D room on the listing (needs property_id + scene_id from manage_scenes list; omit scene_id to take it off).',
         '  • schedule_viewing — book a viewing (needs property_id + scheduled_at ISO datetime). Syncs to the calendar with a reminder.',
         '  • draft_description — AI-generate listing copy (needs property_id). CREDIT-METERED. Returns a draft to review, does not auto-save.',
         '  • log_maintenance  — raise a maintenance work order on a rental (needs property_id + work_order_title).',
@@ -315,7 +322,7 @@ export const createManageRealEstateTool = (
         '  • manage_deal      — create a pipeline deal (property_id) or update one (deal_id): move stage, set deal_value/buyer_contact_id, or set status won/lost/open.',
       ].join('\n'),
       schema: z.object({
-        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'list_deals', 'list_investments', 'cma_report', 'buyer_portal_link', 'property_performance', 'property_links', 'rent_settlements', 'commission_splits', 'create_listing', 'publish_listing', 'schedule_viewing', 'draft_description', 'log_maintenance', 'complete_sale', 'manage_deal']).describe('Which action to run.'),
+        action: z.enum(['list_properties', 'get_property', 'find_leads', 'list_lettings', 'list_deals', 'list_investments', 'cma_report', 'buyer_portal_link', 'property_performance', 'property_links', 'rent_settlements', 'commission_splits', 'create_listing', 'publish_listing', 'set_walkthrough', 'schedule_viewing', 'draft_description', 'log_maintenance', 'complete_sale', 'manage_deal']).describe('Which action to run.'),
         status: z.string().optional().describe('Filter by listing_status (properties) or inquiry status (leads).'),
         property_type: z.string().optional().describe('residential/commercial/land/other — filter, or category for create_listing.'),
         transaction_type: z.string().optional().describe('sale/rent/short_let/business_transfer — for create_listing.'),
@@ -324,6 +331,7 @@ export const createManageRealEstateTool = (
         town: z.string().optional().describe('Town/area for create_listing.'),
         scheduled_at: z.string().optional().describe('ISO datetime for schedule_viewing.'),
         property_id: z.string().optional().describe('Target a specific listing (required for get_property/publish/schedule/draft/log_maintenance).'),
+        scene_id: z.string().uuid().optional().describe('set_walkthrough: the 3D room, from manage_scenes list.'),
         work_order_title: z.string().optional().describe('Maintenance issue summary for log_maintenance.'),
         work_order_description: z.string().optional().describe('Optional detail for log_maintenance.'),
         sale_price: z.number().optional().describe('Agreed final sale price for complete_sale.'),

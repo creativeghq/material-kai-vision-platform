@@ -4,6 +4,7 @@
 
 import { resolveImageSlots } from './image-slots.ts';
 import { resolveMediaSource } from '../conversation-media.ts';
+import { serviceClient } from '../supabase-client.ts';
 
 // `tool` is typed non-generically ON PURPOSE. Inferring it pulls @langchain/core's generic
 // graph into every module that defines a tool, and that instantiation — not file size — is what
@@ -225,7 +226,7 @@ export const createInteriorVideoV2Tool = (
   userImages: string[] = [],
 ) => {
   return tool(
-    async ({ source_image_url: explicitSource, source, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url, reference_image_urls, last_frame_url }) => {
+    async ({ source_image_url: explicitSource, source, video_type, model, prompt, aspect_ratio, duration_seconds, before_image_url, reference_image_urls, last_frame_url, invented_camera }) => {
       const slots = resolveImageSlots(userImages.length);
       const picked = resolveMediaSource({
         sourceImageUrl: explicitSource, source, conversationImages,
@@ -234,6 +235,20 @@ export const createInteriorVideoV2Tool = (
       const source_image_url = picked.url;
       if (!source_image_url) {
         return JSON.stringify({ success: false, error: 'No image to animate: attach one, generate one first, or pass source_image_url.' });
+      }
+      if (video_type === 'before_after' && !model) {
+        if (!before_image_url) return JSON.stringify({ success: false, error: 'before_after needs before_image_url: ask for the before photo.' });
+        onChunk?.({ type: 'before_after_video', before_image_url, after_image_url: source_image_url, timestamp: Date.now() });
+        return JSON.stringify({ success: true, credits_used: 0, before_image_url, source_image_url, message: 'The before and after is being drawn from the two real pictures on screen (free, about 10 seconds) and arrives in this conversation. Do not call again.' });
+      }
+      if ((video_type === 'walkthrough' || video_type === 'floorplan_flythrough') && !model && !invented_camera) {
+        const { data: rendered } = await serviceClient().from('scene_renders').select('floor_plan_id, floor_plans!inner(id, name, source_kind, extract_status, workspace_id)')
+          .eq('image_url', source_image_url).eq('workspace_id', workspaceId).limit(1).maybeSingle();
+        const scene = (rendered as { floor_plans?: Record<string, unknown> } | null)?.floor_plans;
+        if (scene) {
+          onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent: { mode: 'record_walkthrough', object_id: null, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
+          return JSON.stringify({ success: true, credits_used: 0, scene_id: scene.id, message: 'This picture was rendered from a 3D room, so the real walkthrough of that room is recording on the canvas (free, about half a minute; the tab must stay in front) and arrives in this conversation. Do not call again. Pass invented_camera only if the person asks for an AI-imagined clip instead.' });
+        }
       }
       try {
         onChunk?.({ type: 'tool_progress', status: `Starting ${video_type} video generation with ${model ?? 'auto-selected model'}...`, timestamp: Date.now() });
@@ -312,9 +327,9 @@ export const createInteriorVideoV2Tool = (
       name: 'generate_video',
       description: `Generate an interior design video using AI. Routes to the best model based on video type.
 Video types and the model each one prefers (the five values video_type accepts — there are no others):
-- walkthrough: Wan3.0 720p (55cr) — cinematic camera moves through a room
+- walkthrough: of a picture rendered from a 3D room, the real walkthrough is recorded free from that room; otherwise Gemini Omni or Wan3.0 invents a camera move through the picture (20-55cr). Say which one it was.
 - product_spotlight: Kling 3.0 (20cr) — focuses on a specific material/product with audio
-- before_after: Luma Ray3.2 (20cr) — interpolates from the room image to before_image_url, which is the only model here that can actually end on a given frame
+- before_after: free, drawn in the browser from before_image_url and the source image, so it starts and ends exactly on the two real pictures; passing a model makes an AI clip instead
 - floorplan_flythrough: Wan3.0 720p (55cr) — aerial view flythrough
 - social_reel: MiniMax H3 768p (25cr) — 15s with stereo audio, the reel format itself
 If the preferred model's provider has no credential deployed, the generator substitutes the best
@@ -367,6 +382,8 @@ Returns video_url when complete, or prediction_id if still processing (poll chec
           .describe('Required only for before_after type: the "before" state image URL'),
         reference_image_urls: z.array(z.string().url()).max(19).optional()
           .describe('Wan/Seedance: images held in shot (a product, a moodboard tile, another render of the room), by URL from this conversation.'),
+        invented_camera: z.boolean().optional()
+          .describe('walkthrough/floorplan_flythrough of a 3D room render: true only when the person asks for an AI-imagined clip instead of the real recorded walkthrough.'),
         last_frame_url: z.string().url().optional()
           .describe('Wan/Seedance/Ray: the frame the clip ends on, e.g. a second render of the same 3D room from another camera, so the motion is between two real views.'),
       }),

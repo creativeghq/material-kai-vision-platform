@@ -116,7 +116,7 @@ matrix = TS table; row policies answered as warehouse / client fixtures).
 ---
 
 ## 5. Public (no auth) surfaces
-`/tools` (IP-quota), `/knowledge-base`, `/brand/:slug`, `/u/:userId`, `/ar/:productId`, and token-gated links (`/board/:id`, `/q/:token`, `/c/:slug`, `/cv/:token`, `/pay/:token`).
+`/tools` (IP-quota), `/knowledge-base`, `/brand/:slug`, `/u/:userId`, and token-gated links (`/board/:id`, `/q/:token`, `/c/:slug`, `/cv/:token`, `/pay/:token`).
 
 ---
 

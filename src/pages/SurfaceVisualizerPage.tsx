@@ -10,7 +10,7 @@ import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { SurfaceVisualizer } from '@/components/features/visualizer/SurfaceVisualizer';
-import { SceneEditor } from '@/components/features/visualizer/SceneEditor';
+import { LibrarySceneEditor } from '@/components/features/visualizer/LibrarySceneEditor';
 import { WastageRatesCard } from '@/components/features/visualizer/WastageRatesCard';
 import { parseRenderState, serializeRenderState, type RenderState } from '@/lib/surfaceRenderer';
 import {
@@ -223,7 +223,7 @@ export default function SurfaceVisualizerPage() {
                       </div>
                     )}
                     {editing && scene.workspace_id ? (
-                      <SceneEditor
+                      <LibrarySceneEditor
                         scene={scene}
                         workspaceId={activeWorkspaceId}
                         existing={surfaces}

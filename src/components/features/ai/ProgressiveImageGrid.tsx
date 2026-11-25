@@ -1267,9 +1267,9 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                           <DropdownMenuSeparator />
                           <DropdownMenuLabel className="text-[11px] font-semibold text-muted-foreground pb-1">Video Style</DropdownMenuLabel>
                           {[
-                            { value: 'walkthrough',          label: 'Walkthrough',          description: 'Cinematic camera walk through the space' },
+                            { value: 'walkthrough',          label: 'Walkthrough',          description: 'The real 3D room when there is one, free' },
                             { value: 'product_spotlight',    label: 'Product Spotlight',    description: 'Zoom focus on a featured element' },
-                            { value: 'before_after',         label: 'Before / After',       description: 'Transition between original and new design' },
+                            { value: 'before_after',         label: 'Before / After',       description: 'Wipe from your photo to this picture, free' },
                             { value: 'floorplan_flythrough', label: 'Floorplan Flythrough', description: 'Aerial perspective from floor plan' },
                             { value: 'social_reel',          label: 'Social Reel 9:16',     description: 'Vertical clip for social media' },
                           ].map(vt => (

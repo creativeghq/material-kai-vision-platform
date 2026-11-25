@@ -1,21 +1,22 @@
 /** The editable Scene Studio room (#564): walls cut around openings, floors, and every object as a true-size stand-in. */
-import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { createContext, forwardRef, useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
 import {
-  Box3, Color, DoubleSide, Material, Matrix4, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
+  ACESFilmicToneMapping, Box3, CanvasTexture, Color, DoubleSide, Material, Matrix4, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
   type Object3D, type PerspectiveCamera, type RectAreaLight, type Group,
 } from 'three';
-import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
+import { PackedSplats, SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, oakFloorTexture, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
 import { canvasRelief, finishTone } from '@/components/features/scenestudio/surfaceMaps';
 import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
-import { MODEL_FRONT_TURN_DEG, fitModel } from '@/lib/scene/splatFit';
+import { MODEL_FRONT_TURN_DEG, fitModel, thinSplats } from '@/lib/scene/splatFit';
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
+import { drawSplatsOver, isSplat, splatsSettled } from '@/components/features/scenestudio/splatOverlay';
 import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
 import type { Pose } from '@/lib/scene/walkthroughTimeline';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
@@ -52,6 +53,8 @@ export interface SceneCanvasHandle {
   captureIdPassAt(pose: CameraPose): Promise<{ idPass: Blob; idMap: Record<string, string> }>;
   /** Depth of the scene as it stands from each pose, for a photoreal version of a room. */
   captureDepth(poses: WorldPose[]): DepthView[];
+  /** False while splats are still catching up with the camera or the layout. */
+  settled(): boolean;
   setPose(pose: CameraPose): void;
   topView(): void;
   resetView(): void;
@@ -94,6 +97,8 @@ interface Props {
   script?: React.MutableRefObject<ScriptFrame | null>;
   /** Photoreal versions of rooms, in scene coordinates: shown while the camera stands in that room. */
   worlds?: RoomWorld[];
+  /** How many furniture models and photoreal rooms are still loading; a failed one counts as done. */
+  onAssets?(pending: number): void;
 }
 
 export interface RoomWorld { roomId: string; url: string }
@@ -114,34 +119,44 @@ const ScriptDriver: React.FC<{ script: React.MutableRefObject<ScriptFrame | null
   return null;
 };
 
+const AssetContext = createContext<(key: string, loading: boolean) => void>(() => undefined);
+
 /** Swaps the drawn room for its photoreal version while the camera is inside it, and back outside. */
 const PhotorealRooms: React.FC<{
   worlds: RoomWorld[]; rooms: PlanRoom[]; frame: PlanFrame; heightM: number; drawn: React.RefObject<Group>;
 }> = ({ worlds, rooms, frame, heightM, drawn }) => {
   const [loaded, setLoaded] = useState<Record<string, SplatMesh>>({});
   const key = worlds.map((w) => w.url).join('|');
+  const track = useContext(AssetContext);
   useEffect(() => {
     let gone = false;
+    worlds.forEach((w) => track(w.url, true));
     const made: SplatMesh[] = [];
     void (async () => {
       for (const w of worlds) {
         const mesh = new SplatMesh({ url: w.url });
+        mesh.userData.splat = true;
         mesh.visible = false;
         made.push(mesh);
-        try { await mesh.initialized; } catch { continue; }
+        const ok = await mesh.initialized.then(() => true, () => false);
         if (gone) return;
+        track(w.url, false);
+        if (!ok) continue;
         setLoaded((m) => ({ ...m, [w.roomId]: mesh }));
       }
     })();
-    return () => { gone = true; setLoaded({}); made.forEach((m) => m.dispose()); if (drawn.current) drawn.current.visible = true; };
+    return () => { gone = true; worlds.forEach((w) => track(w.url, false)); setLoaded({}); made.forEach((m) => m.dispose()); if (drawn.current) drawn.current.visible = true; };
   }, [key]);
-  useFrame(({ camera }) => {
+  const inside = useRef<string | null>(null);
+  useFrame(({ camera, scene }) => {
     const [x, y] = toPlan(camera.position.x, camera.position.z, frame);
     const room = camera.position.y < heightM ? rooms.find((r) => loaded[r.id] && pointInPolygon(x, y, r.outline)) : undefined;
     for (const [id, mesh] of Object.entries(loaded)) mesh.visible = id === room?.id;
-    if (drawn.current) drawn.current.visible = !room;
+    if (!drawn.current) return;
+    if ((room?.id ?? null) !== inside.current) { inside.current = room?.id ?? null; drawn.current.visible = true; }
+    else if (room && drawn.current.visible && splatsSettled(scene)) drawn.current.visible = false;
   });
-  return <group userData={{ splat: true }}>{Object.entries(loaded).map(([id, mesh]) => <primitive key={id} object={mesh} />)}</group>;
+  return <group>{Object.entries(loaded).map(([id, mesh]) => <primitive key={id} object={mesh} />)}</group>;
 };
 
 const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
@@ -163,24 +178,26 @@ const SplatModel: React.FC<{
 }> = ({ url, w, d, h, tint, bands }) => {
   const [fit, setFit] = useState<{ mesh: SplatMesh; scale: number; offset: [number, number, number] } | null>(null);
   const source = useRef<{ y: Float32Array; rgb: Float32Array; opacity: Float32Array; groups?: Uint8Array; tinted: boolean } | null>(null);
+  const track = useContext(AssetContext);
+  const trackKey = useId();
   useEffect(() => {
     let live = true;
-    const mesh = new SplatMesh({ url });
-    mesh.userData.splat = true;
-    mesh.quaternion.copy(SPLAT_TURN);
-    mesh.initialized.then(() => {
+    track(trackKey, true);
+    const full = new SplatMesh({ url });
+    let mesh: SplatMesh | null = null;
+    full.initialized.then(() => {
       if (!live) return;
       const xs: number[] = []; const ys: number[] = []; const zs: number[] = [];
-      const n = mesh.packedSplats.numSplats;
-      const all = { y: new Float32Array(n), rgb: new Float32Array(n * 3), opacity: new Float32Array(n), tinted: false };
+      const opacities = new Float32Array(full.packedSplats.numSplats);
       const v = new Vector3();
-      mesh.forEachSplat((_i, center, _s, _q, opacity) => {
+      full.packedSplats.forEachSplat((i, center, _s, _q, opacity) => {
+        opacities[i] = opacity;
         if (opacity < 0.2) return;
         v.copy(center).applyQuaternion(SPLAT_TURN);
         xs.push(v.x); ys.push(v.y); zs.push(v.z);
       });
       if (xs.length < 100) return;
-      const q = (arr: number[], p: number) => { const a = [...arr].sort((m, n2) => m - n2); return a[Math.floor(p * (a.length - 1))]; };
+      const q = (arr: number[], p: number) => { const sorted = Float32Array.from(arr).sort(); return sorted[Math.floor(p * (sorted.length - 1))]; };
       const box = new Box3(new Vector3(q(xs, 0.02), q(ys, 0.01), q(zs, 0.02)), new Vector3(q(xs, 0.98), q(ys, 0.99), q(zs, 0.98)));
       const size = box.getSize(new Vector3());
       const k = fitModel(size, w, d, h);
@@ -191,25 +208,34 @@ const SplatModel: React.FC<{
       const stretch = new Vector3(k[0], k[1], k[2]);
       const rot = new Quaternion(); const basis = new Matrix4(); const sc = new Vector3();
       const ax = [new Vector3(), new Vector3(), new Vector3()];
-      mesh.packedSplats.forEachSplat((i, center, scales, quat, opacity, color) => {
+      const { keep, grow } = thinSplats(opacities);
+      const kept = new Uint8Array(opacities.length);
+      for (const i of keep) kept[i] = 1;
+      const packed = new PackedSplats({ maxSplats: keep.length });
+      const all = { y: new Float32Array(keep.length), rgb: new Float32Array(keep.length * 3), opacity: new Float32Array(keep.length), tinted: false };
+      let n = 0;
+      full.packedSplats.forEachSplat((i, center, scales, quat, opacity, color) => {
+        if (!kept[i]) return;
         center.applyQuaternion(place).multiply(stretch).add(shift);
         rot.copy(place).multiply(quat);
         basis.makeRotationFromQuaternion(rot).extractBasis(ax[0], ax[1], ax[2]);
         ax[0].multiply(stretch).multiplyScalar(scales.x); ax[1].multiply(stretch).multiplyScalar(scales.y); ax[2].multiply(stretch).multiplyScalar(scales.z);
-        sc.set(ax[0].length(), ax[1].length(), ax[2].length());
+        sc.set(ax[0].length(), ax[1].length(), ax[2].length()).multiplyScalar(grow);
         ax[0].normalize(); ax[1].addScaledVector(ax[0], -ax[1].dot(ax[0])).normalize(); ax[2].crossVectors(ax[0], ax[1]);
         rot.setFromRotationMatrix(basis.makeBasis(ax[0], ax[1], ax[2]));
-        mesh.packedSplats.setSplat(i, center, sc, rot, opacity, color);
-        all.y[i] = center.y; all.opacity[i] = opacity;
-        all.rgb[i * 3] = color.r; all.rgb[i * 3 + 1] = color.g; all.rgb[i * 3 + 2] = color.b;
+        packed.pushSplat(center, sc, rot, opacity, color);
+        all.y[n] = center.y; all.opacity[n] = opacity;
+        all.rgb[n * 3] = color.r; all.rgb[n * 3 + 1] = color.g; all.rgb[n * 3 + 2] = color.b;
+        n += 1;
       });
-      mesh.packedSplats.needsUpdate = true;
-      mesh.needsUpdate = true;
-      mesh.quaternion.identity();
+      packed.needsUpdate = true;
+      mesh = new SplatMesh({ packedSplats: packed });
+      mesh.userData.splat = true;
       source.current = all;
       setFit({ mesh, scale: 1, offset: [0, 0, 0] });
-    }).catch(() => { /* the box stays as the stand-in */ });
-    return () => { live = false; mesh.dispose(); };
+      full.dispose();
+    }).catch(() => undefined).finally(() => { if (live) track(trackKey, false); });
+    return () => { live = false; track(trackKey, false); full.dispose(); mesh?.dispose(); };
   }, [url, w, d, h]);
   const tintKey = JSON.stringify([tint, bands]);
   const wish = useRef({ tint, bands });
@@ -250,6 +276,58 @@ const SparkLayer: React.FC = () => {
     return () => { scene.remove(spark); };
   }, [gl, scene]);
   return null;
+};
+
+/** Splats in the post-processing buffer come out washed to white, so it runs without them and they are laid over its picture. */
+const SplatsAfterComposer: React.FC<{ script?: React.MutableRefObject<ScriptFrame | null> }> = ({ script }) => {
+  const { gl, scene, camera } = useThree();
+  const held = useRef<Object3D[]>([]);
+  const depthOnly = useMemo(() => new MeshBasicMaterial({ colorWrite: false, side: DoubleSide }), []);
+  const release = () => { held.current.forEach((o) => { o.visible = true; }); held.current = []; };
+  useEffect(() => () => { release(); depthOnly.dispose(); }, [depthOnly]);
+  useFrame(() => {
+    scene.traverse((o) => { if (isSplat(o) && o.visible) { o.visible = false; held.current.push(o); } });
+  }, 0.5);
+  useFrame(() => {
+    release();
+    drawSplatsOver(gl, scene, camera, depthOnly, (script?.current?.objects ?? 1) < 0.6);
+  }, 2);
+  return null;
+};
+
+const LEGGED_KINDS = new Set(['chair', 'armchair', 'stool', 'dining_table', 'coffee_table', 'desk', 'side_table', 'plant']);
+
+let groundShadow: CanvasTexture | null = null;
+const groundShadowTexture = () => {
+  if (groundShadow) return groundShadow;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const ctx = c.getContext('2d')!;
+  ctx.filter = 'blur(9px)';
+  ctx.fillStyle = '#000';
+  ctx.fillRect(20, 20, 88, 88);
+  groundShadow = new CanvasTexture(c);
+  return groundShadow;
+};
+
+/** A splat casts no shadow, so an unseen shape casts the sun's and a soft patch on the floor grounds the piece. */
+const SplatShadow: React.FC<{ kind: string; w: number; d: number; h: number; onFloor: boolean }> = ({ kind, w, d, h, onFloor }) => {
+  const legged = LEGGED_KINDS.has(kind);
+  const top = legged ? h * 0.18 : h;
+  return (
+    <group userData={{ splat: true }}>
+      <mesh castShadow userData={{ splat: true }} raycast={() => null} position={[0, h - top / 2, 0]}>
+        <boxGeometry args={[w * 0.96, top, d * 0.96]} />
+        <meshBasicMaterial colorWrite={false} depthWrite={false} />
+      </mesh>
+      {onFloor && (
+        <mesh userData={{ splat: true }} raycast={() => null} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.022, 0]}>
+          <planeGeometry args={[w * 1.75, d * 1.75]} />
+          <meshBasicMaterial map={groundShadowTexture()} transparent opacity={legged ? 0.5 : 0.8} depthWrite={false} toneMapped={false} />
+        </mesh>
+      )}
+    </group>
+  );
 };
 
 const MAX_CAPTURE_SIDE = 1536;
@@ -464,8 +542,8 @@ const OpeningMesh: React.FC<{ wall: PlanWall; opening: PlanOpening; frame: PlanF
 const ObjectMesh: React.FC<{
   obj: SceneObject; idHex: string; frame: PlanFrame; product?: SceneProduct; selected: boolean; wireframe: boolean;
   tool: SceneTool; floorPlane: Plane; controls: React.MutableRefObject<OrbitControlsImpl | null>;
-  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void; modelUrl?: string; finishes?: SlotFinishes; modelStale?: boolean;
-}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove, modelUrl, finishes, modelStale }) => {
+  onSelect(): void; onMove: Props['onMoveObject']; onRemove(): void; modelUrl?: string; finishes?: SlotFinishes;
+}> = ({ obj, idHex, frame, product, selected, wireframe, tool, floorPlane, controls, onSelect, onMove, onRemove, modelUrl, finishes }) => {
   const size = effectiveSize(obj, product);
   const w = size.width_mm / 1000;
   const d = size.depth_mm / 1000;
@@ -525,13 +603,7 @@ const ObjectMesh: React.FC<{
           {edges}
         </mesh>
         {modelUrl
-          ? (
-            <SplatModel
-              url={modelUrl} w={w} d={d} h={h}
-              tint={modelStale ? splatTintOf(obj.kind, finishes ?? {}) : undefined}
-              bands={splatBandsOf(obj.kind)}
-            />
-          )
+          ? <SplatShadow kind={obj.kind} w={w} d={d} h={h} onFloor={elev < 0.05} />
           : <ObjectShape kind={obj.kind} w={w} d={d} h={h} colour={colour} wireframe={wireframe} common={common} finishes={finishes} layout={obj.kitchen_layout} />}
       </group>
     );
@@ -550,6 +622,21 @@ const ObjectMesh: React.FC<{
       onPointerUp={end}
     >
       {body}
+    </group>
+  );
+};
+
+/** A generated model stands outside the group the intro scales: Spark rebuilds every splat whenever one is rescaled. */
+const ObjectModel: React.FC<{ obj: SceneObject; frame: PlanFrame; product?: SceneProduct; url: string; finishes?: SlotFinishes; stale?: boolean }> = ({ obj, frame, product, url, finishes, stale }) => {
+  const size = effectiveSize(obj, product);
+  const [x, z] = toScene(obj.x_mm, obj.y_mm, frame);
+  return (
+    <group position={[x, (obj.elevation_mm ?? 0) / 1000, z]} rotation={[0, rotationToScene(obj.rotation_deg), 0]}>
+      <SplatModel
+        url={url} w={size.width_mm / 1000} d={size.depth_mm / 1000} h={size.height_mm / 1000}
+        tint={stale ? splatTintOf(obj.kind, finishes ?? {}) : undefined}
+        bands={splatBandsOf(obj.kind)}
+      />
     </group>
   );
 };
@@ -663,7 +750,10 @@ const Bridge = forwardRef<SceneCanvasHandle, {
   useImperativeHandle(ref, () => ({
     async capture() {
       const { colourCanvas, idCanvas } = withHelpersHidden(() => {
+        const tone = gl.toneMapping;
+        gl.toneMapping = ACESFilmicToneMapping;
         gl.render(scene, camera);
+        gl.toneMapping = tone;
         const colourCanvas = snapshot(true);
         const idCanvas = renderIdPass();
         return { colourCanvas, idCanvas };
@@ -688,6 +778,7 @@ const Bridge = forwardRef<SceneCanvasHandle, {
       }
     },
     captureDepth(poses) { return renderDepthViews(gl, scene, poses, span / 2); },
+    settled() { return splatsSettled(scene); },
     setPose(pose) { flight.current = null; setPose(pose); },
     topView() { flyTo({ position: [0, span * 1.35, 0.01], target: [0, 0, 0], fov: 45 }); },
     resetView() { flyTo(initial); },
@@ -822,8 +913,15 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
-    frontsOpen = 0, cabinetHardware, sunHour = null, script, worlds = [],
+    frontsOpen = 0, cabinetHardware, sunHour = null, script, worlds = [], onAssets,
   } = props;
+  const loading = useRef(new Set<string>());
+  const reportAssets = useRef(onAssets);
+  reportAssets.current = onAssets;
+  const track = useCallback((key: string, on: boolean) => {
+    if (on) loading.current.add(key); else loading.current.delete(key);
+    reportAssets.current?.(loading.current.size);
+  }, []);
   const drawn = useRef<Group>(null);
   const wallsGroup = useRef<Group>(null);
   const objectsGroup = useRef<Group>(null);
@@ -962,6 +1060,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     <Canvas
       shadows="soft"
       dpr={[1, 2]}
+      resize={{ offsetSize: true }}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ position: initial.position, fov: initial.fov, near: 0.05, far: 500 }}
       onPointerMissed={() => onSelect(null)}
@@ -972,6 +1071,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       {!wireframe && windowLights.map((l) => <WindowLight key={l.id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
       {(hasModels || worlds.length > 0) && <SparkLayer />}
+      <AssetContext.Provider value={track}>
       <group ref={drawn}>
       <group userData={{ splat: true }}>
         <ContactShadows position={[0, 0.004, 0]} scale={span * 1.6} far={2.5} blur={2.2} opacity={0.3} resolution={1024} />
@@ -1105,13 +1205,24 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
           onRemove={() => onRemoveObject(o.id)}
           modelUrl={modelUrls[o.id]}
           finishes={finishesByObject[o.id]}
-          modelStale={staleModels?.has(o.id)}
         />
       ))}
       </group>
+      {objects.filter((o) => !o.removed_at && modelUrls[o.id]).map((o) => (
+        <ObjectModel
+          key={o.id}
+          obj={o}
+          frame={frame}
+          product={o.product_id ? products[o.product_id] : undefined}
+          url={modelUrls[o.id]}
+          finishes={finishesByObject[o.id]}
+          stale={staleModels?.has(o.id)}
+        />
+      ))}
       </CabinetViewContext.Provider>
       </group>
       {worlds.length > 0 && <PhotorealRooms worlds={worlds} rooms={rooms} frame={frame} heightM={defaultWallHeightMm / 1000} drawn={drawn} />}
+      </AssetContext.Provider>
       {script && <ScriptDriver script={script} walls={wallsGroup} objects={objectsGroup} />}
       <OrbitControls
         ref={controls}
@@ -1125,7 +1236,8 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
-      {!wireframe && !photo && !hasModels && !worlds.length && (
+      {!wireframe && !photo && (hasModels || worlds.length > 0) && <SplatsAfterComposer script={script} />}
+      {!wireframe && !photo && (
         <EffectComposer multisampling={4}>
           <N8AO aoRadius={0.5} distanceFalloff={0.6} intensity={2.2} halfRes quality="medium" />
           <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />

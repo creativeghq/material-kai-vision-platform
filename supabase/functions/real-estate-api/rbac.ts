@@ -42,7 +42,7 @@ export const PROPERTY_WRITABLE = [
   // energy & compliance
   'energy_class', 'electronic_building_id', 'atak', 'heating_type',
   // media
-  'virtual_tour_url', 'video_url',
+  'virtual_tour_url', 'video_url', 'walkthrough_floor_plan_id',
   // agent & branding
   'agent_license_no', 'agency_logo_url',
   // lifecycle switches (publish state is set via publish/unpublish actions, not free-write)

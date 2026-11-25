@@ -297,7 +297,6 @@ export default function PublicClientViewPage() {
           </section>
         )}
 
-        {/* 3D walkthrough */}
         {/* Lighting moods */}
         {view.embed_lighting && view.lighting_image_url && (
           <section>

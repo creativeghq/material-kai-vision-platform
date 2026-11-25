@@ -3,8 +3,8 @@ import { Image as ImageIcon, X } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import type { PlanRoom } from '@/lib/scene/sceneGeometry';
-import type { SceneCanvasHandle } from '@/components/features/scenestudio/SceneCanvas';
-import { currentWorlds, type WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
+import type { RoomWorld, SceneCanvasHandle } from '@/components/features/scenestudio/SceneCanvas';
+import type { WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
 
 const SceneCanvas = lazy(() => import('@/components/features/scenestudio/SceneCanvas').then((m) => ({ default: m.SceneCanvas })));
 
@@ -14,16 +14,16 @@ interface Props {
   data: WalkthroughPayload;
   rooms: PlanRoom[];
   modelUrls: Record<string, string>;
+  worlds: RoomWorld[];
   shots: Record<string, string>;
   onClose(): void;
 }
 
-export const WalkthroughExplore: React.FC<Props> = ({ data, rooms, modelUrls, shots, onClose }) => {
+export const WalkthroughExplore: React.FC<Props> = ({ data, rooms, modelUrls, worlds, shots, onClose }) => {
   const canvas = useRef<SceneCanvasHandle>(null);
   const touch = useMemo(() => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches, []);
   const [roomId, setRoomId] = useState<string | undefined>(rooms[0]?.id);
   const [finished, setFinished] = useState(false);
-  const worlds = useMemo(() => currentWorlds(data), [data]);
   const shot = roomId && !worlds.some((w) => w.roomId === roomId) ? shots[roomId] : undefined;
 
   useEffect(() => {

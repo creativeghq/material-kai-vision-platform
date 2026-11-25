@@ -665,7 +665,9 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     return {
       name: data?.scene.name ?? '3D room', default_wall_height_mm: data?.scene.default_wall_height_mm ?? 2600, cabinet_hardware: data?.scene.cabinet_hardware ?? null,
       rooms: data?.rooms ?? [], walls: data?.walls ?? [], openings: data?.openings ?? [],
-      objects, surfaces, finishes, products,
+      objects: objects.map((o) => ({ ...o, model_url: modelUrls[o.id] ?? null })), surfaces, finishes, products,
+      renders: renders.filter((r) => r.kind === 'full' && r.image_url).map((r) => ({ image_url: r.image_url, camera: (r.camera as unknown as Pose | null) ?? null })),
+      worlds: worlds.ready.map((w) => ({ room_id: w.room_id, url: publicUrl(w.splat_path as string), sig: w.layout_snapshot?.sig ?? null })),
       render: latest ? { image_url: latest.image_url, camera: (latest.camera as unknown as Pose | null) ?? null } : null,
     };
   };

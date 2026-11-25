@@ -19,6 +19,7 @@ import { emitFlowEventToWorkspaceRoles } from '../_shared/flow-events.ts';
 import { findOrCreateParty, normalizeEmail } from '../_shared/crm-party.ts';
 import { getTrustedClientIp } from '../_shared/client-ip.ts';
 import { recordPageEvent } from '../_shared/document-events.ts';
+import { buildSceneWalkthrough } from '../_shared/scene-walkthrough.ts';
 
 
 /** RE T1-1 — per-IP throttle for the anonymous lead-capture writes. Returns a 429 Response when the
@@ -462,7 +463,10 @@ Deno.serve(withApiLogging('real-estate-public', async (req) => {
       metadata: { surface: 'public_listing' },
     }).catch(() => {});
     supabase.rpc('increment_property_view_count', { p_property_id: property.id }).then(() => {}, () => {});
-    return json({ listing: toPublic(property), photos: signed });
+    const walkthrough = property.walkthrough_floor_plan_id
+      ? await buildSceneWalkthrough(supabase, property.walkthrough_floor_plan_id, property.workspace_id)
+      : null;
+    return json({ listing: toPublic(property), photos: signed, walkthrough });
   }
 
   if (action === 'inquire') {

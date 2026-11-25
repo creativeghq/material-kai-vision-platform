@@ -23421,6 +23421,7 @@ export type Database = {
           view_count: number
           view_types: string[] | null
           virtual_tour_url: string | null
+          walkthrough_floor_plan_id: string | null
           wc: number | null
           wc_count: number | null
           within_settlement: boolean | null
@@ -23593,6 +23594,7 @@ export type Database = {
           view_count?: number
           view_types?: string[] | null
           virtual_tour_url?: string | null
+          walkthrough_floor_plan_id?: string | null
           wc?: number | null
           wc_count?: number | null
           within_settlement?: boolean | null
@@ -23765,6 +23767,7 @@ export type Database = {
           view_count?: number
           view_types?: string[] | null
           virtual_tour_url?: string | null
+          walkthrough_floor_plan_id?: string | null
           wc?: number | null
           wc_count?: number | null
           within_settlement?: boolean | null
@@ -23773,6 +23776,13 @@ export type Database = {
           year_renovated?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "properties_walkthrough_floor_plan_id_fkey"
+            columns: ["walkthrough_floor_plan_id"]
+            isOneToOne: false
+            referencedRelation: "floor_plans"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "properties_parent_development_id_fkey"
             columns: ["parent_development_id"]

@@ -1,3 +1,4 @@
+import type { WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
 import { supabase } from '@/integrations/supabase/client';
 import { edgeError } from '@/utils/edgeError';
 
@@ -637,7 +638,7 @@ export function isPublishBlocked(e: unknown): e is { code: 'publish_blocked'; er
 }
 
 // ── Public token page + cross-workspace discovery (no auth; toPublic-projected) ──
-export interface PublicListing { listing: Record<string, any>; photos: { id: string; kind: string; caption: string | null; is_cover: boolean; url: string | null }[] }
+export interface PublicListing { listing: Record<string, any>; photos: { id: string; kind: string; caption: string | null; is_cover: boolean; url: string | null }[]; walkthrough?: WalkthroughPayload | null }
 export type PublicListingCard = Record<string, any> & { id: string; cover_url: string | null };
 /** `query` triggers semantic (Voyage) ranking server-side; the facet fields still apply as filters. */
 export interface DiscoverFilters { query?: string; property_type?: string; transaction_type?: string; town?: string; price_min?: number; price_max?: number; bedrooms_min?: number }

@@ -4,7 +4,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { ACESFilmicToneMapping, BufferAttribute, BufferGeometry, Color, Matrix4, Mesh as ThreeMesh, MeshBasicMaterial, NormalBlending, type Texture as TextureT, type Material, type Mesh, type Object3D, type Scene, type Texture } from 'three';
 import { DenoiseMaterial, GradientEquirectTexture, PathTracingSceneGenerator, WebGLPathTracer } from 'three-gpu-pathtracer';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
-import { SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
+
+import { drawSplatsOver, invisibleMaterial, isSplat } from '@/components/features/scenestudio/splatOverlay';
 
 const MAX_SAMPLES = 600;
 
@@ -20,10 +21,6 @@ function disposeTracer(t: WebGLPathTracer) {
   inner._pathTracer?.dispose();
   inner._lowResPathTracer?.dispose();
 }
-
-const isSplat = (o: Object3D) => o instanceof SplatMesh || o instanceof SparkRenderer;
-
-const invisibleMaterial = (m: Material | Material[]) => (Array.isArray(m) ? m.every((x) => !x.visible) : !m.visible);
 
 function excludedFromTrace(o: Object3D): boolean {
   if (o.userData?.helper || o.userData?.splat || isSplat(o)) return true;
@@ -109,28 +106,7 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
       dm.kSigma = 1;
       dm.threshold = 0.04;
       denoise.render(renderer);
-      let splats = false;
-      scene.traverseVisible((o) => { if (o instanceof SplatMesh) splats = true; });
-      if (splats) {
-        const swapped: Array<[Mesh, Material | Material[]]> = [];
-        const hidden: Object3D[] = [];
-        scene.traverse((o) => {
-          if (isSplat(o)) return;
-          if (o.userData?.splat || o.userData?.helper) { if (o.visible) { o.visible = false; hidden.push(o); } return; }
-          const mesh = o as Mesh;
-          if (mesh.isMesh && !invisibleMaterial(mesh.material)) { swapped.push([mesh, mesh.material]); mesh.material = depthOnly; }
-        });
-        const shadows = renderer.shadowMap.autoUpdate;
-        const background = (scene as Scene).background;
-        renderer.shadowMap.autoUpdate = false;
-        (scene as Scene).background = null;
-        renderer.clearDepth();
-        renderer.render(scene, camera);
-        (scene as Scene).background = background;
-        renderer.shadowMap.autoUpdate = shadows;
-        for (const [mesh, m] of swapped) mesh.material = m;
-        for (const o of hidden) o.visible = true;
-      }
+      drawSplatsOver(renderer, scene as Scene, camera, depthOnly);
       renderer.autoClear = auto;
     };
     return t;

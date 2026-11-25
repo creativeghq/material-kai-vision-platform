@@ -25,7 +25,7 @@ interface Props {
 
 const CORNER_HINTS = ['far-left corner', 'far-right corner', 'near-right corner', 'near-left corner'];
 
-export const SceneEditor: React.FC<Props> = ({ scene, workspaceId, existing, onSaved }) => {
+export const LibrarySceneEditor: React.FC<Props> = ({ scene, workspaceId, existing, onSaved }) => {
   const { toast } = useToast();
   const imgRef = useRef<HTMLImageElement>(null);
   const [points, setPoints] = useState<Pt[]>([]);

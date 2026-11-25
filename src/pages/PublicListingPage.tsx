@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { formatMoney } from '@/utils/decimal';
 import { useParams } from 'react-router-dom';
 import { Building2, MapPin, BedDouble, Bath, Ruler, Zap, Loader2, CheckCircle2, ExternalLink } from 'lucide-react';
@@ -7,6 +7,8 @@ import { Checkbox } from '@/components/core/ui/checkbox';
 import { Input } from '@/components/core/ui/input';
 import { Textarea } from '@/components/core/ui/textarea';
 import { realEstatePublic, type PublicListing } from '@/modules/real-estate/services/realEstateService';
+
+const ScrollWalkthrough = lazy(() => import('@/components/features/scenestudio/ScrollWalkthrough'));
 
 // Public `/p/:token` listing page (anonymous). All content comes from the token-gated
 // real-estate-public edge fn's toPublic() projection; rendered via JSX only (no HTML-string assembly).
@@ -113,6 +115,16 @@ export default function PublicListingPage() {
 
           <div className="md:col-span-1"><InquiryForm token={token} /></div>
         </div>
+
+        {data.walkthrough && data.walkthrough.rooms.length > 0 && (
+          <section className="mt-8">
+            <h2 className="font-semibold">Walk Through the Home</h2>
+            <p className="mb-3 text-sm text-muted-foreground">Scroll to move through the rooms, drawn to scale. Furniture and finishes show a possible design and are not part of the sale.</p>
+            <Suspense fallback={<div className="flex h-40 items-center justify-center"><Loader2 className="h-5 w-5 animate-spin" /></div>}>
+              <ScrollWalkthrough data={data.walkthrough} />
+            </Suspense>
+          </section>
+        )}
       </div>
     </div>
   );

@@ -192,7 +192,8 @@ describe('finishing a room surface by surface', () => {
     expect(src).toMatch(/new ThreeMesh\(sub, material\)/);
     expect(src).toMatch(/_generator = new PathTracingSceneGenerator\(\)/);
     const canvas = blankComments(readFileSync('src/components/features/scenestudio/SceneCanvas.tsx', 'utf8'));
-    expect(canvas).toMatch(/!wireframe && !photo && !hasModels && !worlds\.length && \(\s*<EffectComposer/);
+    expect(canvas).toMatch(/!wireframe && !photo && \(hasModels \|\| worlds\.length > 0\) && <SplatsAfterComposer/);
+    expect(canvas).toMatch(/isSplat\(o\) && o\.visible[\s\S]{0,120}\}, 0\.5\);[\s\S]{0,200}drawSplatsOver\([\s\S]{0,120}\}, 2\);/);
   });
 });
 

@@ -5,7 +5,7 @@ import { Footprints } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 
 import { planBounds, planFrame, pointInPolygon, polygonCentroid, toScene, type PlanOpening, type PlanRoom, type PlanWall } from '@/lib/scene/sceneGeometry';
-import { fitFov, walkthroughFrame, type Pose, type WalkRoom } from '@/lib/scene/walkthroughTimeline';
+import { fitFov, walkthroughStage, type Pose, type WalkRoom } from '@/lib/scene/walkthroughTimeline';
 import { roomSignature } from '@/lib/scene/worldViews';
 import type { SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 import type { ScriptFrame } from '@/components/features/scenestudio/SceneCanvas';
@@ -58,6 +58,24 @@ export function walkPlanOf(
   return { span: Math.max((b.maxX - b.minX) / 1000, (b.maxY - b.minY) / 1000, 2), walk, shots };
 }
 
+/** Everything a walkthrough of this plan shows; the scroll page, the explorer and the recorder all read this one answer. */
+export function useWalkthrough(data: WalkthroughPayload) {
+  return useMemo(() => {
+    const ordered = [...data.rooms].sort((a, b) => (a.walk_order ?? 0) - (b.walk_order ?? 0)).filter((r) => r.outline.length >= 3);
+    const { span, walk, shots } = walkPlanOf(ordered, data.walls, data.objects, (data.renders ?? []).filter((r): r is Shot => !!r.camera?.position));
+    const worlds = currentWorlds(data);
+    const heroInRoom = !!data.render && shots.some((x) => x?.image_url === data.render!.image_url);
+    return {
+      ordered, span, walk, shots, worlds, heroInRoom,
+      finalPose: heroInRoom ? null : data.render?.camera ?? null,
+      names: ordered.map((r) => r.name),
+      photoreal: ordered.map((r) => worlds.some((w) => w.roomId === r.id)),
+      shotByRoom: Object.fromEntries(ordered.flatMap((r, i) => (shots[i] ? [[r.id, shots[i]!.image_url]] : []))) as Record<string, string>,
+      modelUrls: Object.fromEntries(data.objects.filter((o) => o.model_url).map((o) => [o.id, o.model_url as string])) as Record<string, string>,
+    };
+  }, [data]);
+}
+
 const webgl2 = () => {
   try { return !!document.createElement('canvas').getContext('webgl2'); } catch { return false; }
 };
@@ -73,20 +91,8 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
   const reduced = useMemo(() => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
   const canRender = useMemo(() => typeof document !== 'undefined' && webgl2(), []);
 
-  const ordered = useMemo(() => [...data.rooms].sort((a, b) => (a.walk_order ?? 0) - (b.walk_order ?? 0)), [data.rooms]);
-  const renders = useMemo(() => (data.renders ?? []).filter((r): r is Shot => !!r.camera?.position), [data.renders]);
-  const { span, walk, shots } = useMemo(() => walkPlanOf(ordered, data.walls, data.objects, renders), [ordered, data.walls, data.objects, renders]);
-  const shotByRoom = useMemo(() => {
-    const out: Record<string, string> = {};
-    ordered.filter((r) => r.outline.length >= 3).forEach((r, i) => { const x = shots[i]; if (x) out[r.id] = x.image_url; });
-    return out;
-  }, [ordered, shots]);
-  const worlds = useMemo(() => currentWorlds(data), [data]);
-  const heroInRoom = !!data.render && shots.some((x) => x?.image_url === data.render!.image_url);
-  const finalPose = heroInRoom ? null : data.render?.camera ?? null;
-  const names = ordered.map((r) => r.name);
-  const photoreal = useMemo(() => ordered.filter((r) => r.outline.length >= 3).map((r) => worlds.some((w) => w.roomId === r.id)), [ordered, worlds]);
-  const modelUrls = useMemo(() => Object.fromEntries(data.objects.filter((o) => o.model_url).map((o) => [o.id, o.model_url as string])), [data.objects]);
+  const plan = useWalkthrough(data);
+  const { ordered, walk, shots, worlds, heroInRoom, names, shotByRoom, modelUrls } = plan;
 
   useLayoutEffect(() => {
     const el = section.current;
@@ -109,24 +115,22 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const p = Math.min(1, Math.max(0, -rect.top / Math.max(1, rect.height - window.innerHeight)));
-      const f = walkthroughFrame(p, span, walk, finalPose);
+      const st = walkthroughStage(p, plan);
+      const f = st.frame;
       const aspect = window.innerWidth / Math.max(1, window.innerHeight);
       script.current = { pose: { ...f.pose, fov: fitFov(f.pose.fov, aspect) }, walls: f.walls, objects: f.objects };
-      if (dip.current) dip.current.style.opacity = String(f.dip);
+      if (dip.current) dip.current.style.opacity = String(st.dip);
       const fit = aspect < 1.5 ? 'contain' : 'cover';
-      if (photo.current) { photo.current.style.opacity = String(f.render); photo.current.style.objectFit = fit; }
-      shotImgs.current.forEach((img, i) => { if (img) { img.style.opacity = String(i === f.room && !photoreal[i] ? f.shot : 0); img.style.objectFit = fit; } });
-      if (caption.current) {
-        caption.current.textContent = f.room < 0 ? (p < 0.12 ? 'The plan' : 'Your rooms, to scale')
-          : f.room < names.length ? names[f.room] : finalPose ? 'The finished design' : 'Your home';
-      }
+      if (photo.current) { photo.current.style.opacity = String(st.hero); photo.current.style.objectFit = fit; }
+      shotImgs.current.forEach((img, i) => { if (img) { img.style.opacity = String(i === st.shotRoom ? st.shotOpacity : 0); img.style.objectFit = fit; } });
+      if (caption.current) caption.current.textContent = st.caption;
     };
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(tick); };
     tick();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); if (raf) cancelAnimationFrame(raf); };
-  }, [reduced, canRender, span, walk, finalPose, names, photoreal]);
+  }, [reduced, canRender, plan]);
 
   if (reduced || !canRender) {
     return data.render
@@ -175,7 +179,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
       </div>
       {exploring && (
         <Suspense fallback={null}>
-          <WalkthroughExplore data={data} rooms={ordered} modelUrls={modelUrls} shots={shotByRoom} onClose={() => setExploring(false)} />
+          <WalkthroughExplore data={data} rooms={ordered} modelUrls={modelUrls} worlds={worlds} shots={shotByRoom} onClose={() => setExploring(false)} />
         </Suspense>
       )}
     </div>

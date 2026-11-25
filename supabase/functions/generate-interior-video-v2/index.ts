@@ -141,7 +141,7 @@ const TYPE_MODEL_PREFERENCE: Record<VideoType, VideoModel[]> = {
   // Ray3.2 is the ONLY model that interpolates first frame -> last frame, so a substitute
   // starts from the source and drifts instead of landing on `endFrameUrl`. Still better than
   // refusing, but the response says which model actually ran.
-  before_after:         ['ray-3.2-720p', 'runway-gen4-turbo', 'kling-v3.0', 'wan-3.0-720p'],
+  before_after:         ['ray-3.2-720p', 'runway-gen4-turbo', 'kling-v3.0', 'wan-3.0-720p', 'gemini-omni-1.2-flash-720p'],
   // A reel is 15s on a phone, not 30 on a monitor — H3 Max with stereo audio for 25 credits.
   social_reel:          ['h3-max-768p', 'gemini-omni-1.2-flash-720p', 'wan-3.0-480p', 'runway-gen4-turbo', 'kling-v3.0'],
 };
@@ -403,8 +403,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
       return jsonResponse({
         success: false,
         code: 'no_video_provider_configured',
-        error: 'Video generation is unavailable: no video provider has a credential deployed. '
-          + 'This is a platform configuration problem, and no credits have been charged.',
+        error: `No provider for ${video_type.replace(/_/g, ' ')} videos can run right now. No credits have been charged.`,
       }, 503);
     }
     substitutedFrom = resolvedModel;

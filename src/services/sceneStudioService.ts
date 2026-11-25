@@ -422,6 +422,23 @@ export const sceneStudioService = {
     return data;
   },
 
+  /** The workspace's rooms that were read and have something to walk through. */
+  async walkable(workspaceId: string): Promise<Array<{ id: string; name: string }>> {
+    const { data, error } = await supabase.from('floor_plans').select('id, name, floor_plan_rooms!inner(id)')
+      .eq('workspace_id', workspaceId).eq('extract_status', 'ready').order('updated_at', { ascending: false }).limit(100);
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as Array<{ id: string; name: string }>).map(({ id, name }) => ({ id, name }));
+  },
+
+  /** The 3D room a picture was rendered from, if it was. */
+  async sceneOfRender(imageUrl: string): Promise<{ id: string; name: string; source_kind: string; capture_url: string | null } | null> {
+    const { data, error } = await supabase.from('scene_renders').select('capture_path, floor_plans!inner(id, name, source_kind)')
+      .eq('image_url', imageUrl).limit(1).maybeSingle();
+    if (error) throw new Error(error.message);
+    const row = data as { capture_path: string | null; floor_plans: { id: string; name: string; source_kind: string } } | null;
+    return row ? { ...row.floor_plans, capture_url: row.capture_path ? publicUrl(row.capture_path) : null } : null;
+  },
+
   async listWorlds(sceneId: string): Promise<SceneWorld[]> {
     const { data, error } = await supabase.from('scene_worlds')
       .select('id, room_id, quality, status, splat_path, poster_path, layout_snapshot, error, created_at')
@@ -673,6 +690,22 @@ export const sceneStudioService = {
       credits_used: 0, completed_at: new Date().toISOString(),
     }).select('id').single();
     if (error || !data) throw new Error(`The walkthrough was recorded but not saved: ${error?.message ?? 'no row'}`);
+    return { id: (data as { id: string }).id, video_url: url };
+  },
+
+  /** A before/after clip made in the browser becomes a `generation_videos` row like any generated video. */
+  async saveBeforeAfterVideo(workspaceId: string, afterUrl: string, video: Blob): Promise<{ id: string; video_url: string }> {
+    const ext = video.type.includes('mp4') ? 'mp4' : 'webm';
+    const path = `scene-studio/${workspaceId}/before-after/${Date.now()}.${ext}`;
+    await uploadTo(path, video, ext === 'mp4' ? 'video/mp4' : 'video/webm');
+    const url = publicUrl(path);
+    const { data: auth } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from('generation_videos').insert({
+      user_id: auth.user?.id, workspace_id: workspaceId, source_image_url: afterUrl, video_url: url,
+      prompt: 'Before and after', status: 'completed', model: 'before-after', video_type: 'before_after',
+      credits_used: 0, completed_at: new Date().toISOString(),
+    }).select('id').single();
+    if (error || !data) throw new Error(`The video was made but not saved: ${error?.message ?? 'no row'}`);
     return { id: (data as { id: string }).id, video_url: url };
   },
 

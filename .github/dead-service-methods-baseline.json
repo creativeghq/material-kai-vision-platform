@@ -156,9 +156,6 @@
     "src/services/platformSecretsService.ts": [
       "clearValue"
     ],
-    "src/services/product3dService.ts": [
-      "modelFormatsByProduct"
-    ],
     "src/services/quoteAnalyticsService.ts": [
       "getSessionId",
       "trackDownload",

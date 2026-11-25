@@ -32,12 +32,13 @@ export function useSceneWorlds(sceneId: string, signatureOf: (roomId: string) =>
     const ready = mine.find((w) => w.status === 'ready' && w.splat_path) ?? null;
     return { ready, stale: !!ready && ready.layout_snapshot?.sig !== signatureOf(roomId), running: mine.find(running) ?? null, failed: mine[0]?.status === 'failed' ? mine[0] : null };
   };
-  const shown = useMemo(() => {
-    const out = new Map<string, string>();
-    for (const w of worlds) if (w.status === 'ready' && w.splat_path && !out.has(w.room_id)) out.set(w.room_id, publicUrl(w.splat_path));
-    return [...out].map(([roomId, url]) => ({ roomId, url }));
+  const ready = useMemo(() => {
+    const newest = new Map<string, SceneWorld>();
+    for (const w of worlds) if (w.status === 'ready' && w.splat_path && !newest.has(w.room_id)) newest.set(w.room_id, w);
+    return [...newest.values()];
   }, [worlds]);
-  return { stateOf, shown, reload };
+  const shown = useMemo(() => ready.map((w) => ({ roomId: w.room_id, url: publicUrl(w.splat_path as string) })), [ready]);
+  return { stateOf, ready, shown, reload };
 }
 
 const QUALITIES: Array<{ id: WorldQuality; label: string; note: string }> = [

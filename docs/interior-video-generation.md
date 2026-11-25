@@ -12,11 +12,17 @@ The `generate-interior-video-v2` edge function routes to the optimal AI video mo
 
 ---
 
+## Walkthroughs and before/after are free when the real thing exists
+
+- **Walkthrough / flythrough of a picture rendered from a 3D room**: the room itself is recorded in the browser, frame by frame (`WalkthroughRecorder`), with the furniture models, photoreal rooms and renders the client view shows. No model call. `generate_video` sends it there unless `invented_camera` or an explicit `model` is passed.
+- **Before/after**: a wipe drawn in the browser from the two real pictures (`src/lib/scene/beforeAfterVideo.ts`). No model call unless a `model` is passed.
+
 ## Models
 
 | Model | Credits | Max length | Audio | Best For |
 |---|---|---|---|---|
-| `veo-2` | 50 | 8s | no | Cinematic walkthroughs, floor-plan flythroughs |
+| `gemini-omni-1.2-flash-720p` | 20 | 15s | yes | The default while Google is the only configured provider |
+| `gemini-omni-1.2-flash-1080p` | 30 | 15s | yes | The same, upscaled |
 | `kling-v3.0` | 20 | 10s | yes | Product spotlights, before/after, short social reels |
 | `runway-gen4-turbo` | 40 | 10s | no | Premium quality output |
 | `wan-3.0-480p` | 30 | 30s | yes | Long clips on a budget |
@@ -37,7 +43,7 @@ Routing per provider: Kling, Seedance and Wan go through the AI SDK inside
 `_shared/ai-client.ts` (`@ai-sdk/klingai@3`, `@ai-sdk/bytedance@1` and
 `@ai-sdk/alibaba@1` — each pinned to its **spec-v3** major, which is the one
 `npm:ai@6` accepts; a spec-v4 package throws `AI_UnsupportedModelVersionError` before the
-request is built). Veo-2 uses Google's API, Ray goes direct to Luma (below), and Runway is the
+request is built). Gemini Omni uses Google's API, Ray goes direct to Luma (below), and Runway is the
 only remaining Replicate model here.
 
 **Luma Ray3.2 is raw REST, and not because no provider exists.** `@ai-sdk/luma` exposes exactly
@@ -217,7 +223,6 @@ For social-media-specific short videos, the separate `generate-social-video` edg
 | `h3-max-768p` (delegated) — **the default** | 25 |
 | `h3-max-480p` (delegated) | 15 |
 | `kling-3.0` (run here, via Replicate) | 20 |
-| `veo-2` (delegated to `generate-interior-video-v2`) | 50 |
 | `wan-3.0-480p` / `720p` / `1080p` (delegated) | 30 / 55 / 110 |
 | `seedance-2.5-480p` / `720p` (delegated) | 60 / 125 |
 

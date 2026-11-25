@@ -142,6 +142,7 @@ import type { SheetType } from '@/services/moodboardSheetsService';
 import { SEO_ARTICLE_DEMO_DATA } from '@/data/demo/seo-article';
 const SceneEditor = lazy(() => import('@/components/features/scenestudio/SceneEditor'));
 import { sceneStudioService, type SceneProduct } from '@/services/sceneStudioService';
+import { recordBeforeAfter } from '@/lib/scene/beforeAfterVideo';
 import { sceneSourceLabel as formatSceneSource } from '@/lib/scene/sceneLabels';
 import { useEntitlements } from '@/hooks/useEntitlements';
 import type { SceneIntent, SceneRenderedEvent } from '@/components/features/scenestudio/SceneEditor';
@@ -2247,6 +2248,21 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     (agent) => agent.comingSoon && roleHierarchy[userRole] >= roleHierarchy[agent.requiredRole],
   );
 
+  const makeBeforeAfter = useCallback(async (beforeUrl: string, afterUrl: string) => {
+    if (!workspaceId) return;
+    toast({ title: 'Making the before and after…', description: 'Drawn from the two pictures in about 10 seconds. Free; keep this tab in front.' });
+    try {
+      const saved = await sceneStudioService.saveBeforeAfterVideo(workspaceId, afterUrl, await recordBeforeAfter(beforeUrl, afterUrl));
+      const videoData = { video_url: saved.video_url, job_id: saved.id, status: 'completed' as const, video_type: 'before_after' };
+      const msg: Message = { id: `msg-before-after-${Date.now()}`, role: 'assistant', content: 'Before and after, drawn from the two real pictures.', timestamp: new Date(), agentId: 'interior-designer', videoData };
+      setMessages((prev) => [...prev, msg]);
+      const convId = conversationIdRef.current;
+      if (convId) void saveAndLinkMessage(msg.id, { conversationId: convId, role: 'assistant', content: msg.content, metadata: { agentId: 'interior-designer', videoData } });
+    } catch (e) {
+      toast({ title: 'The before and after could not be made', description: e instanceof Error ? e.message : String(e), variant: 'destructive' });
+    }
+  }, [workspaceId, saveAndLinkMessage, toast]);
+
   // Generate video from a Gemini-generated image
   const handleGenerateVideo = useCallback(async (
     imageUrl: string,
@@ -2261,6 +2277,28 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const supabaseUrl = (supabase as any).supabaseUrl || process.env.SUPABASE_URL;
 
       const resolvedVideoType = videoType || 'walkthrough';
+
+      // A picture rendered from a 3D room gets the real camera path through that room, not an invented one.
+      if (resolvedVideoType !== 'product_spotlight' && resolvedVideoType !== 'social_reel') {
+        const scene = await sceneStudioService.sceneOfRender(imageUrl).catch(() => null);
+        if (scene && resolvedVideoType !== 'before_after') {
+          const sceneData = { scene_id: scene.id, name: scene.name, source_kind: scene.source_kind, intent: { mode: 'record_walkthrough' as const, object_id: null, room_id: null, nonce: Date.now() } };
+          const msg: Message = { id: `msg-scene-${Date.now()}`, role: 'assistant', content: `${scene.name} is recording its walkthrough from the 3D room, free; keep this tab in front.`, timestamp: new Date(), agentId: 'interior-designer', sceneData };
+          setMessages((prev) => [...prev, msg]);
+          setActiveCanvasId(msg.id);
+          setGeminiModalImage(null);
+          return;
+        }
+        if (resolvedVideoType === 'before_after') {
+          const at = messages.findIndex((m) => m.id === sourceMessage.id);
+          const earlier = messages.slice(0, at < 0 ? undefined : at + 1).reverse().find((m) => m.role === 'user' && (m.images?.length ?? 0) > 0);
+          const before = scene?.capture_url ?? earlier?.images?.[0] ?? null;
+          if (!before) throw new Error('Attach the before photo to the conversation first; the clip needs both pictures.');
+          setGeminiModalImage(null);
+          await makeBeforeAfter(before, imageUrl);
+          return;
+        }
+      }
       const resolvedModel = videoModel === 'auto' ? undefined : videoModel;
 
       // Read from the registry projection rather than a hand-kept map. The map this
@@ -3123,6 +3161,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 setMessages(prev => [...prev, vizMsg]);
               // Handle video_generated — agent-produced video → the rich player card (was falling
               // through to the generic JSON card because video_generated was in AGENT_RESULT_TITLES).
+              } else if (chunk.type === 'before_after_video' && chunk.before_image_url && chunk.after_image_url) {
+                void makeBeforeAfter(chunk.before_image_url as string, chunk.after_image_url as string);
               } else if (chunk.type === 'video_generated' && chunk.video_url) {
                 const videoMsg: Message = {
                   id: `msg-video-${Date.now()}`,

@@ -124,7 +124,6 @@ describe('lighting presets are shared, not hardcoded', () => {
 
   it('the 3D surfaces light themselves from the catalogue, not from literals', () => {
     for (const f of [
-      'src/components/features/ar/ProductModelViewer.tsx',
       'src/components/features/roomplanner/RoomScene3D.tsx',
     ]) {
       const src = read(f);
