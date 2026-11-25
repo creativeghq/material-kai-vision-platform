@@ -149,6 +149,7 @@ export const createManageScenesTool = (
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const next = mode === 'make_3d'
         ? `${target?.label ?? 'The object'} is selected in the room; the user presses "Make 3D (10 credits)" to confirm.`
+        : mode === 'photoreal' ? 'The room is open with the photoreal offer; the user picks the quality, sees the price and confirms it there.'
         : mode === 'walk' ? 'The room is open in walk mode: WASD or arrows, drag to look, click the floor to go there.'
             : mode === 'drawings' ? 'The kitchen drawings are open: floor plan with dimensions, an elevation per wall, the electrical and the plumbing drawings and the cut list; Print is in the dialog.' : 'The room is open on the canvas.';
       const services = mode === 'drawings' ? servicesReport(await kitchenRunsOf(sb, scene_id)).out : {};
@@ -602,7 +603,7 @@ export const createManageScenesTool = (
       + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '
       + 'layout each run with the confirmed units, then open mode drawings. '
       + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
-      + 'for Make 3D (10 credits, the user confirms). '
+      + 'for Make 3D (10 credits, the user confirms), mode photoreal with a room offers to rebuild that room photoreal so it can be walked around in (the user sees the price and confirms). '
       + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space, '
       + 'or on one part of an object (object + part, e.g. the sofa upholstery or the kitchen fronts); free. '
       + 'price_kitchen: prices the kitchen units standing in the room on a project plan from the kitchen blueprint '
@@ -621,7 +622,7 @@ export const createManageScenesTool = (
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),
-      mode: z.enum(['view', 'walk', 'make_3d', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
+      mode: z.enum(['view', 'walk', 'make_3d', 'photoreal', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
       room: z.string().max(120).optional().describe('open/finish/render: the space, by name (e.g. living room).'),
       area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
       part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),

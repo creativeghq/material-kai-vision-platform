@@ -1679,7 +1679,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },
       { name: 'scene_id', type: 'string', optional: true, description: 'status/open/finish: the scene.' },
       { name: 'object', type: 'string', optional: true, description: 'open/finish: the object, by its name in the room (e.g. sofa).' },
-      { name: 'mode', type: 'enum', enum: ['view', 'walk', 'make_3d', 'drawings'], optional: true, description: 'open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.' },
+      { name: 'mode', type: 'enum', enum: ['view', 'walk', 'make_3d', 'photoreal', 'drawings'], optional: true, description: 'open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.' },
       { name: 'room', type: 'string', optional: true, description: 'open/finish/render: the space, by name (e.g. living room).' },
       { name: 'area', type: 'enum', enum: ['floor', 'walls', 'ceiling'], optional: true, description: 'finish: which surface of the space.' },
       { name: 'part', type: 'enum', enum: ['upholstery', 'legs', 'frame', 'bedding', 'top', 'seat', 'fronts', 'carcass', 'worktop', 'handles', 'plinth', 'shade', 'base', 'fabric', 'body'], optional: true, description: 'finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.' },

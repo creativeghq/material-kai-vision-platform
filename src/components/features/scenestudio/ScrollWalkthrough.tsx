@@ -6,6 +6,7 @@ import { Button } from '@/components/core/ui/button';
 
 import { planBounds, planFrame, pointInPolygon, polygonCentroid, toScene, type PlanOpening, type PlanRoom, type PlanWall } from '@/lib/scene/sceneGeometry';
 import { fitFov, walkthroughFrame, type Pose, type WalkRoom } from '@/lib/scene/walkthroughTimeline';
+import { roomSignature } from '@/lib/scene/worldViews';
 import type { SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 import type { ScriptFrame } from '@/components/features/scenestudio/SceneCanvas';
 
@@ -25,7 +26,13 @@ export interface WalkthroughPayload {
   products: Record<string, SceneProduct>;
   render: { image_url: string; camera: Pose | null } | null;
   renders?: Array<{ image_url: string; camera: Pose | null }>;
+  worlds?: Array<{ room_id: string; url: string; sig: string | null }>;
 }
+
+/** Photoreal rooms that still match the plan; one made before a change is not shown to the client. */
+export const currentWorlds = (d: WalkthroughPayload) => (d.worlds ?? [])
+  .filter((w) => w.sig === roomSignature(w.room_id, d.objects, d.surfaces, d.finishes))
+  .map((w) => ({ roomId: w.room_id, url: w.url }));
 
 type Shot = { image_url: string; camera: Pose };
 
@@ -74,9 +81,11 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
     ordered.filter((r) => r.outline.length >= 3).forEach((r, i) => { const x = shots[i]; if (x) out[r.id] = x.image_url; });
     return out;
   }, [ordered, shots]);
+  const worlds = useMemo(() => currentWorlds(data), [data]);
   const heroInRoom = !!data.render && shots.some((x) => x?.image_url === data.render!.image_url);
   const finalPose = heroInRoom ? null : data.render?.camera ?? null;
   const names = ordered.map((r) => r.name);
+  const photoreal = useMemo(() => ordered.filter((r) => r.outline.length >= 3).map((r) => worlds.some((w) => w.roomId === r.id)), [ordered, worlds]);
   const modelUrls = useMemo(() => Object.fromEntries(data.objects.filter((o) => o.model_url).map((o) => [o.id, o.model_url as string])), [data.objects]);
 
   useLayoutEffect(() => {
@@ -106,7 +115,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
       if (dip.current) dip.current.style.opacity = String(f.dip);
       const fit = aspect < 1.5 ? 'contain' : 'cover';
       if (photo.current) { photo.current.style.opacity = String(f.render); photo.current.style.objectFit = fit; }
-      shotImgs.current.forEach((img, i) => { if (img) { img.style.opacity = String(i === f.room ? f.shot : 0); img.style.objectFit = fit; } });
+      shotImgs.current.forEach((img, i) => { if (img) { img.style.opacity = String(i === f.room && !photoreal[i] ? f.shot : 0); img.style.objectFit = fit; } });
       if (caption.current) {
         caption.current.textContent = f.room < 0 ? (p < 0.12 ? 'The plan' : 'Your rooms, to scale')
           : f.room < names.length ? names[f.room] : finalPose ? 'The finished design' : 'Your home';
@@ -117,7 +126,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
     return () => { window.removeEventListener('scroll', onScroll); window.removeEventListener('resize', onScroll); if (raf) cancelAnimationFrame(raf); };
-  }, [reduced, canRender, span, walk, finalPose, names]);
+  }, [reduced, canRender, span, walk, finalPose, names, photoreal]);
 
   if (reduced || !canRender) {
     return data.render
@@ -148,6 +157,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
             onPaint={noop}
             cabinetHardware={data.cabinet_hardware}
             modelUrls={modelUrls}
+            worlds={worlds}
             script={script}
           />
         </Suspense>}

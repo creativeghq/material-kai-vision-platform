@@ -405,7 +405,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
       if (plan && !belongsToView(plan)) {
         console.error(`[moodboard-sheet-share] floor_plan ${fp} is not in the view's workspace — withheld`);
       } else if (plan) {
-        const [rooms, walls, openings, objects, surfaces, finishes, renders] = await Promise.all([
+        const [rooms, walls, openings, objects, surfaces, finishes, renders, worlds] = await Promise.all([
           supabase.from('floor_plan_rooms').select('id, name, outline, height_mm, walk_order').eq('floor_plan_id', fp).order('walk_order'),
           supabase.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm, height_mm').eq('floor_plan_id', fp),
           supabase.from('floor_plan_openings').select('id, wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', fp),
@@ -417,6 +417,7 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
             .eq('floor_plan_id', fp),
           supabase.from('floor_plan_object_finishes').select('id, object_id, slot, product_id, colour_hex').eq('floor_plan_id', fp),
           supabase.from('scene_renders').select('image_url, camera, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(24),
+          supabase.from('scene_worlds').select('room_id, splat_path, layout_snapshot, created_at').eq('floor_plan_id', fp).eq('status', 'ready').not('splat_path', 'is', null).order('created_at', { ascending: false }).limit(40),
         ]);
         const productIds = [...new Set([
           ...((objects.data ?? []) as any[]).map((o) => o.product_id),
@@ -471,6 +472,11 @@ Deno.serve(withApiLogging('moodboard-sheet-share', async (req: Request) => {
           products,
           render: render ? { image_url: render.image_url, camera: render.camera } : null,
           renders: ((renders.data ?? []) as any[]).map((r) => ({ image_url: r.image_url, camera: r.camera })),
+          worlds: [...new Map(((worlds.data ?? []) as any[]).slice().reverse().map((w) => [w.room_id, {
+            room_id: w.room_id,
+            url: supabase.storage.from(SCENE_MODEL_BUCKET).getPublicUrl(w.splat_path).data.publicUrl,
+            sig: w.layout_snapshot?.sig ?? null,
+          }])).values()],
         };
       }
     }

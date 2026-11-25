@@ -33034,6 +33034,172 @@
         }
       }
     },
+    "/scene-world": {
+      "post": {
+        "tags": [
+          "Projects"
+        ],
+        "summary": "Make a photoreal, walkable version of one room of a 3D scene",
+        "operationId": "post_scene_world",
+        "description": "Turns one room of a 3D scene into a photoreal 3D room. `start` takes 6-20 depth views of the room (PNG captures stored in the scene's folder, with their cameras), an optional approved render whose look is matched, and a quality; it debits the room's price BEFORE any work. World Labs Atlas draws the same room photoreal at those cameras and builds one Gaussian splat in scene coordinates. `status` steps the job and returns it; a cron does the same once a minute. A failure refunds the credits. The workspace comes from the scene and is checked for moodboards.use and the 3D rooms module.\n\n**Actions** (`action` in the body):\n- `start` — Start a photoreal version of one room (debits credits)\n- `status` — Step a running photoreal room and return it\n- `advance` — Cron only (x-cron-secret): step every running photoreal room\n\n**Response:** `202 { id, status: running, charged, credits_used } | 200 { world: { status: views|building|ready|failed, splat_path, poster_path, error } }`",
+        "security": [
+          {
+            "supabaseJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request (validation error)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized (missing/invalid credential)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden (role/entitlement)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "floor_plan_id",
+                      "room_id",
+                      "views"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "start"
+                        ],
+                        "description": "Start a photoreal version of one room (debits credits)"
+                      },
+                      "floor_plan_id": {
+                        "type": "string",
+                        "description": "the 3D scene. (string (uuid))"
+                      },
+                      "room_id": {
+                        "type": "string",
+                        "description": "the room in that scene. (string (uuid))"
+                      },
+                      "views": {
+                        "type": "array",
+                        "description": "depth_path, z_min, z_max, position, quaternion, fov per view."
+                      },
+                      "quality": {
+                        "type": "string",
+                        "description": "draft is quick, refined is sharper and takes about 20 minutes. (one of: draft | refined)"
+                      },
+                      "style_render_id": {
+                        "type": "string",
+                        "description": "a render of this scene whose look the room takes. (string (uuid))"
+                      },
+                      "finishes": {
+                        "type": "string",
+                        "description": "the room's surface finishes, in words."
+                      },
+                      "objects": {
+                        "type": "string",
+                        "description": "the furniture in the room, in words."
+                      },
+                      "layout_snapshot": {
+                        "type": "object",
+                        "description": "the layout the views were taken from."
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action",
+                      "id"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "status"
+                        ],
+                        "description": "Step a running photoreal room and return it"
+                      },
+                      "id": {
+                        "type": "string",
+                        "description": "the photoreal room. (string (uuid))"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "action"
+                    ],
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "advance"
+                        ],
+                        "description": "Cron only (x-cron-secret): step every running photoreal room"
+                      }
+                    }
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "action"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/object-3d": {
       "post": {
         "tags": [

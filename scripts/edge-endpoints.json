@@ -18419,6 +18419,93 @@
     "response": "202 { success, status: extracting, floor_plan_id } — then poll floor_plans.extract_status for ready or failed"
   },
   {
+    "name": "scene-world",
+    "tag": "Projects",
+    "summary": "Make a photoreal, walkable version of one room of a 3D scene",
+    "description": "Turns one room of a 3D scene into a photoreal 3D room. `start` takes 6-20 depth views of the room (PNG captures stored in the scene's folder, with their cameras), an optional approved render whose look is matched, and a quality; it debits the room's price BEFORE any work. World Labs Atlas draws the same room photoreal at those cameras and builds one Gaussian splat in scene coordinates. `status` steps the job and returns it; a cron does the same once a minute. A failure refunds the credits. The workspace comes from the scene and is checked for moodboards.use and the 3D rooms module.",
+    "security": [
+      "supabaseJwt"
+    ],
+    "docs": null,
+    "methods": [
+      "POST"
+    ],
+    "actions": [
+      {
+        "name": "start",
+        "summary": "Start a photoreal version of one room (debits credits)",
+        "params": [
+          {
+            "name": "floor_plan_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "the 3D scene."
+          },
+          {
+            "name": "room_id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "the room in that scene."
+          },
+          {
+            "name": "views",
+            "type": "array",
+            "required": true,
+            "desc": "depth_path, z_min, z_max, position, quaternion, fov per view."
+          },
+          {
+            "name": "quality",
+            "type": "draft | refined",
+            "required": false,
+            "desc": "draft is quick, refined is sharper and takes about 20 minutes."
+          },
+          {
+            "name": "style_render_id",
+            "type": "string (uuid)",
+            "required": false,
+            "desc": "a render of this scene whose look the room takes."
+          },
+          {
+            "name": "finishes",
+            "type": "string",
+            "required": false,
+            "desc": "the room's surface finishes, in words."
+          },
+          {
+            "name": "objects",
+            "type": "string",
+            "required": false,
+            "desc": "the furniture in the room, in words."
+          },
+          {
+            "name": "layout_snapshot",
+            "type": "object",
+            "required": false,
+            "desc": "the layout the views were taken from."
+          }
+        ]
+      },
+      {
+        "name": "status",
+        "summary": "Step a running photoreal room and return it",
+        "params": [
+          {
+            "name": "id",
+            "type": "string (uuid)",
+            "required": true,
+            "desc": "the photoreal room."
+          }
+        ]
+      },
+      {
+        "name": "advance",
+        "summary": "Cron only (x-cron-secret): step every running photoreal room",
+        "params": []
+      }
+    ],
+    "response": "202 { id, status: running, charged, credits_used } | 200 { world: { status: views|building|ready|failed, splat_path, poster_path, error } }"
+  },
+  {
     "name": "object-3d",
     "tag": "Projects",
     "summary": "Show a product or a 3D-room object as a photo-real 3D model",

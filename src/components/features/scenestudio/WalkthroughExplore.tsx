@@ -4,7 +4,7 @@ import { Image as ImageIcon, X } from 'lucide-react';
 import { Button } from '@/components/core/ui/button';
 import type { PlanRoom } from '@/lib/scene/sceneGeometry';
 import type { SceneCanvasHandle } from '@/components/features/scenestudio/SceneCanvas';
-import type { WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
+import { currentWorlds, type WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
 
 const SceneCanvas = lazy(() => import('@/components/features/scenestudio/SceneCanvas').then((m) => ({ default: m.SceneCanvas })));
 
@@ -23,7 +23,8 @@ export const WalkthroughExplore: React.FC<Props> = ({ data, rooms, modelUrls, sh
   const touch = useMemo(() => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: coarse)').matches, []);
   const [roomId, setRoomId] = useState<string | undefined>(rooms[0]?.id);
   const [finished, setFinished] = useState(false);
-  const shot = roomId ? shots[roomId] : undefined;
+  const worlds = useMemo(() => currentWorlds(data), [data]);
+  const shot = roomId && !worlds.some((w) => w.roomId === roomId) ? shots[roomId] : undefined;
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -82,6 +83,7 @@ export const WalkthroughExplore: React.FC<Props> = ({ data, rooms, modelUrls, sh
             onPaint={noop}
             cabinetHardware={data.cabinet_hardware}
             modelUrls={modelUrls}
+            worlds={worlds}
             walkRoomId={roomId}
             onWalkEnd={() => setRoomId(undefined)}
           />

@@ -3392,6 +3392,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
         run: { tool: 'manage_scenes', fixedArgs: { action: 'list' } },
       },
       { label: 'Walk Through a Room', description: 'Walk a 3D room at eye height, room to room', prompt: 'Open my latest 3D room in walk mode.', icon: 'Compass' },
+      { label: 'Make a Room Photoreal', description: 'Rebuild one room photoreal from the plan and walk around in it', prompt: 'Make the living room of my latest 3D room photoreal.', icon: 'Sparkles' },
       { label: 'Make an Object 3D', description: 'Turn a sofa, bed or lamp in a 3D room into a photo-real model', prompt: 'In my latest 3D room, make the sofa 3D.', icon: 'Package' },
       { label: 'Finish a Room Surface', description: 'Lay a tile, wood or paint on a floor, the walls or a ceiling of a 3D room', prompt: 'In my latest 3D room, lay Amonito on the living room floor.', icon: 'Palette' },
       { label: 'Electrical and Plumbing', description: 'Labelled drawings for the electrician and plumber of a kitchen, with their checks', prompt: 'Make the electrical and plumbing drawings of the kitchen in my latest 3D room and tell me which checks fail.', icon: 'FileText' },

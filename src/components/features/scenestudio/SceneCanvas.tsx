@@ -27,6 +27,8 @@ import {
   rotationToPlan, rotationToScene, toPlan, toScene, walkStep, wallPieces,
   type PlanFrame, type PlanOpening, type PlanRoom, type PlanWall,
 } from '@/lib/scene/sceneGeometry';
+import { renderDepthViews, type DepthView } from '@/components/features/scenestudio/worldCapture';
+import type { WorldPose } from '@/lib/scene/worldViews';
 import type { SceneCamera, SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 
 export type SceneTool = 'view' | 'move' | 'turn' | 'remove' | 'paint';
@@ -48,6 +50,8 @@ export interface SceneCanvasHandle {
   capture(): Promise<SceneCapture>;
   /** ID pass only, from the given pose, with the current layout. For object edits on an existing render. */
   captureIdPassAt(pose: CameraPose): Promise<{ idPass: Blob; idMap: Record<string, string> }>;
+  /** Depth of the scene as it stands from each pose, for a photoreal version of a room. */
+  captureDepth(poses: WorldPose[]): DepthView[];
   setPose(pose: CameraPose): void;
   topView(): void;
   resetView(): void;
@@ -88,7 +92,11 @@ interface Props {
   sunHour?: number | null;
   /** Read-only playback (the client walkthrough): camera, wall height and unit rise are read from this ref every frame. */
   script?: React.MutableRefObject<ScriptFrame | null>;
+  /** Photoreal versions of rooms, in scene coordinates: shown while the camera stands in that room. */
+  worlds?: RoomWorld[];
 }
+
+export interface RoomWorld { roomId: string; url: string }
 
 export interface ScriptFrame { pose: Pose; walls: number; objects: number }
 
@@ -104,6 +112,36 @@ const ScriptDriver: React.FC<{ script: React.MutableRefObject<ScriptFrame | null
     if (objects.current) { objects.current.scale.y = Math.max(0.001, f.objects); objects.current.visible = f.objects > 0.01; }
   });
   return null;
+};
+
+/** Swaps the drawn room for its photoreal version while the camera is inside it, and back outside. */
+const PhotorealRooms: React.FC<{
+  worlds: RoomWorld[]; rooms: PlanRoom[]; frame: PlanFrame; heightM: number; drawn: React.RefObject<Group>;
+}> = ({ worlds, rooms, frame, heightM, drawn }) => {
+  const [loaded, setLoaded] = useState<Record<string, SplatMesh>>({});
+  const key = worlds.map((w) => w.url).join('|');
+  useEffect(() => {
+    let gone = false;
+    const made: SplatMesh[] = [];
+    void (async () => {
+      for (const w of worlds) {
+        const mesh = new SplatMesh({ url: w.url });
+        mesh.visible = false;
+        made.push(mesh);
+        try { await mesh.initialized; } catch { continue; }
+        if (gone) return;
+        setLoaded((m) => ({ ...m, [w.roomId]: mesh }));
+      }
+    })();
+    return () => { gone = true; setLoaded({}); made.forEach((m) => m.dispose()); if (drawn.current) drawn.current.visible = true; };
+  }, [key]);
+  useFrame(({ camera }) => {
+    const [x, y] = toPlan(camera.position.x, camera.position.z, frame);
+    const room = camera.position.y < heightM ? rooms.find((r) => loaded[r.id] && pointInPolygon(x, y, r.outline)) : undefined;
+    for (const [id, mesh] of Object.entries(loaded)) mesh.visible = id === room?.id;
+    if (drawn.current) drawn.current.visible = !room;
+  });
+  return <group userData={{ splat: true }}>{Object.entries(loaded).map(([id, mesh]) => <primitive key={id} object={mesh} />)}</group>;
 };
 
 const SPLAT_TURN = new Quaternion(1, 0, 0, 0);
@@ -649,6 +687,7 @@ const Bridge = forwardRef<SceneCanvasHandle, {
         setPose(before);
       }
     },
+    captureDepth(poses) { return renderDepthViews(gl, scene, poses, span / 2); },
     setPose(pose) { flight.current = null; setPose(pose); },
     topView() { flyTo({ position: [0, span * 1.35, 0.01], target: [0, 0, 0], fov: 45 }); },
     resetView() { flyTo(initial); },
@@ -783,8 +822,9 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
-    frontsOpen = 0, cabinetHardware, sunHour = null, script,
+    frontsOpen = 0, cabinetHardware, sunHour = null, script, worlds = [],
   } = props;
+  const drawn = useRef<Group>(null);
   const wallsGroup = useRef<Group>(null);
   const objectsGroup = useRef<Group>(null);
   const cabinetView = useMemo(() => ({ open: frontsOpen, hardware: cabinetHardware ?? 'bar_handles' }), [frontsOpen, cabinetHardware]);
@@ -931,7 +971,8 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       <RoomLighting span={span} sunHour={sunHour} />
       {!wireframe && windowLights.map((l) => <WindowLight key={l.id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
-      {hasModels && <SparkLayer />}
+      {(hasModels || worlds.length > 0) && <SparkLayer />}
+      <group ref={drawn}>
       <group userData={{ splat: true }}>
         <ContactShadows position={[0, 0.004, 0]} scale={span * 1.6} far={2.5} blur={2.2} opacity={0.3} resolution={1024} />
       </group>
@@ -1069,6 +1110,8 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       ))}
       </group>
       </CabinetViewContext.Provider>
+      </group>
+      {worlds.length > 0 && <PhotorealRooms worlds={worlds} rooms={rooms} frame={frame} heightM={defaultWallHeightMm / 1000} drawn={drawn} />}
       {script && <ScriptDriver script={script} walls={wallsGroup} objects={objectsGroup} />}
       <OrbitControls
         ref={controls}
@@ -1082,7 +1125,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         maxDistance={span * 4}
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} />
-      {!wireframe && !photo && !hasModels && (
+      {!wireframe && !photo && !hasModels && !worlds.length && (
         <EffectComposer multisampling={4}>
           <N8AO aoRadius={0.5} distanceFalloff={0.6} intensity={2.2} halfRes quality="medium" />
           <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
