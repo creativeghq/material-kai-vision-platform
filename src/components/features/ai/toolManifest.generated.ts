@@ -1675,7 +1675,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
     factory: 'createManageScenesTool',
     description: '3D rooms: turn a floor plan, a room photo or a render into an editable 3D room on the canvas, where the user rearranges it, recolours or swaps products, and renders it photo-real in any style. create: reads image_url …',
     params: [
-      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video'], optional: false, description: 'What to do.' },
+      { name: 'action', type: 'enum', enum: ['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video', 'photograph', 'client_look'], optional: false, description: 'What to do.' },
       { name: 'image_url', type: 'string', optional: true, description: 'create: the https URL of the plan, photo or render.' },
       { name: 'kind', type: 'enum', enum: ['plan_image', 'photo', 'render'], optional: true, description: 'create: what the image shows; a dimensioned sketch or elevation is plan_image.' },
       { name: 'name', type: 'string', optional: true, description: 'create: a name for the scene.' },
@@ -1689,6 +1689,7 @@ export const TOOL_MANIFEST: ToolManifestEntry[] = [
       { name: 'colour', type: 'string', optional: true, description: 'finish: a paint colour as #rrggbb, instead of a product.' },
       { name: 'project', type: 'string', optional: true, description: 'price_kitchen: the project to price on, by name, when the room has none yet; create with drawing: the project the drawing is on.' },
       { name: 'fronts', type: 'enum', enum: ['closed', 'half', 'open'], optional: true, description: 'open: show the kitchen doors and drawers closed, half open or open.' },
+      { name: 'look', type: 'enum', enum: ['photoreal', 'drawn'], optional: true, description: 'client_look: drawn or photoreal.' },
       { name: 'handles', type: 'enum', enum: ['gola', 'push_to_open', 'edge_pull', 'bar_handles', 'knobs', 'cup_pulls'], optional: true, description: 'handles: how the kitchen fronts open.' },
       { name: 'units', type: 'array', optional: true, description: 'layout: the units of the run left to right; omit for an automatic layout.' },
       { name: 'seating_cm', type: 'number', optional: true, description: 'layout: seating overhang of an island worktop, cm.' },

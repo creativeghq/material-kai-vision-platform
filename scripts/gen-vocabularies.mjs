@@ -19,6 +19,7 @@ export const VOCABULARIES = [
   ['src/config/brandProfileFields.ts', 'supabase/functions/_shared/brandProfileFields.generated.ts'],
   ['src/config/writingVocabulary.ts', 'supabase/functions/_shared/writingVocabulary.generated.ts'],
   ['src/config/b2bCompanyTypes.ts', 'supabase/functions/_shared/b2bCompanyTypes.generated.ts'],
+  ['src/config/sceneClientLook.ts', 'supabase/functions/_shared/sceneClientLook.generated.ts'],
   ['src/config/cabinetHardware.ts', 'supabase/functions/_shared/cabinetHardware.generated.ts'],
   ['src/config/flowEdgeFunctions.ts', 'supabase/functions/_shared/flowEdgeFunctions.generated.ts'],
   ['src/config/catalogueCsvImport.ts', 'supabase/functions/_shared/catalogueCsvImport.generated.ts'],

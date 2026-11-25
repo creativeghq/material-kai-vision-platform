@@ -1,12 +1,13 @@
 /** The public walkthrough of one 3D room (client view and property listing): projected by hand, nothing priced. */
 import type { DbClient } from './supabase-client.ts';
+import { rendersForLook, worldsForLook } from './sceneClientLook.generated.ts';
 
 const SCENE_MODEL_BUCKET = 'generation-images';
 
 /** Null when the room does not exist or is not in `workspaceId`; an unknown workspace withholds. */
 export async function buildSceneWalkthrough(supabase: DbClient, fp: string, workspaceId: string | null): Promise<unknown> {
   const { data: plan } = await supabase.from('floor_plans')
-    .select('id, name, workspace_id, default_wall_height_mm, cabinet_hardware').eq('id', fp).maybeSingle();
+    .select('id, name, workspace_id, default_wall_height_mm, cabinet_hardware, client_look').eq('id', fp).maybeSingle();
   if (!plan) return null;
   if (!workspaceId || plan.workspace_id !== workspaceId) {
     console.error(`[scene-walkthrough] floor_plan ${fp} is not in the expected workspace, withheld`);
@@ -23,7 +24,7 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
       .select('id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex')
       .eq('floor_plan_id', fp),
     supabase.from('floor_plan_object_finishes').select('id, object_id, slot, product_id, colour_hex').eq('floor_plan_id', fp),
-    supabase.from('scene_renders').select('image_url, camera, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(24),
+    supabase.from('scene_renders').select('image_url, camera, source, room_sig, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(24),
     supabase.from('scene_worlds').select('room_id, splat_path, layout_snapshot, created_at').eq('floor_plan_id', fp).eq('status', 'ready').not('splat_path', 'is', null).order('created_at', { ascending: false }).limit(40),
   ]);
   const productIds = [...new Set([
@@ -62,7 +63,8 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
       };
     }
   }
-  const render = ((renders.data ?? []) as any[])[0] ?? null;
+  const pictures = rendersForLook(plan.client_look, (renders.data ?? []) as any[]);
+  const render = pictures[0] ?? null;
   return {
     name: plan.name,
     default_wall_height_mm: plan.default_wall_height_mm,
@@ -79,8 +81,8 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
     finishes: finishes.data ?? [],
     products,
     render: render ? { image_url: render.image_url, camera: render.camera } : null,
-    renders: ((renders.data ?? []) as any[]).map((r) => ({ image_url: r.image_url, camera: r.camera })),
-    worlds: [...new Map(((worlds.data ?? []) as any[]).slice().reverse().map((w) => [w.room_id, {
+    renders: pictures.map((r) => ({ image_url: r.image_url, camera: r.camera, source: r.source, sig: r.room_sig })),
+    worlds: [...new Map(worldsForLook(plan.client_look, (worlds.data ?? []) as any[]).slice().reverse().map((w) => [w.room_id, {
       room_id: w.room_id,
       url: supabase.storage.from(SCENE_MODEL_BUCKET).getPublicUrl(w.splat_path).data.publicUrl,
       sig: w.layout_snapshot?.sig ?? null,

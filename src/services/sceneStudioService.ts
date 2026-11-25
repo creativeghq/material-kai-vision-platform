@@ -1,3 +1,4 @@
+import type { ClientLook, RenderSource } from '@/config/sceneClientLook';
 import { supabase } from '@/integrations/supabase/client';
 import { KITCHEN_KINDS, runModulesOf, zoneOfKind, type KitchenLayout } from '@/lib/scene/kitchenComposition';
 import { edgeError, parseEdgeError } from '@/utils/edgeError';
@@ -50,6 +51,7 @@ export interface SceneRow {
   view_camera: SceneCamera | null;
   /** CABINET_HARDWARE key; null draws bar handles. */
   cabinet_hardware: string | null;
+  client_look: ClientLook;
   created_at: string;
   updated_at: string;
 }
@@ -133,6 +135,9 @@ export interface SceneRender {
   instruction: string | null;
   image_url: string;
   layout_snapshot: Record<string, LayoutEntry>;
+  /** Photo Mode pictures are of the live room itself; `room_sig` says which state of it. */
+  source?: RenderSource;
+  room_sig?: string | null;
   created_at: string;
 }
 
@@ -162,11 +167,11 @@ export interface SceneData {
   renders: SceneRender[];
 }
 
-const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, cabinet_hardware, created_at, updated_at';
+const SCENE_COLUMNS = 'id, workspace_id, project_id, project_plan_id, name, default_wall_height_mm, source_kind, source_storage_path, extract_status, extract_error, extract_notes, view_camera, cabinet_hardware, client_look, created_at, updated_at';
 const OBJECT_COLUMNS = 'id, floor_plan_id, room_id, kind, label, product_id, x_mm, y_mm, rotation_deg, width_mm, depth_mm, height_mm, elevation_mm, size_source, colour_hex, source, removed_at, model_status, model_storage_path, model_error, model_finish, kitchen_layout';
 const SURFACE_COLUMNS = 'id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex';
 const FINISH_COLUMNS = 'id, object_id, slot, product_id, colour_hex, decor_brand, decor_code, decor_name';
-const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, colour_plan, instruction, image_url, layout_snapshot, created_at';
+const RENDER_COLUMNS = 'id, floor_plan_id, parent_render_id, kind, edited_object_id, camera, capture_path, id_pass_path, id_map, style_reference_url, style_label, colour_plan, instruction, image_url, layout_snapshot, source, room_sig, created_at';
 
 const num = (v: unknown, fallback = 0) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 
@@ -343,6 +348,11 @@ export const sceneStudioService = {
     const { data, error } = await supabase.rpc('board_edge_tapes' as never, { p_product_id: productId } as never);
     if (error) throw new Error(error.message);
     return (data ?? []) as Array<{ product_id: string; name: string }>;
+  },
+
+  async setClientLook(sceneId: string, look: ClientLook): Promise<void> {
+    const { error } = await supabase.from('floor_plans').update({ client_look: look }).eq('id', sceneId);
+    if (error) throw new Error(error.message);
   },
 
   async setCabinetHardware(sceneId: string, hardware: string | null): Promise<void> {

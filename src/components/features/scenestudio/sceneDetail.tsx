@@ -2,8 +2,8 @@
 import React, { useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import {
-  BackSide, Box3, BoxGeometry, Color, CubeCamera, DoubleSide, HalfFloatType, NoToneMapping, PMREMGenerator, SRGBColorSpace, TextureLoader, Vector2, Vector3,
-  WebGLCubeRenderTarget, type BufferGeometry, type Group, type Mesh, type Object3D, type Texture, type WebGLRenderTarget,
+  BackSide, Box3, Color, CubeCamera, DoubleSide, HalfFloatType, NoToneMapping, PMREMGenerator, SRGBColorSpace, TextureLoader, Vector2, Vector3,
+  WebGLCubeRenderTarget, WebGLRenderTarget, type Group, type Mesh, type Object3D, type Texture,
 } from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
@@ -17,6 +17,9 @@ import { sunAt } from '@/lib/scene/sun';
 import { KITCHEN_KINDS, type KitchenLayout } from '@/lib/scene/kitchenComposition';
 import type { BoardSlot } from '@/lib/scene/cabinetPanels';
 import { CabinetViewContext, buildKitchenGeometry, type FittingGroup } from '@/components/features/scenestudio/cabinetMesh';
+import { Curtain, Hob, HoodVisor, Lamp, OvenFace, Pendant, Picture, SinkBowl, worktopGeometry, type Common } from '@/components/features/scenestudio/fixtures';
+import { bowlFor, slabAround } from '@/lib/scene/fixturePlan';
+import { partGeometry } from '@/lib/scene/partGeometry';
 
 const INTERIOR_ENV = '/env/interior.hdr';
 const OUTDOOR = '/env/garden.webp';
@@ -67,13 +70,14 @@ function showWindowsOf(scene: Object3D, room: string | null) {
 }
 
 /** Lights the room the camera stands in with what that room itself looks like, so the floor warms the walls and the window side stays brighter. */
-function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, lit?: React.MutableRefObject<boolean>) {
-  const { gl, scene } = useThree();
+function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, lit?: React.MutableRefObject<boolean>, loaded = false) {
+  const { gl, scene, camera } = useThree();
   const base = useRef<Texture | null>(null);
   const own = useRef(new Set<Texture>());
   const probes = useRef(new Map<string, WebGLRenderTarget>());
   const state = useRef<{ room: string | null; since: number | null; shot: number; version: unknown }>({ room: null, since: null, shot: 0, version });
   const pmrem = useMemo(() => new PMREMGenerator(gl), [gl]);
+  // The same size as the interior map's: any other makes every material rebuild on entering a room.
   const cube = useMemo(() => new WebGLCubeRenderTarget(128, { type: HalfFloatType, generateMipmaps: false }), []);
   const eye = useMemo(() => new CubeCamera(0.05, 100, cube), [cube]);
 
@@ -133,6 +137,49 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, 
     }
   };
 
+  useEffect(() => {
+    if (!loaded || !base.current) return;
+    let live = true;
+    const target = new WebGLRenderTarget(4, 4, { type: HalfFloatType });
+    const was: Array<[Object3D, boolean]> = [];
+    const show = (o: Object3D, on: boolean) => { if (o.visible !== on) { was.push([o, o.visible]); o.visible = on; } };
+    const before = gl.getRenderTarget();
+    const counts = new Set<number>();
+    const textures = new Set<Texture>();
+    try {
+      gl.setRenderTarget(target);
+      for (const room of [null, ...rooms]) {
+        let lights = 0;
+        scene.traverse((o) => { if ('windowRoom' in o.userData && (room === null || o.userData.windowRoom === room.id)) lights += 1; });
+        if (counts.has(lights)) continue;
+        counts.add(lights);
+        scene.traverse((o) => {
+          if (o.userData?.outdoors || o.userData?.surface === 'ceiling') show(o, true);
+          if ('windowRoom' in o.userData) show(o, room === null || o.userData.windowRoom === room.id);
+        });
+        void gl.compileAsync(scene, camera).catch(() => undefined);
+      }
+    } finally {
+      gl.setRenderTarget(before);
+      for (const [o, on] of was.reverse()) o.visible = on;
+    }
+    scene.traverse((o) => {
+      const mats = (o as Mesh).isMesh ? (o as Mesh).material : null;
+      for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) {
+        for (const v of Object.values(m)) if (v && (v as Texture).isTexture && (v as Texture).image) textures.add(v as Texture);
+      }
+    });
+    const queue = [...textures];
+    const next = () => {
+      const t = queue.shift();
+      if (!live || !t) { target.dispose(); return; }
+      gl.initTexture(t);
+      requestAnimationFrame(next);
+    };
+    requestAnimationFrame(next);
+    return () => { live = false; };
+  }, [loaded, gl, scene, camera, rooms]);
+
   useFrame(({ camera, clock }) => {
     if (lit) lit.current = true;
     if (scene.environment && !own.current.has(scene.environment)) return;
@@ -158,8 +205,8 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, 
 const BASE_LIGHT = 0.75;
 const ROOM_LIGHT = 0.95;
 
-export const RoomLighting: React.FC<{ span: number; sunHour?: number | null; rooms: LitRoom[]; version: unknown; solid(): boolean; lit?: React.MutableRefObject<boolean> }> = ({ span, sunHour, rooms, version, solid, lit }) => {
-  useRoomLight(rooms, version, solid, lit);
+export const RoomLighting: React.FC<{ span: number; sunHour?: number | null; rooms: LitRoom[]; version: unknown; solid(): boolean; lit?: React.MutableRefObject<boolean>; loaded?: boolean }> = ({ span, sunHour, rooms, version, solid, lit, loaded }) => {
+  useRoomLight(rooms, version, solid, lit, loaded);
   const s = Math.max(span, 4);
   const sun = sunHour == null ? null : sunAt(sunHour, span);
   return (
@@ -210,7 +257,6 @@ export const Ceiling: React.FC<{
   );
 };
 
-type Common = { castShadow: boolean; receiveShadow: boolean; userData: Record<string, unknown> };
 /** One material slot drawn in its finish at real size: the product's own look, or the library material it calls for. */
 export const FinishMaterial: React.FC<{
   attach?: string; finish: Finish | null; fallback: string; w: number; h: number; offX?: number; offY?: number;
@@ -220,7 +266,8 @@ export const FinishMaterial: React.FC<{
   const colour = useMemo(() => (look ? new Color().setRGB(...look.colour) : new Color(finish?.hex ?? fallback)), [look, finish?.hex, fallback]);
   const relief = useMemo(() => new Vector2(look?.normalScale ?? 1, look?.normalScale ?? 1), [look?.normalScale]);
   return (
-    <meshStandardMaterial
+    <meshPhysicalMaterial
+      specularIntensity={role === 'surface:floor' ? FLOOR_SHEEN : 1}
       key={look ? `m${look.map ? 1 : 0}${look.normalMap ? 1 : 0}` : 'n'}
       attach={attach}
       color={colour}
@@ -238,42 +285,10 @@ export const FinishMaterial: React.FC<{
   );
 };
 
+/** A room's light map has no depth, so a floor seen at a low angle mirrors a wall that is not there. */
+const FLOOR_SHEEN = 0.3;
+
 export type SlotFinishes = Partial<Record<SceneObjectSlot, Finish | null>>;
-
-const ROUND_STEPS = 4;
-
-/** A box with rounded edges whose faces stay truly flat (three's own tilts the normals of the flat part). */
-function roundedBox(size: [number, number, number], r: number): BufferGeometry {
-  const n = ROUND_STEPS * 2 + 1;
-  const g = new BoxGeometry(1, 1, 1, n, n, n);
-  const pos = g.getAttribute('position'); const nor = g.getAttribute('normal');
-  const d = new Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    const at = [pos.getX(i), pos.getY(i), pos.getZ(i)].map((c) => Math.round((c + 0.5) * n));
-    const low = at.map((k) => k <= ROUND_STEPS);
-    d.fromArray(at.map((k, axis) => Math.tan((Math.PI / 4) * (low[axis] ? k / ROUND_STEPS - 1 : (k - ROUND_STEPS - 1) / ROUND_STEPS)))).normalize();
-    nor.setXYZ(i, d.x, d.y, d.z);
-    const p = size.map((s, axis) => (low[axis] ? -1 : 1) * (s / 2 - r) + d.getComponent(axis) * r);
-    pos.setXYZ(i, p[0], p[1], p[2]);
-  }
-  return g;
-}
-
-/** A box or rounded box whose UVs are metres on every face, grain along the face's longer side. */
-export function partGeometry(size: [number, number, number], round?: number): BufferGeometry {
-  const r = round ? Math.min(round, Math.min(...size) / 2 - 0.0005) : 0;
-  const g = r > 0 ? roundedBox(size, r) : new BoxGeometry(...size);
-  g.clearGroups();
-  const pos = g.getAttribute('position'); const uv = g.getAttribute('uv');
-  for (let i = 0; i < pos.count; i++) {
-    const axis = Math.floor(i / (pos.count / 6)) >> 1;
-    const [a, b] = axis === 0 ? [2, 1] : axis === 1 ? [0, 2] : [0, 1];
-    const at = [pos.getX(i), pos.getY(i), pos.getZ(i)];
-    const [u, v] = size[a] > size[b] ? [b, a] : [a, b];
-    uv.setXY(i, at[u] + size[u] / 2, at[v] + size[v] / 2);
-  }
-  return g;
-}
 
 const Part: React.FC<{
   part: ReturnType<typeof objectParts>[number]; finish: Finish | null | undefined; kind: string; wireframe: boolean; common: Common;
@@ -310,11 +325,16 @@ const KitchenRun: React.FC<{
   const geo = useMemo(() => buildKitchenGeometry(kind, w, d, h, view, layout), [kind, w, d, h, view, layout]);
   useEffect(() => () => geo?.dispose(), [geo]);
   const seating = (layout?.seating_mm ?? 0) / 1000;
-  const extras = useMemo(() => objectParts(kind, w, d, h, colour)
-    .filter((p) => p.slot === 'worktop' || p.slot === null)
-    .map((p) => (p.slot === 'worktop' && seating > 0
-      ? { ...p, size: [p.size[0], p.size[1], p.size[2] + seating] as [number, number, number], pos: [p.pos[0], p.pos[1], p.pos[2] - seating / 2] as [number, number, number] }
-      : p.slot === null && geo?.sinkX != null ? { ...p, pos: [p.pos[0] + geo.sinkX, p.pos[1], p.pos[2]] as [number, number, number] } : p)), [kind, w, d, h, colour, seating, geo]);
+  const top = useMemo(() => {
+    const slab = objectParts(kind, w, d, h, colour).find((q) => q.slot === 'worktop');
+    if (!slab) return null;
+    const spot = geo?.spots.find((q) => q.type === 'sink_base') ?? (kind === 'sink' ? { x: 0, w } : null);
+    const bowl = spot ? { x: spot.x, z: 0.03, ...bowlFor(spot.w, d) } : null;
+    const pieces = slabAround([slab.pos[0], slab.pos[1], slab.pos[2] - seating / 2], [slab.size[0], slab.size[1], slab.size[2] + seating], bowl);
+    return { bowl, color: slab.color, rough: slab.rough ?? 0.3, pieces, geometry: worktopGeometry(pieces) };
+  }, [kind, w, d, h, colour, seating, geo]);
+  useEffect(() => () => top?.geometry.forEach((g) => g.dispose()), [top]);
+  const spotsOf = (type: string, on: boolean) => (on && !wireframe ? geo?.spots.filter((q) => q.type === type) ?? [] : []);
   const slotFinish = (slot: BoardSlot): Finish | null | undefined => (slot === 'back' ? null : finishes[slot]);
   return (
     <group>
@@ -337,7 +357,15 @@ const KitchenRun: React.FC<{
           />
         </mesh>
       ))}
-      {extras.map((q, i) => <Part key={`x${i}`} part={q} finish={q.slot ? finishes[q.slot] : null} kind={kind} wireframe={wireframe} common={common} />)}
+      {top?.pieces.map((q, i) => (
+        <mesh key={`t${i}`} {...common} geometry={top.geometry[i]} position={q.pos}>
+          <FinishMaterial finish={finishes.worktop ?? null} fallback={top.color} w={1} h={1} wireframe={wireframe} role="slot:worktop" rough={top.rough} />
+        </mesh>
+      ))}
+      {!wireframe && top?.bowl && <SinkBowl x={top.bowl.x} z={top.bowl.z} top={h} w={top.bowl.w} d={top.bowl.d} common={common} />}
+      {!wireframe && geo?.openings.filter((q) => q.type.startsWith('oven')).map((q, i) => <OvenFace key={`o${i}`} pos={q.pos} size={q.size} common={common} />)}
+      {spotsOf('oven_base', kind !== 'kitchen_wall').map((q, i) => <Hob key={`h${i}`} x={q.x} z={0.01} top={h} w={Math.min(0.58, q.w - 0.02)} d={Math.min(0.5, d - 0.1)} common={common} />)}
+      {spotsOf('extractor', kind === 'kitchen_wall').map((q, i) => <HoodVisor key={`v${i}`} x={q.x} w={q.w} d={d - 0.02} common={common} />)}
     </group>
   );
 };
@@ -358,14 +386,13 @@ export const ObjectShape: React.FC<{
       </group>
     );
   }
-  if (kind === 'pendant') {
-    return (
-      <group>
-        <mesh {...common} position={[0, h * 0.75, 0]}><cylinderGeometry args={[0.005, 0.005, h * 0.5, 6]} /><meshStandardMaterial color={DARK} /></mesh>
-        <mesh {...common} position={[0, h * 0.35, 0]}><coneGeometry args={[w * 0.5, h * 0.3, 24, 1, true]} /><meshStandardMaterial color={finishes.shade?.hex ?? colour} roughness={0.5} side={DoubleSide} emissive="#ffe9c4" emissiveIntensity={0.15} wireframe={wireframe} /></mesh>
-      </group>
-    );
+  if (kind === 'pendant') return <Pendant w={w} h={h} hex={finishes.shade?.hex ?? colour} wireframe={wireframe} common={common} />;
+  if (kind === 'lamp') return <Lamp w={w} h={h} baseHex={finishes.base?.hex} shadeHex={finishes.shade?.hex} wireframe={wireframe} common={common} />;
+  if (kind === 'curtain') {
+    const fabric = <FinishMaterial finish={finishes.fabric ?? null} fallback={colour} w={1} h={1} wireframe={wireframe} role="kind:curtain" rough={0.95} side={DoubleSide} />;
+    return <Curtain w={w} d={d} h={h} wireframe={wireframe} common={common} fabric={fabric} />;
   }
+  if (kind === 'artwork' || kind === 'mirror') return <Picture w={w} h={h} colour={colour} mirror={kind === 'mirror'} wireframe={wireframe} common={common} />;
   return (
     <group>
       {list.map((q, i) => <Part key={i} part={q} finish={q.slot ? finishes[q.slot] : null} kind={kind} wireframe={wireframe} common={common} />)}
@@ -386,6 +413,13 @@ export const DoorOrWindow: React.FC<{ kind: 'door' | 'window'; width: number; he
         ))}
         <mesh castShadow position={[0, height / 2 + frame / 2 - 0.01, 0]}><boxGeometry args={[width + frame * 2, frame, depth + 0.03]} />{m(WHITE, 0.4)}</mesh>
         <mesh castShadow receiveShadow position={[0, -0.005, 0]}><boxGeometry args={[width - 0.01, height - 0.01, 0.04]} />{m('#ece6dc', 0.45)}</mesh>
+        {[-1, 1].flatMap((sz) => [[0.24, 0.62], [-0.27, 0.36]].flatMap(([cy, k]) => {
+          const pw = width - 0.28; const ph = (height - 0.2) * k - 0.12;
+          const at = cy * (height - 0.1);
+          return [[0, ph / 2, pw, 0.016], [0, -ph / 2, pw, 0.016], [-pw / 2, 0, 0.016, ph], [pw / 2, 0, 0.016, ph]].map(([dx, dy, bw, bh], i) => (
+            <mesh key={`p${sz}${cy}${i}`} receiveShadow position={[dx, at + dy - 0.005, sz * 0.022]}><boxGeometry args={[bw, bh, 0.008]} />{m('#ece6dc', 0.45)}</mesh>
+          ));
+        }))}
         {[-1, 1].map((sz) => (
           <mesh key={`h${sz}`} position={[width / 2 - 0.08, -0.05, sz * 0.035]}><boxGeometry args={[0.12, 0.018, 0.018]} />{m(STEEL, 0.25, 0.9)}</mesh>
         ))}

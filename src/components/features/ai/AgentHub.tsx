@@ -3590,6 +3590,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                     : intent?.mode === 'photoreal' ? 'is open. Pick the quality and confirm the photoreal room there.'
                     : intent?.mode === 'make_3d' ? 'is open with the object selected. Press Make 3D to confirm (10 credits).'
                         : intent?.mode === 'render' ? `is rendering${intent.style ? ` in ${intent.style}` : ''}; the render arrives here.`
+                          : intent?.mode === 'photograph' ? 'is photographing every room; keep this tab in front.'
                           : intent?.mode === 'record_walkthrough' ? 'is recording its walkthrough video; keep this tab in front.'
                             : intent?.mode === 'drawings' ? (intent.set === 'assembly' ? (intent.save ? 'is saving its workshop assembly sheets.' : 'has its workshop assembly sheets open.') : intent.save ? 'is saving its drawings to the project.' : 'has its drawings open.')
                               : 'is open on the canvas. Arrange it, then pick a style to render it.';

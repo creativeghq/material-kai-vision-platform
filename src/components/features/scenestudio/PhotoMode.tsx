@@ -9,9 +9,9 @@ import { denoise as cleanPhoto, denoiserNet, photoExposure, photoTexture, readFl
 import { drawOutdoorsOver } from '@/components/features/scenestudio/outdoorsOverlay';
 import { drawSplatsOver, invisibleMaterial, isSplat } from '@/components/features/scenestudio/splatOverlay';
 
-const MAX_SAMPLES = 600;
+const MAX_SAMPLES = 240;
 /** A clean picture is made at each of these; the last one is the photo. */
-const CLEAN_AT = [24, 72, 200, MAX_SAMPLES];
+const CLEAN_AT = [24, 72, MAX_SAMPLES];
 const EXPOSE_AT = 6;
 
 /** The library's own dispose() reads a field that does not exist in 0.0.23 and throws, taking the canvas with it. */
@@ -211,6 +211,7 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
   const lastCam = useRef(new Matrix4());
   const lastFov = useRef(0);
   const reported = useRef(-1);
+  const ended = useRef(false);
 
   useEffect(() => {
     const prevEnv = scene.environment;
@@ -268,9 +269,11 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
       void develop();
       photo.current.step += 1;
     }
-    if (samples !== reported.current && (samples % 4 === 0 || samples < 4 || samples >= MAX_SAMPLES)) {
+    const finished = samples >= MAX_SAMPLES && photo.current.step >= CLEAN_AT.length + 1 && !photo.current.busy;
+    if ((samples !== reported.current && (samples % 4 === 0 || samples < 4)) || finished !== ended.current) {
       reported.current = samples;
-      onProgress(Math.max(0, samples), samples >= MAX_SAMPLES, samples < 0);
+      ended.current = finished;
+      onProgress(Math.max(0, samples), finished, samples < 0);
     }
   }, 1);
 

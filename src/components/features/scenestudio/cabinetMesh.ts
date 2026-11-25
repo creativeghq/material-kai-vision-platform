@@ -22,8 +22,9 @@ export type FittingGroup = 'metal' | 'gola' | 'appliance';
 export interface KitchenGeometry {
   slots: Array<{ slot: BoardSlot; geometry: BufferGeometry }>;
   fittings: Array<{ group: FittingGroup; geometry: BufferGeometry }>;
-  /** Centre of the sink base along the run, metres; null when the run has none. */
-  sinkX: number | null;
+  /** Where each module stands along the run, metres. */
+  spots: Array<{ type: string; x: number; w: number }>;
+  openings: Array<{ type: string; pos: Vec3; size: Vec3 }>;
   dispose(): void;
 }
 
@@ -55,6 +56,7 @@ export function buildKitchenGeometry(kind: string, w: number, d: number, h: numb
   if (!pieces.length) return null;
   const bySlot = new Map<BoardSlot, BufferGeometry[]>();
   const byGroup = new Map<FittingGroup, BufferGeometry[]>();
+  const openings: KitchenGeometry['openings'] = [];
   for (const piece of pieces) {
     const cab = generateCabinet({
       zone: piece.zone, type: piece.type, width_mm: piece.width_mm, height_mm: piece.height_mm, depth_mm: piece.depth_mm,
@@ -72,6 +74,7 @@ export function buildKitchenGeometry(kind: string, w: number, d: number, h: numb
       const list = byGroup.get(group) ?? [];
       list.push(placedBox(f.size, f.pos, f.rot, offset));
       byGroup.set(group, list);
+      if (f.kind === 'appliance') openings.push({ type: piece.type, pos: f.pos.map((v, i) => (v + offset[i]) / 1000) as Vec3, size: f.size.map((v) => v / 1000) as Vec3 });
     }
   }
   const merge = (parts: BufferGeometry[]) => {
@@ -81,11 +84,11 @@ export function buildKitchenGeometry(kind: string, w: number, d: number, h: numb
   };
   const slots = Array.from(bySlot, ([slot, parts]) => ({ slot, geometry: merge(parts) }));
   const fittings = Array.from(byGroup, ([group, parts]) => ({ group, geometry: merge(parts) }));
-  const sink = pieces.find((p) => p.type === 'sink_base');
   return {
     slots,
     fittings,
-    sinkX: sink ? sink.x_mm / 1000 : null,
+    spots: pieces.map((p) => ({ type: p.type, x: p.x_mm / 1000, w: p.width_mm / 1000 })),
+    openings,
     dispose() {
       for (const s of slots) s.geometry.dispose();
       for (const f of fittings) f.geometry.dispose();

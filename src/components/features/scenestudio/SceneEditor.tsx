@@ -31,11 +31,12 @@ import { KitchenPrice } from '@/components/features/scenestudio/KitchenPrice';
 import { KitchenRunEditor } from '@/components/features/scenestudio/KitchenRunEditor';
 import { KitchenDrawingsDialog, type DrawingSetSaved } from '@/components/features/scenestudio/KitchenDrawingsDialog';
 import { MaterialsPanel, renderMaterialRows } from '@/components/features/scenestudio/RenderMaterials';
-import type { WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
-import type { Pose } from '@/lib/scene/walkthroughTimeline';
+import { walkPlanOf, type WalkthroughPayload } from '@/components/features/scenestudio/ScrollWalkthrough';
+import { roomPoses, type Pose } from '@/lib/scene/walkthroughTimeline';
 import { ReadyMadeLinePrice } from '@/components/features/scenestudio/ReadyMadeLinePrice';
 import { KITCHEN_KINDS } from '@/lib/scene/kitchenComposition';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '@/config/cabinetHardware';
+import { CLIENT_LOOKS, CLIENT_LOOK_LABELS, rendersForLook, worldsForLook, type ClientLook } from '@/config/sceneClientLook';
 import { SCENE_READ_STATUS, SCENE_SOURCE_LABEL } from '@/lib/scene/sceneLabels';
 import type { PaintScope, SceneCanvasHandle, SceneTool } from '@/components/features/scenestudio/SceneCanvas';
 import { decorOfRow, type BoardDecorRef } from '@/lib/scene/boardDecor';
@@ -75,7 +76,7 @@ export interface SceneEditorProps {
 }
 
 export interface SceneIntent {
-  mode: 'view' | 'walk' | 'make_3d' | 'photoreal' | 'drawings' | 'render' | 'record_walkthrough';
+  mode: 'view' | 'walk' | 'make_3d' | 'photoreal' | 'drawings' | 'render' | 'record_walkthrough' | 'photograph';
   object_id: string | null;
   room_id?: string | null;
   fronts?: FrontsState;
@@ -88,6 +89,7 @@ export interface SceneIntent {
 }
 
 const INTENT_FRESH_MS = 120_000;
+const PHOTO_LIMIT_MS = 600_000;
 
 interface Snapshot { objects: SceneObject[]; surfaces: SceneSurface[]; finishes: SceneObjectFinish[] }
 
@@ -663,13 +665,14 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   };
 
   const walkthroughPayload = (): WalkthroughPayload => {
-    const latest = renders.find((r) => r.kind === 'full' && r.image_url);
+    const shared = rendersForLook(data?.scene.client_look, renders.filter((r) => r.kind === 'full' && r.image_url));
+    const latest = shared[0];
     return {
       name: data?.scene.name ?? '3D room', default_wall_height_mm: data?.scene.default_wall_height_mm ?? 2600, cabinet_hardware: data?.scene.cabinet_hardware ?? null,
       rooms: data?.rooms ?? [], walls: data?.walls ?? [], openings: data?.openings ?? [],
       objects: objects.map((o) => ({ ...o, model_url: modelUrls[o.id] ?? null })), surfaces, finishes, products,
-      renders: renders.filter((r) => r.kind === 'full' && r.image_url).map((r) => ({ image_url: r.image_url, camera: (r.camera as unknown as Pose | null) ?? null })),
-      worlds: worlds.ready.map((w) => ({ room_id: w.room_id, url: publicUrl(w.splat_path as string), sig: w.layout_snapshot?.sig ?? null })),
+      renders: shared.map((r) => ({ image_url: r.image_url, camera: (r.camera as unknown as Pose | null) ?? null, source: r.source, sig: r.room_sig })),
+      worlds: worldsForLook(data?.scene.client_look, worlds.ready).map((w) => ({ room_id: w.room_id, url: publicUrl(w.splat_path as string), sig: w.layout_snapshot?.sig ?? null })),
       render: latest ? { image_url: latest.image_url, camera: (latest.camera as unknown as Pose | null) ?? null } : null,
     };
   };
@@ -730,6 +733,78 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     }
   };
 
+  const photoNow = useRef(photoSamples);
+  photoNow.current = photoSamples;
+  const [photographing, setPhotographing] = useState<string | null>(null);
+  const photoStop = useRef(false);
+  const savePhoto = async (): Promise<boolean> => {
+    if (!data || !canvasRef.current || !planFrameNow) return false;
+    const shot = await canvasRef.current.picture();
+    const [px, , pz] = shot.camera.position;
+    const room = shot.camera.position[1] * 1000 < data.scene.default_wall_height_mm
+      ? data.rooms.find((r) => pointInPolygon(px * 1000 + planFrameNow.cx, pz * 1000 + planFrameNow.cy, r.outline)) : undefined;
+    if (!room) throw new Error('Stand inside a room first: a picture belongs to the room it is taken in.');
+    const path = await sceneStudioService.uploadCapture(data.scene, shot.blob, 'view');
+    const saved = await sceneStudioService.saveRender({
+      floor_plan_id: id, parent_render_id: null, kind: 'full', edited_object_id: null,
+      camera: shot.camera as unknown as Record<string, unknown>, capture_path: null, id_pass_path: null, id_map: {},
+      style_reference_url: null, style_label: 'Photo Mode', colour_plan: null, instruction: null, image_url: publicUrl(path),
+      layout_snapshot: layoutOf(objects, finishes), source: 'photo_mode', room_sig: signatureOf(room.id),
+    });
+    setRenders((list) => [saved, ...list]);
+    onRendered?.({ image_url: saved.image_url, label: `${room.name}, Photo Mode`, credits_used: 0, kind: 'full' });
+    return true;
+  };
+  const takePhoto = async () => {
+    try {
+      if (await savePhoto()) toast({ title: 'Picture saved', description: 'It is in the conversation, and the shared walkthrough ends this room on it.' });
+    } catch (e) { fail('The picture could not be saved', e); }
+  };
+  const photographRooms = async () => {
+    if (!data || !planFrameNow || photographing) return;
+    photoStop.current = false;
+    setShowRender(false);
+    setSelectedId(null);
+    setTool('view');
+    setWalkRoomId(undefined);
+    setWireframe(false);
+    setPhoto(true);
+    let done = 0;
+    try {
+      const ordered = data.rooms.filter((r) => r.outline.length >= 3);
+      const { walk } = walkPlanOf(ordered, data.walls, objects, []);
+      for (let i = 0; i < ordered.length; i++) {
+        setPhotographing(`${ordered[i].name} (${i + 1} of ${ordered.length})`);
+        const old = shotOf(ordered[i]);
+        const pose = (old?.camera as unknown as Pose | null) ?? roomPoses(walk[i])[1];
+        setPhotoSamples({ n: 0, settled: false, preparing: true });
+        canvasRef.current?.setPose(pose);
+        await new Promise((r) => setTimeout(r, 1500));
+        for (const until = performance.now() + PHOTO_LIMIT_MS; performance.now() < until && !photoStop.current && !photoNow.current.settled;) await new Promise((r) => setTimeout(r, 500));
+        if (photoStop.current) break;
+        if (!photoNow.current.settled) throw new Error(`${ordered[i].name} took too long on this device.`);
+        if (await savePhoto()) done += 1;
+      }
+      if (done) toast({ title: `${count(done, 'room')} photographed`, description: 'The pictures are in the conversation, and the shared walkthrough ends each room on its own.' });
+    } catch (e) {
+      fail(done ? `${count(done, 'room')} photographed, then it stopped` : 'The rooms could not be photographed', e);
+    } finally {
+      setPhotographing(null);
+    }
+  };
+
+  const setClientLook = async (look: ClientLook) => {
+    if (!data) return;
+    const previous = data.scene.client_look;
+    setData((d) => (d ? { ...d, scene: { ...d.scene, client_look: look } } : d));
+    try {
+      await sceneStudioService.setClientLook(data.scene.id, look);
+    } catch (e) {
+      setData((d) => (d ? { ...d, scene: { ...d.scene, client_look: previous } } : d));
+      fail('What the client sees could not be saved', e);
+    }
+  };
+
   const setHardware = async (hardware: string) => {
     if (!data) return;
     const previous = data.scene.cabinet_hardware;
@@ -771,6 +846,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
       return;
     }
     if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
+    if (intent.mode === 'photograph') { if (fresh) setTimeout(() => void photographRooms(), 1500); return; }
     if (intent.mode === 'photoreal') { setPhotorealFor(roomId ?? data.rooms[0]?.id ?? null); return; }
     if (roomId) goToRoom(roomId, false);
     if (obj) setSelectedId(obj.id);
@@ -1152,6 +1228,17 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
         />
         <ReadyMadeLinePrice objects={objects} />
         <div className="space-y-1.5 border-t border-hairline pt-3">
+          <Label className="text-xs">Client Sees</Label>
+          <Select value={scene.client_look} onValueChange={(v) => { const look = CLIENT_LOOKS.find((k) => k === v); if (look) void setClientLook(look); }}>
+            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+            <SelectContent>{CLIENT_LOOKS.map((k) => <SelectItem key={k} value={k} className="text-xs">{CLIENT_LOOK_LABELS[k]}</SelectItem>)}</SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" className="w-full gap-1.5" disabled={!!photographing || !webgl || noRoom} onClick={() => void photographRooms()}>
+            <Aperture className="h-3.5 w-3.5" />Photograph all rooms
+          </Button>
+          <p className="text-[11px] text-muted-foreground">One Photo Mode picture per room, free, a few minutes; keep this tab in front. The shared walkthrough ends each room on its own picture.</p>
+        </div>
+        <div className="space-y-1.5 border-t border-hairline pt-3">
           <Label className="text-xs">Photo-Real Furniture</Label>
           {batchProgress ? (
             <p className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Starting {batchProgress.done} of {batchProgress.total}…</p>
@@ -1321,7 +1408,12 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
               {photo && (
                 <div className="pointer-events-none absolute left-1/2 top-3 flex -translate-x-1/2 items-center gap-1.5 rounded-sm border border-hairline bg-card px-2.5 py-1 text-xs shadow-overlay">
                   <Aperture className="h-3.5 w-3.5 text-primary" />
-                  {photoSamples.preparing ? 'Photo Mode · Preparing the light (first time takes a moment)' : photoSamples.settled ? 'Photo Mode · Finished' : photoSamples.n < 2 ? 'Photo Mode · Hold still' : `Photo Mode · Refining ${photoSamples.n}`}
+                  {photographing ? `Photographing ${photographing} · ` : ''}{photoSamples.preparing ? 'Photo Mode · Preparing the light (first time takes a moment)' : photoSamples.settled ? 'Photo Mode · Finished' : photoSamples.n < 2 ? 'Photo Mode · Hold still' : `Photo Mode · Refining ${photoSamples.n}`}
+                  <span className="pointer-events-auto ml-1.5 flex gap-1">
+                    {photographing
+                      ? <Button size="sm" variant="outline" className="h-6 px-2 text-xs" onClick={() => { photoStop.current = true; }}>Stop</Button>
+                      : <Button size="sm" variant="outline" className="h-6 px-2 text-xs" disabled={photoSamples.n < 24} onClick={() => void takePhoto()}>Save picture</Button>}
+                  </span>
                 </div>
               )}
 

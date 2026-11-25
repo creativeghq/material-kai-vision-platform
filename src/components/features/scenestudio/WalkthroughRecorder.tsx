@@ -52,7 +52,7 @@ export const WalkthroughRecorder: React.FC<{
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const plan = useWalkthrough(data);
-  const { walk, shots, worlds, modelUrls, heroInRoom } = plan;
+  const { walk, shots, worlds, modelUrls, hero: heroShot, heroInRoom } = plan;
   const assets = Object.keys(modelUrls).length + worlds.length;
   const [pending, setPending] = useState<number | null>(assets ? null : 0);
   const ready = pending === 0;
@@ -84,7 +84,7 @@ export const WalkthroughRecorder: React.FC<{
     setError(null);
     setProgress(0);
     try {
-      const hero = data.render?.image_url && !heroInRoom ? await loadPicture(data.render.image_url) : null;
+      const hero = heroShot && !heroInRoom ? await loadPicture(heroShot.image_url) : null;
       const shotPictures = await Promise.all(shots.map((x) => (x ? loadPicture(x.image_url) : null)));
       const total = seconds * FPS;
       let room: number | null = null;
@@ -133,7 +133,7 @@ export const WalkthroughRecorder: React.FC<{
               rooms={data.rooms} walls={data.walls} openings={data.openings} surfaces={data.surfaces} finishes={data.finishes}
               objects={data.objects} products={data.products} defaultWallHeightMm={data.default_wall_height_mm} viewCamera={null}
               tool="view" wireframe={false} selectedId={null} onSelect={noop} onMoveObject={noop} onRemoveObject={noop} onPaint={noop}
-              cabinetHardware={data.cabinet_hardware} modelUrls={modelUrls} worlds={worlds} script={script} onAssets={setPending}
+              cabinetHardware={data.cabinet_hardware} modelUrls={modelUrls} worlds={worlds} allWorlds script={script} onAssets={setPending}
             />
           </Suspense>
         </div>

@@ -17,6 +17,7 @@ import {
   type KitchenLayout, type RoomComposition,
 } from '../kitchenComposition.generated.ts';
 import { CABINET_HARDWARE, CABINET_HARDWARE_OPTIONS } from '../cabinetHardware.generated.ts';
+import { CLIENT_LOOKS, CLIENT_LOOK_LABELS } from '../sceneClientLook.generated.ts';
 import { cabinetAssemblies, DEFAULT_CONSTRUCTION } from '../cabinetPanels.generated.ts';
 
 const MODULE_SLUG = 'scene-studio';
@@ -103,7 +104,7 @@ export const createManageScenesTool = (
   onChunk?: (chunk: any) => void,
   uploads: string[] = [],
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm, style, style_reference_url, drawing, page }) => {
+  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, look, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm, style, style_reference_url, drawing, page }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -349,6 +350,15 @@ export const createManageScenesTool = (
       return JSON.stringify({ success: true, handles: CABINET_HARDWARE_OPTIONS[handles].label, message: `The kitchen fronts now show ${CABINET_HARDWARE_OPTIONS[handles].label.toLowerCase()} in the room.` });
     }
 
+    if (action === 'client_look') {
+      if (!scene_id || !look) return JSON.stringify({ success: false, error: 'client_look needs scene_id and look.' });
+      const { data: scene, error } = await sb.from('floor_plans').update({ client_look: look }).eq('id', scene_id).select(SCENE_COLUMNS).maybeSingle();
+      if (error) return JSON.stringify({ success: false, error: error.message });
+      if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
+      onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent: { mode: 'view', object_id: null, room_id: null, nonce: Date.now() } }, timestamp: Date.now() });
+      return JSON.stringify({ success: true, client_sees: CLIENT_LOOK_LABELS[look], message: 'The shared walkthrough shows this from now on.' });
+    }
+
     if (action === 'cut_list') {
       if (!scene_id) return JSON.stringify({ success: false, error: 'cut_list needs scene_id.' });
       const { data: scene } = await sb.from('floor_plans').select('id, project_plan_id').eq('id', scene_id).maybeSingle();
@@ -457,7 +467,7 @@ export const createManageScenesTool = (
       });
     }
 
-    if (action === 'render' || action === 'drawing_set' || action === 'walkthrough_video') {
+    if (action === 'render' || action === 'drawing_set' || action === 'walkthrough_video' || action === 'photograph') {
       if (!scene_id) return JSON.stringify({ success: false, error: `${action} needs scene_id.` });
       const { data: scene } = await sb.from('floor_plans').select(`${SCENE_COLUMNS}, project_id`).eq('id', scene_id).maybeSingle();
       if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
@@ -474,7 +484,7 @@ export const createManageScenesTool = (
         ? { mode: 'render', object_id: null, room_id: roomId, ...(style ? { style } : {}), ...(style_reference_url ? { style_reference_url } : {}), nonce: Date.now() }
         : action === 'drawing_set'
           ? { mode: 'drawings', object_id: null, room_id: null, save: true, nonce: Date.now() }
-          : { mode: 'record_walkthrough', object_id: null, room_id: null, nonce: Date.now() };
+          : { mode: action === 'photograph' ? 'photograph' : 'record_walkthrough', object_id: null, room_id: null, nonce: Date.now() };
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const setRuns = action === 'drawing_set' ? await kitchenRunsOf(sb, scene_id) : [];
       const checks = drawingChecks(setRuns);
@@ -490,6 +500,8 @@ export const createManageScenesTool = (
           ? `The room is rendering on the canvas${style ? ` in ${style}` : ''}${roomId ? `, from eye height in ${room}` : ''}; it is charged like a render from the room and arrives in this conversation, where every image tool can take it. Do not call again.`
           : action === 'drawing_set'
             ? 'The drawings (plan with wall lengths and areas; for a kitchen also the elevations, a sheet labelled Electrical and a sheet labelled Plumbing per wall that has points, and the cut list) are being saved to the project as one PDF; the link arrives in this conversation. Lay out each kitchen run first if it is not confirmed.'
+            : action === 'photograph'
+              ? 'Every room is being photographed in Photo Mode on the canvas (free, a few minutes; the tab must stay in front). Each picture arrives in this conversation, and the shared walkthrough ends that room on it. Do not call again.'
             : 'The walkthrough of the real plan is recording on the canvas (free, about half a minute; the tab must stay in front). The video arrives in this conversation and can be shared or fed to the next step.',
       });
     }
@@ -599,6 +611,8 @@ export const createManageScenesTool = (
       + 'assembly_sheets: workshop sheets, one per distinct cabinet (exploded view, panel list with sizes and edge banding, hardware), saved as a PDF into the conversation; name every failed check per cabinet. '
         + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, separate sheets labelled Electrical and Plumbing for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks, electrical and plumbing, name each failure. A KITCHEN MADE FROM A DESIGN (plan, sketch or render) ALWAYS GETS ITS ELECTRICAL AND PLUMBING DRAWINGS: status, layout, price_kitchen and drawing_set all return the electrical and plumbing checks; report them every time. '
       + 'walkthrough_video: records the walkthrough of the real plan as a video, free; it arrives in the conversation. '
+      + 'photograph: takes one Photo Mode picture of every room, free; they arrive in the conversation and end each room of the shared walkthrough. '
+      + 'client_look: what the shared walkthrough shows (look drawn: the live 3D rooms and their Photo Mode pictures; photoreal: photoreal rooms and renders where they exist). '
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
       + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '
       + 'layout each run with the confirmed units, then open mode drawings. '
@@ -616,7 +630,7 @@ export const createManageScenesTool = (
       + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
       + 'Every render, drawing set and video returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video', 'photograph', 'client_look']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows; a dimensioned sketch or elevation is plan_image.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),
@@ -630,6 +644,7 @@ export const createManageScenesTool = (
       colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
       project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet; create with drawing: the project the drawing is on.'),
       fronts: z.enum(['closed', 'half', 'open']).optional().describe('open: show the kitchen doors and drawers closed, half open or open.'),
+      look: z.enum(CLIENT_LOOKS).optional().describe('client_look: drawn or photoreal.'),
       handles: z.enum(CABINET_HARDWARE).optional().describe('handles: how the kitchen fronts open.'),
       units: z.array(z.object({ type: z.enum(KITCHEN_MODULE_TYPES), width_cm: z.number() })).optional().describe('layout: the units of the run left to right; omit for an automatic layout.'),
       seating_cm: z.number().optional().describe('layout: seating overhang of an island worktop, cm.'),

@@ -223,3 +223,12 @@ export function roomSignature(roomId: string, objects: SigObject[], surfaces: Si
   for (let i = 0; i < rows.length; i++) h = Math.imul(h ^ rows.charCodeAt(i), 0x01000193) >>> 0;
   return h.toString(16);
 }
+
+export function worldsNear(worlds: Array<{ roomId: string; url: string }>, rooms: Array<Pick<PlanRoom, 'id' | 'outline'>>, x: number, y: number, keep = 2): string[] {
+  const away = (id: string) => {
+    const poly = rooms.find((r) => r.id === id)?.outline ?? [];
+    if (poly.length < 3) return Infinity;
+    return pointInPolygon(x, y, poly) ? -1 : edgeDistance(poly, x, y);
+  };
+  return [...worlds].sort((a, b) => away(a.roomId) - away(b.roomId)).slice(0, keep).map((w) => w.url).sort();
+}

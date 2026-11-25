@@ -1,7 +1,7 @@
 /** The editable Scene Studio room (#564): walls cut around openings, floors, and every object as a true-size stand-in. */
 import React, { forwardRef, useCallback, useContext, useEffect, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
-import { ContactShadows, Edges, OrbitControls } from '@react-three/drei';
+import { ContactShadows, Edges, OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import {
   ACESFilmicToneMapping, Box3, CanvasTexture, Color, DoubleSide, Material, Matrix4, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
   type Object3D, type PerspectiveCamera, type RectAreaLight, type Group,
@@ -32,7 +32,7 @@ import {
   type PlanFrame, type PlanOpening, type PlanRoom, type PlanWall,
 } from '@/lib/scene/sceneGeometry';
 import { renderDepthViews, type DepthView } from '@/components/features/scenestudio/worldCapture';
-import type { WorldPose } from '@/lib/scene/worldViews';
+import { worldsNear, type WorldPose } from '@/lib/scene/worldViews';
 import type { SceneCamera, SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 
 export type SceneTool = 'view' | 'move' | 'turn' | 'remove' | 'paint';
@@ -60,6 +60,8 @@ export interface SceneCanvasHandle {
   settled(): boolean;
   /** False while the room the camera stands in is still taking its own light. */
   lit(): boolean;
+  /** What is on screen now, as a picture. */
+  picture(): Promise<{ blob: Blob; camera: CameraPose }>;
   setPose(pose: CameraPose): void;
   topView(): void;
   resetView(): void;
@@ -105,6 +107,10 @@ interface Props {
   worlds?: RoomWorld[];
   /** How many furniture models and photoreal rooms are still loading; a failed one counts as done. */
   onAssets?(pending: number): void;
+  /** Loads every photoreal room up front; off, only the nearest two are in memory. */
+  allWorlds?: boolean;
+  /** Trades sharpness for speed on a slow device. */
+  adaptive?: boolean;
 }
 
 export interface RoomWorld { roomId: string; url: string }
@@ -122,37 +128,55 @@ const ScriptDriver: React.FC<{ script: React.MutableRefObject<ScriptFrame | null
     if (walls.current) walls.current.scale.y = Math.max(0.001, f.walls);
     if (objects.current) { objects.current.scale.y = Math.max(0.001, f.objects); objects.current.visible = f.objects > 0.01; }
   });
+  useEffect(() => () => {
+    if (walls.current) walls.current.scale.y = 1;
+    if (objects.current) { objects.current.scale.y = 1; objects.current.visible = true; }
+  }, [walls, objects]);
   return null;
 };
 
-/** Swaps the drawn room for its photoreal version while the camera is inside it, and back outside. */
+/** Swaps the drawn room for its photoreal version while the camera is inside it, and back outside. Loads the room ahead and drops the one behind, unless `all`. */
 const PhotorealRooms: React.FC<{
-  worlds: RoomWorld[]; rooms: PlanRoom[]; frame: PlanFrame; heightM: number; drawn: React.RefObject<Group>;
-}> = ({ worlds, rooms, frame, heightM, drawn }) => {
+  worlds: RoomWorld[]; rooms: PlanRoom[]; frame: PlanFrame; heightM: number; drawn: React.RefObject<Group>; all: boolean;
+}> = ({ worlds, rooms, frame, heightM, drawn, all }) => {
   const [loaded, setLoaded] = useState<Record<string, SplatMesh>>({});
-  const key = worlds.map((w) => w.url).join('|');
+  const [wanted, setWanted] = useState<string[]>([]);
   const track = useContext(AssetContext);
+  const made = useRef(new Map<string, SplatMesh>());
   useEffect(() => {
-    let gone = false;
-    worlds.forEach((w) => track(w.url, true));
-    const made: SplatMesh[] = [];
-    void (async () => {
-      for (const w of worlds) {
-        const mesh = new SplatMesh({ url: w.url });
-        mesh.userData.splat = true;
-        mesh.visible = false;
-        made.push(mesh);
-        const ok = await mesh.initialized.then(() => true, () => false);
-        if (gone) return;
+    const keep = new Set(wanted);
+    for (const w of worlds) {
+      if (!keep.has(w.url) || made.current.has(w.url)) continue;
+      const mesh = new SplatMesh({ url: w.url });
+      mesh.userData.splat = true;
+      mesh.visible = false;
+      made.current.set(w.url, mesh);
+      track(w.url, true);
+      void mesh.initialized.then(() => true, () => false).then((ok) => {
         track(w.url, false);
-        if (!ok) continue;
-        setLoaded((m) => ({ ...m, [w.roomId]: mesh }));
-      }
-    })();
-    return () => { gone = true; worlds.forEach((w) => track(w.url, false)); setLoaded({}); made.forEach((m) => m.dispose()); if (drawn.current) drawn.current.visible = true; };
-  }, [key]);
+        if (ok && made.current.get(w.url) === mesh) setLoaded((m) => ({ ...m, [w.roomId]: mesh }));
+      });
+    }
+    for (const [url, mesh] of made.current) {
+      if (keep.has(url)) continue;
+      made.current.delete(url);
+      track(url, false);
+      setLoaded((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => v !== mesh)));
+      mesh.dispose();
+    }
+  }, [wanted, worlds, track]);
+  useEffect(() => {
+    const mine = made.current;
+    return () => {
+      mine.forEach((mesh, url) => { track(url, false); mesh.dispose(); });
+      mine.clear();
+      if (drawn.current) drawn.current.visible = true;
+    };
+  }, [track, drawn]);
   useFrame(({ camera, scene }) => {
     const [x, y] = toPlan(camera.position.x, camera.position.z, frame);
+    const want = all ? worlds.map((w) => w.url) : worldsNear(worlds, rooms, x, y);
+    if (want.join() !== wanted.join()) setWanted(want);
     const room = camera.position.y < heightM ? rooms.find((r) => loaded[r.id] && pointInPolygon(x, y, r.outline)) : undefined;
     for (const [id, mesh] of Object.entries(loaded)) mesh.visible = id === room?.id;
     if (drawn.current) drawn.current.visible = !room || !splatShown(scene, loaded[room.id]);
@@ -334,6 +358,7 @@ const SplatShadow: React.FC<{ kind: string; w: number; d: number; h: number; onF
 };
 
 const MAX_CAPTURE_SIDE = 1536;
+const MIN_DPR = 0.75;
 const WALL_DEFAULT = '#efebe4';
 const FLOOR_DEFAULT = '#a98f6f';
 const SELECT_COLOUR = '#ff7a3d';
@@ -770,6 +795,13 @@ const Bridge = forwardRef<SceneCanvasHandle, {
     captureDepth(poses) { return renderDepthViews(gl, scene, poses, span / 2); },
     settled() { return splatsSettled(scene); },
     lit() { return lit.current; },
+    async picture() {
+      const src = gl.domElement;
+      const out = document.createElement('canvas');
+      out.width = src.width; out.height = src.height;
+      out.getContext('2d')!.drawImage(src, 0, 0);
+      return { blob: await toBlob(out, 'image/jpeg'), camera: currentPose() };
+    },
     setPose(pose) { flight.current = null; setPose(pose); },
     topView() { flyTo({ position: [0, span * 1.35, 0.01], target: [0, 0, 0], fov: 45 }); },
     resetView() { flyTo(initial); },
@@ -891,7 +923,7 @@ const WalkController: React.FC<{
 
 let rectLightsReady = false;
 
-/** Daylight coming in through one window: a soft area light in the opening, aimed into the room and slightly down. */
+/** Daylight coming in through one window: a soft area light in the opening, aimed straight into the room: tilted, its edge cuts across a curtain hung in front of it. */
 const WindowLight: React.FC<{ roomId: string | null; pos: [number, number, number]; look: [number, number, number]; width: number; height: number }> = ({ roomId, pos, look, width, height }) => {
   const ref = useRef<RectAreaLight>(null);
   if (!rectLightsReady) { RectAreaLightUniformsLib.init(); rectLightsReady = true; }
@@ -904,14 +936,24 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
-    frontsOpen = 0, cabinetHardware, sunHour = null, script, worlds = [], onAssets,
+    frontsOpen = 0, cabinetHardware, sunHour = null, script, worlds = [], onAssets, allWorlds = false, adaptive = false,
   } = props;
   const loading = useRef(new Set<string>());
   const reportAssets = useRef(onAssets);
+  const quiet = useRef(0);
+  const [loaded, setLoaded] = useState(false);
+  const sharp = Math.min(window.devicePixelRatio || 1, 2);
+  const [dpr, setDpr] = useState(sharp);
   reportAssets.current = onAssets;
   const track = useCallback((key: string, on: boolean) => {
     if (on) loading.current.add(key); else loading.current.delete(key);
     reportAssets.current?.(loading.current.size);
+    clearTimeout(quiet.current);
+    quiet.current = window.setTimeout(() => { if (!loading.current.size) setLoaded(true); }, 500);
+  }, []);
+  useEffect(() => {
+    quiet.current = window.setTimeout(() => { if (!loading.current.size) setLoaded(true); }, 4000);
+    return () => clearTimeout(quiet.current);
   }, []);
   const drawn = useRef<Group>(null);
   const wallsGroup = useRef<Group>(null);
@@ -1042,7 +1084,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     const nz = ((wall.x2_mm - wall.x1_mm) / len) * sign;
     const inset = Math.max(wall.thickness_mm, 20) / 2000 + 0.03;
     const pos: [number, number, number] = [p.center[0] + nx * inset, p.center[1], p.center[2] + nz * inset];
-    const look: [number, number, number] = [pos[0] + nx, pos[1] - 0.25, pos[2] + nz];
+    const look: [number, number, number] = [pos[0] + nx, pos[1], pos[2] + nz];
     const roomId = sides.exterior === 'minus' ? sides.plus : sides.minus;
     return [{ id: o.id, roomId, pos, look, width: p.width, height: p.height }];
   }), [openings, walls, wallSides, frame]);
@@ -1057,7 +1099,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
   return (
     <Canvas
       shadows="soft"
-      dpr={[1, 2]}
+      dpr={adaptive ? dpr : [1, 2]}
       resize={{ offsetSize: true }}
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ position: initial.position, fov: initial.fov, near: 0.05, far: 500 }}
@@ -1065,7 +1107,8 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       style={{ touchAction: 'none' }}
     >
       <color attach="background" args={['#e9e6e1']} />
-      <RoomLighting span={span} sunHour={sunHour} rooms={litRooms} version={lightVersion} solid={lightReady} lit={lit} />
+      {adaptive && loaded && !photo && <PerformanceMonitor onChange={({ factor }) => setDpr(Math.round((MIN_DPR + (sharp - MIN_DPR) * factor) * 4) / 4)} factor={1} flipflops={4} onFallback={() => setDpr(Math.min(1, sharp))} />}
+      <RoomLighting span={span} sunHour={sunHour} rooms={litRooms} version={lightVersion} solid={lightReady} lit={lit} loaded={loaded} />
       {!wireframe && windowLights.map(({ id, ...l }) => <WindowLight key={id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
       {(hasSplats || worlds.length > 0) && <SparkLayer />}
@@ -1219,7 +1262,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       ))}
       </CabinetViewContext.Provider>
       </group>
-      {worlds.length > 0 && <PhotorealRooms worlds={worlds} rooms={rooms} frame={frame} heightM={defaultWallHeightMm / 1000} drawn={drawn} />}
+      {worlds.length > 0 && <PhotorealRooms worlds={worlds} rooms={rooms} frame={frame} heightM={defaultWallHeightMm / 1000} drawn={drawn} all={allWorlds} />}
       </AssetContext.Provider>
       {script && <ScriptDriver script={script} walls={wallsGroup} objects={objectsGroup} />}
       <OrbitControls
@@ -1237,7 +1280,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       {!wireframe && !photo && (hasSplats || worlds.length > 0) && <SplatsAfterComposer script={script} />}
       {!wireframe && !photo && (
         <EffectComposer multisampling={4}>
-          <N8AO aoRadius={0.3} distanceFalloff={0.4} intensity={1.2} halfRes quality="medium" />
+          <N8AO aoRadius={0.5} distanceFalloff={0.5} intensity={1.7} halfRes quality="medium" />
           <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
         </EffectComposer>
       )}
