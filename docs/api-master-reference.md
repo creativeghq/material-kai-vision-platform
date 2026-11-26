@@ -69,7 +69,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 |---|---|---|
 | `generate-social-content` | JWT / kai_* | Draft social post captions under the channel's writing rules |
 | `generate-social-image` | JWT / kai_* | Generate a social media image |
-| `generate-social-video` | JWT / kai_* | Generate a short-form social video (MiniMax H3 by default; Kling, Gemini Omni, Wan3.0, Seedance 2.5 and Ray3.2 selectable) |
+| `generate-social-video` | JWT / kai_* | Generate a short-form social video (Kling, Gemini Omni, Wan3.0, Seedance 2.5 and Ray3.2 selectable) |
 | `zernio-api` _(GET + POST)_ | JWT / kai_* | Social media publishing, OAuth account management, and analytics via Zernio. |
 | `zernio-webhook-handler` | sig | Receives Zernio webhooks for social post events and WhatsApp messaging events. |
 

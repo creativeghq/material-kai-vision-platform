@@ -3648,8 +3648,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
           // the offered values.
           { key: 'model', label: 'Model', kind: 'select', default: 'gemini-omni-1.2-flash-1080p', options: [
             { value: 'gemini-omni-1.2-flash-1080p', label: 'Gemini Omni 1080p — 15s with audio, 30 credits' },
-            { value: 'kling-v3.0', label: 'Kling v3.0 — 20 Credits' },
-            { value: 'runway-gen4-turbo', label: 'Runway Gen-4 Turbo — 40 Credits' },
+            { value: 'kling-v4.0', label: 'Kling v4.0 — 1080p, keeps the room exact, 45 credits' },
             { value: 'wan-3.0-480p', label: 'Wan3.0 480p — 30s with audio, 30 credits' },
             { value: 'wan-3.0-720p', label: 'Wan3.0 720p — 30s with audio, 55 credits' },
             { value: 'wan-3.0-1080p', label: 'Wan3.0 1080p — 30s with audio, 110 credits' },
@@ -3665,7 +3664,7 @@ export const TOOLKITS: ToolkitDefinition[] = [
             { value: '9:16', label: '9:16 — social reel' },
             { value: '1:1', label: '1:1 — square' },
           ] },
-          { key: 'duration_seconds', label: 'Duration (Seconds)', kind: 'number', default: '8', help: '4–30 seconds; clamped to the model ceiling (Runway/Kling 10s, Omni/H3 Max 15s, Wan/Seedance 30s)' },
+          { key: 'duration_seconds', label: 'Duration (Seconds)', kind: 'number', default: '8', help: '4–30 seconds; clamped to the model ceiling (Kling/Ray 10s, Omni/H3 Max 15s, Wan/Seedance 30s)' },
           { key: 'notes', label: 'Anything to Emphasize? (optional)', kind: 'textarea', placeholder: 'e.g. slow pan across the kitchen island' },
         ],
       },

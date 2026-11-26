@@ -40,12 +40,6 @@ import { generateText, generateImage, experimental_generateVideo as generateVide
 import type { LanguageModelUsage, SystemModelMessage } from 'npm:ai@6';
 import { createGoogleGenerativeAI } from 'npm:@ai-sdk/google@3';
 import { createAnthropic } from 'npm:@ai-sdk/anthropic@3';
-// Pinned to a MAJOR, like the two providers above. The bare `npm:@ai-sdk/klingai` this
-// replaced was a wildcard: `supabase/functions/deno.lock` is NOT tracked, so nothing held
-// the resolved 4.0.17 and every deploy took whatever npm called latest that morning. That
-// is the exact shape that got the Python `anthropic` SDK removed (a pin trap broke the
-// `tools` kwarg) and that produced `fix(ai-client): AI SDK v4 API against a v6 pin`.
-import { createKlingAI } from 'npm:@ai-sdk/klingai@3';
 // Seedance 2.5 (ByteDance) over BytePlus ModelArk. Major 1 for exactly the reason above:
 // `@ai-sdk/bytedance@2` is spec v4. 1.0.38 is spec v3 and speaks the same Ark
 // `/contents/generations/tasks` API.
@@ -268,7 +262,7 @@ async function _logUnitCall(opts: {
 // Lazy: constructed on FIRST USE (not at module load) so that platform_secrets values
 // bootstrapped into Deno.env inside the request handler are reflected in apiKey.
 // Existing call sites (`google(modelId)`, `google.image(modelId)`, `anthropic(modelId)`,
-// `klingai.video(modelId)`) are unchanged — the Proxy makes lazy construction invisible.
+// ...) are unchanged — the Proxy makes lazy construction invisible.
 
 let _google: ReturnType<typeof createGoogleGenerativeAI> | null = null;
 let _anthropic: ReturnType<typeof createAnthropic> | null = null;
@@ -307,12 +301,10 @@ const DEFAULT_CLAUDE_MODEL = CLAUDE_OPUS;
 // ── Billing identity for the per-unit models ───────────────────────────────
 // `generation_models.id` values, NOT the provider strings this file passes to the SDKs. They
 // differ, and that is the whole reason these constants exist rather than reusing `modelId`:
-// the KlingAI SDK wants 'kling-v3.0-i2v', and
 // xAI's endpoint wants the slug 'grok-imagine-image-quality' — none of which is a key the
 // pricing table knows.
 const MAX_VIDEO_DOWNLOAD_BYTES = 48 * 1024 * 1024;
 
-const KLING_PRICING_MODEL_ID = 'kling-v3.0';
 const GROK_PRICING_MODEL_ID = 'xai-aurora';
 
 // ── Types ──
@@ -1289,88 +1281,6 @@ async function generateMultiImageWithGemini(
     mimeType: imagePart.inlineData.mimeType,
     model: config.model,
   };
-}
-
-// ── Kling AI: Video generation ──
-export interface KlingVideoResult {
-  base64: string;
-  mimeType: string;
-  model: string;
-}
-
-export async function generateVideoWithKling(
-  prompt: string,
-  config?: UnitBillingConfig & {
-    /** Default: 'kling-v3.0-i2v' */
-    model?: string;
-    /** Source image URL for image-to-video */
-    imageUrl?: string;
-    /** 5 or 10 seconds. Default: 5 */
-    durationSeconds?: 5 | 10;
-    aspectRatio?: '16:9' | '9:16' | '1:1';
-    /** 'std' or 'pro'. Default: 'pro' */
-    mode?: 'std' | 'pro';
-  },
-): Promise<KlingVideoResult> {
-  const modelId = config?.model ?? 'kling-v3.0-i2v';
-  const _start = Date.now();
-  const seconds = config?.durationSeconds ?? 5;
-
-  const visionPrompt: any = config?.imageUrl
-    ? { image: config.imageUrl, text: prompt }
-    : prompt;
-
-  try {
-    const [accessKey, secretKey] = await Promise.all([_secret('KLINGAI_ACCESS_KEY'), _secret('KLINGAI_SECRET_KEY')]);
-    if (!accessKey || !secretKey) throw new Error('KLINGAI_ACCESS_KEY / KLINGAI_SECRET_KEY are not configured');
-    _syncEnvIntoPolyfill();
-    const klingai = createKlingAI({ accessKey, secretKey });
-    const { video } = await generateVideo({
-      // KlingAIProvider is NOT callable — it exposes video()/videoModel(). Calling it
-      // directly (klingai(modelId)) threw a TypeError on every invocation.
-      model: klingai.video(modelId),
-      prompt: visionPrompt,
-      durationSeconds: seconds,
-      aspectRatio: config?.aspectRatio ?? '16:9',
-      providerOptions: {
-        klingai: {
-          mode: config?.mode ?? 'pro',
-        },
-      },
-      pollTimeoutMs: 600_000,
-    } as any);
-
-    // KLING_PRICING_MODEL_ID, not `modelId`: the string this client hands the KlingAI SDK
-    // ('kling-v3.0-i2v') is neither the generation_models id nor an ai_model_pricing key, and
-    // resolution here is exact on purpose — `kling-3.0` and `kling-1.6-pro` are different rates.
-    if (config?.logUsage !== false) await _logUnitCall({
-      task: config?.task ?? 'kling_video_generation',
-      modelKey: KLING_PRICING_MODEL_ID,
-      units: seconds,
-      latencyMs: Date.now() - _start,
-      userId: config?.userId,
-      workspaceId: config?.workspaceId,
-      chargedSeparately: config?.chargedSeparately,
-    });
-
-    return {
-      base64: (video as any).base64,
-      mimeType: (video as any).mimeType ?? 'video/mp4',
-      model: modelId,
-    };
-  } catch (err) {
-    await _logUnitCall({
-      task: config?.task ?? 'kling_video_generation',
-      modelKey: KLING_PRICING_MODEL_ID,
-      units: 0,
-      latencyMs: Date.now() - _start,
-      errorMessage: err instanceof Error ? err.message : String(err),
-      userId: config?.userId,
-      workspaceId: config?.workspaceId,
-      chargedSeparately: config?.chargedSeparately,
-    });
-    throw err;
-  }
 }
 
 // ── Wan3.0 (Alibaba) ───────────────────────────────────────────────────────

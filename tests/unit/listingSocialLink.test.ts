@@ -45,7 +45,7 @@ describe('a generated video says what it was for (#378 N7)', () => {
     expect(
       read('supabase/functions/generate-social-video/index.ts'),
       'the generation_videos row must carry social_post_id',
-    ).toMatch(/social_post_id: post_id \?\? null/);
+    ).toMatch(/update\(\{ social_post_id: post_id \}\)/);
   });
 });
 

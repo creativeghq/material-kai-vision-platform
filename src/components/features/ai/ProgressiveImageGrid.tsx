@@ -34,8 +34,7 @@ const VIDEO_MODEL_OPTIONS: ReadonlyArray<{
   // refunded undefined credits. Wan's price was also advertised at 10 while the generator
   // charged 12.
   { value: 'gemini-omni-1.2-flash-1080p', label: 'Gemini Omni 1080p', description: 'Google Omni — 15s with audio, 1080p', credits: 30 },
-  { value: 'kling-v3.0', label: 'Kling 3.0', description: 'Kling 3.0 — cinematic + audio', credits: 20 },
-  { value: 'runway-gen4-turbo', label: 'Runway Gen-4', description: 'Runway Gen-4 — premium output', credits: 40 },
+  { value: 'kling-v4.0', label: 'Kling 4.0', description: 'Kling 4.0 — 1080p, keeps the room exactly as photographed', credits: 45 },
   // Wan is the only entry here that reaches 30 seconds and the only one that returns
   // the clip with sound. Priced per tier because the provider rate differs 4x across
   // them — one premium entry would have put every 30-second clip at 155 credits.
@@ -1279,8 +1278,7 @@ const ProgressiveImageGridInner: React.FC<ProgressiveImageGridProps> = ({
                                 <div className="text-[11px] text-muted-foreground">{vt.description}</div>
                               </div>
                               {/* Priced by the selected MODEL, not by the style — every style row
-                                  read a hardcoded "30 cr", so choosing Kling showed 30 and charged
-                                  20, and choosing Runway showed 30 and charged 40. */}
+                                  read a hardcoded "30 cr". */}
                               {AVAILABLE_VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits != null && (
                                 <span className="ml-2 text-[11px] text-muted-foreground flex-shrink-0">
                                   {AVAILABLE_VIDEO_MODEL_OPTIONS.find(m => m.value === videoModel)?.credits} cr

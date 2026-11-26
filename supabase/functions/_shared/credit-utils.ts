@@ -54,10 +54,9 @@ const FALLBACK_PRICING: Record<string, ServicePricing> = {
   'firecrawl-scrape':     { cost_per_unit: 0.001,  unit: 'credit',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'xai-aurora':           { cost_per_unit: 0.07,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   'flux-dev':             { cost_per_unit: 0.04,   unit: 'image',       markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
-  'kling-3.0':            { cost_per_unit: 0.10,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
+  'kling-v4.0':           { cost_per_unit: 0.235,  unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // 'kling-1.6-pro' and 'wan2.1-i2v' removed 2026-08-12 (issue #4) — both models 404 upstream,
   // so no call can reach these prices. Their ai_model_pricing rows are deactivated to match.
-  'runway-gen4-turbo':    { cost_per_unit: 0.15,   unit: 'second',      markup_multiplier: MARKUP_MULTIPLIER, billing_mode: 'ai_markup', credits: null },
   // Veo is priced per SECOND and clamped to 8s by generate-interior-video-v2, so a full clip is
   // $2.80 — by some distance the most expensive thing this platform can be asked to make. It was
   // absent here while its siblings were present, so a DB outage silently dropped Veo's cost to

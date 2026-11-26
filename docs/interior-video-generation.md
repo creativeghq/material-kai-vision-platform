@@ -22,8 +22,7 @@ The `generate-interior-video-v2` edge function routes to the optimal AI video mo
 | Model | Credits | Max length | Audio | Best For |
 |---|---|---|---|---|
 | `gemini-omni-1.2-flash-1080p` | 30 | 15s | yes | The default while Google is the only configured provider; Google upscales it from 720p |
-| `kling-v3.0` | 20 | 10s | yes | Product spotlights, before/after, short social reels |
-| `runway-gen4-turbo` | 40 | 10s | no | Premium quality output |
+| `kling-v4.0` | 45 | 10s | no | Keeps the room exactly as photographed, 1080p. Takes about 4 minutes, so it is collected by cron |
 | `wan-3.0-480p` | 30 | 30s | yes | Long clips on a budget |
 | `wan-3.0-720p` | 55 | 30s | yes | The default long clip |
 | `wan-3.0-1080p` | 110 | 30s | yes | Long clips at full HD |
@@ -42,8 +41,8 @@ Routing per provider: Kling, Seedance and Wan go through the AI SDK inside
 `_shared/ai-client.ts` (`@ai-sdk/klingai@3`, `@ai-sdk/bytedance@1` and
 `@ai-sdk/alibaba@1` — each pinned to its **spec-v3** major, which is the one
 `npm:ai@6` accepts; a spec-v4 package throws `AI_UnsupportedModelVersionError` before the
-request is built). Gemini Omni uses Google's API, Ray goes direct to Luma (below), and Runway is the
-only remaining Replicate model here.
+request is built). Gemini Omni uses Google's API, Ray goes direct to Luma (below), and Kling v4.0 is the
+only Replicate model here.
 
 **Luma Ray3.2 is raw REST, and not because no provider exists.** `@ai-sdk/luma` exposes exactly
 two model ids — `photon-1` and `photon-flash-1` — which Luma's own model page says no longer
@@ -94,7 +93,7 @@ If you pass `video_type` without `model`, the function auto-selects:
 |---|---|
 | `walkthrough` | `wan-3.0-720p` |
 | `floorplan_flythrough` | `wan-3.0-720p` |
-| `product_spotlight` | `kling-v3.0` |
+| `product_spotlight` | `kling-v4.0` |
 | `before_after` | `ray-3.2-720p` |
 | `social_reel` | `h3-max-768p` |
 
@@ -147,7 +146,7 @@ Content-Type: application/json
 {
   "success": true,
   "video_url": "https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/generation-videos/...",
-  "model": "kling-v3.0",
+  "model": "kling-v4.0",
   "credits_used": 20,
   "duration_ms": 42000
 }
@@ -173,12 +172,11 @@ Poll with `GET /functions/v1/generate-interior-video-v2?job_id=<uuid>` until `st
 
 ## Async Polling Pattern
 
-Replicate-backed models (Wan, Runway) and Veo-2 can take 2-5 minutes. If the edge function's 55s polling window elapses:
+Kling v4.0 takes about 4 minutes, longer than the call waits (about 45s):
 
-1. `prediction_id` is stored in the `generation_videos` table
-2. Response returns `job_id` and `status: 'processing'`
-3. Frontend polls the endpoint with `?job_id=` on a 5-10s interval
-4. Once Replicate/Veo reports `succeeded`, video is downloaded → re-uploaded to Supabase Storage → `generation_videos` updated
+1. The response returns `job_id` and `status: 'processing'`; `replicate_prediction_id` is stored on `generation_videos`.
+2. pg_cron `generation-videos-collect` calls `{ action: 'collect' }` every minute while such a job exists.
+3. On success the video is stored in our bucket, the billing row is written, the post (if any) gets the video, and the `video_generation_completed` flow notifies the user. On failure the credits are refunded.
 
 ---
 
@@ -221,7 +219,7 @@ For social-media-specific short videos, the separate `generate-social-video` edg
 |---|---|
 | `h3-max-768p` (delegated) — **the default** | 25 |
 | `h3-max-480p` (delegated) | 15 |
-| `kling-3.0` (run here, via Replicate) | 20 |
+| `kling-v4.0` (delegated) | 45 |
 | `wan-3.0-480p` / `720p` / `1080p` (delegated) | 30 / 55 / 110 |
 | `seedance-2.5-480p` / `720p` (delegated) | 60 / 125 |
 
@@ -230,7 +228,7 @@ POST /functions/v1/generate-social-video
 {
   "prompt": "...",
   "image_url": "...",
-  "model": "kling-3.0",
+  "model": "kling-v4.0",
   "aspect_ratio": "9:16",
   "workspace_id": "uuid"
 }

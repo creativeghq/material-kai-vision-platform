@@ -4,7 +4,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const GENERATOR = 'supabase/functions/generate-interior-video-v2/index.ts';
-const SOCIAL_VIDEO = 'supabase/functions/generate-social-video/index.ts';
 const CREDIT_UTILS = 'supabase/functions/_shared/credit-utils.ts';
 const PICKER = 'src/components/features/ai/ProgressiveImageGrid.tsx';
 const CATALOG = 'src/components/features/ai/agentToolsCatalog.ts';
@@ -16,8 +15,8 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), 'utf8');
 const PROVIDER_USD_PER_SECOND: Record<string, number> = {
   // Gemini Omni 1.2 Flash: $12/1M output tokens x 8,688 tok/s at 1080p.
   'gemini-omni-1.2-flash-1080p': 0.1043,
-  'kling-v3.0': 0.10,
-  'runway-gen4-turbo': 0.15,
+  // Kling v4.0 on Replicate, 1080p from a start image.
+  'kling-v4.0': 0.235,
   // Wan3.0 (model id wan3.0-video), one row per tier — the rate differs 4x across them, so a
   // single averaged entry here would pass the floor for 1080p while underpricing it.
   // Corrected 2026-08-29 from 0.068/0.14/0.28, which was the rate for wan3.0-video-prime — an
@@ -135,34 +134,6 @@ describe('every surface advertises the price the generator actually charges', ()
 
   it('the agent tool description quotes the charged price', () => {
     expect(read(TOOL)).toContain('gemini-omni-1.2-flash-1080p 30cr');
-  });
-});
-
-describe('the second copy of the video prices agrees with the first', () => {
-  // `generate-social-video` keeps its own CREDIT_COSTS. For most models it delegates to
-  // generate-interior-video-v2 and never charges from its own map — but the map still feeds the
-  // "insufficient credits, required: N" message, so a stale entry quotes a price nobody charges,
-  // and it goes live the moment anyone removes the delegation. Two files, one number, nothing
-  // keeping them equal: check it.
-  const primary = parseNumericMap(read(GENERATOR), 'CREDIT_COSTS');
-  const social = parseNumericMap(read(SOCIAL_VIDEO), 'CREDIT_COSTS');
-
-  it('parses both maps', () => {
-    expect(Object.keys(primary).length).toBeGreaterThan(0);
-    expect(Object.keys(social).length).toBeGreaterThan(0);
-  });
-
-  it('agrees on every model both files price', () => {
-    // The two files spell Kling differently ('kling-v3.0' vs 'kling-3.0') because one is the
-    // generator's model key and the other is the Replicate slug. Compare on a normalised name
-    // so the check is about the PRICE, not the spelling.
-    const norm = (k: string) => k.replace('kling-v3.0', 'kling-3.0');
-    const primaryByNorm = Object.fromEntries(Object.entries(primary).map(([k, v]) => [norm(k), v]));
-    for (const [model, credits] of Object.entries(social)) {
-      const other = primaryByNorm[norm(model)];
-      if (other === undefined) continue;
-      expect(credits, `${model}: generate-social-video says ${credits}, generate-interior-video-v2 says ${other}`).toBe(other);
-    }
   });
 });
 

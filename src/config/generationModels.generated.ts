@@ -474,35 +474,12 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "sort_order": 202
   },
   {
-    "id": "kling-v3.0",
-    "display_name": "Kling 3.0",
-    "capability": "video",
-    "sub_capability": "image-to-video",
-    "provider": "klingai",
-    "slug": "kling-v3-video",
-    "version": null,
-    "adapter": "kling",
-    "input_requirements": {
-      "max_images": 1,
-      "min_images": 1,
-      "image_roles": [
-        "source"
-      ],
-      "needs_prompt": true
-    },
-    "pricing_key": "kling-3.0",
-    "tier": "premium",
-    "status": "active",
-    "enabled": false,
-    "sort_order": 210
-  },
-  {
-    "id": "runway-gen4-turbo",
-    "display_name": "Runway Gen-4 Turbo",
+    "id": "kling-v4.0",
+    "display_name": "Kling 4.0",
     "capability": "video",
     "sub_capability": "image-to-video",
     "provider": "replicate",
-    "slug": "runwayml/gen4-turbo",
+    "slug": "kwaivgi/kling-v4.0",
     "version": null,
     "adapter": null,
     "input_requirements": {
@@ -513,11 +490,11 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
       ],
       "needs_prompt": true
     },
-    "pricing_key": "runway-gen4-turbo",
+    "pricing_key": "kling-v4.0",
     "tier": "premium",
     "status": "active",
     "enabled": true,
-    "sort_order": 220
+    "sort_order": 205
   }
 ] as const;
 
@@ -534,7 +511,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = 'c79158e893de6a7710f2d59bf1fcd18c';
+export const PROJECTION_FINGERPRINT = '44c92f7b1ab9197ef3db2a38643a8307';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

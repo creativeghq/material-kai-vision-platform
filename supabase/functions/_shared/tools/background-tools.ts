@@ -214,7 +214,7 @@ export const createDispatchBackgroundTaskTool = (
 };
 
 // ═══════════════════════════════════════════════════════════════
-// Interior Video V2 Tool (multi-model: Veo / Kling / Wan2.1 / Runway)
+// Interior Video V2 Tool (multi-model)
 // ═══════════════════════════════════════════════════════════════
 
 export const createInteriorVideoV2Tool = (
@@ -328,7 +328,7 @@ export const createInteriorVideoV2Tool = (
       description: `Generate an interior design video using AI. Routes to the best model based on video type.
 Video types and the model each one prefers (the five values video_type accepts — there are no others):
 - walkthrough: of a picture rendered from a 3D room, the real walkthrough is recorded free from that room; otherwise Gemini Omni or Wan3.0 invents a camera move through the picture (20-55cr). Say which one it was.
-- product_spotlight: Kling 3.0 (20cr) — focuses on a specific material/product with audio
+- product_spotlight: Kling v4.0 (45cr, 1080p) — keeps the room exactly as photographed while the camera moves
 - before_after: free, drawn in the browser from before_image_url and the source image, so it starts and ends exactly on the two real pictures; passing a model makes an AI clip instead
 - floorplan_flythrough: Wan3.0 720p (55cr) — aerial view flythrough
 - social_reel: MiniMax H3 768p (25cr) — 15s with stereo audio, the reel format itself
@@ -362,13 +362,13 @@ Returns video_url when complete, or prediction_id if still processing (poll chec
         // a failed generation. 'wan2.1-i2v-720p' dropped 2026-08-12 (issue #4) — 404
         // upstream, so it was a fourth way to say the same thing.
         model: z.enum([
-          'gemini-omni-1.2-flash-1080p', 'kling-v3.0', 'runway-gen4-turbo',
+          'gemini-omni-1.2-flash-1080p', 'kling-v4.0',
           'wan-3.0-480p', 'wan-3.0-720p', 'wan-3.0-1080p',
           'seedance-2.5-480p', 'seedance-2.5-720p',
           'h3-max-768p', 'h3-max-480p',
           'ray-3.2-720p', 'ray-3.2-1080p',
         ]).optional()
-          .describe('Override model selection: gemini-omni-1.2-flash-1080p 30cr (Google, 3-15s with native audio described in the prompt), kling-v3.0 20cr, runway-gen4-turbo 40cr, wan-3.0-480p 30cr, wan-3.0-720p 55cr, wan-3.0-1080p 110cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, h3-max-768p 25cr, h3-max-480p 15cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)'),
+          .describe('Override model selection: gemini-omni-1.2-flash-1080p 30cr (Google, 3-15s with native audio described in the prompt), kling-v4.0 45cr (1080p, keeps the photo exact, collected in about 4 minutes), wan-3.0-480p 30cr, wan-3.0-720p 55cr, wan-3.0-1080p 110cr, seedance-2.5-480p 60cr, seedance-2.5-720p 125cr, h3-max-768p 25cr, h3-max-480p 15cr, ray-3.2-720p 20cr, ray-3.2-1080p 70cr (default: auto based on video_type)'),
         prompt: z.string().optional().describe('Additional prompt for the video generation'),
         aspect_ratio: z.enum(['16:9', '9:16', '1:1']).optional()
           .describe('16:9 for standard video, 9:16 for social reels (default: 16:9)'),
@@ -377,7 +377,7 @@ Returns video_url when complete, or prediction_id if still processing (poll chec
         // so a wider range here cannot overspend — it can only stop capping the two
         // models whose whole point is the long clip.
         duration_seconds: z.number().int().min(4).max(30).optional()
-          .describe('Duration in seconds, clamped to the model ceiling (kling 10s, runway/ray 5 or 10s, omni/h3-max 15s, wan/seedance 30s). Default: 8'),
+          .describe('Duration in seconds, clamped to the model ceiling (kling 10s, ray 5 or 10s, omni/h3-max 15s, wan/seedance 30s). Default: 8'),
         before_image_url: z.string().optional()
           .describe('Required only for before_after type: the "before" state image URL'),
         reference_image_urls: z.array(z.string().url()).max(19).optional()

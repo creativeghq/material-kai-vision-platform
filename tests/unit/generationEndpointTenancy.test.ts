@@ -81,7 +81,7 @@ describe('EX-7 — an image URL is validated before a provider is asked to fetch
     'generate-interior-gemini/index.ts',   // reference_image_url -> callFluxDepthPro
     'generate-interior-video-v2/index.ts', // source_image_url -> Replicate / Veo / Kling
     'generate-virtual-staging/index.ts',   // source_image_url -> fetched here, then Gemini
-    'generate-social-video/index.ts',      // source_image_url -> Replicate
+    'generate-social-video/index.ts',      // source_image_url -> the video generator
   ];
 
   it.each(HANDS_URL_TO_A_PROVIDER)('%s runs the URL through the shared SSRF guard', (rel) => {
@@ -93,7 +93,6 @@ describe('EX-7 — an image URL is validated before a provider is asked to fetch
   // The provider's OUTPUT is a URL too, and every one of these downloaded it raw.
   const DOWNLOADS_PROVIDER_OUTPUT: Array<[string, string]> = [
     ['generate-interior-video-v2/index.ts', 'fetchBinaryGuarded'],
-    ['generate-social-video/index.ts', 'fetchBinaryGuarded'],
   ];
 
   it.each(DOWNLOADS_PROVIDER_OUTPUT)('%s downloads the output through %s', (rel, fn) => {
@@ -105,18 +104,13 @@ describe('EX-7 — an image URL is validated before a provider is asked to fetch
 });
 
 describe('EX-12/EX-13 — a failed write is never reported as a finished job', () => {
-  it('generate-social-video refuses to return success with no video', () => {
-    const src = read('generate-social-video/index.ts');
-    // The success branch must bail when storeVideo yielded nothing, BEFORE it logs usage and
-    // tells the caller `status: 'completed'`.
-    const succeeded = src.slice(src.indexOf("pollResult.status === 'succeeded'"));
-    const bail = succeeded.indexOf('if (!videoUrl)');
-    const completed = succeeded.indexOf("status: 'completed'");
-    expect(bail, 'a succeeded prediction with no usable output falls through as a success again')
-      .toBeGreaterThan(-1);
-    expect(bail, 'the empty-output check moved after the success response').toBeLessThan(completed);
-    expect(succeeded.slice(bail, completed), 'the credits are no longer refunded when no video arrived')
-      .toContain('refundCredits');
+  it('generate-interior-video-v2 refunds a collected job that produced no video', () => {
+    const src = read('generate-interior-video-v2/index.ts');
+    const collector = src.slice(src.indexOf('async function collectReplicateJobs'));
+    const noVideo = collector.indexOf('if (!videoUrl) {');
+    expect(noVideo, 'the collector no longer handles a finished job with no stored video').toBeGreaterThan(-1);
+    expect(collector.slice(noVideo, noVideo + 600)).toContain('refund_credits');
+    expect(noVideo, 'the empty-output check moved after the completion write').toBeLessThan(collector.indexOf("status: 'completed'"));
   });
 });
 
@@ -124,7 +118,6 @@ describe('EX-14 — an ai_usage_logs failure is reported, never swallowed', () =
   const BILLED = [
     'generate-interior-gemini/index.ts',
     'generate-interior-video-v2/index.ts',
-    'generate-social-video/index.ts',
     'generate-region-edit/index.ts',
     'generate-virtual-staging/index.ts',
   ];

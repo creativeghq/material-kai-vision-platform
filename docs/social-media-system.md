@@ -45,8 +45,8 @@ Admin Panel → /admin/social-media/* → Direct DB queries (social_posts, socia
 | `zernio-webhook-handler` | Receive Zernio webhooks (`post.published`, `post.failed`, `post.partial`, `post.cancelled`, `post.scheduled`, `account.disconnected`) | `ZERNIO_WEBHOOK_SECRET` |
 | `generate-social-content` | Claude Haiku generates 3 caption variants + hashtags | *(uses shared ANTHROPIC_API_KEY)* |
 | `generate-social-image` | Image generation with Gemini Nano Banana 2.1 | `GOOGLE_GENERATIVE_AI_API_KEY` |
-| `generate-social-video` | Short-form reel. Delegates every model but `kling-3.0` to `generate-interior-video-v2`; attaches the result to the post. `{ action: 'status', job_id }` collects a render that outran the inline poll | none directly — credentials are resolved by the shared client it delegates to |
-| `generate-interior-video-v2` | Multi-model interior video (Veo 2 / Kling / Wan / Runway) | none directly — resolved through `_shared` provider clients |
+| `generate-social-video` | Short-form reel. Delegates every model to `generate-interior-video-v2`; attaches the result to the post. `{ action: 'status', job_id }` collects a render that outran the inline poll | none directly — credentials are resolved by the shared client it delegates to |
+| `generate-interior-video-v2` | Multi-model interior video (Omni / Kling / Wan / Seedance / H3 Max / Ray) | none directly — resolved through `_shared` provider clients |
 
 ---
 
@@ -98,24 +98,18 @@ first (`generate_image` puts one there, and `generate_video` reads it off the po
 |---|---|---|
 | `h3-max-768p` **(default)** | 25 | 5–15s with stereo audio. The reel format itself. |
 | `h3-max-480p` | 15 | Same, cheaper. |
-| `veo-2` | 50 | |
 | `wan-3.0-480p/720p/1080p` | 30 / 55 / 110 | Up to 30s, scored. |
 | `seedance-2.5-480p/720p` | 60 / 125 | Up to 30s in one pass. |
 | `ray-3.2-720p/1080p` | 20 / 70 | Interpolates to a LAST frame. |
-| `kling-3.0` | 20 | **Do not pick it.** The one model still run here through Replicate, which is answering `auth_failed` to every call. It is why the default moved off it. |
+| `gemini-omni-1.2-flash-1080p` | 30 | 3–15s with sound. |
+| `kling-v4.0` | 45 | 1080p and keeps the photo exact; about 4 minutes, collected by cron. |
 
-Every model except `kling-3.0` is delegated to `generate-interior-video-v2`, which debits its own
+Every model is delegated to `generate-interior-video-v2`, which debits its own
 credits. `generate-social-video` adds what the generator cannot know: it writes `video_url` onto
 the post and stamps `generation_videos.social_post_id` so a job that finishes later can find its
 way back.
 
-**A render that outruns the 50s inline poll must be collected.** The call returns
-`status: 'processing'` and a `job_id`; `{ action: 'status', job_id }` polls the provider once and,
-on success, downloads the file into our bucket, attaches it to the post and writes the billing
-row. Nothing else does this: `reconcile_stuck_generation_videos` only marks a 30-minute-old job
-**failed** and refunds it, so before the collector existed a video Replicate finished at 90
-seconds was thrown away and reported as a failure. The agent reaches it through
-`manage_social`'s `video_status`.
+**A render that outruns the inline poll is collected by `generate-interior-video-v2`'s cron** (`generation-videos-collect`, every minute while one is waiting): it stores the file, writes the billing row and attaches the video to the post. `{ action: 'status', job_id }` (the agent's `manage_social` `video_status`) only reports where the job stands.
 
 ---
 

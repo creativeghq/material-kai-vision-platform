@@ -7,7 +7,6 @@ import { probeReplicateAccount } from '../_shared/replicate-account.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import {
   generateVideoWithGeminiOmni,
-  generateVideoWithKling,
   generateVideoWithWan,
   generateVideoWithSeedance,
   generateVideoWithH3Max,
@@ -18,7 +17,7 @@ import { bootstrapForFunction } from '../_shared/secrets-bootstrap.ts';
 import { emitFlowEvent } from '../_shared/flow-events.ts';
 import { resolveOutputPath, type SessionPathCtx } from '../_shared/storage-paths.ts';
 import { getServicePricing } from '../_shared/credit-utils.ts';
-import { authenticate, userHasWorkspaceCapability } from '../_shared/auth.ts';
+import { authenticate, isCronAuthorized, userHasWorkspaceCapability } from '../_shared/auth.ts';
 import { fetchBinaryGuarded } from '../_shared/fetch-image.ts';
 import { assertSafeUrl, SSRFError } from '../_shared/ssrf-guard.ts';
 import { captureException } from '../_shared/sentry.ts';
@@ -29,7 +28,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 // The budget tier stays VACANT until a replacement is verified against a funded account
 // (issue #4 Phase 5): the last occupant 404'd upstream and hard-failed every call.
 type VideoModel = 'gemini-omni-1.2-flash-1080p'
-  | 'kling-v3.0' | 'runway-gen4-turbo'
+  | 'kling-v4.0'
   | 'wan-3.0-480p' | 'wan-3.0-720p' | 'wan-3.0-1080p'
   | 'seedance-2.5-480p' | 'seedance-2.5-720p'
   | 'h3-max-768p' | 'h3-max-480p'
@@ -41,8 +40,7 @@ type AspectRatio = '16:9' | '9:16' | '1:1';
 // MAX_DURATION_SECONDS below is what the caller can actually ask for and the fee is flat.
 const CREDIT_COSTS: Record<VideoModel, number> = {
   'gemini-omni-1.2-flash-1080p': 30,
-  'kling-v3.0':         20,
-  'runway-gen4-turbo':  40,
+  'kling-v4.0':         45,
   'wan-3.0-480p':       30,
   'wan-3.0-720p':       55,
   'wan-3.0-1080p':      110,
@@ -57,8 +55,7 @@ const CREDIT_COSTS: Record<VideoModel, number> = {
 // Longest clip each model will produce.
 const MAX_DURATION_SECONDS: Record<VideoModel, number> = {
   'gemini-omni-1.2-flash-1080p': 15,
-  'kling-v3.0':         10,
-  'runway-gen4-turbo':  10,
+  'kling-v4.0':         10,
   'wan-3.0-480p':       30,
   'wan-3.0-720p':       30,
   'wan-3.0-1080p':      30,
@@ -108,8 +105,7 @@ const RAY_RESOLUTION: Partial<Record<VideoModel, '720p' | '1080p'>> = {
 /** Which provider each model bills. Must match both the dispatch below and `generation_models.provider`. */
 const MODEL_PROVIDER: Record<VideoModel, string> = {
   'gemini-omni-1.2-flash-1080p': 'google',
-  'kling-v3.0':        'klingai',
-  'runway-gen4-turbo': 'replicate',
+  'kling-v4.0':        'replicate',
   'wan-3.0-480p':      'alibaba',
   'wan-3.0-720p':      'alibaba',
   'wan-3.0-1080p':     'alibaba',
@@ -126,15 +122,15 @@ const MODEL_PROVIDER: Record<VideoModel, string> = {
 // so every video type debited, failed at the provider and refunded, for everybody.
 const TYPE_MODEL_PREFERENCE: Record<VideoType, VideoModel[]> = {
   // An 8-second silent clip is not a walkthrough: Wan gives 30s, scored, multi-reference.
-  walkthrough:          ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
-  floorplan_flythrough: ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'runway-gen4-turbo', 'kling-v3.0', 'h3-max-768p'],
-  product_spotlight:    ['kling-v3.0', 'h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'runway-gen4-turbo', 'wan-3.0-720p'],
+  walkthrough:          ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'kling-v4.0', 'h3-max-768p'],
+  floorplan_flythrough: ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'kling-v4.0', 'h3-max-768p'],
+  product_spotlight:    ['kling-v4.0', 'h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-720p'],
   // Ray3.2 is the ONLY model that interpolates first frame -> last frame, so a substitute
   // starts from the source and drifts instead of landing on `endFrameUrl`. Still better than
   // refusing, but the response says which model actually ran.
-  before_after:         ['ray-3.2-720p', 'runway-gen4-turbo', 'kling-v3.0', 'wan-3.0-720p', 'gemini-omni-1.2-flash-1080p'],
+  before_after:         ['ray-3.2-720p', 'kling-v4.0', 'wan-3.0-720p', 'gemini-omni-1.2-flash-1080p'],
   // A reel is 15s on a phone, not 30 on a monitor — H3 Max with stereo audio for 25 credits.
-  social_reel:          ['h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-480p', 'runway-gen4-turbo', 'kling-v3.0'],
+  social_reel:          ['h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-480p', 'kling-v4.0'],
 };
 
 const TYPE_MODEL_MAP: Record<VideoType, VideoModel> = Object.fromEntries(
@@ -177,9 +173,8 @@ async function usableVideoProviders(db: DbClient): Promise<Set<string> | null> {
   }
 }
 
-// Replicate model identifiers (Kling now uses native SDK, not Replicate)
 const REPLICATE_MODELS: Record<string, string> = {
-  'runway-gen4-turbo': 'runwayml/gen4-turbo',
+  'kling-v4.0': 'kwaivgi/kling-v4.0',
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -267,6 +262,115 @@ async function pollReplicate(
   return { status: 'processing' };
 }
 
+
+/** Finish Replicate jobs that outran the inline poll. Runs from pg_cron; the claim makes it single-shot per job. */
+async function collectReplicateJobs(db: DbClient): Promise<Record<string, number>> {
+  const counts = { checked: 0, completed: 0, failed: 0, pending: 0 };
+  const { data: jobs, error } = await db.from('generation_videos')
+    .select('id, user_id, workspace_id, model, video_type, duration_s, credits_used, replicate_prediction_id, social_post_id, collect_claimed_at')
+    .eq('status', 'processing')
+    .not('replicate_prediction_id', 'is', null)
+    .in('model', Object.keys(REPLICATE_MODELS))
+    .limit(20);
+  if (error) throw error;
+  const token = await replicateToken();
+  for (const job of (jobs ?? []) as Array<Record<string, any>>) {
+    counts.checked++;
+    const res = await fetch(`https://api.replicate.com/v1/predictions/${job.replicate_prediction_id}`, {
+      headers: { 'Authorization': `Token ${token}` },
+    });
+    if (!res.ok) { counts.pending++; continue; }
+    const pred = await res.json() as { status: string; output?: string | string[]; error?: string };
+    if (pred.status !== 'succeeded' && pred.status !== 'failed' && pred.status !== 'canceled') { counts.pending++; continue; }
+
+    // Claim: a second collector running at the same time finds the lease taken and moves on.
+    const lease = new Date(Date.now() - 5 * 60_000).toISOString();
+    const { data: claimed } = await db.from('generation_videos')
+      .update({ collect_claimed_at: new Date().toISOString() })
+      .eq('id', job.id).eq('status', 'processing')
+      .or(`collect_claimed_at.is.null,collect_claimed_at.lt.${lease}`)
+      .select('id');
+    if (!claimed?.length) continue;
+
+    const rawUrl = pred.status === 'succeeded' ? (Array.isArray(pred.output) ? pred.output[0] : pred.output) : null;
+    let videoUrl: string | null = null;
+    let failure = pred.status === 'succeeded' ? null : (pred.error || `Provider reported ${pred.status}`);
+    if (rawUrl) {
+      try {
+        videoUrl = await uploadVideoToStorage(db, rawUrl, job.id, false, { userId: job.user_id });
+      } catch (e) {
+        failure = `The finished video could not be stored: ${e instanceof Error ? e.message : String(e)}`;
+      }
+    } else if (!failure) {
+      failure = 'The model returned no usable video';
+    }
+
+    if (!videoUrl) {
+      await db.rpc('refund_credits', {
+        p_user_id: job.user_id, p_amount: job.credits_used ?? 0,
+        p_operation_type: 'interior_video_generation_v2_refund',
+        p_description: `Refund: ${job.model} generation failed`, p_workspace_id: job.workspace_id ?? null,
+      });
+      const { error: failErr } = await db.from('generation_videos')
+        .update({ status: 'failed', error_message: failure, completed_at: new Date().toISOString() }).eq('id', job.id);
+      if (failErr) console.error(`[generate-interior-video-v2] collect: job ${job.id} refunded but not marked failed`, failErr);
+      emitFlowEvent('video_generation_failed', {
+        user_id: job.user_id, workspace_id: job.workspace_id, type: 'video_failed', action_url: '/agent-hub',
+        title: 'Video generation failed', body: 'Something went wrong generating your video. Any credits used have been refunded.',
+        job_id: job.id, video_type: job.video_type,
+      }).catch(() => {});
+      counts.failed++;
+      continue;
+    }
+
+    try {
+      const pricing = await getServicePricing(db, job.model);
+      const units = pricing?.unit === 'second' ? (job.duration_s || 1) : 1;
+      const rawCostUsd = pricing ? pricing.cost_per_unit * units : null;
+      const { error: usageErr } = await db.from('ai_usage_logs').insert({
+        user_id: job.user_id, workspace_id: job.workspace_id ?? null,
+        operation_type: 'interior_video_generation_v2', model_name: job.model, api_provider: 'replicate',
+        credits_debited: job.credits_used ?? 0, raw_cost_usd: rawCostUsd,
+        billed_cost_usd: rawCostUsd === null ? null : rawCostUsd * pricing!.markup_multiplier,
+        markup_multiplier: pricing?.markup_multiplier ?? null,
+        metadata: { success: true, model: job.model, video_type: job.video_type, billing_type: 'per_unit', units, unit: pricing?.unit ?? null, collected_by: 'cron' },
+      });
+      if (usageErr) throw usageErr;
+    } catch (usageErr) {
+      console.error('[generate-interior-video-v2] collect: ai_usage_logs insert FAILED', usageErr);
+      await captureException(usageErr instanceof Error ? usageErr : new Error(String((usageErr as { message?: string })?.message ?? usageErr)), {
+        tags: { area: 'billing', operation: 'interior_video_generation_v2' },
+        extra: { job_id: job.id, workspace_id: job.workspace_id ?? null },
+        fingerprint: ['ai-usage-log-write-failed', 'interior_video_generation_v2'],
+      });
+    }
+
+    const { error: doneErr } = await db.from('generation_videos')
+      .update({ status: 'completed', video_url: videoUrl, completed_at: new Date().toISOString() }).eq('id', job.id);
+    if (doneErr) { console.error(`[generate-interior-video-v2] collect: job ${job.id} stored but not marked completed`, doneErr); continue; }
+
+    if (job.social_post_id) {
+      const { data: post } = await db.from('social_posts').select('credits_used, credits_breakdown').eq('id', job.social_post_id).maybeSingle();
+      if (post) {
+        const { error: attachErr } = await db.from('social_posts').update({
+          video_url: videoUrl,
+          credits_used: (post.credits_used || 0) + (job.credits_used || 0),
+          credits_breakdown: { ...(post.credits_breakdown || {}), video: job.credits_used || 0 },
+        }).eq('id', job.social_post_id);
+        if (attachErr) console.error(`[generate-interior-video-v2] collect: job ${job.id} not attached to its post`, attachErr);
+      }
+    }
+
+    emitFlowEvent('video_generation_completed', {
+      user_id: job.user_id, workspace_id: job.workspace_id, type: 'video_ready', action_url: videoUrl,
+      title: 'Your video is ready!', body: `Your ${String(job.video_type ?? 'interior').replace(/_/g, ' ')} video has been generated successfully.`,
+      job_id: job.id, video_type: job.video_type,
+    }).catch(() => {});
+    counts.completed++;
+  }
+  return counts;
+}
+
 Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   await bootstrapForFunction();
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
@@ -279,6 +383,12 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
 
   const body = await req.json();
+
+  if (body?.action === 'collect') {
+    if (!isCronAuthorized(req)) return jsonResponse({ success: false, error: 'Unauthorized' }, 401);
+    return jsonResponse({ success: true, ...(await collectReplicateJobs(supabase)) });
+  }
+
   let userId: string;
   let keyWorkspaceId: string | null | undefined;
   const isServiceCall = token === supabaseServiceKey && !!body.user_id;
@@ -364,7 +474,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
   // here rather than letting it flow on: CREDIT_COSTS[unknown] is undefined, which
   // debits `undefined` credits, writes credits_used=undefined onto generation_videos,
   // and only fails much later at the provider switch — refunding undefined.
-  const requestedOrDefault: VideoModel = requestedModel || TYPE_MODEL_MAP[video_type as VideoType] || 'kling-v3.0';
+  const requestedOrDefault: VideoModel = requestedModel || TYPE_MODEL_MAP[video_type as VideoType] || 'gemini-omni-1.2-flash-1080p';
   if (typeof CREDIT_COSTS[requestedOrDefault] !== 'number') {
     return jsonResponse({
       success: false,
@@ -412,26 +522,17 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
     ? Math.min(Math.round(requestedDuration), MAX_DURATION_SECONDS[resolvedModel])
     : Math.min(8, MAX_DURATION_SECONDS[resolvedModel]);
 
-  // Ray (Luma's two priced durations) and Runway Gen-4 (Replicate 422s anything else) take 5
-  // or 10 only. Snapped HERE so `generation_videos.duration_s` and `ai_usage_logs` record the
-  // clip actually made, not the requested 8.
-  const fiveOrTenOnly = Boolean(RAY_RESOLUTION[resolvedModel]) || resolvedModel === 'runway-gen4-turbo';
-  const durationSeconds = fiveOrTenOnly
+  // Ray takes Luma's two priced durations only. Snapped HERE so `generation_videos.duration_s`
+  // and `ai_usage_logs` record the clip actually made, not the requested 8.
+  const durationSeconds = RAY_RESOLUTION[resolvedModel]
     ? (clampedDuration > 7 ? 10 : 5)
-    : resolvedModel === 'gemini-omni-1.2-flash-1080p' ? Math.max(3, clampedDuration) : clampedDuration;
-
-  // `ai_model_pricing` keys differ from the model ids this function uses: the price
-  // table carries `kling-3.0`, here it is `kling-v3.0`. Identity map only — no prices
-  // are defined here. (Issue #4 Phase 1 deletes this map by making the id the key everywhere.)
-  const PRICING_KEY_BY_MODEL: Record<string, string> = {
-    'kling-v3.0': 'kling-3.0',
-  };
+    : (resolvedModel === 'gemini-omni-1.2-flash-1080p' || resolvedModel === 'kling-v4.0') ? Math.max(3, clampedDuration) : clampedDuration;
 
   // This function debited credits per video but wrote NO ai_usage_logs row at all, so
   // interior video generation was absent from usage and cost reporting entirely — not a
   // null cost, no row. Kling/Wan rows are priced per SECOND, so units = actual duration.
   const logVideoUsage = async (actualSeconds: number) => {
-    const key = PRICING_KEY_BY_MODEL[resolvedModel] ?? resolvedModel;
+    const key = resolvedModel;
     const pricing = await getServicePricing(supabase, key);
     if (!pricing) {
       console.warn(`[generate-interior-video-v2] no ai_model_pricing row for "${key}" — cost logged as null`);
@@ -808,77 +909,17 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
         status: 'completed',
       });
 
-    } else if (resolvedModel === 'kling-v3.0') {
-      // Kling v3.0 via native @ai-sdk/klingai
-      const klingPrompt = prompt || 'Professional cinematic interior design video, smooth camera movement';
-      const klingDuration = durationSeconds >= 10 ? 10 : 5;
-
-      const klingResult = await generateVideoWithKling(klingPrompt, {
-        model: 'kling-v3.0-i2v',
-        imageUrl: source_image_url,
-        durationSeconds: klingDuration as 5 | 10,
-        aspectRatio: aspect_ratio as '16:9' | '9:16' | '1:1',
-        mode: 'pro',
-        task: 'interior_video_generation_v2',
-        userId,
-        workspaceId: workspace_id ?? undefined,
-        logUsage: false,
-      });
-
-      const videoUrl = await uploadVideoToStorage(supabase, klingResult.base64, jobId, true, uploadCtx);
-      await logVideoUsage(klingDuration);
-
-      // Discarded, this write leaves the row on `processing` while the user is told it is
-      // ready — see the first completion branch above.
-      const { error: completeErr } = await supabase.from('generation_videos').update({
-        status: 'completed',
-        video_url: videoUrl,
-        completed_at: new Date().toISOString(),
-      }).eq('id', jobId);
-      if (completeErr) throw completeErr;
-
-      emitFlowEvent('video_generation_completed', {
-        user_id: userId,
-        workspace_id,
-        type: 'video_ready',
-        action_url: videoUrl,
-        title: 'Your video is ready!',
-        body: `Your ${video_type.replace(/_/g, ' ')} video has been generated successfully.`,
-        job_id: jobId,
-        video_type,
-      }).catch(() => {});
-
-      return jsonResponse({
-        success: true,
-        job_id: jobId,
-        video_url: videoUrl,
-        model_used: resolvedModel,
-        ...(substitutedFrom ? { substituted_from: substitutedFrom } : {}),
-        credits_used: creditCost,
-        video_type,
-        status: 'completed',
-      });
-
     } else {
-      // Replicate models (Wan 720p, Runway Gen-4)
+      // Replicate (Kling v4.0). It keeps the photo's own framing, so aspect_ratio is not sent.
       const replicateModel = REPLICATE_MODELS[resolvedModel];
       if (!replicateModel) throw new Error(`Unknown model: ${resolvedModel}`);
-
-      // Build model-specific input
       const replicateInput: Record<string, unknown> = {
-        image: source_image_url,
+        start_image: source_image_url,
         prompt: prompt || 'Professional cinematic interior design video, smooth camera movement',
         duration: durationSeconds,
-        aspect_ratio,
+        resolution: '1080p',
+        ...(endFrameUrl ? { end_image: endFrameUrl } : {}),
       };
-
-      // Model-specific params
-      if (resolvedModel === 'runway-gen4-turbo') {
-        replicateInput.ratio = aspect_ratio;
-        replicateInput.image_as_end_frame = false;
-      } else if (video_type === 'before_after' && before_image_url) {
-        replicateInput.image_end = before_image_url;
-      }
 
       const prediction = await createReplicatePrediction(replicateModel, replicateInput);
 
@@ -938,7 +979,7 @@ Deno.serve(withApiLogging('generate-interior-video-v2', async (req) => {
           credits_used: creditCost,
           video_type,
           status: 'processing',
-          message: 'Video generation in progress. Poll with job_id to check status.',
+          message: 'Video generation in progress. It is collected automatically and you are notified when it is ready.',
         });
 
       } else {
