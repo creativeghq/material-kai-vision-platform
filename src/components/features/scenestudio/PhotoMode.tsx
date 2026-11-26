@@ -16,13 +16,27 @@ const CLEAN_AT = [24, 60, MAX_SAMPLES];
 const DENOISE_LIMIT_MS = 60_000;
 const EXPOSE_AT = 6;
 
-/** The library's own dispose() reads a field that does not exist in 0.0.23 and throws, taking the canvas with it. */
+type Disposable = { dispose?(): void; isTexture?: boolean; renderTarget?: { dispose(): void } | null };
+
+/** The library's own dispose() reads a field that does not exist in 0.0.23 and throws, and it never frees the scene data held in the material's uniforms, so each Photo Mode session kept ~0.7 GB of GPU memory. */
 export function disposeTracer(t: WebGLPathTracer) {
   const inner = t as unknown as {
     _quad?: { dispose(): void; material: { dispose(): void } };
-    _pathTracer?: { dispose(): void };
+    _pathTracer?: { dispose(): void; material?: (Material & { uniforms?: Record<string, { value: unknown }> }) | null };
     _lowResPathTracer?: { dispose(): void };
+    _colorBackground?: Disposable | null;
+    _internalBackground?: Disposable | null;
   };
+  const material = inner._pathTracer?.material;
+  for (const [name, u] of Object.entries(material?.uniforms ?? {})) {
+    const v = u.value as Disposable | null;
+    if (!v || name === 'backgroundMap' || name === 'sobolTexture') continue;
+    if (v.isTexture && v.renderTarget) v.renderTarget.dispose();
+    else v.dispose?.();
+  }
+  material?.dispose();
+  inner._colorBackground?.dispose?.();
+  inner._internalBackground?.dispose?.();
   inner._quad?.dispose();
   inner._quad?.material.dispose();
   inner._pathTracer?.dispose();
@@ -180,6 +194,7 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
       if (!pending.current || pending.current.sig !== sig) pending.current = { sig, at: now };
       if (built.current === null || now - pending.current.at > 0.3) {
         (tracer as unknown as { _generator: PathTracingSceneGenerator })._generator = new PathTracingSceneGenerator();
+        scene.environment = sky;
         withTraceView(scene, () => tracer.setScene(scene, camera));
         built.current = sig;
         pending.current = null;

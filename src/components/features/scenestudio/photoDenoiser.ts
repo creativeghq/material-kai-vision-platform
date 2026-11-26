@@ -17,7 +17,11 @@ export function denoiserNet(): Promise<UNet | null> {
 }
 
 /** A denoiser that hung is made again for the next picture. */
-export function forgetDenoiser(): void { net = null; }
+export function forgetDenoiser(): void {
+  const old = net;
+  net = null;
+  void old?.then((u) => { try { u?.dispose(); } catch { /* already lost */ } });
+}
 
 export interface PhotoGuides { albedo: Float32Array; normal: Float32Array; width: number; height: number }
 

@@ -292,6 +292,17 @@ const SparkLayer: React.FC = () => {
   return null;
 };
 
+/** The composer stays mounted (neither it nor N8AO frees its buffers on unmount, so remounting leaked GPU memory on every Photo Mode exit) and holds tone mapping at none; a direct render tone-maps itself. */
+const DirectToneMapping: React.FC = () => {
+  const gl = useThree((s) => s.gl);
+  useEffect(() => {
+    const before = gl.toneMapping;
+    gl.toneMapping = ACESFilmicToneMapping;
+    return () => { gl.toneMapping = before; };
+  }, [gl]);
+  return null;
+};
+
 /** Splats in the post-processing buffer come out washed to white, so it runs without them and they are laid over its picture. */
 const SplatsAfterComposer: React.FC<{ script?: React.MutableRefObject<ScriptFrame | null> }> = ({ script }) => {
   const { gl, scene, camera } = useThree();
@@ -1268,12 +1279,11 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
       />
       <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} lit={lit} wallsUp={lightReady} />
       {!wireframe && !photo && hasSplats && <SplatsAfterComposer script={script} />}
-      {!wireframe && !photo && (
-        <EffectComposer multisampling={4}>
-          <N8AO aoRadius={0.5} distanceFalloff={0.5} intensity={1.7} halfRes quality="medium" />
-          <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-        </EffectComposer>
-      )}
+      <EffectComposer multisampling={4} enabled={!wireframe && !photo}>
+        <N8AO aoRadius={0.5} distanceFalloff={0.5} intensity={1.7} halfRes quality="medium" />
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      </EffectComposer>
+      {wireframe && !photo && <DirectToneMapping />}
       {walkPose && (
         <WalkController
           start={walkPose.start} facing={walkPose.facing} walls={walls} openings={openings} frame={frame}
