@@ -22,6 +22,12 @@ describe('object-3d makes a GLB mesh', () => {
     expect(EDITOR).toMatch(/make3d\(\{ floor_plan_object_id: o\.id, \.\.\.\(await cropFromRender\(o\)\)/);
   });
 
+  it('crops each object from the render that shows it most, never just the one on screen', () => {
+    const crop = EDITOR.slice(EDITOR.indexOf('const cropFromRender'), EDITOR.indexOf('const make3d'));
+    expect(crop).not.toContain('activeRender');
+    expect(crop).toMatch(/seen\.reduce\(\(a, b\) => \(b\.area > a\.area \? b : a\)\)/);
+  });
+
   it('repaints with Gemini only for a finish variant', () => {
     const input = EDGE.slice(EDGE.indexOf('async function modelInput('), EDGE.indexOf('async function generate('));
     const finishBranch = input.slice(input.indexOf('if (t.finish) {'), input.indexOf('if (t.source.path) return'));

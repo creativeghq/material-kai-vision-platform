@@ -467,18 +467,20 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   }, [anyProcessing, id]);
 
   const cropFromRender = async (o: SceneObject): Promise<{ image_path: string; mask_path: string }> => {
-    const source = (activeRender && activeRender.layout_snapshot?.[o.id] ? activeRender : null)
-      ?? renders.find((r) => r.id_pass_path && Object.values(r.id_map ?? {}).includes(o.id)) ?? null;
-    if (!data || !source?.id_pass_path) {
+    const hexIn = (r: SceneRender) => Object.entries(r.id_map ?? {}).find(([, objId]) => objId === o.id)?.[0];
+    const candidates = renders.filter((r) => r.id_pass_path && hexIn(r)).slice(0, 8);
+    if (!data || !candidates.length) {
       throw new Error(renders.length
         ? 'This object is not in any render yet. Render the room again, then make it 3D.'
         : 'Render the room first: the 3D model is made from how the object looks in a render.');
     }
-    const hex = Object.entries(source.id_map ?? {}).find(([, objId]) => objId === o.id)?.[0];
-    if (!hex) throw new Error('This object is not in any render yet. Render the room again first.');
-    const [pass, base] = await Promise.all([loadImage(publicUrl(source.id_pass_path)), loadImage(source.image_url)]);
-    const mask = await objectMask([{ image: pass, hex }], 0.004);
-    if (!mask.box) throw new Error('This object cannot be seen in the current render.');
+    const seen = await Promise.all(candidates.map(async (r) => {
+      const mask = await objectMask([{ image: await loadImage(publicUrl(r.id_pass_path!)), hex: hexIn(r)! }], 0.004);
+      return { r, mask, area: mask.box ? (mask.box.x1 - mask.box.x0) * (mask.box.y1 - mask.box.y0) : 0 };
+    }));
+    const { r: source, mask } = seen.reduce((a, b) => (b.area > a.area ? b : a));
+    if (!mask.box) throw new Error('This object cannot be seen in any render. Render a view that shows it, then make it 3D.');
+    const base = await loadImage(source.image_url);
     const W = base.naturalWidth; const H = base.naturalHeight;
     const padX = (mask.box.x1 - mask.box.x0) * 0.15; const padY = (mask.box.y1 - mask.box.y0) * 0.15;
     const x0 = Math.max(0, (mask.box.x0 - padX) * W); const y0 = Math.max(0, (mask.box.y0 - padY) * H);
