@@ -155,9 +155,11 @@ export const StylePanel: React.FC<{
 export const ProductPicker: React.FC<{
   workspaceId: string;
   onPick(p: SceneProduct): void;
-  onCancel(): void;
+  onCancel?(): void;
   title: string;
-}> = ({ workspaceId, onPick, onCancel, title }) => {
+  categoryIds?: string[];
+  emptyText?: string;
+}> = ({ workspaceId, onPick, onCancel, title, categoryIds, emptyText }) => {
   const pinned = useContext(PinnedProductsContext);
   const [q, setQ] = useState('');
   const [results, setResults] = useState<SceneProduct[] | null>(null);
@@ -165,17 +167,17 @@ export const ProductPicker: React.FC<{
   useEffect(() => {
     let live = true;
     const t = setTimeout(() => {
-      sceneStudioService.searchProducts(workspaceId, q)
+      sceneStudioService.searchProducts(workspaceId, q, categoryIds)
         .then((r) => { if (live) { setResults(r); setError(null); } })
         .catch((e) => { if (live) setError(e instanceof Error ? e.message : 'Search failed'); });
     }, 250);
     return () => { live = false; clearTimeout(t); };
-  }, [workspaceId, q]);
+  }, [workspaceId, q, categoryIds]);
   return (
     <div className="space-y-2 rounded-sm border border-hairline bg-surface-sunken p-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium">{title}</span>
-        <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onCancel} aria-label="Close"><X className="h-3.5 w-3.5" /></Button>
+        {onCancel && <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onCancel} aria-label="Close"><X className="h-3.5 w-3.5" /></Button>}
       </div>
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your catalogue" autoFocus />
       {!q.trim() && pinned.length > 0 && (
@@ -194,7 +196,7 @@ export const ProductPicker: React.FC<{
       {error ? <p className="text-xs text-destructive">{error}</p> : results === null ? (
         <p className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Searching</p>
       ) : results.length === 0 ? (
-        <p className="text-xs text-muted-foreground">No products match. Add products to your catalogue first.</p>
+        <p className="text-xs text-muted-foreground">{q.trim() ? 'No products match.' : emptyText ?? 'No products match. Add products to your catalogue first.'}</p>
       ) : (
         <div className="grid max-h-64 grid-cols-3 gap-1.5 overflow-y-auto">
           {results.map((p) => (

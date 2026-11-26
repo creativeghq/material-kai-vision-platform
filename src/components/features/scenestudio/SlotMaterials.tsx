@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { ChevronDown, Layers, Loader2, Package, RotateCcw, Sparkles, X } from 'lucide-react';
+import { ChevronDown, Layers, Loader2, RotateCcw, Sparkles, X } from 'lucide-react';
 
 import { Button } from '@/components/core/ui/button';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
-import { ColourRow, ProductPicker } from '@/components/features/scenestudio/ScenePanels';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { ProductPicker } from '@/components/features/scenestudio/ScenePanels';
 import { SCENE_SLOT_FOLLOWS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { colourOptions, resolveFinish } from '@/lib/scene/sceneSurfaces';
 import { decorLabel, decorTone, type BoardDecorRef } from '@/lib/scene/boardDecor';
 import { sceneStudioService, type BoardDecor, type SceneObject, type SceneObjectFinish, type SceneProduct } from '@/services/sceneStudioService';
 
 const EDGED_SLOTS: ReadonlySet<SceneObjectSlot> = new Set(['fronts', 'carcass']);
+const DECOR_SLOTS: ReadonlySet<SceneObjectSlot> = new Set(['fronts', 'carcass', 'plinth', 'worktop', 'top', 'seat', 'frame']);
 
 /** The edge tape the catalogue matches to a board (same decor and surface structure); says so when there is none. */
 const BoardEdgeTape: React.FC<{ product: SceneProduct }> = ({ product }) => {
@@ -29,6 +31,8 @@ const BoardEdgeTape: React.FC<{ product: SceneProduct }> = ({ product }) => {
     </p>
   );
 };
+
+const NO_CATEGORIES: string[] = [];
 
 const refOf = (d: BoardDecor): BoardDecorRef => ({ brand: d.brand, code: d.decor_code, name: d.decor_name });
 
@@ -98,7 +102,13 @@ export const SlotMaterials: React.FC<{
 }> = ({ obj, rows, products, workspaceId, makingTexture, onSet, onReset, onMakeTexture }) => {
   const slots = slotsForKind(obj.kind);
   const [open, setOpen] = useState<SceneObjectSlot | null>(slots.length === 1 ? slots[0] : null);
-  const [picking, setPicking] = useState<'product' | 'decor' | null>(null);
+  const [picking, setPicking] = useState<'decor' | null>(null);
+  const [slotCats, setSlotCats] = useState<Record<string, string[]> | null>(null);
+  useEffect(() => {
+    let live = true;
+    void sceneStudioService.slotCategories().then((c) => { if (live) setSlotCats(c); }).catch(() => { if (live) setSlotCats({}); });
+    return () => { live = false; };
+  }, []);
   const own = (slot: SceneObjectSlot) => rows.find((r) => r.object_id === obj.id && r.slot === slot);
   return (
     <div className="space-y-1.5">
@@ -125,76 +135,92 @@ export const SlotMaterials: React.FC<{
                 <span className="min-w-0 flex-1">
                   <span className="block text-xs font-medium">{SCENE_SLOT_LABELS[slot]}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">
-                    {finish?.label ?? (finish?.hex ? finish.hex : follows ? `As ${SCENE_SLOT_LABELS[SCENE_SLOT_FOLLOWS[slot]!]}` : 'As modelled')}
+                    {finish?.label ?? (follows ? `As ${SCENE_SLOT_LABELS[SCENE_SLOT_FOLLOWS[slot]!]}` : 'Material not chosen')}
                   </span>
                 </span>
                 <ChevronDown className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${isOpen ? 'rotate-180' : ''}`} />
               </button>
               {isOpen && (
-                <div className="space-y-2 bg-surface-sunken px-2 py-2">
-                  <ColourRow value={row && !row.product_id && !row.decor_code ? row.colour_hex : null} onChange={(hex) => onSet(slot, { product: null, colour_hex: hex })} />
-                  {row?.decor_code && (
+                <Tabs defaultValue="materials" className="bg-surface-sunken px-2 py-2">
+                  <TabsList className="h-8">
+                    <TabsTrigger value="materials" className="text-xs">Materials</TabsTrigger>
+                    <TabsTrigger value="colours" className="text-xs">Colours</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="materials" className="mt-2 space-y-2">
                     <p className="text-[11px] text-muted-foreground">
-                      {row.colour_hex ? `Approximate Tone ≈ ${row.colour_hex}. ` : 'No approximate tone for this decor. '}
-                      The photo-real render reproduces the named decor, not this preview colour.
+                      {product ? `Now: ${product.name}` : row?.decor_code ? `Now: ${finish?.label ?? row.decor_code}` : 'Now: Material not chosen. Pick something you sell.'}
                     </p>
-                  )}
-                  {product && colourOptions(product).length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {colourOptions(product).map((o) => (
-                        <button
-                          key={o.hex}
-                          type="button"
-                          title={o.name}
-                          aria-label={o.name}
-                          onClick={() => onSet(slot, { product, colour_hex: row?.colour_hex === o.hex ? null : o.hex })}
-                          className={`h-7 w-7 overflow-hidden rounded-sm border ${row?.colour_hex === o.hex ? 'border-primary ring-2 ring-primary/40' : 'border-hairline'}`}
-                          style={{ backgroundColor: o.hex }}
-                        >
-                          {o.swatch_url && <img src={o.swatch_url} alt="" className="h-full w-full object-cover" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {product && EDGED_SLOTS.has(slot) && <BoardEdgeTape product={product} />}
-                  {product && row && (row.colour_hex
-                    ? !product.colourTextures?.[row.colour_hex] && colourOptions(product).some((o) => o.hex === row.colour_hex && o.swatch_url)
-                    : !product.albedoUrl) && (
-                    <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => onMakeTexture(product, row.colour_hex)}>
-                      {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                      {makingTexture ? 'Making the Texture…' : 'Make a Clean Texture (6 credits)'}
-                    </Button>
-                  )}
-                  {picking === 'product' ? (
-                    <ProductPicker
-                      workspaceId={workspaceId}
-                      title={`${SCENE_SLOT_LABELS[slot]} from the catalogue`}
-                      onCancel={() => setPicking(null)}
-                      onPick={(p) => { setPicking(null); onSet(slot, { product: p, colour_hex: null }); }}
-                    />
-                  ) : picking === 'decor' ? (
-                    <BoardDecorPicker
-                      workspaceId={workspaceId}
-                      title={`${SCENE_SLOT_LABELS[slot]} Board Decor`}
-                      onCancel={() => setPicking(null)}
-                      onPick={(d) => { setPicking(null); onSet(slot, { product: null, colour_hex: decorTone(d.decor_name), decor: refOf(d) }); }}
-                    />
-                  ) : (
+                    {picking === 'decor' ? (
+                      <BoardDecorPicker
+                        workspaceId={workspaceId}
+                        title={`${SCENE_SLOT_LABELS[slot]} Board Decor`}
+                        onCancel={() => setPicking(null)}
+                        onPick={(d) => { setPicking(null); onSet(slot, { product: null, colour_hex: decorTone(d.decor_name), decor: refOf(d) }); }}
+                      />
+                    ) : slotCats === null ? (
+                      <p className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Loading</p>
+                    ) : (
+                      <ProductPicker
+                        workspaceId={workspaceId}
+                        title={`${SCENE_SLOT_LABELS[slot]} From Your Catalogue`}
+                        categoryIds={slotCats[slot] ?? NO_CATEGORIES}
+                        emptyText={`Nothing in your catalogue is sold for ${SCENE_SLOT_LABELS[slot].toLowerCase()} yet. Add the product to your catalogue to use it here.`}
+                        onPick={(p) => onSet(slot, { product: p, colour_hex: null })}
+                      />
+                    )}
                     <div className="flex flex-wrap gap-1.5">
-                      <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setPicking('product')}>
-                        <Package className="h-3.5 w-3.5" />{product && row ? 'Another material' : 'Choose a material'}
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setPicking('decor')}>
-                        <Layers className="h-3.5 w-3.5" />{row?.decor_code ? 'Another decor' : 'Board decor'}
-                      </Button>
+                      {DECOR_SLOTS.has(slot) && picking !== 'decor' && (
+                        <Button size="sm" variant="outline" className="flex-1 gap-1.5" onClick={() => setPicking('decor')}>
+                          <Layers className="h-3.5 w-3.5" />{row?.decor_code ? 'Another board decor' : 'Board decor'}
+                        </Button>
+                      )}
                       {row && (
                         <Button size="sm" variant="ghost" className="gap-1.5" onClick={() => onReset(slot)}>
                           <RotateCcw className="h-3.5 w-3.5" />Reset
                         </Button>
                       )}
                     </div>
-                  )}
-                </div>
+                    {product && EDGED_SLOTS.has(slot) && <BoardEdgeTape product={product} />}
+                  </TabsContent>
+                  <TabsContent value="colours" className="mt-2 space-y-2">
+                    {product && colourOptions(product).length > 0 ? (
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {colourOptions(product).map((o) => (
+                          <button
+                            key={o.hex}
+                            type="button"
+                            title={o.name}
+                            onClick={() => onSet(slot, { product, colour_hex: row?.colour_hex === o.hex ? null : o.hex })}
+                            className={`overflow-hidden rounded-sm border text-left ${row?.colour_hex === o.hex ? 'border-primary ring-2 ring-primary/40' : 'border-hairline'}`}
+                          >
+                            <span className="block aspect-square w-full" style={{ backgroundColor: o.hex }}>
+                              {o.swatch_url && <img src={o.swatch_url} alt="" className="h-full w-full object-cover" />}
+                            </span>
+                            <span className="block truncate px-1 py-0.5 text-[10px]">{o.name}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">
+                        {product ? `${product.name} is sold in one colour.` : row?.decor_code ? 'A board decor is one fixed colour.' : 'Choose a material first. Its colours come from the product you sell.'}
+                      </p>
+                    )}
+                    {row?.decor_code && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {row.colour_hex ? `Approximate Tone ≈ ${row.colour_hex}. ` : 'No approximate tone for this decor. '}
+                        The photo-real render reproduces the named decor, not this preview colour.
+                      </p>
+                    )}
+                    {product && row && (row.colour_hex
+                      ? !product.colourTextures?.[row.colour_hex] && colourOptions(product).some((o) => o.hex === row.colour_hex && o.swatch_url)
+                      : !product.albedoUrl) && (
+                      <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => onMakeTexture(product, row.colour_hex)}>
+                        {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        {makingTexture ? 'Making the Texture…' : 'Make a Clean Texture (6 credits)'}
+                      </Button>
+                    )}
+                  </TabsContent>
+                </Tabs>
               )}
             </div>
           );

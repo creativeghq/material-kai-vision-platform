@@ -207,6 +207,7 @@ async function uploadTo(path: string, blob: Blob, contentType: string): Promise<
   if (error) throw new Error(`Upload failed: ${error.message}`);
 }
 
+let slotCategoriesLoad: Promise<Record<string, string[]>> | null = null;
 const PRODUCT_COLUMNS = 'id, name, attributes, metadata, image_product_associations(overall_score, document_images(image_url)), product_material_maps(storage_bucket, albedo_path, normal_path, roughness_path, is_selected, option_value_id), product_colour_textures(colour_hex, storage_bucket, albedo_path, covers_mm)';
 
 function selectedMaps(row: Record<string, unknown>): { albedoUrl: string | null; normalUrl: string | null; roughnessUrl: string | null } {
@@ -588,14 +589,31 @@ export const sceneStudioService = {
     return projectPlansService.rescale(plan.id, plan.dimensions ?? {}, change((plan.composition as PlanComposition).config ?? {}));
   },
 
-  async searchProducts(workspaceId: string, query: string): Promise<SceneProduct[]> {
+  async slotCategories(): Promise<Record<string, string[]>> {
+    slotCategoriesLoad ??= (async () => {
+      const { data, error } = await supabase.from('scene_slot_categories')
+        .select('slot, sort, material_categories!inner(id)').order('sort', { ascending: true });
+      if (error) { slotCategoriesLoad = null; throw new Error(error.message); }
+      const out: Record<string, string[]> = {};
+      for (const r of (data ?? []) as Array<{ slot: string; material_categories: { id: string } | Array<{ id: string }> }>) {
+        const cat = Array.isArray(r.material_categories) ? r.material_categories[0] : r.material_categories;
+        if (cat) (out[r.slot] ??= []).push(cat.id);
+      }
+      return out;
+    })();
+    return slotCategoriesLoad;
+  },
+
+  async searchProducts(workspaceId: string, query: string, categoryIds?: string[]): Promise<SceneProduct[]> {
     const q = query.trim();
+    if (categoryIds && !categoryIds.length) return [];
     let req = supabase
       .from('products')
       .select(PRODUCT_COLUMNS)
       .eq('workspace_id', workspaceId)
       .order('updated_at', { ascending: false })
       .limit(24);
+    if (categoryIds) req = req.in('category_id', categoryIds);
     if (q) req = req.ilike('name', `%${q.replace(/[%_,()]/g, ' ')}%`);
     const { data, error } = await req;
     if (error) throw new Error(error.message);

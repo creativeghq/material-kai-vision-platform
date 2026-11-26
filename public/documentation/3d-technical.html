@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D &amp; Rendering — How It Works | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="3d-rooms.html">3D Rooms</a> / How It Works</div>
+  <h1>3D &amp; Rendering — How It Works</h1>
+  <div class="routes"><span class="badge">Technical reference</span><span class="badge gated">Scene Studio module</span></div>
+  <p class="lead">The technical side of <a href="3d-rooms.html">3D Rooms</a>, <a href="product-3d.html">Product 3D Models</a> and the <a href="room-planner.html">Room Planner</a>: every AI model we call and why it won, everything that runs in your browser and the technique behind it, the open-source projects it is built on, and what each step costs. Written for technical buyers, partners and our own team.</p>
+
+  <div class="callout"><p><strong>The split, in one line:</strong> the cloud does what needs a large model (reading a plan, photoreal renders, turning a photo into a 3D mesh); the <strong>browser</strong> does everything that is geometry or light (the live 3D room, path-traced Photo Mode, baked light, video), so those are free and private.</p></div>
+
+  <h2 id="pipeline">The pipeline</h2>
+  <ol>
+    <li><strong>Read</strong> — a floor plan, room photo, render or drawing page is read by Claude into walls, openings, rooms and objects with real sizes.</li>
+    <li><strong>Edit</strong> — the room is a real 3D scene in the browser (three.js). Every part's finish is a catalogue product in one of its real colourways.</li>
+    <li><strong>Render</strong> — the current view is captured and sent to Gemini with the object list, the finishes and their product images; a photoreal picture comes back. An <strong>object-ID pass</strong> is saved with it.</li>
+    <li><strong>Make 3D</strong> — each piece is cut out of the render where it is most visible, with its exact mask, and SAM 3D turns it into a textured GLB mesh that replaces the stand-in shape.</li>
+    <li><strong>Light &amp; picture</strong> — the browser path-traces the room (Photo Mode), denoises it with Intel OIDN, bakes light into the surfaces, and records walkthrough video frame by frame.</li>
+    <li><strong>Share</strong> — the client walkthrough link reads the saved renders, Photo Mode pictures and baked light; nothing is recomputed for the visitor.</li>
+  </ol>
+
+  <h2 id="models">AI models we use</h2>
+  <table>
+    <thead><tr><th>Step</th><th>Model</th><th>Where it runs</th><th>Cost to you</th></tr></thead>
+    <tbody>
+      <tr><td>Read a plan / photo / render / drawing into a 3D room</td><td>Claude <code>claude-fable-5-2</code>, strict JSON schema output</td><td>Anthropic API, from the <code>scene-studio-read</code> edge function</td><td>Per image read</td></tr>
+      <tr><td>Photoreal render of a view; object and area edits</td><td>Gemini <strong>Nano Banana 2.1</strong> (fast tier)</td><td>Google AI, from <code>generate-interior-gemini</code></td><td>6 credits</td></tr>
+      <tr><td>Virtual staging (furnish an empty photo) and unstaging (empty a room)</td><td>Gemini <strong>3 Pro Image</strong> (Nano Banana Pro)</td><td>Google AI, from <code>generate-virtual-staging</code> / <code>generate_gemini</code></td><td>Pro-tier credits</td></tr>
+      <tr><td>Furniture and product → 3D mesh</td><td><strong>SAM 3D Objects</strong> (Meta) — <a href="https://github.com/facebookresearch/sam-3d-objects">repo</a>, hosted on <a href="https://fal.ai/models/fal-ai/sam-3/3d-objects">fal</a></td><td>fal queue, called by our backend (MIVAA)</td><td>10 credits, refunded on failure</td></tr>
+      <tr><td>"In these materials" variant of a 3D model</td><td>Gemini repaints the source photo first, then SAM 3D</td><td>Google AI + fal</td><td>Charged separately</td></tr>
+      <tr><td>Clean seamless texture from a product photo</td><td>Gemini</td><td>Google AI, from <code>surface-texture</code></td><td>6 credits</td></tr>
+      <tr><td>Video from a picture (not from a 3D room)</td><td>H3 Max, Kling v4.0, Wan 3.0, Seedance 2.5, Ray 3.2, Gemini Omni — picked by video type</td><td>fal, Replicate, Alibaba, ByteDance, Luma, Google</td><td>15–125 credits</td></tr>
+    </tbody>
+  </table>
+  <p>Every paid step debits credits <strong>before</strong> the provider is called and refunds on failure. There is no silent fallback to another model: if a provider fails, the step says so.</p>
+
+  <h2 id="browser">What runs in your browser</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Technique</th><th>Built on</th></tr></thead>
+    <tbody>
+      <tr><td>Live 3D room</td><td>WebGL scene graph, physically based materials, contact shadows and screen-space ambient occlusion (N8AO)</td><td><a href="https://github.com/mrdoob/three.js">three.js</a> 0.178, <a href="https://github.com/pmndrs/react-three-fiber">react-three-fiber</a>, <a href="https://github.com/pmndrs/drei">drei</a>, <a href="https://github.com/pmndrs/react-postprocessing">react-postprocessing</a></td></tr>
+      <tr><td>Generated furniture</td><td>GLB meshes with Meshopt compression, fitted to the object's box (upright, front +Z, real proportions)</td><td>three.js GLTFLoader + <a href="https://github.com/zeux/meshoptimizer">meshoptimizer</a></td></tr>
+      <tr><td>Photo Mode</td><td>GPU <strong>path tracing</strong> — 6 light bounces, rendered in 2×2 tiles, up to 120 samples, accelerated by a BVH</td><td><a href="https://github.com/gkjohnson/three-gpu-pathtracer">three-gpu-pathtracer</a> 0.0.23, <a href="https://github.com/gkjohnson/three-mesh-bvh">three-mesh-bvh</a></td></tr>
+      <tr><td>Denoising</td><td>Intel Open Image Denoise neural network (HDR + albedo + normal inputs) run on WebGPU; clean frames at 24, 60 and 120 samples</td><td><a href="https://github.com/RenderKit/oidn">Intel OIDN</a> via <a href="https://github.com/pissang/oidn-webgpu">oidn-webgpu</a> 0.6.0</td></tr>
+      <tr><td>Baked light</td><td>The path tracer lights every wall, floor and ceiling once (256 samples, 5 bounces) into a lightmap atlas, stored and reused by walking, the client link and video</td><td>three-gpu-pathtracer + our lightmap atlas</td></tr>
+      <tr><td>Walkthrough &amp; before/after video</td><td>Rendered <strong>frame by frame</strong> at 24 fps (not screen capture), encoded to MP4/H.264 or WebM/VP9 with WebCodecs</td><td><a href="https://github.com/Vanilagy/mediabunny">mediabunny</a></td></tr>
+      <tr><td>Object-ID pass</td><td>The same camera re-rendered with every object in one exact flat colour; an object's mask is the pixels of its colour</td><td>three.js render target</td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="id-pass">Why the object-ID pass matters</h2>
+  <p>Every render stores an ID pass beside it. It is what lets an <strong>object edit</strong> change only that object (the edit is composited back through its mask, so every other pixel stays exactly as it was), and what lets <strong>Make 3D</strong> cut a piece out cleanly. Two rules make it reliable:</p>
+  <ul>
+    <li><strong>Colours are matched exactly.</strong> With 30+ objects, neighbouring ID colours are close; a loose match picks up the anti-aliased edges of <em>other</em> objects. The match tolerance is 6 of 255.</li>
+    <li><strong>The render that shows the piece best is used</strong> — measured by how many pixels the piece covers across all saved renders. A piece that no render shows is refused before anything is charged.</li>
+  </ul>
+
+  <h2 id="benchmarks">How we chose the models</h2>
+  <p>Each choice was measured on our own inputs (packshots and renders of the demo apartment), not taken from public leaderboards, which ranked badly for our tasks.</p>
+  <h3>Image to 3D</h3>
+  <table>
+    <thead><tr><th>Model</th><th>Price / run</th><th>Time</th><th>File</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td><strong>SAM 3D Objects</strong> (in use)</td><td>$0.02</td><td>33–41 s</td><td>~1.3 MB</td><td>Faithful shape and colour, clean backs, browser-light. Soft on fine tufting.</td></tr>
+      <tr><td><a href="https://github.com/Tencent-Hunyuan">Hunyuan 3D 3.1 Pro</a></td><td>low</td><td>~170 s</td><td>26 MB</td><td>Best fine detail; 500k faces is too heavy for the browser without reduction.</td></tr>
+      <tr><td><a href="https://github.com/microsoft/TRELLIS">Trellis 2</a></td><td>$0.05</td><td>35–95 s</td><td>16–20 MB</td><td>Good shapes and the best plant; speckled fabric textures.</td></tr>
+      <tr><td>Tripo P2</td><td>low</td><td>~70 s</td><td>1.4–3 MB</td><td>Light, but rotated 90° and colour drift.</td></tr>
+      <tr><td>Meshy 7.1</td><td>$0.80</td><td>~95 s</td><td>3.5 MB</td><td>Good, scribbled fabric; 40× SAM's price.</td></tr>
+    </tbody>
+  </table>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/3d/3d-model-benchmark-sofa.png" alt="Five image-to-3D models compared on the same sofa photo">
+    <figcaption>The same sofa photo through five image-to-3D models, each shown from the front, three-quarter and back.</figcaption>
+  </figure>
+  <h3>Removing one object, emptying and furnishing a room</h3>
+  <ul>
+    <li><strong>Remove one object (masked):</strong> Finegrain Eraser was cleanest; Bria and FLUX Erase were clean but removed or invented something nearby; fal Object Removal failed. Our object edit keeps every pixel outside the mask exact, which none of the prompt-only models do.</li>
+    <li><strong>Empty a room:</strong> Nano Banana Pro followed the removal list; Nano Banana 2 left lamps behind.</li>
+    <li><strong>Furnish an empty room:</strong> Nano Banana Pro kept the architecture; Nano Banana 2 deleted a wall and a FLUX staging LoRA furnished the next room as well.</li>
+  </ul>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/3d/virtual-staging-benchmark.png" alt="Virtual staging compared across three models">
+    <figcaption>Furnishing the same emptied living room: Nano Banana Pro (ours), Nano Banana 2, FLUX 2 staging LoRA.</figcaption>
+  </figure>
+
+  <h2 id="retired">What we tried and retired</h2>
+  <ul>
+    <li><strong>Gaussian splats</strong> (Spark.js, and our own Idol service) — photo-like, but no real geometry: they could not take a material, cast correct light or be measured. Replaced by SAM 3D meshes.</li>
+    <li><strong>Hosted photoreal rooms</strong> (World Labs) — replaced by our own path-traced Photo Mode, which runs on real geometry and costs nothing per picture.</li>
+    <li><a href="https://github.com/playcanvas/splat-transform">splat-transform</a> — evaluated for shrinking splats; no longer needed once splats were retired.</li>
+  </ul>
+
+  <h2 id="limits">Known limits</h2>
+  <ul>
+    <li>A mesh made from one picture has the right <em>proportions</em> but no measured size; in a 3D room it takes the object's box, and in the Room Planner it takes a size someone stated (otherwise a 0.60 m placeholder, flagged as such).</li>
+    <li>A mesh cut from a render carries that render's lighting in its texture; a clean product photo gives truer colour.</li>
+    <li>Photo Mode, baked light and video need the browser tab in front; the denoiser needs WebGPU (recent Chrome or Edge).</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

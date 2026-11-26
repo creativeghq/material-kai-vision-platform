@@ -25,15 +25,15 @@ export function renderMaterialRows(
     for (const f of own) {
       const fin = resolveFinish(f, f.product_id ? products[f.product_id] : undefined);
       if (!fin) continue;
-      rows.push({ key: `f-${f.id}`, objectId: o.id, where: `${o.label} · ${SCENE_SLOT_LABELS[f.slot]}`, what: fin.label ?? fin.hex ?? '', hex: fin.hex ?? null, imageUrl: fin.imageUrl ?? null });
+      rows.push({ key: `f-${f.id}`, objectId: o.id, where: `${o.label} · ${SCENE_SLOT_LABELS[f.slot]}`, what: fin.label ?? NOT_CHOSEN, hex: fin.hex ?? null, imageUrl: fin.imageUrl ?? null });
     }
-    if (!p && !own.length) rows.push({ key: `c-${o.id}`, objectId: o.id, where: o.label, what: o.colour_hex ?? NOT_CHOSEN, hex: o.colour_hex, imageUrl: null });
+    if (!p && !own.length) rows.push({ key: `c-${o.id}`, objectId: o.id, where: o.label, what: NOT_CHOSEN, hex: o.colour_hex, imageUrl: null });
   }
   const roomName = (id: string) => rooms.find((r) => r.id === id)?.name ?? 'Room';
   for (const s of surfaces) {
     const fin = resolveFinish(s, s.product_id ? products[s.product_id] : undefined);
     if (!fin) continue;
-    rows.push({ key: `s-${s.id}`, objectId: null, where: `${roomName(s.room_id)} · ${SURFACE_LABELS[s.surface] ?? s.surface}`, what: fin.label ?? fin.hex ?? '', hex: fin.hex ?? null, imageUrl: fin.imageUrl ?? null });
+    rows.push({ key: `s-${s.id}`, objectId: null, where: `${roomName(s.room_id)} · ${SURFACE_LABELS[s.surface] ?? s.surface}`, what: fin.label ?? NOT_CHOSEN, hex: fin.hex ?? null, imageUrl: fin.imageUrl ?? null });
   }
   for (const r of rooms) {
     for (const kind of ['floor', 'walls'] as const) {
