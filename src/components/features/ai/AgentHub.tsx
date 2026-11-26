@@ -5073,8 +5073,18 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // in the chat stream alone meant that on a phone — where `canvasPaneVisible` unmounts the chat
     // — the gate the user has to act on was the one thing they could not see.
     if (m.actionConfirmationData) {
-      const n = confirmItems(m.actionConfirmationData).length;
-      return { id: m.id, kind: 'confirm', title: n > 1 ? `${n} actions to approve` : (m.actionConfirmationData.title || 'Needs your approval') };
+      const d = m.actionConfirmationData;
+      const items = confirmItems(d);
+      const n = items.length;
+      // Answered = no longer waiting on the user, so it stops looking like a question.
+      if (d.status === 'approved' || d.status === 'declined') {
+        const failed = items.filter((i) => i.outcome && !i.outcome.ok).length;
+        const title = d.status === 'declined' ? 'Declined'
+          : failed > 0 ? `${n - failed} of ${n} done, ${failed} failed`
+            : `${d.autoApproved ? 'Auto-approved' : 'Approved'}: ${n > 1 ? `${n} actions` : (d.title || 'action')}`;
+        return { id: m.id, kind: 'result', title };
+      }
+      return { id: m.id, kind: 'confirm', title: n > 1 ? `${n} actions to approve` : (d.title || 'Needs your approval') };
     }
     return null;
   }, []);
