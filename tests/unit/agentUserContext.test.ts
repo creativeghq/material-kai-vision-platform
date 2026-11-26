@@ -67,7 +67,7 @@ describe('wiring', () => {
   });
 
   it('the client sends its timezone and a bounded history', () => {
-    expect(agentHub).toMatch(/client_context: \{ timezone: Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone \}/);
+    expect(agentHub).toMatch(/client_context: \{ timezone: Intl\.DateTimeFormat\(\)\.resolvedOptions\(\)\.timeZone[, }]/);
     expect(agentHub).toMatch(/messages: boundedAgentHistory\(messages\)/);
     expect(agentHub).toMatch(/older = all\.slice\(0, -AGENT_HISTORY_SENT\)\.filter\(.*images/);
   });
