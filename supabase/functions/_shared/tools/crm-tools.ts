@@ -318,8 +318,29 @@ export const createManageCrmTool = (
         }, jwt);
         if (!created.ok) return JSON.stringify({ success: false, error: created.error || `crm-api ${created.status}` });
         const row = Array.isArray(created.data) ? created.data[0] : (created.data?.data ?? created.data);
-        onChunk?.({ type: 'crm_contact_created', data: { company: null, contact: row, source: 'agent' }, timestamp: Date.now() });
-        return JSON.stringify({ success: true, contact: row, message: `Created contact "${name}".` });
+        // A named company is LINKED, not just typed: the link is what derives the person's role.
+        let linked: AnyRow | null = null;
+        let linkNote = '';
+        if (company_name && row?.id) {
+          const resolved = await resolveCompanyInWorkspace(workspaceId, undefined, String(company_name));
+          if (resolved.company) {
+            const { error: linkErr } = await supabase.from('crm_company_contacts').upsert(
+              { company_id: resolved.company.id, contact_id: row.id, is_primary: false },
+              { onConflict: 'company_id,contact_id', ignoreDuplicates: true },
+            );
+            if (linkErr) linkNote = ` Could not link them to ${resolved.company.name}: ${linkErr.message}.`;
+            else linked = resolved.company;
+          } else {
+            linkNote = resolved.candidates?.length
+              ? ` Not linked to a company: several match "${company_name}" (${resolved.candidates.map((c) => c.name).join(', ')}). Ask which one.`
+              : ` Not linked to a company: "${company_name}" is not in the CRM yet.`;
+          }
+        }
+        onChunk?.({ type: 'crm_contact_created', data: { company: linked, contact: row, source: 'agent' }, timestamp: Date.now() });
+        return JSON.stringify({
+          success: true, contact: row, linked_company: linked,
+          message: `Created contact "${name}"${linked ? ` and linked them to ${linked.name}` : ''}.${linkNote}`,
+        });
       }
 
       if (action === 'log_activity') {
