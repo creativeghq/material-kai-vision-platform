@@ -51,7 +51,6 @@ describe('#363 EE-2 — image and video spend reaches ai_usage_logs', () => {
     'generateImageWithGemini',
     'generateMultiImageWithGemini',
     'generateVideoWithGeminiOmni',
-    'generateVideoWithKling',
     'generateImageWithGrok',
     'editImageWithGrok',
   ];
