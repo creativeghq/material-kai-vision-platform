@@ -35,6 +35,7 @@ import {
 import { logger } from '@/config';
 
 import { Button } from '@/components/core/ui/button';
+import { Switch } from '@/components/core/ui/switch';
 import { Textarea } from '@/components/core/ui/textarea';
 import {
   Tooltip,
@@ -96,7 +97,7 @@ import { InspirationUrlModal } from './InspirationUrlModal';
 // StarterPromptsModal removed — DB-curated starters now live inside
 // PromptBuilderModal as the "Prompt Library" tab.
 import { ToolkitPickerModal } from './ToolkitPickerModal';
-import { ActionConfirmationCard } from './ActionConfirmationCard';
+import { ActionConfirmationCard, type ActionConfirmationItem } from './ActionConfirmationCard';
 import {
   TOOLKITS, ALWAYS_ON_TOOLKIT_IDS, getToolkitOwnerAgents, getAgentSignatureToolkits,
   resolveToolkitAgent, buildToolInput, renderPromptTemplate,
@@ -331,12 +332,22 @@ const STATUS_STEP_COPY: Record<string, string> = {
 /** SEOGenericCard's chunks. One predicate, so the two branches below cannot disagree. */
 // A `run:` quick-start calls its tool with no model turn, so silence is by design and the card
 // IS the answer — "No response from agent" reads as a failure on a turn that succeeded.
-const emptyTurnText = (directRun?: { quickStartLabel?: string; resumeAfter?: boolean } | null) =>
+const emptyTurnText = (directRun?: { quickStartLabel?: string } | null) =>
   directRun?.quickStartLabel
     ? `${directRun.quickStartLabel} — the result is in the card below.`
-    : directRun?.resumeAfter
-      ? 'Approved and done — reading the result now.'
-      : 'No response from agent';
+    : 'No response from agent';
+
+type ConfirmData = NonNullable<Message['actionConfirmationData']>;
+/** A card saved before batching holds its one action at the top level. */
+const confirmItems = (d: ConfirmData): ActionConfirmationItem[] => (d.items?.length ? d.items : [d]);
+const sortedJson = (v: unknown): string => (v && typeof v === 'object' && !Array.isArray(v)
+  ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${sortedJson((v as Record<string, unknown>)[k])}`).join(',')}}`
+  : JSON.stringify(v));
+const confirmItemKey = (i: ActionConfirmationItem) => `${i.tool}:${sortedJson(i.input)}`;
+const AUTO_APPROVE_KEY = 'agentHub.autoApprove';
+/** Rounds of auto-approve + resume one typed message may chain before a human has to look. */
+const MAX_AUTO_APPROVE_ROUNDS = 3;
+const RESUME_BUBBLE = 'Approved — carry on with what I asked.';
 
 const isSeoToolkitCard = (type: unknown): type is string =>
   typeof type === 'string' && type.startsWith('seo_') && type.endsWith('_card') && type !== 'seo_research_card';
@@ -759,15 +770,14 @@ interface Message {
   }; // Interactive presentation sheet awaiting canvas input
   // Human-in-the-loop approval for a sensitive agent action. The tool previewed instead
   // of mutating; Approve re-invokes it with confirm:true via the direct_tool path.
-  actionConfirmationData?: {
-    tool: string;
-    input: Record<string, unknown>;
-    title: string;
-    summary: string;
-    danger?: boolean;
-    toolkitId?: string;
-    status?: 'pending' | 'approved' | 'declined';
+  actionConfirmationData?: ActionConfirmationItem & {
+    status?: 'pending' | 'running' | 'approved' | 'declined';
+    /** Every action this turn proposed, approved with ONE click. Absent on cards saved before batching. */
+    items?: ActionConfirmationItem[];
+    autoApproved?: boolean;
   };
+  /** Machinery the model needs and the reader does not (an approval's resume prompt). */
+  hidden?: boolean;
   /**
    * A structured question the agent asked via `request_input` (#370, Class D). Rendered as a
    * ClarifyCard and hosted on the canvas — the agent's only previous way to ask was prose.
@@ -1117,6 +1127,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   );
   const savedSceneIds = useRef(new Set<string>());
   const [messages, setMessages] = useState<Message[]>([]);
+  const messagesRef = useRef<Message[]>(messages);
+  messagesRef.current = messages;
   /**
    * Artifacts the user closed from this conversation's view (the canvas tab menu's
    * "Close in chat"). View state only — the message stays saved and comes back on
@@ -1152,11 +1164,27 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     toolkitId: string;
     /** Which quick-start ran, so the reply can offer its siblings and not itself. */
     quickStartLabel?: string;
-    /** An approved confirmation card: hand the result back to the model to finish the ask. */
-    resumeAfter?: boolean;
   } | null>(null);
   // Model-only context for the NEXT send (never shown in the bubble): an approved run's result.
   const pendingResumeContextRef = useRef<string | null>(null);
+  // The next send is an approval's resume: its bubble is hidden and it does not reset the auto-approve budget.
+  const pendingHiddenSendRef = useRef(false);
+  // This turn's ONE approval card; later confirmations in the same turn join it.
+  const turnConfirmRef = useRef<{
+    localId: string;
+    data: ConfirmData;
+    baseMetadata: Record<string, unknown>;
+    dbId: Promise<string | undefined>;
+  } | null>(null);
+  const [autoApprove, setAutoApprove] = useState<boolean>(() => {
+    try { return localStorage.getItem(AUTO_APPROVE_KEY) === '1'; } catch { return false; }
+  });
+  const autoApproveRef = useRef(autoApprove);
+  useEffect(() => {
+    autoApproveRef.current = autoApprove;
+    try { localStorage.setItem(AUTO_APPROVE_KEY, autoApprove ? '1' : '0'); } catch { /* private mode */ }
+  }, [autoApprove]);
+  const autoApproveRoundsRef = useRef(0);
   // This turn ended on an Approve card or a form: suggested next steps would race the user's answer.
   const awaitingUserRef = useRef(false);
   // Toolkit IDs to force-include in the NEXT send's selected_toolkits, regardless
@@ -1426,26 +1454,100 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     return null;
   }, [attachedImages, messages]);
 
-  // Human-in-the-loop confirmation: Approve re-invokes the sensitive tool with confirm:true
-  // through the deterministic direct_tool path; Decline just marks the card and runs nothing.
-  const handleActionApprove = useCallback((messageId: string, data: NonNullable<Message['actionConfirmationData']>) => {
-    setMessages(prev => prev.map(m =>
-      m.id === messageId && m.actionConfirmationData
-        ? { ...m, actionConfirmationData: { ...m.actionConfirmationData, status: 'approved' } }
-        : m));
-    pendingDirectRunRef.current = {
-      toolName: data.tool,
-      toolInput: { ...data.input, confirm: true },
-      // Approving a confirmation card: the card's own title IS the sentence
-      // ("Send the quote to Maria?"), so it needs no rewrite. No quick-start
-      // behind it, so the tool's own message carries the reply.
-      say: data.title,
-      done: '',
-      toolkitId: data.toolkitId || '',
-      resumeAfter: true,
-    };
-    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+  /** Run ONE approved action with confirm:true. No model turn and no chat messages; the card records the outcome. */
+  const runApprovedAction = useCallback(async (item: ActionConfirmationItem): Promise<{ ok: boolean; error?: string; result?: unknown }> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return { ok: false, error: 'Not signed in.' };
+      const supabaseUrl = (supabase as any).supabaseUrl || process.env.SUPABASE_URL;
+      const res = await fetch(`${supabaseUrl}/functions/v1/agent-chat`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [],
+          agentId: selectedAgent,
+          model: selectedModel,
+          conversation_id: conversationIdRef.current,
+          workspace_id: getActiveWorkspaceId(session.user?.id) ?? workspaceId,
+          selected_toolkits: Array.from(new Set([...(activeToolkits || []), ...(item.toolkitId ? [item.toolkitId] : [])])),
+          mode: 'direct_tool',
+          direct_tool: { name: item.tool, input: { ...item.input, confirm: true } },
+          recover_reply: false,
+        }),
+      });
+      if (!res.ok || !res.body) return { ok: false, error: humanEdgeRefusal(await res.text()) ?? `Request failed (${res.status}).` };
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let final: any = null;
+      let streamError: string | null = null;
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const chunk = JSON.parse(line);
+            if (chunk.type === 'final_result') final = chunk;
+            else if (chunk.type === 'error') streamError = chunk.message || chunk.error || 'The action failed.';
+          } catch { /* partial line */ }
+        }
+      }
+      const result = Array.isArray(final?.toolResults) ? final.toolResults[0]?.result : undefined;
+      if (!final || final.error || streamError || result === undefined) {
+        return { ok: false, error: streamError || final?.errorMessage || final?.text || 'The action did not report a result.' };
+      }
+      if (result && typeof result === 'object' && (result as { success?: boolean }).success === false) {
+        return { ok: false, error: (result as { error?: string }).error || 'The action failed.', result };
+      }
+      return { ok: true, result };
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : 'The action failed.' };
+    }
+  }, [selectedAgent, selectedModel, workspaceId, activeToolkits]);
+
+  const persistConfirmCard = useCallback((messageId: string, data: ConfirmData) => {
+    const m = messagesRef.current.find((x) => x.id === messageId);
+    if (!m?.dbId) return;
+    void agentChatHistoryService.updateMessageMetadata(m.dbId, {
+      agentId: m.agentId, model: m.model, actionConfirmationData: data,
+    });
   }, []);
+
+  /**
+   * Human-in-the-loop confirmation. Approve runs EVERY action on the card, in order, then hands
+   * the results back to the model in ONE hidden turn, so a batch costs one model call, not one per action.
+   */
+  const handleActionApprove = useCallback(async (messageId: string, data: ConfirmData, auto = false) => {
+    const items = confirmItems(data).map((i) => ({ ...i, outcome: undefined }));
+    let current: ConfirmData = { ...data, items, status: 'running', autoApproved: auto };
+    const write = (next: ConfirmData) => {
+      current = next;
+      setMessages((prev) => prev.map((m) => (m.id === messageId ? { ...m, actionConfirmationData: next } : m)));
+    };
+    write(current);
+    const results: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const r = await runApprovedAction(items[i]);
+      const raw = typeof r.result === 'string' ? r.result : JSON.stringify(r.result ?? null);
+      results.push(`${i + 1}. ${items[i].title} (${items[i].tool}): ${r.ok ? 'done' : `FAILED: ${r.error}`}. Result: ${raw.length > 1500 ? `${raw.slice(0, 1500)}… (cut)` : raw}`);
+      const nextItems = current.items!.map((it, j) => (j === i ? { ...it, outcome: { ok: r.ok, ...(r.error ? { error: r.error } : {}) } } : it));
+      write({ ...current, items: nextItems });
+    }
+    write({ ...current, status: 'approved' });
+    persistConfirmCard(messageId, current);
+
+    pendingResumeContextRef.current = `[I approved ${items.length === 1 ? 'the action' : `all ${items.length} actions`} you proposed and they ran:\n`
+      + `${results.join('\n')}\n`
+      + 'Do not propose or re-check these again. If anything is left of my original request, do it now. '
+      + 'Otherwise confirm what was done in one or two sentences, naming any that failed.]';
+    pendingHiddenSendRef.current = true;
+    setInput(RESUME_BUBBLE);
+    setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+  }, [runApprovedAction, persistConfirmCard]);
 
   /**
    * The user answered the agent's structured question. The answers go back as an ordinary user
@@ -1487,11 +1589,12 @@ export const AgentHub: React.FC<AgentHubProps> = ({
   }, []);
 
   const handleActionDecline = useCallback((messageId: string) => {
-    setMessages(prev => prev.map(m =>
-      m.id === messageId && m.actionConfirmationData
-        ? { ...m, actionConfirmationData: { ...m.actionConfirmationData, status: 'declined' } }
-        : m));
-  }, []);
+    const m = messagesRef.current.find((x) => x.id === messageId);
+    if (!m?.actionConfirmationData) return;
+    const next: ConfirmData = { ...m.actionConfirmationData, status: 'declined' };
+    setMessages(prev => prev.map(x => (x.id === messageId ? { ...x, actionConfirmationData: next } : x)));
+    persistConfirmCard(messageId, next);
+  }, [persistConfirmCard]);
 
   /**
    * Single dispatcher for a toolkit quick-start. This is THE launch path now
@@ -2632,6 +2735,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // Toolkits queued by a quick-start launcher for this send (race-proof).
     const pendingToolkits = pendingToolkitsRef.current;
     pendingToolkitsRef.current = [];
+    const hiddenSend = pendingHiddenSendRef.current;
+    pendingHiddenSendRef.current = false;
+    // Only a message the user typed or clicked refills the auto-approve budget.
+    if (!hiddenSend) autoApproveRoundsRef.current = 0;
 
     if (!directRun && !input.trim() && attachedImages.length === 0 && attachedCatalogPdfs.length === 0 && attachedDocuments.length === 0) {
       return;
@@ -2677,6 +2784,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       content: userInput,
       timestamp: new Date(),
       images: userAttachedImages.length > 0 ? userAttachedImages : undefined,
+      hidden: hiddenSend || undefined,
     };
 
     setMessages((prev) => [...prev, userMessage]);
@@ -2731,6 +2839,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // Per TURN, not per conversation: a card rendered last turn must not silence this turn's reply.
     renderedResultCardRef.current = false;
     awaitingUserRef.current = false;
+    turnConfirmRef.current = null;
     setReasoningSteps([]); // Clear reasoning steps for new message
     setStreamingText('');
 
@@ -2817,7 +2926,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           conversationId,
           role: 'user',
           content: userInput,
-          metadata: resolvedImageUrls.length > 0 ? { attachedImages: resolvedImageUrls } : undefined,
+          metadata: resolvedImageUrls.length > 0 || hiddenSend
+            ? { ...(resolvedImageUrls.length > 0 ? { attachedImages: resolvedImageUrls } : {}), ...(hiddenSend ? { hidden: true } : {}) }
+            : undefined,
         });
         // Add to sidebar only after message is saved (messageCount > 0 in DB)
         // This prevents empty conversations from appearing in history on page load
@@ -3490,31 +3601,54 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 // Human-in-the-loop gate: a sensitive tool previewed instead of mutating.
                 // Render an inline Approve/Decline card; Approve re-invokes the tool with confirm:true.
                 awaitingUserRef.current = true;
-                const confirmMsg: Message = {
-                  id: `msg-confirm-${Date.now()}`,
-                  role: 'assistant',
-                  content: chunk.title || 'This action needs your approval.',
-                  timestamp: new Date(),
-                  agentId: selectedAgent,
-                  model: selectedModel,
-                  actionConfirmationData: {
-                    tool: chunk.tool,
-                    input: chunk.input || {},
-                    title: chunk.title || 'Confirm action',
-                    summary: chunk.summary || '',
-                    danger: !!chunk.danger,
-                    toolkitId: chunk.toolkit_id,
-                    status: 'pending',
-                  },
+                const item: ActionConfirmationItem = {
+                  tool: chunk.tool,
+                  input: chunk.input || {},
+                  title: chunk.title || 'Confirm action',
+                  summary: chunk.summary || '',
+                  danger: !!chunk.danger,
+                  toolkitId: chunk.toolkit_id,
                 };
-                setMessages(prev => [...prev, confirmMsg]);
-                if (conversationId) {
-                  await saveAndLinkMessage(confirmMsg.id, {
-                    conversationId,
+                const key = confirmItemKey(item);
+                const batch = turnConfirmRef.current;
+                // An action already waiting on a card (this turn's or an earlier one) is not asked twice.
+                const alreadyPending = (batch?.data.items ?? []).some((i) => confirmItemKey(i) === key)
+                  || messages.some((m) => m.actionConfirmationData?.status === 'pending'
+                    && confirmItems(m.actionConfirmationData).some((i) => confirmItemKey(i) === key));
+                if (!alreadyPending && batch) {
+                  batch.data = { ...batch.data, items: [...(batch.data.items ?? []), item] };
+                  const data = batch.data;
+                  setMessages(prev => prev.map((m) => (m.id === batch.localId ? { ...m, actionConfirmationData: data } : m)));
+                  void batch.dbId.then((dbId) => {
+                    if (dbId) void agentChatHistoryService.updateMessageMetadata(dbId, { ...batch.baseMetadata, actionConfirmationData: data });
+                  });
+                }
+                if (!alreadyPending && !batch) {
+                  const data: NonNullable<Message['actionConfirmationData']> = { ...item, status: 'pending', items: [item] };
+                  const confirmMsg: Message = {
+                    id: `msg-confirm-${Date.now()}`,
                     role: 'assistant',
-                    content: confirmMsg.content,
-                    metadata: { agentId: selectedAgent, model: selectedModel, actionConfirmationData: confirmMsg.actionConfirmationData },
-                  }).catch(() => {});
+                    content: item.title,
+                    timestamp: new Date(),
+                    agentId: selectedAgent,
+                    model: selectedModel,
+                    actionConfirmationData: data,
+                  };
+                  const baseMetadata = { agentId: selectedAgent, model: selectedModel };
+                  setMessages(prev => [...prev, confirmMsg]);
+                  turnConfirmRef.current = {
+                    localId: confirmMsg.id,
+                    data,
+                    baseMetadata,
+                    dbId: conversationId
+                      ? saveAndLinkMessage(confirmMsg.id, {
+                        conversationId,
+                        role: 'assistant',
+                        content: confirmMsg.content,
+                        metadata: { ...baseMetadata, actionConfirmationData: data },
+                      }).then((s) => s?.id).catch(() => undefined)
+                      : Promise.resolve(undefined),
+                  };
                 }
               } else if (chunk.type === 'sheet_canvas_open') {
                 const canvasMsg: Message = {
@@ -3742,7 +3876,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
               } else if (AGENT_RESULT_TITLES[chunk.type] && !isSeoToolkitCard(chunk.type)) {
                 // The model's own lookups (reader names, endpoint lists, raw JSON) are its working,
                 // not the answer — shown only when no model turn will narrate them.
-                if (INTERNAL_RESULT_TYPES.has(chunk.type) && (!directRun || directRun.resumeAfter)) continue;
+                if (INTERNAL_RESULT_TYPES.has(chunk.type) && !directRun) continue;
                 // Generic structured render for previously-plain-text result chunks
                 const { type: _t, timestamp: _ts, ...payload } = chunk as Record<string, any>;
                 const title = AGENT_RESULT_TITLES[chunk.type];
@@ -4224,17 +4358,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       // through to a placeholder and the chat said "Done — ran manage_appointments."
       // — an internal tool id, shown to a customer. The quick-start's own `done`
       // copy replaces it.
-      let resumeAfterApproval = false;
       if (directRun) {
         const toolResult = Array.isArray(data.tool_results) ? data.tool_results[0]?.result : undefined;
         const failed = toolResult && toolResult.success === false;
-        if (directRun.resumeAfter && !failed) {
-          const raw = typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult ?? null);
-          pendingResumeContextRef.current = `[The action I just approved (${directRun.toolName}) ran. Its result: `
-            + `${raw.length > 4000 ? `${raw.slice(0, 4000)}… (cut)` : raw}. Carry on with my original request `
-            + 'using it — read whatever else you need and give me the answer. Do not ask me to approve this again.]';
-          resumeAfterApproval = true;
-        }
         const toolMessage = (cleanedText || '').trim();
         // Two shapes of placeholder: the current bare 'Done.', and the old
         // `Done — ran <tool>.`. Both are matched because the edge function and this
@@ -4292,11 +4418,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         generation_job: data.generation_job ?? generationJobLocal ?? undefined,
         geminiImageData: pendingGeminiData ?? undefined,
         searchSpec: pendingSearchSpec ?? undefined, // Explainable search spec from material_search
-        followUps: directRun?.toolkitId && !directRun.resumeAfter
+        followUps: directRun?.toolkitId
           ? { toolkitId: directRun.toolkitId, ranLabel: directRun.quickStartLabel }
           : undefined,
         nextSteps: Array.isArray(data.next_steps) && data.next_steps.length > 0
-          && !awaitingUserRef.current && !resumeAfterApproval
+          && !awaitingUserRef.current
           ? data.next_steps
           : undefined,
       };
@@ -4352,11 +4478,13 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           },
         });
       }
-      // An approval is a step inside a task, not the end of it: ending here left the original ask
-      // unanswered under a bare result card.
-      if (resumeAfterApproval) {
-        setInput('Approved — carry on with what I asked.');
-        setTimeout(() => { void handleSendMessageRef.current?.(); }, 50);
+      // Auto-approve: the turn's one card is approved as if clicked, capped per typed message so a
+      // resume that keeps proposing cannot loop unattended.
+      const turnBatch = turnConfirmRef.current;
+      if (turnBatch && autoApproveRef.current && autoApproveRoundsRef.current < MAX_AUTO_APPROVE_ROUNDS) {
+        autoApproveRoundsRef.current += 1;
+        await turnBatch.dbId;
+        setTimeout(() => { void handleActionApprove(turnBatch.localId, turnBatch.data, true); }, 50);
       }
     } catch (error) {
       console.error('Error executing agent:', error);
@@ -4400,7 +4528,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // send WITHOUT typing hits the empty-composer guard above with a stale empty array: the button
     // is enabled, the click does nothing, and nothing is reported. Typing anything first hid it,
     // because `input` is in this list.
-  }, [input, selectedAgent, selectedModel, attachedImages, attachedCatalogPdfs, attachedDocuments, userId, currentConversationId, messages]);
+  }, [input, selectedAgent, selectedModel, attachedImages, attachedCatalogPdfs, attachedDocuments, userId, currentConversationId, messages, handleActionApprove]);
 
   // Keep ref in sync so effects can call the latest handleSendMessage without stale closures
   useEffect(() => {
@@ -4691,6 +4819,11 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       }
       setJustEnabledToolkitId(null);
       const msgs = await agentChatHistoryService.getConversationMessages(conversationId);
+      // Conversations from before approvals were batched echo each click as a user bubble.
+      const confirmTitles = new Set(msgs.map((m) => (m.metadata?.actionConfirmationData as { title?: string } | undefined)?.title).filter(Boolean));
+      const isApprovalEcho = (m: (typeof msgs)[number]) => m.role === 'user' && (m.metadata?.hidden === true
+        || m.content === RESUME_BUBBLE
+        || (m.content.startsWith('▶ ') && confirmTitles.has(m.content.slice(2))));
       setMessages(dropRepeats(
         msgs.map((msg) => ({
           id: msg.id,
@@ -4699,6 +4832,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           dbId: msg.id,
           role: msg.role,
           content: msg.content,
+          hidden: isApprovalEcho(msg) || undefined,
           timestamp: new Date(msg.createdAt),
           agentId: msg.metadata?.agentId as string,
           model: msg.metadata?.model as string,
@@ -4937,7 +5071,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     // …and so is a pending APPROVAL. This one blocks the turn until it is answered, so leaving it
     // in the chat stream alone meant that on a phone — where `canvasPaneVisible` unmounts the chat
     // — the gate the user has to act on was the one thing they could not see.
-    if (m.actionConfirmationData) return { id: m.id, kind: 'confirm', title: m.actionConfirmationData.title || 'Needs your approval' };
+    if (m.actionConfirmationData) {
+      const n = confirmItems(m.actionConfirmationData).length;
+      return { id: m.id, kind: 'confirm', title: n > 1 ? `${n} actions to approve` : (m.actionConfirmationData.title || 'Needs your approval') };
+    }
     return null;
   }, []);
 
@@ -4947,7 +5084,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
    * the tab, so closing one and leaving the other is not "closed".
    */
   const visibleMessages = useMemo(
-    () => (hiddenArtifactIds.length === 0 ? messages : messages.filter((m) => !hiddenArtifactIds.includes(m.id))),
+    () => messages.filter((m) => !m.hidden && !hiddenArtifactIds.includes(m.id)),
     [messages, hiddenArtifactIds],
   );
 
@@ -5780,11 +5917,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     if (message.actionConfirmationData) {
       return (
         <ActionConfirmationCard
-          title={message.actionConfirmationData.title}
-          summary={message.actionConfirmationData.summary}
-          danger={message.actionConfirmationData.danger}
+          items={confirmItems(message.actionConfirmationData)}
           status={message.actionConfirmationData.status}
-          onApprove={() => handleActionApprove(message.id, message.actionConfirmationData!)}
+          autoApproved={message.actionConfirmationData.autoApproved}
+          onApprove={() => { void handleActionApprove(message.id, message.actionConfirmationData!); }}
           onDecline={() => handleActionDecline(message.id)}
         />
       );
@@ -7265,6 +7401,26 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                       )}
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <label className="ml-auto flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                        <Switch
+                          checked={autoApprove}
+                          onCheckedChange={setAutoApprove}
+                          aria-label="Auto-approve actions"
+                          className="scale-75"
+                        />
+                        <span className={cn(autoApprove && 'font-medium text-foreground')}>Auto-approve</span>
+                      </label>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>
+                        {autoApprove
+                          ? 'On: actions the agent proposes run without asking. Each still shows on its card, with its outcome.'
+                          : 'Off: the agent asks once per message before it changes anything.'}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
               {/* Main input row */}

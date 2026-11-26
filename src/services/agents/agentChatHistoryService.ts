@@ -258,6 +258,20 @@ export class AgentChatHistoryService {
     }
   }
 
+  /** Replace a saved message's metadata, e.g. an approval card's outcome. */
+  async updateMessageMetadata(messageId: string, metadata: Record<string, unknown>): Promise<boolean> {
+    const { data, error } = await supabase
+      .from('agent_chat_messages')
+      .update({ metadata: metadata as never })
+      .eq('id', messageId)
+      .select('id');
+    if (error || !data?.length) {
+      console.warn('Could not update message metadata:', error?.message ?? 'no row updated');
+      return false;
+    }
+    return true;
+  }
+
   /**
    * Get messages for a conversation
    */

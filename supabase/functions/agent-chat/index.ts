@@ -1707,7 +1707,11 @@ async function executeAgent(
   // Runs before config lookup so the rest of the turn executes AS the chosen agent.
   // Who was ASKED for, before routing rewrites `agentId`.
   const requestedAgentId = agentId;
-  if (ORCHESTRATOR_IDS.has(agentId)) {
+  // A direct run names its tool, so there is nothing to classify: routing it was a paid model call
+  // per approval click. The generalist binds every toolkit.
+  if (directTool && ORCHESTRATOR_IDS.has(agentId)) {
+    agentId = 'kai';
+  } else if (ORCHESTRATOR_IDS.has(agentId)) {
     const routed = await routeToSpecialist(supabase, userInput, { userId, workspaceId });
     if (routed && AGENT_CONFIGS[routed.slug]) {
       onChunk?.({ type: 'agent_routed', to: routed.slug, name: routed.name, timestamp: Date.now() });
@@ -4182,7 +4186,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
     // Initialize runtime on first real request (not OPTIONS)
     await initRuntime();
 
-    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null, client_context: bodyClientContext = null, inbox_auto_reply: bodyInboxAutoReply = false } = await req.json();
+    const { messages = [], agentId = 'kai', images = [], documents = [], conversation_id = null, pinned_material_images = [], generation_mode = null, selected_toolkits = null, user_id: bodyUserId = null, mode = 'chat', direct_tool = null, workspace_id: bodyWorkspaceId = null, model_override: bodyModelOverride = null, audience: bodyAudience = null, thread_id: bodyThreadId = null, eval_run: bodyEvalRun = false, operator_instruction: bodyOperatorInstruction = null, client_context: bodyClientContext = null, inbox_auto_reply: bodyInboxAutoReply = false, recover_reply: bodyRecoverReply = true } = await req.json();
     // mode: 'chat' (default, LLM-driven) | 'direct_tool' (deterministic single-tool run).
     // direct_tool: { name: string, input: object } — required when mode==='direct_tool'.
     //   Fired by toolkit quick-starts that carry a `run` descriptor. The tool is
@@ -4895,7 +4899,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
           // message within a second or two; if it is not — tab closed, connection dropped, the
           // 150s idle timeout — nothing else ever will. Runs under `runInBackground` because the
           // isolate is otherwise torn down the moment this handler returns.
-          if (conversation_id && finalResult?.text && !forCustomerTurn && !isEvalRun) {
+          // `recover_reply:false` = an approval run whose outcome the client records on the card.
+          if (conversation_id && finalResult?.text && !forCustomerTurn && !isEvalRun && bodyRecoverReply !== false) {
             void runInBackground(
               recoverAssistantMessage(supabase, conversation_id, turnId, turnStartedAtIso, finalResult.text, {
                 agentId: ranAsAgentId,

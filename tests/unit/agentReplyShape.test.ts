@@ -88,7 +88,7 @@ describe('a turn reads as one reply', () => {
     for (const t of ['platform_api_matches', 'platform_data_matches', 'platform_api_result', 'platform_data_result']) {
       expect(INTERNAL_RESULT_TYPES.has(t)).toBe(true);
     }
-    expect(HUB).toContain('INTERNAL_RESULT_TYPES.has(chunk.type) && (!directRun || directRun.resumeAfter)');
+    expect(HUB).toContain('INTERNAL_RESULT_TYPES.has(chunk.type) && !directRun');
   });
 });
 
@@ -98,9 +98,23 @@ describe('a finished answer always reaches the user', () => {
     expect(fn.slice(0, fn.indexOf('.insert('))).toContain(".eq('metadata->>turn_id', turnId)");
   });
 
-  it('an approved action hands its result back to the model instead of ending the turn', () => {
-    expect(HUB).toMatch(/resumeAfter: true/);
-    expect(HUB).toMatch(/if \(resumeAfterApproval\) \{[\s\S]{0,200}handleSendMessageRef\.current/);
+  it('an approved batch hands its results back to the model in ONE hidden turn', () => {
+    const fn = HUB.slice(HUB.indexOf('const handleActionApprove = useCallback'));
+    const body = fn.slice(0, fn.indexOf('}, [runApprovedAction'));
+    // Every action runs first; the single resume is sent after the loop, never inside it.
+    const loopAt = body.indexOf('for (let i = 0; i < items.length; i++)');
+    expect(loopAt).toBeGreaterThan(-1);
+    expect(body.indexOf('pendingHiddenSendRef.current = true')).toBeGreaterThan(loopAt);
+    expect(body.match(/handleSendMessageRef\.current/g)).toHaveLength(1);
+    // An approval run is no model turn and writes no chat rows of its own.
+    expect(HUB).toMatch(/mode: 'direct_tool',[\s\S]{0,160}recover_reply: false/);
+  });
+
+  it('a turn proposing several actions gets ONE approval card', () => {
+    const at = HUB.indexOf("chunk.type === 'action_confirmation'");
+    const branch = HUB.slice(at, HUB.indexOf('} else if', at + 1));
+    expect(branch).toContain('turnConfirmRef.current');
+    expect(branch).toMatch(/items: \[\.\.\.\(batch\.data\.items/);
   });
 });
 
