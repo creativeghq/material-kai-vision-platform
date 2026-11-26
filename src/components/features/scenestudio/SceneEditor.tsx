@@ -103,6 +103,8 @@ const layoutOf = (objects: SceneObject[], finishes: SceneObjectFinish[]): Record
 
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 
+const MIN_VISIBLE_COVERAGE = 0.0004;
+
 const FREE_STANDING = new Set([
   'sofa', 'armchair', 'chair', 'stool', 'dining_table', 'coffee_table', 'side_table', 'desk', 'bed', 'nightstand',
   'wardrobe', 'cabinet', 'shelving', 'tv_unit', 'lamp', 'plant', 'toilet', 'bathtub', 'vanity',
@@ -476,10 +478,10 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     }
     const seen = await Promise.all(candidates.map(async (r) => {
       const mask = await objectMask([{ image: await loadImage(publicUrl(r.id_pass_path!)), hex: hexIn(r)! }], 0.004);
-      return { r, mask, area: mask.box ? (mask.box.x1 - mask.box.x0) * (mask.box.y1 - mask.box.y0) : 0 };
+      return { r, mask, area: mask.box?.coverage ?? 0 };
     }));
-    const { r: source, mask } = seen.reduce((a, b) => (b.area > a.area ? b : a));
-    if (!mask.box) throw new Error('This object cannot be seen in any render. Render a view that shows it, then make it 3D.');
+    const { r: source, mask, area } = seen.reduce((a, b) => (b.area > a.area ? b : a));
+    if (!mask.box || area < MIN_VISIBLE_COVERAGE) throw new Error('This object cannot be seen in any render. Render a view that shows it, then make it 3D.');
     const base = await loadImage(source.image_url);
     const W = base.naturalWidth; const H = base.naturalHeight;
     const padX = (mask.box.x1 - mask.box.x0) * 0.15; const padY = (mask.box.y1 - mask.box.y0) * 0.15;

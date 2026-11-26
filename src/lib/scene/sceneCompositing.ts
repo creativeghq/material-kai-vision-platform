@@ -31,7 +31,7 @@ export async function objectMask(passes: Array<{ image: HTMLImageElement; hex: s
     if (!rgb) continue;
     const px = p.image === passes[0].image ? first : pixels(p.image);
     if (px.width !== width || px.height !== height) continue;
-    const m = maskForColour(px.data, rgb, 48);
+    const m = maskForColour(px.data, rgb, 6);
     for (let i = 0; i < m.length; i++) if (m[i]) union[i] = 1;
   }
   const box = maskBox(union, width, height);

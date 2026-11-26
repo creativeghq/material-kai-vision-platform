@@ -26,6 +26,14 @@ describe('object-3d makes a GLB mesh', () => {
     const crop = EDITOR.slice(EDITOR.indexOf('const cropFromRender'), EDITOR.indexOf('const make3d'));
     expect(crop).not.toContain('activeRender');
     expect(crop).toMatch(/seen\.reduce\(\(a, b\) => \(b\.area > a\.area \? b : a\)\)/);
+    expect(crop).toContain('area: mask.box?.coverage ?? 0');
+    expect(crop).toContain('area < MIN_VISIBLE_COVERAGE');
+  });
+
+  it('matches an ID-pass colour exactly: a wide tolerance takes the edges of neighbouring objects', () => {
+    const compositing = stripComments(readFileSync(join(ROOT, 'src', 'lib', 'scene', 'sceneCompositing.ts'), 'utf8'));
+    const tol = Number(/maskForColour\(px\.data, rgb, (\d+)\)/.exec(compositing)?.[1]);
+    expect(tol).toBeLessThanOrEqual(8);
   });
 
   it('repaints with Gemini only for a finish variant', () => {
