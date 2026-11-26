@@ -36,6 +36,11 @@ describe('object-3d makes a GLB mesh', () => {
     expect(EDGE).toMatch(/if \(!ready && !processing && !target\.noun\) \{\s*throw new HttpError\(400/);
   });
 
+  it('sizes a product model only from a size a person stated, never an estimate', () => {
+    expect(EDGE).toContain("if (link.size_source === 'manual') target.sizeM = statedSize(link.width_mm, link.depth_mm, link.height_mm);");
+    expect(EDGE).toContain("size_m: t.kind === 'product' ? t.sizeM ?? null : null,");
+  });
+
   it('never overwrites a model the supplier uploaded', () => {
     expect(EDGE).toContain("row.source !== 'generated'");
     expect(EDGE).toContain("row?.status === 'ready' && (supplied || isMesh(row.storage_path))");

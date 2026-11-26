@@ -36,6 +36,7 @@ interface Target {
   folder: string;
   source: { url?: string; path?: string; maskPath?: string };
   linkObjectId?: string;
+  sizeM?: { width: number; depth: number; height: number };
 }
 
 /** Only a GLB mesh is a finished model; a splat left from before #617 is made again. */
@@ -44,6 +45,11 @@ const isMesh = (path: string | null | undefined): path is string => !!path && /\
 const objectNoun = (kind?: string): string => {
   const noun = (kind ?? '').replace(/_/g, ' ').trim().toLowerCase();
   return /^[\p{L} ]{2,40}$/u.test(noun) ? noun : '';
+};
+
+const statedSize = (w: unknown, d: unknown, h: unknown): Target['sizeM'] => {
+  const m = [w, d, h].map((v) => Number(v) / 1000);
+  return m.every((v) => Number.isFinite(v) && v > 0.01 && v <= 20) ? { width: m[0], depth: m[1], height: m[2] } : undefined;
 };
 
 const MIME_EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
@@ -132,6 +138,7 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
       body: JSON.stringify({
         target: t.kind, row_id: t.rowId, image_path: imagePath, mask_path: maskPath, prompt: t.noun,
         product_id: t.kind === 'scene_object' ? null : t.id,
+        size_m: t.kind === 'product' ? t.sizeM ?? null : null,
         out_path: `${t.folder}/${stamp}.glb`, link_object_id: t.linkObjectId ?? null,
         model_finish: t.finish?.text ?? null,
         refund: { user_id: charge.uid, credits: charge.credits, transaction_id: charge.transactionId, workspace_id: charge.workspaceId },
@@ -157,6 +164,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const body = (await req.json().catch(() => ({}))) as {
     product_id?: string; floor_plan_object_id?: string; workspace_id?: string; image_path?: string; mask_path?: string; object_kind?: string;
+    size_mm?: { width?: number; depth?: number; height?: number };
     finish?: { description?: string; image_url?: string };
   };
   const finishText = typeof body.finish?.description === 'string' ? body.finish.description.trim().slice(0, 600) : '';
@@ -206,12 +214,14 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     target.rowId = row?.id ?? '';
     if (body.floor_plan_object_id) {
       const { data: link } = await admin.from('floor_plan_objects')
-        .select('id, product_id, kind, floor_plans(workspace_id)').eq('id', body.floor_plan_object_id).maybeSingle();
+        .select('id, product_id, kind, width_mm, depth_mm, height_mm, size_source, floor_plans(workspace_id)').eq('id', body.floor_plan_object_id).maybeSingle();
       const linkWs = (link?.floor_plans as { workspace_id?: string } | null)?.workspace_id;
       if (!link || link.product_id !== product.id || linkWs !== ws) throw new HttpError(404, 'Object not found');
       target.linkObjectId = link.id;
       target.noun = String(link.kind).replace(/_/g, ' ');
+      if (link.size_source === 'manual') target.sizeM = statedSize(link.width_mm, link.depth_mm, link.height_mm);
     }
+    target.sizeM ??= body.size_mm ? statedSize(body.size_mm.width, body.size_mm.depth, body.size_mm.height) : undefined;
     if (!ready && !processing && !target.noun) {
       throw new HttpError(400, 'Say what the object is (object_kind, e.g. "sofa"): a product name does not tell the 3D model which object in the photo to build.');
     }

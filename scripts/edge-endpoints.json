@@ -18464,6 +18464,12 @@
         "desc": "For a product request without floor_plan_object_id: what the object is (e.g. 'sofa', 'dining chair'), so the model knows which object in the photo to build. Required when a new model has to be made."
       },
       {
+        "name": "size_mm",
+        "type": "object { width: number, depth: number, height: number }",
+        "required": false,
+        "desc": "For a product request: the product's real size in millimetres, so the generated model stands at true scale in the room planner. A room object whose size was set by hand supplies it instead; an estimated size is never used."
+      },
+      {
         "name": "finish",
         "type": "object { description: string, image_url?: https URL }",
         "required": false,

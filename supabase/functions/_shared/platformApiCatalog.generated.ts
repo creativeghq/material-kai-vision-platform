@@ -3444,6 +3444,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
         "type": "string",
         "description": "For a product request without floor_plan_object_id: what the object is (e.g. 'sofa', 'dining chair'), so the model knows"
       },
+      "size_mm": {
+        "type": "string",
+        "description": "For a product request: the product's real size in millimetres, so the generated model stands at true scale in the room p"
+      },
       "finish": {
         "type": "string",
         "description": "Make the model in a chosen finish (e.g. 'upholstery in green velvet, legs in black'); the image shows the material. A pr"
