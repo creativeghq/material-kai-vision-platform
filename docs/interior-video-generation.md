@@ -160,8 +160,8 @@ Content-Type: application/json
   "status": "processing",
   "job_id": "uuid",
   "prediction_id": "replicate-prediction-id",
-  "model": "veo-2",
-  "credits_used": 30,
+  "model": "kling-v4.0",
+  "credits_used": 45,
   "message": "Video generation in progress. Poll /functions/v1/generate-interior-video-v2?job_id=..."
 }
 ```

@@ -200,10 +200,11 @@ Complete documentation for Material Kai Vision Platform.
 - Complete API reference and usage examples
 - Best practices and troubleshooting
 
-- Spark.js Gaussian Splat renderer via `@sparkjsdev/spark` + `three@0.178` (code-split, ~496KB)
-- Orbit + First-person (WASD + mouse look + Shift speed boost) navigation with toggle
-- 3 quality levels (100k/500k/full SPZ)
-- Credit-based pricing (50 credits mini ~30-45s, 200 credits plus ~5min) with refund on failure
+**[3d-rooms-and-models.md](3d-rooms-and-models.md)** - 3D rooms, renders, generated 3D furniture ✨ NEW
+- Plan / photo / render → editable 3D room (Claude read), Gemini renders with object-ID pass
+- Make 3D: SAM 3D Objects GLB meshes; Photo Mode path tracing + OIDN; baked light; walkthrough video
+- Model choices with the benchmark numbers (image→3D, object removal, unstage, staging)
+- Retired: splats, Idol, Atlas, VR World
 
 **[search-strategies.md](search-strategies.md)** - Complete search system guide ✨ UPDATED
 - 6 search strategies (100% implemented)

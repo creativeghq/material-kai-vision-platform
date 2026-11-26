@@ -119,32 +119,9 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
 
 ---
 
-## 5. 3D Designer Flow
+## 5. 3D Rooms Flow
 
-**Purpose:** Interactive 3D room designer for material visualization
-
-**User Journey:**
-1. User accesses /designer route
-   ↓
-2. DesignerLayout loads with:
-   - Asset Library Panel (materials, furniture)
-   - 3D Canvas (React Three Fiber)
-   - Properties Panel (object properties)
-   - Toolbar (transform tools)
-   ↓
-3. User can:
-   - Drag and drop materials/objects
-   - Transform objects (move, rotate, scale)
-   - Adjust room dimensions
-   - Configure lighting
-   ↓
-4. Real-time 3D rendering with:
-   - Camera controls (orbit, pan, zoom)
-   - Grid snapping
-   - Material previews
-
-**Frontend Component:** `DesignerPage.tsx` → `DesignerLayout.tsx`
-**Route:** `/designer`
+The `/designer` route no longer exists. A floor plan, room photo or render becomes an editable 3D room on the agent canvas (Vision / JARVIS `manage_scenes`): edit, render (Gemini, 6 credits), make furniture 3D (SAM 3D, 10 credits), Photo Mode, baked light and walkthrough video (free, in the browser), then share by client link. Full reference: [3d-rooms-and-models.md](3d-rooms-and-models.md).
 
 ---
 

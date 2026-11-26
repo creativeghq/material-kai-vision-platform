@@ -102,7 +102,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
 | Replicate | ComfyUI Interior Remodel, Interiorly Gen1 Dev, Designer Architecture + 4 others | Image-to-image interior transformation | Per image |
 | Google Gemini | gemini-3-pro-image | AI room staging from empty photos | 15 credits/run |
-| Replicate | Wan 2.1 i2v 720p, Runway Gen4 Turbo | Interior video generation (budget + premium) | 12/40 credits |
+| fal / Replicate / Alibaba / ByteDance / Luma / Google | H3 Max, Kling v4.0, Wan 3.0, Seedance 2.5, Ray 3.2, Gemini Omni | Interior video generation | 15–125 credits |
 | Replicate | meta/sam-2, ali-vilab/anydoor | Pixel-precise mask generation, product placement | Per use |
 | Google Gemini | gemini-nano-banana-2.1, gemini-3-pro-image | Interior image generation (4 modes) | 6/15 credits |
 | xAI (Grok) | grok-2-aurora | Social images | 10 credits |
@@ -265,16 +265,20 @@ Users paint a zone over any room image using the `RegionEditCanvas` tool. Gemini
 
 **E. Interior Video Generation**
 
-Any design image can become a video via four AI models:
+Any design image can become a video. The video type picks the model, falling back when a provider has no credential:
 
-| Model | Credits | Best For |
-|-------|---------|----------|
-| Veo-2 (Google) | 30 | Cinematic walkthroughs, floor-plan flythroughs |
-| Kling v3.0 | 20 | Product spotlights, before/after reveals, social reels |
-| Wan 2.1 i2v 720p | 12 | Budget general-purpose |
-| Runway Gen4 Turbo | 40 | Premium quality |
+| Model | Credits (max-length clip) | Provider |
+|---|---|---|
+| H3 Max 768p / 480p | 25 / 15 | fal |
+| Gemini Omni 1.2 Flash 1080p | 30 | Google |
+| Kling v4.0 | 45 | Replicate |
+| Wan 3.0 480p / 720p / 1080p | 30 / 55 / 110 | Alibaba |
+| Seedance 2.5 480p / 720p | 60 / 125 | ByteDance |
+| Ray 3.2 720p / 1080p | 20 / 70 | Luma |
 
-Video type auto-selects the optimal model. Supports 16:9, 9:16, 1:1 aspect ratios. Async polling for long renders (Veo, Runway) with `job_id` polling pattern.
+A video of a 3D room is recorded in the browser from the room itself and is free (see [3d-rooms-and-models.md](3d-rooms-and-models.md)).
+
+Supports 16:9, 9:16, 1:1. Long renders are polled by `job_id`.
 
 ---
 
@@ -429,7 +433,7 @@ AI-powered social media content generation and cross-platform publishing via Zer
 **Content Generation:**
 - **Captions**: Claude generates 3 variants per platform (Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, Threads), each respecting character limits, hashtag conventions, and platform tone. 2 credits.
 - **Images**: Auto-routed by content type — xAI Aurora for lifestyle/people (10cr), Gemini Imagen for product/interior (5cr), FLUX Dev for artistic/textured (6cr). 1:1, 4:5, 9:16, 16:9 aspect ratios.
-- **Videos**: Kling 1.6 Pro (15cr, fast) or Veo-2 (30cr, premium) for short-form social videos. Async polling for longer renders.
+- **Videos**: H3 Max (15–25cr) for reels, Kling v4.0 / Wan 3.0 / Ray 3.2 for longer clips. Async polling for longer renders.
 
 **Publishing (Zernio):**
 - Users connect Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, or Threads via OAuth at their profile settings page
@@ -587,8 +591,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 | Gemini interior (flash) | ~$0.02 | 6 credits | 3x markup |
 | Gemini interior (pro/4K) | ~$0.06 | 15 credits | 2.5x markup |
 | Virtual staging | ~$0.134 Google | 15 credits ($0.15) | 1.1x |
-| Interior video (Kling v3.0) | ~$0.12 | 20 credits ($0.20) | 1.7x markup |
-| Interior video (Veo-2) | ~$0.25 | 30 credits ($0.30) | 1.2x + overhead |
+| Interior video | per model, priced for a max-length clip | 15–125 credits | see `generate-interior-video-v2` `CREDIT_COSTS` |
 | Region edit (Gemini) | ~$0.034 Google | 6 credits ($0.06) | 1.8x |
 | Social image (Aurora) | ~$0.04 | 10 credits | 2.5x markup |
 | Social caption (Claude) | ~$0.002 | 2 credits | 10x+ markup |
@@ -713,7 +716,7 @@ No competitor currently offers: ingestion → AI search → agent interaction �
 - Gemini interior generation (4 modes: text-to-image, image-edit, floor-plan-render, floor-plan-text)
 - Virtual staging (AI-furnished rooms from empty photos — Gemini 3 Pro, 15cr)
 - Region editing / masked inpainting (Gemini, 6cr)
-- Interior video generation (4 models: Veo-2 30cr, Kling v3.0 20cr, Wan 2.1 12cr, Runway 40cr)
+- Interior video generation (H3 Max, Gemini Omni, Kling v4.0, Wan 3.0, Seedance 2.5, Ray 3.2; 15–125cr)
 - Social media suite (caption/image/video generation + Zernio publishing across 8 platforms)
 - Professional marketplace (profiles, services, Hire Me, Discover directory)
 - Moodboards (private + public, comments, featured board)

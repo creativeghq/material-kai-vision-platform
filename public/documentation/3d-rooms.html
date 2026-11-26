@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Rooms | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / 3D Rooms</div>
+  <h1>3D Rooms (Scene Studio)</h1>
+  <div class="routes"><span class="badge route">/agent-hub</span><span class="badge gated">Scene Studio module</span></div>
+  <p class="lead">A <strong>3D room</strong> is an editable 3D model of a home or a single room, built for you by the AI from a <strong>floor plan, a room photo, a render or a drawing page</strong>. Walls, doors, windows and furniture are placed at real size, and from there you rearrange, change finishes with your own catalogue products, take photoreal renders, turn furniture into real 3D models, and share a walkthrough with your client. It replaces hand-drawing a scene in a separate 3D program.</p>
+
+  <div class="callout"><p><strong>Where:</strong> 3D rooms open on the <a href="agent-hub.html">Agent Hub</a> canvas — there is no separate page. Your workspace needs the <strong>Scene Studio</strong> module (see <a href="account-modules.html">Modules</a>).</p></div>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/3d/3d-room-editor.png" alt="The 3D room editor with the Materials panel">
+    <figcaption>The 3D room editor on the Agent Hub canvas — the room in the middle, the <strong>Materials</strong> panel listing what each part is made of.</figcaption>
+  </figure>
+
+  <h2>Opening or creating a 3D room</h2>
+  <ol>
+    <li>Open <strong>Agent Hub</strong> and pick the <strong>Vision</strong> agent (or stay on JARVIS — it routes design requests there).</li>
+    <li>Open the <strong>Interior Design</strong> toolkit and choose a quick-start:
+      <ul class="feat">
+        <li><strong>Editable 3D From a Plan</strong> — attach a floor plan; you get a 3D room of every room on it.</li>
+        <li><strong>Editable 3D From a Photo</strong> — attach a room photo or a render; its furniture becomes objects you can move, recolour and swap.</li>
+        <li><strong>My 3D Rooms</strong> — lists the 3D rooms already in your workspace; click one to open it.</li>
+      </ul>
+    </li>
+    <li>Or, on any generated image in the Hub, choose <strong>Open in 3D</strong>. Rooms, walls and furniture appear on the canvas in about a minute.</li>
+  </ol>
+  <p>You can also just ask in plain words — "open my latest 3D room in walk mode", "lay Amonito on the living room floor", "make the sofa 3D".</p>
+
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/3d/3d-room-whole-home.png" alt="A whole apartment as a 3D room">
+    <figcaption>A whole apartment read from one floor plan — every room, wall, door and window in place.</figcaption>
+  </figure>
+
+  <h2>Editing the room</h2>
+  <ul class="feat">
+    <li><strong>Move and rotate</strong> — select a piece of furniture and drag or turn it. Add products from your catalogue with <strong>Add to the room</strong>.</li>
+    <li><strong>Walk mode</strong> — walk through the home at eye height, room to room.</li>
+    <li><strong>Finishes per part</strong> — a sofa's upholstery and its legs, a kitchen's fronts and its handles, each get their own product or colour.</li>
+    <li><strong>Finishes per surface</strong> — lay a tile, wood or paint on a floor, the walls or a ceiling, one room at a time.</li>
+    <li><strong>Colour plan</strong> — pick a style and the room is given a coordinated set of colours, which the next render follows.</li>
+    <li><strong>Time of Day</strong> — move the sun to see the room in morning, midday or evening light.</li>
+    <li><strong>Make a Clean Texture</strong> (6 credits) — when a product's photo shows a whole room rather than the material, this makes one flat, repeatable piece of it. It is made once and kept on the product, so every later room uses it for free.</li>
+  </ul>
+
+  <h2>Render — a photoreal picture of the current view</h2>
+  <p>Frame the view you want and press <strong>Render</strong>. You get a photoreal picture of exactly that view, with your finishes and furniture, for <strong>6 credits</strong>. Each render is saved with the room, together with where the camera stood and a hidden map of which object is where.</p>
+  <p>That map is what makes later changes precise: <strong>Edit from this view</strong> on an object, or <strong>Change an area</strong> on part of the picture, (6 credits each) changes only that object or area — everything else in the picture stays pixel for pixel the same.</p>
+  <figure>
+      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/3d/3d-room-render-living.png" alt="Photoreal render of a living room made from a 3D room">
+      <figcaption>A living room render made from the 3D room.</figcaption>
+  </figure>
+  <figure>
+      <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/3d/3d-room-render-bedroom.png" alt="Photoreal render of a bedroom made from a 3D room">
+      <figcaption>A bedroom render from the same home.</figcaption>
+  </figure>
+
+  <h2>Make 3D — photo-real furniture</h2>
+  <p>Furniture starts as simple true-size shapes. <strong>Make 3D</strong> on a selected piece turns it into a real 3D model of the sofa, bed or lamp you see in your render — <strong>10 credits per piece, refunded if it fails</strong>. <strong>Make All Furniture 3D</strong> (under <strong>Photo-Real Furniture</strong>) does every free-standing piece at once and shows the total before you confirm. You can also ask for it "in these materials", which first repaints the piece in its current finish.</p>
+  <p>The model is made from the render where the piece is most visible, so it keeps the real proportions and stands inside the piece's box in the room. Built-ins — the kitchen, wardrobes fitted to walls — stay as true-size models.</p>
+  <figure>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/3d/3d-room-kitchen-generated-furniture.png" alt="A kitchen with generated 3D bar stools and a sofa">
+    <figcaption>A kitchen whose bar stools and sofa were made 3D from its renders.</figcaption>
+  </figure>
+
+  <h2>Photo Mode and baked light — free, in your browser</h2>
+  <ul class="feat">
+    <li><strong>Photo Mode</strong> — turns the live 3D view into a physically lit picture, drawn in your browser and cleaned up as it refines. Hold still while it refines, then <strong>Save picture</strong> — it is kept with the room's renders. <strong>Photograph all rooms</strong> takes one picture of every room. Free.</li>
+    <li><strong>Bake light</strong> — lights every wall, floor and ceiling with real daylight once (about five minutes), so walking, the client link and the video all look like the pictures. After you move furniture or change a finish it is out of date; press <strong>Bake light again</strong>. Free.</li>
+    <li><strong>Walkthrough Video</strong> — records a walk through the home as an MP4 (or WebM), frame by frame in your browser, so it is smooth whatever your computer. Free.</li>
+  </ul>
+
+  <h2>Kitchen tools</h2>
+  <p>When a 3D room has a kitchen, it becomes a working document, not just a picture:</p>
+  <ul class="feat">
+    <li><strong>Drawings</strong> — a drawing set of plan, elevations, electrical and plumbing drawings and a cut list, exported as a PDF, with the checks that fail named. Assembly sheets and tile drawings are included.</li>
+    <li><strong>Price the Kitchen</strong> — turns the kitchen into a priced plan you can send as a <a href="quotes.html">quote</a>.</li>
+  </ul>
+
+  <h2>Sharing with your client</h2>
+  <ul class="feat">
+    <li><strong>Client View</strong> <span class="badge public">/cv/:token</span> — in a project's <a href="projects-client-view.html">Client View</a>, switch on <strong>Scroll Walkthrough</strong> and pick the <strong>3D Room</strong>. The client scrolls through the home room by room; each room ends on its render or Photo Mode picture, and they can walk freely at any point. <strong>Client Sees</strong> in the editor decides which pictures they get: <em>Live 3D Rooms and All Renders</em>, or <em>Live 3D Rooms and Photo Mode Pictures</em>.</li>
+    <li><strong>Property listing</strong> <span class="badge public">/p/:token</span> — pick the room under <strong>3D Walkthrough</strong> on a <a href="real-estate-listings.html">real estate listing</a> and the public listing page carries the same walkthrough.</li>
+  </ul>
+
+  <div class="callout tip"><p><strong>Tips &amp; limits.</strong></p>
+    <ul>
+      <li><strong>Render each room before Make All Furniture 3D.</strong> A piece must be visible in at least one render; pieces hidden in every render are skipped and cost nothing.</li>
+      <li>A generated model has the real proportions of the piece, but takes its size from the piece's size in the room — resize the box if it is wrong.</li>
+      <li>Photo Mode, Bake light and video recording need the tab <strong>in front</strong> while they run. A browser with WebGPU (recent Chrome or Edge) gives the best clean-up of the picture.</li>
+    </ul>
+  </div>
+
+  <div class="callout tip"><p><strong>Worked example — a two-bedroom apartment.</strong> Agent Hub → Vision → Interior Design → <strong>Editable 3D From a Plan</strong>, attach the plan → in a minute the whole home is on the canvas → lay an oak floor in the living room and a tile in the bathroom → <strong>Render</strong> each room (6 credits each) → <strong>Make All Furniture 3D</strong> → <strong>Bake light</strong> → <strong>Photograph all rooms</strong> → attach it to the project's Client View and send the link.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

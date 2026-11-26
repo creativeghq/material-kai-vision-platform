@@ -27,7 +27,8 @@
         { file: "moodboards-sheets.html", title: "Presentation sheets" },
       ]},
       { file: "room-planner.html", title: "Room Planner", icon: "📐" },
-      { file: "product-3d.html", title: "Product 3D & materials", icon: "🧊" },
+      { file: "3d-rooms.html", title: "3D Rooms", icon: "🏠" },
+      { file: "product-3d.html", title: "Product 3D Models", icon: "🧊" },
       { file: "projects.html", title: "Projects", icon: "📁", children: [
         { file: "projects-overview.html", title: "Overview, costs & team" },
         { file: "projects-tasks.html", title: "Tasks, board & My tasks" },

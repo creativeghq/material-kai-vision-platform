@@ -616,12 +616,16 @@ Complete reference of all platform features and capabilities.
 
 **Documentation**: [interior-video-generation.md](interior-video-generation.md)
 
-| Model | Credits | Best For |
+| Model | Credits (max-length clip) | Provider |
 |---|---|---|
-| Veo-2 (Google) | 30 | Cinematic walkthroughs, floorplan flythroughs |
-| Kling v3.0 | 20 | Product spotlights, before/after, social reels |
-| Wan 2.1 i2v 720p | 12 | Budget general-purpose |
-| Runway Gen4 Turbo | 40 | Premium quality |
+| H3 Max 768p / 480p | 25 / 15 | fal |
+| Gemini Omni 1.2 Flash 1080p | 30 | Google |
+| Kling v4.0 | 45 | Replicate |
+| Wan 3.0 480p / 720p / 1080p | 30 / 55 / 110 | Alibaba |
+| Seedance 2.5 480p / 720p | 60 / 125 | ByteDance |
+| Ray 3.2 720p / 1080p | 20 / 70 | Luma |
+
+A video of a 3D room is recorded in the browser from the room itself and is free (see [3d-rooms-and-models.md](3d-rooms-and-models.md)).
 
 - ✅ Auto model selection by `video_type`
 - ✅ Async polling pattern for long renders (>55s → returns `job_id`)
@@ -695,7 +699,7 @@ Complete reference of all platform features and capabilities.
 **Content Generation:**
 - ✅ Caption generation (3 variants) for Instagram, Facebook, LinkedIn, TikTok, Pinterest, YouTube, Twitter, Threads — 2 credits
 - ✅ Image generation: xAI Aurora (10cr), Gemini Imagen (5cr), FLUX Dev (6cr) — auto-routed by image type
-- ✅ Video generation: Kling 1.6 Pro (15cr), Veo-2 (30cr)
+- ✅ Video generation: H3 Max (15–25cr), Kling v4.0 (45cr), Wan 3.0, Ray 3.2
 
 **Publishing (Zernio):**
 - ✅ OAuth account connect/disconnect for all 8 platforms
