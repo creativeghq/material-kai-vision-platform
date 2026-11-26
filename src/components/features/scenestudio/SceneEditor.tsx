@@ -1341,7 +1341,6 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
                 openings={data.openings}
                 surfaces={viewed.surfaces}
                 finishes={viewed.finishes}
-                staleModels={staleModels}
                 objects={viewed.objects}
                 products={products}
                 defaultWallHeightMm={scene.default_wall_height_mm}

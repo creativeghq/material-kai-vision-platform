@@ -1,10 +1,10 @@
 import { BufferAttribute, BufferGeometry, Mesh as ThreeMesh, type Material, type Mesh, type Object3D } from 'three';
 
-import { invisibleMaterial, isSplat } from '@/components/features/scenestudio/splatOverlay';
+const invisibleMaterial = (m: Material | Material[]) => (Array.isArray(m) ? m.every((x) => !x.visible) : !m.visible);
 
 export function excludedFromTrace(o: Object3D): boolean {
   if (o.userData?.ground) return false;
-  if (o.userData?.helper || o.userData?.splat || isSplat(o)) return true;
+  if (o.userData?.helper || o.userData?.contactShadow) return true;
   const mesh = o as Mesh;
   return !!mesh.isMesh && invisibleMaterial(mesh.material);
 }

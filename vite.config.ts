@@ -33,13 +33,6 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), chunkModulesManifest()],
     optimizeDeps: {
-      // Excluding @sparkjsdev/spark from pre-bundling fixes the "(void 0) is not a constructor"
-      // error in dev mode. When Vite pre-bundles spark with esbuild, it externalises `three`
-      // but creates EMPTY imports (import {} from "chunk-three.js") for the `import * as THREE`
-      // namespace — so all THREE.* constructors are undefined inside the pre-bundle.
-      // Excluding makes Vite serve spark.module.js as raw ESM and rewrite its bare "three"
-      // specifier to the proper pre-bundled three URL, giving spark the full THREE namespace.
-      exclude: ['@sparkjsdev/spark'],
       // grapesjs-preset-newsletter is a UMD bundle — must be pre-bundled by Vite/esbuild
       // so it is available as a proper ESM module in the dev server.
       include: ['grapesjs', 'grapesjs-preset-newsletter'],
@@ -60,7 +53,6 @@ export default defineConfig(({ mode }) => {
         '@': path.resolve(__dirname, './src'),
       },
       // Ensure only one instance of three.js is used across all modules
-      // (prevents @sparkjsdev/spark from getting a separate THREE instance)
       dedupe: ['three'],
     },
     define: {
@@ -85,9 +77,6 @@ export default defineConfig(({ mode }) => {
         output: {
           // Extract the exact package name from the resolved module path (handles
           // both scoped @org/pkg and plain pkg, and both / and \ path separators).
-          // This is equivalent to the array-based manualChunks but also correctly
-          // assigns @sparkjsdev/spark into vendor-3d (which the array syntax failed
-          // to do, causing spark to get a tree-shaken THREE with missing exports).
           manualChunks: (id) => {
             if (!id.includes('node_modules')) return undefined;
 
@@ -101,12 +90,10 @@ export default defineConfig(({ mode }) => {
             if (pkg === 'react-dom' && tail?.includes('server')) return undefined;
 
             const CHUNK: Record<string, string> = {
-              // 3D (three + spark must be co-bundled so spark's `import * as THREE`
-              // resolves the full, un-tree-shaken namespace)
+              // 3D
               'three': 'vendor-3d',
               '@react-three/fiber': 'vendor-3d',
               '@react-three/drei': 'vendor-3d',
-              '@sparkjsdev/spark': 'vendor-3d',
               // Core framework only — keep this chunk small
               'react': 'vendor-react',
               'react-dom': 'vendor-react',

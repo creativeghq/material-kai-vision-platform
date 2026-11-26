@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
 import { AssetContext } from '@/components/features/scenestudio/assetContext';
-import { fitModel } from '@/lib/scene/splatFit';
+import { fitModel } from '@/lib/scene/modelFit';
 
 const loaded = new Map<string, Promise<Object3D>>();
 
@@ -26,7 +26,7 @@ export function fitMesh(source: Object3D, w: number, d: number, h: number, userD
   const box = new Box3().setFromObject(copy);
   if (box.isEmpty()) return null;
   const size = box.getSize(new Vector3());
-  const [kx, ky, kz] = fitModel({ x: size.z, y: size.y, z: size.x }, w, d, h);
+  const [kx, ky, kz] = fitModel(size, w, d, h);
   const c = box.getCenter(new Vector3());
   const out = new Group();
   out.add(copy);

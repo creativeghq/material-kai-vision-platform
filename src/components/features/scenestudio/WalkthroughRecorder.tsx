@@ -35,7 +35,7 @@ const drawCover = (ctx: CanvasRenderingContext2D, img: HTMLImageElement, opacity
 
 const painted = () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
 
-/** Encodes frame by frame, waiting for the splats whenever the room changes, so a slow graphics card makes it slower, never choppier. */
+/** Encodes frame by frame, waiting for the room's light whenever the room changes, so a slow graphics card makes it slower, never choppier. */
 export const WalkthroughRecorder: React.FC<{
   data: WalkthroughPayload;
   autoStart?: boolean;
@@ -95,7 +95,7 @@ export const WalkthroughRecorder: React.FC<{
         await painted();
         const limit = st.frame.room === room && scene.current?.lit() ? SETTLE_FRAME_MS : SETTLE_ROOM_MS;
         room = st.frame.room;
-        for (const until = performance.now() + limit; !(scene.current?.settled() && scene.current.lit()) && performance.now() < until;) await painted();
+        for (const until = performance.now() + limit; !scene.current?.lit() && performance.now() < until;) await painted();
         ctx.drawImage(gl, 0, 0, W, H);
         const shot = st.shotRoom >= 0 ? shotPictures[st.shotRoom] : null;
         if (shot && st.shotOpacity > 0) drawCover(ctx, shot, st.shotOpacity);

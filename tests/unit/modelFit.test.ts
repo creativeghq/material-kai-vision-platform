@@ -1,17 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { fitModel } from '@/lib/scene/splatFit';
+import { fitModel } from '@/lib/scene/modelFit';
 
 describe('fitModel', () => {
-  it('reads the model width along Z and fills a TV unit box', () => {
-    const k = fitModel({ x: 0.27, y: 0.26, z: 1.0 }, 1.8, 0.4, 0.5);
+  it('reads the model width along X and fills a TV unit box', () => {
+    const k = fitModel({ x: 1.0, y: 0.26, z: 0.27 }, 1.8, 0.4, 0.5);
     expect(1.0 * k[0]).toBeCloseTo(1.8, 2);
     expect(0.26 * k[1]).toBeLessThanOrEqual(0.5 + 1e-9);
     expect(0.27 * k[2]).toBeLessThanOrEqual(0.4 + 1e-9);
   });
 
   it('stretches a too-deep, too-flat sofa to its true size', () => {
-    const k = fitModel({ x: 0.75, y: 0.32, z: 1.04 }, 2.4, 0.9, 0.85);
+    const k = fitModel({ x: 1.04, y: 0.32, z: 0.75 }, 2.4, 0.9, 0.85);
     expect(1.04 * k[0]).toBeCloseTo(2.4, 2);
     expect(0.32 * k[1]).toBeCloseTo(0.85, 2);
     expect(0.75 * k[2]).toBeCloseTo(0.9, 2);

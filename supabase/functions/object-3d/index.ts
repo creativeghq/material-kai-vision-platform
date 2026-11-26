@@ -38,6 +38,9 @@ interface Target {
   linkObjectId?: string;
 }
 
+/** Only a GLB mesh is a finished model; a splat left from before #617 is made again. */
+const isMesh = (path: string | null | undefined): path is string => !!path && /\.glb$/i.test(path);
+
 const MIME_EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 interface Charge { uid: string; credits: number; transactionId: string | null; workspaceId: string }
@@ -192,7 +195,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
         .select('id, status, storage_path, updated_at, source').eq('product_id', product.id).eq('format', 'glb').maybeSingle();
     const supplied = !!row && 'source' in row && row.source !== 'generated';
     if (supplied && row.status !== 'ready') throw new HttpError(409, 'The supplier 3D model of this product is not ready yet.');
-    if (row?.status === 'ready') ready = row.storage_path;
+    if (row?.status === 'ready' && (supplied || isMesh(row.storage_path))) ready = row.storage_path;
     else if (row?.status === 'processing' && Date.parse(row.updated_at) > Date.now() - STALE_MS) processing = true;
     else if (!imageUrl) throw new HttpError(409, 'This product has no photo to make a 3D model from.');
     target.rowId = row?.id ?? '';
@@ -216,7 +219,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
       noun: String(obj.kind).replace(/_/g, ' '), workspaceId: ws,
       folder: `${folder}/object-3d/${obj.id}`, source: { path: body.image_path, maskPath: body.mask_path }, finish,
     };
-    if (obj.model_status === 'ready' && obj.model_storage_path && (obj.model_finish ?? '') === (finish?.text ?? '')) ready = obj.model_storage_path;
+    if (obj.model_status === 'ready' && isMesh(obj.model_storage_path) && (obj.model_finish ?? '') === (finish?.text ?? '')) ready = obj.model_storage_path;
     else if (obj.model_status === 'processing' && obj.model_updated_at && Date.parse(obj.model_updated_at) > Date.now() - STALE_MS) processing = true;
     else {
       const inScene = (p?: string) => !!p && p.startsWith(`${folder}/`) && !p.includes('..');
@@ -252,7 +255,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
         const { data: claimed } = await admin.from(productTable(target))
           .update({ status: 'processing', error: null, created_by: uid })
           .eq('id', target.rowId)
-          .or(`status.eq.failed,and(status.eq.processing,updated_at.lt.${staleBefore})`)
+          .or(`status.eq.failed,and(status.eq.processing,updated_at.lt.${staleBefore}),status.eq.ready`)
           .select('id');
         if (!claimed?.length) return json({ success: true, status: 'processing', charged: false });
       }
@@ -260,7 +263,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
       const { data: claimed } = await admin.from('floor_plan_objects')
         .update({ model_status: 'processing', model_error: null, model_updated_at: new Date().toISOString() })
         .eq('id', target.rowId)
-        .or(`model_status.is.null,model_status.eq.failed,and(model_status.eq.processing,model_updated_at.lt.${staleBefore})`)
+        .or(`model_status.is.null,model_status.eq.failed,and(model_status.eq.processing,model_updated_at.lt.${staleBefore}),model_status.eq.ready`)
         .select('id');
       if (!claimed?.length) return json({ success: true, status: 'processing', charged: false });
     }

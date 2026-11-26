@@ -32,5 +32,12 @@ describe('object-3d makes a GLB mesh', () => {
 
   it('never overwrites a model the supplier uploaded', () => {
     expect(EDGE).toContain("row.source !== 'generated'");
+    expect(EDGE).toContain("row?.status === 'ready' && (supplied || isMesh(row.storage_path))");
+  });
+
+  it('makes an old splat again instead of serving it as ready', () => {
+    expect(EDGE).toContain("obj.model_status === 'ready' && isMesh(obj.model_storage_path)");
+    expect(EDGE).toMatch(/model_updated_at\.lt\.\$\{staleBefore\}\),model_status\.eq\.ready`/);
+    expect(EDGE).toMatch(/updated_at\.lt\.\$\{staleBefore\}\),status\.eq\.ready`/);
   });
 });

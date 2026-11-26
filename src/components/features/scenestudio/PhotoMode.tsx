@@ -7,7 +7,6 @@ import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 
 import { denoise as cleanPhoto, denoiserNet, forgetDenoiser, photoExposure, photoTexture, readFloatPixels, renderGuides, type PhotoGuides } from '@/components/features/scenestudio/photoDenoiser';
 import { drawOutdoorsOver } from '@/components/features/scenestudio/outdoorsOverlay';
-import { drawSplatsOver } from '@/components/features/scenestudio/splatOverlay';
 import { excludedFromTrace, withTraceView } from '@/components/features/scenestudio/traceView';
 
 const MAX_SAMPLES = 120;
@@ -97,7 +96,6 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
         denoise.render(renderer);
       }
       drawOutdoorsOver(renderer, scene as Scene, camera, depthOnly);
-      drawSplatsOver(renderer, scene as Scene, camera, depthOnly);
       renderer.autoClear = auto;
     };
     return t;

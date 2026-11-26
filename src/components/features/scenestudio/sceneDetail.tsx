@@ -11,7 +11,6 @@ import { DARK, STEEL, STONE, WHITE, objectParts } from '@/lib/scene/objectParts'
 import type { SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import type { Finish } from '@/lib/scene/sceneSurfaces';
 import { useLook } from '@/components/features/scenestudio/surfaceMaps';
-import { isSplat } from '@/components/features/scenestudio/splatOverlay';
 import { litRoomAt, type LitRoom } from '@/lib/scene/roomLight';
 import { sunAt } from '@/lib/scene/sun';
 import { KITCHEN_KINDS, type KitchenLayout } from '@/lib/scene/kitchenComposition';
@@ -116,7 +115,7 @@ function useRoomLight(rooms: LitRoom[], version: unknown, solid: () => boolean, 
     try {
       scene.traverse((o) => {
         if (o.userData?.outdoors || o.userData?.surface === 'ceiling') set(o, true);
-        else if (isSplat(o) || o.userData?.splat || o.userData?.helper) set(o, false);
+        else if (o.userData?.contactShadow || o.userData?.helper) set(o, false);
         if ('windowRoom' in o.userData) set(o, o.userData.windowRoom === room.id);
       });
       gl.toneMapping = NoToneMapping;

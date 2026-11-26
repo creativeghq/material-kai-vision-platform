@@ -1,6 +1,5 @@
 import type { Camera, Material, Mesh, MeshBasicMaterial, Object3D, Scene, WebGLRenderer } from 'three';
 
-import { isSplat } from '@/components/features/scenestudio/splatOverlay';
 
 /** Puts the sharp view outside where a photo's window is; the traced picture only holds its light. */
 export function drawOutdoorsOver(renderer: WebGLRenderer, scene: Scene, camera: Camera, depthOnly: MeshBasicMaterial) {
@@ -13,7 +12,7 @@ export function drawOutdoorsOver(renderer: WebGLRenderer, scene: Scene, camera: 
   scene.traverse((o) => {
     if (!o.visible || outdoors.includes(o)) return;
     const mesh = o as Mesh;
-    if (isSplat(o) || o.userData?.splat || (o.userData?.helper && !o.userData.ground) || (mesh.isMesh && glass(mesh.material))) { o.visible = false; hidden.push(o); return; }
+    if (o.userData?.contactShadow || (o.userData?.helper && !o.userData.ground) || (mesh.isMesh && glass(mesh.material))) { o.visible = false; hidden.push(o); return; }
     if (mesh.isMesh) { swapped.push([mesh, mesh.material]); mesh.material = depthOnly; }
   });
   const before = { auto: renderer.autoClear, shadows: renderer.shadowMap.autoUpdate, background: scene.background, exposure: renderer.toneMappingExposure };
