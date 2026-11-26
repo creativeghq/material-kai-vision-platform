@@ -259,10 +259,10 @@ export class AgentChatHistoryService {
   }
 
   /** Replace a saved message's metadata, e.g. an approval card's outcome. */
-  async updateMessageMetadata(messageId: string, metadata: Record<string, unknown>): Promise<boolean> {
+  async updateMessageMetadata(messageId: string, metadata: Record<string, unknown>, content?: string): Promise<boolean> {
     const { data, error } = await supabase
       .from('agent_chat_messages')
-      .update({ metadata: metadata as never })
+      .update({ metadata: metadata as never, ...(content !== undefined ? { content } : {}) })
       .eq('id', messageId)
       .select('id');
     if (error || !data?.length) {

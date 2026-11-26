@@ -1496,7 +1496,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           } catch { /* partial line */ }
         }
       }
-      const result = Array.isArray(final?.toolResults) ? final.toolResults[0]?.result : undefined;
+      const result = Array.isArray(final?.tool_results) ? final.tool_results[0]?.result : undefined;
       if (!final || final.error || streamError || result === undefined) {
         return { ok: false, error: streamError || final?.errorMessage || final?.text || 'The action did not report a result.' };
       }
@@ -3618,9 +3618,10 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                 if (!alreadyPending && batch) {
                   batch.data = { ...batch.data, items: [...(batch.data.items ?? []), item] };
                   const data = batch.data;
-                  setMessages(prev => prev.map((m) => (m.id === batch.localId ? { ...m, actionConfirmationData: data } : m)));
+                  const content = `${data.items!.length} actions need your approval`;
+                  setMessages(prev => prev.map((m) => (m.id === batch.localId ? { ...m, content, actionConfirmationData: data } : m)));
                   void batch.dbId.then((dbId) => {
-                    if (dbId) void agentChatHistoryService.updateMessageMetadata(dbId, { ...batch.baseMetadata, actionConfirmationData: data });
+                    if (dbId) void agentChatHistoryService.updateMessageMetadata(dbId, { ...batch.baseMetadata, actionConfirmationData: data }, content);
                   });
                 }
                 if (!alreadyPending && !batch) {
