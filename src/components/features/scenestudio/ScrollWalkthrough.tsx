@@ -6,7 +6,7 @@ import { Button } from '@/components/core/ui/button';
 
 import { planBounds, planFrame, pointInPolygon, polygonCentroid, toScene, type PlanOpening, type PlanRoom, type PlanWall } from '@/lib/scene/sceneGeometry';
 import { fitFov, walkthroughStage, type Pose, type WalkRoom } from '@/lib/scene/walkthroughTimeline';
-import { roomSignature } from '@/lib/scene/roomSignature';
+import { homeSignature, roomSignature } from '@/lib/scene/roomSignature';
 import type { SceneObject, SceneObjectFinish, SceneProduct, SceneSurface } from '@/services/sceneStudioService';
 import { ExploreBar, ExploreShot, exploreHint, useExplore } from '@/components/features/scenestudio/WalkthroughExplore';
 import type { SceneCanvasHandle, ScriptFrame } from '@/components/features/scenestudio/SceneCanvas';
@@ -26,6 +26,7 @@ export interface WalkthroughPayload {
   products: Record<string, SceneProduct>;
   render: { image_url: string; camera: Pose | null } | null;
   renders?: Array<{ image_url: string; camera: Pose | null; source?: string | null; sig?: string | null }>;
+  lightmap?: { url: string; intensity: number; atlas_sig: string; home_sig: string; room_gain?: Record<string, number> | null } | null;
 }
 
 /** Pictures a room can end on: a Photo Mode picture of a room that has changed since is left out. */
@@ -78,6 +79,8 @@ export function useWalkthrough(data: WalkthroughPayload) {
       finalPose: heroInRoom ? null : hero?.camera ?? null,
       names: ordered.map((r) => r.name),
       shotByRoom: Object.fromEntries(ordered.flatMap((r, i) => (shots[i] ? [[r.id, shots[i]!.image_url]] : []))) as Record<string, string>,
+      lightmap: data.lightmap && data.lightmap.home_sig === homeSignature(data.rooms.map((r) => r.id), data.objects, data.surfaces, data.finishes)
+        ? { url: data.lightmap.url, intensity: data.lightmap.intensity, atlasSig: data.lightmap.atlas_sig, roomGain: data.lightmap.room_gain ?? null } : null,
       modelUrls: Object.fromEntries(data.objects.filter((o) => o.model_url).map((o) => [o.id, o.model_url as string])) as Record<string, string>,
     };
   }, [data]);
@@ -99,7 +102,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
   const canRender = useMemo(() => typeof document !== 'undefined' && webgl2(), []);
 
   const plan = useWalkthrough(data);
-  const { ordered, walk, shots, hero, heroInRoom, names, shotByRoom, modelUrls } = plan;
+  const { ordered, walk, shots, hero, heroInRoom, names, shotByRoom, modelUrls, lightmap } = plan;
   const explore = useExplore(ordered, shotByRoom, canvas);
   const exploring = explore.on;
 
@@ -180,6 +183,7 @@ export const ScrollWalkthrough: React.FC<{ data: WalkthroughPayload }> = ({ data
               walkRoomId={exploring ? explore.roomId : undefined}
               onWalkEnd={explore.overview}
               adaptive
+              lightmap={lightmap}
             />
           </Suspense>
           {exploring ? (

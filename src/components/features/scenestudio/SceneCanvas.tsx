@@ -4,22 +4,24 @@ import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber'
 import { ContactShadows, Edges, OrbitControls, PerformanceMonitor } from '@react-three/drei';
 import {
   ACESFilmicToneMapping, Box3, CanvasTexture, Color, DoubleSide, Material, Matrix4, Mesh, MeshBasicMaterial, Plane, Quaternion, Shape, Vector3,
-  type Object3D, type PerspectiveCamera, type RectAreaLight, type Group,
+  type Object3D, type Texture, type PerspectiveCamera, type RectAreaLight, type Group,
 } from 'three';
 import { PackedSplats, SparkRenderer, SplatMesh } from '@sparkjsdev/spark';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { EffectComposer, N8AO, ToneMapping } from '@react-three/postprocessing';
 import { ToneMappingMode } from 'postprocessing';
 import { Ceiling, DoorOrWindow, FinishMaterial, ObjectShape, RoomLighting, type SlotFinishes } from '@/components/features/scenestudio/sceneDetail';
-import type { LitRoom } from '@/lib/scene/roomLight';
+import { litRoomAt, type LitRoom } from '@/lib/scene/roomLight';
 import { finishTone } from '@/components/features/scenestudio/surfaceMaps';
 import { groupSplats, tintSplats, type SplatGroup } from '@/lib/scene/splatTint';
 import { MODEL_FRONT_TURN_DEG, MAX_MODEL_SPLATS, crowded, fitModel, isMeshModel, thinSplats } from '@/lib/scene/splatFit';
 import { slotsForKind } from '@/lib/scene/sceneReadSchema';
 import { PhotoMode } from '@/components/features/scenestudio/PhotoMode';
+import { bakeLight, isBaked, loadLightMap, showBakedLight, surfaceCharts, atlasOf, type Bake } from '@/components/features/scenestudio/bakedLight';
 import { AssetContext } from '@/components/features/scenestudio/assetContext';
 import { MeshModel } from '@/components/features/scenestudio/meshModel';
 import { drawSplatsOver, isSplat, splatsSettled } from '@/components/features/scenestudio/splatOverlay';
+import { BAKED_SURFACES as BAKED_KINDS } from '@/components/features/scenestudio/bakedLight';
 import { CabinetViewContext } from '@/components/features/scenestudio/cabinetMesh';
 import type { Pose } from '@/lib/scene/walkthroughTimeline';
 import { RectAreaLightUniformsLib } from 'three/examples/jsm/lights/RectAreaLightUniformsLib.js';
@@ -56,6 +58,8 @@ export interface SceneCanvasHandle {
   settled(): boolean;
   /** False while the room the camera stands in is still taking its own light. */
   lit(): boolean;
+  /** Lights every wall, floor and ceiling with the path tracer, once; the result is stored and read back while walking. */
+  bakeLight(onProgress: (done: number) => void, stop: () => boolean): Promise<Bake>;
   /** What is on screen now, as a picture. */
   picture(): Promise<{ blob: Blob; camera: CameraPose }>;
   setPose(pose: CameraPose): void;
@@ -101,9 +105,13 @@ interface Props {
   script?: React.MutableRefObject<ScriptFrame | null>;
   /** How many furniture models are still loading; a failed one counts as done. */
   onAssets?(pending: number): void;
+  /** A stored bake of this home; ignored when the surfaces no longer match it. */
+  lightmap?: LightMapRef | null;
   /** Trades sharpness for speed on a slow device. */
   adaptive?: boolean;
 }
+
+export interface LightMapRef { url: string; intensity: number; atlasSig: string; roomGain?: Record<string, number> | null }
 
 export interface ScriptFrame { pose: Pose; walls: number; objects: number }
 
@@ -122,6 +130,44 @@ const ScriptDriver: React.FC<{ script: React.MutableRefObject<ScriptFrame | null
     if (walls.current) walls.current.scale.y = 1;
     if (objects.current) { objects.current.scale.y = 1; objects.current.visible = true; }
   }, [walls, objects]);
+  return null;
+};
+
+/** Shows a stored bake on the surfaces it was made for, and puts the live materials back the moment they stop matching. */
+const BakedLight: React.FC<{ lightmap: LightMapRef; ready(): boolean; rooms: LitRoom[] }> = ({ lightmap, ready, rooms }) => {
+  const { scene } = useThree();
+  const [map, setMap] = useState<Texture | null>(null);
+  const shown = useRef(new Map<Mesh, Material | Material[]>());
+  const tick = useRef(0);
+  const eye = useRef<{ room: string | null; gain: number }>({ room: null, gain: 1 });
+  useEffect(() => {
+    let live = true;
+    loadLightMap(lightmap.url).then((t) => { if (live) setMap(t); else t.dispose(); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [lightmap.url]);
+  const restore = () => {
+    for (const [mesh, m] of shown.current) if (isBaked(mesh.material)) mesh.material = m;
+    shown.current.clear();
+  };
+  useEffect(() => () => { restore(); map?.dispose(); }, [map]);
+  useFrame(({ camera }, dt) => {
+    if (!map) return;
+    const e = eye.current;
+    e.room = litRoomAt(rooms, e.room, camera.position.x, camera.position.y, camera.position.z)?.id ?? null;
+    const want = (e.room && lightmap.roomGain?.[e.room]) || 1;
+    if (Math.abs(want - e.gain) > 0.002) {
+      e.gain += (want - e.gain) * Math.min(1, dt * 2.5);
+      for (const mesh of shown.current.keys()) for (const m of [mesh.material].flat()) if ((m as MeshBasicMaterial).lightMap) (m as MeshBasicMaterial).lightMapIntensity = lightmap.intensity * e.gain;
+    }
+    if ((tick.current++ % 20) !== 0 || !ready()) return;
+    const atlas = atlasOf(surfaceCharts(scene));
+    if (!atlas || atlas.sig !== lightmap.atlasSig) { restore(); return; }
+    let stale = false;
+    scene.traverse((o) => { const m = o as Mesh; if (m.isMesh && BAKED_KINDS.has(m.userData?.surface) && !isBaked(m.material)) stale = true; });
+    if (!stale) return;
+    const swapped = showBakedLight(scene, map, lightmap.intensity * eye.current.gain, lightmap.atlasSig);
+    swapped?.forEach((m, mesh) => { if (!isBaked(m)) shown.current.set(mesh, m); });
+  });
   return null;
 };
 
@@ -600,8 +646,8 @@ const ObjectModel: React.FC<{ obj: SceneObject; frame: PlanFrame; product?: Scen
 /** Exposes capture and camera moves to the page. Lives inside the Canvas so it can reach the renderer. */
 const Bridge = forwardRef<SceneCanvasHandle, {
   controls: React.MutableRefObject<OrbitControlsImpl | null>; span: number; initial: CameraPose; idHexById: Record<string, string>;
-  rooms: PlanRoom[]; frame: PlanFrame; lit: React.MutableRefObject<boolean>;
-}>(({ controls, span, initial, idHexById, rooms, frame, lit }, ref) => {
+  rooms: PlanRoom[]; frame: PlanFrame; lit: React.MutableRefObject<boolean>; wallsUp(): boolean;
+}>(({ controls, span, initial, idHexById, rooms, frame, lit, wallsUp }, ref) => {
   const { gl, scene, camera, size } = useThree();
   const flight = useRef<{ from: CameraPose; to: CameraPose; t: number } | null>(null);
 
@@ -735,6 +781,10 @@ const Bridge = forwardRef<SceneCanvasHandle, {
     },
     settled() { return splatsSettled(scene); },
     lit() { return lit.current; },
+    async bakeLight(onProgress, stop) {
+      if (!wallsUp()) throw new Error('Wait until the walls are up.');
+      return bakeLight(gl, scene, rooms.filter((r) => r.outline.length > 2).map((r) => ({ id: r.id, outline: r.outline.map(([x, y]) => toScene(x, y, frame)) })), onProgress, stop);
+    },
     async picture() {
       const src = gl.domElement;
       const out = document.createElement('canvas');
@@ -876,7 +926,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     rooms, walls, openings, surfaces, finishes = [], objects, products, defaultWallHeightMm, viewCamera, tool, wireframe, selectedId,
     onSelect, onMoveObject, onRemoveObject, onPaint, onFocusRoom, modelUrls = {}, walkRoomId, onWalkEnd,
     staleModels, paintScope = 'wall', splashBand = { fromMm: 900, toMm: 1500 }, photo = false, onPhotoProgress,
-    frontsOpen = 0, cabinetHardware, sunHour = null, script, onAssets, adaptive = false,
+    frontsOpen = 0, cabinetHardware, sunHour = null, script, onAssets, adaptive = false, lightmap = null,
   } = props;
   const loading = useRef(new Set<string>());
   const reportAssets = useRef(onAssets);
@@ -1048,6 +1098,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
     >
       <color attach="background" args={['#e9e6e1']} />
       {adaptive && loaded && !photo && <PerformanceMonitor onChange={({ factor }) => setDpr(Math.round((MIN_DPR + (sharp - MIN_DPR) * factor) * 4) / 4)} factor={1} flipflops={4} onFallback={() => setDpr(Math.min(1, sharp))} />}
+      {lightmap && !photo && !wireframe && <BakedLight lightmap={lightmap} ready={lightReady} rooms={litRooms} />}
       <RoomLighting span={span} sunHour={sunHour} rooms={litRooms} version={lightVersion} solid={lightReady} lit={lit} loaded={loaded} />
       {!wireframe && windowLights.map(({ id, ...l }) => <WindowLight key={id} {...l} />)}
       {photo && !wireframe && <PhotoMode ceilingHeight={defaultWallHeightMm / 1000} onProgress={(n, settled, preparing) => onPhotoProgress?.(n, settled, preparing)} />}
@@ -1215,7 +1266,7 @@ export const SceneCanvas = forwardRef<SceneCanvasHandle, Props>((props, ref) => 
         minDistance={0.5}
         maxDistance={span * 4}
       />
-      <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} lit={lit} />
+      <Bridge ref={ref} controls={controls} span={span} initial={initial} idHexById={idHexById} rooms={rooms} frame={frame} lit={lit} wallsUp={lightReady} />
       {!wireframe && !photo && hasSplats && <SplatsAfterComposer script={script} />}
       {!wireframe && !photo && (
         <EffectComposer multisampling={4}>

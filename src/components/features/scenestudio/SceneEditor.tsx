@@ -1,13 +1,11 @@
 /** The editable 3D room, hosted in the interior designer's canvas (#564). Renders go back into the conversation. */
 import React, { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Box, Eye, FileText, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus,
-  RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Aperture, Eraser, Film,
-} from 'lucide-react';
+import { Box, Eye, FileText, Footprints, Grid3x3, Hand, Layers, Loader2, Map as MapIcon, Move, Package, Paintbrush, Plus, RefreshCw, RotateCw, Sparkles, Trash2, Undo2, X, Box as BoxIcon, PersonStanding, Aperture, Eraser, Film, Sun } from 'lucide-react';
 
 import { HubEmptyState } from '@/components/core/hub/HubEmptyState';
 import { Badge } from '@/components/core/ui/badge';
 import { Button } from '@/components/core/ui/button';
+import { Progress } from '@/components/core/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/core/ui/card';
 import { Input } from '@/components/core/ui/input';
 import { Label } from '@/components/core/ui/label';
@@ -18,10 +16,10 @@ import { useToast } from '@/hooks/use-toast';
 import { loadVocabulary, type VocabularyTerm } from '@/services/vocabularies';
 import {
   publicUrl, sceneStudioService,
-  type LayoutEntry, type SceneData, type SceneObject, type SceneObjectFinish, type SceneProduct, type SceneRender, type SceneSurface,
+  type LayoutEntry, type SceneData, type SceneLightmap, type SceneObject, type SceneObjectFinish, type SceneProduct, type SceneRender, type SceneSurface,
 } from '@/services/sceneStudioService';
 import { describeBox, describeObject, effectiveSize, planBounds, planFrame, pointInPolygon, polygonCentroid, type PlanRoom } from '@/lib/scene/sceneGeometry';
-import { roomSignature } from '@/lib/scene/roomSignature';
+import { homeSignature, roomSignature } from '@/lib/scene/roomSignature';
 import { compositeMasked, loadImage, objectMask, paintedMask } from '@/lib/scene/sceneCompositing';
 import { RegionEditCanvas, type RegionEditResult } from '@/components/features/ai/RegionEditCanvas';
 import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
@@ -75,7 +73,7 @@ export interface SceneEditorProps {
 }
 
 export interface SceneIntent {
-  mode: 'view' | 'walk' | 'make_3d' | 'drawings' | 'render' | 'record_walkthrough' | 'photograph';
+  mode: 'view' | 'walk' | 'make_3d' | 'drawings' | 'render' | 'record_walkthrough' | 'photograph' | 'bake_light';
   object_id: string | null;
   room_id?: string | null;
   fronts?: FrontsState;
@@ -659,6 +657,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
       rooms: data?.rooms ?? [], walls: data?.walls ?? [], openings: data?.openings ?? [],
       objects: objects.map((o) => ({ ...o, model_url: modelUrls[o.id] ?? null })), surfaces, finishes, products,
       renders: shared.map((r) => ({ image_url: r.image_url, camera: (r.camera as unknown as Pose | null) ?? null, source: r.source, sig: r.room_sig })),
+      lightmap: lightmap ? { url: lightmap.url, intensity: lightmap.intensity, atlas_sig: lightmap.atlasSig, home_sig: lightmap.homeSig, room_gain: lightmap.roomGain } : null,
       render: latest ? { image_url: latest.image_url, camera: (latest.camera as unknown as Pose | null) ?? null } : null,
     };
   };
@@ -684,6 +683,29 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   const photoNow = useRef(photoSamples);
   photoNow.current = photoSamples;
   const [photographing, setPhotographing] = useState<string | null>(null);
+  const [lightmap, setLightmap] = useState<SceneLightmap | null>(null);
+  const [baking, setBaking] = useState<number | null>(null);
+  const bakeStop = useRef(false);
+  useEffect(() => { void sceneStudioService.latestLightmap(id).then(setLightmap).catch(() => setLightmap(null)); }, [id]);
+  const homeSigNow = data ? homeSignature(data.rooms.map((r) => r.id), objects, surfaces, finishes) : '';
+  const lightCurrent = !!lightmap && lightmap.homeSig === homeSigNow;
+  const bake = async () => {
+    if (!data || !canvasRef.current || baking !== null) return;
+    bakeStop.current = false;
+    setShowRender(false); setSelectedId(null); setTool('view'); setWireframe(false); setPhoto(false);
+    setBaking(0);
+    try {
+      await new Promise((r) => setTimeout(r, 600));
+      const sig = homeSignature(data.rooms.map((r) => r.id), objects, surfaces, finishes);
+      const result = await canvasRef.current.bakeLight((x) => setBaking(Math.round(x * 100)), () => bakeStop.current);
+      setLightmap(await sceneStudioService.saveLightmap(data.scene, result, sig));
+      toast({ title: 'Light baked', description: 'Walking around and the shared walkthrough now show it. Bake again after moving furniture or changing a finish.' });
+    } catch (e) {
+      if (!bakeStop.current) fail('The light could not be baked', e);
+    } finally {
+      setBaking(null);
+    }
+  };
   const photoStop = useRef(false);
   const savePhoto = async (): Promise<boolean> => {
     if (!data || !canvasRef.current || !planFrameNow) return false;
@@ -794,6 +816,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
       return;
     }
     if (intent.mode === 'walk') { startWalk(roomId ?? null); return; }
+    if (intent.mode === 'bake_light') { if (fresh) setTimeout(() => void bake(), 1500); return; }
     if (intent.mode === 'photograph') { if (fresh) setTimeout(() => void photographRooms(), 1500); return; }
     if (roomId) goToRoom(roomId, false);
     if (obj) setSelectedId(obj.id);
@@ -1184,6 +1207,21 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
             <Aperture className="h-3.5 w-3.5" />Photograph all rooms
           </Button>
           <p className="text-[11px] text-muted-foreground">One Photo Mode picture per room, free, a few minutes; keep this tab in front. The shared walkthrough ends each room on its own picture.</p>
+          {baking !== null ? (
+            <div className="flex items-center gap-2">
+              <Progress value={baking} className="h-2 flex-1" />
+              <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => { bakeStop.current = true; }}>Stop</Button>
+            </div>
+          ) : (
+            <Button variant="outline" size="sm" className="w-full gap-1.5" disabled={!!photographing || !webgl || noRoom} onClick={() => void bake()}>
+              <Sun className="h-3.5 w-3.5" />{lightmap ? 'Bake light again' : 'Bake light'}
+            </Button>
+          )}
+          <p className="text-[11px] text-muted-foreground">
+            {lightCurrent ? 'Light is baked: walls, floors and ceilings show real daylight and shadows while walking.'
+              : lightmap ? 'The baked light is out of date since a change; it is not shown until it is baked again.'
+                : 'Lights every wall, floor and ceiling with real daylight once (free, about five minutes; keep this tab in front), so walking looks like the pictures.'}
+          </p>
         </div>
         <div className="space-y-1.5 border-t border-hairline pt-3">
           <Label className="text-xs">Photo-Real Furniture</Label>
@@ -1312,6 +1350,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
                 frontsOpen={FRONTS_OPEN[fronts]}
                 sunHour={sunHour}
                 cabinetHardware={scene.cabinet_hardware}
+                lightmap={lightCurrent && !photo ? lightmap : null}
                 walkRoomId={walkRoomId}
                 onWalkEnd={() => setWalkRoomId(undefined)}
               />

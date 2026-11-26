@@ -13,7 +13,7 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
     console.error(`[scene-walkthrough] floor_plan ${fp} is not in the expected workspace, withheld`);
     return null;
   }
-  const [rooms, walls, openings, objects, surfaces, finishes, renders] = await Promise.all([
+  const [rooms, walls, openings, objects, surfaces, finishes, light, renders] = await Promise.all([
     supabase.from('floor_plan_rooms').select('id, name, outline, height_mm, walk_order').eq('floor_plan_id', fp).order('walk_order'),
     supabase.from('floor_plan_walls').select('id, x1_mm, y1_mm, x2_mm, y2_mm, thickness_mm, height_mm').eq('floor_plan_id', fp),
     supabase.from('floor_plan_openings').select('id, wall_id, kind, offset_mm, width_mm, sill_mm, head_mm').eq('floor_plan_id', fp),
@@ -24,6 +24,7 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
       .select('id, room_id, surface, wall_id, band_from_mm, band_to_mm, zone_key, zone_u0_mm, zone_u1_mm, zone_v0_mm, zone_v1_mm, product_id, colour_hex')
       .eq('floor_plan_id', fp),
     supabase.from('floor_plan_object_finishes').select('id, object_id, slot, product_id, colour_hex').eq('floor_plan_id', fp),
+    supabase.from('scene_lightmaps').select('storage_path, intensity, atlas_sig, home_sig, room_gain').eq('floor_plan_id', fp).order('created_at', { ascending: false }).limit(1).maybeSingle(),
     supabase.from('scene_renders').select('image_url, camera, source, room_sig, created_at').eq('floor_plan_id', fp).eq('kind', 'full').order('created_at', { ascending: false }).limit(24),
   ]);
   const productIds = [...new Set([
@@ -81,5 +82,9 @@ export async function buildSceneWalkthrough(supabase: DbClient, fp: string, work
     products,
     render: render ? { image_url: render.image_url, camera: render.camera } : null,
     renders: pictures.map((r) => ({ image_url: r.image_url, camera: r.camera, source: r.source, sig: r.room_sig })),
+    lightmap: light.data ? {
+      url: supabase.storage.from(SCENE_MODEL_BUCKET).getPublicUrl((light.data as any).storage_path).data.publicUrl,
+      intensity: Number((light.data as any).intensity), atlas_sig: (light.data as any).atlas_sig, home_sig: (light.data as any).home_sig, room_gain: (light.data as any).room_gain ?? {},
+    } : null,
   };
 }

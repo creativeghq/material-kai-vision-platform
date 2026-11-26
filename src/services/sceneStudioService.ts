@@ -138,6 +138,8 @@ export function kitchenUnitsForPricing(objects: SceneObject[]) {
     runModulesOf(o).map((m) => ({ zone: zoneOfKind(o.kind), type: m.type, width_mm: m.width_mm, label: o.label, ...(m.type === 'drawers' ? { drawers: 3 } : {}) })));
 }
 
+export interface SceneLightmap { url: string; intensity: number; atlasSig: string; homeSig: string; roomGain: Record<string, number> }
+
 export interface SceneData {
   scene: SceneRow;
   rooms: PlanRoom[];
@@ -331,6 +333,27 @@ export const sceneStudioService = {
     const { data, error } = await supabase.rpc('board_edge_tapes' as never, { p_product_id: productId } as never);
     if (error) throw new Error(error.message);
     return (data ?? []) as Array<{ product_id: string; name: string }>;
+  },
+
+  async latestLightmap(sceneId: string): Promise<SceneLightmap | null> {
+    const { data, error } = await supabase.from('scene_lightmaps').select('storage_path, intensity, atlas_sig, home_sig, room_gain')
+      .eq('floor_plan_id', sceneId).order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) return null;
+    const row = data as { storage_path: string; intensity: number; atlas_sig: string; home_sig: string; room_gain: Record<string, number> | null };
+    return { url: publicUrl(row.storage_path), intensity: Number(row.intensity), atlasSig: row.atlas_sig, homeSig: row.home_sig, roomGain: row.room_gain ?? {} };
+  },
+
+  async saveLightmap(scene: Pick<SceneRow, 'workspace_id' | 'id'>, bake: { blob: Blob; intensity: number; atlasSig: string; side: number; samples: number; roomGain: Record<string, number> }, homeSig: string): Promise<SceneLightmap> {
+    const path = `${sceneFolder(scene)}/light/${Date.now()}.png`;
+    await uploadTo(path, bake.blob, 'image/png');
+    const { data: auth } = await supabase.auth.getUser();
+    const { error } = await supabase.from('scene_lightmaps').insert({
+      floor_plan_id: scene.id, workspace_id: scene.workspace_id, storage_path: path, intensity: bake.intensity, atlas_sig: bake.atlasSig,
+      home_sig: homeSig, room_gain: bake.roomGain, side: bake.side, samples: bake.samples, created_by: auth.user?.id ?? null,
+    });
+    if (error) throw new Error(`The light was baked but could not be saved: ${error.message}`);
+    return { url: publicUrl(path), intensity: bake.intensity, atlasSig: bake.atlasSig, homeSig, roomGain: bake.roomGain };
   },
 
   async setClientLook(sceneId: string, look: ClientLook): Promise<void> {

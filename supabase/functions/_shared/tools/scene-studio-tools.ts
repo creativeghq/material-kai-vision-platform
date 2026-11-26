@@ -466,7 +466,7 @@ export const createManageScenesTool = (
       });
     }
 
-    if (action === 'render' || action === 'drawing_set' || action === 'walkthrough_video' || action === 'photograph') {
+    if (action === 'render' || action === 'drawing_set' || action === 'walkthrough_video' || action === 'photograph' || action === 'bake_light') {
       if (!scene_id) return JSON.stringify({ success: false, error: `${action} needs scene_id.` });
       const { data: scene } = await sb.from('floor_plans').select(`${SCENE_COLUMNS}, project_id`).eq('id', scene_id).maybeSingle();
       if (!scene) return JSON.stringify({ success: false, error: 'Scene not found.' });
@@ -483,7 +483,7 @@ export const createManageScenesTool = (
         ? { mode: 'render', object_id: null, room_id: roomId, ...(style ? { style } : {}), ...(style_reference_url ? { style_reference_url } : {}), nonce: Date.now() }
         : action === 'drawing_set'
           ? { mode: 'drawings', object_id: null, room_id: null, save: true, nonce: Date.now() }
-          : { mode: action === 'photograph' ? 'photograph' : 'record_walkthrough', object_id: null, room_id: null, nonce: Date.now() };
+          : { mode: action === 'photograph' ? 'photograph' : action === 'bake_light' ? 'bake_light' : 'record_walkthrough', object_id: null, room_id: null, nonce: Date.now() };
       onChunk?.({ type: 'scene_studio_scene', scene: { ...scene, intent }, timestamp: Date.now() });
       const setRuns = action === 'drawing_set' ? await kitchenRunsOf(sb, scene_id) : [];
       const checks = drawingChecks(setRuns);
@@ -499,6 +499,8 @@ export const createManageScenesTool = (
           ? `The room is rendering on the canvas${style ? ` in ${style}` : ''}${roomId ? `, from eye height in ${room}` : ''}; it is charged like a render from the room and arrives in this conversation, where every image tool can take it. Do not call again.`
           : action === 'drawing_set'
             ? 'The drawings (plan with wall lengths and areas; for a kitchen also the elevations, a sheet labelled Electrical and a sheet labelled Plumbing per wall that has points, and the cut list) are being saved to the project as one PDF; the link arrives in this conversation. Lay out each kitchen run first if it is not confirmed.'
+            : action === 'bake_light'
+              ? 'The light of the whole home is being baked on the canvas (free, about five minutes; the tab must stay in front). Walking around and the shared walkthrough show it when it is done. Do not call again.'
             : action === 'photograph'
               ? 'Every room is being photographed in Photo Mode on the canvas (free, a few minutes; the tab must stay in front). Each picture arrives in this conversation, and the shared walkthrough ends that room on it. Do not call again.'
             : 'The walkthrough of the real plan is recording on the canvas (free, about half a minute; the tab must stay in front). The video arrives in this conversation and can be shared or fed to the next step.',
@@ -610,6 +612,7 @@ export const createManageScenesTool = (
       + 'assembly_sheets: workshop sheets, one per distinct cabinet (exploded view, panel list with sizes and edge banding, hardware), saved as a PDF into the conversation; name every failed check per cabinet. '
         + 'drawing_set: saves the drawings (dimensioned plan of any room; elevations, separate sheets labelled Electrical and Plumbing for the electrician and plumber, and cut list for a kitchen) as a PDF: on the project as a sheet for the client view and deck, or into the conversation when the room is on no project; it returns checks, electrical and plumbing, name each failure. A KITCHEN MADE FROM A DESIGN (plan, sketch or render) ALWAYS GETS ITS ELECTRICAL AND PLUMBING DRAWINGS: status, layout, price_kitchen and drawing_set all return the electrical and plumbing checks; report them every time. '
       + 'walkthrough_video: records the walkthrough of the real plan as a video, free; it arrives in the conversation. '
+      + 'bake_light: lights every wall, floor and ceiling of the home once with real daylight, free, so walking and the shared walkthrough look like the pictures; bake again after furniture or finishes change. '
       + 'photograph: takes one Photo Mode picture of every room, free; they arrive in the conversation and end each room of the shared walkthrough. '
       + 'client_look: what the shared walkthrough shows (look drawn: the live 3D rooms and their Photo Mode pictures; renders: also every stored render). '
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
@@ -629,7 +632,7 @@ export const createManageScenesTool = (
       + 'open with fronts closed/half/open shows the cabinets with their doors and drawers that way. '
       + 'Every render, drawing set and video returns to the conversation.',
     schema: z.object({
-      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video', 'photograph', 'client_look']).describe('What to do.'),
+      action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video', 'photograph', 'bake_light', 'client_look']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows; a dimensioned sketch or elevation is plan_image.'),
       name: z.string().max(200).optional().describe('create: a name for the scene.'),

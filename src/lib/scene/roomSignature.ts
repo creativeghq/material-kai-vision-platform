@@ -14,3 +14,10 @@ export function roomSignature(roomId: string, objects: SigObject[], surfaces: Si
   for (let i = 0; i < rows.length; i++) h = Math.imul(h ^ rows.charCodeAt(i), 0x01000193) >>> 0;
   return h.toString(16);
 }
+
+export function homeSignature(roomIds: string[], objects: SigObject[], surfaces: SigSurface[], finishes: SigFinish[]): string {
+  const text = [...roomIds].sort().map((id) => `${id}:${roomSignature(id, objects, surfaces, finishes)}`).join('|');
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(16);
+}

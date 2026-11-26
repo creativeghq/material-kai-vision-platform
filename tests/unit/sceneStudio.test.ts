@@ -186,7 +186,7 @@ describe('finishing a room surface by surface', () => {
   });
 
   it('photo mode leaves click boxes and splat furniture out of the traced scene', () => {
-    const src = blankComments(readFileSync('src/components/features/scenestudio/PhotoMode.tsx', 'utf8'));
+    const src = blankComments(readFileSync('src/components/features/scenestudio/PhotoMode.tsx', 'utf8')) + blankComments(readFileSync('src/components/features/scenestudio/traceView.ts', 'utf8'));
     expect(src).toMatch(/invisibleMaterial\(mesh\.material\)/);
     expect(src).toMatch(/withTraceView\(scene, \(\) => tracer\.setScene/);
     expect(src).toMatch(/new ThreeMesh\(sub, material\)/);
