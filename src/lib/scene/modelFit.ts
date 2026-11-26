@@ -2,7 +2,6 @@ export interface Extent { x: number; y: number; z: number }
 
 const MAX_STRETCH = 1.8;
 
-/** Per-axis scale that fits a model (width along X, depth along Z) into its object's true-size box, never stretching one axis past MAX_STRETCH of another. */
 export function fitModel(e: Extent, w: number, d: number, h: number): [number, number, number] {
   const sx = Math.max(e.x, 1e-6);
   const sy = Math.max(e.y, 1e-6);

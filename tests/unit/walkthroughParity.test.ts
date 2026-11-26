@@ -37,7 +37,7 @@ describe('the recorded walkthrough shows what the client sees', () => {
       expect(src).not.toContain('walkthroughFrame(');
       expect(src).toMatch(/modelUrls=\{modelUrls\}/);
     }
-    expect(recorder).toMatch(/settled\(\)/);
+    expect(recorder).toMatch(/!scene\.current\?\.lit\(\) && performance\.now\(\) < until/);
     expect(recorder).toMatch(/=== room && scene\.current\?\.lit\(\) \? SETTLE_FRAME_MS : SETTLE_ROOM_MS/);
     expect(recorder).toMatch(/disabled=\{[^}]*!ready/);
   });
