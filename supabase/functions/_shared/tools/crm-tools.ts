@@ -336,6 +336,11 @@ export const createManageCrmTool = (
               : ` Not linked to a company: "${company_name}" is not in the CRM yet.`;
           }
         }
+        // Linking re-derives the role flags, so report the row as it is now, not as crm-api returned it.
+        const { data: current } = linked
+          ? await supabase.from('crm_contacts').select('*').eq('id', row.id).eq('workspace_id', workspaceId).maybeSingle()
+          : { data: null };
+        if (current) Object.assign(row, current);
         onChunk?.({ type: 'crm_contact_created', data: { company: linked, contact: row, source: 'agent' }, timestamp: Date.now() });
         return JSON.stringify({
           success: true, contact: row, linked_company: linked,
