@@ -15,7 +15,7 @@ const CLEAN_AT = [24, 60, MAX_SAMPLES];
 const DENOISE_LIMIT_MS = 60_000;
 const EXPOSE_AT = 6;
 
-type Disposable = { dispose?(): void; isTexture?: boolean; renderTarget?: { dispose(): void } | null };
+type Disposable = { dispose?(): void; isTexture?: boolean; renderTarget?: { dispose(): void } | null; tex?: { dispose(): void } };
 
 /** The library's own dispose() reads a field that does not exist in 0.0.23 and throws, and it never frees the scene data held in the material's uniforms, so each Photo Mode session kept ~0.7 GB of GPU memory. */
 export function disposeTracer(t: WebGLPathTracer) {
@@ -31,7 +31,8 @@ export function disposeTracer(t: WebGLPathTracer) {
     const v = u.value as Disposable | null;
     if (!v || name === 'backgroundMap' || name === 'sobolTexture') continue;
     if (v.isTexture && v.renderTarget) v.renderTarget.dispose();
-    else v.dispose?.();
+    else if (v.dispose) v.dispose();
+    else v.tex?.dispose();
   }
   material?.dispose();
   inner._colorBackground?.dispose?.();
@@ -168,7 +169,7 @@ export const PhotoMode: React.FC<{ ceilingHeight: number; onProgress(samples: nu
     gl.toneMapping = ACESFilmicToneMapping;
     built.current = null;
     return () => {
-      scene.environment = prevEnv;
+      if (scene.environment === sky) scene.environment = prevEnv === sky ? null : prevEnv;
       scene.environmentIntensity = prevIntensity;
       gl.toneMapping = prevTone;
       gl.toneMappingExposure = prevExposure;
