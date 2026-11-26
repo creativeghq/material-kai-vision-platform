@@ -373,7 +373,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "h3-max-480p",
     "tier": "budget",
     "status": "active",
-    "enabled": false,
+    "enabled": true,
     "sort_order": 197
   },
   {
@@ -422,7 +422,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
     "pricing_key": "h3-max-768p",
     "tier": "standard",
     "status": "active",
-    "enabled": false,
+    "enabled": true,
     "sort_order": 199
   },
   {
@@ -511,7 +511,7 @@ export const GENERATION_MODELS: readonly GenerationModelRow[] = [
  * from the array above; a hand-edit changes the rows and not this constant, and the build fails.
  * Between the two, both directions of drift are covered without a secret in CI.
  */
-export const PROJECTION_FINGERPRINT = '44c92f7b1ab9197ef3db2a38643a8307';
+export const PROJECTION_FINGERPRINT = '25adf2a383ff5cbfbf516a82b734e2eb';
 
 /** Model ids the registry knows about, for O(1) membership checks. */
 export const GENERATION_MODEL_IDS: ReadonlySet<string> = new Set(

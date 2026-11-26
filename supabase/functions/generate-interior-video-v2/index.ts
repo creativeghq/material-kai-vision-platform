@@ -125,10 +125,9 @@ const TYPE_MODEL_PREFERENCE: Record<VideoType, VideoModel[]> = {
   walkthrough:          ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'kling-v4.0', 'h3-max-768p'],
   floorplan_flythrough: ['wan-3.0-720p', 'gemini-omni-1.2-flash-1080p', 'kling-v4.0', 'h3-max-768p'],
   product_spotlight:    ['kling-v4.0', 'h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-720p'],
-  // Ray3.2 is the ONLY model that interpolates first frame -> last frame, so a substitute
-  // starts from the source and drifts instead of landing on `endFrameUrl`. Still better than
-  // refusing, but the response says which model actually ran.
-  before_after:         ['ray-3.2-720p', 'kling-v4.0', 'wan-3.0-720p', 'gemini-omni-1.2-flash-1080p'],
+  // Only Ray3.2 and H3 Max land ON `endFrameUrl` (H3 measured 2026-11-26); the rest start from
+  // the source and drift. Still better than refusing, and the response names the model that ran.
+  before_after:         ['ray-3.2-720p', 'h3-max-768p', 'kling-v4.0', 'wan-3.0-720p', 'gemini-omni-1.2-flash-1080p'],
   // A reel is 15s on a phone, not 30 on a monitor — H3 Max with stereo audio for 25 credits.
   social_reel:          ['h3-max-768p', 'gemini-omni-1.2-flash-1080p', 'wan-3.0-480p', 'kling-v4.0'],
 };

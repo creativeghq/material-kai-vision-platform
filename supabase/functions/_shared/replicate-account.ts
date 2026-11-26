@@ -14,9 +14,9 @@ export function classifyProbe(httpStatus: number, body = ''): ProbeStatus {
   if (httpStatus >= 200 && httpStatus < 300) return 'ok';
   if (httpStatus === 402) return 'credit_exhausted';
   if (httpStatus === 404) return 'not_found';
+  if (/insufficient credit|payment required|billing|exhausted balance/i.test(body)) return 'credit_exhausted';
   if (httpStatus === 401 || httpStatus === 403) return 'auth_failed';
   if (httpStatus === 422 || httpStatus === 400) return 'schema_rejected';
-  if (/insufficient credit|payment required|billing/i.test(body)) return 'credit_exhausted';
   return 'error';
 }
 

@@ -9,12 +9,13 @@ import { classifyProbe, probeReplicateAccount } from '../replicate-account.ts';
  * Every verdict comes from a free read of the model, plus ONE near-free create per run that answers
  * for the whole Replicate account. A provider joins only with a real request for it.
  */
-const PROBEABLE_PROVIDERS = ['replicate', 'google', 'openai'];
+const PROBEABLE_PROVIDERS = ['replicate', 'google', 'openai', 'fal'];
 
 const MODEL_READ: Record<string, { url: (slug: string) => string; headers: (key: string) => Record<string, string> }> = {
   replicate: { url: (s) => `https://api.replicate.com/v1/models/${s}`, headers: (k) => ({ Authorization: `Bearer ${k}` }) },
   google: { url: (s) => `https://generativelanguage.googleapis.com/v1beta/models/${s}`, headers: (k) => ({ 'x-goog-api-key': k }) },
   openai: { url: (s) => `https://api.openai.com/v1/models/${s}`, headers: (k) => ({ Authorization: `Bearer ${k}` }) },
+  fal: { url: (s) => `https://api.fal.ai/v1/models?endpoint_id=${encodeURIComponent(s)}`, headers: (k) => ({ Authorization: `Key ${k}` }) },
 };
 
 /**
@@ -160,7 +161,7 @@ export class ModelHealthCheckAgent implements AgentRunner {
           .eq('enabled', true);
       }
     }
-    for (const prov of ['google', 'openai']) {
+    for (const prov of ['google', 'openai', 'fal']) {
       if (modelList.some((m) => m.provider === prov)) {
         tokens[prov] = (await resolveSecret(supabase, PROVIDER_KEYS[prov][0]))?.value ?? null;
       }
