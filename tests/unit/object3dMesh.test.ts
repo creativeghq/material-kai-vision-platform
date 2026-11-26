@@ -30,6 +30,12 @@ describe('object-3d makes a GLB mesh', () => {
     expect(EDGE.match(/generateImageWithGemini\(/g)).toHaveLength(1);
   });
 
+  it('never prompts with a product name: a product-only call states what the object is', () => {
+    expect(EDGE).not.toMatch(/noun: product\.name/);
+    expect(EDGE).toContain('noun: objectNoun(body.object_kind)');
+    expect(EDGE).toMatch(/if \(!ready && !processing && !target\.noun\) \{\s*throw new HttpError\(400/);
+  });
+
   it('never overwrites a model the supplier uploaded', () => {
     expect(EDGE).toContain("row.source !== 'generated'");
     expect(EDGE).toContain("row?.status === 'ready' && (supplied || isMesh(row.storage_path))");

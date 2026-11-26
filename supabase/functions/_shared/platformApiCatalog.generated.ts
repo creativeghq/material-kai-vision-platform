@@ -3418,7 +3418,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Show a product or a 3D-room object as a photo-real 3D model",
-    "description": "Returns a photo-real 3D model (a Gaussian splat, compressed .spz) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits ",
+    "description": "Returns a 3D model (a textured GLB mesh) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits BEFORE any work; a reques",
     "fields": {
       "product_id": {
         "type": "string",
@@ -3435,6 +3435,14 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "image_path": {
         "type": "string",
         "description": "For a room object with no model yet: a capture of that object stored in its room's folder."
+      },
+      "mask_path": {
+        "type": "string",
+        "description": "For a room object: a black-and-white mask of the object in image_path (white = the object), stored in its room's folder."
+      },
+      "object_kind": {
+        "type": "string",
+        "description": "For a product request without floor_plan_object_id: what the object is (e.g. 'sofa', 'dining chair'), so the model knows"
       },
       "finish": {
         "type": "string",

@@ -41,6 +41,11 @@ interface Target {
 /** Only a GLB mesh is a finished model; a splat left from before #617 is made again. */
 const isMesh = (path: string | null | undefined): path is string => !!path && /\.glb$/i.test(path);
 
+const objectNoun = (kind?: string): string => {
+  const noun = (kind ?? '').replace(/_/g, ' ').trim().toLowerCase();
+  return /^[\p{L} ]{2,40}$/u.test(noun) ? noun : '';
+};
+
 const MIME_EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' };
 
 interface Charge { uid: string; credits: number; transactionId: string | null; workspaceId: string }
@@ -151,7 +156,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
   const uid = auth.userId;
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
   const body = (await req.json().catch(() => ({}))) as {
-    product_id?: string; floor_plan_object_id?: string; workspace_id?: string; image_path?: string; mask_path?: string;
+    product_id?: string; floor_plan_object_id?: string; workspace_id?: string; image_path?: string; mask_path?: string; object_kind?: string;
     finish?: { description?: string; image_url?: string };
   };
   const finishText = typeof body.finish?.description === 'string' ? body.finish.description.trim().slice(0, 600) : '';
@@ -184,7 +189,7 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     const imageUrl = (img?.document_images as { image_url?: string } | null)?.image_url;
     const variantKey = finish ? await sha32(`${finish.text}|${finish.imageUrl ?? ''}`) : null;
     target = {
-      kind: variantKey ? 'variant' : 'product', id: product.id, rowId: '', what: `the product "${product.name}"`, noun: product.name, workspaceId: ws,
+      kind: variantKey ? 'variant' : 'product', id: product.id, rowId: '', what: `the product "${product.name}"`, noun: objectNoun(body.object_kind), workspaceId: ws,
       folder: variantKey ? `object-3d/products/${product.id}/variants/${variantKey}` : `object-3d/products/${product.id}`,
       source: { url: imageUrl }, finish, variantKey: variantKey ?? undefined,
     };
@@ -206,6 +211,9 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
       if (!link || link.product_id !== product.id || linkWs !== ws) throw new HttpError(404, 'Object not found');
       target.linkObjectId = link.id;
       target.noun = String(link.kind).replace(/_/g, ' ');
+    }
+    if (!ready && !processing && !target.noun) {
+      throw new HttpError(400, 'Say what the object is (object_kind, e.g. "sofa"): a product name does not tell the 3D model which object in the photo to build.');
     }
   } else if (body.floor_plan_object_id) {
     const { data: obj } = await admin.from('floor_plan_objects')
