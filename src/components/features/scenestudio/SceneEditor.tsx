@@ -466,7 +466,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     return () => clearInterval(t);
   }, [anyProcessing, id]);
 
-  const cropFromRender = async (o: SceneObject): Promise<string> => {
+  const cropFromRender = async (o: SceneObject): Promise<{ image_path: string; mask_path: string }> => {
     const source = (activeRender && activeRender.layout_snapshot?.[o.id] ? activeRender : null)
       ?? renders.find((r) => r.id_pass_path && Object.values(r.id_map ?? {}).includes(o.id)) ?? null;
     if (!data || !source?.id_pass_path) {
@@ -477,7 +477,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     const hex = Object.entries(source.id_map ?? {}).find(([, objId]) => objId === o.id)?.[0];
     if (!hex) throw new Error('This object is not in any render yet. Render the room again first.');
     const [pass, base] = await Promise.all([loadImage(publicUrl(source.id_pass_path)), loadImage(source.image_url)]);
-    const mask = await objectMask([{ image: pass, hex }]);
+    const mask = await objectMask([{ image: pass, hex }], 0.004);
     if (!mask.box) throw new Error('This object cannot be seen in the current render.');
     const W = base.naturalWidth; const H = base.naturalHeight;
     const padX = (mask.box.x1 - mask.box.x0) * 0.15; const padY = (mask.box.y1 - mask.box.y0) * 0.15;
@@ -489,8 +489,20 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     const ctx = canvas.getContext('2d')!;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(base, x0, y0, x1 - x0, y1 - y0, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob>((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error('Crop failed'))), 'image/png'));
-    return sceneStudioService.uploadCapture(data.scene, blob, `object-${o.id.slice(0, 8)}`);
+    const mw = mask.canvas.width / W; const mh = mask.canvas.height / H;
+    const maskCanvas = document.createElement('canvas');
+    maskCanvas.width = canvas.width; maskCanvas.height = canvas.height;
+    const mctx = maskCanvas.getContext('2d')!;
+    mctx.fillStyle = '#000';
+    mctx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+    mctx.drawImage(mask.canvas, x0 * mw, y0 * mh, (x1 - x0) * mw, (y1 - y0) * mh, 0, 0, maskCanvas.width, maskCanvas.height);
+    const png = (c: HTMLCanvasElement) => new Promise<Blob>((res, rej) => c.toBlob((b) => (b ? res(b) : rej(new Error('Crop failed'))), 'image/png'));
+    const tag = `object-${o.id.slice(0, 8)}`;
+    const [image_path, mask_path] = await Promise.all([
+      sceneStudioService.uploadCapture(data.scene, await png(canvas), tag),
+      sceneStudioService.uploadCapture(data.scene, await png(maskCanvas), `${tag}-mask`),
+    ]);
+    return { image_path, mask_path };
   };
 
   const make3d = async (o: SceneObject, quiet = false) => {
@@ -501,7 +513,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
       const finish = fin ? { description: fin, image_url: finishImage(o) } : undefined;
       const result = o.product_id
         ? await sceneStudioService.make3d({ product_id: o.product_id, workspace_id: data.scene.workspace_id, floor_plan_object_id: o.id, finish })
-        : await sceneStudioService.make3d({ floor_plan_object_id: o.id, image_path: await cropFromRender(o), finish });
+        : await sceneStudioService.make3d({ floor_plan_object_id: o.id, ...(await cropFromRender(o)), finish });
       const states = new Map((await sceneStudioService.objectModelStates(id)).map((r) => [r.id, r]));
       setObjects((list) => list.map((x) => (states.has(x.id) ? { ...x, ...states.get(x.id) } : x)));
       if (quiet) return true;

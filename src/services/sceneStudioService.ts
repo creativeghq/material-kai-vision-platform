@@ -439,7 +439,7 @@ export const sceneStudioService = {
     return (data ?? []) as Array<Pick<SceneObject, 'id' | 'model_status' | 'model_storage_path' | 'model_error' | 'model_finish'>>;
   },
 
-  async make3d(body: { floor_plan_object_id?: string; image_path?: string; product_id?: string; workspace_id?: string; finish?: { description: string; image_url?: string } }): Promise<{ status: 'ready' | 'processing'; url?: string; charged: boolean; credits_used?: number }> {
+  async make3d(body: { floor_plan_object_id?: string; image_path?: string; mask_path?: string; product_id?: string; workspace_id?: string; finish?: { description: string; image_url?: string } }): Promise<{ status: 'ready' | 'processing'; url?: string; charged: boolean; credits_used?: number }> {
     const { data, error } = await supabase.functions.invoke('object-3d', { body });
     if (error) throw await edgeError(error, 'The 3D model could not be started');
     if (!data?.success) throw new Error(data?.error || 'The 3D model could not be started.');
