@@ -1,7 +1,7 @@
 import { kbPrerender } from './kbPrerender.js';
 import { sitemap } from './sitemap.js';
 
-const KB_ARTICLE = /^\/knowledge-base\/([^/]+)\/?$/;
+const KB_ARTICLE = /^\/knowledge-base\/(?!brands\/?$)([^/]+)\/?$/;
 
 export const SPA_ROUTE =
   /^\/(?!api|assets|avatars|covers|models|static|documentation|embed|fonts|favicon\.ico|robots\.txt|sitemap\.xml|llms\.txt|site\.webmanifest|sw\.js|wp-admin|wp-content|wp-includes|wp-json|xmlrpc|phpmyadmin|cgi-bin|actuator|server-status)(?!\.(?!well-known))(?!.*\/\.)(?!.*\.(?:html|htm|php|phtml|asp|aspx|jsp|cgi|pl|sql|bak|old|swp|zip|rar|7z|tar|tgz|gz|env)(?:$|\/)).*$/;

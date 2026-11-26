@@ -1669,6 +1669,8 @@ async function executeAgent(
   /** An unattended Inbox auto-reply: binds the handoff tool. Secret-level callers only. */
   inboxAutoReply = false,
   turnId: string | null = null,
+  /** The user's Auto-approve switch: staged actions run without a click. */
+  autoApprove = false,
 ): Promise<{
   text: string;
   materialResults?: { products: any[]; images?: Record<string, string>; title?: string };
@@ -2049,6 +2051,17 @@ async function executeAgent(
     }
     systemPrompt += customerAudienceGuardrails({ publicThread: customerPublicThread });
     systemPrompt += customerThreadFactsBlock;
+  }
+
+  // How staged actions are approved: one card for the turn, or none at all under Auto-approve.
+  if (!forCustomer && !directTool) {
+    try {
+      systemPrompt += `
+
+${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'manual')}`;
+    } catch (e) {
+      console.error('[agent-chat] approval_card prompt missing; replies may ask for one approval per action:', e);
+    }
   }
 
   // Situational context and long-term memory are independent lookups, fetched concurrently.
@@ -4492,6 +4505,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
       toolkits: Array.isArray(selected_toolkits) ? selected_toolkits : null,
     });
     let turnClosed = false;
+    let turnBelled = false;
     const closeTurn = (f: Parameters<typeof closeAgentTurn>[4]) => {
       if (turnClosed) return;
       turnClosed = true;
@@ -4651,7 +4665,9 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                 // pending Approve/Decline isn't lost if the user navigates away (and so
                 // background/tool-result-triggered confirmations — invariant #9 — surface
                 // at all). The inline card stays the primary surface. Fire-and-forget.
-                if (chunk?.type === 'action_confirmation' && userId) {
+                // ONE bell per turn, and none when Auto-approve will run it without the user.
+                if (chunk?.type === 'action_confirmation' && userId && !turnBelled && bodyClientContext?.auto_approve !== true) {
+                  turnBelled = true;
                   try {
                     supabase.from('user_notifications').insert({
                       user_id: userId,
@@ -4683,6 +4699,7 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
               typeof bodyClientContext?.timezone === 'string' ? bodyClientContext.timezone : null,
               audience === 'customer' && bodyInboxAutoReply === true,
               turnId,
+              bodyClientContext?.auto_approve === true,
             );
             if (finalResult) {
             }

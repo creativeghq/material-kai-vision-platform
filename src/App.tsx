@@ -188,17 +188,6 @@ import { buildModuleRoutes } from './modules/_core';
 // same loader while lazy chunks / entitlement checks resolve — no blank screens on navigation.
 import { PageLoader } from './components/core/PageLoader';
 
-// Coverage page component
-const CoveragePage = () => (
-  <div style={{ width: '100%', height: '100vh' }}>
-    <iframe
-      src="/coverage/lcov-report/index.html"
-      style={{ width: '100%', height: '100%', border: 'none' }}
-      title="Test Coverage Report"
-    />
-  </div>
-);
-
 const App = () => (
   <CriticalErrorBoundary name="Application Root">
     <HelmetProvider>
@@ -1026,9 +1015,11 @@ const App = () => (
                   path="/monitoring/pages"
                   element={
                     <AuthGuard>
-                      <Layout>
-                        <PageWatchesPage />
-                      </Layout>
+                      <EntitlementGuard moduleSlug="page-monitoring" moduleName="Page Monitoring">
+                        <Layout>
+                          <PageWatchesPage />
+                        </Layout>
+                      </EntitlementGuard>
                     </AuthGuard>
                   }
                 />
@@ -1141,8 +1132,6 @@ const App = () => (
 
                 <Route path="/health" element={<AuthGuard><HealthPage /></AuthGuard>} />
                 <Route path="/ready" element={<AuthGuard><HealthPage /></AuthGuard>} />
-                <Route path="/coverage" element={<AuthGuard><CoveragePage /></AuthGuard>} />
-                <Route path="/coverage/*" element={<AuthGuard><CoveragePage /></AuthGuard>} />
                 {/* Public Presentation Catalog (email-gated, no layout) */}
                 {/* A catalog slug is unique within its WORKSPACE, so the handle is part of the
                     address. The one-segment form is every link shared before that was true: the

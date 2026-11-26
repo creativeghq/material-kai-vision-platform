@@ -2972,7 +2972,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
           }),
           agentId: selectedAgent,
           model: selectedModel,
-          client_context: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+          client_context: { timezone: Intl.DateTimeFormat().resolvedOptions().timeZone, auto_approve: autoApproveRef.current },
           images: resolvedImageUrls,
           ...(userAttachedDocuments.length > 0 ? { documents: userAttachedDocuments } : {}),
           // Use the local `conversationId` (already includes a freshly-created id),
