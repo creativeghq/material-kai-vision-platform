@@ -5283,8 +5283,9 @@ export const AgentHub: React.FC<AgentHubProps> = ({
       const produced = group?.members.filter((m) => m.kind !== 'run') ?? [];
       if (produced.length === 0) continue;
       yieldedRunsRef.current.add(run.run_id);
-      // The LAST thing the turn produced: the outcome, with the steps that made it behind it
-      // on the sub-tabs.
+      // A record card the reply already summarises stays a chip: the modal would take the
+      // composer's focus, so the user's next Enter lands on the dialog instead of sending.
+      if (produced[produced.length - 1].kind === 'result') continue;
       setActiveCanvasId(produced[produced.length - 1].id);
     }
   }, [canvasGroups, displayRuns]);

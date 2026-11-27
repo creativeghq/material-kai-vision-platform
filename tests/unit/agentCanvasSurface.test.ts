@@ -278,6 +278,14 @@ describe('the modal opens on the OUTCOME, and never mid-turn', () => {
       .toBeLessThan(body.indexOf('yieldedRunsRef.current.add'));
   });
 
+  it('a record card stays a chip instead of opening over the composer', () => {
+    const yieldEffect = hub.slice(hub.indexOf('const yieldedRunsRef'));
+    const body = yieldEffect.slice(0, yieldEffect.indexOf('}, [canvasGroups'));
+    expect(body.indexOf("kind === 'result') continue"))
+      .toBeGreaterThan(-1);
+    expect(body.indexOf("kind === 'result') continue")).toBeLessThan(body.indexOf('setActiveCanvasId(produced'));
+  });
+
   it('a chip never names one thing and opens another', () => {
     // `renderCanvasArtifact` draws a <video> for a gemini message that also carries videoData —
     // the image was animated — so the derivation must not call that "Generated image".
