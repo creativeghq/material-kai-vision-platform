@@ -104,7 +104,7 @@ export const createManageScenesTool = (
   onChunk?: (chunk: any) => void,
   uploads: string[] = [],
 ) => tool(
-  async ({ action, image_url, kind, name, scene_id, object, mode, room, area, part, product, colour, project, fronts, handles, look, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm, style, style_reference_url, drawing, page }) => {
+  async ({ action, image_url, kind, name, scene_id: sceneIdArg, object, mode, room, area, part, product, colour, project, fronts, handles, look, blueprint, units, seating_cm, sun_hour, line, series, recipient_email, recipient_name, confirm, style, style_reference_url, drawing, page }) => {
     const denied = await moduleGate(workspaceId, MODULE_SLUG);
     if (denied) return denied;
     if (!userId || !jwt) return JSON.stringify({ success: false, error: 'Scene Studio needs a signed-in user.' });
@@ -117,6 +117,22 @@ export const createManageScenesTool = (
       const scenes = data ?? [];
       onChunk?.({ type: 'scene_studio_scenes', scenes, timestamp: Date.now() });
       return JSON.stringify({ success: true, count: scenes.length, scenes });
+    }
+
+    let scene_id = sceneIdArg;
+    if (!scene_id && name?.trim() && action !== 'create') {
+      const wanted = name.trim().toLowerCase();
+      const { data: hits, error: findError } = await sb.from('floor_plans').select('id, name')
+        .eq('workspace_id', workspaceId).ilike('name', `%${name.trim().replace(/[%_,()]/g, ' ')}%`).order('updated_at', { ascending: false }).limit(6);
+      if (findError) return JSON.stringify({ success: false, error: findError.message });
+      const list = (hits ?? []) as Array<{ id: string; name: string }>;
+      const pick = list.find((h) => (h.name ?? '').trim().toLowerCase() === wanted) ?? (list.length === 1 ? list[0] : null);
+      if (!pick) {
+        return JSON.stringify(list.length
+          ? { success: false, error: `More than one 3D room matches "${name}". Ask which one.`, matches: list }
+          : { success: false, error: `No 3D room called "${name}". List the scenes to see their names.` });
+      }
+      scene_id = pick.id;
     }
 
     if (action === 'open') {
@@ -158,18 +174,25 @@ export const createManageScenesTool = (
 
     if (action === 'finish') {
       if (!scene_id || (!object && (!room || !area))) return JSON.stringify({ success: false, error: 'finish needs scene_id and either an object, or a room and an area.' });
-      if (!product && !colour) return JSON.stringify({ success: false, error: 'finish needs a product or a colour.' });
+      if (!product) return JSON.stringify({ success: false, error: 'finish needs a catalogue product: a bare colour is not something the business sells. Search the catalogue and name the product; colour picks one of its colourways.' });
       let productRow: { id: string; name: string } | null = null;
-      if (product) {
+      {
         const isId = /^[0-9a-f-]{36}$/i.test(product.trim());
-        const q = sb.from('products').select('id, name').eq('workspace_id', workspaceId).limit(10);
+        const q = sb.from('products').select('id, name, metadata').eq('workspace_id', workspaceId).limit(10);
         const { data: found } = isId ? await q.eq('id', product.trim()) : await q.ilike('name', `%${product.trim().replace(/[%_,()]/g, ' ')}%`);
-        const list = (found ?? []) as Array<{ id: string; name: string }>;
-        productRow = list.find((p) => p.name.toLowerCase() === product.trim().toLowerCase()) ?? list[0] ?? null;
-        if (!productRow) return JSON.stringify({ success: false, error: `No product called "${product}" in this workspace's catalogue.` });
-        if (list.length > 1 && productRow.name.toLowerCase() !== product.trim().toLowerCase()) {
+        const list = (found ?? []) as Array<{ id: string; name: string; metadata: Record<string, unknown> | null }>;
+        const hit = list.find((p) => p.name.toLowerCase() === product.trim().toLowerCase()) ?? list[0] ?? null;
+        if (!hit) return JSON.stringify({ success: false, error: `No product called "${product}" in this workspace's catalogue.` });
+        if (list.length > 1 && hit.name.toLowerCase() !== product.trim().toLowerCase()) {
           return JSON.stringify({ success: false, error: 'More than one product matches; name one exactly.', matches: list.map((p) => p.name) });
         }
+        if (colour) {
+          const options = (Array.isArray(hit.metadata?.colour_options) ? hit.metadata!.colour_options : []) as Array<{ hex?: string; name?: string }>;
+          if (!options.some((o) => (o.hex ?? '').toLowerCase() === colour.toLowerCase())) {
+            return JSON.stringify({ success: false, error: `${hit.name} is not sold in ${colour}.`, colourways: options.map((o) => ({ name: o.name, hex: o.hex })) });
+          }
+        }
+        productRow = { id: hit.id, name: hit.name };
       }
       if (object) {
         const { data: objs } = await sb.from('floor_plan_objects').select('id, label, kind').eq('floor_plan_id', scene_id).is('removed_at', null);
@@ -618,9 +641,9 @@ export const createManageScenesTool = (
       + 'A DRAWING SOMEONE BUILDS FROM (plan, elevations, dimensions for a builder or carpenter) comes only from here, never from an image generator: '
       + 'create kind plan_image from the person\'s OWN sketch or plan (never from a generated drawing), status until ready, show the person the runs and units read and ask about anything that does not add up, '
       + 'layout each run with the confirmed units, then open mode drawings. '
-      + 'open: opens scene_id on the canvas; mode walk lets the user walk through it, object + mode make_3d selects that object '
+      + 'open: opens a scene on the canvas, by scene_id or by name ("open my Demo Apartment" = open with name); mode walk lets the user walk through it, object + mode make_3d selects that object '
       + 'for Make 3D (10 credits, the user confirms). '
-      + 'finish: lays a catalogue product (by name) or a #hex colour on the floor, walls or ceiling of one space, '
+      + 'finish: lays a catalogue product (by name), optionally in one of its own colourways, on the floor, walls or ceiling of one space, '
       + 'or on one part of an object (object + part, e.g. the sofa upholstery or the kitchen fronts); free. '
       + 'price_kitchen: prices the kitchen units standing in the room on a project plan from the kitchen blueprint '
       + '(runs, cabinet counts, sizes; the door model and worktop chosen on the plan are kept) and returns the subtotal. '
@@ -635,7 +658,7 @@ export const createManageScenesTool = (
       action: z.enum(['create', 'status', 'list', 'open', 'finish', 'price_kitchen', 'handles', 'cut_list', 'layout', 'price_line', 'share_walkthrough', 'render', 'renders', 'drawing_set', 'assembly_sheets', 'walkthrough_video', 'photograph', 'bake_light', 'client_look']).describe('What to do.'),
       image_url: z.string().url().optional().describe('create: the https URL of the plan, photo or render.'),
       kind: z.enum(['plan_image', 'photo', 'render']).default('photo').describe('create: what the image shows; a dimensioned sketch or elevation is plan_image.'),
-      name: z.string().max(200).optional().describe('create: a name for the scene.'),
+      name: z.string().max(200).optional().describe('create: a name for the scene. Any other action: the scene by its name when scene_id is not known (e.g. "Demo Apartment").'),
       scene_id: z.string().uuid().optional().describe('status/open/finish: the scene.'),
       object: z.string().max(120).optional().describe('open/finish: the object, by its name in the room (e.g. sofa).'),
       mode: z.enum(['view', 'walk', 'make_3d', 'drawings']).optional().describe('open: what to do in the room; drawings opens the kitchen drawing set (plan, elevations, cut list) to print.'),
@@ -643,7 +666,7 @@ export const createManageScenesTool = (
       area: z.enum(['floor', 'walls', 'ceiling']).optional().describe('finish: which surface of the space.'),
       part: z.enum(SCENE_OBJECT_SLOTS).optional().describe('finish with object: which part (upholstery, legs, fronts, worktop, handles…); default the main one.'),
       product: z.string().max(200).optional().describe('finish: the catalogue product to lay, by exact name or id.'),
-      colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: a paint colour as #rrggbb, instead of a product.'),
+      colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().describe('finish: one of the product\'s own colourways, as its #rrggbb (never a free colour).'),
       project: z.string().max(200).optional().describe('price_kitchen: the project to price on, by name, when the room has none yet; create with drawing: the project the drawing is on.'),
       fronts: z.enum(['closed', 'half', 'open']).optional().describe('open: show the kitchen doors and drawers closed, half open or open.'),
       look: z.enum(CLIENT_LOOKS).optional().describe('client_look: drawn or renders.'),

@@ -20,7 +20,8 @@ import {
 } from '@/services/sceneStudioService';
 import { describeBox, describeObject, effectiveSize, planBounds, planFrame, pointInPolygon, polygonCentroid, type PlanRoom } from '@/lib/scene/sceneGeometry';
 import { homeSignature, roomSignature } from '@/lib/scene/roomSignature';
-import { compositeMasked, loadImage, objectMask, paintedMask } from '@/lib/scene/sceneCompositing';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/core/ui/tabs';
+import { compositeMasked, idPassCoverage, loadImage, objectMask, paintedMask } from '@/lib/scene/sceneCompositing';
 import { RegionEditCanvas, type RegionEditResult } from '@/components/features/ai/RegionEditCanvas';
 import { SCENE_OBJECT_KINDS, SCENE_SLOT_LABELS, slotsForKind, type SceneObjectSlot } from '@/lib/scene/sceneReadSchema';
 import { SlotMaterials } from '@/components/features/scenestudio/SlotMaterials';
@@ -42,7 +43,7 @@ import {
   DEFAULT_SPLASH, colourOptions, describeObjectFinishes, describeTarget, finishSignature, objectSlotFinishes, resolveFinish, surfaceKey, targetKey, type SurfaceTarget,
 } from '@/lib/scene/sceneSurfaces';
 import {
-  COLOUR_SWATCHES, ColourRow, ObjectInspector, PinnedProductsContext, ProductPicker, StylePanel, type StyleChoice,
+  COLOUR_SWATCHES, ObjectInspector, PinnedProductsContext, ProductPicker, StylePanel, type StyleChoice,
 } from '@/components/features/scenestudio/ScenePanels';
 
 const SceneCanvas = lazy(() => import('@/components/features/scenestudio/SceneCanvas').then((m) => ({ default: m.SceneCanvas })));
@@ -203,12 +204,17 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   const [rendering, setRendering] = useState(false);
   const [applying, setApplying] = useState(false);
   const [styles, setStyles] = useState<VocabularyTerm[]>([]);
-  const [paintColour, setPaintColour] = useState<string | null>('#efebe4');
+  const [paintColour] = useState<string | null>(null);
+  const [surfaceCats, setSurfaceCats] = useState<string[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    void sceneStudioService.slotCategories().then((c) => { if (live) setSurfaceCats(c.surface ?? []); }).catch(() => { if (live) setSurfaceCats([]); });
+    return () => { live = false; };
+  }, []);
   const [paintProduct, setPaintProduct] = useState<SceneProduct | null>(null);
   const [paintOption, setPaintOption] = useState<string | null>(null);
   const [makingTexture, setMakingTexture] = useState(false);
   const [areaEditing, setAreaEditing] = useState(false);
-  const [pickingPaint, setPickingPaint] = useState(false);
   const [paintScope, setPaintScope] = useState<PaintScope>('wall');
   const [erasing, setErasing] = useState(false);
   const [splashTopCm, setSplashTopCm] = useState(String(DEFAULT_SPLASH.toMm / 10));
@@ -510,7 +516,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   };
 
   const make3d = async (o: SceneObject, quiet = false) => {
-    if (!data || (making3d && !quiet)) return;
+    if (!data || (making3d && !quiet)) return false;
     setMaking3d(o.id);
     try {
       const fin = describeFinishes(o);
@@ -520,14 +526,16 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
         : await sceneStudioService.make3d({ floor_plan_object_id: o.id, ...(await cropFromRender(o)), finish });
       const states = new Map((await sceneStudioService.objectModelStates(id)).map((r) => [r.id, r]));
       setObjects((list) => list.map((x) => (states.has(x.id) ? { ...x, ...states.get(x.id) } : x)));
-      if (quiet) return true;
+      if (quiet) return result.charged ? (result.credits_used ?? 10) : 0;
       toast({
         title: result.status === 'ready' ? `${o.label} is now 3D` : `Making ${o.label} 3D`,
         description: result.charged
           ? `${result.credits_used ?? 10} credits used.${result.status === 'processing' ? ' It appears in the room in about a minute.' : ''}`
-          : 'Another 3D model of it is being made right now. Try again in a minute; nothing was charged.',
+          : result.status === 'ready'
+            ? 'It already had a 3D model, so it was placed for free.'
+            : 'Another 3D model of it is being made right now. Try again in a minute; nothing was charged.',
       });
-      return true;
+      return 0;
     } catch (e) {
       if (!quiet) fail('The object could not be made 3D', e);
       return false;
@@ -537,7 +545,21 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   };
 
   const batchCandidates = objects.filter((o) => !o.removed_at && FREE_STANDING.has(o.kind) && o.model_status !== 'ready' && o.model_status !== 'processing');
-  const inRender = (o: SceneObject) => !!o.product_id || renders.some((r) => r.id_pass_path && Object.values(r.id_map ?? {}).includes(o.id));
+  const [visibleIds, setVisibleIds] = useState<Set<string> | null>(null);
+  const idPassKey = renders.filter((r) => r.id_pass_path).map((r) => r.id).join(',');
+  useEffect(() => {
+    let live = true;
+    setVisibleIds(null);
+    const withPass = renders.filter((r) => r.id_pass_path).slice(0, 8);
+    void Promise.all(withPass.map(async (r) => {
+      const map = Object.entries(r.id_map ?? {});
+      const cov = idPassCoverage(await loadImage(publicUrl(r.id_pass_path!)), map.map(([hex]) => hex));
+      return map.filter(([hex]) => (cov.get(hex) ?? 0) >= MIN_VISIBLE_COVERAGE).map(([, objId]) => objId);
+    })).then((lists) => { if (live) setVisibleIds(new Set(lists.flat())); }).catch(() => { if (live) setVisibleIds(new Set()); });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idPassKey]);
+  const inRender = (o: SceneObject) => !!o.product_id || !!visibleIds?.has(o.id);
   const batchReady = batchCandidates.filter(inRender);
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchProgress, setBatchProgress] = useState<{ done: number; total: number; failed: number } | null>(null);
@@ -546,14 +568,15 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     const list = [...batchReady];
     setBatchProgress({ done: 0, total: list.length, failed: 0 });
     let failed = 0;
+    let credits = 0;
     for (let i = 0; i < list.length; i++) {
-      const ok = await make3d(list[i], true);
-      if (!ok) failed++;
+      const used = await make3d(list[i], true);
+      if (used === false) failed++; else credits += used;
       setBatchProgress({ done: i + 1, total: list.length, failed });
     }
     toast({
       title: `${list.length - failed} of ${list.length} objects are being made 3D`,
-      description: `${(list.length - failed) * 10} credits used.${failed ? ` ${failed} could not start and cost nothing.` : ''} They appear in the room over the next minutes.`,
+      description: `${credits} credits used.${failed ? ` ${failed} could not start and cost nothing.` : ''} They appear in the room over the next minutes.`,
     });
     setBatchProgress(null);
   };
@@ -1059,57 +1082,72 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
         <Button size="sm" variant={erasing ? 'secondary' : 'outline'} className="w-full gap-1.5" onClick={() => setErasing((v) => !v)}>
           <Eraser className="h-3.5 w-3.5" />{erasing ? 'Removing Finishes: Click a Surface' : 'Remove a Finish'}
         </Button>
-        <div className="space-y-1">
-          <Label className="text-xs">Colour</Label>
-          <ColourRow value={paintProduct ? null : paintColour} onChange={(hex) => { setPaintColour(hex); setPaintProduct(null); setPaintOption(null); setErasing(false); }} />
-        </div>
-        <div className="space-y-1">
-          <Label className="text-xs">Or a product (tile, wood, paint)</Label>
-          {paintProduct && (
-            <div className="flex items-center gap-2 rounded-sm border border-primary p-1.5">
-              {paintProduct.imageUrl && <img src={paintProduct.imageUrl} alt={paintProduct.name} className="h-8 w-8 rounded-sm object-cover" />}
-              <span className="min-w-0 flex-1 truncate text-xs">{paintProduct.name}</span>
-              <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => { setPaintProduct(null); setPaintOption(null); }} aria-label="Clear product"><X className="h-3.5 w-3.5" /></Button>
-            </div>
-          )}
-          {paintProduct && colourOptions(paintProduct).length > 0 && (
-            <div className="space-y-1">
-              <Label className="text-xs">Colour Option</Label>
-              <div className="flex flex-wrap gap-1">
-                {colourOptions(paintProduct).map((o) => (
-                  <button
-                    key={o.hex}
-                    type="button"
-                    title={o.name}
-                    aria-label={o.name}
-                    onClick={() => setPaintOption(paintOption === o.hex ? null : o.hex)}
-                    className={`h-7 w-7 overflow-hidden rounded-sm border ${paintOption === o.hex ? 'border-primary ring-2 ring-primary/40' : 'border-hairline'}`}
-                    style={{ backgroundColor: o.hex }}
-                  >
-                    {o.swatch_url && <img src={o.swatch_url} alt="" className="h-full w-full object-cover" />}
-                  </button>
-                ))}
+        <Tabs defaultValue="materials">
+          <TabsList className="h-8">
+            <TabsTrigger value="materials" className="text-xs">Materials</TabsTrigger>
+            <TabsTrigger value="colours" className="text-xs">Colours</TabsTrigger>
+          </TabsList>
+          <TabsContent value="materials" className="mt-2 space-y-2">
+            {paintProduct ? (
+              <div className="flex items-center gap-2 rounded-sm border border-primary p-1.5">
+                {paintProduct.imageUrl && <img src={paintProduct.imageUrl} alt={paintProduct.name} className="h-8 w-8 rounded-sm object-cover" />}
+                <span className="min-w-0 flex-1 truncate text-xs">{paintProduct.name}</span>
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={() => { setPaintProduct(null); setPaintOption(null); }} aria-label="Clear product"><X className="h-3.5 w-3.5" /></Button>
               </div>
-              <p className="text-[11px] text-muted-foreground">{paintOption ? colourOptions(paintProduct).find((o) => o.hex === paintOption)?.name : 'No option picked: the product photo is used.'}</p>
-            </div>
-          )}
-          {paintProduct && (paintOption ? colourOptions(paintProduct).some((o) => o.hex === paintOption && o.swatch_url) : true) && (
-            (paintOption ? paintProduct.colourTextures?.[paintOption] : paintProduct.albedoUrl)
-              ? <p className="text-[11px] text-muted-foreground">Laid with its clean texture.</p>
-              : (
-                <div className="space-y-1 rounded-sm border border-hairline bg-surface-sunken p-2">
-                  <p className="text-[11px] text-muted-foreground">{paintOption ? 'The catalogue swatch of this colour is very small, so a library material in the same tone is laid. A clean texture is this colour itself, made once and kept on the product for every room.' : 'Laid from the product photo, which may show a whole room. A clean texture is one flat piece of the material, made once and kept on the product for every room.'}</p>
-                  <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => void makeTexture(paintProduct, paintOption)}>
-                    {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                    {makingTexture ? 'Making the Texture…' : 'Make a Clean Texture (6 credits)'}
-                  </Button>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">Pick what you sell: paint, wall covering, tile, flooring or board.</p>
+            )}
+            {surfaceCats === null ? (
+              <p className="flex items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" />Loading</p>
+            ) : (
+              <ProductPicker
+                workspaceId={scene.workspace_id}
+                title="Surfaces From Your Catalogue"
+                categoryIds={surfaceCats}
+                emptyText="Nothing in your catalogue is sold for walls, floors or ceilings yet. Add paints, tiles or flooring to your catalogue to use them here."
+                onPick={(p) => { setPaintProduct(p); setPaintOption(null); setErasing(false); }}
+              />
+            )}
+          </TabsContent>
+          <TabsContent value="colours" className="mt-2 space-y-2">
+            {paintProduct && colourOptions(paintProduct).length > 0 ? (
+              <>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {colourOptions(paintProduct).map((o) => (
+                    <button
+                      key={o.hex}
+                      type="button"
+                      title={o.name}
+                      onClick={() => setPaintOption(paintOption === o.hex ? null : o.hex)}
+                      className={`overflow-hidden rounded-sm border text-left ${paintOption === o.hex ? 'border-primary ring-2 ring-primary/40' : 'border-hairline'}`}
+                    >
+                      <span className="block aspect-square w-full" style={{ backgroundColor: o.hex }}>
+                        {o.swatch_url && <img src={o.swatch_url} alt="" className="h-full w-full object-cover" />}
+                      </span>
+                      <span className="block truncate px-1 py-0.5 text-[10px]">{o.name}</span>
+                    </button>
+                  ))}
                 </div>
-              )
-          )}
-          {pickingPaint
-            ? <ProductPicker workspaceId={scene.workspace_id} title="Paint with a product" onCancel={() => setPickingPaint(false)} onPick={(p) => { setPaintProduct(p); setPaintOption(null); setPickingPaint(false); setErasing(false); }} />
-            : <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={() => setPickingPaint(true)}><Package className="h-3.5 w-3.5" />Choose a product</Button>}
-        </div>
+                <p className="text-[11px] text-muted-foreground">{paintOption ? colourOptions(paintProduct).find((o) => o.hex === paintOption)?.name : 'No colour picked: the product photo is used.'}</p>
+              </>
+            ) : (
+              <p className="text-[11px] text-muted-foreground">{paintProduct ? `${paintProduct.name} is sold in one colour.` : 'Choose a material first. Its colours come from the product you sell.'}</p>
+            )}
+          </TabsContent>
+        </Tabs>
+        {paintProduct && (paintOption ? colourOptions(paintProduct).some((o) => o.hex === paintOption && o.swatch_url) : true) && (
+          (paintOption ? paintProduct.colourTextures?.[paintOption] : paintProduct.albedoUrl)
+            ? <p className="text-[11px] text-muted-foreground">Laid with its clean texture.</p>
+            : (
+              <div className="space-y-1 rounded-sm border border-hairline bg-surface-sunken p-2">
+                <p className="text-[11px] text-muted-foreground">{paintOption ? 'The catalogue swatch of this colour is very small, so a library material in the same tone is laid. A clean texture is this colour itself, made once and kept on the product for every room.' : 'Laid from the product photo, which may show a whole room. A clean texture is one flat piece of the material, made once and kept on the product for every room.'}</p>
+                <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={makingTexture} onClick={() => void makeTexture(paintProduct, paintOption)}>
+                  {makingTexture ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                  {makingTexture ? 'Making the Texture…' : 'Make a Clean Texture (6 credits)'}
+                </Button>
+              </div>
+            )
+        )}
         <p className="text-xs text-muted-foreground">Then click a floor, a wall or a ceiling; what will change lights up blue. Tiles are laid at their real size, with joints.</p>
       </CardContent>
     </Card>
@@ -1248,8 +1286,10 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
               <BoxIcon className="h-3.5 w-3.5" />Make All Furniture 3D{batchReady.length ? ` (${batchReady.length * 10} credits)` : ''}
             </Button>
           )}
-          {batchCandidates.length > batchReady.length && (
-            <p className="text-[11px] text-muted-foreground">{count(batchCandidates.length - batchReady.length, 'piece')} not in a render yet. Render the room first to include them.</p>
+          {visibleIds === null && batchCandidates.length > 0 ? (
+            <p className="text-[11px] text-muted-foreground">Checking which pieces your renders show…</p>
+          ) : batchCandidates.length > batchReady.length && (
+            <p className="text-[11px] text-muted-foreground">{count(batchCandidates.length - batchReady.length, 'piece')} not visible in any render: {batchCandidates.filter((o) => !inRender(o)).map((o) => o.label).slice(0, 4).join(', ')}. Render a view that shows them to include them.</p>
           )}
         </div>
         <p className="text-[11px] text-muted-foreground">Built-ins (kitchen, wardrobes fitted to walls) stay as true-size models; free-standing furniture can become photo-real.</p>

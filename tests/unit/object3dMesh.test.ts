@@ -65,4 +65,18 @@ describe('object-3d makes a GLB mesh', () => {
     expect(EDGE).toMatch(/model_updated_at\.lt\.\$\{staleBefore\}\),model_status\.eq\.ready`/);
     expect(EDGE).toMatch(/updated_at\.lt\.\$\{staleBefore\}\),status\.eq\.ready`/);
   });
+
+  it('places a model that already exists for free and charges only for new work', () => {
+    const readyAt = EDGE.indexOf("return json({ success: true, status: 'ready', charged: false, credits_used: 0");
+    const debitAt = EDGE.indexOf('const debit = await debitExternalServiceCredits(');
+    expect(readyAt).toBeGreaterThan(0);
+    expect(debitAt).toBeGreaterThan(readyAt);
+    expect(EDGE).not.toContain('cached: !!ready');
+  });
+
+  it('counts only pieces a saved render actually shows', () => {
+    expect(EDITOR).toContain('idPassCoverage(await loadImage(publicUrl(r.id_pass_path!))');
+    expect(EDITOR).toContain('const inRender = (o: SceneObject) => !!o.product_id || !!visibleIds?.has(o.id);');
+    expect(EDITOR).toMatch(/if \(used === false\) failed\+\+; else credits \+= used;/);
+  });
 });

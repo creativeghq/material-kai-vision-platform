@@ -8,6 +8,8 @@ const read = (...p: string[]) => stripComments(readFileSync(join(ROOT, ...p), 'u
 const SLOT = read('src', 'components', 'features', 'scenestudio', 'SlotMaterials.tsx');
 const RENDER = read('src', 'components', 'features', 'scenestudio', 'RenderMaterials.tsx');
 const SERVICE = read('src', 'services', 'sceneStudioService.ts');
+const EDITOR = read('src', 'components', 'features', 'scenestudio', 'SceneEditor.tsx');
+const TOOL = read('supabase', 'functions', '_shared', 'tools', 'scene-studio-tools.ts');
 
 describe('3D-room part finishes come from the catalogue', () => {
   it('offers Materials and Colours tabs and no free colour picker', () => {
@@ -32,5 +34,21 @@ describe('3D-room part finishes come from the catalogue', () => {
     expect(RENDER).not.toMatch(/what: [^,]*\.hex/);
     expect(RENDER).not.toMatch(/what: o\.colour_hex/);
     expect(SLOT).not.toMatch(/finish\?\.hex \? finish\.hex/);
+  });
+
+  it('paints walls, floors and ceilings only with catalogue surfaces', () => {
+    expect(EDITOR).not.toContain('ColourRow');
+    expect(EDITOR).toContain('categoryIds={surfaceCats}');
+    expect(EDITOR).toContain('setSurfaceCats(c.surface ?? [])');
+  });
+
+  it('the agent finishes with a catalogue product and only its own colourways', () => {
+    expect(TOOL).toMatch(/if \(!product\) return JSON\.stringify\(\{ success: false/);
+    expect(TOOL).toContain('is not sold in ${colour}');
+  });
+
+  it('the agent opens a 3D room by its name', () => {
+    expect(TOOL).toContain("if (!scene_id && name?.trim() && action !== 'create')");
+    expect(TOOL).toContain('More than one 3D room matches');
   });
 });

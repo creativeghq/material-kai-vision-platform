@@ -89,3 +89,24 @@ export function paintedMask(img: HTMLImageElement): ObjectMask {
   ctx.putImageData(out, 0, 0);
   return { canvas: c, box };
 }
+
+export function idPassCoverage(image: HTMLImageElement, hexes: string[]): Map<string, number> {
+  const { data, width, height } = pixels(image);
+  const counts = new Map<number, number>();
+  for (let i = 0; i < data.length; i += 4) {
+    const key = (data[i] << 16) | (data[i + 1] << 8) | data[i + 2];
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  const out = new Map<string, number>();
+  for (const hex of hexes) {
+    const rgb = hexToRgb(hex);
+    if (!rgb) continue;
+    let n = 0;
+    for (const [key, c] of counts) {
+      const dr = ((key >> 16) & 255) - rgb[0]; const dg = ((key >> 8) & 255) - rgb[1]; const db = (key & 255) - rgb[2];
+      if (dr * dr + dg * dg + db * db <= 36) n += c;
+    }
+    out.set(hex, n / (width * height));
+  }
+  return out;
+}

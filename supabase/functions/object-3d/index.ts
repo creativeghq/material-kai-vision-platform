@@ -287,19 +287,19 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     }
   }
 
-  const debit = await debitExternalServiceCredits(admin, uid, SERVICE, 'object_3d', 1, { target: target.kind, id: target.id, cached: !!ready }, target.workspaceId);
-  if (!debit.success) {
-    if (!ready) await markFailed(admin, target, 'Not enough credits');
-    return json({ success: false, error: debit.error ?? 'Insufficient credits', credits_required: debit.credits_debited, service: SERVICE }, 402);
-  }
-
   if (ready) {
     if (target.linkObjectId) {
       await admin.from('floor_plan_objects').update({
         model_status: 'ready', model_storage_path: ready, model_error: null, model_finish: finish?.text ?? null, model_updated_at: new Date().toISOString(),
       }).eq('id', target.linkObjectId);
     }
-    return json({ success: true, status: 'ready', charged: true, credits_used: debit.credits_debited, url: publicUrl(admin, ready) });
+    return json({ success: true, status: 'ready', charged: false, credits_used: 0, url: publicUrl(admin, ready) });
+  }
+
+  const debit = await debitExternalServiceCredits(admin, uid, SERVICE, 'object_3d', 1, { target: target.kind, id: target.id }, target.workspaceId);
+  if (!debit.success) {
+    await markFailed(admin, target, 'Not enough credits');
+    return json({ success: false, error: debit.error ?? 'Insufficient credits', credits_required: debit.credits_debited, service: SERVICE }, 402);
   }
 
   if (target.linkObjectId) {
