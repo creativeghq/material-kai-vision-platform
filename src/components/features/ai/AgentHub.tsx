@@ -1465,7 +1465,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
         headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [],
-          agentId: selectedAgent,
+          agentId: item.agentId ?? selectedAgent,
           model: selectedModel,
           conversation_id: conversationIdRef.current,
           workspace_id: getActiveWorkspaceId(session.user?.id) ?? workspaceId,
@@ -3608,6 +3608,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
                   summary: chunk.summary || '',
                   danger: !!chunk.danger,
                   toolkitId: chunk.toolkit_id,
+                  ...(typeof chunk.agent_id === 'string' ? { agentId: chunk.agent_id } : {}),
                 };
                 const key = confirmItemKey(item);
                 const batch = turnConfirmRef.current;

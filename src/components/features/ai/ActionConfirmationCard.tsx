@@ -17,6 +17,8 @@ export interface ActionConfirmationItem {
   summary: string;
   danger?: boolean;
   toolkitId?: string;
+  /** The agent that staged it; its tool may be bound on no other. */
+  agentId?: string;
   /** Set once the action has run. */
   outcome?: { ok: boolean; error?: string };
 }

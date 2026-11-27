@@ -4636,8 +4636,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
 
           const executeStartTime = Date.now();
           try {
-            // Execute agent with streaming callback
-
+            // An approval re-runs its tool on the agent that STAGED it — the router's pick, not the composer's.
+            let stagingAgent = agentId;
             finalResult = await executeAgent(
               agentId,
               workspaceId,
@@ -4669,6 +4669,8 @@ Deno.serve(withApiLogging('agent-chat', async (req) => {
                     credits_used: chunk.credits_used,
                   };
                 }
+                if (chunk?.type === 'agent_routed' && typeof chunk.to === 'string') stagingAgent = chunk.to;
+                if (chunk?.type === 'action_confirmation' && !chunk.agent_id) chunk.agent_id = stagingAgent;
                 if (!streamClosed) {
                   safeEnqueue(chunk);
                 }
