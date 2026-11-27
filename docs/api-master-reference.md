@@ -408,7 +408,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `installation-guide-appearance` | JWT / kai_* | Read a product photo into the finish each part of an installation guide carries |
 | `installation-guide-extract` | JWT / kai_* | Read an uploaded installation manual into a step-by-step guide |
 | `installation-guide-public` | public | Open an installation guide through its public share link |
-| `object-3d` | JWT | Make a product or a 3D-room object into a GLB mesh (SAM 3D Objects on fal, via MIVAA); product calls need `object_kind`, optional `size_mm` |
+| `object-3d` | JWT | Show a product or a 3D-room object as a photo-real 3D model |
 | `project-assessment` | JWT | Derive a project's health signals, and optionally write the AI assessment of them |
 | `scan-drawing-title-block` | JWT / kai_* | Read a drawing's title block into project drawing-register fields |
 | `scene-studio-read` | JWT / kai_* | Read a floor plan, room photo or render into an editable 3D room |
