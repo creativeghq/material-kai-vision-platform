@@ -13,7 +13,7 @@ Open work lives on GitHub (#617 generated furniture, #604 kitchen studio, #608 g
 | Clean seamless texture for a surface | `surface-texture` | Gemini | 6 credits |
 | Photoreal render of the current view | `generate-interior-gemini` `mode: 'scene-render'`, `model_tier: 'fast'` | Gemini Nano Banana 2.1 | 6 credits |
 | Object edit / area edit on a render | `generate-interior-gemini` `mode: 'image-edit'` + client mask composite | Gemini Nano Banana 2.1 | 6 credits |
-| Make one object 3D / Make All Furniture 3D | `object-3d` → MIVAA `/api/internal/object3d/generate` | SAM 3D Objects on fal (`fal-ai/sam-3/3d-objects`) | 10 credits per piece, refunded on failure |
+| Make one object 3D / Make All Furniture 3D | `object-3d` → MIVAA `/api/internal/object3d/generate` | Product packshot: Hunyuan 3D 3.1 Pro on fal; room piece / scene photo: SAM 3D Objects on fal | 10 credits per NEW model (an existing one is placed free), refunded on failure |
 | Photo Mode picture | `PhotoMode.tsx` (browser) | `three-gpu-pathtracer` 0.0.23 + Intel OIDN (`oidn-webgpu`) | free |
 | Baked light | `bakedLight.ts` (browser) → `scene_lightmaps` | path tracer, 256 spp, 5 bounces | free |
 | Walkthrough / before-after video | `WalkthroughRecorder.tsx`, `beforeAfterVideo.ts` | frame-by-frame 24 fps, `mediabunny` MP4/AVC or WebM/VP9 | free |
@@ -62,9 +62,17 @@ hues). It is what lets an object edit change only that object and what cuts an o
    - Scene object: crop of the best render + exact mask (`cropFromRender`), noun = the object kind.
    - Product: the product photo + `object_kind` (required; a product NAME is not a prompt — a box around the whole photo modelled the floor).
    - "In these materials": the photo is first repainted with Gemini (`object_3d/clean_shot_finish`, charged separately).
-2. MIVAA `object3d_routes.py`: fal queue, `mask_urls` if given else `prompt`, `export_textured_glb`, seed 42; 10 min
-   deadline, 80 MB cap, `glTF` magic check; re-hosted to `generation-images` as `.glb`; `log_external_call` at the
-   `sam-3d-objects` price ($0.02). Failure → refund + `model_status='failed'` with the provider message. No fallback model.
+2. MIVAA `object3d_routes.py` picks the engine (`choose_engine`):
+   - **Hunyuan 3D 3.1 Pro** (`fal-ai/hunyuan-3d/v3.1/pro/image-to-3d`, `face_count` 50,000, $0.525 = $0.375 + $0.15 custom
+     face count) for a product or finish variant whose photo is a clean shot: `is_clean_shot` = ≥92% of a 4% border band
+     is studio white (≥235 grey). Hunyuan takes no mask and no noun, so it gets only photos holding one object.
+   - **SAM 3D Objects** (`fal-ai/sam-3/3d-objects`, $0.02) for everything else: every scene object (render crop + mask),
+     a product photo with a scene behind it, any input over Hunyuan's 8 MB limit. `mask_urls` if given, else a
+     `box_prompts` foreground box for a clean finish shot, else `prompt`; `export_textured_glb`, seed 42.
+   - Both: 10 min deadline, 80 MB cap, `glTF` magic check; then `slim_glb_textures` re-encodes opaque embedded textures
+     as ≤2048 px JPEG (Hunyuan ships a 4096 PNG: 11.8 MB → 1.5 MB, visually identical); re-hosted to `generation-images`
+     as `.glb`; `log_external_call` at that engine's `ai_model_pricing` row; `generator` records which engine made it.
+     Failure → refund + `failed` with the provider message. Never a second engine after a failure.
 3. Browser: `meshModel.tsx` + `lib/scene/modelFit.ts` stand the GLB in the object's box (y-up, front +Z, natural axes, max
    per-axis stretch 1.8).
 
@@ -86,15 +94,15 @@ All on our own inputs (IKEA-style packshots, Demo Apartment renders), 2026-11-24
 
 | Model | $/run | Time | Size / faces | Verdict |
 |---|---|---|---|---|
-| **SAM 3D Objects** (fal) — **in use** | 0.02 | 33–41 s | ~1.3 MB / 10–16k | Faithful shape and colour; clean backs; soft on fine tufting; plants come out blobby |
-| Hunyuan 3D 3.1 Pro (fal) | 0.015/unit | ~170 s | 26 MB / 500k | Best detail (seat tufting, bed lift handle); far too heavy for the browser at default — would need `face_count` ≈ 50k |
+| **SAM 3D Objects** (fal) — **in use for room pieces** | 0.02 | 33–41 s | ~1.3 MB / 10–16k | Faithful shape and colour; clean backs; soft on fine tufting; plants come out blobby |
+| **Hunyuan 3D 3.1 Pro** (fal) — **in use for product packshots** | 0.525 at 50k faces (0.375 default) | 145–170 s | 1.5 MB slimmed / 50k (26 MB at default 500k) | Best detail (seat tufting, bed lift handle); 50k keeps the tufting; no mask input |
 | Trellis 2 (fal) | 0.05 | 35–95 s | 16–20 MB / 470k | Good shapes; speckled mattress texture; best plant (keeps variegated leaves) |
 | Tripo P2 (fal) | ~0.01/credit | ~70 s | 1.4–3 MB / 3–5k | Light; exports rotated 90°; bed colour drifted yellow, headboard wrong |
 | Meshy 7.1 (fal) | 0.80 | ~95 s | 3.5 MB / 26k | Good, scribbled mattress texture; 40× SAM's price |
 | Rodin Gen-2 (Replicate) | 0.40 | 2–9 min | 35–50 MB / 1M | Cleanest geometry, needs a size bbox; heavy |
 | Idol (Modal splats) | — | — | — | **Retired** — splats, no mesh |
 
-Decision: SAM 3D stays. Revisit Hunyuan 3.1 with a reduced `face_count` if tufted upholstery detail becomes the complaint.
+Decision (2026-11-27): Hunyuan 3.1 at 50k faces for a product packshot, SAM 3D for room pieces and anything it must pick out of a scene.
 
 ### Remove one object (masked)
 

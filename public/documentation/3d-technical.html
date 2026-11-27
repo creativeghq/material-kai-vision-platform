@@ -32,8 +32,9 @@
       <tr><td>Read a plan / photo / render / drawing into a 3D room</td><td>Claude <code>claude-fable-5-2</code>, strict JSON schema output</td><td>Anthropic API, from the <code>scene-studio-read</code> edge function</td><td>Per image read</td></tr>
       <tr><td>Photoreal render of a view; object and area edits</td><td>Gemini <strong>Nano Banana 2.1</strong> (fast tier)</td><td>Google AI, from <code>generate-interior-gemini</code></td><td>6 credits</td></tr>
       <tr><td>Virtual staging (furnish an empty photo) and unstaging (empty a room)</td><td>Gemini <strong>3 Pro Image</strong> (Nano Banana Pro)</td><td>Google AI, from <code>generate-virtual-staging</code> / <code>generate_gemini</code></td><td>Pro-tier credits</td></tr>
-      <tr><td>Furniture and product → 3D mesh</td><td><strong>SAM 3D Objects</strong> (Meta) — <a href="https://github.com/facebookresearch/sam-3d-objects">repo</a>, hosted on <a href="https://fal.ai/models/fal-ai/sam-3/3d-objects">fal</a></td><td>fal queue, called by our backend (MIVAA)</td><td>10 credits, refunded on failure</td></tr>
-      <tr><td>"In these materials" variant of a 3D model</td><td>Gemini repaints the source photo first, then SAM 3D</td><td>Google AI + fal</td><td>Charged separately</td></tr>
+      <tr><td>Product photo on a white background → 3D mesh</td><td><strong>Hunyuan 3D 3.1 Pro</strong> (Tencent) at 50,000 faces — <a href="https://github.com/Tencent-Hunyuan">repo</a>, hosted on <a href="https://fal.ai/models/fal-ai/hunyuan-3d/v3.1/pro/image-to-3d">fal</a></td><td>fal queue, called by our backend (MIVAA)</td><td>10 credits per new model, refunded on failure; an existing model is placed free</td></tr>
+      <tr><td>Furniture in a 3D room, or a product photo with a scene behind it → 3D mesh</td><td><strong>SAM 3D Objects</strong> (Meta) — <a href="https://github.com/facebookresearch/sam-3d-objects">repo</a>, hosted on <a href="https://fal.ai/models/fal-ai/sam-3/3d-objects">fal</a>. The only one that can be told which object to build (exact mask from the ID pass, or a noun)</td><td>fal queue, called by our backend (MIVAA)</td><td>10 credits per new model, refunded on failure</td></tr>
+      <tr><td>"In these materials" variant of a 3D model</td><td>Gemini repaints the source photo on white first, then Hunyuan 3D (a product) or SAM 3D (a room piece)</td><td>Google AI + fal</td><td>Charged separately</td></tr>
       <tr><td>Clean seamless texture from a product photo</td><td>Gemini</td><td>Google AI, from <code>surface-texture</code></td><td>6 credits</td></tr>
       <tr><td>Video from a picture (not from a 3D room)</td><td>H3 Max, Kling v4.0, Wan 3.0, Seedance 2.5, Ray 3.2, Gemini Omni — picked by video type</td><td>fal, Replicate, Alibaba, ByteDance, Luma, Google</td><td>15–125 credits</td></tr>
     </tbody>
@@ -67,8 +68,8 @@
   <table>
     <thead><tr><th>Model</th><th>Price / run</th><th>Time</th><th>File</th><th>Result</th></tr></thead>
     <tbody>
-      <tr><td><strong>SAM 3D Objects</strong> (in use)</td><td>$0.02</td><td>33–41 s</td><td>~1.3 MB</td><td>Faithful shape and colour, clean backs, browser-light. Soft on fine tufting.</td></tr>
-      <tr><td><a href="https://github.com/Tencent-Hunyuan">Hunyuan 3D 3.1 Pro</a></td><td>low</td><td>~170 s</td><td>26 MB</td><td>Best fine detail; 500k faces is too heavy for the browser without reduction.</td></tr>
+      <tr><td><strong>SAM 3D Objects</strong> (in use for room pieces)</td><td>$0.02</td><td>33–41 s</td><td>~1.3 MB</td><td>Faithful shape and colour, clean backs, browser-light. Soft on fine tufting.</td></tr>
+      <tr><td><a href="https://github.com/Tencent-Hunyuan">Hunyuan 3D 3.1 Pro</a> (in use for product packshots)</td><td>$0.525 at 50k faces</td><td>145–170 s</td><td>1.5 MB</td><td>Best fine detail (seat tufting, handles). At 50,000 faces with its 4096 px texture re-encoded to a 2048 px JPEG, a 12 MB file becomes 1.5 MB and looks the same. Takes no mask, so only single-object packshots go to it.</td></tr>
       <tr><td><a href="https://github.com/microsoft/TRELLIS">Trellis 2</a></td><td>$0.05</td><td>35–95 s</td><td>16–20 MB</td><td>Good shapes and the best plant; speckled fabric textures.</td></tr>
       <tr><td>Tripo P2</td><td>low</td><td>~70 s</td><td>1.4–3 MB</td><td>Light, but rotated 90° and colour drift.</td></tr>
       <tr><td>Meshy 7.1</td><td>$0.80</td><td>~95 s</td><td>3.5 MB</td><td>Good, scribbled fabric; 40× SAM's price.</td></tr>
