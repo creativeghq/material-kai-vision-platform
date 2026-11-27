@@ -1551,7 +1551,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
             </DialogHeader>
             <DialogFooter>
               <Button variant="outline" onClick={() => setBatchOpen(false)}>Cancel</Button>
-              <Button className="gap-1.5" onClick={() => void runBatch()}><BoxIcon className="h-4 w-4" />Make {batchReady.length} pieces 3D</Button>
+              <Button className="gap-1.5" onClick={() => void runBatch()}><BoxIcon className="h-4 w-4" />Make {count(batchReady.length, 'piece')} 3D</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

@@ -128,7 +128,7 @@ export const MaterialsPanel: React.FC<{
               </button>
             ))}
             {colours.length === 0 && <p className="text-xs text-muted-foreground">No colourway picked yet.</p>}
-            {ownColour > 0 && <p className="text-[11px] text-muted-foreground">{ownColour === 1 ? '1 part shows' : `${ownColour} parts show`} its product in the colour of its catalogue photo.</p>}
+            {ownColour > 0 && <p className="text-[11px] text-muted-foreground">{ownColour === 1 ? '1 part shows its product' : `${ownColour} parts show their product`} in the colour of its catalogue photo.</p>}
             {plan.length > 0 && (
               <section className="space-y-1.5 border-t border-hairline pt-2">
                 <h4 className="text-xs font-semibold">Style Palette</h4>
