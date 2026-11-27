@@ -12,7 +12,7 @@ export interface TurnMessage {
   turnId?: string;
   recovered?: boolean;
   sceneData?: { scene_id: string; intent?: unknown };
-  agentResultData?: { title?: string };
+  agentResultData?: { title?: string; resultType?: string };
   seoGenericData?: unknown;
   actionConfirmationData?: unknown;
   inputRequestData?: unknown;
@@ -38,6 +38,10 @@ export function isResultCardRow(m: TurnMessage): boolean {
     || (!!m.seoGenericData && prose === '');
 }
 
+/** A lookup's card: the answer when it is all the turn produced, noise beside a write's result. */
+export const LOOKUP_RESULT_TYPES: ReadonlySet<string> = new Set(['record_search_results']);
+const isLookupCard = (m: TurnMessage) => LOOKUP_RESULT_TYPES.has(m.agentResultData?.resultType ?? '');
+
 /** Waiting on the user — stays where it is, never folded under a reply. */
 const awaitsUser = (m: TurnMessage) => !!m.actionConfirmationData || !!m.inputRequestData;
 
@@ -62,7 +66,9 @@ export function layoutTurns<M extends TurnMessage>(
     const isReply = turn.map((m) => speaks(m) && (!!m.turnId || artifactTitle(m) === null));
     const spoke = turn.map(speaks);
     const firstReply = isReply.indexOf(true);
+    const hasOtherCard = turn.some((m, i) => !isReply[i] && !isLookupCard(m) && (awaitsUser(m) || artifactTitle(m) !== null));
     turn.forEach((m, i) => {
+      if (hasOtherCard && isLookupCard(m)) { absorbed.add(m.id); return; }
       if (isReply[i] || awaitsUser(m) || artifactTitle(m) === null) return;
       const host = spoke[i]
         ? (i < firstReply ? firstReply : -1)

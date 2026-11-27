@@ -53,6 +53,17 @@ describe('a turn reads as one reply', () => {
     expect(attached.get('reply')?.map((m) => m.id)).toEqual(['room']);
   });
 
+  it('a lookup card is dropped beside a write result, kept when it is the answer', () => {
+    const lookup = { id: 'look', role: 'assistant', content: 'Records Found', agentResultData: { title: 'Records Found', resultType: 'record_search_results' }, card: 'Records Found' };
+    const created = { id: 'made', role: 'assistant', content: 'Contact Added', agentResultData: { title: 'Contact Added', resultType: 'crm_contact_created' }, card: 'Contact Added' };
+    const reply = { id: 'r', role: 'assistant', content: 'Added Maria.', turnId: 't' };
+    const withWrite = layoutTurns([lookup, created, reply], titleOf);
+    expect(withWrite.attached.get('r')?.map((m) => m.id)).toEqual(['made']);
+    expect(withWrite.absorbed.has('look')).toBe(true);
+    const alone = layoutTurns([lookup, reply], titleOf);
+    expect(alone.attached.get('r')?.map((m) => m.id)).toEqual(['look']);
+  });
+
   it('a card saved after the reply attaches back to it', () => {
     const { attached } = layoutTurns([turn[3], turn[1]], titleOf);
     expect(attached.get('r1')?.map((m) => m.id)).toEqual(['c1']);
