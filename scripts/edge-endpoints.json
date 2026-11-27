@@ -18417,7 +18417,7 @@
     "name": "object-3d",
     "tag": "Projects",
     "summary": "Show a product or a 3D-room object as a photo-real 3D model",
-    "description": "Returns a 3D model (a textured GLB mesh) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits BEFORE any work; a request that finds another generation already running is not charged. Generation sends the photo (a product's best photo, or the room object's capture with its exact mask) to SAM 3D Objects on fal, which builds the mesh; only a model in a chosen finish is first repainted by the image model. An older splat model is never served: it is made again as a mesh. A failure anywhere refunds the credits and leaves no model behind. The workspace for a product request is checked for moodboards.use and the 3D rooms module; an object's workspace comes from its room.",
+    "description": "Returns a 3D model (a textured GLB mesh) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. A model that already exists is placed free; a request that starts a new one debits the object-3d price (10 credits) BEFORE any work, or object-3d-premium (15 credits) with quality 'premium'; a request that finds another generation already running is not charged. Generation sends the photo (a product's best photo, or the room object's capture with its exact mask) to SAM 3D Objects on fal, which builds the mesh; Premium Generation sends a product photo on white to Hunyuan 3D 3.1 instead, remakes a standard model, and when the photo is not on white fails, refunds and keeps the standard model; only a model in a chosen finish is first repainted by the image model. An older splat model is never served: it is made again as a mesh. A failure anywhere refunds the credits and leaves no model behind. The workspace for a product request is checked for moodboards.use and the 3D rooms module; an object's workspace comes from its room.",
     "security": [
       "supabaseJwt"
     ],
@@ -18462,6 +18462,12 @@
         "type": "string",
         "required": false,
         "desc": "For a product request without floor_plan_object_id: what the object is (e.g. 'sofa', 'dining chair'), so the model knows which object in the photo to build. Required when a new model has to be made."
+      },
+      {
+        "name": "quality",
+        "type": "string",
+        "required": false,
+        "desc": "'premium' for Premium Generation of a product (sharper, Hunyuan 3D, needs a photo on a plain white background). Omitted = standard."
       },
       {
         "name": "size_mm",

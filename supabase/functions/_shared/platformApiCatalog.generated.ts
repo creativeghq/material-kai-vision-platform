@@ -3418,7 +3418,7 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "POST"
     ],
     "summary": "Show a product or a 3D-room object as a photo-real 3D model",
-    "description": "Returns a 3D model (a textured GLB mesh) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. Each request that returns or starts a model debits 10 credits BEFORE any work; a reques",
+    "description": "Returns a 3D model (a textured GLB mesh) of a catalogue product or of one object in a 3D room. A product's model is generated once from its best photo and kept in product_3d_models, so every later request is served from that library; an object that is not a product keeps its model on its floor_plan_objects row. A model that already exists is placed free; a request that starts a new one debits the ",
     "fields": {
       "product_id": {
         "type": "string",
@@ -3443,6 +3443,10 @@ export const PLATFORM_API_CATALOG: readonly PlatformApiEndpoint[] = [
       "object_kind": {
         "type": "string",
         "description": "For a product request without floor_plan_object_id: what the object is (e.g. 'sofa', 'dining chair'), so the model knows"
+      },
+      "quality": {
+        "type": "string",
+        "description": "'premium' for Premium Generation of a product (sharper, Hunyuan 3D, needs a photo on a plain white background). Omitted "
       },
       "size_mm": {
         "type": "string",

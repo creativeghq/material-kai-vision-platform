@@ -12,6 +12,8 @@ import { captureException } from '../_shared/sentry.ts';
 const BUCKET = 'generation-images';
 const STALE_MS = 15 * 60 * 1000;
 const SERVICE = 'object-3d';
+const PREMIUM_SERVICE = 'object-3d-premium';
+const PREMIUM_GENERATOR = 'hunyuan-3d-v31-pro';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -37,6 +39,8 @@ interface Target {
   source: { url?: string; path?: string; maskPath?: string };
   linkObjectId?: string;
   sizeM?: { width: number; depth: number; height: number };
+  premium?: boolean;
+  previousPath?: string;
 }
 
 /** Only a GLB mesh is a finished model; a splat left from before #617 is made again. */
@@ -78,6 +82,15 @@ async function sha32(text: string): Promise<string> {
 
 async function markFailed(admin: DbClient, t: Target, message: string) {
   const msg = message.slice(0, 500);
+  if (t.previousPath) {
+    await admin.from(productTable(t)).update({ status: 'ready', storage_path: t.previousPath, error: msg }).eq('id', t.rowId);
+    if (t.linkObjectId) {
+      await admin.from('floor_plan_objects').update({
+        model_status: 'ready', model_storage_path: t.previousPath, model_error: msg, model_updated_at: new Date().toISOString(),
+      }).eq('id', t.linkObjectId);
+    }
+    return;
+  }
   if (t.linkObjectId) {
     await admin.from('floor_plan_objects').update({ model_status: 'failed', model_error: msg, model_updated_at: new Date().toISOString() }).eq('id', t.linkObjectId);
   }
@@ -142,6 +155,8 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
         out_path: `${t.folder}/${stamp}.glb`, link_object_id: t.linkObjectId ?? null,
         model_finish: t.finish?.text ?? null,
         clean_background: !!cleanBackground,
+        premium: !!t.premium,
+        previous_path: t.previousPath ?? null,
         refund: { user_id: charge.uid, credits: charge.credits, transaction_id: charge.transactionId, workspace_id: charge.workspaceId },
       }),
     });
@@ -167,7 +182,10 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     product_id?: string; floor_plan_object_id?: string; workspace_id?: string; image_path?: string; mask_path?: string; object_kind?: string;
     size_mm?: { width?: number; depth?: number; height?: number };
     finish?: { description?: string; image_url?: string };
+    quality?: string;
   };
+  const premium = body.quality === 'premium';
+  if (premium && !body.product_id) throw new HttpError(400, 'Premium Generation works from a product photo, not from a piece of a room.');
   const finishText = typeof body.finish?.description === 'string' ? body.finish.description.trim().slice(0, 600) : '';
   const finishImage = typeof body.finish?.image_url === 'string' && body.finish.image_url.startsWith('https://') ? body.finish.image_url : null;
   const finish = finishText ? { text: finishText, imageUrl: finishImage } : undefined;
@@ -200,16 +218,19 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     target = {
       kind: variantKey ? 'variant' : 'product', id: product.id, rowId: '', what: `the product "${product.name}"`, noun: objectNoun(body.object_kind), workspaceId: ws,
       folder: variantKey ? `object-3d/products/${product.id}/variants/${variantKey}` : `object-3d/products/${product.id}`,
-      source: { url: imageUrl }, finish, variantKey: variantKey ?? undefined,
+      source: { url: imageUrl }, finish, variantKey: variantKey ?? undefined, premium,
     };
     const { data: row } = variantKey
       ? await admin.from('product_3d_model_variants')
-        .select('id, status, storage_path, updated_at').eq('product_id', product.id).eq('variant_key', variantKey).maybeSingle()
+        .select('id, status, storage_path, updated_at, generator').eq('product_id', product.id).eq('variant_key', variantKey).maybeSingle()
       : await admin.from('product_3d_models')
-        .select('id, status, storage_path, updated_at, source').eq('product_id', product.id).eq('format', 'glb').maybeSingle();
+        .select('id, status, storage_path, updated_at, source, generator').eq('product_id', product.id).eq('format', 'glb').maybeSingle();
     const supplied = !!row && 'source' in row && row.source !== 'generated';
     if (supplied && row.status !== 'ready') throw new HttpError(409, 'The supplier 3D model of this product is not ready yet.');
-    if (row?.status === 'ready' && (supplied || isMesh(row.storage_path))) ready = row.storage_path;
+    if (supplied && premium) throw new HttpError(409, 'This product has its supplier\'s own 3D model, which is used as it is.');
+    const upgrade = premium && row?.generator !== PREMIUM_GENERATOR;
+    if (row?.status === 'ready' && (supplied || isMesh(row.storage_path)) && !upgrade) ready = row.storage_path;
+    if (upgrade && row?.status === 'ready' && isMesh(row.storage_path)) target.previousPath = row.storage_path;
     else if (row?.status === 'processing' && Date.parse(row.updated_at) > Date.now() - STALE_MS) processing = true;
     else if (!imageUrl) throw new HttpError(409, 'This product has no photo to make a 3D model from.');
     target.rowId = row?.id ?? '';
@@ -297,7 +318,9 @@ Deno.serve(withApiLogging(SERVICE, async (req: Request) => {
     return json({ success: true, status: 'ready', charged: false, credits_used: 0, url: publicUrl(admin, ready) });
   }
 
-  const debit = await debitExternalServiceCredits(admin, uid, SERVICE, 'object_3d', 1, { target: target.kind, id: target.id }, target.workspaceId);
+  const debit = await debitExternalServiceCredits(
+    admin, uid, premium ? PREMIUM_SERVICE : SERVICE, premium ? 'object_3d_premium' : 'object_3d', 1, { target: target.kind, id: target.id }, target.workspaceId,
+  );
   if (!debit.success) {
     await markFailed(admin, target, 'Not enough credits');
     return json({ success: false, error: debit.error ?? 'Insufficient credits', credits_required: debit.credits_debited, service: SERVICE }, 402);

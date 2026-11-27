@@ -13,7 +13,8 @@ Open work lives on GitHub (#617 generated furniture, #604 kitchen studio, #608 g
 | Clean seamless texture for a surface | `surface-texture` | Gemini | 6 credits |
 | Photoreal render of the current view | `generate-interior-gemini` `mode: 'scene-render'`, `model_tier: 'fast'` | Gemini Nano Banana 2.1 | 6 credits |
 | Object edit / area edit on a render | `generate-interior-gemini` `mode: 'image-edit'` + client mask composite | Gemini Nano Banana 2.1 | 6 credits |
-| Make one object 3D / Make All Furniture 3D | `object-3d` → MIVAA `/api/internal/object3d/generate` | Product packshot: Hunyuan 3D 3.1 Pro on fal; room piece / scene photo: SAM 3D Objects on fal | 10 credits per NEW model (an existing one is placed free), refunded on failure |
+| Make one object 3D / Make All Furniture 3D | `object-3d` → MIVAA `/api/internal/object3d/generate` | SAM 3D Objects on fal, for every product photo and room piece | 10 credits per NEW model (an existing one is placed free), refunded on failure |
+| Premium Generation (a product only, asked for) | `object-3d` with `quality: 'premium'` | Hunyuan 3D 3.1 Pro on fal | 15 credits (`object-3d-premium`); a photo not on white fails, refunds and keeps the standard model |
 | Photo Mode picture | `PhotoMode.tsx` (browser) | `three-gpu-pathtracer` 0.0.23 + Intel OIDN (`oidn-webgpu`) | free |
 | Baked light | `bakedLight.ts` (browser) → `scene_lightmaps` | path tracer, 256 spp, 5 bounces | free |
 | Walkthrough / before-after video | `WalkthroughRecorder.tsx`, `beforeAfterVideo.ts` | frame-by-frame 24 fps, `mediabunny` MP4/AVC or WebM/VP9 | free |
@@ -58,17 +59,19 @@ hues). It is what lets an object edit change only that object and what cuts an o
 
 ## 4. Generated furniture (`object-3d`)
 
-1. Edge: claim the row, debit `object-3d` (10 credits), build the input.
+1. Edge: claim the row, debit `object-3d` (10 credits) or, for `quality: 'premium'`, `object-3d-premium` (15), build the input.
+   Premium is refused for a room piece (400) and a supplier model (409); it remakes a ready model whose `generator` is not
+   Hunyuan, passing that model as `previous_path` so a failed Premium restores it (`ready` + `error`) instead of losing it.
    - Scene object: crop of the best render + exact mask (`cropFromRender`), noun = the object kind.
    - Product: the product photo + `object_kind` (required; a product NAME is not a prompt — a box around the whole photo modelled the floor).
    - "In these materials": the photo is first repainted with Gemini (`object_3d/clean_shot_finish`, charged separately).
-2. MIVAA `object3d_routes.py` picks the engine (`choose_engine`):
+2. MIVAA `object3d_routes.py` picks the engine (`choose_engine`) from what was PAID for, never on its own:
+   - **SAM 3D Objects** (`fal-ai/sam-3/3d-objects`, $0.02) unless `premium`: every scene object (render crop + mask) and
+     every product photo. `mask_urls` if given, else a `box_prompts` foreground box when the photo is a clean shot
+     (`is_clean_shot` = ≥92% of a 4% border band is studio white, ≥235 grey), else `prompt`; `export_textured_glb`, seed 42.
    - **Hunyuan 3D 3.1 Pro** (`fal-ai/hunyuan-3d/v3.1/pro/image-to-3d`, `face_count` 50,000, $0.525 = $0.375 + $0.15 custom
-     face count) for a product or finish variant whose photo is a clean shot: `is_clean_shot` = ≥92% of a 4% border band
-     is studio white (≥235 grey). Hunyuan takes no mask and no noun, so it gets only photos holding one object.
-   - **SAM 3D Objects** (`fal-ai/sam-3/3d-objects`, $0.02) for everything else: every scene object (render crop + mask),
-     a product photo with a scene behind it, any input over Hunyuan's 8 MB limit. `mask_urls` if given, else a
-     `box_prompts` foreground box for a clean finish shot, else `prompt`; `export_textured_glb`, seed 42.
+     face count) only when `premium`. It takes no mask and no noun, so a premium run on a room piece, a photo over 8 MB or
+     a photo that is not a clean shot raises `PremiumNotPossible` → refund. It is never quietly made with SAM instead.
    - Both: 10 min deadline, 80 MB cap, `glTF` magic check; then `slim_glb_textures` re-encodes opaque embedded textures
      as ≤2048 px JPEG (Hunyuan ships a 4096 PNG: 11.8 MB → 1.5 MB, visually identical); re-hosted to `generation-images`
      as `.glb`; `log_external_call` at that engine's `ai_model_pricing` row; `generator` records which engine made it.
@@ -94,15 +97,17 @@ All on our own inputs (IKEA-style packshots, Demo Apartment renders), 2026-11-24
 
 | Model | $/run | Time | Size / faces | Verdict |
 |---|---|---|---|---|
-| **SAM 3D Objects** (fal) — **in use for room pieces** | 0.02 | 33–41 s | ~1.3 MB / 10–16k | Faithful shape and colour; clean backs; soft on fine tufting; plants come out blobby |
-| **Hunyuan 3D 3.1 Pro** (fal) — **in use for product packshots** | 0.525 at 50k faces (0.375 default) | 145–170 s | 1.5 MB slimmed / 50k (26 MB at default 500k) | Best detail (seat tufting, bed lift handle); 50k keeps the tufting; no mask input |
+| **SAM 3D Objects** (fal) — **standard, every model** | 0.02 | 33–41 s | ~1.3 MB / 10–16k | Faithful shape and colour; clean backs; soft on fine tufting; plants come out blobby |
+| **Hunyuan 3D 3.1 Pro** (fal) — **Premium Generation only** | 0.525 at 50k faces (0.375 default) | 145–170 s | 1.5 MB slimmed / 50k (26 MB at default 500k) | Best detail (seat tufting, bed lift handle); 50k keeps the tufting; no mask input |
 | Trellis 2 (fal) | 0.05 | 35–95 s | 16–20 MB / 470k | Good shapes; speckled mattress texture; best plant (keeps variegated leaves) |
 | Tripo P2 (fal) | ~0.01/credit | ~70 s | 1.4–3 MB / 3–5k | Light; exports rotated 90°; bed colour drifted yellow, headboard wrong |
 | Meshy 7.1 (fal) | 0.80 | ~95 s | 3.5 MB / 26k | Good, scribbled mattress texture; 40× SAM's price |
 | Rodin Gen-2 (Replicate) | 0.40 | 2–9 min | 35–50 MB / 1M | Cleanest geometry, needs a size bbox; heavy |
 | Idol (Modal splats) | — | — | — | **Retired** — splats, no mesh |
 
-Decision (2026-11-27): Hunyuan 3.1 at 50k faces for a product packshot, SAM 3D for room pieces and anything it must pick out of a scene.
+Decision (2026-11-27, revised the same day): SAM 3D is the standard for everything. Side by side on the same packshot
+Hunyuan is visibly sharper only up close (tufting, seams, chrome legs) at ~26× the cost, so it is an opt-in
+**Premium Generation** (15 credits) for a product photo on white, never chosen automatically.
 
 ### Remove one object (masked)
 

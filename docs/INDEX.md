@@ -202,7 +202,7 @@ Complete documentation for Material Kai Vision Platform.
 
 **[3d-rooms-and-models.md](3d-rooms-and-models.md)** - 3D rooms, renders, generated 3D furniture ✨ NEW
 - Plan / photo / render → editable 3D room (Claude read), Gemini renders with object-ID pass
-- Make 3D: GLB meshes (Hunyuan 3D 3.1 for product packshots, SAM 3D for room pieces); Photo Mode path tracing + OIDN; baked light; walkthrough video
+- Make 3D: GLB meshes (SAM 3D standard; Hunyuan 3D 3.1 as opt-in Premium Generation); Photo Mode path tracing + OIDN; baked light; walkthrough video
 - Model choices with the benchmark numbers (image→3D, object removal, unstage, staging)
 - Retired: splats, Idol, Atlas, VR World
 

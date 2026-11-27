@@ -225,6 +225,13 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
   const [focusRoomId, setFocusRoomId] = useState<string | null>(null);
   const [eyeLevel, setEyeLevel] = useState(false);
   const [making3d, setMaking3d] = useState<string | null>(null);
+  const [credits3d, setCredits3d] = useState<{ standard: number | null; premium: number | null }>({ standard: null, premium: null });
+  useEffect(() => {
+    let live = true;
+    void sceneStudioService.make3dCredits().then((c) => { if (live) setCredits3d(c); }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
+  const creditsLabel = (n: number | null) => (n == null ? '' : ` (${n} credits)`);
   const [walkRoomId, setWalkRoomId] = useState<string | null | undefined>(undefined);
   const walking = walkRoomId !== undefined;
   const startWalk = (roomId: string | null) => { setShowRender(false); setSelectedId(null); setTool('view'); setWalkRoomId(roomId ?? focusRoomId ?? data?.rooms[0]?.id ?? null); };
@@ -515,24 +522,27 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     return { image_path, mask_path };
   };
 
-  const make3d = async (o: SceneObject, quiet = false) => {
+  const make3d = async (o: SceneObject, quiet = false, premium = false) => {
     if (!data || (making3d && !quiet)) return false;
     setMaking3d(o.id);
     try {
       const fin = describeFinishes(o);
       const finish = fin ? { description: fin, image_url: finishImage(o) } : undefined;
       const result = o.product_id
-        ? await sceneStudioService.make3d({ product_id: o.product_id, workspace_id: data.scene.workspace_id, floor_plan_object_id: o.id, finish })
+        ? await sceneStudioService.make3d({
+          product_id: o.product_id, workspace_id: data.scene.workspace_id, floor_plan_object_id: o.id, finish, ...(premium ? { quality: 'premium' as const } : {}),
+        })
         : await sceneStudioService.make3d({ floor_plan_object_id: o.id, ...(await cropFromRender(o)), finish });
       const states = new Map((await sceneStudioService.objectModelStates(id)).map((r) => [r.id, r]));
       setObjects((list) => list.map((x) => (states.has(x.id) ? { ...x, ...states.get(x.id) } : x)));
-      if (quiet) return result.charged ? (result.credits_used ?? 10) : 0;
+      if (quiet) return result.charged ? (result.credits_used ?? 0) : 0;
+      const kind = premium ? 'Premium 3D model' : '3D model';
       toast({
-        title: result.status === 'ready' ? `${o.label} is now 3D` : `Making ${o.label} 3D`,
+        title: result.status === 'ready' ? `${o.label} is now 3D` : `Making the ${kind} of ${o.label}`,
         description: result.charged
-          ? `${result.credits_used ?? 10} credits used.${result.status === 'processing' ? ' It appears in the room in about a minute.' : ''}`
+          ? `${result.credits_used ?? 0} credits used.${result.status === 'processing' ? ` It appears in the room in ${premium ? 'about three minutes' : 'about a minute'}.` : ''}`
           : result.status === 'ready'
-            ? 'It already had a 3D model, so it was placed for free.'
+            ? `It already had a ${kind}, so it was placed for free.`
             : 'Another 3D model of it is being made right now. Try again in a minute; nothing was charged.',
       });
       return 0;
@@ -543,6 +553,18 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
       setMaking3d(null);
     }
   };
+
+  const premiumOption = (o: SceneObject) => (o.product_id ? (
+    <>
+      <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={making3d === o.id} onClick={() => void make3d(o, false, true)}>
+        {making3d === o.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+        Premium Generation{creditsLabel(credits3d.premium)}
+      </Button>
+      <p className="text-muted-foreground">
+        Sharper stitching, seams and metal, for close-up renders. Made from a product photo on a plain white background; any other photo is refunded.
+      </p>
+    </>
+  ) : null);
 
   const batchCandidates = objects.filter((o) => !o.removed_at && FREE_STANDING.has(o.kind) && o.model_status !== 'ready' && o.model_status !== 'processing');
   const [visibleIds, setVisibleIds] = useState<Set<string> | null>(null);
@@ -860,7 +882,7 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
     if (roomId) goToRoom(roomId, false);
     if (obj) setSelectedId(obj.id);
     if (intent.mode === 'make_3d' && obj) {
-      toast({ title: `${obj.label} is selected`, description: 'Press Make 3D in the panel below the room to confirm (10 credits).' });
+      toast({ title: `${obj.label} is selected`, description: 'Press Make 3D in the panel below the room to confirm; the price is on the button.' });
     }
   }, [intent, data]);
 
@@ -1035,12 +1057,17 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
             <p className="flex items-center gap-1.5"><BoxIcon className="h-3.5 w-3.5" />The 3D model is previewed in the new materials.</p>
             <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={making3d === selected.id} onClick={() => void make3d(selected)}>
               {making3d === selected.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BoxIcon className="h-3.5 w-3.5" />}
-              Make 3D in these materials (10 credits)
+              Make 3D in these materials{creditsLabel(credits3d.standard)}
             </Button>
             <p className="text-muted-foreground">The preview re-tints the model; this remakes it photo-real in {describeFinishes(selected) || 'its original finish'}, once, then keeps it for every room.</p>
+            {premiumOption(selected)}
           </>
         ) : selected.model_status === 'ready' ? (
-          <p className="flex items-center gap-1.5"><BoxIcon className="h-3.5 w-3.5" />Shown as a photo-real 3D model{selected.model_finish ? `, ${selected.model_finish}` : ''}.</p>
+          <>
+            <p className="flex items-center gap-1.5"><BoxIcon className="h-3.5 w-3.5" />Shown as a photo-real 3D model{selected.model_finish ? `, ${selected.model_finish}` : ''}.</p>
+            {selected.model_error && <p className="text-destructive">Premium Generation did not run and was refunded: {selected.model_error} The standard model is kept.</p>}
+            {premiumOption(selected)}
+          </>
         ) : selected.model_status === 'processing' ? (
           <p className="flex items-center gap-1.5 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Making the 3D model. It appears in the room in about a minute.</p>
         ) : (
@@ -1048,9 +1075,10 @@ export default function SceneEditor({ sceneId: id, pinned = [], onRendered, onDr
             {selected.model_status === 'failed' && <p className="text-destructive">The last attempt failed and was refunded{selected.model_error ? `: ${selected.model_error}` : '.'}</p>}
             <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={making3d === selected.id} onClick={() => void make3d(selected)}>
               {making3d === selected.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <BoxIcon className="h-3.5 w-3.5" />}
-              Make 3D (10 credits)
+              Make 3D{creditsLabel(credits3d.standard)}
             </Button>
             <p className="text-muted-foreground">{selected.product_id ? 'Made from the product photo, once, then kept for every room.' : 'Made from how it looks in the current render.'}</p>
+            {premiumOption(selected)}
           </>
         )}
       </CardContent>

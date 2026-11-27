@@ -440,7 +440,19 @@ export const sceneStudioService = {
     return (data ?? []) as Array<Pick<SceneObject, 'id' | 'model_status' | 'model_storage_path' | 'model_error' | 'model_finish'>>;
   },
 
-  async make3d(body: { floor_plan_object_id?: string; image_path?: string; mask_path?: string; product_id?: string; workspace_id?: string; finish?: { description: string; image_url?: string } }): Promise<{ status: 'ready' | 'processing'; url?: string; charged: boolean; credits_used?: number }> {
+  /** What Make 3D and Premium Generation cost, from the same rows object-3d debits. Null until known. */
+  async make3dCredits(): Promise<{ standard: number | null; premium: number | null }> {
+    const { data, error } = await supabase.from('ai_model_pricing').select('model_key, credits')
+      .in('model_key', ['object-3d', 'object-3d-premium']).eq('is_active', true);
+    if (error) throw new Error(error.message);
+    const of = (key: string) => {
+      const v = Number((data ?? []).find((r) => r.model_key === key)?.credits);
+      return Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+    };
+    return { standard: of('object-3d'), premium: of('object-3d-premium') };
+  },
+
+  async make3d(body: { floor_plan_object_id?: string; image_path?: string; mask_path?: string; product_id?: string; workspace_id?: string; finish?: { description: string; image_url?: string }; quality?: 'premium' }): Promise<{ status: 'ready' | 'processing'; url?: string; charged: boolean; credits_used?: number }> {
     const { data, error } = await supabase.functions.invoke('object-3d', { body });
     if (error) throw await edgeError(error, 'The 3D model could not be started');
     if (!data?.success) throw new Error(data?.error || 'The 3D model could not be started.');

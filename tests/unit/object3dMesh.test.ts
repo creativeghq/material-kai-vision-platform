@@ -80,6 +80,25 @@ describe('object-3d makes a GLB mesh', () => {
     expect(EDITOR).toMatch(/if \(used === false\) failed\+\+; else credits \+= used;/);
   });
 
+  it('Premium Generation is only ever asked for, priced on its own row, and only for a product', () => {
+    expect(EDGE).toContain("const premium = body.quality === 'premium';");
+    expect(EDGE).toMatch(/if \(premium && !body\.product_id\) throw new HttpError\(400/);
+    expect(EDGE).toContain("const PREMIUM_SERVICE = 'object-3d-premium';");
+    expect(EDGE).toContain('premium ? PREMIUM_SERVICE : SERVICE');
+    expect(EDGE).toContain('premium: !!t.premium,');
+    expect(EDITOR).toContain("onClick={() => void make3d(o, false, true)}");
+    expect(EDITOR).toMatch(/const make3d = async \(o: SceneObject, quiet = false, premium = false\)/);
+    expect(EDITOR).not.toMatch(/\(1[05] credits\)/);
+  });
+
+  it('Premium remakes a standard model, and a refused Premium keeps the model it would have replaced', () => {
+    expect(EDGE).toContain('const upgrade = premium && row?.generator !== PREMIUM_GENERATOR;');
+    expect(EDGE).toContain("(supplied || isMesh(row.storage_path)) && !upgrade) ready = row.storage_path;");
+    const failed = EDGE.slice(EDGE.indexOf('async function markFailed('), EDGE.indexOf('async function readSource('));
+    expect(failed.indexOf('if (t.previousPath)')).toBeLessThan(failed.indexOf("status: 'failed'"));
+    expect(EDGE).toContain('previous_path: t.previousPath ?? null,');
+  });
+
   it('a finish shot on white is selected by its foreground, not by the noun', () => {
     expect(EDGE).toContain('return { imagePath: path, maskPath: null, cleanBackground: true };');
     expect(EDGE).toContain('clean_background: !!cleanBackground,');
