@@ -79,4 +79,9 @@ describe('object-3d makes a GLB mesh', () => {
     expect(EDITOR).toContain('const inRender = (o: SceneObject) => !!o.product_id || !!visibleIds?.has(o.id);');
     expect(EDITOR).toMatch(/if \(used === false\) failed\+\+; else credits \+= used;/);
   });
+
+  it('a finish shot on white is selected by its foreground, not by the noun', () => {
+    expect(EDGE).toContain('return { imagePath: path, maskPath: null, cleanBackground: true };');
+    expect(EDGE).toContain('clean_background: !!cleanBackground,');
+  });
 });

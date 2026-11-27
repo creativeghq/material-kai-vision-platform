@@ -102,7 +102,7 @@ async function store(admin: DbClient, path: string, bytes: Uint8Array, mimeType:
 }
 
 /** The image SAM 3D reads: a finish variant is repainted first, a plain model uses the photo or capture as it is. */
-async function modelInput(admin: DbClient, t: Target, charge: Charge, stamp: number): Promise<{ imagePath: string; maskPath: string | null }> {
+async function modelInput(admin: DbClient, t: Target, charge: Charge, stamp: number): Promise<{ imagePath: string; maskPath: string | null; cleanBackground?: boolean }> {
   if (t.finish) {
     const images = [(await readSource(admin, t)).bytes];
     if (t.finish.imageUrl) images.push((await fetchImageGuarded(t.finish.imageUrl)).bytes);
@@ -114,7 +114,7 @@ async function modelInput(admin: DbClient, t: Target, charge: Charge, stamp: num
     );
     const path = `${t.folder}/${stamp}-finish.png`;
     await store(admin, path, Uint8Array.from(atob(shot.base64), (c) => c.charCodeAt(0)), shot.mimeType || 'image/png');
-    return { imagePath: path, maskPath: null };
+    return { imagePath: path, maskPath: null, cleanBackground: true };
   }
   if (t.source.path) return { imagePath: t.source.path, maskPath: t.source.maskPath ?? null };
   const photo = await fetchImageGuarded(t.source.url!);
@@ -126,7 +126,7 @@ async function modelInput(admin: DbClient, t: Target, charge: Charge, stamp: num
 async function generate(admin: DbClient, t: Target, charge: Charge): Promise<void> {
   try {
     const stamp = Date.now();
-    const { imagePath, maskPath } = await modelInput(admin, t, charge, stamp);
+    const { imagePath, maskPath, cleanBackground } = await modelInput(admin, t, charge, stamp);
     if (t.kind !== 'scene_object') {
       await admin.from(productTable(t)).update({ input_image_path: imagePath, source_image_url: t.source.url ?? null }).eq('id', t.rowId);
     } else {
@@ -141,6 +141,7 @@ async function generate(admin: DbClient, t: Target, charge: Charge): Promise<voi
         size_m: t.kind === 'product' ? t.sizeM ?? null : null,
         out_path: `${t.folder}/${stamp}.glb`, link_object_id: t.linkObjectId ?? null,
         model_finish: t.finish?.text ?? null,
+        clean_background: !!cleanBackground,
         refund: { user_id: charge.uid, credits: charge.credits, transaction_id: charge.transactionId, workspace_id: charge.workspaceId },
       }),
     });

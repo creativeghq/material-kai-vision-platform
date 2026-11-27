@@ -51,4 +51,12 @@ describe('3D-room part finishes come from the catalogue', () => {
     expect(TOOL).toContain("if (!scene_id && name?.trim() && action !== 'create')");
     expect(TOOL).toContain('More than one 3D room matches');
   });
+
+  it('the render sidebar lists each catalogue material once, its colourways apart, and unchosen parts on their own', () => {
+    expect(RENDER).toContain('<TabsTrigger value="materials"');
+    expect(RENDER).toContain('<TabsTrigger value="colours"');
+    expect(RENDER).toContain('groupBy(chosen, (r) => r.material!.key)');
+    expect(RENDER).toContain('Material not chosen ({unchosen.length})');
+    expect(RENDER).not.toMatch(/colour_hex \?\? |o\.colour_hex/);
+  });
 });
