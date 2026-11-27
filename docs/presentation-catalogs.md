@@ -402,7 +402,7 @@ After pulling the branch:
 ### Database
 
 - `../supabase/migrations/20260508_presentation_catalogs_module.sql` — 5 tables + 4 enums + RLS + 5 storage buckets + `is_admin_user()` helper + module entry + default template seed.
-- `../supabase/migrations/20260508_kai_prompt_catalogs_addendum.sql` — appends catalog tool guidance to the `kai` prompt row. Idempotent via `--END_PRESENTATION_CATALOGS_ADDENDUM--` marker.
+- `prompts` row `tool / toolkit_guide / kai.catalogs` — the catalog tool guidance, sent only while the Catalogs toolkit is bound (moved out of the `kai` prompt 2026-11-27).
 - `../supabase/migrations/20260508_catalog_view_events.sql` — `catalog_view_events` table + enum + 2 atomic RPCs (the `catalog_operations_summary` view was dropped 2026-11-13).
 
 ### Backend (edge functions)

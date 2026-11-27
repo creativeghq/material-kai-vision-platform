@@ -118,6 +118,7 @@ async function initRuntime() {
   getSharedOperatingDoctrine = promptMod.getSharedOperatingDoctrine;
   getSharedReplyStyle = promptMod.getSharedReplyStyle;
   loadPrompt = promptMod.loadPrompt;
+  tryLoadPrompt = promptMod.tryLoadPrompt;
   renderPromptTemplate = promptMod.renderPromptTemplate;
   extractTextContent = lgCoreMod.extractTextContent;
   authenticate = authMod.authenticate;
@@ -258,6 +259,11 @@ function buildAgentStateAnnotation() {
     reducer: (prev, next) => prev + next,
     default: () => 0,
   }),
+  /** The part of cacheWriteTokens written with the 1h TTL, which bills at 2x instead of 1.25x. */
+  cacheWrite1hTokens: Annotation<number>({
+    reducer: (prev, next) => prev + next,
+    default: () => 0,
+  }),
   turnCount: Annotation<number>({
     reducer: (prev, next) => prev + next,
     default: () => 0,
@@ -363,7 +369,7 @@ function createAgentGraph(
     const systemMessage = new SystemMessage({
       content: splitAt
         ? [
-          { type: 'text', text: systemText.slice(0, splitAt), cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: systemText.slice(0, splitAt), cache_control: { type: 'ephemeral', ttl: '1h' } },
           { type: 'text', text: systemText.slice(splitAt), cache_control: { type: 'ephemeral' } },
         ]
         : [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }],
@@ -405,6 +411,7 @@ function createAgentGraph(
       ?? usage?.cache_read_input_tokens ?? 0;
     const cacheWriteTokens = um?.input_token_details?.cache_creation
       ?? usage?.cache_creation_input_tokens ?? 0;
+    const cacheWrite1hTokens = Math.min(cacheWriteTokens, usage?.cache_creation?.ephemeral_1h_input_tokens ?? 0);
     // (use ?? not || so a legitimate 0 isn't treated as missing)
     const inputTokens = um?.input_tokens != null
       ? Math.max(0, um.input_tokens - cacheReadTokens - cacheWriteTokens)
@@ -476,6 +483,7 @@ function createAgentGraph(
         outputTokens,
         cacheReadTokens,
         cacheWriteTokens,
+        cacheWrite1hTokens,
         turnCount: 1,
         finalResponse,
       };
@@ -488,6 +496,7 @@ function createAgentGraph(
       outputTokens,
       cacheReadTokens,
       cacheWriteTokens,
+      cacheWrite1hTokens,
       turnCount: 1,
     };
   }
@@ -917,6 +926,7 @@ let getSharedReplyStyle: (supabase: any) => Promise<string>;
 // Prompts that are neither an agent persona nor a tool description — the router classifier and
 // the conversation compactor. Both used to be string literals in this file. Also from promptMod.
 let loadPrompt: (supabase: any, promptType: string, category: string, subcategory?: string) => Promise<string>;
+let tryLoadPrompt: (supabase: any, promptType: string, category: string, subcategory?: string) => Promise<string | null>;
 let renderPromptTemplate: (template: string, vars: Record<string, string | number | null | undefined>) => string;
 
 // Claude models — initialized in initRuntime()
@@ -1699,6 +1709,8 @@ async function executeAgent(
     cacheReadTokens?: number;
     /** Prefix tokens written into the cache on a miss — billed at 1.25x. */
     cacheWriteTokens?: number;
+    /** Of those, written with the 1h TTL — billed at 2x. */
+    cacheWrite1hTokens?: number;
     totalTokens: number;
     modelName: string;
     turnCount: number;
@@ -2071,6 +2083,18 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
     } catch (e) {
       console.error('[agent-chat] approval_card prompt missing; replies may ask for one approval per action:', e);
     }
+  }
+
+  // A toolkit's usage guide travels with the toolkit: sent only while its tools are bound, so a
+  // turn that never touches presentation sheets does not pay for their instructions.
+  const toolkitGuide = (toolkitId: string): Promise<string | null> =>
+    tryLoadPrompt(supabase, 'tool', 'toolkit_guide', `${agentId}.${toolkitId}`)
+      .catch((e: unknown) => { console.warn(`[agent-chat] toolkit guide ${toolkitId} unreadable:`, e); return null; });
+  if (!forCustomer) {
+    const guides = await Promise.all(
+      activeToolkitIds.filter((id) => !TOOLKIT_CLUSTERS[id]?.alwaysOn).map(toolkitGuide),
+    );
+    for (const g of guides) if (g) systemPrompt += `\n\n${g}`;
   }
 
   try {
@@ -3488,7 +3512,7 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
   // agent can call the freshly-loaded tool in the SAME turn (no re-send).
   const applyToolkitInRun = async (
     toolkitId: string,
-  ): Promise<{ success: boolean; tool_ids?: string[]; toolkit_name?: string; error?: string }> => {
+  ): Promise<{ success: boolean; tool_ids?: string[]; toolkit_name?: string; guide?: string; error?: string }> => {
     const def = TOOLKIT_CLUSTERS[toolkitId];
     if (!def) return { success: false, error: `Unknown toolkit "${toolkitId}".` };
     // Only bind tools this agent is actually allowed to use.
@@ -3520,7 +3544,8 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
     if (present.length === 0) {
       return { success: false, error: `Could not load "${toolkitId}" (admin-only or unavailable for your role).` };
     }
-    return { success: true, tool_ids: present, toolkit_name: toolkitId };
+    const guide = await toolkitGuide(toolkitId);
+    return { success: true, tool_ids: present, toolkit_name: toolkitId, ...(guide ? { guide } : {}) };
   };
 
   // Register load_toolkit ONCE on the live tool list, wired to the in-run loader.
@@ -3876,6 +3901,7 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
     outputTokens: 0,
     cacheReadTokens: 0,
     cacheWriteTokens: 0,
+    cacheWrite1hTokens: 0,
     turnCount: 0,
     finalResponse: null,
     generationJob: null,
@@ -3969,6 +3995,7 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
         // that mysteriously stopped consuming input.
         cacheReadTokens: result.cacheReadTokens,
         cacheWriteTokens: result.cacheWriteTokens,
+        cacheWrite1hTokens: result.cacheWrite1hTokens,
         totalTokens: result.inputTokens + result.outputTokens + result.cacheReadTokens + result.cacheWriteTokens,
         modelName,
         turnCount: result.turnCount
@@ -4138,6 +4165,7 @@ async function logAgentUsage(
     outputTokens: number;
     cacheReadTokens?: number;
     cacheWriteTokens?: number;
+    cacheWrite1hTokens?: number;
     totalTokens: number;
     modelName: string;
     turnCount: number;
@@ -4167,6 +4195,7 @@ async function logAgentUsage(
         p_output_tokens: usage.outputTokens,
         p_cache_read_tokens: usage.cacheReadTokens ?? 0,
         p_cache_write_tokens: usage.cacheWriteTokens ?? 0,
+        p_cache_write_1h_tokens: usage.cacheWrite1hTokens ?? 0,
         p_tools_called: toolsCalled,
         p_latency_ms: attribution.latencyMs ?? null,
       });

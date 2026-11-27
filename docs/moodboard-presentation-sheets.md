@@ -500,7 +500,7 @@ The JARVIS prompt addendum needs to be applied. Run the second migration. Check 
 SELECT system_prompt FROM prompts
 WHERE prompt_type = 'agent' AND category = 'kai' AND is_active = true;
 ```
-Look for the `--END_PRESENTATION_SHEETS_ADDENDUM--` marker. If missing, the migration didn't run.
+JARVIS's guide is the `prompts` row `tool / toolkit_guide / kai.presentation-sheets`, sent only while the Presentation Sheets toolkit is bound; the interior-designer prompt still carries its own block.
 
 **Canvas widget shows "No PDF available" after Render.**
 The edge function returned an error. The canvas catches it and shows it inline. Check the sheet row:

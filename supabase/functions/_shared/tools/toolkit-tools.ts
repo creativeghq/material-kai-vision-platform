@@ -27,6 +27,8 @@ export interface ApplyToolkitResult {
   success: boolean;
   tool_ids?: string[];
   toolkit_name?: string;
+  /** How to use this toolkit's tools; sent with the result because it is not in the system prompt. */
+  guide?: string;
   error?: string;
 }
 
@@ -73,6 +75,7 @@ export const createLoadToolkitTool = (
         message:
           `Loaded the "${res.toolkit_name || input.toolkit_id}" toolkit — its tools are now available in THIS turn. ` +
           `Continue with the user's request immediately; do NOT ask the user to re-send.`,
+        ...(res.guide ? { guidance: res.guide } : {}),
       });
     },
     {

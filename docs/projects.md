@@ -324,7 +324,7 @@ Four tools on the `kai` + `interior-designer` agents. Source: [supabase/function
 | `find_project(query)` | Before any project-scoped action when project is referenced by name | Fuzzy name match, max 5 results. |
 | `add_task(project_id ∣ project_name, title, parent_task_id?, room_name?, due_date?, visibility?)` | "remind me to X for [project]" | Resolves project + room by name internally. Pass `parent_task_id` for subtasks. |
 
-A JARVIS prompt addendum (idempotent block `--BEGIN_PROJECT_WORKSPACE_ADDENDUM--`) teaches both agents the natural-language mappings to these tools.
+A JARVIS toolkit guide (`prompts` row `tool / toolkit_guide / kai.projects`, sent only while the Projects toolkit is bound) teaches both agents the natural-language mappings to these tools.
 
 ---
 
