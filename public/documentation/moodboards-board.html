@@ -29,13 +29,14 @@
   <p><strong>What it affects:</strong> deleting a board removes it <em>and its generated sheets</em> — but it does <strong>not</strong> delete the underlying catalogue products, so the materials remain available for other boards and quotes.</p>
 
   <h3>The board detail page</h3>
-  <p><strong>What it is —</strong> the screen you reach when you open a board: two tabs (<strong>Items</strong> and <strong>Tools</strong>) plus an action toolbar. <strong>Why it matters —</strong> this is your workspace for the board — everything you do to build, enrich, price and publish a board happens here.</p>
+  <p><strong>What it is —</strong> the screen you reach when you open a board: three tabs (<strong>Items</strong>, <a href="#room-views">Room Views</a> and <strong>Tools</strong>) plus an action toolbar. <strong>Why it matters —</strong> this is your workspace for the board — everything you do to build, enrich, price and publish a board happens here.</p>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/moodboards/moodboard-detail.png" alt="MoodBoard detail">
     <figcaption>A board's detail view with the Items / Tools tabs and the action toolbar.</figcaption>
   </figure>
   <ul class="feat">
     <li><strong>Items tab</strong> — the board itself: the materials and images you've collected, arranged as a visual grid. Review what's on the board, open an individual item to inspect it, arrange items, or remove ones you no longer want. The products visible here are what feed <strong>Generate Quote</strong> and the product-based presentation sheets, so curating this tab directly shapes those deliverables.</li>
+    <li><strong>Room Views tab</strong> — the board's products laid on a room at their real format (see <a href="#room-views">Room Views</a>).</li>
     <li><strong>Tools tab</strong> — board-level helpers. The key one is <strong>Find Products</strong>, which looks across the catalogue for materials that match what's already on the board. It is also where you reach <strong>New Tool</strong> to start a <a href="moodboards-sheets.html">presentation sheet</a>.</li>
   </ul>
 
@@ -82,7 +83,7 @@
   <ol>
     <li>From the top navigation open <strong>MoodBoards</strong>, then click <strong>New MoodBoard</strong>.</li>
     <li>Enter a <strong>title</strong> for the board (and an optional <strong>description</strong>), then confirm.</li>
-    <li>Open the new board to reach its detail page with the <strong>Items</strong> and <strong>Tools</strong> tabs.</li>
+    <li>Open the new board to reach its detail page with the <strong>Items</strong>, <strong>Room Views</strong> and <strong>Tools</strong> tabs.</li>
   </ol>
 
   <h2>Step by step: add materials</h2>
@@ -103,6 +104,22 @@
 
   <h2>Worked example — turning a Pinterest reference into a priced board</h2>
   <div class="callout tip"><p>Open <strong>MoodBoards → New MoodBoard</strong> and give it a title and short description → on the detail page click <strong>Import from Pinterest</strong> and paste a pin URL; the platform auto-matches that image against the catalogue and suggests the closest products, which you add to the board → run <strong>Find Products</strong> from the <strong>Tools</strong> tab to round out the concept with complementary materials → arrange everything on the <strong>Items</strong> tab → click <strong>Generate Quote</strong> to convert the board's products into a priced proposal, then set the board <span class="badge public">Public</span> and send the <span class="badge route">/board/:id</span> link so the client can see the visual reference while you finish the quote.</p></div>
+
+  <h2 id="room-views">Room Views — the board's materials laid on a room</h2>
+  <p><strong>What it is —</strong> a picture of a room with several of the board's products laid on it at their real format: one tile on the floor, another on a wall, the stone on a backsplash. <strong>Why it matters —</strong> a client judges a combination far better on a room than as swatches, and the render is exact rather than an AI impression — the same product, size, pattern and joint you will quote. The render is drawn in your browser; saving it as a sheet costs 1 credit.</p>
+  <ol>
+    <li>On a board, open the <strong>Room Views</strong> tab (between <strong>Items</strong> and <strong>Tools</strong>) and press <strong>New room view</strong> — or hover an item and choose <strong>See it in a room</strong>.</li>
+    <li>Give it a <strong>Title</strong> and <strong>Pick a room</strong> — a library scene (kitchen, bathroom, living, bedroom, dining, hallway) or a room photo your workspace has marked up in the Surface Visualizer.</li>
+    <li>For each surface (Floor, Wall…), choose a product — from <strong>On This Moodboard</strong> or <strong>Other Products</strong> — and its <strong>Pattern</strong>, <strong>Rotation</strong> and joint width.</li>
+    <li>Press <strong>Save to moodboard</strong>. The view is saved as a sheet with numbered, clickable pins naming each product; <strong>Open the PDF</strong> gives numbered callouts and a legend with format, pattern and joint.</li>
+  </ol>
+  <ul class="feat">
+    <li><strong>Add to a quote.</strong> A saved view shows the coverage per surface and offers <em>Add N m² / boxes / pieces to a quote</em> in the product's own selling unit. A product with no unit set is refused rather than guessed. The quote line keeps a link to the render it was measured from.</li>
+    <li><strong>Kept current.</strong> If a product changed after the render, the view warns that it should be saved again.</li>
+    <li><strong>Everywhere a sheet goes.</strong> A room view is a <a href="moodboards-sheets.html">presentation sheet</a>, so it follows the board's sharing, goes into full decks, and appears with its pins in a project's <a href="projects-client-view.html">client view</a>, where the client can press <em>Ask about this</em>. No cost or supplier is shown to the client.</li>
+    <li><strong>From a project room.</strong> In a project's <a href="projects-rooms.html">Rooms</a>, <strong>New room view</strong> on a room opens its newest moodboard (or creates <em>&lt;Room&gt; Moodboard</em>) straight into the editor, and each room lists its views.</li>
+  </ul>
+  <div class="callout"><p><strong>One product on one surface.</strong> The <strong>Surface Visualizer</strong> (<span class="badge route">/visualizer</span>) lays a single product on a room photo — reached from <strong>See it on a surface</strong> on a product card, the product page and Discover. Upload your own room photo and <strong>Mark a surface</strong> there; <strong>Render photoreal</strong> is an optional AI pass that changes nothing but realism. Its result can be added to a quote or saved to a moodboard.</p></div>
 
   <h2>What it affects</h2>
   <p>Everything you collect on a board can be re-used downstream: the products become a <a href="quotes.html">quote</a>, the board becomes <a href="moodboards-sheets.html">presentation sheets</a>, and the sheets feed a Client View. Deleting a board removes it and its generated sheets but leaves the underlying catalogue products intact. For larger deliverables that combine sheets from <em>several</em> boards, MoodBoards feed into <a href="projects.html">Projects → Client Views</a>.</p>

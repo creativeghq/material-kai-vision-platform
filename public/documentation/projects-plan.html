@@ -3,21 +3,21 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Projects: Plan &amp; Estimating | MaterialsHub Documentation</title>
+<title>Projects: Estimate | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Plan &amp; Estimating</div>
-  <h1>Projects · Plan &amp; Estimating</h1>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Estimate</div>
+  <h1>Projects · Estimate</h1>
   <div class="routes"><span class="badge route">/projects/:id</span> <span class="badge gated">owner</span></div>
-  <p class="lead">The <strong>Plan</strong> tab turns a project into a priced, professional <strong>estimate</strong>. You start from a reusable <a href="projects-blueprints.html">blueprint</a> (a structured scope of works), type in a few <strong>measurements</strong>, and the plan prices itself — labour and materials, line by line — from parametric formulas and your service catalogue. From there you offer <strong>good/better/best options</strong> and <strong>allowances</strong>, keep <strong>versions</strong> as the scope changes, turn it into a client <strong>quote</strong> they can <strong>e-sign</strong>, pull a <strong>material list</strong> for purchasing, and raise <strong>change orders</strong>. This is the estimating engine — built on Blueprints (#242).</p>
+  <p class="lead">The <strong>Estimate</strong> section has two ways to measure a job: <strong>From Dimensions</strong>, described on this page, and <strong>From Drawings</strong> — the <a href="construction-drawings.html#takeoff">drawing takeoff</a>, offered on construction projects. From Dimensions turns a project into a priced, professional <strong>estimate</strong>. You start from a reusable <a href="projects-blueprints.html">blueprint</a> (a structured scope of works), type in a few <strong>measurements</strong>, and the plan prices itself — labour and materials, line by line — from parametric formulas and your service catalogue. From there you offer <strong>good/better/best options</strong> and <strong>allowances</strong>, keep <strong>versions</strong> as the scope changes, turn it into a client <strong>quote</strong> they can <strong>e-sign</strong>, pull a <strong>material list</strong> for purchasing, and raise <strong>change orders</strong>. This is the estimating engine — built on Blueprints (#242).</p>
 
-  <div class="callout"><p><strong>Where:</strong> open a project (<span class="badge route">/projects/:id</span>) → the <strong>Specification</strong> stage → <strong>Plan</strong>. It's open to the owner and the <a href="projects-overview.html#team">project team</a>, never to an invited client. The reusable templates it draws on live in the <a href="projects-blueprints.html">Blueprint Library</a>; there's also a public <a href="tools.html">project-plan estimator</a> for quick ballpark figures.</p></div>
+  <div class="callout"><p><strong>Where:</strong> open a project (<span class="badge route">/projects/:id</span>) → the <strong>Specification</strong> stage → <strong>Estimate</strong> → <strong>From Dimensions</strong> (the only view when the project has no drawing takeoff). It is offered on Renovation &amp; Fit-Out and Construction Contract projects and is open to the owner and the <a href="projects-overview.html#team">project team</a>, never to an invited client. The reusable templates it draws on live in the <a href="projects-blueprints.html">Blueprint Library</a>; there's also a public <a href="tools.html">project-plan estimator</a> for quick ballpark figures.</p></div>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-plan.png" alt="A project's Plan tab — the estimating engine">
-    <figcaption>The project <strong>Plan</strong> tab — import a blueprint, enter measurements, and the estimate prices itself.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-plan.png" alt="A project's Estimate section — the estimating engine">
+    <figcaption>The project <strong>Estimate</strong> section, From Dimensions — import a blueprint, enter measurements, and the estimate prices itself.</figcaption>
   </figure>
 
   <h2>How it fits together</h2>
@@ -30,7 +30,7 @@
 
   <h2>Step by step: build an estimate</h2>
   <ol>
-    <li><strong>Start the plan.</strong> On the Plan tab click <strong>Import a blueprint</strong> and pick one from your library (or a starter). The blueprint's scope and measurement fields load in. (You can also build a plan from scratch and <em>Save as blueprint</em> later.)</li>
+    <li><strong>Start the plan.</strong> In Estimate → From Dimensions click <strong>Import a blueprint</strong> and pick one from your library (or a starter). The blueprint's scope and measurement fields load in. (You can also build a plan from scratch and <em>Save as blueprint</em> later.)</li>
     <li><strong>Enter the measurements.</strong> In <strong>Project measurements</strong>, type the numbers the blueprint asks for — e.g. <em>Floor area (m²)</em>, <em>Wall area (m²)</em>, <em>Electrical points</em>. These are the inputs the formulas read.</li>
     <li><strong>Watch it price itself.</strong> Each task's <strong>quantity</strong> comes from its formula (e.g. <code>= floor_area * 1.1</code> for a 10% waste factor), and its price comes from the linked <strong>service / product</strong> (labour rate + material cost + margin). The <strong>Subtotal</strong> updates live.</li>
     <li><strong>Adjust the scope.</strong> Add or remove <strong>sections</strong> and <strong>tasks</strong>, tweak quantities, units, costs or margins on any line — see the plan tree below.</li>
@@ -42,7 +42,7 @@
   <h2>Project measurements (the parametric inputs)</h2>
   <p><strong>What it is —</strong> the named numbers that drive the estimate — each has a <strong>key</strong> (used in formulas), a <strong>label</strong> and a <strong>unit</strong>. <strong>Why it matters —</strong> this is what makes the estimate <em>parametric</em>: change one measurement and every formula that references it recalculates, so re-pricing a slightly bigger room is one number, not a rebuild. The note on screen says it plainly: <em>“these drive the parametric formulas.”</em></p>
 
-  <div class="callout"><p><strong>Zone-driven blueprints (e.g. a kitchen).</strong> Some blueprints are built from <strong>zones</strong> rather than a handful of measurements — a kitchen is <em>bottom units, top units, island, worktop</em>. When you import one, the Plan tab shows a <strong>Zone configurator</strong> above the measurements: you add the actual <strong>units</strong> (a cabinet type, a width, a quantity) to each zone, and the run lengths and quantities are <em>derived</em> from that layout, so the measurements panel only asks for anything the zones don't already imply. Editing a zone <strong>rescales</strong> and re-prices the plan. It's the same configurator as the public <a href="tools.html#kitchen">Kitchen cost calculator</a>. The plan tree also gains <strong>schedule</strong> lines (hinges, drawer runners, gola profile) badged <em>“counted here, priced on the quote”</em> — they answer <em>how many</em> and add their money on the quote, not in the plan subtotal.</p></div>
+  <div class="callout"><p><strong>Zone-driven blueprints (e.g. a kitchen).</strong> Some blueprints are built from <strong>zones</strong> rather than a handful of measurements — a kitchen is <em>bottom units, top units, island, worktop</em>. When you import one, the estimate shows a <strong>Zone configurator</strong> above the measurements: you add the actual <strong>units</strong> (a cabinet type, a width, a quantity) to each zone, and the run lengths and quantities are <em>derived</em> from that layout, so the measurements panel only asks for anything the zones don't already imply. Editing a zone <strong>rescales</strong> and re-prices the plan. It is the same configurator as the public <a href="tools.html#kitchen">Kitchen cost calculator</a>. The <strong>New Kitchen From Boards</strong> starter prices the cabinets from the boards they are cut from rather than per running metre — see <a href="projects-blueprints.html#boards">pricing from boards</a>. The plan tree also gains <strong>schedule</strong> lines (hinges, drawer runners, gola profile) badged <em>“counted here, priced on the quote”</em> — they answer <em>how many</em> and add their money on the quote, not in the plan subtotal.</p></div>
 
   <h2>The plan tree — sections, tasks &amp; line pricing</h2>
   <p><strong>What it is —</strong> the scope of works as a tree of <strong>sections</strong> (headings) and <strong>tasks</strong> (the priced lines). <strong>Why it matters —</strong> it's both the estimate's maths and the document the client reads. Each <strong>task</strong> carries:</p>
@@ -74,7 +74,7 @@
     <tbody>
       <tr><td><strong>Create quote</strong></td><td>Generates a client <a href="quotes-build.html">quote</a> from the plan (linked back to it). The customer opens the public quote, reviews it, and can <strong>approve &amp; e-sign</strong> it — see below.</td></tr>
       <tr><td><strong>Generate material list</strong></td><td>Pulls the plan's material lines into a <strong>material list / budget</strong> as <a href="finance.html">purchase items</a>, so what you priced is what you buy.</td></tr>
-      <tr><td><strong>Create change order</strong></td><td>Raises a <strong>change order</strong> from the plan to capture an agreed change in scope/price after the original was accepted.</td></tr>
+      <tr><td><strong>Create change order</strong></td><td>Raises a <strong>change order</strong> from the plan to capture an agreed change in scope/price after the original was accepted. It is recorded as a variation in the project's <a href="construction-commercial.html#changes">Changes</a> register, which is where it counts toward the contract.</td></tr>
       <tr><td><strong>Save as blueprint</strong></td><td>Saves this plan back to the <a href="projects-blueprints.html">Blueprint Library</a> as a reusable template (<em>“reuse it on your next project”</em>).</td></tr>
     </tbody>
   </table></div>
@@ -83,7 +83,7 @@
   <h2>Approval &amp; e-sign (with audit trail)</h2>
   <p><strong>What it is —</strong> when a plan becomes a quote, the customer-facing public quote page lets them <strong>accept and electronically sign</strong> it. <strong>Why it matters —</strong> you get a recorded, timestamped acceptance instead of a “yes” in an email. The acceptance is captured with an <strong>audit trail</strong> (who accepted, when), and the quote shows as <strong>Accepted</strong>. See <a href="quotes-build.html">Quotes · Build &amp; send</a> and <a href="public-pages.html">Public &amp; Shared Pages</a> for the customer side.</p>
 
-  <div class="callout tip"><p><strong>Quick start:</strong> Plan tab → <strong>Import a blueprint</strong> (e.g. a bathroom reno) → type the floor/wall areas → the estimate prices itself → add a good/better/best fixtures option and a tile allowance → <strong>Save version</strong> → <strong>Create quote</strong> and send it for e-sign → once approved, <strong>Generate material list</strong> for purchasing.</p></div>
+  <div class="callout tip"><p><strong>Quick start:</strong> Estimate → From Dimensions → <strong>Import a blueprint</strong> (e.g. a bathroom reno) → type the floor/wall areas → the estimate prices itself → add a good/better/best fixtures option and a tile allowance → <strong>Save version</strong> → <strong>Create quote</strong> and send it for e-sign → once approved, <strong>Generate material list</strong> for purchasing.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

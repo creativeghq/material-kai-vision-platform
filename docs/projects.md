@@ -141,11 +141,29 @@ Guarded by [tests/unit/projectCategories.test.ts](../tests/unit/projectCategorie
 
 `(id, task_id, project_id, author_id, body, created_at, edited_at)` — the internal discussion on a task. `project_id` is stamped from the task by a trigger, never taken from the client. Readable/writable by the project owner and by the task's assignee while they are an **active** member of the project's workspace (`_user_can_discuss_task`); a collaborator never sees it.
 
-### Overview: cost & margin, visits
+### Overview: Get Started, money, visits
 
 **Money** (owner + `finance.manage`) is `ProjectMoneyCard`, reading `get_project_command_centre` and `get_project_finance_summary`. `get_project_dashboard(project, today)` remains for the agent's platform API. `materials_by_category` splits materials (supplier bills + uninvoiced order cogs) by product material category: a bill is spread over its purchase order's lines by net share, and whatever no product line explains is the `not_linked` row, so the rows always sum to the materials figure. It wraps `get_project_pnl` (the only cost derivation), adds open purchase orders by `supplier_eta` (late = ETA before the operator's today), crew per day from `time_entries` (people and minutes, never cost), and `budget_headroom`. Headroom is null when the budget and the costs are in different currencies. Against a contract, headroom IS `forecast_margin_amount`.
 
 **Visits & meetings** reads `list_project_visits`, the union of `crm_meetings.project_id` (booked by the team) and `appointments.project_id` (requested by the client). The owner books through `crmMeetingsService.create({ projectId })` in one insert; `crm_meetings_project_guard` holds it to the meeting's workspace. A collaborator requests through `request_project_visit`, which takes an advisory lock and re-checks `get_project_visit_slots`: the owner's published hours minus pending/confirmed bookings and scheduled meetings, computed in the **owner's** zone (`appointment_availability.time_zone`, stamped by Availability settings). `appointments_project_guard` refuses a booking on a project unless it is with the project owner and made by the owner or an active collaborator. A booking stores the owner's wall-clock date + time AND the zone it was made in (`appointments.time_zone`); `get_project_visit_slots` and `list_project_visits` return `starts_at` (the instant), so a client in another zone sees slots in their own time with the team's time beneath. `appointment_availability.time_zone` is NOT NULL — Availability settings refuses to save hours without one.
+
+### Commercial stage (#523)
+
+One question per section; the priced schedule ("Bill") is gone — a takeoff feeds a draft quote line instead, so a job has one commercial document.
+
+| Section (`?tab=`) | Component | Holds |
+|---|---|---|
+| Quotes (`quotes`) | `QuotesTab` + `TakeoffQuoteWarnings` | Quotes by revision chain; `get_project_takeoff_summary` warns when a newer drawing revision changed a quoted area. Updating a quantity is a person's choice, drafts only. |
+| Changes (`changes`) | `ChangesTab` → `VariationsCard` | The one variations register (client in / subcontractor out, signed, never netted). |
+| Invoicing (`billing`) | `InvoicingTab` | Invoices, `ApplicationsCard` (valuations + retention, when `applications` is offered), sales orders. |
+| Purchases (`purchases`) | `PurchasesTab` | Made-to-order items, purchase orders (separate delivered / billed columns), `TenderPackagesCard` (when `tenders` is offered), supplier bills, expenses. Amounts only for a finance viewer. |
+| Costs (`finance`) | `CostReportTab` | `JobCostCard` (job cost + labour), `CostCodesCard` (budget / spent / on order / draft orders / to complete / forecast / variance, plus Value + Margin when `cvr` is offered, from `get_project_cost_control`; budgets via `set_project_cost_budget`), `ProjectStockCard`. Read-only. |
+
+Invoicing and Costs render only for `isManager && can('finance.manage')`, behind `ModuleTabGate('sales-finance')`.
+
+**Signed approvals.** Approving a variation, certifying an application and confirming a project purchase order are refused server-side ("needs a signed approval") when an `approval_rules` row for `project_variation` / `project_application` / `project_purchase_order` applies. The UI catches that refusal and calls `raiseProjectApproval` ([services/projectApprovals.ts](../src/modules/projects/services/projectApprovals.ts)), which raises one pending `approval_requests` row unless one is already pending.
+
+**Command centre.** `get_project_command_centre(project)` returns the contract, retention and the SQL-derived health `flags` the Overview's `ProjectMoneyCard` renders (`negative_forecast_margin`, `over_budget`, `billed_exceeds_contract`, `pending_variations_exposure` > 10% of contract, `certified_unpaid_overdue`, `late_deliveries`, `critical_snags_open`, `overdue_requests`, `mixed_currencies`, `revision_order_short`); each flag links to its section (`FLAG_SECTION`). The cost curve reads `project_cost_snapshots` (snapshot_date, actual_cost, committed_cost, billed_revenue, budget_cost; newest 365). `project_cvr` exposes an `early_warning` view reading the same function.
 
 ### Task views
 
@@ -175,7 +193,7 @@ Each row carries a `payload jsonb` with the fields relevant to that event (e.g. 
 - `user_id` stays NULL until the invitee signs in via OTP and accepts.
 - `share_token` is a UUID embedded in the public invite URL.
 - `expires_at` defaults to `invited_at + 90 days`.
-- `role` is reserved for future use (currently only `client`).
+- `role` (`CollaboratorRole`): `client` sees quotes (customer view), moodboards, documents and progress, can raise requests and sign approvals; `architect` / `subcontractor` see no prices and only the requests they raise or are assigned (RFIs, submittals). All three land on `ClientProjectHome`. `editor` exists in the type but is not offered by `InviteCollaboratorsModal`.
 
 ---
 
@@ -370,7 +388,7 @@ path is not a storage claim), see [storage-buckets.md](storage-buckets.md).
 
 ---
 
-## Drawing takeoff (#532) — Specification → Takeoff and Bill
+## Drawing takeoff (#532) — Estimate → From Drawings
 
 Uploads are **PDF only** (never DXF/DWG/IFC). A project can start from its drawings: drop the plan PDFs
 and the engineer's study, confirm what they say, and add it to a quote.
@@ -396,7 +414,7 @@ list, labour hours or a programme.
 - **Projects ≠ workspaces.** Workspace = tenant/org boundary. Project = one engagement inside the workspace.
 - **No hard delete via API.** Archive only — the financial / audit history is load-bearing.
 - **Quote line items are not exposed to collaborators.** They see quote name + status + total only.
-- **No collaborator write access.** Read-only by design. Task comments exist but are internal (owner + assignee); client-facing comments/approval is still a future feature.
+- **No collaborator write access to the project record.** Collaborators raise and answer requests (RFIs, submittals, approval requests) and send client-view feedback; everything else is read-only. Task comments stay internal (owner + assignee).
 - **No realtime collaboration.** Standard cache-invalidate-on-action; no presence channels.
 
 ---
@@ -413,9 +431,7 @@ list, labour hours or a programme.
 ## Pending follow-ups (not shipped)
 
 - **Structured room picker on `AddProductsSheet`** — DB column ready, UI swap not done. Freeform `quote_items.room` text still works.
-- **Client share + approval flow** (issue #2 in the brainstorm) — read-only collaborator surface is live (Phase 4); per-item comments + approve/reject is the natural next layer on top.
 - **AgentHub rich-card chunk renderer for `project_created`** — agent's text reply works fine, cards are polish.
-- **Activity surface for collaborators** — they currently can't see Timeline events. A `client_visible_events` filter would be the equivalent of `client_visible` on tasks.
 - **External-API collaborator acceptance via partner credentials** — today the invitee MUST go through Supabase OTP. A future API could let a partner accept on the invitee's behalf via the share_token + a verified-email assertion.
 
 ---
@@ -423,6 +439,9 @@ list, labour hours or a programme.
 ## See also
 
 - [docs/projects-api.md](projects-api.md) — full external API reference (Bearer `kai_*` partner endpoints).
+- [docs/blueprint-estimating.md](blueprint-estimating.md) — Estimate → From Dimensions, kitchen zones, pricing from boards and ready-made cabinet lines.
+- [docs/surface-visualizer.md](surface-visualizer.md) — room views (moodboard sheets started from a project room).
+- [docs/installation-guides.md](installation-guides.md) — assembly guides from supplier PDFs, tile setting-out.
 - [src/modules/projects/](../src/modules/projects/) — frontend source.
 - [supabase/functions/_shared/tools/project-tools.ts](../supabase/functions/_shared/tools/project-tools.ts) — JARVIS agent tools.
 - [mivaa-pdf-extractor/app/api/project_tracking_routes.py](../mivaa-pdf-extractor/app/api/project_tracking_routes.py) — Python MIVAA wrapper.

@@ -79,6 +79,8 @@
 
   <p><strong>What it affects:</strong> a valid key authorises external calls to the price, mention and job tracking APIs against your account.</p>
 
+  <div class="callout warn"><p><strong>A key acts in one workspace.</strong> A key is bound to the workspace you have open when you generate it, and it acts as you inside that workspace only — even if you belong to several, it cannot read or change your other workspaces. It can call only the functions the API reference marks as accepting a <code>kai_</code> key, and it never carries platform-administrator rights, whatever your own account holds. To work in another workspace, switch to it and generate a key there.</p></div>
+
   <h2>What it affects</h2>
   <ul class="feat">
     <li>Changing your plan changes your <strong>monthly credit allowance</strong>, your <strong>quotas</strong>, and which <strong>advanced capabilities</strong> are available across the platform's modules.</li>

@@ -39,7 +39,7 @@ Default rate limits: 60 req/min user (standard), 30 req/min user (streaming), we
 
 Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}`
 
-> Machine-readable: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json) (browse via [`edge-swagger.html`](../public/api/edge-swagger.html)). The table below is the complete index (auth column: JWT = user session, `kai_*` = partner key, secret = admin `apikey`, cron = `x-cron-secret`, sig = webhook signature, token = share/query token, public = none). The §1.x subsections that follow add call-pattern detail for the high-traffic groups.
+> Machine-readable: [`public/api/openapi-edge.json`](../public/api/openapi-edge.json) (browse via [`edge-swagger.html`](../public/api/edge-swagger.html)). The table below is the complete index (auth column: JWT = user session, `kai_*` = partner key, secret = admin `apikey`, cron = `x-cron-secret`, sig = webhook signature, token = share/query token, public = none). A `kai_*` key acts as its owner in the ONE workspace it is bound to (fenced in the database and on the edge) and never passes a platform-operator gate; a function accepts one only where this column says so. The §1.x subsections that follow add call-pattern detail for the high-traffic groups.
 
 ### 1.0 Complete edge-function index
 
@@ -408,7 +408,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | `installation-guide-appearance` | JWT / kai_* | Read a product photo into the finish each part of an installation guide carries |
 | `installation-guide-extract` | JWT / kai_* | Read an uploaded installation manual into a step-by-step guide |
 | `installation-guide-public` | public | Open an installation guide through its public share link |
-| `object-3d` | JWT | Show a product or a 3D-room object as a photo-real 3D model |
+| `object-3d` | JWT | Make a product or a 3D-room object into a GLB mesh (SAM 3D Objects on fal, via MIVAA); product calls need `object_kind`, optional `size_mm` |
 | `project-assessment` | JWT | Derive a project's health signals, and optionally write the AI assessment of them |
 | `scan-drawing-title-block` | JWT / kai_* | Read a drawing's title block into project drawing-register fields |
 | `scene-studio-read` | JWT / kai_* | Read a floor plan, room photo or render into an editable 3D room |
@@ -452,7 +452,7 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 
 | Function | Method | Auth | Purpose | Deep docs |
 |----------|--------|------|---------|-----------|
-| `agent-chat` | POST (SSE) | JWT | Unified multi-agent chat (kai / interior-designer / demo). RBAC-gated tools, multimodal, skills. | [agent-chat-api](agent-system.md), [agent-system](agent-system.md) |
+| `agent-chat` | POST (SSE) | JWT / kai_* | Multi-agent chat: JARVIS orchestrator + specialists (interior-designer, product-business, marketing, property-advisor, erp, social-media) and demo. RBAC-, capability- and module-gated tools, multimodal, skills, approval cards. | [agent-chat-api](agent-system.md), [agent-system](agent-system.md) |
 | `agent-chat-debug` | POST | public | Dev-only echo/debug stub | — |
 | `background-agent-runner` | POST | JWT or service-role | Universal executor for `kai-task`, `product-enrichment`, `material-tagger`, `factory-enrichment`, `social-analytics-sync`, `social-insights-sync`. Accepts `?catalog=1` GET for type listing. | [background-agents](background-agents.md) |
 
@@ -467,21 +467,25 @@ Base URL: `https://bgbavxtjlbvgplozizxu.supabase.co/functions/v1/{function-name}
 | ~~`generate-pbr-maps`~~ | — | — | **REMOVED 2026-08-11.** Never existed as source; wrote a `pbr_maps` value 0 times. Replaced by `generate-interior-gemini` `mode: material-texture` → `product_material_maps`. | — | — |
 | `generate-quote-pdf` | POST | JWT | Branded quote PDFs with cover/backcover templates from `quote-templates` storage bucket. | — | — |
 
-### 1.3 SEO suite (admin/owner only)
+### 1.3 SEO suite
 
-All POST, all JWT-authenticated.
+User actions take a session JWT or a `kai_` key and check `marketing.seo` on the website's workspace (paid ones also the `seo-toolkit` entitlement); `cron-*` actions take `x-cron-secret`. Full engineering reference: [seo-system.md](seo-system.md).
 
 | Function | Purpose |
 |----------|---------|
-| `seo-api` `{action:'research'}` _(a doc previously listed this as its own `seo-research` function)_ | Keyword research via DataForSEO (6 parallel API calls, volumes + SERP analysis) |
-| `seo-plan` | Generate article structure + meta tags + FAQ schema from research output |
-| `seo-write` | Full article generation from plan via Claude Opus |
-| `seo-analyze` | 15+ SEO quality checks; auto-fix issues via Gemini |
-| `seo-pipeline` | Orchestrator: research → plan → write → analyze in one call |
-| `seo-api` | Consolidated SEO toolkit router (research/plan/write/analyze/pipeline + toolkit audit/research handlers) |
-| `crawl-user-website` | Sitemap-driven crawler (JWT owner / `x-cron-secret`). Firecrawl-scrapes a user's own site into `user_website_pages` with Voyage 1024D embeddings for SEO interlinking. `mode:'preview'` samples 5 URLs; `mode:'full'` crawls up to `min(max_pages,1000)`. |
+| `seo-api` | The SEO router. Article pipeline (`research`, `plan`, `write`, `analyze`, `pipeline`, review/refresh/suggestions), `page_review`, `citability` (incl. `rival_url` comparison), `presence_plan`, `llm_mentions`, `collector_estimates`, toolkit audit/research handlers. There are no separate `seo-plan` / `seo-write` / `seo-analyze` / `seo-pipeline` functions. |
+| `seo-rank-tracker` | Rank tracking of the chosen keyword set; manual run (optional `tag`) and `cron-run` over `website_collectors_due('rank_tracking')`. |
+| `seo-domain-tracker` | Own-domain and competitor snapshots (rank, keywords, traffic, backlinks); `cron-run` over the `domain_tracking` collector. |
+| `seo-site-audit` | Homepage audit (`site_audit` collector), full-site crawl (`cron-sync-crawls`) and `action:'page'` single-page audit on the website's own domain. |
+| `seo-reports` | Builds saved website reports on demand and on their cadence. |
+| `seo-content-freshness` | Weekly refresh-due nudge (notify only) and the opt-in weekly page-review batch. |
+| `seo-publish` | Publishes an article to the workspace's WordPress connection. |
+| `gsc-api` | Google OAuth (server-side callback), Search Console sync, URL inspection, `submit_sitemaps`, GA4 sync. |
+| `crawl-user-website` | Demand-driven page reader into `user_website_pages` (direct fetch first, Firecrawl fallback, 1 credit per queued page). `mode:'preview'` samples 5 URLs. |
+| `ai-crawler-ingest` | Signed (HMAC-SHA256, 300 s window) AI-crawler hit ingest per website; operator-only to connect. |
+| `dataforseo-reconcile` | Nightly reconcile of DataForSEO spend against the provider's balance. |
 
-Reference: the JARVIS agent exposes `seo_*` sub-agent tools that call these.
+Reference: Edith's `seo_*` tools call these.
 
 ### 1.4 Knowledge Base & Embeddings
 
@@ -510,7 +514,7 @@ All service-role-authenticated (pg_cron invokes them). No user-facing API.
 | `ai-pricing-updater` | weekly | Syncs AI model pricing from provider sources into `ai_model_pricing` |
 | `campaign-processor` | every 1 min | Dispatches scheduled email campaigns via Resend (rate-limited 8/min) |
 | `check-material-alerts` | daily | Runs saved-search queries, emails matching results to subscribers |
-| `monitoring-cron` | `15/30/45 * * * *` + `0 3 * * *` | Single dispatcher for ALL five monitoring tasks — `?task=price-refresh\|mention-refresh\|mention-probe\|job-refresh\|job-digest`. Replaced the five per-task functions, which are retired. |
+| `monitoring-cron` | `15/30/45 * * * *` + `0 3 * * *` | Single dispatcher for the monitoring tasks — `?task=price-refresh\|mention-refresh\|mention-probe\|job-refresh\|job-digest\|signals-corpus\|signals-described`. The two signals tasks are module-gated (`signals-core`, `signals-described`) and POST MIVAA `/api/v1/signals/cron-corpus` and `/cron-described`. Replaced the five per-task functions, which are retired. |
 | `scheduled-import-runner` | every 5 min | Runs due XML imports |
 | `messaging-processor` | every 1 min | Batches outbound WhatsApp campaign sends (Zernio) |
 | `finance-fiscal-offline-recovery` | hourly | Backfills myDATA MARK on offline-queued documents (Novus `RequestTransmittedDocs`) |
@@ -554,9 +558,13 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | Function | Method | Auth | Purpose |
 |----------|--------|------|---------|
 | `finance-issue-invoice` | POST | JWT (finance roles) | Create-from-quote, issue (series/AA), transmit to AADE via Novus, POS card/IRIS, credit/delivery notes |
-| `finance-invoice-pdf` | POST | JWT | Render A4 PDF (invoice / credit note / delivery note) |
+| `finance-invoice-pdf` | POST | JWT | Render A4 PDF (invoice / credit note / delivery note); `format=en16931` returns the EN 16931 UBL 2.1 XML |
 | `finance-pay-invoice` | POST | JWT or public `pay_token` | Pay link / Stripe Checkout session (Connect-routed) |
 | `finance-send-invoice-email` | POST | JWT | Email invoice PDF via `email-api` |
+| `finance-send-document-email` | POST | JWT / flow-engine | Email a credit note, delivery note or order with its online link; called by the seeded automatic-send flows |
+| `public-document` | POST | public share token | Allowlisted projection of one invoice / credit note / delivery note / order for `/d/:token` and `/pay/:token` |
+| `inbound-structured-fetch` | POST | JWT | Fetch, parse and verdict the EN 16931 file a supplier's provider serves (read-only, SSRF-guarded) |
+| `flight-search` | POST | JWT | Flight fares via Bright Data for the Travel add-on (quota-claimed) |
 | `finance-send-statement` | POST | JWT / `x-cron-secret` | Party ledger (καρτέλα) PDF + email; cron auto-statements |
 | `finance-inbound-sync` | POST | JWT / `x-cron-secret` | Pull AADE `RequestDocs` into `inbound_documents` |
 | `finance-fiscal-offline-recovery` | POST | `x-cron-secret` | Backfill MARK on offline documents |
@@ -578,6 +586,11 @@ Multi-tenant (tenant = workspace). Gated on the `sales-finance` module entitleme
 | `mivaa-gateway` action `search_knowledge_base` + `category_slug:"pricing"` | POST | JWT (admin) | Quick-pick direct semantic search — no LLM cost | ↑ |
 | PostgREST `/rest/v1/product_prices` | POST / PATCH | JWT (admin/owner via RLS) | Commit confirmed prices with source doc IDs and `price_lookup_call_id` audit link | ↑ |
 | PostgREST `/rest/v1/quote_items` | PATCH | JWT (admin/owner via RLS) | Writes `unit_price` + `price_source` + `price_lookup_call_id` for auditable quote pricing | ↑ |
+| RPC `resolve_purchase_prices` | POST | JWT | SQL-resolved purchase prices over `kb_price_rows` (size/grade/unit filtered; `p_per_doc`, `p_all_grades`). Read by `price_lookup`, `knowledge_base_search` price questions and `quote-buy-prices`. | [knowledge-base-implementation](knowledge-base-implementation.md) |
+| RPC `compute_price_with_options` | POST | JWT | Net price for a resolver row with the ticked order-dependent options applied | ↑ |
+| edge `quote-buy-prices` | POST | JWT | Per quote line, the price-list candidates and the one a model chose (or none). Writes nothing. | [quotes-system-architecture](quotes-system-architecture.md) |
+| RPC `get_quote_economics` / `get_quote_pipeline_summary` | POST | JWT (sell-side, own-or-admin) | Per-quote revenue/cost/margin, and the open/won/lost pipeline with win rate | ↑ |
+| RPC `set_quote_status` | POST | JWT | Manual moves: draft / submitted / rejected (with reason) | ↑ |
 
 ### 1.11 Social (Zernio)
 

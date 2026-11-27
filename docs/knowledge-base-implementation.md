@@ -357,6 +357,39 @@ Success responses include document fields such as `id`, `workspace_id`, `title`,
 
 ---
 
+## Supplier price rows — `kb_price_rows` and the purchase-price resolver
+
+Price lists in the private **Pricing** category are not answered from document text. Their
+tables are loaded into `kb_price_rows` (one row per priced item, carrying its own doc slug, so a
+citation is verified from the row and the source document can be deleted), and every price answer
+comes from SQL:
+
+- **Facts are columns, derived by trigger.** `kb_price_rows_facts_trg` (BEFORE) fills `size_keys`
+  (cm, `60x120`; via `kb_row_sizes` / `kb_extract_sizes`, which reads CM/MM/εκ., the Greek Χ
+  separator, a rectified `R` suffix and unitless slab formats), `grade`
+  (`standard|second_choice|lower`, via `kb_row_grade`), `unit_norm` and `unit_status`
+  (`printed|section|unconfirmed`). A loader inserts rows and nothing else. An INSERT with no unit is
+  refused (`23514`) unless `attrs.unit_unconfirmed=true`. `lint_price_row_facts()` (service_role,
+  includes `size_drift`) must return all zeros after a load.
+- **`resolve_purchase_prices`** applies the supplier rules over those rows, so a model presents a
+  price and never computes one. A sized query never returns another size; a non-standard grade
+  only with `p_all_grades` (flagged); an unconfirmed unit is a warning. `p_per_doc` caps rows per
+  document. Name matches outrank digit permutations of a size, documents are interleaved, and when
+  no size was asked it says which sizes the series is listed in. A list price with no
+  unconditional rule carries no final price. Returns `row_grade` / `row_section`.
+- **`compute_price_with_options()`** applies the order-dependent options (prepayment, full truck,
+  extra tiers) the resolver offered for that row — ticked in `PriceResolutionCard` — counting equal
+  options once.
+- **Callers.** `price_lookup` (agent), `knowledge_base_search` for a price question (admin only),
+  the `PriceLookupDrawer` (AI mode / Quick pick / Check market) and `quote-buy-prices`. A failed
+  search is reported as an error, never as "no price on file". Supplier hints always run: a
+  supplier named with no matching item answers with its collections in the asked size.
+  `catalog_names_not_held` withholds material-search neighbours for a word that price lists carry
+  and no product does. The quote buy-price match is not offered across a unit clash and is low
+  confidence when the unit is unconfirmed or the grade is not standard.
+- `products.size_keys` is derived by trigger from `available_sizes` + `dimensions[].metric_cm` in
+  the same cm form, so product and price row match on one key. Never write it.
+
 ## Who may read a section — one gate, one spelling
 
 `kb_hybrid_doc_chunks` is the reference implementation, and its `eligible` CTE is `materialized` on

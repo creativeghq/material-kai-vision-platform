@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kitchen Design | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Kitchen Design</div>
+  <h1>Kitchen Design</h1>
+  <div class="routes"><span class="badge route">/projects/:id</span> <span class="badge gated">Projects module</span></div>
+  <p class="lead">A kitchen standing in a <a href="3d-rooms.html">3D room</a> is a buildable design, not a picture. Every cabinet is made of the boards a workshop cuts, the units in each run are laid out by rules a fitter would follow, the kitchen is priced from a blueprint or from a supplier's ready-made cabinet line, and one press gives the drawing set: plan, elevations, cut list, electrical and plumbing sheets, and an assembly sheet per cabinet. The 3D view, the price and the drawings all read the same layout, so they cannot disagree.</p>
+
+  <div class="callout"><p><strong>Where:</strong> open a 3D room with a kitchen in it (see <a href="3d-rooms.html">3D rooms</a> for creating, editing and rendering a room) and select a kitchen run. The kitchen tools are in the room panel. A kitchen is priced on a <a href="projects.html">project</a>'s plan, so the room needs a project to price it.</p></div>
+
+  <h2 id="cabinets">Cabinets built from boards</h2>
+  <p>Each unit is drawn panel by panel — sides, bottom, rails or top, back, shelves, plinth, doors, drawer fronts and drawer boxes, lift doors — with its handles and its appliance openings. A board decor lays across a front at its real size, as one continuous surface.</p>
+  <ul class="feat">
+    <li><strong>Kitchen Fronts</strong> — <strong>Closed</strong>, <strong>Half Open</strong> or <strong>Open</strong>: doors swing on their hinges and drawers slide out, so you can show the inside.</li>
+    <li><strong>Handles</strong> — one hardware system for the whole kitchen, handleless (gola) included.</li>
+    <li><strong>Board decors</strong> — the melamine decors in your workspace's supplier price lists can be chosen as a cabinet material. Under a board on the fronts or the carcass the material panel names the <strong>matching edge tape</strong> (same decor and surface structure), or says that none in your catalogue matches. The 3D preview of a decor is an approximate tone and is labelled as such.</li>
+  </ul>
+
+  <h2 id="layout">Laying out a run</h2>
+  <p>Select a kitchen run to see <strong>Units, Left to Right</strong>. Change a unit's type or width (in cm), move it left or right, remove it, or add one; an island also takes a <strong>Seating Overhang</strong>. <strong>Auto Layout</strong> proposes standard widths with as little filler as possible, the dishwasher beside the sink, drawers first, end panels on an island, and wall units split around the windows behind them.</p>
+  <p>Each unit is either built or refused with its reason, listed as <em>“Not built: …”</em> — the wrong run for the unit, a width no cabinet has, it does not fit (with what is left), a corner unit away from an end, a wall unit over a window, or any unit across a door. A gap of up to 15 cm is closed with a filler; a bigger one is reported as empty. A dishwasher away from the sink, or a worktop above a window sill, is reported but still built.</p>
+  <div class="callout"><p><strong>Kitchens read from a drawing.</strong> When a room is created from a sketch or a drawing page, its units arrive as a proposal: <em>“These units were read from the drawing. Check each one against it, then confirm.”</em> Press <strong>Confirm Units</strong> once they match. Until then the drawings mark those widths as assumed.</p></div>
+
+  <h2 id="pricing">Pricing the kitchen</h2>
+  <h3>From a blueprint</h3>
+  <p>The <strong>Kitchen Price</strong> panel prices the kitchen on the project's plan. Choose the blueprint under <strong>Price By</strong> before the first price — the per-metre <strong>New Kitchen</strong>, <strong>New Kitchen From Boards</strong>, or one of your own (see <a href="projects-blueprints.html#boards">kitchen blueprints</a>). Then <strong>Price this kitchen</strong>. Once priced, you can change the <strong>Door Model</strong>, <strong>Carcass Board</strong>, <strong>Front Board</strong>, <strong>Front Edge Tape</strong> and <strong>Worktop</strong> in place, read the <strong>Cut List</strong>, and press <strong>Create quote</strong> to turn the kitchen into a draft quote with every priced line (or <strong>Open quote</strong> once one exists). When the kitchen has changed in the room since it was priced, the panel says so and offers <strong>Update from room</strong>.</p>
+  <h3 id="ready-made">From a ready-made cabinet line</h3>
+  <p>Under <strong>Ready-Made Line</strong>, choose a supplier's cabinet line and a front series from your price lists and press <strong>Price From This Line</strong>. Each unit is matched to the cheapest code in that line of the same zone, type and width, preferring the same drawer count. The result is the supplier net total, how many units matched, and the code per unit. <em>Units with no code are not in the total</em> — they are listed so you can change their width or type, or choose another line; they are never priced at zero.</p>
+
+  <h2 id="drawings">The drawing set</h2>
+  <p>Press <strong>Drawings</strong> in the kitchen panel. The set is A4 landscape sheets with a title block (sheet n of m, date, <em>dimensions in cm, not to scale</em>):</p>
+  <ul class="feat">
+    <li><strong>Floor Plan</strong> — every unit of every run (wall units dashed), a dimension chain per run, the overall length; for any room also wall lengths, room areas and furniture.</li>
+    <li><strong>Elevations</strong> — the runs on each wall (an island gets its own): carcass outline, fronts, handles, plinth, worktop, appliance openings and the windows behind, with height and width chains.</li>
+    <li><strong>Electrical</strong> and <strong>Plumbing</strong> sheets per kitchen wall — <em>For the electrician</em> and <em>For the plumber</em>: numbered sockets, dedicated circuits, extraction, water, waste and gas points, each at a height <em>Set by a Person</em> or a <em>Trade Default</em>, with that trade's checks.</li>
+    <li><strong>Cut List and Hardware</strong> — the plan's own schedule lines, so it is the quantity that was priced.</li>
+  </ul>
+  <p>The legend tells you how far to trust a figure: widths <strong>From the Drawing or Confirmed</strong> are blue, <strong>Assumed</strong> ones grey with ≈, and a run its units do not cover is hatched red as <em>Does Not Add Up as Drawn</em>. When the room came from a sketch, the original drawing and how it was read sit beside the plan.</p>
+  <h3 id="checks">Checks before building</h3>
+  <p>Each set ends with the checks that must pass before anyone builds from it — for example units confirmed by a person, every width stated, every dimension chain closing, standard appliance openings, buildable heights, wall units over a base run, and the electrical and plumbing points each unit needs (such as an isolator behind a tall appliance unit). A failed check is named, never hidden.</p>
+  <h3 id="assembly">Workshop assembly sheets</h3>
+  <p>Switch to <strong>Workshop assembly</strong> from the dialog's footer. There is one sheet per distinct cabinet: an exploded view of its boards with numbered parts, the <strong>Panel List</strong> (part, L × W × T in mm, board, and which edges are banded), the <strong>Hardware per Cabinet</strong>, and the <strong>Checks before cutting</strong> — every panel fits a standard 2800 × 2070 board, edge banding covers whole edges, drawer boxes fit their fronts and the carcass, and the cabinet size was stated by a person.</p>
+  <h3>Saving and printing</h3>
+  <p><strong>Print</strong> sends only the sheets, one per page. <strong>Save to project</strong> stores the set as a vector PDF on the project — where it can go into a presentation deck and the <a href="projects-client-view.html">client view</a> — or, with no project, <strong>Save as PDF</strong> keeps it with the room.</p>
+
+  <div class="callout tip"><p><strong>From chat:</strong> the <a href="agent-hub.html">assistant</a> can create a room from your sketch or a drawing page, lay out runs, price the kitchen by blueprint or ready-made line, and open or save the drawing set and assembly sheets — and it names every check that fails. A drawing a builder works from always comes from the room, never from an image model.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

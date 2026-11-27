@@ -3,62 +3,88 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Projects: The stages | MaterialsHub Documentation</title>
+<title>Projects: Kinds, stages &amp; sections | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / The stages</div>
-  <h1>Projects · The stages &amp; who sees what</h1>
-  <div class="routes"><span class="badge route">/projects/:id</span></div>
-  <p class="lead">A project's detail page is organised into <strong>seven stages</strong>, each holding a few sections. This guide maps every section to its stage, explains who sees which (the owner, the <a href="projects-overview.html#team">project team</a>, or an invited client), and shows how to bring a client in with an invite.</p>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Kinds, stages &amp; sections</div>
+  <h1>Projects · Kinds, stages &amp; who sees what</h1>
+  <div class="routes"><span class="badge route">/projects/:id</span> <span class="badge route">/projects/:id?tab=…</span></div>
+  <p class="lead">A project's page shows only the sections its kind of job needs. A design-and-supply job gets rooms, moodboards and selections; a construction contract adds drawing takeoff, tenders, valuations and cost-value reconciliation. This guide covers the four kinds, the six stages the sections sit in, how to switch sections on or off, who on the job sees what, and what an invited client, architect or subcontractor gets.</p>
 
-  <h2>Where it is</h2>
-  <p>Apps menu → <strong>Projects Hub</strong> → <strong>Projects</strong> → open a project to reach its detail page (<span class="badge route">/projects/:id</span>). The stages run across the top of the page; the selected stage lists its sections in a <strong>rail beside the content</strong> (a strip above it on a narrow screen). The set you see depends on who you are on the project and on which modules are enabled.</p>
-
-  <h2>What's on the screen — seven stages</h2>
-  <p>The detail page groups its sections into <strong>seven stages</strong> on one row (you don't have to use them in order — they just gather related sections). A stage you can only see one section of shows as that section.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Stage</th><th>Sections under it</th></tr></thead>
+  <h2 id="kinds">The kind of project</h2>
+  <p><strong>What it is —</strong> the first choice in the <strong>New Project</strong> dialog. It decides which sections the project offers. <strong>Why it matters —</strong> a trip or an internal stock move does not need a moodboard, and a bathroom refit does not need tender packages. Each job shows the tools it uses.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Kind</th><th>For</th><th>What it adds</th></tr></thead>
     <tbody>
-      <tr><td><strong>Overview</strong></td><td>The cover with description, client, deadline, budget and tasks; <a href="projects-overview.html#cost">Cost &amp; margin</a>, Rooms, <a href="projects-overview.html#visits">Visits &amp; meetings</a>, task progress and milestones, and the <a href="projects-overview.html#team">Team</a>. See <a href="projects-overview.html">Overview, costs, visits &amp; team</a>.</td></tr>
-      <tr><td><strong>Design</strong></td><td><a href="projects-rooms.html">Rooms</a>, <a href="moodboards.html">Moodboards</a>, <a href="projects-technical-plans.html">Sheets</a> (presentation &amp; technical plans).</td></tr>
-      <tr><td><strong>Specification</strong></td><td>Products <span class="badge gated">team</span>, <a href="projects-plan.html">Plan</a> (the estimating engine) <span class="badge gated">team</span>, Purchases (made-to-order joinery + supplier sheet) <span class="badge gated">team</span>.</td></tr>
-      <tr><td><strong>Commercial</strong></td><td><a href="quotes.html">Quotes</a>, <a href="contracts.html">Contracts</a> <span class="badge gated">team</span>, Billing <span class="badge gated">manager</span>, and <strong>Finance</strong> — which holds the <a href="construction-commercial.html">construction money chain</a> (BoQ, variations/CVR, valuations/retention, tenders, labour). <span class="badge gated">manager · finance.manage</span></td></tr>
-      <tr><td><strong>Delivery</strong></td><td><a href="projects-tasks.html">Tasks</a> (List, Board, Calendar and the <a href="construction-programme.html">Schedule</a>), <a href="construction-site.html">Site</a> (diary, inspections, snags), Documents (including <a href="construction-drawings.html">Drawings</a>).</td></tr>
-      <tr><td><strong>Client</strong></td><td><a href="projects-client-view.html">Client View</a> <span class="badge gated">team</span>, <a href="construction-requests.html">Requests</a> (RFIs &amp; submittals), Handover (<a href="crm-installed-base.html">warranties</a>) <span class="badge gated">team</span>.</td></tr>
-      <tr><td><strong>Review</strong></td><td><a href="ai-assessment.html">AI Assessment</a> <span class="badge gated">team</span>, Timeline <span class="badge gated">team</span>.</td></tr>
+      <tr><td><strong>General</strong></td><td>Tasks, documents and costs: a trip, a stock move, an internal job.</td><td>Tasks, Documents, Purchases, Costs, Requests.</td></tr>
+      <tr><td><strong>Design &amp; Supply</strong></td><td>Rooms, moodboards and selections, quoted and supplied to a client.</td><td>Assessment, Rooms, Moodboards, Presentations, Selections, Quotes, Contracts, Invoicing, Purchases, Costs, Tasks, Documents, Requests.</td></tr>
+      <tr><td><strong>Renovation &amp; Fit-Out</strong></td><td>Design through site work: estimate, purchases, snags and handover.</td><td>Everything in Design &amp; Supply, plus Estimate, Changes, Site and Equipment &amp; Warranties.</td></tr>
+      <tr><td><strong>Construction Contract</strong></td><td>A main or trade contract.</td><td>Everything in Fit-Out, plus the construction features: <strong>Drawing Takeoff</strong>, <strong>Tender Packages</strong>, <strong>Valuations &amp; Retention</strong> and <strong>Cost-Value Reconciliation</strong>.</td></tr>
     </tbody>
-  </table>
-  </div>
-  <p>Several sections have their own guides: <a href="projects-rooms.html">Rooms</a>, the <a href="projects-plan.html">Plan &amp; Estimating</a> engine, <a href="projects-technical-plans.html">Technical Plans</a>, the <a href="projects-client-view.html">Client View</a>, and the whole <a href="construction.html">Construction &amp; Contracting</a> toolset (Commercial, Delivery and Client stages). A <span class="badge gated">team</span> section is open to the owner and the project team but never to an invited client; <span class="badge gated">manager</span> means the owner and project managers only. Coming back to a stage reopens the section you left it on.</p>
+  </table></div>
+  <p>Overview and Timeline are on every project. <strong>Start from drawings</strong> on the Projects list opens the same dialog with <em>Construction Contract</em> chosen and, once created, lands on the drawing takeoff (see <a href="construction-drawings.html#takeoff">Takeoff from drawings</a>).</p>
 
-  <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-overview.png" alt="A project's Overview tab">
-    <figcaption>A project's Overview tab.</figcaption>
-  </figure>
+  <h3 id="sections">Changing the sections of one project</h3>
+  <ol>
+    <li>In the project header, open the <strong>⋯</strong> menu and choose <strong>Sections</strong> (owner and project managers).</li>
+    <li>The <strong>Project Sections</strong> dialog shows the <strong>Kind of Project</strong>, a tick list of <strong>Sections</strong> and a tick list of <strong>Construction Features</strong>.</li>
+    <li>Change the kind to reset the ticks to that kind's defaults, or tick and untick single sections. Press <strong>Save</strong>.</li>
+  </ol>
+  <div class="callout"><p><strong>Hiding never hides data.</strong> A section that already holds records stays on whatever the kind or the ticks say. If a fit-out job already has a tender package, Purchases keeps showing it.</p></div>
+
+  <h2 id="stages">The six stages</h2>
+  <p>The sections sit in six stages on one row across the page. The selected stage lists its sections in a rail beside the content, or in a strip above it on a narrow screen. A stage with one visible section opens that section directly. Going back to a stage reopens the section you left it on.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Stage</th><th>Sections</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Overview</strong></td><td><a href="projects-overview.html">Overview</a>, <strong>Timeline</strong> (project events, requests and site activity in one list, with a filter), <a href="ai-assessment.html">Assessment</a>.</td></tr>
+      <tr><td><strong>Design</strong></td><td><a href="projects-rooms.html">Rooms</a>, <a href="moodboards.html">Moodboards</a>, <strong>Presentations</strong> (presentation and <a href="projects-technical-plans.html">technical sheets</a> together with <a href="projects-client-view.html">client views</a>).</td></tr>
+      <tr><td><strong>Specification</strong></td><td><strong>Selections</strong> (what the client picked, with allowances; order progress is read from the linked order line), <a href="projects-plan.html">Estimate</a> (<em>From Dimensions</em> with a blueprint, or <em>From Drawings</em> with takeoff).</td></tr>
+      <tr><td><strong>Commercial</strong></td><td><a href="quotes.html">Quotes</a>, <strong>Changes</strong> (the one variations register), <a href="contracts.html">Contracts</a>, <strong>Invoicing</strong>, <strong>Purchases</strong>, <strong>Costs</strong>. See <a href="construction-commercial.html">Commercial &amp; cost control</a>.</td></tr>
+      <tr><td><strong>Delivery</strong></td><td><a href="projects-tasks.html">Tasks</a> (List, Board, Calendar and the <a href="construction-programme.html">Schedule</a>), <a href="construction-site.html">Site</a>, <strong>Documents</strong> (including <a href="construction-drawings.html">Drawings</a>), <strong>Equipment &amp; Warranties</strong> (<a href="crm-installed-base.html">installed base</a>).</td></tr>
+      <tr><td><strong>Client</strong></td><td><a href="construction-requests.html">Requests</a> (RFIs, submittals, approvals and client questions).</td></tr>
+    </tbody>
+  </table></div>
+  <p>Every section has its own link (<span class="badge route">/projects/:id?tab=quotes</span>), so a notification or a colleague can send you straight to it.</p>
 
   <h2 id="who">Who sees what</h2>
   <div class="table-wrap"><table>
     <thead><tr><th>Who</th><th>What they get</th></tr></thead>
     <tbody>
       <tr><td><strong>Owner</strong></td><td>Everything, including <strong>Delete</strong> and handing the project over.</td></tr>
-      <tr><td><strong>Project manager</strong></td><td>Every section, including Billing and (with finance access) Finance; edits the project, archives it, invites clients and manages the team.</td></tr>
-      <tr><td><strong>Team member</strong></td><td>Every section except Billing and Finance — the working surface without the money.</td></tr>
-      <tr><td><strong>Invited client</strong></td><td>A read-only slice: Overview, Rooms, Moodboards, Sheets, Quotes, Tasks marked <em>Client visible</em>, Site, Documents and Requests. Never Products, Plan, Purchases, Contracts, Billing, Finance, Client View, Handover, Timeline or the AI Assessment.</td></tr>
+      <tr><td><strong>Project manager</strong></td><td>Every section the project offers. <strong>Invoicing</strong> and <strong>Costs</strong> need finance access as well. Edits the project, changes its sections, archives it, invites people and manages the team.</td></tr>
+      <tr><td><strong>Team member</strong></td><td>Every section except Invoicing and Costs: the working surface without the money.</td></tr>
+      <tr><td><strong>Invited guest</strong></td><td>Not the team's page at all. A guest gets their own project home (below).</td></tr>
     </tbody>
   </table></div>
-  <p>Teammates are added on the Overview's <a href="projects-overview.html#team">Team panel</a>. Clients are invited by email, below.</p>
+  <p>Teammates are added on the Overview's <a href="projects-overview.html#team">Team panel</a>. Guests are invited by email.</p>
 
-  <h2 id="client">Inviting the client</h2>
-  <p><strong>What it is —</strong> a passwordless email invitation that lets your client look in on the project (<span class="badge route">/projects/invite/:token</span>). <strong>Why it matters —</strong> the client follows progress, sees what you choose to share and can <a href="projects-overview.html#visits">request a visit</a>, without you handing over your workspace.</p>
+  <h2 id="client">Inviting a client, architect or subcontractor</h2>
+  <p><strong>What it is —</strong> a passwordless email invitation (<span class="badge route">/projects/invite/:token</span>) to someone outside your workspace. <strong>Why it matters —</strong> the people around a job can follow it, answer questions and sign approvals without a seat in your workspace.</p>
   <ol>
-    <li>In the project header, press <strong>Invite client</strong> (owner and managers). The dialog is <em>“Invite Clients to View This Project”</em>.</li>
-    <li>Enter the client's <strong>Email address</strong>, an optional <strong>Personal message</strong>, and press <strong>Send invitation</strong>.</li>
-    <li>The client opens the link, signs in with a one-time code sent to that email, and accepts. The dialog lists each invite as <em>Pending</em>, <em>Active</em>, <em>Expired</em> or <em>Revoked</em>; you can copy the link, re-send it or revoke access.</li>
+    <li>In the project header, press <strong>Invite client</strong> (owner and managers). The dialog is <em>Invite People to This Project</em>.</li>
+    <li>Enter the <strong>Email Address</strong> and pick a <strong>Role</strong>:
+      <ul>
+        <li><strong>Client</strong> — sees quotes, moodboards, documents and the progress; can ask questions and sign approvals.</li>
+        <li><strong>Architect</strong> or <strong>Subcontractor</strong> — no prices; sees only the requests they raise or are assigned; can raise RFIs and submittals.</li>
+      </ul>
+    </li>
+    <li>Add an optional <strong>Personal Message</strong> and press <strong>Send invitation</strong>.</li>
+    <li>The guest opens the link, signs in with a one-time code sent to that email, and accepts. The dialog lists each invite as <em>Pending</em>, <em>Active</em>, <em>Expired</em> or <em>Revoked</em>; you can copy the link, re-send it or revoke access.</li>
   </ol>
-  <div class="callout tip"><p><strong>Worked example.</strong> Add your site supervisor to the <a href="projects-overview.html#team">team</a> as a <strong>Member</strong> so they can run tasks and the site diary, then <strong>Invite client</strong> with the homeowner's email. The supervisor works in the project like you do (minus the money); the homeowner sees progress, client-visible tasks and documents, and can ask for a showroom visit — but never your costs, your plan or your internal task comments.</p></div>
+
+  <h3 id="guest-home">What a guest sees</h3>
+  <p>A guest opening the project gets one page marked <strong>Shared with you</strong>, with these tabs:</p>
+  <ul class="feat">
+    <li><strong>Updates</strong> — a timeline of the requests, inspections and snags they may see, a <strong>Waiting on You</strong> card listing what needs their answer (an approval to sign, or a question the team has answered), and the client and deadline.</li>
+    <li><strong>Requests</strong> — the request register, with a count of what is waiting on them.</li>
+    <li><strong>Design</strong> — rooms (without budgets), moodboards and presentations.</li>
+    <li><strong>Quotes</strong> — the customer view of the project's quotes. Clients only; an architect or subcontractor never sees prices.</li>
+    <li><strong>Documents</strong> and <strong>Progress</strong> (the tasks marked <em>Client visible</em> and the schedule).</li>
+  </ul>
+  <div class="callout tip"><p><strong>Worked example.</strong> Add your site supervisor to the <a href="projects-overview.html#team">team</a> as a <strong>Member</strong>, invite the homeowner as <strong>Client</strong> and the structural engineer as <strong>Architect</strong>. The supervisor works in the project like you do, minus the money. The homeowner sees the design, the quotes and the progress and signs approvals. The engineer sees the RFIs they raised or were assigned, and nothing priced.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

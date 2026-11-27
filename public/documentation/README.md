@@ -47,4 +47,4 @@ git log <last-synced>..HEAD --no-merges --format="%h %s" | grep -E " (feat|fix)"
 Read each change against the page that describes its area, correct what moved or was renamed,
 add what is new, then update the marker below in the same commit as the page edits.
 
-**Last synced through:** `c6c2a0f91` (2026-10-13)
+**Last synced through:** `49a07d93e` (2026-11-27)

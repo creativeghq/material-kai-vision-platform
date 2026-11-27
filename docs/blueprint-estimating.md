@@ -79,8 +79,11 @@ The frontend must show the same number the engine will persist, but Vite can't i
 
 ## The platform starters
 
-Four, one per job: **New Kitchen** (`kitchen_cabinets`), **Bathroom Renovation**, **Full Repaint**,
-**Full Home Renovation**. Only the kitchen is zone-driven; the other three are flat scopes.
+Five: **New Kitchen** (`kitchen_cabinets`, priced per running metre), **New Kitchen From Boards**
+(the same zones in materials mode, see [Pricing from boards](#pricing-from-boards-604)), **Bathroom
+Renovation**, **Full Repaint**, **Full Home Renovation**. Only the kitchens are zone-driven; the
+other three are flat scopes. The default order in a picker is the workspace's own blueprints, then
+the starters in the order they were added, so a new starter never silently becomes the default.
 
 There used to be a fifth — `kitchen_refit` — which priced the WORKS of a kitchen job (strip-out,
 first-fix electrics and plumbing, tiling, painting, debris) while `kitchen_cabinets` priced the
@@ -165,6 +168,48 @@ Guarded by [`tests/unit/blueprintComposition.test.ts`](../tests/unit/blueprintCo
 
 ---
 
+## Pricing from boards (#604)
+
+A `units` zone may declare `construction`. Each module is then broken into the panels a workshop
+cuts by `generateCabinet` ([src/lib/scene/cabinetPanels.ts](../src/lib/scene/cabinetPanels.ts),
+import-free, mirrored to Deno by `vocab:mirror`) — sides, bottom, rails or top, back, shelves,
+plinth, doors, drawer fronts and boxes, lift doors, handles, appliance openings — and
+`cutList` / `cutListYields` publish the cut list into the schedule:
+`total_board_m2_carcass` / `_fronts` / `_back` / `_plinth` and `total_edge_m_carcass` / `_fronts`.
+A module type may carry its own recipe. Both kitchen starters declare construction on their five
+cabinet zones and carry a **Cut List** section of six schedule lines, so the 3D room, the plan and
+the drawings read one set of panels.
+
+A zone with `pricing: 'materials'` counts its modules and prices nothing per running metre.
+Option globals carrying `board_slot` / `edge_slot` price the cut list instead: each chosen board is
+bought **once across every zone using it**, in whole sheets (rate unit `sheet`; sheet area and
+wastage from the zone's construction) or per m², and edge tape per metre. A board slot with nothing
+chosen raises an issue. New Kitchen From Boards ships Carcass Board, Front Board, Back Panel, Plinth
+Board and both edge tapes as absorbed choices (placeholder rates), plus Cutting and Edging (per m²)
+and Cabinet Assembly and Fitting (per unit).
+
+**Layout.** `placeRun` in [src/lib/scene/kitchenComposition.ts](../src/lib/scene/kitchenComposition.ts) is the only writer of a run's units; each unit is
+built or refused with its reason (wrong run, no cabinet at that width, does not fit, corner unit
+away from an end, wall unit over a window, any unit across a door). A remainder up to 15 cm becomes
+a filler (a module in both kitchen blueprints); more is reported empty. `autoLayout` proposes the
+standard layout. `floor_plan_objects.kitchen_layout` stores a run's units and an island's seating
+overhang; the drawing, the price and the agent read the same layout, or the same auto layout when
+nothing is stored. `floor_plans.cabinet_hardware` holds the kitchen's one handle system.
+
+**Ready-made cabinet lines.** `cabinet_code_grammars` (platform reference data, read-only to
+members) decodes a supplier's cabinet codes with ordered regex rules; `ready_made_cabinet_codes`
+(view, `security_invoker`) projects every coded `kb_price_rows` row as zone, module type, size (with
+its source: printed, read from the code, or none), drawer count and price per front series.
+`price_kitchen_from_line(supplier, line, series, modules)` (INVOKER) matches each unit to the
+cheapest code of the same zone, type and width (within 25 mm), preferring the same drawer count;
+units with no code are counted and listed, never priced at 0. Agent: `manage_scenes price_line`.
+
+**Boards in the catalogue.** `panel_boards` fields `decor_repeat_mm` and `grain_direction` are in
+the field registry; `board_edge_tapes(product)` (INVOKER) derives the matching tapes in the board's
+workspace by `decor_code` AND `surface_structure_code` — never a hand-typed link.
+
+---
+
 ## Public estimator — `/tools/project-plan`
 
 Anonymous lead-gen, same family as the other [public tools](#related):
@@ -194,7 +239,7 @@ Anonymous lead-gen, same family as the other [public tools](#related):
 
 ## Related
 
-- [projects.md](projects.md) — the Plan tab lives on the project detail page
+- [projects.md](projects.md) — the plan is Estimate → From Dimensions on the project page
 - [quotes-system-architecture.md](quotes-system-architecture.md) — where `create-quote-from-plan` lands
 - [public-tools-api.md](public-tools-api.md) — the shared Turnstile + `public_lookup_log` quota model
 - [pricing-api.md](units-and-quantity-pricing.md) — service/product rates the engine prices against

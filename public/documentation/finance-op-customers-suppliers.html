@@ -19,7 +19,7 @@
   <h2>What's on the screen</h2>
   <p>One list of every CRM party with finance activity, plus the controls to narrow it and the headline numbers:</p>
   <ul class="feat">
-    <li><strong>Stats</strong> — two figures at the top keep the big picture in view: <em>Total customers owe</em> (€) and <em>We owe suppliers</em> (€).</li>
+    <li><strong>Stats</strong> — two figures at the top keep the big picture in view: <em>Total customers owe</em> (€) and <em>We owe suppliers · statement</em> (€) — the supplier figure is read from each supplier's statement, so it includes received AADE documents not yet booked as bills.</li>
     <li><strong>Filters</strong> — narrow the list to <em>All</em> customers/suppliers, and <em>All segments</em>.</li>
     <li><strong>Search</strong> — find a party by <em>Name or email</em>.</li>
     <li><strong>The party list</strong> — every CRM party with finance activity, one row each. Click a row to open that party's <strong>account</strong>: it replaces the list full-width, with tabs for <em>Invoices</em>, <em>Bills</em>, <em>Orders</em>, <em>Payments</em> and <em>Ledger</em>, and <strong>All parties</strong> takes you back. Links elsewhere that open a party's ledger land on the same account.</li>
@@ -46,6 +46,19 @@
     <li><strong>The running account.</strong> It shows their <strong>opening balance</strong>, payments received, and what's outstanding — the same figures as the emailed statement.</li>
     <li><strong>Pay the balance.</strong> The customer can <strong>pay online (Stripe)</strong> straight from the page, or use the <strong>bank details</strong> shown to pay by transfer — so a statement doubles as a payment request.</li>
   </ul>
+
+  <h2>The supplier statement — what you owe without booking every bill</h2>
+  <p>A party's <strong>Ledger</strong> and statement are built from one derivation, used by the in-app ledger, the list's <strong>Statement</strong> column and the emailed or PDF statement alike. On a supplier, it includes:</p>
+  <ul class="feat">
+    <li><strong>Received AADE documents</strong> not yet booked as bills (<em>Supplier Invoice (AADE)</em>, <em>Supplier Credit Note (AADE)</em>), counted against the CRM company with the same VAT number. Issuers that match no company are listed with an <strong>Add company</strong> link.</li>
+    <li>A <strong>Paid at Issue</strong> line for documents paid in cash, by POS or IRIS, and a <strong>Settled Outside</strong> line for costs settled outside the books.</li>
+  </ul>
+
+  <h2>Opening balances</h2>
+  <p>A party can start from a dated <strong>Opening Balance</strong> — one per party and side (customer / supplier). Open the party's account and click <strong>Set opening balance</strong>: enter the <strong>Amount</strong>, <strong>Direction</strong>, <strong>Currency</strong>, <strong>As Of</strong> date and an optional note. Entries on or before that date are shown greyed (<em>Before opening — not counted</em>). To load many at once, <strong>Import opening balances</strong> on the list takes a CSV matched by VAT number, with a preview before anything is saved. An opening balance has no P&amp;L, VAT or myDATA effect.</p>
+  <h3>Payments on account</h3>
+  <p>A payment with no document — <strong>Record payment on account</strong> on the party's account, or <em>Book on Account</em> on a <a href="banking-reconciliation.html">bank-feed line</a> — clears the oldest open items first. Money not yet settled against anything shows as <strong>On Account</strong>. A payment dated before the opening balance is flagged and not counted.</p>
+  <p>The same opening balance and payment-on-account controls sit on the <strong>Account</strong> tab of a CRM <a href="crm-companies.html">company</a> or <a href="crm-contacts.html">contact</a>, one box per role the party holds. That tab also lists the party's <strong>Issued Invoices</strong> (with a button to issue a new one to them) and <strong>Received Invoices</strong>.</p>
 
   <h2>What it affects elsewhere</h2>
   <p>The statement (emailed or shared) is branded by the <strong>Statement PDF</strong> settings (cover/footer images, in <a href="finance-settings-accounts-payments.html">Settings → Accounts &amp; Payments → Statements</a>); online payment lands via your connected <a href="account-keys.html">Stripe payouts</a>. This tab complements the <a href="crm.html">CRM</a> rather than replacing it — the party records live there; their money side lives here.</p>

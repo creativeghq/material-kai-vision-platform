@@ -56,7 +56,7 @@ Branch the flow based on data values.
 | `if_else` | Evaluates field vs value → `true` / `false` branches |
 | `switch` | Matches field against N cases → `case_0`, `case_1`, … branches |
 | `filter` | Evaluates multiple conditions with AND / OR logic |
-| `delay` | Pauses execution for a duration (capped at 30s in edge function) |
+| `delay` | Pauses execution for up to 365 days. Up to 25s runs inline; longer parks the branch in `flow_run_waits` and the minute cron resumes it (see flows-notification-system.md §3) |
 
 **Supported Operators for `if_else`:**
 
@@ -210,7 +210,7 @@ Individual actions may consume credits (e.g., `send_sms`/`send_whatsapp` via Zer
 ## Error Handling
 
 - **Node failure**: Execution stops at the failed node; `flow_runs` records the error and which node failed.
-- **Timeout**: Edge function has a 60s wall-clock limit. Use `delay` nodes conservatively (capped at 30s).
+- **Timeout**: Edge function has a 60s wall-clock limit. A `delay` longer than 25s does not hold the invocation: it parks the run as `waiting` and `resume-waits` continues it.
 - **Template resolution failure**: Unresolvable `{{path}}` returns the literal `{{path}}` string — execution continues.
 
 ---

@@ -96,13 +96,13 @@ Internal product flow (session JWT):
 - `POST /api/v1/mention-monitoring/products/{id}/track` — find-or-create + first refresh
 - `DELETE /api/v1/mention-monitoring/products/{id}/track` — soft delete
 - `GET /api/v1/mention-monitoring/products/{id}` — read summary row
-- `POST /api/v1/mention-monitoring/products/{id}/refresh` — re-run discovery (`force=true` requires admin)
+- `POST /api/v1/mention-monitoring/products/{id}/refresh` — re-run discovery (`force=true` is open to the subject's owner as well as admins)
 - `GET /api/v1/mention-monitoring/products/{id}/feed` — latest run rows
 - `GET /api/v1/mention-monitoring/products/{id}/history?days=&sentiment=&outlet_type=` — historical rows
 - `GET /api/v1/mention-monitoring/products/{id}/summary?days=30` — aggregate snapshot
 - `GET /api/v1/mention-monitoring/products/{id}/llm-visibility` — most recent probe snapshot
 - `GET /api/v1/mention-monitoring/products/{id}/llm-visibility-trend?days=` — across RUNS, not the latest one
-- `POST /api/v1/mention-monitoring/products/{id}/probe-llm` — admin trigger
+- `POST /api/v1/mention-monitoring/products/{id}/probe-llm` — manual probe (subject owner or admin)
 
 Subject-id flow (brand/keyword):
 - `POST /track` / `GET|PUT|DELETE /track/{id}` — CRUD
@@ -115,6 +115,8 @@ Cross-flow: `/classifier-correction`, `/cron-refresh`, `/cron-probe-llm` (latter
 - `mention-monitoring-refresh-hourly` (`30 * * * *`) → POSTs to **`monitoring-cron?task=mention-refresh`** → MIVAA `/cron-refresh`
 - `llm-mention-probe-daily` (`0 3 * * *`) → **`monitoring-cron?task=mention-probe`** → MIVAA `/cron-probe-llm`
 - `mention-classifier-cache-prune` (`0 4 * * *`) → DELETE expired cache rows
+
+**Automatic checks are opt-in.** `tracked_mentions.auto_refresh` defaults to false; the hourly refresh and the LLM probe sweep take only subjects with it on (`cron_has_internal_subjects` reads it too, so an all-manual platform posts nothing). The per-product **Mention Monitor** tab has an **Automatic checks** switch beside **Monitoring**: on, mentions refresh every `refresh_interval_hours` (default 24) and AI answers are probed weekly, charged per run; off reads "On demand only" and nothing runs until **Refresh** or **Run probe**. Both are open to the subject's owner, not only admins.
 
 **Notification dispatcher** ([mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py](../mivaa-pdf-extractor/app/modules/mention_monitoring_notifications/service.py)):
 

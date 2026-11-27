@@ -10,7 +10,7 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-documents.html">Documents</a> / Credit notes</div>
   <h1>Documents · Credit notes</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge route">/finance/credit-notes/:id</span> <span class="badge route">/finance/credit-notes/drafts/:id</span> <span class="badge gated">finance.manage</span></div>
   <p class="lead">A credit note is the document that credits or refunds an amount against an invoice you already issued. It sits on its own tab alongside Invoices, Receipts and Expenses, and it's how you correct a sale without deleting a legal record. This guide covers where the tab lives, how to read the list, how to create a credit note step by step, when and why you'd issue one, a worked example, and what it affects elsewhere.</p>
 
   <h2>Where it is</h2>
@@ -33,7 +33,7 @@
     <figcaption>The Credit notes tab — the <strong>New</strong> toolbar action above the column list.</figcaption>
   </figure>
 
-  <p>The columns let you read each credit note at a glance — note the <strong>Invoice</strong> column (the invoice it offsets) and <strong>mD</strong> (whether it has reached the tax authority):</p>
+  <p>Drafts are listed first, and every row opens its page. The columns let you read each credit note at a glance — note the <strong>Invoice</strong> column (the invoice it offsets) and <strong>mD</strong> (whether it has reached the tax authority):</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
@@ -44,16 +44,16 @@
       <tr><td><strong>Reason</strong></td><td>The reason for the credit.</td></tr>
       <tr><td><strong>Amount</strong></td><td>The credited amount.</td></tr>
       <tr><td><strong>mD</strong></td><td>The myDATA transmission status — whether the document has been transmitted to the tax authority (ΑΑΔΕ).</td></tr>
-      <tr><td><strong>Invoice</strong></td><td>The invoice this credit note offsets.</td></tr>
+      <tr><td><strong>Invoice</strong></td><td>The invoice this credit note offsets, and its customer.</td></tr>
     </tbody>
   </table>
   </div>
 
   <h2>Two sides: issued and received</h2>
-  <p>Credit notes exist on both sides of the trade, so the toolbar starts with a switch: <strong>Issued to customers</strong> / <strong>Received from suppliers</strong>.</p>
+  <p>Credit notes exist on both sides of the trade, so the toolbar starts with a switch: <strong>Issued to Customers</strong> / <strong>Received from Suppliers</strong>.</p>
   <ul class="feat">
-    <li><strong>Issued to customers</strong> — the list above, with <strong>New</strong>. Each row's actions include submit/retransmit to myDATA, <strong>Download PDF</strong>, and — while it hasn't been transmitted — a card button, <strong>Refund to the card on a terminal</strong> (sign → refund on the terminal → enter the transaction id → file it).</li>
-    <li><strong>Received from suppliers</strong> — a supplier's credit note is <em>received</em>, not authored, so there is no New here. Instead, <strong>Fetch from myDATA</strong> (or <strong>Fetch N from myDATA</strong> when some are waiting) records the ones AADE already holds; a banner says how many received credit notes are not in the books yet, because the list is incomplete until you fetch them. Columns: Number, Date, Reason, Status, Net, VAT, Total.</li>
+    <li><strong>Issued to Customers</strong> — the list above, with <strong>New</strong>. Each row's actions include submit/retransmit to myDATA, <strong>Download PDF</strong>, and — while it hasn't been transmitted — a card button, <strong>Refund to the card on a terminal</strong> (sign → refund on the terminal → enter the transaction id → file it).</li>
+    <li><strong>Received from Suppliers</strong> — a supplier's credit note is <em>received</em>, not authored, so there is no New here. Instead, <strong>Fetch from myDATA</strong> (or <strong>Fetch N from myDATA</strong> when some are waiting) records the ones AADE already holds; a banner says how many received credit notes are not in the books yet, because the list is incomplete until you fetch them. Columns: Number, Date, Reason, Status, Net, VAT, Total.</li>
   </ul>
 
   <h2>How to create a credit note — step by step</h2>
@@ -63,8 +63,16 @@
     <li>Choose the <strong>Type</strong>.</li>
     <li>Enter the <strong>Reason</strong> for the credit.</li>
     <li>Link the original invoice in the <strong>Invoice</strong> field so the credit offsets the right document.</li>
-    <li>Save; issue/transmit when ready.</li>
+    <li><strong>Save draft</strong> to keep it as a draft, or issue it straight away. Issuing transmits it to myDATA at once, under the workspace's <em>Send to AADE automatically</em> setting; a failed send leaves the note issued and can be retried from its page.</li>
   </ol>
+
+  <h2>Draft and issued credit note pages</h2>
+  <ul class="feat">
+    <li><strong>Draft</strong> (<span class="badge route">/finance/credit-notes/drafts/:id</span>) — a draft holds only what you intend to credit: it has no number and is not counted in any balance or report. <strong>Edit draft</strong>, issue it, or <strong>Delete draft</strong>.</li>
+    <li><strong>Issued</strong> (<span class="badge route">/finance/credit-notes/:id</span>) — the customer, the invoice it credits (<strong>Credits Invoice</strong>), the <strong>Correlated MARK</strong>, the <strong>Reason</strong>, <strong>Lines Credited</strong> with net, VAT and total, the fiscal record, the <strong>Customer link</strong> panel and the <strong>P&amp;L</strong> state it inherits from the invoice. Actions: PDF, <strong>Send to myDATA</strong> while it is not sent, and <strong>Receive returned goods</strong> to book returned items back into stock (<strong>Goods Returned</strong> shows what came back).</li>
+  </ul>
+  <p>On the list, an issued credit note row has a <strong>Download EN 16931 XML</strong> button (the European-standard e-invoice file). Credit notes are emailed to the customer once AADE assigns the MARK.</p>
+  <div class="callout"><p><strong>Returning goods to a supplier</strong> needs no credit note from you — the supplier issues one against their own invoice. Start the return from the supplier invoice in Expenses (<strong>Return to supplier…</strong>); see <a href="finance-doc-delivery-notes.html">Delivery notes → Returning goods to a supplier</a>.</p></div>
 
   <div class="callout"><p><strong>The credit follows the invoice.</strong> A credit line's VAT rate comes from the credited invoice line itself (from its own VAT amount when the line has no catalogue VAT category), so a 24% line is never printed or transmitted as 0%. A credit note against a <strong>retail receipt</strong> is an <strong>11.4</strong> and, when transmitted through the provider, is filed standalone rather than correlated to the receipt — the provider refuses that correlation.</p></div>
   <div class="callout tip"><p><strong>Worked example — crediting a returned item.</strong> A customer returns goods from an invoice you already issued. Open <strong>Finance → Credit notes</strong> → click <strong>New</strong> → set the <strong>Type</strong> → write the <strong>Reason</strong> ("returned goods") → pick the original invoice in the <strong>Invoice</strong> field. The credit note counter-balances that invoice, and both documents stay on file.</p></div>

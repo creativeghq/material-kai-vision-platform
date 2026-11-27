@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM: Leads | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Leads</div>
+  <h1>CRM · Leads</h1>
+  <div class="routes"><span class="badge route">/crm?tab=leads</span> <span class="badge route">/crm/leads/:id</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">A <strong>lead</strong> is an enquiry that is not a customer yet — someone who phoned, wrote or walked in asking about something. Leads live in their own list and <strong>never appear in Contacts</strong>, so your contact list holds only the people you actually deal with. When an enquiry goes somewhere, you <strong>convert</strong> the lead and it becomes a contact, with its history and quotes carried over.</p>
+
+  <h2>Where it is</h2>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Leads</strong> tab, or the App Launcher's CRM <em>Leads</em> chip. Click any lead to open its page.</p>
+
+  <h2>The Leads list</h2>
+  <ul class="feat">
+    <li><strong>New lead</strong> opens the lead form (below).</li>
+    <li><strong>Search leads…</strong> and a status filter — <strong>Open</strong> (New, Contacted and Quoted; the default), <strong>All</strong>, or one status.</li>
+    <li><strong>List</strong> / <strong>Board</strong> switch. The list's columns are <strong>Name</strong>, <strong>Interest</strong>, <strong>Source</strong>, <strong>Status</strong>, <strong>Est. Value</strong>, <strong>Quotes</strong>, <strong>Follow-up</strong>, <strong>Received</strong> and <strong>Actions</strong> (convert, delete).</li>
+    <li>The <strong>Board</strong> has a column per status. Drag a card to change its status; dropping it on <strong>Converted</strong> opens the convert dialog.</li>
+  </ul>
+
+  <h2>The lead form</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What it holds</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Name</strong> (required), <strong>Email</strong>, <strong>Phone</strong>, <strong>Company</strong></td><td>Who is asking.</td></tr>
+      <tr><td><strong>Source</strong></td><td>Email, Phone, Website, WhatsApp, Walk-in, Referral, Social or Other.</td></tr>
+      <tr><td><strong>Interested In</strong></td><td>A one-line summary, e.g. <em>Floor tiles ~70m²</em> — shown as Interest in the list.</td></tr>
+      <tr><td><strong>Request</strong></td><td>What they asked for, in full.</td></tr>
+      <tr><td><strong>Status</strong></td><td>New, Contacted, Quoted, Lost or Converted. <strong>Lost Reason</strong> appears when you pick Lost.</td></tr>
+      <tr><td><strong>Est. Value (EUR)</strong></td><td>What the enquiry might be worth.</td></tr>
+      <tr><td><strong>Follow-Up On</strong></td><td>When to get back to them.</td></tr>
+      <tr><td><strong>Reference</strong></td><td>Where it came from — an email subject, a link.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>The lead page</h2>
+  <ul class="feat">
+    <li><strong>Header</strong> — the name, status and source, <strong>Email</strong> (opens a new email in your <a href="inbox.html">Inbox</a>, addressed and linked to the lead — nothing is sent until you press Send) and <strong>Call</strong>. Above it: <strong>Edit</strong>, <strong>Convert to contact</strong> and delete.</li>
+    <li><strong>Details</strong> — status, email, phone, company, estimated value, follow-up date and when it was received.</li>
+    <li><strong>Quotes</strong> — <strong>Create quote</strong> starts a quote already filled in from the lead, and <strong>Link existing quote</strong> attaches one you made earlier. Linking or creating a quote moves a New or Contacted lead to <strong>Quoted</strong>. In the Quotes list, the lead's name shows as the customer.</li>
+    <li><strong>Request</strong> — what they asked for.</li>
+    <li><strong>Activity</strong> — a timeline of notes, logged calls and meetings (with reminders), quotes and emails, each its own entry.</li>
+  </ul>
+
+  <h2>Leads from email and WhatsApp</h2>
+  <p>A lead can also be created automatically when an enquiry email or WhatsApp message arrives, by an <strong>Inquiry Received</strong> automation in <a href="flows.html">Flows</a> (currently set up by the platform operator). Such a lead's page shows a <strong>Conversation</strong> panel: a summary of the conversation, with its status and follow-up date kept in step with it as new messages come in. A reply from your side moves a New lead to Contacted. Changing the status yourself stops the automatic syncing; <strong>Stop syncing</strong> and <strong>Resume syncing</strong> switch it by hand. Syncing never moves a lead backwards and never converts it.</p>
+
+  <h2>Converting a lead</h2>
+  <ol>
+    <li>Press <strong>Convert to contact</strong> (or drop the card on Converted).</li>
+    <li>Leave <strong>Also open a deal in the pipeline</strong> ticked to start a <a href="crm-deals.html">deal</a> too — its stage follows the lead's status, and a follow-up date becomes a task.</li>
+    <li>Press <strong>Convert</strong>. You land on the new contact. The lead's request, notes and activity are kept on the contact and its quotes move to it.</li>
+  </ol>
+  <div class="callout tip"><p><strong>No duplicates.</strong> If a contact with the same email already exists, it is reused instead of creating a second one. Converting the same lead twice opens the contact it already became.</p></div>
+
+  <div class="callout"><p>Leads are workspace data and follow the <code>crm.view</code> capability like the rest of CRM. For people you already deal with, see <a href="crm-contacts.html">Contacts</a>.</p></div>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

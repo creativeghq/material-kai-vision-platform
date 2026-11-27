@@ -63,6 +63,14 @@
     <li><strong>Pricing</strong> — supplier price lists and pricing notes. This is what the <strong>Get price</strong> button looks up when you add a product to a <a href="quotes.html">quote</a> or open a product. Pricing pages are saved private, and an admin can fill one by uploading a supplier's <strong>PDF</strong>: the text is extracted into the page for review before it is saved.</li>
     <li><strong>Audits &amp; Templates</strong> — blank forms your business keeps (checklists, standard documents). The <a href="agent-tools.html">assistant</a> fills these in on request and saves the result to your <a href="team-docs.html">team Docs</a>, rather than writing a form from memory.</li>
   </ul>
+  <h3>Get price — how a price is found</h3>
+  <p>The <strong>Get price</strong> drawer (on a quote line, a custom product, an order or a product window) has two modes: <strong>AI mode</strong>, where the assistant composes a price with its reasoning, and <strong>Quick pick</strong>, a direct search of your price lists at no AI cost. <strong>Check market</strong> runs a one-off retailer scan to compare your price against the market.</p>
+  <ul class="feat">
+    <li><strong>The database works out the price.</strong> Each price-list row carries its size, its quality grade and its unit as separate facts, so a 60×120 query never returns a 60×60 row, a second-choice or lower-quality row appears only when you ask for it, and a row whose unit was never printed is shown with a warning rather than assumed to be per m².</li>
+    <li><strong>Tick the rules that apply.</strong> Order-dependent discounts on file for the row (prepayment, full truck, extra quantity tiers) appear as options; tick the ones that apply and the net and incl.-VAT price is computed from them. With no rule on file, you are told to confirm the price by hand. <strong>Use net</strong> or <strong>Use incl. VAT</strong> puts the result on the line.</li>
+    <li><strong>One table per price basis.</strong> A supplier's answer is split into its purchase prices, its lower-quality purchase prices and its list prices after discount, each labelled <em>Final purchase price</em> or <em>List price</em>.</li>
+    <li><strong>A failed search is not "no price".</strong> If the lookup itself fails you are told so. In AI mode, a supplier you name with no matching item answers with the product lines it does carry rather than a guessed price.</li>
+  </ul>
 
   <div class="callout"><p><strong>Looking for materials, not articles?</strong> To search the product catalogue itself — by look, colour, material and spec — use the <a href="agent-hub.html">Agent Hub</a>'s material/visual search or <a href="discover-products.html">Discover → Products</a>. The Knowledge Base is for <em>knowledge</em> (guides, manuals, certifications, how-tos).</p></div>
 </main>

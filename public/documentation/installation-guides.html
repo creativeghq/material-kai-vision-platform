@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Installation Guides | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Installation Guides</div>
+  <h1>Installation Guides</h1>
+  <div class="routes"><span class="badge route">/guides</span> <span class="badge route">/guides/:id</span> <span class="badge route">/guides/:id/play</span> <span class="badge route">/g/:token</span> <span class="badge public">shared link</span> <span class="badge route">/tools/tile-installation</span> <span class="badge public">public tool</span></div>
+  <p class="lead">An installation guide turns a supplier's assembly manual into an interactive, step-by-step 3D build: each step puts its parts and hardware in place, with the manual's own page beside it. Customers and installers can watch it from a link without an account. For floors, the <strong>Tile Installation Guide</strong> builds a tiled floor step by step and gives a setting-out drawing with a cut schedule.</p>
+
+  <div class="callout"><p><strong>Where:</strong> Apps menu → <strong>Projects Hub</strong> → <strong>Installation Guides</strong> (<span class="badge route">/guides</span>). It is its own module — if it is not shown, Installation Guides is not enabled for your workspace (see <a href="account-modules.html">Modules</a>).</p></div>
+
+  <h2 id="create">Making a guide from a manual</h2>
+  <ol>
+    <li>On <strong>Installation Guides</strong>, press <strong>New guide</strong>, choose the supplier's PDF and press <strong>Read the manual</strong>. The PDF is uploaded, its pages turned into images, and it is read; the list shows each guide as <em>Not read</em>, <em>Reading</em>, <em>To Review</em>, <em>Published</em> or <em>Failed</em>, with its pages and steps. Reading a manual is charged per page.</li>
+    <li>Open the guide. Its <strong>Steps</strong> tab lists each step with its <em>Title</em>, <em>Instruction</em>, an optional <em>Warning</em>, how many <em>People</em> it takes and the <em>Parts this step puts in</em>. The <strong>Parts</strong> tab is <strong>The Kit</strong> — names, printed part numbers, kind and counts as read from the manual. Correct anything it misread and <strong>Save changes</strong>.</li>
+    <li>Press <strong>Publish</strong>. A published guide is read-only; <strong>Unpublish</strong> it to correct a step or a part.</li>
+  </ol>
+  <p>If a read fails or stops part-way, the guide says so and offers <strong>Try again</strong> or <strong>Read the manual</strong> again.</p>
+
+  <h2 id="look">The Look — real finishes and your space</h2>
+  <p>Until a product photo is read, the 3D shows plain laminate. On the <strong>Look</strong> tab:</p>
+  <ul class="feat">
+    <li><strong>Find photos of</strong> the product, <strong>Upload your photo</strong>, or paste a product page or photo address. Pick the photo that matches and press <strong>Read the finishes</strong> (one credit).</li>
+    <li><strong>Finishes</strong> lists what was read; correct a colour or a material if the photo misled the reader. <strong>Which part has which finish</strong> assigns a finish to each part — or plain, or its own look (wood, black plastic, steel) for hardware.</li>
+    <li><strong>Your Space</strong> — when the photo shows a room, the 3D straightens the wall behind the product into a level backdrop and builds the room around it. Drag the four points onto the back wall's corners (the bottom two where it meets the floor, the top two where it meets the ceiling or the top of the photo).</li>
+    <li>Press <strong>Save the look</strong> to apply it, or <strong>Clear the finishes</strong>.</li>
+  </ul>
+
+  <h2 id="player">Watching the build</h2>
+  <p><strong>Open the guide</strong> to play it (<span class="badge route">/guides/:id/play</span>). Each step brings its panels and hardware in one piece at a time, doors swing and drawers slide, and drilled holes and part numbers are shown. Beside the build is the manual page for the step (<strong>Open the manual at this page</strong>) and the step's <em>Parts in</em> and <em>Hardware in</em>, with a <strong>Hardware schedule</strong>.</p>
+  <ul class="feat">
+    <li><strong>Controls</strong> — previous / next step (<kbd>[</kbd> <kbd>]</kbd>), <strong>Play the build</strong> / Pause (space), and an <strong>Assembly timeline</strong> to scrub.</li>
+    <li>Views — <strong>Your Space</strong> (the build in the photographed room), <strong>Exploded</strong> (⇧X), show or hide part names (⇧N), and the camera following each piece or holding the step view (F). The manual opens with ⇧B.</li>
+    <li>The player works on a phone as well as a desktop.</li>
+  </ul>
+
+  <h2 id="share">Sharing a guide</h2>
+  <p>Press <strong>Share</strong> in the player and choose who can open the build:</p>
+  <ul class="feat">
+    <li><strong>Your workspace</strong> — copy the workspace link; members of this workspace can open it.</li>
+    <li><strong>Public link</strong> — turn it on to get a link (<span class="badge route">/g/:token</span>) a customer or installer can open without an account, to watch the build and read the manual. Turn it off and the old link stops working.</li>
+  </ul>
+
+  <h2 id="tiles">Tile Installation Guide</h2>
+  <p><strong>What it is —</strong> a free public tool (<span class="badge route">/tools/tile-installation</span>, also in the <a href="tools.html">Tools</a> hub) that lays a tiled floor step by step in 3D and tells you what to buy. <strong>Why it matters —</strong> you see the pattern, the cuts and the materials before the first tile goes down.</p>
+  <ol>
+    <li>Under <strong>Your Floor</strong>, enter the width and depth (m), the tile length, width and thickness (mm), the <strong>Pattern</strong> and rotation, and optionally a photo of the tile.</li>
+    <li>Under <strong>Setting</strong>, set the joint and wall gap (mm), the <strong>Cutting Allowance</strong> (usually 5–10%, more for diagonal and herringbone), the <strong>Trowel Notch</strong>, the <strong>Grout Colour</strong>, whether to <strong>Prime the floor first</strong> and to <strong>Back-Butter Tiles</strong>.</li>
+    <li>Optionally add <strong>Your Room</strong> — a photo of the real room; mark the floor's four corners to see the tiles in it.</li>
+    <li>Read <strong>What you need</strong>: the floor area, the tiles covering the floor (edge cuts counted whole), the tiles to order once a cutting allowance is set, the pieces on the floor, spacers, and approximate kilos of tile adhesive and grout (typical coverage — the figures on your product's bag take precedence).</li>
+  </ol>
+  <h3 id="setting-out">Setting-out drawing and cut schedule</h3>
+  <p>When the <a href="agent-hub.html">assistant</a> plans a tile installation, its result card has a <strong>Setting-out drawing</strong> per room: the start lines, every tile, cut pieces shaded, cuts under a third of a tile hatched red, a <strong>Cut Schedule</strong> of the cut pieces grouped by size, and the <strong>Checks before laying</strong> — no cut under a third of a tile, edge cuts that match on opposite walls, and room sizes given by a person. An angled pattern is reported as not measured (its cuts are marked out on site), never as passing. <strong>Download PDF</strong> saves the sheet; failed checks are listed on the card as <em>Before laying: …</em>.</p>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

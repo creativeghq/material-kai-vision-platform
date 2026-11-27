@@ -58,6 +58,8 @@ Stored in `user_credits` table:
 | `total_used` | Lifetime credits consumed |
 | `stripe_customer_id` | Linked Stripe customer |
 
+**Monthly statement.** Profile → Credits renders `CreditUsageHistory` from `get_my_credit_statement`: per month the starting balance, credits added (top-ups, monthly grant, bonuses, refunds), credits spent by category, ending balance, daily spend and the charged operations, with a CSV download. Spend categories are pinned by `tests/unit/creditSpendCategories.test.ts`.
+
 ---
 
 ## Subscriptions

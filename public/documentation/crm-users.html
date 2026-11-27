@@ -10,21 +10,26 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="crm.html">CRM</a> / Users</div>
   <h1>CRM · Users</h1>
-  <div class="routes"><span class="badge route">/crm?tab=users</span> <span class="badge gated">platform operator</span></div>
-  <p class="lead">The Users tab is where you <strong>manage the platform users in your workspace</strong> — the people who actually have a login. It lists each user alongside their role, subscription tier and credit balance, so the access and spend of every account is visible at a glance. This is the tab you use to keep access correct: a user's role is the gate on what they can see and do across the platform, and the subscription and credit columns tell you what each account can spend.</p>
-
-  <div class="callout warn"><p><strong>Platform operators only.</strong> Account tiers, subscriptions, credits and creating logins are platform administration, so this tab — and the Total Users / Active Users tiles above the CRM — appear only for a platform operator. A workspace member with CRM access doesn't see it, and a <code>?tab=users</code> link opens Contacts for them. To bring a colleague into <em>your</em> workspace, invite them from <a href="finance-settings-team.html">Team</a> instead.</p></div>
+  <div class="routes"><span class="badge route">/crm?tab=users</span> <span class="badge route">/crm/users/:id</span> <span class="badge gated">crm.view</span></div>
+  <p class="lead">The Users tab shows <strong>the people who log in to your workspace</strong> — your members, their roles and the invitations still waiting to be accepted. Every workspace has it. A platform operator also sees, below the team, every account on the platform with its account tier, subscription and credits.</p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>CRM</strong> → the <strong>Users</strong> tab (operators only, beside Pipeline, Contacts, Companies and Categories).</p>
+  <p>Top navigation → <strong>CRM</strong> → the <strong>Users</strong> tab (between Leads and Contacts), or the App Launcher's CRM <em>Users</em> chip.</p>
+
+  <h2>Your team</h2>
+  <p>The top of the tab is the same Team panel as <a href="finance-settings-team.html">Finance → Settings → Team</a>: <strong>Invite a Team Member</strong>, <strong>Awaiting Acceptance</strong>, <strong>Support Access</strong> and <strong>Members</strong>, where you change a member's role or remove them. People without the right to manage the team see the list read-only. See that page for every role you can grant and for time-limited Support access.</p>
+
+  <h2>Platform Accounts (platform operators only)</h2>
+  <p>Below the team, a platform operator sees <strong>Platform Accounts</strong> — <em>“Every account on the platform and the business it runs.”</em> Ordinary members never see this part.</p>
 
   <div class="callout"><p><strong>Users vs. Contacts —</strong> a <em>user</em> has login access to your workspace; a <em>contact</em> is a record of a person you deal with who may or may not have a login. Most users arrive on their own once you invite them (see <a href="finance-settings-team.html">Team invites</a>); this tab is where you see and manage them once they're in.</p></div>
 
   <h2>What's on the screen</h2>
   <p>A toolbar sits above a table of users:</p>
   <ul class="feat">
-    <li><strong>Add User</strong> — a toolbar button that opens the new-user flow (see the step-by-step below).</li>
-    <li><strong>Search</strong> — a search box (<em>"Search users by email…"</em>) that filters the list so you can find someone quickly.</li>
+    <li><strong>Add user</strong> — a button that opens the new-user flow (see the step-by-step below).</li>
+    <li><strong>Search</strong> — a search box (<em>“Search by email…”</em>) with filters, and sortable column headers.</li>
+    <li><strong>Select rows</strong> — tick rows (or all) for bulk actions: <em>Set account tier</em>, <em>Set status</em>, <em>Professional Type</em> and <em>Add to category</em>.</li>
     <li><strong>The users table</strong> — one row per user, each row exposing the columns described below with per-row <strong>Actions</strong> on the right.</li>
   </ul>
 
@@ -40,29 +45,28 @@
     <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td><strong>Email</strong></td><td>The user's login email address — this is also what the search box matches on.</td></tr>
-      <tr><td><strong>Account tier</strong></td><td>The user's <strong>account role</strong> — this is the <em>access tier</em> (see the box below). Editable <strong>inline</strong> from this column.</td></tr>
+      <tr><td><strong>Account Tier</strong></td><td>The user's <strong>account role</strong> — this is the <em>access tier</em> (see the box below). Editable <strong>inline</strong> from this column.</td></tr>
       <tr><td><strong>Type</strong></td><td>The account/professional type of the user.</td></tr>
       <tr><td><strong>Subscription</strong></td><td>The user's subscription tier (free, pro, …).</td></tr>
       <tr><td><strong>Credits</strong></td><td>The user's current credit balance — what the account has left to spend.</td></tr>
       <tr><td><strong>Status</strong></td><td>The account status (e.g. active).</td></tr>
-      <tr><td><strong>Actions</strong></td><td><strong>Reset password</strong> (key icon) and <strong>Delete user</strong> (bin).</td></tr>
+      <tr><td><strong>Actions</strong></td><td><strong>Reset password</strong> (key icon) and <strong>Delete user</strong> (bin). Clicking a row opens the account's full record at <span class="badge route">/crm/users/:id</span>.</td></tr>
     </tbody>
   </table>
   </div>
 
-  <h2>The account role = the access tier</h2>
-  <p>A user's <strong>account role</strong> is now the single thing that decides what they can do across the platform. Set it here (the Role column is an inline dropdown). There are six tiers:</p>
+  <h2>Account tier vs. workspace role</h2>
+  <p>An account's <strong>tier</strong> is platform-wide — it is true in every workspace the person belongs to — and is set inline in the Account Tier column. There are four:</p>
   <div class="table-wrap"><table>
-    <thead><tr><th>Role</th><th>What it grants</th></tr></thead>
+    <thead><tr><th>Tier</th><th>What it means</th></tr></thead>
     <tbody>
-      <tr><td><strong>User</strong></td><td>A standard team member — the baseline; access falls back to their workspace membership.</td></tr>
-      <tr><td><strong>Sales</strong></td><td>The <a href="sales.html">Sales portal</a> and their own customers (no finance back-office).</td></tr>
-      <tr><td><strong>Supplier</strong></td><td>The full supplier business node and its downstream (this replaces the old <em>dealer</em> and <em>factory</em> roles — both now map to Supplier).</td></tr>
+      <tr><td><strong>User</strong></td><td>The baseline account; what they can do comes from their workspace role.</td></tr>
+      <tr><td><strong>Supplier</strong></td><td>A supplier business node and its downstream.</td></tr>
       <tr><td><strong>Architect</strong></td><td>Sells to end clients with their own downstream.</td></tr>
-      <tr><td><strong>Finance</strong></td><td>The full <a href="finance.html">Finance</a> module, including expense approval.</td></tr>
-      <tr><td><strong>Admin</strong></td><td>Workspace administration (replaces the old <em>super admin</em>). Platform-operator “see everything” is reserved and not granted by this role alone.</td></tr>
+      <tr><td><strong>Admin</strong></td><td>Platform administration.</td></tr>
     </tbody>
   </table></div>
+  <p>Functional jobs — runs HR, the warehouse team, a sales manager, the accountant — are <strong>workspace roles</strong>, given per workspace from the Team panel above, never account tiers.</p>
   <div class="callout"><p><strong>Filters.</strong> The toolbar has <strong>Any role</strong>, <strong>Any status</strong>, <strong>Any plan</strong> and <strong>Any type</strong> dropdowns to narrow the list, plus the email search box.</p></div>
 
   <h2>How to search</h2>
@@ -71,26 +75,25 @@
   <h2>How to add a user</h2>
   <ol>
     <li>Open <strong>CRM</strong> from the top navigation and go to the <strong>Users</strong> tab.</li>
-    <li>Click <strong>Add User</strong> in the toolbar to open the new-user flow.</li>
+    <li>Click <strong>Add user</strong> in the Platform Accounts header to open the new-user flow.</li>
     <li>Provide the user's details and choose their <strong>role</strong> — the role decides which areas of the platform they'll be able to reach.</li>
     <li>Save / create the user.</li>
     <li>The new user appears in the list, where you can read their role, subscription tier, credits and status at a glance, and manage them via the per-row <strong>Actions</strong>.</li>
   </ol>
 
-  <h2>What the per-row Actions do</h2>
-  <p>Each row carries an <strong>Actions</strong> control at the right end — the per-row way to manage that user (for example to adjust their account from the list rather than navigating away). Use it on the specific user whose role, subscription or status you need to change.</p>
+  <h2>Deleting an account — what is refused</h2>
+  <p>Deleting removes the login and the workspace it runs, so it is guarded. The delete is refused for <strong>your own account</strong>, for the <strong>owner of the platform's root workspace</strong>, and for any account that still has an <strong>active subscription</strong> or a <strong>credit balance</strong>. Bulk deletes run one account at a time, and the message names the reason any one of them was refused. Deleting a <em>contact</em> that invoices or supplier bills still point to is refused the same way, in plain words.</p>
 
   <h2>What this affects elsewhere</h2>
   <p>This tab decides <strong>who can log in</strong> and, through each user's role, <strong>what they can see and do platform-wide</strong>:</p>
   <ul class="feat">
     <li><strong>Role is the access tier.</strong> The role you set here is the primary driver of what a person can reach platform-wide — CRM, Finance, Sales, supplier/architect surfaces, and so on (per the six tiers above). It's changed inline, and takes effect for that user.</li>
-    <li><strong>Invites land here.</strong> When you invite a colleague via <a href="finance-settings-team.html">Finance → Settings → Team</a>, they sign up with the role baked into the link and then appear in this Users list, where their role and subscription are managed.</li>
+    <li><strong>Invites land here.</strong> A colleague you invite appears under <strong>Members</strong> with the workspace role baked into the invitation. The workspace role (Team) decides what they can do in <em>your</em> workspace; the account tier (Platform Accounts) is platform-wide.</li>
   </ul>
-  <div class="callout"><p><strong>Changed in 2026-06:</strong> roles were consolidated — <em>dealer</em> and <em>factory</em> merged into <strong>Supplier</strong>, and <em>super admin</em> into <strong>Admin</strong> — and the old auto-populated “Dealer/Factory Accounts” role categories were retired. Old records still display with the new label.</p></div>
 
-  <div class="callout tip"><p><strong>Worked example — onboarding a supplier.</strong> You've sent an invite link from <a href="finance-settings-team.html">Team</a>; once they sign up they appear here in the <strong>Users</strong> tab. Use the email <strong>Search</strong> to find them, confirm their <strong>Status</strong> is active, and set their <strong>Role</strong> to <em>Supplier</em> from the inline dropdown — that grants their supplier business node immediately, no further list-keeping needed.</p></div>
+  <div class="callout tip"><p><strong>Worked example — onboarding a supplier.</strong> Once a supplier has signed up, find them in <strong>Platform Accounts</strong> with the email <strong>Search</strong>, confirm their <strong>Status</strong> is active, and set their <strong>Account Tier</strong> to <em>Supplier</em> from the inline dropdown — that grants their supplier business node immediately, no further list-keeping needed.</p></div>
 
-  <div class="callout"><p>Users are one of the four CRM tabs — for the people and organisations you do business with, see <a href="crm.html">CRM</a> (Contacts, Companies and Categories). To invite a new person into the workspace, use <a href="finance-settings-team.html">Finance → Settings → Team</a>; for what each role can do, see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</p></div>
+  <div class="callout"><p>For the people and organisations you do business with, see <a href="crm.html">CRM</a> (Leads, Contacts, Companies and Categories). For what each role can do, see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

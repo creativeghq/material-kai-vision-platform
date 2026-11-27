@@ -26,13 +26,19 @@
         <td>Public quote</td>
         <td><span class="badge route">/q/:token</span></td>
         <td><span class="badge public">public</span></td>
-        <td>Reviews the quote's line items, specifications and totals, then <strong>accepts</strong> it online. See <a href="quotes.html">Quotes</a>.</td>
+        <td>Reviews the quote's line items (with photos and units), specifications, totals, notes and terms, signs and <strong>accepts</strong> it online, and can pay a deposit or the full amount. See <a href="quotes-build.html">Quotes · Build &amp; send</a>.</td>
       </tr>
       <tr>
         <td>Pay invoice</td>
         <td><span class="badge route">/pay/:token</span></td>
         <td><span class="badge public">public</span></td>
         <td>Views an invoice and <strong>pays it online</strong>. See <a href="finance.html">Finance &amp; Invoicing</a>.</td>
+      </tr>
+      <tr>
+        <td>Finance document</td>
+        <td><span class="badge route">/d/:token</span></td>
+        <td><span class="badge public">public</span></td>
+        <td>Views a credit note, delivery note or order online and downloads its PDF, from the customer link it was sent. See <a href="finance-einvoicing.html">e-invoicing → The public invoice page</a>.</td>
       </tr>
       <tr>
         <td>Account statement</td>
@@ -131,7 +137,7 @@
   <h2>What each page does — and when to send it</h2>
   <p>The table above is the quick reference; the cards below add the <em>why</em>. For each page you'll find what the recipient sees and does, and the moment in your workflow when sending it makes sense.</p>
   <div class="cards">
-    <div class="card"><h3>🧾 Public quote</h3><p><strong>What —</strong> a clean, read-only presentation of a quote: every line item with its description and specification, sub-totals, taxes and the grand total, with a one-click <strong>Accept</strong>. <strong>When to send —</strong> the moment a proposal is ready for the customer's decision; their acceptance turns it into a confirmed order with no back-and-forth email.</p></div>
+    <div class="card"><h3>🧾 Public quote</h3><p><strong>What —</strong> a clean, read-only presentation of a quote: every line item with its photo, unit, description and specification, sub-totals, taxes and the grand total, your notes and terms &amp; conditions, a sign-and-<strong>Accept</strong> step with the signer pre-filled from the customer, and payment online or by bank transfer to the accounts you list. <strong>When to send —</strong> the moment a proposal is ready for the customer's decision; their acceptance turns it into a confirmed order with no back-and-forth email.</p></div>
     <div class="card"><h3>💳 Pay invoice</h3><p><strong>What —</strong> the invoice plus an online payment option. <strong>When to send —</strong> as soon as you want to be paid; the customer can settle the moment they open the link, and the payment is reconciled back against the invoice in your Finance workspace automatically.</p></div>
     <div class="card"><h3>🎨 Public moodboard</h3><p><strong>What —</strong> a shareable view of a moodboard: the images, materials and products you've gathered. <strong>When to send —</strong> early in a project, to let a client or collaborator browse a direction at their leisure and react before you commit to a full deck.</p></div>
     <div class="card"><h3>📐 Client view</h3><p><strong>What —</strong> the richest deliverable: a project sign-off page bundling the deck as a PDF, a 3D room walkthrough (scroll room to room, each room ending on its render, or walk freely), switchable lighting moods over the hero render, a live FF&amp;E list, and inline approve/comment controls. <strong>When to send —</strong> at a milestone that needs formal client sign-off, when a flat PDF can't convey the experience.</p></div>

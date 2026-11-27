@@ -10,7 +10,7 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-documents.html">Documents</a> / Delivery notes</div>
   <h1>Documents · Delivery notes</h1>
-  <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
+  <div class="routes"><span class="badge route">/finance</span> <span class="badge route">/finance/delivery-notes/:id</span> <span class="badge gated">finance.manage</span></div>
   <p class="lead">A delivery note is a record of goods dispatched — the document that says stock left your premises. It's one of the document tabs on the Finance page; this guide explains what it is, where to find it, how the list is laid out, how to create one step by step, and how it ties into the dispatch/warehouse flow.</p>
 
   <h2>Where it is</h2>
@@ -36,7 +36,9 @@
     <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td><strong>Number</strong></td><td>The delivery note number.</td></tr>
-      <tr><td><strong>Type</strong></td><td><em>Dispatch</em> or <em>Receipt</em>.</td></tr>
+      <tr><td><strong>Type</strong></td><td><em>Dispatch</em> or <em>Receipt</em>, with the movement purpose.</td></tr>
+      <tr><td><strong>Party</strong></td><td>The customer (or, for a return, the supplier) the goods go to.</td></tr>
+      <tr><td><strong>For</strong></td><td>What the note is for — the invoice or order a dispatch delivers, or the supplier invoice a return sends back.</td></tr>
       <tr><td><strong>Date</strong></td><td>The dispatch date.</td></tr>
       <tr><td><strong>Job</strong></td><td>The job its order belongs to.</td></tr>
       <tr><td><strong>Status</strong></td><td>The document status, with <em>myDATA ✓</em> once it carries a MARK (hover for the MARK).</td></tr>
@@ -44,9 +46,21 @@
   </table>
   </div>
 
+  <h2>The delivery note page</h2>
+  <p>Click a row to open the note at <span class="badge route">/finance/delivery-notes/:id</span>; a new note lands there when you save it. The page shows the party, what the note is <strong>For</strong>, the <strong>Purpose</strong>, the <strong>Loading Place</strong> and <strong>Delivery Place</strong>, <strong>Transport Date</strong>, <strong>Vehicle</strong>, the myDATA record, and each line with whether it moves stock.</p>
+  <ul class="feat">
+    <li><strong>Draft</strong> — <strong>Edit note</strong> while it is a draft, then <strong>Issue &amp; send to myDATA</strong>. Issuing transmits the note at once, under the same <em>Send to AADE automatically</em> setting invoices follow; a failed send leaves the note issued and can be retried from the page.</li>
+    <li><strong>Issued</strong> — <strong>PDF</strong>, the fiscal record (MARK, UID, authentication code, Verify on AADE), the <strong>Customer link</strong> panel, and — on a dispatch — <strong>Create invoice</strong>.</li>
+  </ul>
+  <div class="callout"><p><strong>The PDF carries no money.</strong> A delivery note prints the lines with description, quantity and unit, a total quantity, the recipient and a transport block (places, purpose, date, vehicle) — no prices, VAT or totals. The customer's online copy (from the customer link) is the same.</p></div>
+
+  <h2>Returning goods to a supplier</h2>
+  <p>On a received supplier invoice in <a href="finance-doc-expenses.html">Expenses</a> (row ⋮), or in a CRM company's supplier documents, choose <strong>Return to supplier…</strong>. Pick the lines and quantities to send back — you can return at most what was invoiced and received, less what was already returned. It drafts a delivery note (9.3) with purpose <em>5 — Return</em>, addressed to the supplier and citing their invoice number and MARK. Issuing it takes the returned quantities out of stock.</p>
+  <p>A return is refunded by the <strong>supplier's</strong> credit note, so there is nothing for you to issue and <em>Create invoice</em> is not offered. The return's page has a <strong>Supplier's credit note</strong> panel showing <em>Received</em> or <em>Not received yet</em> once the supplier's credit note arrives through myDATA.</p>
+
   <h2>Row actions — PDF and the movement lifecycle</h2>
   <ul class="feat">
-    <li><strong>Download PDF</strong> — the printed delivery note.</li>
+    <li><strong>Open</strong> and <strong>Download PDF</strong> — in the row's ⋮ menu, with the links to AADE and the provider's online copy.</li>
     <li><strong>Movement lifecycle</strong> (truck icon) — once the note has left draft, the legs of the movement (start / tranship, return, outcome, recipient rejection, confirmed return) under the digital delivery note rules (ΨΔΑ). <strong>Record &amp; file with AADE</strong> files each leg you declare straight to myDATA under your own AADE credentials, and every leg shows <em>filed</em> (with its MARK), <em>sending</em>, <em>outcome unknown</em>, <em>refused by AADE</em> or <em>not filed</em>. An unanswered filing is never re-sent blind — <strong>Check with AADE</strong> settles it first. Details: <a href="finance-compliance.html">Compliance → ΨΔΑ Phase Β</a>.</li>
   </ul>
   <div class="callout"><p><strong>Numbering.</strong> Delivery notes have their own range (mnemonic ΔΑ), created automatically on the first one if you haven't set one up — they never share a sequence with invoices or receipts.</p></div>
@@ -55,8 +69,8 @@
   <ol>
     <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Delivery notes</strong> tab.</li>
     <li>Click <strong>New</strong>.</li>
-    <li>Pick the delivery note <strong>Type</strong>.</li>
-    <li>Record the dispatch.</li>
+    <li>Pick the delivery note <strong>Type</strong>, the party, the lines, the purpose and the loading and delivery places (street, number, postal code and city — myDATA needs all of them).</li>
+    <li>Click <strong>Issue &amp; send to myDATA</strong>, or <strong>Save draft</strong> to check it on its page first and issue it from there.</li>
   </ol>
 
   <h2>Worked example — dispatching stock ahead of the invoice</h2>

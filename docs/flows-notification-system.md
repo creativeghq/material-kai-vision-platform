@@ -65,7 +65,8 @@ for each matching flow -> execute graph (BFS over nodes)
 | Table | Purpose |
 |---|---|
 | `flows` | The flows themselves (`graph_definition` jsonb, `trigger_type`, `status`, `is_locked`, `tags`, `workspace_id`, `is_global`). |
-| `flow_runs` | One row per execution (status, timing, error). |
+| `flow_runs` | One row per execution (status incl. `waiting`, timing, error). Run counts and last run/error on every flow list are derived from it (runs in the last 30 days); there is no stored `run_count`. |
+| `flow_run_waits` | A branch parked by a durable `delay`: next node ids, context snapshot, the run's mutes, due time, status (`waiting` / `resumed` / `cancelled`). |
 | `flow_run_steps` | Per-node execution log within a run. |
 | `flow_area_registry` | Coverage registry — maps each platform **area** to its canonical flow. |
 | `user_notifications` | Bell notifications (written by the `create_notification` action). |
@@ -204,8 +205,50 @@ surfaces — an operator builds and binds their own flow. They are NOT pre-seede
 a skip-forever default notification (no natural single recipient), so nothing runs
 until an operator wires one in the builder.
 
+### Triggers added since #493 (each with a real emitter)
+
+| Trigger | Emitter / note |
+|---|---|
+| `credit_note_issued`, `delivery_note_issued`, `sales_order_confirmed`, `purchase_order_confirmed` | Finance document lifecycle |
+| `ingestion_audit_failed`, `ingestion_review_waiting` | Catalogue ingestion — a failed audit, and a parked ingestion waiting for review (so it is not silent) |
+| `field_registry_review_due` | 5-day Field Roles reminder (operator) |
+| `server_maintenance_completed` | Weekly server maintenance or its review finished; payload `server`, `verdict`, `stage` (operator-only) |
+| `workspace_access_requested` | A time-limited `support` member asked to re-enter (see [capabilities-and-tenancy.md](capabilities-and-tenancy.md)) |
+| `inquiry_received` | Server-only. An inbound email / WhatsApp message matched an active `inquiry_received` flow's own trigger settings (below) |
+| `client_view_sent` | A designer emailed a client view to the client |
+| `marketplace_application_submitted`, `marketplace_application_reviewed` | Surplus Marketplace applications |
+| `signal.matched` | Server-only; a saved signal found new companies (`evaluate_signals` in SQL), delivered by a locked system-default flow |
+
+`vr_world_created` / `vr_world_failed` were removed with the Atlas worlds.
+
+#### Inquiry → lead is a flow
+
+An inquiry source IS an `inquiry_received` flow: its trigger node carries the match
+(`channel` email | whatsapp, `mail_account_id`, `match_field` subject | body, `match_mode`
+starts_with | contains, `pattern`; form `InquiryTriggerFields`, which also shows how many leads the
+flow made). There is no rules table. Detection (`mail-scheduler` for Gmail, `zernio-webhook-handler`
+for WhatsApp) reads the active `inquiry_received` flows, and on a match copies that flow's trigger
+keys into the event so the engine's generic `trigger_config` match runs exactly that flow. A
+personal mailbox is read only for a flow its owner made, only for matching messages, and never emits
+`mail.received`. The seeded locked operator flow is **Inquiry Received → Create Lead → Only a New
+Lead → Notify**. The `create_lead` action calls `create_lead_from_inquiry` (the flow id comes from
+the engine scope, never from config) — one lead per conversation via the unique
+`(workspace_id, source_ref)` key — and outputs `lead_id`, `created`, `owner_user_id`; the lead links
+back through `crm_leads.capture_flow_id`. Operator-only for now. See [crm-system.md](crm-system.md#leads).
+
+### Who may change a tenant flow
+
+Table policies and `create_simple_flow` / `toggle_simple_flow` / `delete_simple_flow` require
+**`workspace.manage`** — the capability `flow-engine` already required to RUN one. (They were on
+`workspace.read`, so a warehouse, HR or accountant login could create automations that email
+customers.) Automations, Platform defaults and deal-stage emails show controls only to holders and
+say why to everyone else. `increment_flow_run_stats` and `flows.run_count` are gone.
+
 ### Action types (engine handlers in `flow-engine/index.ts`)
-- `create_notification` — insert into `user_notifications` (bell). Guarded.
+- `create_notification` — insert into `user_notifications` (bell). Guarded. Also mirrors a phone
+  push to every active `push_subscriptions` row of the recipient, best effort (a push failure never
+  fails the bell) — see [push-notifications-admin.md](push-notifications-admin.md).
+- `create_lead` — `create_lead_from_inquiry` from an `inquiry_received` run (above).
 - `send_email` — invoke `email-api`. Guarded. Tenant-scoped flows send BYOK.
 - `send_whatsapp` — invoke `messaging-api` (WhatsApp via Zernio). `send_sms` is a
   legacy alias kept for old flows; both route to the same handler.
@@ -232,6 +275,16 @@ until an operator wires one in the builder.
 
 ### Conditions
 - `if_else`, `switch`, `filter`, `delay` — implemented.
+- **`delay` is durable.** Up to 25s runs inline; anything longer (seconds/minutes/hours/days, max
+  365 days — longer is refused with the reason, never shrunk) parks the branch in
+  `flow_run_waits` and the run reads `waiting` (`automation_run_status` / `automation_step_status`
+  both carry `waiting`). `cron_dispatch('minute')` posts `flow-engine` `resume-waits` when
+  `cron_has_due_work('flow-waits')`; `claim_due_flow_waits` flips each due wait to `resumed` in one
+  `UPDATE … FOR UPDATE SKIP LOCKED`, so a retried tick cannot resume it twice. The resumed walk
+  starts at the delay's next nodes with the saved context, is **not billed again**, and settles the
+  run completed / waiting / failed. A paused flow cancels its waits instead of sending; test runs
+  do not wait. Probe `flows.wait_overdue` watches for waits the cron never picked up. Guarded by
+  `tests/unit/flowDurableDelays.test.ts`.
 - `loop` — implemented. Config `{ collection_field, item_variable, max_iterations }`.
   Runs the directly-connected downstream action node(s) once per item in the
   collection, exposing `{{item}}` and `loop_index`. Single-level body; hard cap 1000.

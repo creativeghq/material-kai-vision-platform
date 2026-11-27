@@ -127,7 +127,7 @@ Complete documentation for Material Kai Vision Platform.
 - Trigger types: cron, event, manual, chain
 - Auto-recovery cron (every 5 min, up to 3 retries)
 - Delegation to Python backend for long tasks
-- Admin UI at `/admin/background-agents`
+- Admin UI at `/admin/agent-ops?tab=background-agents`
 
 **[virtual-staging.md](virtual-staging.md)** - Virtual Staging ✨ NEW
 - Gemini 3 Pro Image, 15 credits
@@ -404,7 +404,7 @@ Complete documentation for Material Kai Vision Platform.
 - **Jarvis agent**: material_search, knowledge_base_search, visual_search (all roles); B2B/sub-agent tools (admin/owner only)
 - B2B research: manufacturer search via Anthropic built-in web search (no Perplexity key), company enrichment, contact discovery, email validation
 - Email finder: Hunter.io + Apollo.io fallback, ZeroBounce validation on all discovered emails
-- Admin UI for prompt management (/admin/agent-configs)
+- Admin UI for prompt management (/admin/ai-configs)
 - LangChain.js + LangGraph StateGraph orchestration
 - Real-time prompt updates (no deployment needed)
 - RBAC tool gating
@@ -585,6 +585,14 @@ Complete documentation for Material Kai Vision Platform.
 **[mention-monitoring-system.md](mention-monitoring-system.md)** - Mention monitoring ✨ NEW (2026-07) — news/blog/RSS/YouTube discovery + LLM visibility probes, classifier + cadence pipeline
 
 **[page-monitoring.md](page-monitoring.md)** - Page monitoring ✨ NEW (2026-08) — change detection on non-price pages (supplier terms, regulatory, partner docs) delegated to Firecrawl Monitoring; the unsigned-webhook boundary
+
+**[signals-system.md](signals-system.md)** - Signals ✨ NEW (2026-11) — corpus, saved signals and matches, described signals (#462, #499)
+
+**[admin-headquarters.md](admin-headquarters.md)** - Headquarters, Agent Harness & Agent Ops ✨ NEW (2026-11) — the operator admin layout, the harness, and the Stark/Veritas case desk
+
+**[push-notifications-admin.md](push-notifications-admin.md)** - Phone (Web Push) Notifications — Profile opt-in, the push copy of every bell, and the operator broadcast
+
+**[installation-guides.md](installation-guides.md)** - Installation Guides ✨ NEW (2026-10) — `installation_guides` table, the three edge functions, the 3D player and tile set-out
 
 **[job-research-system.md](job-research-system.md)** - Job research ✨ NEW (2026-07) — job-discovery agent, consolidated digests, v0.1 → v0.3.5 history
 

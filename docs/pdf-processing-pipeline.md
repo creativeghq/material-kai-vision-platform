@@ -1432,6 +1432,24 @@ Each chip indicates which tier produced a given field on that product. The same 
 
 Coverage and source mix are the two best signals for "did this catalog actually parse well?" The bucket chart spots catalogs where average coverage is fine but the long tail is empty; the source chips spot catalogs where one tier silently failed and another is doing all the work. The "Re-run Catalog Knowledge" button is the standard one-click fix when Layer 2 needs to retry.
 
+## Upload options (form fields sent to MIVAA)
+
+`PDFUploadSection` (Data Import Hub) posts these alongside `file_url`, `material_category`, `workspace_id` and `title`:
+
+| Field | Effect |
+|---|---|
+| `publish_on_complete` (default `true`) | Products become `active` once every product in the PDF has processed; if any product fails, all stay drafts. `false` leaves them drafts for review. |
+| `multi_brand` | Distributor catalogue: each product keeps its own brand, and the catalogue's main company is recorded as a supplier of those products (so one brand can have several distributors, picked by price). Off: the main company is every product's brand. |
+| `edition_label` | Free label for this edition (e.g. `2027`), stored on `documents.edition_label`. |
+| `supersedes_document_id` | The earlier catalogue this edition replaces (`documents.supersedes_document_id`). Products are matched to it and changes land in `catalog_edition_changes` (`added` / `removed` / `changed` / `unchanged`); nothing is published until the operator applies them. |
+| `missing_policy` | With `supersedes_document_id`: `keep` (report only), `retire` (mark discontinued) or `needs_replacement` (retire and list under "Needs a new source"). |
+
+Editions are reviewed and applied from Materials Data → Products (`CatalogEditionsPanel`), which calls MIVAA `POST /api/rag/documents/{id}/edition/apply`.
+
+## Ingestion Quality panel
+
+Operations → Catalog lists the latest audit of every processed document (status, number and code coverage, findings). Rows that passed or were marked clean are hidden by default; **Mark clean** / **Mark all clean** and **Re-check** / **Re-check all** (MIVAA recheck endpoint, polled until the fresh audit lands) act on them, and Info findings are counted apart. MIVAA emits the operator-only `ingestion_audit_failed` flow trigger when an audit is failed, needs review, is unverifiable or errored; a locked default flow notifies admins. `prune_ingestion_audits()` (cron `ingestion-audits-prune-daily`) keeps 5 days of superseded audits — each document's latest and latest clean audit always survive — watched by `ops.ingestion_audits_not_pruned`.
+
 ## After a catalogue is created: review, settling and repair
 
 Reference for the review gate and the steps `post_ingestion_repair` runs. Each step records what it did in `ingestion_corrections`, and the audit reports what is left.

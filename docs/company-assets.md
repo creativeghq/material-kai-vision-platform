@@ -64,6 +64,15 @@ Deriving rather than caching is the [one-derivation rule](../CLAUDE.md) applied 
 
 **Leased assets need no depreciation** — the lease payment is already the expense. That's why `none` is the default rather than an omission.
 
+### Tax depreciation (article 24 §4)
+
+`TaxDepreciationCard` (`src/components/business/assets/`) holds the tax rate per statutory category beside the book figure. `tax_depreciation_categories` carries the article 24 §4 reference rate (from 2014-01-01) and the asset categories each one is suggested for.
+
+- **Prefill statutory rates** → `adopt_statutory_tax_rates` copies the reference rate into every EMPTY category; prefilled rows land UNCONFIRMED and nothing is overwritten. `confirm_tax_depreciation_rate` signs off the rate in force.
+- `record_tax_depreciation_rate` is one transaction (replacing a client close-then-insert pair): the same date corrects that entry, an earlier date closes at the next recorded change. Readers: `tax_depreciation_rate_table`, `get_asset_tax_depreciation`.
+- Writes require `workspace.manage` / `finance.manage` / `finance.operate` and go through DEFINER RPCs only (the table policies used to accept any member).
+- The asset form pre-selects the tax category from the asset category and shows the rate on file.
+
 ---
 
 ## 5. Agent parity

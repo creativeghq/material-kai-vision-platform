@@ -324,7 +324,12 @@ says so; there is no unsend to offer.
   - **Members** get full controls (AI Bot toggle, agent settings, add teammate, status select, reply/private-note switch). **End-users** (`persona==='end_user'`) get a read/reply surface only.
   - **Channel filters** All / Internal / WhatsApp / Email, plus an **Order** filter (#342); operators get an "All workspaces" toggle (`scope:'all'`).
   - **Realtime**: members subscribe to `inbox_messages` inserts on the open thread + a `inbox_threads` list channel. The details rail is populated by `get_thread_context`.
-  - **Received email** renders as the sender formatted it: `metadata.email_html` through `sanitizeEmailHtml` (DOMPurify; scripts, forms, frames and remote CSS removed, remote images held back until "Show images" or "Always for <sender>") inside a script-less sandboxed iframe — [`EmailHtmlView`](../src/pages/Inbox/components/EmailHtmlView.tsx). Plain text stays one click away.
+  - **Received email** renders as the sender formatted it: `metadata.email_html` through `sanitizeEmailHtml` (DOMPurify; scripts, forms, frames and remote CSS removed; remote images load by default) inside a script-less sandboxed iframe, scaled to the frame width so a 700-800px newsletter is not cut off. `cid:` images (Outlook signatures) are loaded from the message itself — the Gmail attachment API, or the stored inbound attachment, which records its `content_id` — and swapped in as same-origin `blob:` URLs, raster formats only, never SVG — [`EmailHtmlView`](../src/pages/Inbox/components/EmailHtmlView.tsx). Plain text stays one click away.
+  - **No Sources sidebar section** — it listed nine fixed keys whether or not the workspace had ever received one. The mode tabs split WhatsApp from the rest and labels are the segmentation tool; per-thread source chips stay, and the filter modal's Source option offers only sources the mailbox carries.
+  - **Email composer on desktop** is a one-line bar; clicking it (or Reply all / Forward / Note / Suggest reply / a message's Reply) opens a modal with the answered message on top and the full composer below. Closing keeps the draft; a successful send closes it. Chat channels and mobile keep the inline composer. The same composer and message card serve Inbox email threads and the Gmail view.
+  - **Email avatars**: known photo → Gravatar (`d=404`) → company logo → generated face. The logo is a BIMI mark only when it carries a certificate (`a=`), else Google's site icon when it answers 200 at ≥ 64px; personal mail domains never get one. Cached in `mail_identity_images` (service-role only, RLS on, no grants; `url` NULL = checked, none; rechecked after 30 days), resolved in the background 4 at a time. `list_threads` / `get_thread` return `counterparty_photo_url`.
+  - **Mobile**: swipe left = Delete (archive), right = Done (Reopen in Done, Restore in Archived), with a toast Undo that restores the previous status; tap an avatar or long-press to select, and the app bar becomes a selection bar; pull to refresh. Swipe and bulk bar share one row-action table (`runRowAction`). A conversation opens full screen (`MobileFullScreen`, shared with the Gmail view).
+  - **Compose deep link**: `/inbox?compose=email&to=…` (`src/pages/Inbox/composeLink.ts`) opens the email composer prefilled and linked to a lead or contact. Every record-page Email button uses it (lead, contact, company, deal, Projects Overview, Finance → Parties, Appointments). `compose_email` accepts `lead_id` (workspace-checked), never creates a contact for a lead, and logs `email_sent` on the lead.
   - **Source switcher** (`?src=`): All · Platform · WhatsApp · Gmail. Platform and WhatsApp narrow `list_threads` by `channels[]`; Gmail swaps the three panes for the Gmail mailbox ([§10b](#10b-gmail)). Folders: Inbox, Unread, Starred, Drafts, Sent, Archived (`folder` = starred | sent | drafts, filtered in SQL through an inner embed); Mine / Unassigned under Assignment. Counts read "N+" while more pages exist.
   - **Drafts** (`inbox_drafts`, own rows only): the composer saves the reply and its Cc/Bcc 0.8s after typing stops, flushes on a thread switch, restores on return on any device; `send_message` deletes it once the message is stored. The composer is cleared on every thread switch — it used to carry one customer's reply into the next thread.
   - **Delete**: the bin on a conversation archives it (restorable for 30 days; `purge_archived_inbox_threads` removes it at 03:50 after that). From Archived, a workspace owner or admin can **Delete forever** (`delete_thread_forever`), which deletes only an already-archived thread, now. It removes our copy only; the customer still has theirs.
@@ -376,6 +381,19 @@ The address is allocated the first time `get_my_email_address` is read, which th
 open — an explicit button cost every new user a step before mail could arrive. It stays idempotent
 (`user_id` is UNIQUE), and a taken or invalid handle comes back as a `conflict` the user resolves in
 the Inbox settings popover, where the copy button and the "assistant answers email" toggle live.
+
+### Receiving — never bounced on a platform hiccup
+
+The Cloudflare email Worker (`cloudflare/email-worker`) writes the raw message to R2
+(`inbound-email-spool`) before any hand-off, tries delivery to `email-webhooks` three times inline,
+and otherwise **accepts** the message and leaves it spooled; a `*/2` cron re-delivers until the
+platform has it. Cloudflare turns every `setReject()` into a permanent 5xx, so only a wrong domain,
+a message over 25 MiB, an unknown recipient or an R2 failure still bounce. `email-webhooks` answers
+409 to a delivery whose claim is still `processing`, so a retry never deletes the only copy, and
+takes over a crashed run's stale claim. Attachments are parsed as raw bytes (no base64 round trip,
+which killed the function on 10–25 MB parts), uploaded directly, and de-duplicated by name +
+SHA-256. `health-check` reports `cloudflare.inbound_spool` (waiting = degraded, > 30 min =
+unhealthy). The Worker is deployed with local `wrangler`, not CI.
 
 ### How a reply finds its thread
 

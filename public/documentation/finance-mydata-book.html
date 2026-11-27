@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / myDATA Book</div>
   <h1>myDATA Book (ΑΑΔΕ)</h1>
   <div class="routes"><span class="badge route">/finance?tab=mydata_book</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">The myDATA Book is <strong>AADE's own aggregate book</strong> (Συνοπτικό Βιβλίο) for your business, exactly as myAADE reports it — income and expenses month by month. It is AADE's answer, never mixed with the platform's figures, so you can hold the two side by side and see where they disagree. It sits in the Finance rail under <strong>Tools</strong>, next to <a href="finance-einvoicing.html">myDATA Transmissions</a>: the Book is what AADE holds, Transmissions is what we sent to get it there.</p>
+  <p class="lead">The myDATA Book is <strong>AADE's own book</strong> for your business, exactly as myAADE reports it — as a <strong>Monthly Summary</strong> (Συνοπτικό Βιβλίο, income and expenses month by month) and as the per-document <strong>Income–Expense Book</strong> (Βιβλίο Εσόδων-Εξόδων). It is AADE's answer, never mixed with the platform's figures, so you can hold the two side by side and see where they disagree. It sits in the Finance rail under <strong>Tools</strong>, next to <a href="finance-einvoicing.html">myDATA Transmissions</a>: the Book is what AADE holds, Transmissions is what we sent to get it there.</p>
 
   <div class="callout"><p><strong>Before you start —</strong> the Book is read with your business's own myDATA credentials (User ID + Subscription Key) from <a href="finance-settings-documents.html">Finance → Settings → Documents</a>. Without them the page says <em>“No ΑΑΔΕ credentials for this workspace”</em> and offers <strong>Open Settings → Documents</strong>.</p></div>
 
@@ -22,11 +22,13 @@
 
   <h2>The toolbar</h2>
   <ul class="feat">
-    <li><strong>Period</strong> — <em>This year</em>, <em>Last 3 months</em>, <em>Last year</em> or <em>Custom range</em> (From / To).</li>
-    <li><strong>Refresh from AADE</strong> — fetches the book again. If AADE rate-limits or fails, a band says <em>“Last refresh failed”</em> (with the retry time when AADE gave one) and the last figures AADE actually returned stay on screen.</li>
+    <li><strong>View</strong> — <strong>Monthly Summary</strong> or <strong>Income–Expense Book</strong>.</li>
+    <li><strong>Period</strong> — <em>This year</em>, <em>Last 3 Months</em>, <em>Last Year</em> or <em>Custom Range</em> (From / To).</li>
+    <li><strong>Compare with ledger</strong> — opens the comparison of AADE's book with the platform's figures (below); a red tag on the button counts the months that differ.</li>
+    <li><strong>Refresh from AADE</strong> — fetches the book again, including the documents you issued as AADE holds them and the E3 classifications your accountant filed for each document. If AADE rate-limits or fails, a band says <em>“Last refresh failed”</em> (with the retry time when AADE gave one) and the last figures AADE actually returned stay on screen.</li>
   </ul>
 
-  <h2>Aggregate book</h2>
+  <h2>Monthly Summary</h2>
   <p><strong>What it is —</strong> one row per month and direction (<em>Income</em> / <em>Expenses</em>) in AADE's own columns: <strong>Net value</strong>, <strong>VAT</strong>, <strong>Withheld</strong>, <strong>Other taxes</strong>, <strong>Digital fee</strong>, <strong>Fees</strong>, <strong>Deductions</strong>, <strong>Third-party</strong> and <strong>Docs</strong>. The subtitle states the range, how many documents AADE holds, and when the figures were <em>last confirmed against AADE</em> (or <em>“Never confirmed against AADE”</em>). <strong>Export CSV</strong> downloads the same table, including the closing line.</p>
   <ul class="feat">
     <li><strong>A month with no figure says why</strong> — <em>Nothing filed</em>, <em>Not fetched yet</em>, <em>Could not reach AADE</em> or <em>ΑΑΔΕ codes not set</em> — instead of showing zero. If some months carry no figures, a note says the totals cover only part of the period.</li>
@@ -37,8 +39,16 @@
   <p><strong>Why it matters —</strong> AADE's expense book is <em>purchases only</em>. Payroll, depreciation and the year-end regularisations are filed as «Εγγραφές Οντότητας» (17.x) and AADE keeps them <strong>out</strong> of that total. So below <strong>Total expenses — ΑΑΔΕ book</strong> the table lists your own entries by kind — <em>Payroll</em>, <em>Depreciation</em>, <em>Regularisation entries</em> — and a final <strong>Expenses including your own entries</strong> line that adds them. It is the sum of the rows printed above it, so you can check it by hand.</p>
   <div class="callout warn"><p>If your own entries can't be read, the page says so: <em>“the expense total below is ΑΑΔΕ's alone — payroll and depreciation are not in it”</em>, rather than presenting AADE's figure as complete.</p></div>
 
+  <h2>Income–Expense Book</h2>
+  <p><strong>What it is —</strong> every document AADE holds for the period, one row each, laid out the way the accountant's book is: date, document, counterparty, total, net, one column per category, VAT and withheld, with a subtotal per month and a <em>Brought forward</em> line. The category columns are the E3 categories the accountant filed in myDATA — goods, materials, services, expenses with and without VAT deduction, staff pay, fixed assets — plus intra-EU and non-EU acquisitions. A document nobody has classified yet lands in <strong>Not classified in myDATA</strong>, so every row still adds up.</p>
+  <ul class="feat">
+    <li>Each month carries a check against AADE's own book — <em>Matches AADE</em>, or by how much it differs.</li>
+    <li><strong>Print / PDF</strong> opens an A4-landscape page you can print or save as PDF; <strong>Excel</strong> downloads an .xlsx with one sheet per side.</li>
+    <li>A document AADE holds twice (two MARKs for one document) is booked once, as AADE itself counts it.</li>
+  </ul>
+
   <h2>AADE's book against our ledger</h2>
-  <p><strong>What it is —</strong> a card below the book comparing, month by month, AADE's net with what the platform holds <strong>under a MARK</strong>: income is your issued invoices less credit notes; expenses are the received myDATA documents. Columns: <strong>Month</strong>, <strong>Book</strong> (income / expenses), <strong>AADE net</strong>, <strong>Our net</strong>, <strong>Difference</strong>, <strong>Verdict</strong>. The card's description counts how many months differ.</p>
+  <p><strong>What it is —</strong> a dialog, opened with <strong>Compare with ledger</strong>, comparing, month by month, AADE's net with what the platform holds <strong>under a MARK</strong>: income is your issued invoices less credit notes; expenses are the received myDATA documents. Columns: <strong>Month</strong>, <strong>Book</strong> (income / expenses), <strong>AADE net</strong>, <strong>Our Net</strong>, <strong>Difference</strong>, <strong>Verdict</strong>.</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Verdict</th><th>Meaning</th></tr></thead>
     <tbody>
@@ -48,9 +58,9 @@
       <tr><td><strong>Not read yet</strong> / <strong>Not connected</strong> / <strong>Read failed</strong></td><td>There is no AADE figure to compare, and the reason. Never read as a match.</td></tr>
     </tbody>
   </table></div>
-  <p>If the comparison itself can't be loaded, the card says it is <em>unknown, not matching</em>.</p>
+  <p>If the comparison itself can't be loaded, the dialog says it is <em>unknown, not matching</em>.</p>
 
-  <div class="callout tip"><p><strong>Worked example —</strong> open Finance → <strong>myDATA Book (ΑΑΔΕ)</strong> → pick <em>This year</em> → <strong>Refresh from AADE</strong>. Scroll to <em>AADE's book against our ledger</em>: one month reads <em>Differs</em> on expenses. Open <a href="finance-doc-received-documents.html">Expenses</a> for that month and look for the received document that never made it into the books. When closing the year, take the <em>Expenses including your own entries</em> line, not AADE's purchases-only total.</p></div>
+  <div class="callout tip"><p><strong>Worked example —</strong> open Finance → <strong>myDATA Book (ΑΑΔΕ)</strong> → pick <em>This year</em> → <strong>Refresh from AADE</strong>. Click <strong>Compare with ledger</strong>: one month reads <em>Differs</em> on expenses. Open <a href="finance-doc-received-documents.html">Expenses</a> for that month and look for the received document that never made it into the books. When closing the year, take the <em>Expenses including your own entries</em> line, not AADE's purchases-only total.</p></div>
 
   <h2>Foreign-currency documents</h2>
   <p>A received document in a currency other than EUR is converted at the <strong>ECB reference rate</strong> for its date (the most recent working-day rate on or before it), fetched every working day — never at a guessed 1:1 — and that rate travels with it into the supplier bill.</p>

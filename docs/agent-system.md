@@ -28,7 +28,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 ┌─────────────────────────────────────────────────────────────┐
 │                     Frontend (React)                        │
 │  - Agent Hub (/agent-hub)                                   │
-│  - Agent Configs Admin (/admin/agent-configs)               │
+│  - AI Configurations (/admin/ai-configs), Harness (/admin/agents) │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -38,7 +38,7 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 │  - _shared/skills/ (domain playbooks)                       │
 │  - Loads prompts from database                              │
 │  - LangGraph StateGraph orchestration                       │
-│  - Claude Opus 5 (Jarvis) / Claude Haiku 4.5 (Demo)         │
+│  - Claude Opus 5.5 (agents) / Claude Haiku 5.5 (Demo, router) │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -53,78 +53,71 @@ The Material Kai Vision Platform uses an AI Agent system powered by LangChain.js
 
 ## Agent Types
 
-There are **3 active agents**. Legacy agent IDs (`search`, `insights`, `seo`) are aliases that resolve to `kai`.
+`AGENT_CONFIGS` in `agent-chat/index.ts` is the one source for what an agent can do; the Agent Hub
+picker (`AGENTS` in `AgentHub.tsx`) lists them. Every chat agent runs on `claude-opus-5-5` except Demo
+(`claude-haiku-5-5`).
 
-### 1. Jarvis Agent (Unified)
+| Picker id | Server config | Name | Focus |
+|---|---|---|---|
+| `orchestrator` | routes, falls back to `kai` | **JARVIS** | Default. Routes each turn to a specialist, or keeps it on the generalist `kai`, which binds every toolkit. |
+| `interior-designer` | `interior-designer` | **Vision** | Interior design, image/3D generation, staging, moodboards, sheets. |
+| `product-business` | `product-business` | **Pepper** | Catalogs, B2B research, product knowledge graph, tech radar, job research, signals. |
+| `marketing` | `marketing` | **Edith** | SEO research and audits, content, brand-mention and LLM visibility. |
+| `property-advisor` | `property-advisor` | **Baxter** | Real estate: listings, valuations, viewings, offers, matching, lettings. |
+| `erp` | `erp` | **Trinity** | Finance and quotes: quotes + branded PDFs, account overviews, price history. |
+| `social-media` | `social-media` | **Hermes** | Publish/schedule social posts, social analytics. |
+| `demo` | `demo` | **Demo** | Showcase; `requiredRole: 'admin'`. |
 
-**Agent ID**: `kai`
-**Legacy aliases**: `search`, `insights`, `seo` (all resolve to `kai`)
-**Access**: All users for core tools; admin/owner only for B2B, SEO, and sub-agent tools
-**Model**: Claude Opus 5
-**DB prompt key**: `kai` in `prompts` table (`prompt_type='agent'`, `category='kai'`)
+Stark (`developer`) and Veritas (`qa-reviewer`) are listed in the picker as disabled "Coming soon"
+entries. They are not chat agents: they run as Agent Ops sub-agents (`ask_stark` / `ask_veritas`),
+see [admin-headquarters.md](admin-headquarters.md#agent-ops-adminagent-ops).
 
-**Purpose**: Primary user-facing agent combining material search, knowledge base queries, visual search, B2B manufacturer discovery, SEO analysis, and general material intelligence.
+### Orchestrator routing
 
-**Core Tools** (all roles: viewer, member, admin, owner):
-- `material_search` — RAG-powered semantic search via MIVAA API
-- `knowledge_base_search` — Direct knowledge base retrieval
-- `visual_search` — Image-based product search via SigLIP2 (SLIG) (sends `image_base64` to MIVAA `/api/rag/search?strategy=image`)
+`orchestrator`, `jarvis` and `auto` are orchestrator ids (`ORCHESTRATOR_IDS`). Before the config
+lookup, `routeToSpecialist` asks Haiku for a **server-constrained verdict** through
+`generateStructuredWithClaude` — `{ specialist: enum('none', …slugs), confidence }`, task
+`agent_router`, logged to `ai_usage_logs` against the user and workspace. Below
+`system_settings.agent_router.min_confidence` (no code default) the generalist keeps the turn. An
+image-first turn with under 20 characters of text goes to Vision. A **direct run** (a quick-start or
+an approval that names its tool) skips the router entirely and runs on `kai`. If the `agent_router`
+prompt or the confidence setting cannot be loaded, routing is disabled and every turn runs on the
+generalist (logged as an error).
 
-**Admin/Owner-Only Tools** (gated by RBAC):
-- `b2b_manufacturer_search` — Find manufacturers via Claude built-in web search (`web_search_20250305`, no extra key)
-- `company_website_scrape` — Scrape company websites via Firecrawl
-- `company_enrichment` — Enrich company data via Apollo.io
-- `contact_discovery` — Find contacts via Hunter.io + Apollo.io fallback; all emails validated with ZeroBounce
-- `email_validate` — Validate email addresses on demand via ZeroBounce (single or batch up to 10)
-- `save_to_crm` — Save companies/contacts to CRM
-- Sub-agent orchestration: `research_analysis`, `analytics_analysis`, `business_analysis`, `product_analysis`
+### Legacy aliases
 
-**Multimodal**: Frontend sends `images: string[]` (data URLs) → edge function attaches as `image_url` content blocks on the last HumanMessage.
+`search`, `insights` and `seo` resolve to `kai`; existing flows using them keep working.
 
----
+### Multimodal input and generation chaining
 
-### 2. Interior Designer Agent
-
-**Agent ID**: `interior-designer`
-**Access**: All users (viewer, member, admin, owner)
-**Model**: Claude Opus 5
-
-**Purpose**: AI-powered interior design with spatial analysis, material matching, and 3D/VR visualization.
-
-**Available Tools**:
-- `material_search` — Material discovery (injected only when user explicitly asks for materials)
-- `image_analysis` — Room and material analysis
-- `generate_3d` — Trigger async 3D interior design generation (Replicate models)
-
-**Special Behavior**: Material search is only injected when user message contains keywords like "find materials", "search for materials", etc.
-
-
----
-
-### 3. Demo Agent
-
-**Agent ID**: `demo`
-**Access**: Admin, Owner only
-**Model**: Claude Haiku 4.5 (returns mostly hardcoded demo data)
-
-**Purpose**: Platform showcase with pre-defined demo responses.
+Images arrive as data URLs and are attached as `image_url` blocks on the last HumanMessage. Every
+generated result in a conversation can feed the next generator: `_shared/conversation-media.ts`
+(`collectConversationMedia`) reads every result kind — Gemini / scene renders, virtual staging,
+materials boards, tool images, image-grid tiles, video — live or restored from message metadata, and
+the turn's `[CONTEXT]` block lists the last six by kind and source so the agent can pass the one the
+user means. `resolveMediaSource` (explicit URL > `my_upload` > newest still > attachment) is shared by
+lighting, staging, video and the photo walk. agent-chat carries `virtualStagingData`,
+`materialsBoardData` and `videoData` through its history map, and AgentHub keeps older turns that carry
+media inside the bounded history it sends (40 messages plus any older media-bearing turn).
 
 ---
 
-## Agent Resolution (Legacy Aliases)
+## Approvals (action confirmation)
 
-The following `agentId` values sent from the frontend are transparently mapped to `kai`:
+A state-changing tool called without `confirm: true` returns an `action_confirmation` chunk instead of
+acting (invariant 9). AgentHub collects **every action a turn proposes into ONE card**
+(`ActionConfirmationCard`): **Approve all N** runs them in order as direct tool runs (no model turn, no
+chat rows), marks each item's outcome, then resumes the model ONCE in a hidden turn; **Decline all**
+takes no action. An action already pending on a card is not proposed again. Card status and per-item
+outcome are persisted on the message, so a reload shows the answered card as its outcome
+("Approved: …", "Declined", "N of M done, K failed"). An approval run's result is read from the final
+chunk's `tool_results`.
 
-| Sent agentId | Resolved Agent | Notes |
-|-------------|----------------|-------|
-| `kai` | Jarvis | Direct |
-| `search` | Jarvis | Legacy alias |
-| `insights` | Jarvis | Legacy alias |
-| `seo` | Jarvis | Legacy alias |
-| `interior-designer` | Interior Designer | Direct |
-| `demo` | Demo | Direct |
-
-Existing saved flows using `search`, `insights`, or `seo` continue to work without modification.
+**Auto-approve** is a switch in the composer (off by default, stored in `localStorage` as
+`agentHub.autoApprove`, sent as `client_context.auto_approve`). When on, the turn's card is approved as
+if clicked, capped at 3 rounds per typed message (`MAX_AUTO_APPROVE_ROUNDS`). The reply wording for
+staged actions comes from the DB prompts `tool/approval_card/{manual,auto}`, picked by
+`client_context.auto_approve`. A turn rings the bell once, and not at all under Auto-approve.
 
 ---
 
@@ -134,7 +127,7 @@ Existing saved flows using `search`, `insights`, or `seo` continue to work witho
 
 The `b2b_manufacturer_search` tool uses Anthropic's built-in `web_search_20250305` tool (beta header `web-search-2025-03-05`). No separate Perplexity or search API key is needed — it uses `ANTHROPIC_API_KEY`.
 
-**The model is `claude-opus-5` at `effort:low`, and it is PINNED** (`SEARCH_MODEL` / `ANALYSIS_MODEL` in `_shared/tools/b2b-tools.ts`). Measured against Sonnet 5 on an identical 6-company Polish sweep:
+**The model is `claude-opus-5-5` at `effort:low`, and it is PINNED** (`SEARCH_MODEL` / `ANALYSIS_MODEL` in `_shared/tools/b2b-tools.ts`). Measured against Sonnet 5.5 on an identical 6-company Polish sweep:
 
 | Model | Time | Searches | Input tokens | Domains found | Sources/record | Cost |
 |---|---|---|---|---|---|---|
@@ -293,26 +286,16 @@ Source: [`supabase/functions/_shared/skills/`](../supabase/functions/_shared/ski
 
 ---
 
-## Admin UI - Agent Configurations
+## Admin UI - Prompts and the harness
 
-### Location
-`/admin/agent-configs`
+- **`/admin/ai-configs`** (AI Configurations): Prompts, Chat Starters, Writing Rules, Model Pricing.
+  Agent system prompts are `prompts` rows; edits go through `update_prompt_with_history` and take
+  effect on the next turn, no deploy.
+- **`/admin/agents`** (Agent Harness): turns, models, tools, evals, failures, conversations and the
+  per-conversation trace.
+- **`/admin/agent-ops`** (Agent Ops): cases, Stark/Veritas, background agents, servers, processes.
 
-### Features
-
-- View all configured agents
-- Edit system prompts (stored in `prompts` table)
-- Real-time character count
-- Status management (active/inactive)
-- Changes take effect immediately (no deployment required)
-
-### Usage
-
-1. Navigate to Admin Dashboard → AI & Intelligence → Agent Configurations
-2. Click "Edit" on any agent
-3. Modify the system prompt
-4. Click "Save Changes"
-5. Changes apply on next agent execution
+Full reference: [admin-headquarters.md](admin-headquarters.md).
 
 ---
 
@@ -327,43 +310,42 @@ The request body accepts `messages` (array of role/content objects), `agentId` (
 
 ## Security & Access Control
 
-### Role-Based Access (RBAC Tool Gating)
+### Tool gating
 
-| Agent | Core Tools | Admin/Owner-Only Tools |
-|-------|-----------|------------------------|
-| Jarvis | material_search, knowledge_base_search, visual_search | b2b_manufacturer_search, company_website_scrape, company_enrichment, contact_discovery, email_validate, save_to_crm, sub-agents |
-| Interior Designer | material_search (on demand), image_analysis, generate_3d | — |
-| Demo | — (hardcoded responses) | — |
+A toolkit is bound only when the caller may have it, on three axes (see CLAUDE.md "Agent tools"):
+role (`adminOnly`, matching the `if (isAdmin)` push site in agent-chat), workspace capability
+(`capability` on the toolkit, e.g. `marketing.seo`, `workspace.manage`) and module entitlement
+(`moduleSlug`, enforced in the tool by `moduleGate`). `ops-desk` (Agent Ops) and `field-registry` (Field Roles) bind their tools only for a
+platform operator; `catalog-ingestion` binds for admins, and MIVAA accepts the import only from the operator.
 
 ### Authentication
 
-All requests require:
-1. Valid Supabase session
-2. Workspace membership
-3. Appropriate role for restricted tools
+Every request carries a Supabase session JWT or a `kai_` API key. A `kai_` key acts as its owner in
+the ONE workspace it is bound to (fenced in the database and on the edge) and never passes a
+platform-operator gate. A client disconnect is treated as a cancellation; media a cancelled turn had
+already finished is saved.
 
 ---
 
 ## Monitoring & Logging
 
-### Token Usage Tracking
-- Accumulated across all agent iterations
-- Logged via `log_agent_usage()` RPC
-- Integrates with pricing table for cost calculation
+- **`agent_turns`** — one row per turn, opened `running` and closed with `ok` / `error` / `refused` /
+  `max_tokens` / `empty` / `invalid_tool_call` / `cancelled`; still `running` after 5 minutes means
+  the isolate died.
+- **`agent_tool_call_logs`** — every tool call, with `turn_id`.
+- **`agent_usage_logs`** via `log_agent_usage()` — tokens and cost per turn, priced from
+  `ai_model_pricing` (Haiku 5.5's long-context card applied above a 100K-token prompt).
+- Router calls log to `ai_usage_logs` under task `agent_router`.
 
-### Metrics Tracked
-- Agent invocations per type
-- Average response time
-- Token usage (input/output)
-- Tool execution counts
-- Error rates
+Read all of it at `/admin/agents`.
 
 ---
 
 ## Related Documentation
 
 - **[langgraph-implementation.md](langgraph-implementation.md)** - LangGraph StateGraph, conversation state, memory, situational context, daily brief
-- **[agent-system.md](agent-system.md)** - Full API reference
+- **[admin-headquarters.md](admin-headquarters.md)** - Agent Harness, Agent Ops, Stark/Veritas
+- **[agent-and-tools-reference.md](agent-and-tools-reference.md)** - Toolkits and tools
 - **[ai-models-guide.md](ai-models-guide.md)** - Model configurations
 
 ---
@@ -371,8 +353,8 @@ All requests require:
 ## Troubleshooting
 
 ### Agent Not Responding
-1. Check Edge Function logs in Supabase
-2. Verify agent status is 'active' in database
+1. Open the turn in `/admin/agents` → Conversations (trace): the `agent_turns` row names how it ended
+2. Check the agent's prompt row is active in `/admin/ai-configs` → Prompts
 3. Check API keys are configured
 4. Review rate limits
 
@@ -398,7 +380,7 @@ which half (promote / embed / recall) is dead.
 
 ---
 
-**Last Updated**: April 15, 2026
+**Last Updated**: November 27, 2026
 **Version**: 3.1.0
 **Status**: Production
 **Maintainer**: Development Team

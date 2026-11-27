@@ -11,51 +11,73 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-settings.html">Settings</a> / Team</div>
   <h1>Settings · Team</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">The Team section does two jobs: it shows everyone who already has access to this workspace, and it lets you invite new people by generating a sign-up link tied to a specific role. There are no passwords to set and no seats to buy — you pick a role, generate a link, and send it.</p>
+  <p class="lead">The Team section shows everyone who has access to this workspace, lets you invite new people with a role, change a member's role or remove them, and — for a time-limited <strong>Support</strong> login — decide when they may come back in. The role decides which portal a person lands on and what they can do; there are no passwords to set and no seats to buy.</p>
 
   <h2>Where it is</h2>
-  <p>Top navigation → <strong>Finance</strong> → <strong>Settings</strong> tab → <strong>Team</strong> (in the row of settings sub-tabs). If the row is crowded, Team sits between <em>Services</em> and <em>Online Store</em>.</p>
+  <p>The same Team panel appears in three places, so you can reach it from wherever you are:</p>
+  <ul class="feat">
+    <li><strong>Finance → Settings → Team</strong> — here it sits above <strong>Approvals and Authority</strong> (the bands for credit holds, margin floors and till variances).</li>
+    <li><a href="crm-users.html">CRM → Users</a> — every workspace's own members, roles and invites.</li>
+    <li><strong>Profile → Team</strong> — shown to the workspace owner and admins.</li>
+  </ul>
 
   <h2>What's on the screen</h2>
-  <p>Two stacked areas, top to bottom:</p>
   <ul class="feat">
-    <li><strong>Members (N)</strong> — the list at the top. Each row is one person who can access the workspace, shown by their email (or a short account id), with a <strong>role badge</strong> on the right — e.g. <em>Admin</em> or <em>Member</em>. This is your at-a-glance "who has access" list.</li>
-    <li><strong>Invite Team Member</strong> — the panel below, where you create an invite: a <strong>Role</strong> dropdown, a one-line description of the role you've picked, and a <strong>Generate invite link</strong> button.</li>
+    <li><strong>Invite a Team Member</strong> — a <strong>Role &amp; portal</strong> dropdown (each option reads <em>Role — portal</em>, e.g. <em>Accountant — Finance portal</em>), an optional <strong>Email</strong>, the selected role's description, and two buttons: <strong>Send invitation</strong> and <strong>Generate link instead</strong>. Only people who can manage the team see this panel.</li>
+    <li><strong>Awaiting Acceptance (N)</strong> — invitations not yet claimed, each with its role and expiry date, a copy-link button and <strong>Revoke invitation</strong>. Revoking stops the link working.</li>
+    <li><strong>Support Access (N)</strong> — Support logins, their remaining time and any request to come back in (see below).</li>
+    <li><strong>Members (N)</strong> — each person with their photo, name and email (and their status when it is not active), a role dropdown to change it, and <strong>Remove from workspace</strong>. The owner's row is locked.</li>
   </ul>
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-team-invite.png" alt="Team section: members list, Role dropdown with description, Generate invite link and the generated link">
-    <figcaption>The Members list (top, with role badges), the Role dropdown showing the selected role's description, and the generated invite link with its "valid 30 days" note.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/settings-team-invite.png" alt="Team section: members list, Role dropdown with description and invite link">
+    <figcaption>The Team panel — inviting with a role, and the members list.</figcaption>
   </figure>
 
-  <h2>The roles you can grant, and exactly what each can do</h2>
-  <p>Open the <strong>Role</strong> dropdown and you get three choices. The grey line directly under the dropdown updates to describe whatever you select, so you can confirm the access <em>before</em> you send the invite:</p>
+  <h2>The roles you can grant</h2>
+  <p>The description under the dropdown is the one summarised here. Roles tied to a module are offered only when that module is on for the workspace.</p>
   <div class="table-wrap">
   <table>
-    <thead><tr><th>Role</th><th>What that person can do (the exact text shown under the dropdown)</th><th>Pick it for…</th></tr></thead>
+    <thead><tr><th>Role</th><th>Portal</th><th>What that person can do</th></tr></thead>
     <tbody>
-      <tr><td><strong>Accountant</strong><br><span style="color:var(--muted)">(finance ops, no settings)</span></td><td>"Finance only: view invoices/bills/reports, record payments, submit to myDATA. <em>No settings, pricing, CRM, or new documents.</em>"</td><td>A bookkeeper/accountant who reconciles and files but shouldn't change configuration or see customers.</td></tr>
-      <tr><td><strong>Sales rep</strong></td><td>"Sales portal — create quotes/orders for customers. <em>No finance or settings.</em>"</td><td>A salesperson who should live in the <a href="sales.html">Sales portal</a> and raise quotes, but never see the books.</td></tr>
-      <tr><td><strong>Member</strong></td><td>"Standard member access to this workspace."</td><td>A general colleague who needs normal day-to-day access.</td></tr>
+      <tr><td><strong>Admin</strong></td><td>Full workspace</td><td>Runs the workspace alongside the owner — all modules and settings.</td></tr>
+      <tr><td><strong>Member</strong></td><td>Full workspace (no admin)</td><td>Standard staff access: finance ops, CRM, quotes, stock, projects. No network, pricing or team management.</td></tr>
+      <tr><td><strong>Accountant</strong></td><td>Finance portal</td><td>Finance only: view invoices/bills/reports, record payments, submit to myDATA. No settings, pricing, CRM or new documents.</td></tr>
+      <tr><td><strong>Sales Rep</strong></td><td>Sales portal</td><td>Builds quotes and orders for their own customers. Sees only their own book.</td></tr>
+      <tr><td><strong>Sales Manager</strong></td><td>Sales portal (team-wide)</td><td>Everything a rep can do, across the whole team's quote book. Still no finance settings, pricing rules or team management.</td></tr>
+      <tr><td><strong>HR Officer</strong></td><td>HR module (read-only)</td><td>Reads the roster, absences and documents. No edits, payroll or salary changes.</td></tr>
+      <tr><td><strong>HR Manager</strong></td><td>HR module (full)</td><td>Runs HR end to end: employees, absences, onboarding, payroll and documents.</td></tr>
+      <tr><td><strong>Warehouse Team</strong></td><td>Warehouse module</td><td>Inventory, dispatch, movements and stocktake.</td></tr>
+      <tr><td><strong>Marketing Team</strong></td><td>Email Marketing module</td><td>Designs templates and sends bulk email campaigns.</td></tr>
+      <tr><td><strong>Employee</strong></td><td>HR self-service</td><td>Their own HR record only: profile, onboarding, time off, documents, clock in/out.</td></tr>
+      <tr><td><strong>Estate Agent</strong></td><td>Real Estate portal</td><td>Their own listings and leads, plus any listing marked “open for all”.</td></tr>
+      <tr><td><strong>Support</strong></td><td>Full workspace (time-limited)</td><td>Same access as a Member, for a set time. They cannot manage the team or extend their own time.</td></tr>
     </tbody>
   </table>
   </div>
+  <p>None of the business roles includes workspace administration — giving someone HR or the warehouse does not hand over finance, pricing or the team.</p>
 
   <h2>How to invite someone — step by step</h2>
   <ol>
-    <li>Go to <strong>Finance → Settings → Team</strong>.</li>
-    <li>In the <strong>Invite Team Member</strong> panel, click the <strong>Role</strong> dropdown and choose a role (for example, <em>Sales rep</em>).</li>
-    <li>Read the grey description that appears just under the dropdown to confirm it grants exactly the access you intend.</li>
-    <li>Click <strong>Generate invite link</strong>. A small confirmation appears — <em>"Invite link created · Copied to clipboard"</em> — and the link itself shows under <strong>Share this link (valid 30 days)</strong>, for example <code>https://app.materialshub.gr/auth?mode=signup&amp;invite=3de8b9e3…</code>. It's already on your clipboard; the icon button beside the field copies it again if you need it.</li>
-    <li><strong>Send that link</strong> to your colleague by email or chat.</li>
-    <li>They open it, land on the sign-up screen, create their account, and are added to <em>this</em> workspace with the role baked into the link. The link is valid for <strong>30 days</strong>.</li>
+    <li>Open the Team panel (for example <strong>Finance → Settings → Team</strong>).</li>
+    <li>Pick a role in <strong>Role &amp; portal</strong> and read the description beneath it.</li>
+    <li>Either type their <strong>Email</strong> and press <strong>Send invitation</strong> — the invitation is tied to that address, so a forwarded link cannot be claimed by anyone else — or press <strong>Generate link instead</strong> and send the link yourself. A link is valid for <strong>30 days</strong>.</li>
+    <li>They open it, sign up or sign in, and join <em>this</em> workspace with that role. Until then they are listed under <strong>Awaiting Acceptance</strong>.</li>
   </ol>
 
-  <div class="callout tip"><p><strong>Worked example — adding a part-time bookkeeper.</strong> Open Team → set <strong>Role</strong> to <em>Accountant (finance ops, no settings)</em> → click <strong>Generate invite link</strong> → paste the copied link into an email to them. When they sign up they'll be able to open invoices, record payments and submit to myDATA — but the CRM, Pricing and Settings tabs simply won't appear for them, so there's nothing extra to lock down.</p></div>
+  <h2 id="support">Support access — a login with a timer</h2>
+  <p><strong>What it is —</strong> the <strong>Support</strong> role is for someone helping you for a limited time (an outside consultant, an implementer). <strong>Why it matters —</strong> their access ends by itself; you never have to remember to remove them.</p>
+  <ol>
+    <li>Choose <strong>Support</strong> when inviting and set <strong>Access Lasts</strong> (1 hour, 4 hours, 8 hours, 1 day, 3 days or 7 days). The time starts when they accept the invitation.</li>
+    <li>When the time is up their membership is suspended and they see <strong>“Your access has ended”</strong> with a <strong>Request Approval to Enter Workspace</strong> button. Any API key they hold for the workspace is switched off too.</li>
+    <li>Their request appears under <strong>Support Access</strong> for an owner or admin, who can <strong>Deny</strong> it or <strong>Approve</strong> it — choosing the new access time and how long the PIN stays valid (10 minutes, 30 minutes, 1 hour or 1 day).</li>
+    <li>Approving shows a <strong>6-digit PIN</strong>. Hand it to the person yourself; they type it on their screen and press <strong>Enter workspace</strong>. Too many wrong tries close the request, and they can ask again.</li>
+  </ol>
+  <p><strong>End access</strong> on an active Support row stops it immediately. A Support member cannot approve themselves, invite anyone or extend their own time.</p>
+
+  <div class="callout tip"><p><strong>Worked example — adding a part-time bookkeeper.</strong> Pick <em>Accountant — Finance portal</em>, type their email and press <strong>Send invitation</strong>. When they sign up they can open invoices, record payments and submit to myDATA — the CRM, Pricing and Settings areas simply don't appear for them.</p></div>
 
   <h2>After they join</h2>
-  <p>The new person appears in the <strong>Members</strong> list here with their role badge, and also in <a href="crm.html">CRM → Users</a> (where their role and subscription are managed). The role you chose controls which top-nav areas they can see across the whole platform — see <a href="getting-started.html">Getting Started → Roles &amp; access</a> for the full mapping.</p>
-
-  <div class="callout"><p><strong>Note:</strong> the three roles above are the ones you can hand out from this invite panel. Higher-level roles such as <em>Admin</em> / <em>Operator</em> (which you'll see on existing members) are managed at the platform/CRM level, not granted through a self-serve invite link.</p></div>
+  <p>The new person appears under <strong>Members</strong> with their role. Change the role at any time from the dropdown on their row. For what each role reaches across the platform, see <a href="getting-started.html">Getting Started → Roles &amp; access</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

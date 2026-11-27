@@ -7,7 +7,7 @@ Single source of truth: [`src/components/features/ai/agentToolsCatalog.ts`](../s
 The catalog has three layers:
 
 1. **Tools** (`KAI_TOOLS`, `INTERIOR_DESIGNER_TOOLS`) — individual capabilities (~60 total). Each tool has `id`, `name`, `desc`, `category`, `adminOnly`, `moduleSlug`, `credits`, `examples[]`, optional `workflowOf` + `workflowStep` for multi-step bundles.
-2. **Agents** (`AGENTS`) — JARVIS / Interior Designer / Demo. Each owns a subset of tools.
+2. **Agents** (`AGENTS`) — the chat roster (JARVIS orchestrator + specialists). Each owns a subset of tools.
 3. **Toolkits** (`TOOLKITS`) — the cluster layer. Bundles related tool_ids with a name, icon, description, optional `adminOnly` / `moduleSlug` / `alwaysOn`, and **`quick_starts`** (1-4 starter prompts that fire workflows). This is what the user actually sees in the discovery UI.
 
 Helpers exposed from the catalog:
@@ -29,15 +29,33 @@ Both share the same `agentToolsCatalog.ts`.
 
 ## Agents
 
-The platform has **3 agents**. There is **no separate "B2B Agent" or "SEO Agent"** — those are categories of tools available on KAI, gated by role.
+The picker offers JARVIS (orchestrator, default), Vision, Pepper, Edith, Baxter, Trinity, Hermes and
+Demo (admin); Stark and Veritas appear disabled ("Coming soon") because they run only as Agent Ops
+sub-agents. The roster, server ids and routing rules are in
+[agent-system.md](agent-system.md#agent-types). **Legacy aliases** (`search`, `insights`, `seo`)
+resolve server-side to `kai`.
 
-| Agent ID | Name | Roles allowed | Description |
+## Calculator, signals and operator toolkits
+
+| Toolkit id | Name | Gate | Tools |
 |---|---|---|---|
-| `kai` | JARVIS agent | viewer, member, admin, owner | Material intelligence — search, sub-agents, B2B, SEO, mentions, presentation sheets, pricing. The default agent for most queries. |
-| `interior-designer` | Interior Designer | viewer, member, admin, owner | AI-powered interior design with spatial analysis and material matching. 3D + lighting + VR generation. |
-| `demo` | Demo Agent | admin, owner only | Platform showcase. |
+| `calculators` | Calculators | always on; offered on Trinity, Vision, Baxter | `calculate_heat_pump_sizing`, `calculate_heating_cost_comparison`, `calculate_kitchen_cost`, `plan_tile_installation` (boxes from room sizes or a project's floor-plan rooms, via the quote-line derivation), `estimate_project_plan` (renovation priced off the live price lists) — all 0 credits |
+| `signals-hiring` / `signals-technographics` / `signals-intent` | Hiring / Technology / Intent Signals | module of the same slug | `find_hiring_companies`, `find_companies_using_technology`, `find_companies_in_market`, `company_signals`, `manage_signal` (delete needs `confirm`) |
+| `signals-described` | Described Signals | module `signals-described` | `describe_signal` (draft + test, save only with the shown rules) |
+| `catalog-ingestion` | Catalogue Ingestion | `adminOnly`; MIVAA accepts a catalogue import only from the platform operator | `ingest_catalog` (start, status, review, approve, embed, resume, merge/drop/wipe, apply an edition, job rules, maker-site enrichment), `ingestion_report` (what the pipeline corrected, degraded or left for a decision), `import_catalog_data` (XML feed, CSV, exports) |
+| `field-registry` | Field Registry | `adminOnly`, platform operator | `field_review_queue`, `field_review_apply` (returns counts plus every refusal) |
+| `ops-desk` | Agent Ops | `adminOnly`, platform operator | `ops_cases`, `ask_stark`, `ask_veritas`, `server_maintenance_status`, `request_server_maintenance` — see [admin-headquarters.md](admin-headquarters.md#agent-ops-adminagent-ops) |
 
-**Legacy aliases** (resolved server-side to `kai`): `search`, `insights`, `seo`. Old frontends sending these agent IDs continue to work.
+The **Core** toolkit carries the **Identify a Material** quick-start: a form asks for the photo (and,
+optionally, which part of it), attaches it and sends one ordinary turn that `visual_search` answers.
+`/recognition` redirects to `/agent-hub?capability=visual-search`, which opens it; the old Material
+Recognition page is gone. A quick-start can name its submit button with `submitLabel` ("Identify").
+
+**Generation chain.** Scene Studio / 3D-room tools (`manage_scenes` render/create-from-drawing/share
+walkthrough, `manage_client_view`, `save_to_moodboard`) are bound on `kai` so a routed turn keeps
+them, and every generated result is a source for the next generator (see
+[agent-system.md](agent-system.md#multimodal-input-and-generation-chaining)). Sharing a walkthrough or
+a client view asks for approval on a card first.
 
 ## JARVIS tool inventory (by category)
 
@@ -51,7 +69,7 @@ Each tool has: `name` · `id` · `desc` · `adminOnly` flag · optional `moduleS
 - `analyze_inspiration_url` — Scrape webpage → design tokens → match catalog (1 credit, Firecrawl)
 
 **All three search tools rerank their own results** through `_shared/rerank.ts` before returning
-them (`claude-haiku-4-5`, prompt at `/admin/ai-configs`, `prompts.category='ai_rerank'`). Vector
+them (Voyage `rerank-3-lite` by default; `SEARCH_RERANK_PROVIDER=claude`, or a caller asking for explanations, uses `claude-haiku-5-5` with the prompt at `/admin/ai-configs`, `prompts.category='ai_rerank'`). Vector
 search returns candidates scored *per embedding aspect*; reranking is what fuses them into one
 ordering. It is inert below 2 candidates — no model call, no cost — and every failure path returns
 the source order unchanged, so it can never make search worse. Turn it off platform-wide with
@@ -142,7 +160,7 @@ pair could not be recorded and validation is unavailable for that run — stated
 
 ### B2B Research (admin/owner only)
 
-- `b2b_manufacturer_search` — find manufacturers via web search (Anthropic `web_search_20250305`, `claude-opus-5` at `effort:low` — pinned, see [agent-system.md](agent-system.md#b2b-research-system))
+- `b2b_manufacturer_search` — find manufacturers via web search (Anthropic `web_search_20250305`, `claude-opus-5-5` at `effort:low` — pinned, see [agent-system.md](agent-system.md#b2b-research-system))
 - `company_website_scrape` — Firecrawl a company website
 - `company_enrichment` — Apollo.io company data
 - `contact_discovery` — find + verify decision-maker emails

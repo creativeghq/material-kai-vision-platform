@@ -45,10 +45,11 @@
   <h3>Position — how am I doing?</h3>
   <ul class="feat">
     <li><strong>Nightly checks strip</strong> — the integrity checks that run every night on your finance data. When one finds something, the strip says how many things need a look; a clean night says so in one quiet line, and a strip that could not load says that instead of implying all is well.</li>
-    <li><strong>Profit &amp; loss</strong> — income less expenses for the period, from your own documents: <em>Income</em>, <em>Expenses</em>, <em>Net</em>, and VAT (collected minus paid, labelled with its own direction — payable or refundable). A second row shows <strong>Paid to owners</strong> (owner pay, profit split and partner withdrawals — already included in Expenses) and <strong>Profit before owner payments</strong> (Net with those added back). A third, shaded row shows <strong>ΑΑΔΕ's figures</strong> for the same months from the myDATA book, with how many months were read. The two sides are <em>never merged</em> — ΑΑΔΕ confirms your books, it is never added to them. Links take you to the ΑΑΔΕ book and the <a href="finance-op-vat-return.html">VAT return</a>.</li>
+    <li><strong>Profit &amp; loss</strong> — income less expenses for the period, from your own documents: <em>Income</em>, <em>Expenses</em>, <em>Net</em>, and VAT (VAT on sales minus VAT on purchases, labelled with its direction — payable or refundable — once the period has closed; while it is still running it reads <em>VAT return</em> with <em>so far</em>). A second row shows <strong>Paid to owners</strong> (owner pay, profit split and partner withdrawals — already included in Expenses) and <strong>Profit before owner payments</strong> (Net with those added back). A third, shaded row shows <strong>ΑΑΔΕ's figures</strong> for the same months from the myDATA book, with how many months were read — these count documents filed against your ΑΦΜ, paid or not, so they are not money received or paid. The two sides are <em>never merged</em> — ΑΑΔΕ confirms your books, it is never added to them. Links take you to the ΑΑΔΕ book and the <a href="finance-op-vat-return.html">VAT return</a>.</li>
     <li><strong>What the expenses are made of</strong> — inside the P&amp;L card: how VAT was treated (<em>VAT charged</em>, <em>Reverse charge</em>, <em>No VAT charged</em>, <em>Outside VAT</em>) with document counts, and where the money went — <strong>Greece</strong>, <strong>the EU</strong>, <strong>outside the EU</strong>, <strong>not stated</strong> — with <strong>All expenses</strong> summed beside them. This is where rent and payroll show up without you needing to know their ΑΑΔΕ codes.</li>
     <li><strong>Gap and exclusions</strong> — when ΑΑΔΕ holds more expense than your books, an amber line states the difference and how many received documents are still not booked, with <strong>Book them →</strong> (to <a href="finance-doc-expenses.html">By Supplier</a>). Costs you marked <em>settled outside the books</em> are stated in their own line as NOT in the figures. Underneath, <em>Billed to us</em>, <em>Paid</em>, <em>Still owed on those</em> and <em>Owed right now — all time</em> show the supplier-bill side.</li>
-    <li><strong>Monthly P&amp;L</strong> — income, expenses and net month by month, switchable between <strong>Your books</strong> and the <strong>ΑΑΔΕ book</strong>. Its <em>To book</em> column counts received documents that have not become an expense yet.</li>
+    <li><strong>Pipeline</strong> — revenue not yet in the P&amp;L: <em>Open Pipeline</em> (open quotes and deals, net of VAT), <em>Expected Revenue</em> (deals weighted by stage), <em>Profit On Open Quotes</em> (or <em>No buy prices yet — profit unknown</em>), and what was <em>Won</em> and <em>Lost</em> in the period. A deal with a quote counts once, through the quote. A link opens the Lost Revenue reports.</li>
+    <li><strong>P&amp;L chart and Monthly P&amp;L</strong> — the chart plots income and expenses by day for a short period (every 3 days or weekly for longer ones), switchable between <strong>Your books</strong> and the <strong>ΑΑΔΕ book</strong>; ΑΑΔΕ publishes income only as a month total, so on the ΑΑΔΕ side the chart draws expenses and the table carries income. The month table below shows income, expenses and net month by month; its <em>To Book</em> column counts received documents that have not become an expense yet.</li>
     <li><strong>Revenue trend</strong> — the revenue line with its period-over-period growth.</li>
   </ul>
   <div class="callout"><p><strong>A figure is a value or a reason.</strong> Wherever a figure cannot be read, or ΑΑΔΕ has not been fetched for a month, the card says why instead of showing a zero. A currency mix is reported as such rather than summed.</p></div>
@@ -69,6 +70,8 @@
   <p><strong>Next follow-ups</strong> (with <strong>View all</strong>), <strong>Recent invoices</strong> (with <strong>New</strong> to create one and each row's actions menu), and <strong>Sales insights</strong> for the period: top customers, best-selling products, recent orders and top outstanding customers.</p>
 
   <h2>Where to go next — the sub-pages</h2>
+  <div class="callout"><p><strong>Exclude from P&amp;L.</strong> Invoices, expenses, orders, quotes, time entries and other records carry an <strong>Exclude from P&amp;L</strong> switch. An excluded record still counts for VAT, myDATA, balances and cash; it is only left out of profit, revenue and expense totals, and is tagged <em>Not in P&amp;L</em> in the lists.</p></div>
+
   <p>Finance is deep, so the detail lives on focused sub-pages. Use these cards (or the sidebar) to dive into each area:</p>
   <div class="cards">
     <a class="card" href="finance-receivables-payables.html"><div class="ico">📈</div><h3>Receivables &amp; Payables</h3><p>What you're owed and what you owe, follow-ups, payments and cheques.</p></a>
@@ -76,7 +79,7 @@
     <a class="card" href="finance-einvoicing.html"><div class="ico">🏛️</div><h3>Greek e-invoicing</h3><p>myDATA / ΑΑΔΕ transmission and VAT validation.</p></a>
     <a class="card" href="finance-operations.html"><div class="ico">🚚</div><h3>Operations &amp; Reports</h3><p>Planning, expense cards, customers &amp; suppliers, time &amp; billing, reports.</p></a>
     <a class="card" href="finance-op-vat-return.html"><div class="ico">⚖️</div><h3>VAT Return</h3><p>Prepare the Φ.2 for a month or quarter, check it against ΑΑΔΕ and record the filing.</p></a>
-    <a class="card" href="finance-settings.html"><div class="ico">⚙️</div><h3>Settings — 13 sections</h3><p>General, Business Identity, Documents, e-Invoicing, Compliance, Approvals, Pricing, Categories, Cost Codes, Services, Team, Online Store, Accounts &amp; Payments.</p></a>
+    <a class="card" href="finance-settings.html"><div class="ico">⚙️</div><h3>Settings — 12 sections</h3><p>General, Business Identity, Documents, e-Invoicing, Compliance, Pricing, Categories, Cost Codes, Services, Team (with Approvals), Store, Accounts.</p></a>
     <a class="card" href="pos.html"><div class="ico">🧮</div><h3>Point of Sale</h3><p>Issue receipts and invoices at the counter.</p></a>
   </div>
 
@@ -86,9 +89,9 @@
   <table>
     <thead><tr><th>Group</th><th>Sections</th></tr></thead>
     <tbody>
-      <tr><td>(top)</td><td>Dashboard · Receivables · Payables · Bank feed · Supplier Portal</td></tr>
+      <tr><td>(top)</td><td>Dashboard · Receivables · Payables · Bank Feed · Supplier Portal</td></tr>
       <tr><td>Documents</td><td>Orders · Invoices · Receipts · Credit Notes · Payments · Expenses · By Supplier · By Kind &amp; VAT · Delivery Notes · Cheques</td></tr>
-      <tr><td>Tools</td><td>Planning · Expense Cards · Assets · Time &amp; Billing · AI Assessment · Reports · VAT Return · myDATA Book (ΑΑΔΕ) · myDATA Transmissions · Customers &amp; Suppliers · Follow-Ups · Sourcing · Settings</td></tr>
+      <tr><td>Tools</td><td>Planning · Expense Cards · Travel · Assets · Time &amp; Billing · AI Assessment · Reports · VAT Return · myDATA Book (ΑΑΔΕ) · myDATA Transmissions · Customers &amp; Suppliers · Follow-Ups · Sourcing · Settings</td></tr>
     </tbody>
   </table>
   </div>

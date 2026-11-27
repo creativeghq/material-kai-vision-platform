@@ -8,7 +8,7 @@ Autonomous background agents that run on schedules, respond to events, or are tr
 
 Background agents are long-running tasks that run outside the request/response cycle. They are stored as configuration records in the DB, and each execution is tracked end-to-end with logs and heartbeats.
 
-**Admin UI:** `/admin/background-agents`
+**Admin UI:** Agent Ops → Background Agents (`/admin/agent-ops?tab=background-agents`; the old `/admin/background-agents` redirects there). Runs, failure rate, latency and cost per agent also appear on Agent Ops → Agents and the Agent Harness (`/admin/agents`).
 
 **Edge Functions:**
 - `background-agent-runner` — Universal executor for all agent types
@@ -49,6 +49,12 @@ chain triggers: child agents with parent_agent_id auto-dispatch on completion
 | `social-analytics-sync` | Social Analytics Sync | Syncs per-post engagement metrics from Zernio |
 | `social-insights-sync` | Social Insights Sync | Syncs account-level follower/reach snapshots from Zernio |
 | `factory-enrichment` | Factory Enrichment | Enriches factory/manufacturer records via Apollo, Firecrawl, Hunter.io |
+| `model-health-check` | Model Health Check | Probes registered generation models for reachability and records the verdict on `generation_models` |
+| `tech-radar` | Tech Radar | Watches the tech landscape for a tracked solution and surfaces ring-scored improvement ideas |
+| `embedding-backfill` | Embedding Backfill | Repairs products/chunks/images whose embeddings failed at creation; leaves a settling or deferred ingestion alone and never re-embeds an image excluded from products |
+| `lead-conversation-sync` | Lead Conversation Sync | Keeps each open, auto-tracked lead's conversation summary, status and follow-up date in step with its email / WhatsApp thread; stops on a lead once someone changes its status by hand |
+
+The registry is `RUNNERS` in `_shared/agents/registry.ts`. The Field Roles review is NOT a background runner: `run_field_registry_review_cron()` starts real JARVIS turns in agent-chat (toolkit `field-registry`) only when the queue has work.
 
 To add a new agent type: implement `AgentRunner` in `_shared/agents/your-agent.ts`, import and add to `_shared/agents/registry.ts`.
 
@@ -59,7 +65,7 @@ To add a new agent type: implement `AgentRunner` in `_shared/agents/your-agent.t
 | Trigger | How it fires |
 |---|---|
 | `cron` | `agent-scheduler-cron` checks schedule expression every minute |
-| `event` | `emitAgentEvent(eventType, data)` in `_shared/flow-events.ts` matches `event_type` |
+| `event` | Declared, but `emitAgentEvent` has no callers, so an event agent never fires. The editor keeps trigger type read-only. |
 | `manual` | Admin clicks "Run Now" in UI; calls `background-agent-runner` directly |
 | `chain` | `trigger_type='chain'` + `parent_agent_id` — auto-dispatched when parent `completed` |
 
@@ -68,7 +74,7 @@ To add a new agent type: implement `AgentRunner` in `_shared/agents/your-agent.t
 ## Database Tables
 
 ### `background_agents`
-Configuration records. One row = one agent definition.
+Configuration records. One row = one agent definition. Only a platform admin may update a row (a workspace owner cannot edit or delete agents).
 
 | Column | Type | Description |
 |---|---|---|
@@ -101,10 +107,12 @@ Execution records. One row = one agent run. Real-time enabled.
 | `input_data` | jsonb | Config merged with runtime input overrides |
 | `output_data` | jsonb | Final output from agent |
 | `error_message` | text | Error detail on failure |
-| `model_used` | text | Claude model that ran |
+| `model_used` | text | Model that ran — recorded only when the run spent tokens |
 | `input_tokens` | int | LLM input token count |
 | `output_tokens` | int | LLM output token count |
 | `credits_debited` | int | Credits consumed |
+
+There is no stored USD cost on a run: `ai_usage_logs.agent_run_id` + `agent_run_cost_usd()` derive it, and the model-calling runners stamp their run id on their log rows.
 | `started_at` | timestamptz | Execution start |
 | `completed_at` | timestamptz | Execution end |
 | `duration_ms` | int | Wall-clock duration |
@@ -203,7 +211,7 @@ Returns the registered agent type catalog (name, description, default tools, def
 
 | Component | Location | Purpose |
 |---|---|---|
-| `BackgroundAgentsPage` | `/admin/background-agents` | List, create, enable/disable agents |
+| `BackgroundAgentsPage` | `/admin/agent-ops?tab=background-agents` | List and create agents; edit enabled, cron schedule (validated against the scheduler's matcher), model, system prompt override and config |
 | `AgentRunHistoryDrawer` | Same page | Slide-out panel with run history |
 | `AgentLogsViewer` | Same page | Real-time log stream for a run |
 | `CreateAgentModal` | Same page | Form to define a new agent |
@@ -245,4 +253,4 @@ Alerts appear under the `all`, `failed`, and `stuck` tabs (folded into the `fail
 
 ---
 
-**Last Updated:** April 15, 2026
+**Last Updated:** November 27, 2026

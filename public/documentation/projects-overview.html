@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Projects: Overview, costs, visits &amp; team | MaterialsHub Documentation</title>
+<title>Projects: Overview, money, visits &amp; team | MaterialsHub Documentation</title>
 <link rel="stylesheet" href="assets/style.css">
 </head>
 <body>
 <main class="content">
-  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Overview, costs, visits &amp; team</div>
-  <h1>Projects · Overview, costs, visits &amp; team</h1>
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Overview, money, visits &amp; team</div>
+  <h1>Projects · Overview, money, visits &amp; team</h1>
   <div class="routes"><span class="badge route">/projects/:id</span></div>
   <p class="lead">A project's <strong>Overview</strong> is the page you land on when you open it. It answers the questions you would otherwise go and look up one by one: what is this job, how far along is it, what has it cost against what we agreed, when are we next meeting the client, and who is working on it.</p>
 
@@ -17,28 +17,30 @@
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/projects/project-overview.png" alt="A project's Overview tab">
-    <figcaption>A project's <strong>Overview</strong> — the cover banner with <strong>Change cover</strong>, the stage tabs, the <strong>Cost &amp; margin</strong> panel and the Details card.</figcaption>
+    <figcaption>A project's <strong>Overview</strong> — the cover banner with <strong>Change cover</strong>, the stage strip and the panels below it.</figcaption>
   </figure>
 
   <h2>The layout</h2>
   <ul class="feat">
     <li><strong>The hero.</strong> The project's cover picture runs across the top with its status and category, the name, the <strong>description</strong> (long ones fold, with <em>Show more</em>) and the key facts — <strong>Client</strong>, <strong>Deadline</strong>, <strong>Budget</strong> and <strong>Tasks</strong> — laid over the image. <strong>Change cover</strong> picks a different picture.</li>
-    <li><strong>The main column</strong> holds the working panels: <a href="#cost">Cost &amp; margin</a>, <strong>Rooms</strong> (with budget per room when rooms carry one), and <a href="#visits">Visits &amp; meetings</a>.</li>
+    <li><strong>The main column</strong> holds <a href="#get-started">Get Started</a> (until every step is done), the <a href="#money">Money</a> card, <strong>Rooms</strong> (or <strong>Budget by Room</strong> when rooms carry a budget) and <a href="#visits">Visits &amp; meetings</a>.</li>
     <li><strong>The sidebar</strong> holds <strong>Details</strong> (client, category and linked property — change the category or attach the project to a property here), <strong>Tasks</strong> (a progress bar, Todo / Active / Blocked / Done counts, a <strong>Milestones</strong> strip showing <em>“N/M reached”</em> and the next one, and what is <em>Next due</em>) and the <a href="#team">Team</a>.</li>
   </ul>
-  <p>The page header carries <strong>All projects</strong>, <strong>Invite client</strong> (managers) and a <strong>More</strong> (⋯) menu with <strong>Save as template</strong>, <strong>Archive</strong> (managers) and <strong>Delete</strong> (the owner only).</p>
+  <p>The page header carries <strong>All projects</strong>, <strong>Invite client</strong> (managers) and a <strong>⋯</strong> menu with <strong>Sections</strong> (managers — see <a href="projects-tabs.html#sections">changing the sections</a>), <strong>Save as template</strong>, <strong>Archive</strong> (managers) and <strong>Delete</strong> (the owner only).</p>
 
-  <h2 id="cost">Cost &amp; margin</h2>
-  <p><strong>What it is —</strong> what the job has actually cost so far, set against what you agreed to be paid for it. <em>“Supplier bills, labour, expenses and open purchase orders tagged to this project, net of VAT.”</em> <strong>Why it matters —</strong> you find out a job is losing money while there is still time to do something, not when you close it. It reads the same figures as the project's <strong>Finance</strong> section, so the two never disagree; <strong>Job cost detail</strong> takes you there.</p>
+  <h2 id="get-started">Get Started</h2>
+  <p>A short checklist for a new project, ticked off by what the project actually holds rather than by hand: <strong>Add the client</strong>, <strong>Add the rooms</strong>, then <strong>Start a moodboard</strong> (Design &amp; Supply) or <strong>Build the estimate</strong> (Fit-Out and Construction), <strong>Send the client a quote</strong>, <strong>Plan the work</strong> and <strong>Invite the client to follow along</strong>. Steps for sections the project does not offer are left out. Each open step has a button to the place where it is done, and the card disappears once all are done.</p>
+
+  <h2 id="money">Money</h2>
+  <p><strong>What it is —</strong> <em>“Contract, billing and cost on this project, net of VAT unless stated.”</em> One card with the figures a manager checks first, and warnings when something needs attention. <strong>Why it matters —</strong> you find out a job is losing money, or a client is late paying, while there is still time to act.</p>
   <ul class="feat">
-    <li><strong>Four figures</strong> — <strong>Contract value</strong> (accepted quotes), <strong>Spent so far</strong> (with the share of the contract value, or of the budget when there is no contract), <strong>On order</strong> (purchase orders not billed yet) and <strong>Forecast margin</strong> (shown red when negative; <em>“Needs an accepted quote”</em> when there is no contract yet).</li>
-    <li><strong>A spend bar</strong> split into <strong>Materials &amp; suppliers</strong>, <strong>Labour</strong> and <strong>Expenses</strong>, with what is <strong>on order, not billed yet</strong> hatched on the end — and a line saying how much is left of the contract or budget, or how far over it you are.</li>
-    <li><strong>Materials by category.</strong> The materials figure is broken down by the product category of what was bought (tiles, sanitary, lighting…). A supplier bill is spread over the lines of its purchase order; what no product line explains shows as <em>“Bills not linked to a purchase order line”</em> or <em>“Lines with no product category”</em>, so the rows always add up to the materials total.</li>
-    <li><strong>Material deliveries</strong> — open purchase orders with supplier, amount and expected arrival date, tagged <strong>Late</strong> once the date has passed or <strong>No ETA</strong> when the supplier gave none.</li>
-    <li><strong>Crew on the job, last 7 days</strong> — who logged time on the project each day. Hours come from <strong>Log time</strong> on a <a href="projects-tasks.html">task</a>.</li>
+    <li><strong>The figures</strong> — <strong>Contract incl. Variations</strong> (accepted quotes plus approved variations), <strong>Billed</strong> (issued invoices, less credit notes), <strong>Customers Owe</strong> (unpaid on issued invoices, including VAT), <strong>Spent</strong> (supplier bills, labour and approved expenses), <strong>On Order</strong> (purchase orders not billed yet) and <strong>Forecast Margin</strong> (<em>“Needs an accepted quote”</em> when there is no contract yet). Retention held on valuations is shown when there is any.</li>
+    <li><strong>Warnings</strong>, each with a button to the section that fixes it — for example a negative forecast margin, over budget once open orders are counted, billed more than the contract, variations awaiting a decision worth more than 10% of the contract, certified valuations past due and unpaid, purchase orders past the supplier's ETA, critical snags still open, RFIs past their due date, and a revised quote accepted after its order was already in progress.</li>
+    <li><strong>A cost curve</strong> — spent plus on order against the cost budget over time.</li>
+    <li><strong>Costs</strong> opens the full job cost: margin on what was sold, cost by cost code with budget and forecast, labour and stock (see <a href="construction-commercial.html#costs">Costs</a>).</li>
   </ul>
-  <div class="callout warn"><p><strong>Unknown is never shown as zero.</strong> If the figures cannot be loaded the panel says <em>“They are unknown, not zero.”</em> A budget in a different currency from the costs is not compared, and the panel says why; expense claims still awaiting approval are listed separately and not counted yet.</p></div>
-  <p><strong>Who sees it:</strong> the owner and project <strong>managers</strong> who also have finance access — the same people who see the Finance section.</p>
+  <div class="callout warn"><p><strong>Unknown is never shown as zero.</strong> If the figures cannot be loaded the card says <em>“They are unknown, not zero.”</em> Figures in more than one currency are flagged rather than added up silently.</p></div>
+  <p><strong>Who sees it:</strong> the owner and project <strong>managers</strong> who also have finance access — the same people who see Invoicing and Costs.</p>
 
   <h2 id="visits">Visits &amp; meetings</h2>
   <p><strong>What it is —</strong> the showroom visits, site surveys, design presentations and calls for this project, in one list with <strong>Upcoming</strong> and <strong>Past</strong>. <strong>Why it matters —</strong> a client asking “when are we choosing tiles?” has an answer on the project itself, and the client can ask for a slot without phoning.</p>
@@ -56,12 +58,12 @@
   <p>Booked visits also appear on the project's <a href="projects-tasks.html">task Calendar</a>.</p>
 
   <h2 id="team">Project team</h2>
-  <p><strong>What it is —</strong> the people from your workspace who work on this project. You choose them one by one — it is not the whole workspace — and give each a role. <strong>Why it matters —</strong> before, only the owner could open a project; a colleague given work on it could not even read it. Clients are separate: they are invited with <strong>Invite client</strong> and see a read-only slice (see <a href="projects-tabs.html#client">the stages</a>).</p>
+  <p><strong>What it is —</strong> the people from your workspace who work on this project. You choose them one by one — it is not the whole workspace — and give each a role. <strong>Why it matters —</strong> before, only the owner could open a project; a colleague given work on it could not even read it. Clients, architects and subcontractors are separate: they are invited with <strong>Invite client</strong> and get their own project home (see <a href="projects-tabs.html#client">inviting a guest</a>).</p>
   <div class="table-wrap"><table>
     <thead><tr><th>Role</th><th>What they can do</th></tr></thead>
     <tbody>
       <tr><td><strong>Owner</strong></td><td>Everything. Only the owner can hand the project over or delete it.</td></tr>
-      <tr><td><strong>Manager</strong></td><td><em>“Works on everything, sees the money, edits the project and manages its team”</em> — including Billing, Finance (with finance access), archiving, inviting clients and adding or removing teammates.</td></tr>
+      <tr><td><strong>Manager</strong></td><td><em>“Works on everything, sees the money, edits the project and manages its team”</em> — including Invoicing and Costs (with finance access), changing the sections, archiving, inviting clients and adding or removing teammates.</td></tr>
       <tr><td><strong>Member</strong></td><td><em>“Works on tasks, rooms, documents, site and requests.”</em> The working sections of the project, without the money.</td></tr>
     </tbody>
   </table></div>

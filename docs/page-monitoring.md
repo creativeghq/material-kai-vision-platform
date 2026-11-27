@@ -188,7 +188,8 @@ requires the workspace to be entitled to `page-monitoring`.
 
 | | |
 |---|---|
-| UI | [src/pages/PageWatchesPage.tsx](../src/pages/PageWatchesPage.tsx) at `/monitoring/pages` |
+| UI | [src/pages/PageWatchesPage.tsx](../src/pages/PageWatchesPage.tsx) at `/monitoring/pages`, wrapped in `EntitlementGuard moduleSlug="page-monitoring"` so an unentitled workspace gets the unlock screen, not the edge 402 rendered as "could not be loaded" |
+| User guide | [public/documentation/page-monitoring.html](../public/documentation/page-monitoring.html) |
 | Client | [src/services/pageWatchService.ts](../src/services/pageWatchService.ts) |
 | CRUD | `supabase/functions/page-watches` |
 | Webhook | `supabase/functions/page-watch-webhook` |

@@ -1,185 +1,72 @@
-# Push Notifications Admin Guide
+# Phone (Web Push) Notifications
 
-## Overview
+Phone notifications are one more delivery of the **same** in-app notification. There is no
+separate push pipeline, no per-type preference matrix and no workspace-admin push tab: a user
+opts a device in, and every bell a flow raises for them is also pushed to that device.
 
-The Push Notifications admin tab provides comprehensive management of web push notifications within the Messaging Management interface at `/admin/messaging`.
+## How a push reaches a device
 
-## Features
+```
+Profile → Phone Notifications → Turn On Notifications
+   usePushSubscription(): notification-dispatcher {action:'get-vapid-key'}
+   → pushManager.subscribe() → upsert push_subscriptions (user_id, endpoint, p256dh_key, auth_key, is_active)
 
-### 1. **Subscription Management**
-- View all push subscriptions (active and inactive)
-- See browser breakdown (Chrome, Firefox, Safari, etc.)
-- Track subscription activity and status
-- Remove/deactivate specific subscriptions
-- Cleanup inactive subscriptions in bulk
+flow-engine  create_notification action
+   1. insert user_notifications (the bell)            ← always
+   2. read the user's active push_subscriptions
+   3. notification-dispatcher {action:'send-push', subscriptions, notification:{title, body, data:{url}}}
+      ← best effort: a push failure is logged and never fails the bell
+```
 
-### 2. **Test Notifications**
-- Send test push notifications to your own devices
-- Customize notification title and message
-- Instant delivery testing
-- Verify VAPID configuration
+- **Every in-app notification flow pushes.** The mirror lives inside the `create_notification`
+  handler, so every seeded default and every tenant flow that rings a bell also pushes to an
+  opted-in user. `send_push` remains a separate engine action for flows that want push only.
+- `data.url` is the notification's `action_url` only when it is a same-origin path (`/…`, not
+  `//…`); anything else opens `/`. A body still holding an unresolved `{{…}}` template is sent empty.
+- `public/sw.js` handles `push` (shows the notification) and `notificationclick` (focuses an open
+  app window and navigates it to `data.url`, else opens a new one).
+- Endpoints the push service reports as gone (HTTP 404/410) are set `is_active = false` by the
+  dispatcher, so a dead device stops being tried.
 
-### 3. **Analytics Dashboard**
-- Total subscriptions count
-- Active vs inactive subscriptions
-- Recent activity (last 7 days)
-- Browser distribution statistics
+## User opt-in (Profile)
 
-### 4. **VAPID Configuration Status**
-- Visual indicator of VAPID key configuration
-- Public key display (for verification)
-- Configuration alerts if VAPID is not set up
+**Profile → Phone Notifications** (`src/components/core/Profile/PushNotificationsCard.tsx`) is the
+only opt-in. It is per **device/browser**, not per account. States it can show:
 
-## Setup Requirements
+| State | Shown |
+|---|---|
+| off | **Turn On Notifications** (asks the browser for permission, then subscribes) |
+| on | **Turn Off** (sets this endpoint `is_active = false`) |
+| unsupported | "This browser cannot receive notifications." |
+| needs-install | iPhone: add the app to the Home Screen first, then enable from there |
+| denied | Permission blocked; re-enable in browser / phone settings |
 
-### 1. Generate VAPID Keys
+## Operator broadcast
 
-You can generate VAPID keys using the web-push library or use an online generator: https://vapidkeys.com/
+`/push-notifications` (`src/pages/Operator/PushNotificationsPage.tsx`, `AdminGuard`) — **Send a
+Phone Notification**: Title (≤ 80 chars), Message (≤ 240), optional "Opens" path, audience
+**Everyone subscribed** or **Selected Users**, a confirm dialog, and a **Recent Notifications** list.
 
-### 2. Add VAPID Secrets to Supabase
+| Dispatcher action | Who | Does |
+|---|---|---|
+| `get-vapid-key` | any signed-in user | returns the public VAPID key for subscribing |
+| `send-push` | internal (flow-engine) | sends to the given subscriptions |
+| `list-push-audience` | platform operator | users holding an active subscription (cap 5,000) |
+| `broadcast-push` | platform operator | resolves recipients **server-side** from `push_subscriptions` (never from the body), sends, records a `push_broadcasts` row |
 
-Go to **Supabase Dashboard → Project Settings → Edge Functions → Secrets** and add:
+## Configuration
 
-| Secret Name | Value | Description |
-|-------------|-------|-------------|
-| `VAPID_PUBLIC_KEY` | `BNxxx...` | Your VAPID public key |
-| `VAPID_PRIVATE_KEY` | `xxx...` | Your VAPID private key (keep secret!) |
-| `VAPID_SUBJECT` | `mailto:admin@yourdomain.com` | Contact email or website URL |
-
-### 3. Redeploy Edge Functions
-
-After adding the secrets, redeploy the notification-dispatcher Edge Function using `supabase functions deploy notification-dispatcher`.
-
-## How Push Notifications Work
-
-User subscribes in browser
-       ↓
-Browser generates subscription endpoint
-       ↓
-Frontend calls notificationService.registerPushSubscription()
-       ↓
-Subscription saved to push_subscriptions table
-       ↓
-When notification is sent:
-       ↓
-notificationService.send() → checks user preferences
-       ↓
-Calls notification-dispatcher Edge Function
-       ↓
-Edge Function sends push to browser using VAPID keys
-       ↓
-User receives notification
-
-## User Flow
-
-### For Users (Opt-in)
-
-Users can enable push notifications:
-
-1. Navigate to Settings → Notifications
-2. Enable "Push Notifications" for desired notification types
-3. Browser will prompt for permission
-4. Once granted, device is registered
-
-### For Admins
-
-Admins can:
-
-1. Go to `/admin/messaging` → **Push Notifications** tab
-2. View all subscriptions and analytics
-3. Send test notifications
-4. Monitor subscription health
-5. Remove invalid/inactive subscriptions
-
-## Notification Types Supported
-
-Push notifications can be sent for any notification type configured in the `notification_types` table:
-
-- Quote updates
-- Order status changes
-- System alerts
-- Product availability
-- Custom notifications
-
-Users control which notification types trigger push notifications via their notification preferences.
-
-## Browser Support
-
-| Browser | Support | Notes |
-|---------|---------|-------|
-| Chrome | ✅ Full | Best support |
-| Firefox | ✅ Full | Excellent support |
-| Safari | ⚠️ Limited | Requires user action |
-| Edge | ✅ Full | Chromium-based |
-| Mobile Safari | ⚠️ iOS 16.4+ | Limited |
+VAPID keys are resolved through `resolveSecret` (env first, then `platform_secrets`):
+`VAPID_PUBLIC_KEY` (base64url of the 65-byte uncompressed P-256 point), `VAPID_PRIVATE_KEY`,
+`VAPID_SUBJECT` (`mailto:` or URL). Without them the dispatcher logs a warning and skips the push;
+the bell is unaffected. Encryption and signing are Deno-native (RFC 8291 payload encryption,
+RFC 8292 VAPID) — no web-push library.
 
 ## Troubleshooting
 
-### VAPID Not Configured
-
-**Symptom**: Alert shows "VAPID Configuration Required"
-
-**Solution**:
-1. Generate VAPID keys (see Setup Requirements)
-2. Add keys to Supabase Edge Function secrets
-3. Redeploy notification-dispatcher function
-4. Refresh admin page
-
-### Subscriptions Not Receiving
-
-**Symptom**: Test notifications not delivered
-
-**Check**:
-1. Is subscription marked as `is_active: true`?
-2. Has user granted browser permission?
-3. Is browser still open/online?
-4. Check browser console for errors
-5. Verify VAPID keys are correct
-
-### Invalid/Expired Subscriptions
-
-**Symptom**: Many failed push deliveries
-
-**Solution**:
-- Browser subscriptions can expire or become invalid
-- Use **Cleanup Inactive** button to remove failed subscriptions
-- Users will need to re-subscribe if needed
-
-## Security Best Practices
-
-1. **Never expose VAPID private key** - Only store in Supabase Edge Function secrets
-2. **Use HTTPS** - Push notifications require secure context
-3. **Respect user preferences** - Always honor opt-out settings
-4. **Rate limiting** - Avoid spamming users with too many notifications
-5. **Clean up regularly** - Remove expired subscriptions to save database space
-
-## API Integration
-
-### Register Subscription (Client-side)
-
-Use the browser's `navigator.serviceWorker.ready` to get the service worker registration, then call `registration.pushManager.subscribe()` with `userVisibleOnly: true` and your `applicationServerKey` (VAPID public key). Pass the resulting subscription JSON to `notificationService.registerPushSubscription(userId, subscription.toJSON())`.
-
-### Send Notification (Server-side)
-
-Call `notificationService.send()` with a payload containing `userId`, `notificationType`, `title`, `message`, and optional `data` (such as `action_url`).
-
-## Monitoring
-
-Track push notification performance:
-
-1. **Analytics Tab** - View delivery rates and trends
-2. **Message Logs** - Detailed log of all notifications
-3. **Notifications Table** - Database records with status and timestamps
-
-## Cost Considerations
-
-- **Web Push is FREE** - No per-message costs
-- **VAPID keys are free** - Self-managed authentication
-- Only costs: Database storage for subscriptions (~500 bytes each)
-
-## Related Documentation
-
-- [Flows Notification System](./flows-notification-system.md) - how notifications are delivered
-- [Messaging API](./inbox-system.md) - WhatsApp / messaging channels
-- [Deployment Guide](./deployment-guide.md) - VAPID configuration
-- [System Architecture](./system-architecture.md) - edge functions (notification-dispatcher)
+- **Nothing arrives on iPhone** — Web Push on iOS works only for the app installed to the Home
+  Screen (iOS 16.4+); the card says so.
+- **A device stopped receiving** — check `push_subscriptions.is_active` for its endpoint; a 404/410
+  from the push service deactivated it. Turning notifications on again re-subscribes.
+- **Bell arrives, push does not** — look for `[flow-engine] push mirror failed` in the flow-engine
+  logs, and confirm the VAPID secrets resolve.

@@ -43,28 +43,41 @@
 
   <h3>Preview before the full crawl</h3>
   <p>The crawler is charged per page read, so saving with <strong>Add &amp; Preview</strong> doesn't crawl everything straight away. It opens a <strong>Sitemap Preview</strong> showing <strong>Total URLs</strong>, <strong>Will crawl up to</strong>, and <strong>Sample success</strong> for 5 sample pages, so you can check that titles and descriptions come through. A warning appears if the sitemap holds more pages than your cap. If it looks right, click <strong>Proceed with full crawl</strong>. You never spend credits crawling a site whose sitemap was wrong.</p>
-  <p>After that the crawl keeps the index fresh on its own. It reads the pages search demand points to first, then uses spare capacity on each run to work through sitemap pages it hasn't read yet. The article writer also reads unread pages on its topic before writing.</p>
+  <p>After that, the index is kept fresh by the <strong>Page crawl</strong> <a href="#schedules">schedule</a> and by <strong>Recrawl</strong>. Each run reads the pages search demand points to first, then uses spare capacity to work through sitemap pages it hasn't read yet. The article writer also reads unread pages on its topic before writing.</p>
 
   <h2>The website page</h2>
-  <p>The header shows the domain, the page count and last crawl, with <strong>Visit</strong> and <strong>Recrawl</strong>. A failed crawl shows as a red banner. Four counters (<strong>Articles</strong>, <strong>Keyword research</strong>, <strong>Toolkit runs</strong>, <strong>Tracked domains</strong>) each open their section. A rail on the left (a strip on a phone) groups the sections. The open one is in the address as <code>?section=…</code>, so any section can be bookmarked or linked.</p>
+  <p>The header shows the domain, the page count and last crawl, with <strong>Visit</strong> and <strong>Recrawl</strong>. A failed crawl shows as a red banner. Under it sits the <strong>Search market</strong>, then four counters (<strong>Articles</strong>, <strong>Keyword Research</strong>, <strong>Toolkit Runs</strong>, <strong>Domain Audits</strong>) that each open their section. A rail on the left (a strip on a phone) holds ten sections; a section with several panes shows them as tabs across the top. The open pane is in the address as <code>?section=…&amp;view=…</code>, so any of them can be bookmarked or linked. Older links that named a section from before the rail was regrouped still land on the right pane.</p>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/website-dashboard.png" alt="The per-site SEO dashboard">
-    <figcaption>The website record page (<code>/websites/:id</code>) — headline counters, the section rail grouped into Search, Audience, Visibility, Content, Technical and Activity, and the Overview opening on <strong>What to do next</strong>.</figcaption>
+    <figcaption>The website record page (<code>/websites/:id</code>) — headline counters, the section rail, and the Overview opening on <strong>What to do next</strong>.</figcaption>
   </figure>
 
   <div class="table-wrap"><table>
-    <thead><tr><th>Group</th><th>Sections</th></tr></thead>
+    <thead><tr><th>Group</th><th>Section</th><th>Tabs inside it</th></tr></thead>
     <tbody>
-      <tr><td>—</td><td><a href="#overview"><strong>Overview</strong></a></td></tr>
-      <tr><td><strong>Search</strong></td><td><a href="#gsc">Search Console</a> · <a href="#cannibalisation">Cannibalisation</a> · <a href="#rank-tracker">Rank Tracker</a> · <a href="#serp-features">SERP Features</a></td></tr>
-      <tr><td><strong>Audience</strong></td><td>Overview · Pages · Geography · Devices &amp; events · Products &amp; ads · Funnel · Retention. All from Google Analytics; see <a href="seo-website-analytics.html">Website Analytics</a>.</td></tr>
-      <tr><td><strong>Visibility</strong></td><td><a href="seo-ai-citations.html">AI Citations</a> · <a href="#backlinks">Backlinks</a> · <a href="#competitors">Competitors</a> · <a href="#domain-audits">Domain Audits</a></td></tr>
-      <tr><td><strong>Content</strong></td><td>Articles (with the Topic plan) · <a href="#keyword-research">Keyword Research</a> · Brand Profile. See the <a href="seo-articles.html">SEO Article Writer</a>.</td></tr>
-      <tr><td><strong>Technical</strong></td><td><a href="#crawl">Site Crawl</a> · <a href="#health">Page Health</a> · <a href="#llms">llms.txt</a></td></tr>
-      <tr><td><strong>Activity</strong></td><td>Toolkit Runs · <a href="#reports">Reports</a></td></tr>
+      <tr><td>—</td><td><a href="#overview"><strong>Overview</strong></a></td><td>—</td></tr>
+      <tr><td rowspan="2"><strong>Search</strong></td><td><a href="#gsc"><strong>Search performance</strong></a></td><td>Queries · <a href="#cannibalisation">Cannibalisation</a></td></tr>
+      <tr><td><strong>Keywords</strong></td><td><a href="#rank-tracker">Tracked</a> · <a href="#serp-features">SERP features</a> · <a href="#keyword-research">Research</a></td></tr>
+      <tr><td><strong>Audience</strong></td><td><strong>Audience</strong></td><td>Overview · Pages · Geography · Devices &amp; Events · Products &amp; Ads · Funnel · Retention. All from Google Analytics; see <a href="seo-website-analytics.html">Website Analytics</a>.</td></tr>
+      <tr><td rowspan="3"><strong>Visibility</strong></td><td><a href="seo-ai-citations.html"><strong>AI Citations</strong></a></td><td>1. Where you stand · 2. What we ask · 3. Find questions · 4. Put them on pages · 5. Beyond the chat</td></tr>
+      <tr><td><a href="#authority"><strong>Authority</strong></a></td><td>Backlinks &amp; Authority · Audit history</td></tr>
+      <tr><td><a href="#competitors"><strong>Competitors</strong></a></td><td>Competitors · <a href="#keyword-gap">Keyword Gap</a></td></tr>
+      <tr><td><strong>Content</strong></td><td><strong>Articles</strong></td><td>Articles (with the Topic plan) · Brand Profile. See the <a href="seo-articles.html">SEO Article Writer</a>.</td></tr>
+      <tr><td><strong>Technical</strong></td><td><strong>Site Health</strong></td><td><a href="#crawl">Site Crawl</a> · <a href="#pages">Pages</a> · <a href="#health">Page Health</a> · <a href="#llms">llms.txt</a></td></tr>
+      <tr><td><strong>Activity</strong></td><td><a href="#reports"><strong>Reports</strong></a></td><td>Reports · Toolkit Runs · <a href="#schedules">Schedules</a></td></tr>
     </tbody>
   </table></div>
+
+  <h2 id="market">Search market</h2>
+  <p><strong>What it is —</strong> the country and language Google results are read in for this site. Rank tracking, keyword research and articles all use it. <strong>Where it comes from —</strong> the line under the header says the market and its source: <em>set on this website</em>, <em>from the tracked keywords</em>, <em>from Search Console</em>, <em>from the AI-visibility subject</em> or <em>from the business country</em>. Owners and admins can click <strong>Set market</strong> to choose a <strong>Country</strong> and a <strong>Language</strong>, or <strong>Use the site data instead</strong> to go back. If nothing gives a market, the line says so, and trackers and research do not run until it is set.</p>
+
+  <h2 id="schedules">Paid checks run only when you schedule them</h2>
+  <p><strong>What it is —</strong> <strong>Reports → Schedules</strong> lists the five collectors that call a paid data provider: <strong>Rank tracking</strong>, <strong>Domain tracking</strong> (your domain and your competitors), <strong>Homepage audit</strong>, <strong>Page crawl</strong> and <strong>AI Visibility</strong>. Each one is <strong>Off</strong> until you choose <strong>Daily</strong>, <strong>Weekly</strong> or <strong>Monthly</strong>. <strong>Why it matters —</strong> nothing paid runs on a schedule nobody chose. The table shows each collector's <strong>Per Run (Max)</strong> and <strong>Per Month (Max)</strong> credits before you switch it on, and its <strong>Last Run</strong> and next run. A schedule is charged to the person who switched it on. If a price can't be read right now, it says so instead of showing 0.</p>
+  <p>Every collector also has a button that runs it once: <strong>Check now</strong>, <strong>Re-check</strong>, <strong>Snapshot now</strong> and the like. Each shows <em>up to N cr</em> beside it, from the same estimate.</p>
+
+  <h2 id="keyword-actions">The same actions on every keyword</h2>
+  <p>Wherever a keyword appears (Search Console queries, cannibalisation, the rank tracker, SERP features, keyword research and its suggestions, top ranking keywords, <em>What to do next</em>), its row carries the same four icons: <strong>Track</strong> (adds it to the rank tracker; shows as tracked everywhere at once), <strong>Research</strong> (charged; a repeat within 30 days is free), <strong>Write an article</strong> (charged, asks you to confirm first) and <strong>Copy</strong>.</p>
 
   <h2 id="statuses">A figure is a number, or the reason there isn't one</h2>
   <p><strong>What it is —</strong> every tile on these pages either shows a number or says why it can't. <strong>Why it matters —</strong> "we couldn't fetch your backlinks" and "you have no backlinks" are very different, and a zero would hide which one you're looking at. Where a number would be, you'll see:</p>
@@ -81,65 +94,68 @@
 
   <h2 id="overview">Overview</h2>
   <ul class="feat">
-    <li><strong>What to do next</strong> — one ranked list of actions, built from Search Console, the crawl, your articles and your competitors. Each row says why it's there and is tagged <em>Quick win</em>, <em>Refresh</em>, <em>Consolidate</em>, <em>New page</em>, <em>Not crawled</em>, <em>Crawled, not indexed</em> or <em>Fix page</em>. Its button takes you to the place to act: <strong>Write it</strong> starts a new article with the keyword filled in. Data sources that are missing are listed underneath.</li>
+    <li><strong>Set up this website</strong> — until every step is done, a checklist leads the Overview: connect Search Console, set the market, add competitors, track keywords, run the first crawl and switch on a schedule. Each step opens the place where it's done, and the card disappears once all are ticked.</li>
+    <li><strong>What to do next</strong> — one ranked list of actions, built from Search Console, the crawl, your articles and your competitors. Each row says why it's there and is tagged <em>Quick Win</em>, <em>Refresh</em>, <em>Consolidate</em>, <em>New page</em>, <em>Not crawled</em>, <em>Crawled, not indexed</em> or <em>Fix Page</em>. Its button takes you to the place to act: <strong>Write it</strong> starts a new article with the keyword filled in. Data sources that are missing are listed underneath.</li>
     <li><strong>Search presence</strong> — domain rank, organic keywords, estimated monthly traffic, traffic value, referring domains, backlinks, broken backlinks and spam score. Use <strong>Take first snapshot</strong> or <strong>Refresh</strong>; it warns when the figures are stale.</li>
     <li><strong>Ranking profile</strong> and <strong>Top ranking keywords</strong> — where your keywords sit, and what improved, declined, appeared or was lost week on week.</li>
     <li>Summary cards for <strong>Search Console</strong>, <strong>AI assistants</strong> and <strong>Technical health</strong>, each with a button into the full section.</li>
   </ul>
 
-  <h2 id="gsc">Search Console — real search performance</h2>
-  <p><strong>What it is —</strong> a direct, read-only connection to your property in Google Search Console, so you see the numbers Google actually reports rather than third-party estimates. It also powers the assistant's <em>striking-distance</em> and <em>top-movers</em> tools, the <em>What to do next</em> list and each article's search card.</p>
+  <h2 id="gsc">Search performance — real Google Search Console data</h2>
+  <p><strong>What it is —</strong> a direct connection to your property in Google Search Console, so you see the numbers Google actually reports rather than third-party estimates. It also powers the assistant's <em>striking-distance</em> and <em>top-movers</em> tools, the <em>What to do next</em> list and each article's search card.</p>
   <h3>How to connect</h3>
   <ol>
-    <li>Open the website → <strong>Search Console</strong> → <strong>Connect Search Console</strong>.</li>
-    <li>Grant read-only access at Google. You come back to the website's Search Console section.</li>
+    <li>Open the website → <strong>Search performance</strong> → <strong>Connect Search Console</strong>.</li>
+    <li>Grant access at Google. You come back to the website's Search performance section.</li>
     <li>If it can't match a property to your domain, choose one under <strong>Pick a Search Console Property</strong> (<strong>Load my properties</strong>).</li>
-    <li><strong>Sync</strong> pulls on demand. The disconnect icon stops the connection and keeps your history.</li>
+    <li><strong>Sync</strong> pulls on demand; a nightly pull runs on its own. <strong>Disconnect</strong> stops the connection and keeps your history.</li>
   </ol>
+  <p>The connection also lets the platform <strong>resubmit your sitemap</strong> to Google, remove submitted sitemaps that now answer 404 or 410, and ask Google whether your pages are indexed, newly published articles first. A site connected before this access was requested shows <strong>Update Google access</strong>: click it to re-consent in place. Your history and Analytics property are kept.</p>
   <div class="callout warn"><p><strong>Operator setup required.</strong> Search Console uses Google sign-in, so a platform operator must have configured the Google client credentials. If they haven't, <em>Connect</em> tells you so instead of failing silently.</p></div>
   <h3>What it shows</h3>
   <ul class="feat">
     <li>A <strong>Day / Week / Month / Quarter</strong> range, and four tiles: <strong>Clicks</strong>, <strong>Impressions</strong>, <strong>Avg CTR</strong> and <strong>Avg position</strong>.</li>
     <li>A clicks trend, a <strong>Devices</strong> split, and a <strong>Breakdown</strong> table with <strong>Queries</strong>, <strong>Pages</strong>, <strong>Countries</strong> and <strong>Appearance</strong> tabs. Queries can be filtered by <strong>Page</strong> and <strong>Segment</strong> (all countries and devices, one device, or one country).</li>
+    <li><strong>Lens</strong> on the Queries table: <em>All queries</em>, <em>Striking distance (8–20)</em> (queries averaging position 8 to 20 with at least 20 impressions), <em>Rising</em> and <em>Falling</em>. Every row carries the <a href="#keyword-actions">keyword actions</a>.</li>
     <li><strong>Drill down:</strong> click a query to see the pages Google showed for it, with a warning when several pages split the impressions, which is a cannibalisation signal. Click a page to see the queries that brought it impressions, then <strong>Filter Queries by this page</strong>.</li>
   </ul>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/gsc.png" alt="The Search Console section">
-    <figcaption>Search Console — Clicks / Impressions / Avg CTR / Avg position tiles and a clicks trend, with a Devices split and the switchable Queries / Pages / Countries / Appearance table.</figcaption>
+    <figcaption>Search performance — Clicks / Impressions / Avg CTR / Avg position tiles and a clicks trend, with a Devices split and the switchable Queries / Pages / Countries / Appearance table.</figcaption>
   </figure>
   <div class="callout"><p><strong>Reporting lag.</strong> Search Console data lands 2–3 days behind, so the most recent days may look sparse. That's Google's lag, not a sync problem.</p></div>
 
   <h2 id="cannibalisation">Cannibalisation — your pages competing with each other</h2>
-  <p><strong>Pages competing with each other</strong> lists the queries where Google shows more than one of your pages, with a severity, impressions, the number of pages and the best position. It flags when Google's main page isn't the one earning the clicks. Filter by severity or click split and sort as you like. <strong>Consolidate</strong> lets you pick the page to keep and copies the redirects for the others (Apache <code>.htaccess</code> format).</p>
+  <p><strong>Pages competing with each other</strong> lists the queries where Google shows more than one of your pages, with a severity, impressions, the number of pages and the best position. It flags when Google's main page isn't the one earning the clicks. Filter by severity or click split and sort as you like. <strong>Make this the main page</strong> records which page should win the query, and the row then shows it. If a competing page is one of your articles, you can have a refresh of that article drafted so it stops competing; it's charged at the real model cost and the changes come back as proposals you approve. <strong>Consolidate</strong> lets you pick the page to keep and copies the redirects for the others (Apache <code>.htaccess</code> format).</p>
 
-  <h2 id="rank-tracker">Rank Tracker — the keywords you chose, followed daily</h2>
-  <p><strong>What it is —</strong> the <strong>Rankings</strong> card follows a fixed set of keywords you pick and checks each one's Google position every day. <strong>Why it matters —</strong> it's the one section that answers <em>"are the keywords I care about moving up or down?"</em> <span class="badge gated">Pro add-on</span></p>
+  <h2 id="rank-tracker">Keywords → Tracked — the keywords you chose</h2>
+  <p><strong>What it is —</strong> the rank tracker follows a fixed set of keywords you pick and checks each one's Google position on the <a href="#schedules">schedule</a> you set, or whenever you press <strong>Check now</strong>. <strong>Why it matters —</strong> it's the one section that answers <em>"are the keywords I care about moving up or down?"</em> <span class="badge gated">Pro add-on</span></p>
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/seo/rank-tracker.png" alt="The Rank Tracker section">
-    <figcaption>Rank Tracker — the <strong>Rankings</strong> card with <strong>Add keywords</strong> and <strong>Check now</strong>; once checks have run, the tiles, the distribution and the tracked-keywords table fill in.</figcaption>
+    <figcaption>The rank tracker (Keywords → Tracked) with <strong>Add keywords</strong> and <strong>Check now</strong>; once checks have run, the tiles, the distribution and the tracked-keywords table fill in.</figcaption>
   </figure>
   <ul class="feat">
-    <li><strong>Add keywords</strong> — one per line or comma-separated. Choose the device (<strong>Desktop</strong> / <strong>Mobile</strong>) and the location (<strong>All of GR</strong> or one city), then <strong>Track these</strong>. Keywords are checked daily in Greek results. <strong>Check now</strong> runs a check immediately. <em>Change device or location</em> on a row moves an existing keyword.</li>
+    <li><strong>Add keywords</strong> — one per line or comma-separated. Choose the device (<strong>Desktop</strong> / <strong>Mobile</strong>) and the location (the whole country or one city), then <strong>Track these</strong>. Keywords are checked in the website's <a href="#market">search market</a>, and tracking is refused until a market is set. <strong>Check now</strong> runs a check immediately. <em>Change device or location</em> on a row moves an existing keyword.</li>
     <li><strong>Tiles</strong> — <strong>Visibility</strong> (share of tracked keywords in the top 10), <strong>Avg. position</strong>, <strong>Ranking</strong> (how many rank, how many are outside the top 100) and <strong>Could not check</strong>. A failed check is <em>unknown, not unranked</em>, and neither failures nor unranked keywords distort the averages.</li>
-    <li><strong>Visibility over time</strong>, the distribution across bands (Top 3 · 4–10 · 11–30 · 31–100 · Not ranking), and the <strong>Tracked keywords</strong> table with position, change, trend and ranking page. You can filter it by country, device, location and source.</li>
+    <li><strong>Visibility over time</strong>, the distribution across bands (Top 3 · 4–10 · 11–30 · 31–100 · Not ranking), and the <strong>Tracked keywords</strong> table with position, change, trend and ranking page. You can filter it by country, device, location, source, tag, movement, position band and SERP block.</li>
     <li><strong>Found in Search Console</strong> — keywords your site already shows up for, with a verdict (<em>Earning clicks</em>, <em>Recurring</em>, <em>Near page one</em>, <em>Below the bar</em>). Switch on <strong>Add qualifying keywords automatically</strong> to have them tracked up to a ceiling you set. Stopping tracking a keyword also stops it being suggested back.</li>
   </ul>
-  <div class="callout"><p><strong>Drops are surfaced.</strong> When keywords fall out of the top 10, the platform raises a <a href="flows.html">Flow</a> event to owners and admins.</p></div>
+  <div class="callout"><p><strong>Drops are confirmed before they're announced.</strong> One live Google read is a sample, so a reading that leaves the top 10 is re-read straight away. Only a confirmed drop raises a <a href="flows.html">Flow</a> event to owners and admins, and the alert opens the SEO assistant with the keyword and the page that was ranking. When Google hides a result behind its own redirect link, the tracker still records which of your pages ranks.</p></div>
 
-  <h2 id="serp-features">SERP Features</h2>
-  <p>For your tracked keywords: which search features appear on the results page (AI Overview, featured snippet, People Also Ask, image pack…), whether each one <strong>cites you</strong>, and which keywords show the feature <strong>without</strong> you. A feature you're absent from is a finding, not a gap in the list. Counters show how many keywords were <em>Checked</em>, are <em>Unknown</em> (the latest check failed) or were <em>Never checked</em>. <strong>Refresh</strong> re-reads them.</p>
+  <h2 id="serp-features">Keywords → SERP features</h2>
+  <p>Google decides which blocks appear on a results page; this view only reports them, from the rank checks. For your tracked keywords: which search features appear on the results page (AI Overview, featured snippet, People Also Ask, image pack…), whether each one <strong>cites you</strong>, and which keywords show the feature <strong>without</strong> you. A feature you're absent from is a finding, not a gap in the list. Counters show how many keywords were <em>Checked</em>, are <em>Unknown</em> (the latest check failed) or were <em>Never checked</em>. <strong>Refresh</strong> re-reads them.</p>
 
-  <h2 id="backlinks">Backlinks</h2>
-  <p>From the backlink index: <strong>Backlinks</strong>, <strong>Referring domains</strong>, <strong>Referring main domains</strong>, <strong>Domain rank</strong>, <strong>Spam score</strong> and <strong>Broken backlinks</strong>, plus a <strong>Referring domains</strong> list (linking site, its rank, anchor, which of your pages it links to, first seen). Use <strong>Snapshot now</strong> or <strong>Refresh</strong>. If the list can't be fetched it says <em>Unknown, not zero</em>. (Ranking keywords used to sit here; they're now on Overview.)</p>
+  <h2 id="authority">Authority</h2>
+  <p><strong>Backlinks &amp; Authority</strong> — from the backlink index: <strong>Backlinks</strong>, <strong>Referring domains</strong>, <strong>Referring main domains</strong>, <strong>Domain rank</strong>, <strong>Spam score</strong> and <strong>Broken backlinks</strong>, plus a <strong>Referring domains</strong> list (linking site, its rank, anchor, which of your pages it links to, first seen). Use <strong>Snapshot now</strong> or <strong>Refresh</strong>. If the list can't be fetched it says <em>Unknown, not zero</em>.</p>
+  <p><strong>Audit history</strong> — one <strong>Domain History</strong> series for your own domain: rank, keywords, traffic, referring domains and backlinks per capture, earlier audits included. <strong>Snapshot</strong> takes one now; the <a href="#schedules">Domain tracking</a> schedule keeps it going. When the data provider changes how it estimates traffic, figures from either side of that change are not compared, and the tile says why.</p>
 
   <h2 id="competitors">Competitors</h2>
-  <p>A one-year chart of you against your rivals, switchable between organic traffic, keywords, traffic value, referring domains and domain rank. Under <strong>Tracked domains</strong>, rivals are measured on the same weekly run and in the same market as you. Some are <em>suggested</em>; add your own with <strong>Add competitor</strong>. Their keywords are kept, and feed the <em>New page</em> ideas in <em>What to do next</em>.</p>
+  <p>A one-year chart of you against your rivals, switchable between organic traffic, keywords, traffic value, referring domains and domain rank. Under <strong>Tracked Domains</strong>, rivals are measured on the same Domain tracking run and in the same market as you. Some are <em>Suggested</em>; add your own with <strong>Add competitor</strong>. Their keywords are kept, and feed the <em>New page</em> ideas in <em>What to do next</em>.</p>
+  <h3 id="keyword-gap">Keyword Gap</h3>
+  <p>What your active competitors rank for that this site neither ranks for nor tracks: the keyword, which competitors rank, their best position and the volume, with the <a href="#keyword-actions">keyword actions</a> on each row. With no competitors, or nothing collected yet, it says so instead of showing an empty table.</p>
 
-  <h2 id="domain-audits">Domain Audits</h2>
-  <p>Weekly tracking of your own domain. Click <strong>Track this domain</strong> to start. It shows rank, organic traffic and the last audit, plus a history of each audit (rank, keywords, traffic, referring domains, backlinks, spam, cost).</p>
-
-  <h2 id="keyword-research">Keyword Research</h2>
-  <p>Your saved research runs: target keyword, topic, volume, difficulty, CPC, competition, opportunity, trend and more. Each row has a <strong>Track</strong> icon; <strong>New research</strong> starts one. Opening a run shows its <em>Keyword clusters</em>, which you can <strong>Save as plan</strong> into the <a href="seo-articles.html#topic-plan">Topic plan</a>. If a page of yours already ranks for the keyword, it warns you before you write a competing article. The <em>Asked of AI</em> tile (<strong>Check AI volume</strong>) shows how often the term is asked of AI assistants.</p>
+  <h2 id="keyword-research">Keywords → Research</h2>
+  <p>Your saved research runs: target keyword, topic, volume, difficulty, CPC, competition, opportunity, trend and more. Each row has the <a href="#keyword-actions">keyword actions</a>; <strong>New research</strong> starts one. Opening a run shows its <em>Keyword clusters</em>, which you can <strong>Save as plan</strong> into the <a href="seo-articles.html#topic-plan">Topic plan</a>. If a page of yours already ranks for the keyword, it warns you before you write a competing article. The <em>Asked of AI</em> tile (<strong>Check AI volume</strong>) shows how often the term is asked of AI assistants.</p>
   <h3>Keyword ideas for one of your pages</h3>
   <ol>
     <li>In <strong>Suggested from your pages</strong>, type part of a page title or URL and pick the page.</li>
@@ -148,19 +164,29 @@
   </ol>
   <p>Every row has <strong>Research</strong> and <strong>Track</strong> buttons. Below, <em>Page titles not yet tracked or researched</em> lists pages you haven't worked on yet.</p>
 
-  <h2 id="crawl">Site Crawl</h2>
-  <p><strong>Full site crawl</strong> audits your pages for technical problems. Click <strong>Crawl the site</strong> (later <strong>Crawl again</strong>). It shows pages read, an on-page score, issues (with the change since the last crawl) and pages affected. Issues are grouped: <em>Cannot be indexed</em>, <em>Broken links</em>, <em>Redirect chains</em>, <em>Duplicate titles or descriptions</em>, <em>Duplicate content</em>, <em>Pages returning an error</em>. Each group has a <strong>Fix:</strong> line and <strong>Show all</strong>. Pages that couldn't be fetched are flagged as unknown, not clean.</p>
+  <h2 id="crawl">Site Health → Site Crawl</h2>
+  <p><strong>Full site crawl</strong> audits your pages for technical problems. Click <strong>Crawl the site</strong> (later <strong>Crawl again</strong>). It shows pages read, an on-page score, issues (with the change since the last crawl) and pages affected. Issues are grouped: <em>Cannot be indexed</em>, <em>Broken links</em>, <em>Redirect chains</em>, <em>Duplicate titles or descriptions</em>, <em>Duplicate content</em>, <em>Pages returning an error</em>. Each group has a <strong>Fix:</strong> line and <strong>Show all</strong>. Pages that couldn't be fetched are flagged as unknown, not clean. Each issue row with a URL has <strong>Ask JARVIS to fix</strong>, which hands the page and the issue to the assistant to explain the problem and draft the exact change, and <strong>Open article</strong> when the page is one of your articles.</p>
 
-  <h2 id="health">Page Health</h2>
-  <p>The <strong>Site Health</strong> card runs a Lighthouse (Core Web Vitals) and on-page audit of your homepage. Use <strong>Run check</strong> or <strong>Re-check</strong>. It shows On-page SEO, Performance, Accessibility and Best practices gauges, and <em>What we checked</em>, group by group. An audit that returned no data shows as <strong>Audit failed</strong> with the cause, never as a clean score.</p>
+  <h2 id="pages">Site Health → Pages</h2>
+  <p>Every sitemap page with what the crawl read, its Search Console clicks and impressions over 28 days, its on-page score and its open proposals. Tiles count <strong>Pages Known</strong>, <strong>Pages Read</strong>, <strong>Pages Reviewed</strong>, <strong>Open proposals</strong> and <strong>Applied</strong>. Click a page to open its drawer:</p>
+  <ul class="feat">
+    <li><strong>What the crawl read</strong> — title, description, canonical, language, word count and status.</li>
+    <li><strong>What Google shows it for (90 days)</strong> — its Search Console queries, with striking-distance ones marked.</li>
+    <li><strong>On-page audit</strong> — <strong>Audit</strong> runs the on-page checks for this one URL.</li>
+    <li><strong>Review</strong> — a charged AI review of the page with concrete proposals, each with <strong>Copy</strong> and <strong>Dismiss</strong>. A proposal is marked applied on its own once the crawler finds it on the live page, and stale if the page changed to something else.</li>
+  </ul>
 
-  <h2 id="llms">llms.txt</h2>
+  <h2 id="health">Site Health → Page Health</h2>
+  <p>The <strong>Site Health</strong> card runs a Lighthouse (Core Web Vitals) and on-page audit of your homepage. Use <strong>Run check</strong> or <strong>Re-check</strong>. It shows On-page SEO, Performance, Accessibility and Best practices gauges, and <em>What we checked</em>, group by group. Failing checks can be handed to the assistant, like crawl issues. An audit that returned no data shows as <strong>Audit failed</strong> with the cause, never as a clean score.</p>
+
+  <h2 id="llms">Site Health → llms.txt</h2>
   <p>Builds an <code>llms.txt</code> file from your crawled pages, leaving out pages that return errors or have left the sitemap. Use <strong>Rebuild</strong>, <strong>Copy</strong> or <strong>Download</strong>, then host it yourself at <code>/llms.txt</code>. The platform never writes to your site.</p>
 
-  <h2 id="reports">Toolkit Runs and Reports</h2>
+  <h2 id="reports">Reports</h2>
   <ul class="feat">
     <li><strong>Toolkit Runs</strong> — a log of the research and audit runs the assistant made for this website.</li>
-    <li><strong>Reports</strong> — <strong>New report</strong> builds a saved report from the sections you tick: Search presence, Rank tracker, Search Console, Analytics, Site health, Full site crawl, AI visibility, Competitors and Competing pages. Choose <em>Every month</em>, <em>Every week</em> or <em>Only when I ask</em>. Each build is frozen with its own period, so an old report keeps its own numbers. <strong>Build now</strong> builds one immediately.</li>
+    <li><strong>Reports</strong> — <strong>New report</strong> builds a saved report from the sections you tick: Search presence, Rank tracker, Search Console, Analytics, Site health, Full site crawl, AI visibility, Competitors and Competing pages. Choose <em>Every Month</em>, <em>Every Week</em> or <em>Only when I ask</em>. Each build is frozen with its own period, so an old report keeps its own numbers. <strong>Build now</strong> builds one immediately.</li>
+    <li><strong>Schedules</strong> — which paid collectors run, and how often. See <a href="#schedules">above</a>.</li>
   </ul>
 
   <h2>What it affects elsewhere</h2>

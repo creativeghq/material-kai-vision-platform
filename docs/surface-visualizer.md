@@ -47,6 +47,20 @@ The library was seeded 2026-09-13 from six of the project cover renders (kitchen
 
 ---
 
+## Room views on moodboards (#560, #561)
+
+A room view lays several of a moodboard's products on one scene (floor in one, wall in another) with the same deterministic renderer, and saves it as a `room_view` presentation sheet ([moodboard-presentation-sheets.md](moodboard-presentation-sheets.md)) — so it inherits moodboard / project / collaborator access, share links, full decks, project client views and the `room_id` link.
+
+- **Editor** — Moodboard → **Room Views** tab (`MoodboardRoomViewsTab`, `RoomViewEditor`); item hover "See it in a room"; the Tools tab routes Room View here instead of the sheet wizard. Project → Rooms → *New room view* opens the room's newest moodboard (creating `<Room> Moodboard` when there is none) at `?tab=room-views&new=1`, and the Rooms tab lists each room's views.
+- **Pins** are derived from the surfaces, placed on the nearest painted point (a wall's centre may be masked). The PDF uses the annotated-render layout: numbered callouts and a legend with format, pattern and joint. A re-render warning shows when a product changed after the render.
+- **Client View** serves the pins; *Ask about this* files client feedback against the sheet. The payload is projected field by field — no cost or supplier.
+- **Private copy** — a save verifies the render landed as the sheet's private copy, read through `moodboardSheetsService.isImagePrivate()` (`sheetAssetPrivacy` requires every read of sheet `data` to go through the service); the public hand-off upload is reaped by the orphan sweep.
+- **To a quote** — coverage → "Add N m² / boxes / pieces to a quote" in the product's own selling unit, refused when the unit is unset rather than read as pieces. Same on `/visualizer` and the chat card, which also offer *Save to moodboard*. `quote_items.room_view_sheet_id` (FK, `ON DELETE SET NULL`) and `quote_items.visualizer_state` record the render a line was quantified from (`added_from = 'visualizer'`); a new room view offers Add to quote only once saved.
+- **Library** scenes gained wall / backsplash surfaces with hand-authored masks (bathroom, bedroom, living, dining walls; kitchen backsplash).
+- Discover product tiles carry "See it on a surface".
+
+---
+
 ## Known limits
 
 - The registry carries no unit column, so the format units are a convention in `tileFormatM`. #447 records the follow-up: a unit on `material_metadata_fields` and `tile_width_m` derived on the surfaces view.

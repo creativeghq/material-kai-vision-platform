@@ -63,9 +63,9 @@ One row per conversation: the first question, the agent, every tool called (with
 empty result and `(x)` for a failure), whether **no tool was called at all**, every hedge the
 assistant wrote (`would confirm`, `I don't have access`, `is not connected`, `switch agents`),
 whether the MODE/Confidence framework was used, whether the reply was the literal
-`No response from agent`, and what the turn cost. Operator-only: SECURITY DEFINER, executable by
-the service role and from the SQL editor, not by signed-in users (an admin page would call it
-through an edge function).
+`No response from agent`, and what the turn cost. It is read in the app: the **Unmet Requests** panel
+on the Agent Harness (`/admin/agents`). The function self-guards on `is_platform_admin()`, so an MCP or
+SQL-editor connection (no JWT) cannot run it.
 
 First run, 2026-09-05, 30 days: 23 conversations, 819 credits, **11 with no tool call at all**, 7
 with an empty or failed call, 8 quick-start direct runs of which 3 ended in `No response from agent`.
@@ -85,7 +85,11 @@ Each finding is a case where the platform held the answer or the tool and the ag
 
 ### 4. Golden cases — *for THIS question, did the agent do THIS?* (costs a model turn each)
 
-`agent_eval_cases` holds questions with expectations:
+`agent_eval_cases` holds questions with expectations. Cases are created, edited, deactivated, deleted
+and re-run from Agent Harness → Quality (**Manage cases**, an inline section); regexes are validated the
+way `agent-eval` compiles them.
+
+Columns:
 
 | Column | Meaning |
 |---|---|
@@ -185,7 +189,7 @@ Guarded by [tests/unit/agentEvalSummary.test.ts](../tests/unit/agentEvalSummary.
 ## Before a manual test session
 
 1. `npm test` — the coverage baseline is honest.
-2. `select * from agent_conversation_audit(7)` — what real users hit this week; open anything
+2. Agent Harness → Unmet Requests (7 days) — what real users hit this week; open anything
    hedged or with no tool call.
 3. Run the golden cases (all, or the family you changed); open the failures' conversations.
 4. Check `data_integrity_findings where check_key = 'agent.reply_quality'`.

@@ -37,7 +37,16 @@ Source of truth: `src/auth/capabilities.ts`, `src/hooks/usePermissions.ts`, `src
 
 ### 1.2 Capabilities (`Capability`)
 
-`platform.admin`, `catalog.import`, `network.manage`, `pricing.manage`, `finance.manage`, `invoice.issue`, `crm.view`, `warehouse.manage`, `downstream.view`, `marketplace.browse`, `quotes.use`, `sales.portal`, `sales.team.view`, `projects.use`, `moodboards.use`, `agent.use`, `inbox.use`, `hr.*`, `marketing.email`, `realestate.*`.
+`platform.admin`, `catalog.import`, `workspace.manage`, `workspace.read`, `network.manage`, `pricing.manage`, `finance.manage`, `finance.operate`, `invoice.issue`, `crm.view`, `warehouse.manage`, `downstream.view`, `marketplace.browse`, `quotes.use`, `sales.portal`, `sales.team.view`, `projects.use`, `moodboards.use`, `agent.use`, `inbox.use`, `hr.*`, `marketing.email`, `marketing.seo`, `realestate.*`.
+
+**Inside a workspace the server checks a capability, not membership (#493).** The per-role table is
+`WORKSPACE_ROLE_CAPABILITIES` in `src/auth/roleCapabilities.ts` — the current snapshot is in
+[role-access-matrix.md §3](role-access-matrix.md). Edge: `userHasWorkspaceCapability` /
+`listWorkspaceIdsWithCapability`; SQL: `has_workspace_capability(ws, cap)` and the helpers built on
+it (`assert_workspace_member` requires `workspace.read`, so a `client` or `employee` login reaches no
+tenant RPC). Every deploy's `sync-capability-matrix` job runs `npm run capabilities:sync`, which
+rewrites `workspace_role_capability_matrix()` when it drifted from the TS table and fails the deploy
+if it still differs. Platform work uses `authenticatePlatformOperator`, never a workspace role.
 
 ### 1.3 Persona→capability matrix
 
@@ -148,7 +157,7 @@ Two `auth.users` INSERT triggers: `create_user_profile_on_signup` (creates `user
 - **`is_workspace_member(workspace_id) → bool`** — active member where `user_id = auth.uid()`.
 - **`assert_workspace_member(p_workspace_id)`** — raises `42501` if `auth.uid()` is set and not a member; **passes silently when `auth.uid()` is null** (service-role calls).
 - **`is_workspace_admin(p_workspace_id) → bool`** — active member with role `admin`/`owner`.
-- **`is_workspace_finance_manager(p_workspace_id) → bool`** — active member `owner`/`admin` **OR** `is_platform_operator()`. The finance-write gate.
+- **`is_workspace_finance_manager(p_workspace_id) → bool`** — holds `finance.operate` there (owner, admin, accountant) **OR** `is_platform_operator()`. The finance-write gate.
   The second branch was an UNBOUND global role check (`admin`/`super_admin`/`finance`) until 2026-08-30, which made anyone holding one of those the finance manager of **every** workspace — and this is the sole gate on `workspace_aade_credentials`, `workspace_inbound_credentials`, `workspace_email_config` and `finance_settings`, i.e. every tenant's AADE password, myDATA key and Resend key (#294).
 - **`userCanAccessWorkspace(adminClient, userId, workspaceId)`** (TS, `_shared/auth.ts`) — edge equivalent.
 
@@ -176,3 +185,21 @@ The support workspace role holds the same capabilities as member, and always has
 - **Approval:** in the Team panel, the approver sets the new access time and how long the PIN lasts. The 6-digit PIN is shown once, stored only as a bcrypt hash, and handed over by the approver in person. Five wrong tries close the request.
 
 workspace_access_requests has no client grant and no client policy, because it holds the PIN hash. Clients reach it only through the SECURITY DEFINER RPCs.
+
+## API keys act in ONE workspace (#496)
+
+A `kai_` key (created from Profile → Keys, bound to the active workspace) is a first-class caller,
+accepted only by functions whose `security` in `scripts/edge-endpoints.json` allows it (default
+deny; operator-only functions are never key-capable). `authenticate()` hands a key caller
+`supabaseAsUser` = an acting client for the key's owner: `public.pre_request` runs a service-role
+request carrying `x-acting-user` as that user (role `authenticated`, `auth.uid()` = owner), so RLS
+and every `auth.uid()`-guarded function apply exactly as in a session.
+
+The key is **fenced to its workspace** at both layers. Database: `pre_request` records
+`request.acting_workspace`; `has_any_workspace_capability` (so `has_workspace_capability` and
+`assert_workspace_member`), `is_workspace_admin` and `is_workspace_member` answer no for any other
+workspace, and a RESTRICTIVE select policy on `workspace_members` hides the owner's other
+memberships. Edge: `withApiLogging` opens a per-request scope, `authenticate()` records the key's
+workspace there, and `userCanAccessWorkspace` / `userHasWorkspaceCapability` / the list helpers
+refuse or filter to it. A key never inherits the platform-operator bypass. `mivaa-gateway` refuses a
+key on uploads, job status and `/api/rag`. Guarded by `edgeAuthIsShared.test.ts`.

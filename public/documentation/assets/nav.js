@@ -32,14 +32,16 @@
       ]},
       { file: "product-3d.html", title: "Product 3D Models", icon: "🧊" },
       { file: "projects.html", title: "Projects", icon: "📁", children: [
-        { file: "projects-overview.html", title: "Overview, costs & team" },
+        { file: "projects-overview.html", title: "Overview, money, visits & team" },
         { file: "projects-tasks.html", title: "Tasks, board & My tasks" },
-        { file: "projects-plan.html", title: "Plan & Estimating" },
+        { file: "projects-plan.html", title: "Estimate" },
         { file: "projects-technical-plans.html", title: "Technical Plans" },
         { file: "projects-blueprints.html", title: "Blueprint Library" },
         { file: "projects-rooms.html", title: "Rooms" },
         { file: "projects-client-view.html", title: "Client View" },
-        { file: "projects-tabs.html", title: "Other tabs" },
+        { file: "projects-tabs.html", title: "Kinds, stages & sections" },
+        { file: "kitchen-design.html", title: "Kitchen Design" },
+        { file: "installation-guides.html", title: "Installation Guides" },
       ]},
       { file: "quotes.html", title: "Quotes & Requests", icon: "🧾", children: [
         { file: "quotes-build.html", title: "Build & send a quote" },
@@ -47,6 +49,7 @@
       ]},
       { file: "crm.html", title: "CRM", icon: "👥", children: [
         { file: "crm-users.html", title: "Users" },
+        { file: "crm-leads.html", title: "Leads" },
         { file: "crm-contacts.html", title: "Contacts" },
         { file: "crm-companies.html", title: "Companies" },
         { file: "crm-deals.html", title: "Deals & Pipeline" },
@@ -118,7 +121,6 @@
     { title: "Network & Tools", items: [
       { file: "discover.html", title: "Discover & Network", icon: "🌐", children: [
         { file: "discover-profiles.html", title: "Profiles" },
-        { file: "discover-factory.html", title: "Brands" },
         { file: "discover-products.html", title: "Products" },
         { file: "discover-marketplace.html", title: "Marketplace" },
         { file: "discover-network.html", title: "Network" },
@@ -154,6 +156,8 @@
       { file: "company-assets.html", title: "Company Assets", icon: "🚗" },
       { file: "contracts.html", title: "Contracts & e-Signature", icon: "✍️" },
       { file: "email-marketing.html", title: "Email Marketing (BYOK)", icon: "📣" },
+      { file: "signals.html", title: "Signals", icon: "📡" },
+      { file: "page-monitoring.html", title: "Page Monitoring", icon: "👁️" },
       { file: "seo.html", title: "SEO & Content", icon: "📈", children: [
         { file: "seo-websites.html", title: "Connected Websites & GSC" },
         { file: "seo-website-analytics.html", title: "Website Analytics (GA4)" },

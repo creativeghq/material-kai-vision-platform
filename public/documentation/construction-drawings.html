@@ -9,11 +9,11 @@
 <body>
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="construction.html">Construction</a> / Drawings &amp; markup</div>
-  <h1>Construction · Drawings &amp; Markup</h1>
+  <h1>Construction · Drawings, Markup &amp; Takeoff</h1>
   <div class="routes"><span class="badge route">/projects/:id?tab=documents</span> <span class="badge gated">owner (write)</span></div>
-  <p class="lead">The <strong>Drawings &amp; documents</strong> register is a <em>controlled</em> drawing register — not a folder of files. Each drawing is a numbered slot; revisions stack under it and exactly one is marked <strong>current</strong>, so a client (or a trade on site) is only ever shown the <strong>current revision, never an older one</strong>. From a drawing you can also <strong>mark it up</strong> — cloud the bit that's wrong, measure it, and raise it as an <a href="construction-requests.html">RFI</a> in one step.</p>
+  <p class="lead">The <strong>Drawings &amp; documents</strong> register is a <em>controlled</em> drawing register — not a folder of files. Each drawing is a numbered slot; revisions stack under it and exactly one is marked <strong>current</strong>, so a client (or a trade on site) is only ever shown the <strong>current revision, never an older one</strong>. Drawings also feed the <a href="#takeoff">takeoff</a>, which reads quantities off the PDFs into a quote, and you can <strong>mark one up</strong> — cloud the bit that's wrong, measure it, and raise it as an <a href="construction-requests.html">RFI</a> in one step.</p>
 
-  <div class="callout"><p><strong>Where:</strong> open a construction <a href="projects.html">project</a> → the <strong>Delivery</strong> stage → the <strong>Drawings &amp; documents</strong> section (<span class="badge route">?tab=documents</span>). Adding, revising and marking up are owner-only; collaborators and clients see the current revision of the sheets you've made visible.</p></div>
+  <div class="callout"><p><strong>Where:</strong> open a <a href="projects.html">project</a> → the <strong>Delivery</strong> stage → the <strong>Documents</strong> section (<span class="badge route">?tab=documents</span>). Adding, revising and marking up are owner-only; collaborators and clients see the current revision of the sheets you've made visible.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/drawings.png" alt="The Drawings & documents register">
@@ -34,6 +34,21 @@
   <h2>Revisions</h2>
   <p><strong>Upload revision</strong> suggests the next letter/number and asks for the file, the <strong>date printed on the sheet</strong> (“Issued on” — deliberately <em>not</em> defaulted to today, because it's the sheet's own date), what it was <strong>issued for</strong>, and what changed. The new one becomes current; <strong>the previous revision is kept and stays viewable</strong>. That's the whole point of a register: history is never lost, and everyone downstream sees the same current sheet.</p>
 
+  <h2 id="takeoff">Takeoff from drawings</h2>
+  <p><strong>What it is —</strong> quantities read off the project's drawing PDFs and the engineer's study, reviewed by a person and added to a quote. <strong>Why it matters —</strong> a construction job can start from the drawings the client hands you, without retyping a προμέτρηση or counting doors by hand.</p>
+  <div class="callout"><p><strong>Where:</strong> the <strong>Specification</strong> stage → <strong>Estimate</strong> → <strong>From Drawings</strong> (on a Construction Contract project, or with Drawing Takeoff switched on under <a href="projects-tabs.html#sections">Sections</a>). <strong>Start from drawings</strong> on the Projects list creates a construction project and opens this view. Uploads are <strong>PDF only</strong>.</p></div>
+  <ol>
+    <li><strong>Add the drawings.</strong> The list shows each drawing with its <em>Status</em> (Not analysed, Analysing…, Failed), Pages, To Review and Confirmed counts.</li>
+    <li><strong>Analyse</strong> a drawing (one credit). Each page is sorted into <strong>CAD-exported</strong> or <strong>Scanned</strong>. On CAD-exported pages the printed scale, room area labels, door swings and wall lines are read; printed tables — the προμέτρηση and door, window and radiator schedules — are transcribed; on scanned pages symbols are counted. <em>Scans give counts only, never lengths.</em></li>
+    <li><strong>Review on the sheet.</strong> Everything arrives as a proposal in the <strong>Quantities</strong> list, tagged with where it came from — <em>Printed</em>, <em>Detected</em>, <em>Counted</em>, <em>Seen on scan</em> or <em>By hand</em>. Pick rows to highlight them on the sheet, then <strong>Confirm</strong> or <strong>Reject</strong> each one.</li>
+    <li><strong>Measure what is missing</strong> with the sheet tools: <strong>Find all like this</strong> (drag a box tightly around one symbol to count every match — CAD-exported pages only), <strong>Count</strong> (click each item), <strong>Length</strong> (click along a run, double-click to finish), <strong>Area</strong> (click round the outline, double-click to close) and <strong>Set scale</strong> (click both ends of a dimension you know and type its <em>Real Length</em>).</li>
+    <li><strong>Add to quote.</strong> Tick confirmed rows and press <strong>Add N to quote</strong>: choose a quote (or <em>New draft quote</em>) and a line (or <em>New line</em>). The quantity comes from the confirmed measurements; you set the rate on the quote. One quote line has one unit, so rows in different units are added separately.</li>
+  </ol>
+  <div class="callout warn"><p><strong>No scale, no length.</strong> A sheet with no scale says <em>“No scale — lengths and areas need one”</em>, and a measured length or area cannot be confirmed until the scale is set. Setting the scale later re-derives every measurement on that sheet.</p></div>
+  <h3 id="takeoff-revisions">When a drawing is revised</h3>
+  <p>Analysing a new revision compares it with the previous one. Areas that changed are shaded on the sheet (<em>“Shaded areas changed since the previous revision”</em>), confirmed measurements inside them are flagged for remeasure, and the <a href="construction-commercial.html#quotes">Quotes</a> section warns on the lines they feed. After checking a row, mark it <strong>Checked against the new revision</strong>.</p>
+  <p><strong>From chat:</strong> the assistant's <em>drawing takeoff</em> tool can report status and start an analysis, and can confirm transcribed printed rows only after you press Approve. Counted and measured figures are confirmed only by a person on the sheet.</p>
+
   <h2>Marking up a drawing → an RFI</h2>
   <p><strong>What it is —</strong> the <strong>Mark up</strong> action on a drawing opens a viewer where you can <strong>cloud</strong>, box, arrow, add a note, and <strong>measure</strong> — then raise the marked region as an <a href="construction-requests.html">RFI</a>. <strong>Why it matters —</strong> “this dimension doesn't work” is far clearer as a cloud on the exact spot than as a sentence.</p>
   <ol>
@@ -44,7 +59,7 @@
 
   <div class="callout tip"><p><strong>Worked example.</strong> A subcontractor flags a clash. Open the current architectural sheet → <strong>Mark up</strong> → cloud the clash, set the scale off a known 3000&nbsp;mm grid line, measure the overlap → add the note and <strong>Raise as RFI</strong>. It lands in the project's <a href="construction-requests.html">Requests</a> register as a numbered RFI, tied to that sheet, with the marked-up PDF attached.</p></div>
 
-  <div class="callout"><p><strong>From chat:</strong> the drawing register and markup are UI tools — the assistant doesn't operate them.</p></div>
+  <div class="callout"><p><strong>From chat:</strong> the drawing register and markup are UI tools — the assistant does not operate them.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

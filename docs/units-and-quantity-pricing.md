@@ -67,6 +67,17 @@ rewrite of every stock movement:
 Ordinary movements (manual issue, transfer, adjust) are untouched: they are entered in the stock
 row's own unit, so there is nothing to convert.
 
+### How many tiles — one derivation
+
+`tile_line_quantity` (SQL) is the one answer to "how many tiles/boxes to order" for an area. The
+quote-line tile calculator passes the line's size, and box size is read per size through
+`product_pack_coverage` (an estimated box size is flagged). The agent's `plan_tile_installation`
+takes a product (and size) plus rooms — stated sizes, areas read off an attached floor plan and
+confirmed by the user, or the rooms confirmed on a project's floor-plan drawing — and takes its
+order quantity from the same function; the guide engine supplies only adhesive, grout, spacers and
+the laying steps. The visualizer's installation studio and the guide page show `computeCoverage`
+(coverage, not an order quantity) with the workspace's per-pattern cutting allowance.
+
 ## Quantity discounts
 
 `public.product_price_breaks` — "from 5 pallets, 15% off" or "from 5 pallets, €450 each".

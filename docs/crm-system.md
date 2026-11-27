@@ -1,17 +1,17 @@
 # CRM System
 
-Customer Relationship Management — contacts, companies, and user account management for workspace admins.
+Customer Relationship Management — leads, contacts, companies, the workspace team, and (for the platform operator) platform accounts.
 
 ---
 
 ## Overview
 
-The CRM provides workspace admins with a unified view of contacts, companies, and platform users. It integrates with the messaging system (WhatsApp via Zernio / email campaigns), the quotes system, and the [Finance / Orders](orders-system.md) layer.
+The CRM gives a workspace one place for its leads, contacts, companies and team. It integrates with the messaging system (WhatsApp via Zernio / email campaigns), the quotes system, and the [Finance / Orders](orders-system.md) layer.
 
-**Admin Route:** `/admin/crm`
+**Route:** `/crm` (tabs `?tab=pipeline|leads|users|contacts|companies|categories`), record pages `/crm/leads/:id`, `/crm/contacts/:id`, `/crm/companies/:id`, `/crm/users/:id`. Gated by the `crm.view` capability.
 
 ### Finance / Orders integration
-- **Company page tabs:** **Account** (balance + ledger) and **Orders** (the company's orders; quotes/invoices/payments are now viewed *inside* each order, not as separate tabs). The net figure is labelled **"Account balance (they owe us / we owe them / settled)"**.
+- **Account tab** (`PartyAccountTabs`, the same component on companies and contacts): a pinned `CustomerAccountOverview`, then one `OpeningBalanceCard` per side the party is on (customer / supplier) — **Set opening balance** (as of, direction, amount, currency, source, note; entries dated on or before it are shown but not counted again) and **Record payment on account** (`RecordPaymentDialog`, seeded with the opening date) — then tabs **Orders**, **Payments**, **Issued Invoices** (every party, with **New invoice** prefilled to the party), **Received Invoices** (supplier companies: what they filed on myDATA, flagging rows not yet in Expenses), **Top Items** and **Payment Rules**. The net figure is **"Account balance (they owe us / we owe them / settled)"**.
 - **Business-contact rollup:** a quote/invoice for a contact who belongs to a business is attributed to the **company** (quotes enforce an at-most-one-party constraint, so the contact is dropped on a quote; invoices keep both with company precedence). Linking a contact to a company re-points their existing contact-level quotes/invoices to it.
 - **Parties (Finance):** contacts that belong to a business are **hidden** from the Customers & Suppliers list — the business represents them.
 - **Contacts list:** the company column shows the **attached business** (via the `crm_company_contacts` junction), not only the legacy free-text field.
@@ -101,33 +101,58 @@ on render.
 - **`embedding_status='skipped'` is a verdict, not an absence.** A company whose only fact is its name is not embedded: that vector would encode spelling and rank strangers as lookalikes. Left `pending` it would also be re-picked on every run forever.
 - Guarded by `ops.crm_company_embeddings_never_written` — see [prevention-coverage.md](prevention-coverage.md).
 
-**Routes:**
-- `/admin/crm` (companies tab)
-- `/admin/crm/companies/:id` (company detail)
-- `CompanyDetailPage.tsx`
+**Agencies / dealers:** `crm_company_representations` links an agent to a principal (factory) with an arrangement, the agency person, and `material_category_id` — the **range covered** (NULL = whole range). The pair key is (agent, principal, range), so one factory can have a different agency per range. Last contact is `crm_representation_last_contact()`: the latest of the hand-set `last_contact_on`, CRM calls/emails, past meetings and Inbox messages from the agency's people.
+
+**Quick add from a VAT number:** `splitPartyQuery` routes a bare 9-digit ΑΦΜ, `EL`/`GR`+ΑΦΜ, or a known EU prefix + mostly numeric body to the VAT field (and country) of `QuickAddCompanyDialog`, so Enter runs the ΑΑΔΕ / VIES lookup. A lookup that fails or is unsupported leaves a note on screen; the party can still be added with the VAT as typed.
+
+**Website confirmation by EU VAT:** the site check reads EU VAT numbers printed on a company's website, confirms them in VIES and requires the registered name to match the company. `company-enrich` `verify_only` (platform operator, no billing) re-checks web-sourced websites and fills a blank `vat_number`; it never changes the website.
+
+**Signals tab:** every saved company has a Signals tab (`CompanySignalsPanel`, read from its website): open roles, technologies, intent, careers page — each section module-gated (`signals-*`) and explaining why it is empty.
+
+**Routes:** `/crm?tab=companies`, `/crm/companies/:id` (`CompanyDetailPage.tsx`).
+
+### Leads
+
+An enquiry that is not a contact yet. `crm_leads` (workspace-scoped): name, email, phone, company
+name, `source` (email | phone | website | whatsapp | walk_in | referral | social | other), `title`
+(Interested In), `request`, `status` (new | contacted | quoted | lost | converted), `lost_reason`,
+estimated value, follow-up date, `source_ref`, and for captured leads `capture_flow_id`,
+`conversation_summary`, `conversation_synced_at`, `auto_tracking`. Vocabulary:
+`src/modules/crm/leadVocabulary.ts` (mirrored to Deno). Leads never appear in Contacts.
+
+- **UI:** CRM → Leads (`LeadsPanel`: list or `?view=board`; dragging a card changes status, dropping on Converted opens the convert dialog) and `/crm/leads/:id` (`LeadDetailPage`, HubRecordPage: details, Quotes, Request, Activity, Conversation).
+- **Quotes before a contact exists:** `quotes.lead_id`. Creating or linking a quote moves a new/contacted lead to `quoted`; the Quotes list shows the lead's name as customer.
+- **Activity:** `crm_notes` / `crm_activities` / `crm_meetings` accept target kind `lead`; `crm_record_timeline` has a lead branch. A legacy `crm_leads.notes` renders read-only as Earlier Notes. `_crm_lead_target_guard` stamps `workspace_id` from the target record for every kind (lead/contact/company/deal) and requires `crm.view` or `finance.operate` there.
+- **Convert:** `convert_crm_lead()` is the one path to a contact. It reuses a same-email contact, carries the lead history as a note, hands linked quotes to the contact (and deal), optionally opens a deal whose stage follows the lead status with the follow-up as a task, and replays on a repeat call (`already_converted`). A converted lead's timeline shows on its contact; deleting a converted lead moves it there.
+- **Capture:** an `inquiry_received` flow creates leads from matching inbound email / WhatsApp through the `create_lead` action — see [flows-notification-system.md](flows-notification-system.md#inquiry--lead-is-a-flow). A reply from the team moves a `new` lead to `contacted` (trigger on member/agent WhatsApp messages; Gmail SENT history for email).
+- **Conversation sync:** background agent `lead-conversation-sync` (every 30 min, operator workspace) reads open auto-tracked leads' conversations with new messages (fenced as data; prompt `agent/lead_conversation_sync` in `prompts`) and writes summary, status and follow-up through `apply_lead_conversation_sync`, which never moves status backwards or to `converted`. A status change by any other writer switches `auto_tracking` off; the lead page has Stop / Resume syncing.
 
 ### Users
 
-Platform user accounts. Admins can view all workspace users, update roles, and manage permissions.
+CRM → Users is the **workspace team** for every workspace: `TeamPanel` (the same component as
+Finance → Settings → Team and Profile → Team) — invite with a role, pending invitations, Support
+access, members with role change and removal. The platform operator additionally sees
+`PlatformAccountsPanel` (`CrmUsersTab.tsx`): every platform account with account tier, type,
+subscription, credits and status, bulk actions, and `/crm/users/:id` (`UserDetailPage.tsx`).
+`/admin/users` no longer exists.
 
-**Key fields:** email, role, workspace_id, entity_type (`solo` | `business`), business_id (FK → `crm_companies`), created_at, last_sign_in_at, subscription status
+**Account tiers** (`public.roles`): `user`, `supplier`, `architect`, `admin` — platform-wide.
+Functional roles are workspace roles (see [capabilities-and-tenancy.md](capabilities-and-tenancy.md)).
 
-**Platform roles:** `admin`, `owner`, `super_admin` (admin tier) + `factory`, `dealer`, `user`. The `manager` role was removed 2026-05-23 (collapsed into admin). `dealer` and `factory` are **admin-granted only** — users self-apply via the Role Upgrade Requests flow on the Subscription tab; admins approve on the user detail page. See [user-levels-access.md](user-levels-access.md) for the full role table.
-
-**Routes:**
-- `/admin/crm/users/:id` (user detail)
-- `UserDetailPage.tsx`
+**Delete guards** (`crm-api` users handler, operator-only): refuses the caller's own account, the
+root-workspace owner (409), and any account with an active subscription or a credit balance
+(`user_delete_blockers`); a failed workspace cleanup stops the delete. Bulk actions run one request
+at a time. `DELETE /contacts/:id` maps a `23503` (invoices / supplier bills RESTRICT) to a 409 in
+plain words.
 
 ---
 
 ## Access Control
 
-| Role | Contacts | Companies | Users |
-|---|---|---|---|
-| `admin` / `owner` | Full CRUD | Full CRUD | View + role update |
-| `manager` | Read + write | Read + write | Read only |
-| `factory` | Read own | Read own | None |
-| `member` | None | None | None |
+Inside a workspace the server checks a **capability**, not membership — see
+[capabilities-and-tenancy.md](capabilities-and-tenancy.md). CRM reads and writes need `crm.view`
+(held by owner, admin, member, support, sales, sales_manager and realestate_agent); the team panel's
+controls need `workspace.manage`; platform accounts need the platform operator.
 
 ---
 
@@ -155,6 +180,8 @@ Contacts can be associated with quotes:
 
 | Table | Description |
 |---|---|
+| `crm_leads` | Enquiries not yet contacts (see Leads) |
+| `crm_company_representations` | Agency ↔ factory links, per range (`material_category_id`) |
 | `crm_contacts` | Individual contact records |
 | `crm_companies` | Company records |
 | `crm_contact_company` | Junction: contacts ↔ companies |

@@ -10,23 +10,24 @@
 <main class="content">
   <div class="breadcrumb"><a href="index.html">Docs</a> / CRM</div>
   <h1>CRM</h1>
-  <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/contacts/:id</span> <span class="badge route">/crm/companies/:id</span> <span class="badge gated">crm.view</span></div>
+  <div class="routes"><span class="badge route">/crm</span> <span class="badge route">/crm/leads/:id</span> <span class="badge route">/crm/contacts/:id</span> <span class="badge route">/crm/companies/:id</span> <span class="badge gated">crm.view</span></div>
   <p class="lead">CRM is your relationship hub — the people and companies you do business with, the deals you are working, and the lists you file them under. It's organised into tabs, and each is documented in full (every column, every form field, how to add and edit records, and how it feeds invoicing and outreach) on its own page below.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>CRM</strong>. Switch between the <strong>Pipeline</strong>, <strong>Contacts</strong>, <strong>Companies</strong> and <strong>Categories</strong> tabs. A summary strip across the top shows <strong>Total Contacts</strong> and <strong>Total Companies</strong>. Platform operators also see a <strong>Users</strong> tab and the Total Users / Active Users tiles — for everyone else they are hidden, and a <code>?tab=users</code> link opens Contacts instead.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>CRM</strong>. Switch between the <strong>Pipeline</strong>, <strong>Leads</strong>, <strong>Users</strong>, <strong>Contacts</strong>, <strong>Companies</strong> and <strong>Categories</strong> tabs. A summary strip across the top shows <strong>Total Contacts</strong> and <strong>Total Companies</strong>.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/crm/crm.png" alt="CRM Management with the four tabs and summary counts">
-    <figcaption>CRM Management — summary counts and the tabs (shown as a platform operator, who also sees Users).</figcaption>
+    <figcaption>CRM Management — summary counts and the tabs.</figcaption>
   </figure>
 
   <h2>The tabs</h2>
   <div class="cards">
     <a class="card" href="crm-deals.html"><div class="ico">📊</div><h3>Pipeline</h3><p>Deals moving through per-type stages, with a weighted forecast (Pro add-on).</p></a>
+    <a class="card" href="crm-leads.html"><div class="ico">📥</div><h3>Leads</h3><p>Enquiries that are not contacts yet — list or board, quotes, and one-click convert to a contact and deal.</p></a>
     <a class="card" href="crm-contacts.html"><div class="ico">📇</div><h3>Contacts</h3><p>Individual people — lead info, pricing, invoicing &amp; VAT, linked login, what they deal in.</p></a>
     <a class="card" href="crm-companies.html"><div class="ico">🏢</div><h3>Companies</h3><p>Organisations, suppliers &amp; customers — ΑΑΔΕ/ΓΕΜΗ, VIES and Peppol checks, bank accounts, agencies &amp; the factories they represent.</p></a>
     <a class="card" href="crm-categories.html"><div class="ico">🗂️</div><h3>Categories</h3><p>Your own colour-coded categories and the shared Industry / lead lists, in one table.</p></a>
-    <a class="card" href="crm-users.html"><div class="ico">🧑‍💻</div><h3>Users</h3><p>Platform user administration — account tiers, subscriptions, credits. Platform operators only.</p></a>
+    <a class="card" href="crm-users.html"><div class="ico">🧑‍💻</div><h3>Users</h3><p>Your workspace's members, roles and invitations. Platform operators also see every platform account.</p></a>
   </div>
 
   <h2>Adding a person or a business — one question first</h2>
@@ -72,7 +73,7 @@
     <li>Categories power targeted email outreach such as "Send to Customers" on catalogs.</li>
   </ul>
 
-  <div class="callout"><p>CRM is gated by the <code>crm.view</code> capability. Platform user administration (account tiers, subscriptions, credits, <em>Add user</em>) belongs to the platform operator: the <strong>Users</strong> tab appears only for operators, and an ordinary member never lands on it.</p></div>
+  <div class="callout"><p>CRM is gated by the <code>crm.view</code> capability. On the <strong>Users</strong> tab every workspace sees its own team; platform user administration (account tiers, subscriptions, credits, <em>Add user</em>) appears below it only for the platform operator.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

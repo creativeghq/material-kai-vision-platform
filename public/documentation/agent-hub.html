@@ -31,9 +31,9 @@
     <li>Click <strong>New Conversation</strong> to begin a fresh thread.</li>
     <li>Pick an <a href="agent-agents.html">agent</a> above the composer (see step 2).</li>
     <li>Type your request in plain language and send it.</li>
-    <li>To return to earlier work, reopen any past conversation from the list on the left — it picks up exactly where you left off.</li>
+    <li>To return to earlier work, click <strong>Conversations</strong> (labelled <strong>History</strong> on a phone) in the agent header — it picks up exactly where you left off. <strong>New</strong>, beside it, starts a fresh thread.</li>
   </ol>
-  <p>Your past chats live in a <strong>conversation manager</strong> you open with <strong>⌘K</strong> (a command-palette style modal) — search, reopen, rename or delete any thread from there. Moving conversations into ⌘K keeps the main screen clear for the canvas and the current chat.</p>
+  <p>Your past chats live in a <strong>conversation manager</strong> you open from <strong>Conversations</strong> or with <strong>⌘K</strong> / <strong>Ctrl+K</strong> (a command-palette style modal) — search, reopen, rename or delete any thread from there. Moving conversations into ⌘K keeps the main screen clear for the canvas and the current chat.</p>
   <p><strong>What it affects elsewhere:</strong> start a <strong>new conversation</strong> for a new topic so contexts don't bleed into each other; keep one thread going when you're iterating on the same task.</p>
 
   <!-- 2 -->
@@ -61,6 +61,7 @@
     <li><strong>🎤 Voice</strong> — dictate your message instead of typing. Where the browser can caption live speech you see the words as you talk; where it cannot (Firefox and some Android browsers), the microphone <strong>records</strong> instead and the recording is transcribed into the message box (<em>“Transcribing…”</em>) for you to check before sending.</li>
     <li><strong>🌐 Inspiration URL</strong> — paste a web page; the assistant extracts its palette, materials and style and finds matching products.</li>
     <li><strong>Core / + Toolkit</strong> — the assistant's available tool set; the toolkit expands as your plan/role unlocks more.</li>
+    <li><strong>Auto-approve</strong> — a switch beside the agent picker. Off (the default), the assistant asks once per message before it changes anything; on, the actions it proposes run without asking. See <a href="#approvals">Approving what the assistant does</a>.</li>
   </ul>
   <h3>How to write a good request</h3>
   <ol>
@@ -108,6 +109,22 @@
   </ul>
   <div class="callout"><p><strong>When a turn fails, it says why — and costs nothing.</strong> If the AI service behind the assistant is unavailable, the reply is a plain sentence explaining that, not a block of technical error text, and the failed turn is not charged. A one-click quick-start that runs a tool directly has no written reply by design; the chat names the quick-start and points you to its result card.</p></div>
 
+  <h2 id="approvals">Approving what the assistant does</h2>
+  <p><strong>What it is —</strong> before the assistant changes anything — saves a record, sends an email, books a bill, shares a view with a client — it shows an <strong>approval card</strong> in the chat instead of acting. <strong>Why it matters —</strong> nothing is written or sent on your behalf until you have seen exactly what will happen.</p>
+  <ul class="feat">
+    <li><strong>One card per message.</strong> Everything a reply proposes is gathered onto a single card. With several actions the buttons read <strong>Approve all N</strong> and <strong>Decline all</strong>; with one, <strong>Approve</strong> and <strong>Decline</strong>. Approving runs the actions in order and then lets the assistant carry on from the result.</li>
+    <li><strong>The card shows its outcome.</strong> Once answered it reads <em>“Approved. Done.”</em>, <em>“Declined. No action was taken.”</em> or, if part of a batch failed, how many succeeded and how many failed. The answer is saved, so reopening the conversation later shows the same outcome.</li>
+    <li><strong>Auto-approve.</strong> Turn on the <strong>Auto-approve</strong> switch in the composer and proposed actions run without asking; each still appears on its card marked <em>“Auto-approved”</em>, with its outcome. To keep a runaway chain in check, one typed message can auto-approve at most three rounds before the assistant waits for you. The switch is remembered in this browser only.</li>
+  </ul>
+
+  <h2 id="results-in-the-chat">Results in the chat</h2>
+  <ul class="feat">
+    <li><strong>Each result card sits inside the message it belongs to</strong> — a room opened early in a conversation stays beside the reply that opened it, not under whatever was posted last.</li>
+    <li><strong>Images in a reply are thumbnails.</strong> Click one to open it full size.</li>
+    <li><strong>Live work belongs to its turn.</strong> A progress tracker sits under the message that started it and ends with that turn; switching agent or starting a new chat clears it.</li>
+    <li><strong>Every result can feed the next step.</strong> After a render, a staging, a materials board or a video, you can say <em>“now animate it”</em>, <em>“re-light it”</em> or <em>“add it to the moodboard”</em> and the assistant uses the result you mean, not an older image. If it is ambiguous, name it (<em>“the staged one”</em>).</li>
+  </ul>
+
   <!-- 5 -->
   <h2>5. Turning results into real artefacts</h2>
   <p><strong>What it is —</strong> many chat actions don't just display in the thread — they create real objects that live in their own module. <strong>Why it matters —</strong> a moodboard sheet, a tracked price/mention subject, or a generated image you make in chat is findable later outside the conversation, so the chat becomes a way to <em>do</em> work, not just talk about it.</p>
@@ -132,6 +149,7 @@
       <tr><td><code>?image=&lt;url&gt;</code> · <code>?images=a,b,c</code></td><td>Preload one or more real <strong>chat attachments</strong> into the composer (comma-separated for several) — the image(s) the generation pipeline acts on.</td></tr>
       <tr><td><code>?generation_mode=&lt;mode&gt;</code></td><td>Force the generation pipeline — e.g. <code>image-edit</code>, <code>redesign</code>, <code>floor-plan-render</code>.</td></tr>
       <tr><td><code>?quickstart=&lt;toolkitId&gt;:&lt;label&gt;</code></td><td>Launch a specific <strong>guided flow</strong> deterministically — e.g. <code>generation:Test on a room</code>, <code>presentation-sheets:Material board</code>, <code>seo-research:Research a keyword</code>. (Split on the first colon, so the label may itself contain colons.)</td></tr>
+      <tr><td><code>?capability=&lt;id&gt;</code></td><td>Open the agent and toolkit behind a platform capability and show what it can do — e.g. <code>visual-search</code> opens the <strong>Identify a Material</strong> photo form. This is what the App Launcher and Tools links use.</td></tr>
       <tr><td><code>?conversation=</code></td><td>Open a specific existing conversation.</td></tr>
       <tr><td><code>?moodboard=</code></td><td>Set the moodboard context (so results can be added to that board, and the context survives a reload).</td></tr>
       <tr><td><code>?pinned_product_id=</code> (+ <code>pinned_product_name</code>, <code>pinned_product_image</code>)</td><td>Pre-pin a material so an interior flow already knows which product to apply (this is what a product's <em>“Test on a room”</em> button uses).</td></tr>

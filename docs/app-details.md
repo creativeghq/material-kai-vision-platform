@@ -7,7 +7,7 @@
 
 ## Executive Summary
 
-Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 5 via tool use), Claude Sonnet 5 chunking, Claude Haiku 4.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/Kling for generation.
+Material KAI Vision Platform is an AI-powered B2B SaaS platform for the architecture, interior design, and construction materials industry. It transforms the way professionals discover, specify, visualize, and procure building materials — replacing static PDF catalogs and fragmented manual searches with a unified intelligent platform powered by a focused AI stack: Anthropic-only vision (Claude Opus 5.5 via tool use), Claude Sonnet 5.5 chunking, Claude Haiku 5.5 classifiers, Voyage AI embeddings, SigLIP2 visual embeddings, PaddleOCR-VL layout + OCR backbone (Modal-hosted), plus Replicate/Gemini/xAI/Kling for generation.
 
 The platform serves **5,000+ active users** across three professional groups: buyers (architects, designers, sourcing agents), suppliers (manufacturers, brands), and platform operations. It is live in production at **materialshub.gr** with 99.5%+ uptime, 10,000+ cataloged products, and 1,000+ processed PDFs.
 
@@ -91,12 +91,12 @@ The platform's core differentiator is not a single AI model — it is the orches
 
 | Provider | Model | Role | Cost |
 |----------|-------|------|------|
-| Anthropic | Claude Opus 5 | Jarvis agent, deep product analysis, metadata extraction, B2B research | $15 input / $75 output per 1M tokens |
-| Anthropic | Claude Haiku 4.5 | Fast classification, content detection, B2B web search | $0.80 input / $4 output per 1M tokens |
+| Anthropic | Claude Opus 5.5 | Every chat agent, deep product analysis, metadata extraction, B2B research | $4 input / $20 output per 1M tokens |
+| Anthropic | Claude Haiku 5.5 | Fast classification, content detection, agent routing, Demo agent | $0.10 input / $0.50 output per 1M tokens (prompts up to 100K tokens; $0.50 / $2.50 above) |
 | OpenAI | GPT-4o | Alternative product discovery, multimodal tasks | $2.50 input / $10 output per 1M tokens |
 | OpenAI | GPT-4o-mini | Query intent parsing, lightweight operations | $0.15 input / $0.60 output per 1M tokens |
 | Voyage AI | voyage-4 (1024D) | Primary text embeddings + understanding embeddings | $0.06 per 1M tokens |
-| Anthropic | Claude Opus 5 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
+| Anthropic | Claude Opus 5.5 (vision_analysis) | Image analysis, material recognition — sole vision pass post-2026-05-01, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL` | Anthropic API |
 | Modal | PaddleOCR-VL (`PaddlePaddle/PaddleOCR-VL-1.6`, 0.9B) | Layout + OCR backbone (sole engine post-2026-06-13) — two-stage parser (PP-DocLayoutV3 RT-DETR detector + 0.9B VLM), run as Stage 1 before discovery. Per-attempt metrics in `paddleocr_metrics`. Failure marker: `OCRResult.method='paddleocr_failed'`; `ocr_engine='paddleocr'`. Replaced Surya-2 (which had replaced YOLO + Chandra + `merge_layout`). | Modal endpoint (GPU A10G, scale-to-zero) |
 | Modal | SLIG SigLIP2 (768D × 5 types) | Visual / color / texture / style / material embeddings | Modal endpoint (scale-to-zero; moved off HuggingFace 2026-06-14) |
 | Replicate | FLUX.1-dev, FLUX.1-schnell, SDXL, SD3, Playground v2.5, Kandinsky 2.2, Proteus v0.2 | Text-to-image interior design generation | Per image |
@@ -105,7 +105,7 @@ The platform's core differentiator is not a single AI model — it is the orches
 | fal / Replicate / Alibaba / ByteDance / Luma / Google | H3 Max, Kling v4.0, Wan 3.0, Seedance 2.5, Ray 3.2, Gemini Omni | Interior video generation | 15–125 credits |
 | Replicate | meta/sam-2, ali-vilab/anydoor | Pixel-precise mask generation, product placement | Per use |
 | Google Gemini | gemini-nano-banana-2.1, gemini-3-pro-image | Interior image generation (4 modes) | 6/15 credits |
-| xAI (Grok) | grok-2-aurora | Social images | 10 credits |
+| Google Gemini | gemini-nano-banana-2.1 | Social images | 6 credits |
 | Kling | kling-v3.0 | Interior + social video generation | 20 credits |
 
 ### 7-Vector Embedding Fusion — The Search Backbone
@@ -138,7 +138,7 @@ The primary ingest path. A supplier uploads a product catalog PDF. The platform 
 3. Semantic chunking via Anthropic API (800 token max, 100 overlap)
 4. Generates text + understanding embeddings via Voyage AI
 5. Extracts all images from product pages
-6. Runs Claude Opus 5 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre;
+6. Runs Claude Opus 5.5 vision_analysis (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) on every image — identifies material type, surface properties, finishes, dimensions visible, color palette. Pre;
 7. Generates all 5 SigLIP2 visual embedding types per image
 8. Extracts 200+ metadata fields per product (dimensions, material composition, certifications, weight, finish, slip resistance, etc.)
 9. PaddleOCR-VL layout detection + OCR (Modal-hosted, structure-first Stage 1) localizes regions, labels them, predicts reading order, and reads text/tables→markdown/formulas→LaTeX inside each region
@@ -181,12 +181,12 @@ After retrieval, a secondary AI re-ranking pass scores results on visual, unders
 
 ---
 
-### Feature 3 — Agent Hub (Three AI Agents)
+### Feature 3 — Agent Hub (JARVIS and the Specialists)
 
-The Agent Hub (`/agent-hub`) is the conversational AI interface with memory, multi-turn context, image uploads, and tool-use.
+The Agent Hub (`/agent-hub`) is the conversational AI interface with memory, multi-turn context, image uploads, and tool-use. JARVIS (default) routes each turn to a specialist — Vision (interior design), Pepper (catalogs, B2B, signals), Edith (SEO), Baxter (real estate), Trinity (finance and quotes), Hermes (social) — or answers it as the generalist. Actions that change data are proposed on one approval card per message (**Approve all** / **Decline all**), with an optional **Auto-approve** switch in the composer. See [agent-system.md](agent-system.md).
 
 **Jarvis — Primary Material Intelligence Agent**
-Model: Claude Opus 5 | LangGraph + Supabase checkpointer (conversations resume across sessions)
+Model: Claude Opus 5.5 | LangGraph (no checkpointer — the client sends the conversation history each turn)
 
 Tools available to all authenticated users:
 - `material_search` — 7-vector fusion search across the catalog, with **Explainable Search Spec** (structured interpretation of query across color/material/style/texture/specification dimensions, displayed as a collapsible card above results)
@@ -204,8 +204,8 @@ Tools gated to Admin/Owner only:
 - `create_seo_article` — the one SEO article pipeline; `seo_keyword_research` and `seo_content_analyzer` run standalone
 - Sub-agents: `research_analysis`, `analytics_analysis`, `business_analysis`, `product_analysis`
 
-**Interior Designer Agent**
-Model: Claude Opus 5 | Focused on spatial design and visualization
+**Interior Designer Agent (Vision)**
+Model: Claude Opus 5.5 | Focused on spatial design and visualization
 
 - Analyzes room photos: layout, dimensions, natural light, spatial relationships, accessibility compliance
 - Generates interior design images (text prompt or image reference) — see Feature 4
@@ -214,7 +214,7 @@ Model: Claude Opus 5 | Focused on spatial design and visualization
 - `analyze_inspiration_url` — paste a design URL to extract materials, colors, and styles and find matching catalog products
 
 **Demo Agent**
-Model: Claude Haiku 4.5 | Platform showcases and sales demonstrations. Admin-only.
+Model: Claude Haiku 5.5 | Platform showcases and sales demonstrations. Admin-only.
 
 ---
 
@@ -291,7 +291,8 @@ Visual material collections that serve as both a design tool and a social/portfo
 - Add materials directly from search results or agent chat output
 - Feed a moodboard directly into a Quote (materials pre-populated)
 - Notes and descriptions per board
-- Export for client presentations
+- Room Views: the board's tiles and stone laid on a room at their real format (floor, walls, backsplash), with numbered product pins, a PDF, and "add N m²/boxes to a quote"
+- Export for client presentations (presentation sheets, full decks, project client views)
 
 **Public portfolio use (marketplace layer):**
 - Any board can be made public — visible on the user's public profile (`/u/:userId`)
@@ -375,8 +376,13 @@ A complete B2B procurement workflow from material selection to project delivery 
 4. Monitor which extras the buyer accepted/rejected
 5. Update project timeline milestones with notes per step
 6. Manage Upsells library and Timeline Steps configuration
+7. Price each line on the Pricing tab against buy prices found in the supplier price lists, and read the margin
+8. Move the quote through Draft / Submitted / Sent to customer / Accepted / Declined; accepting (or "Create draft invoice") creates the sales order and a draft invoice
+9. Link the quote to a CRM deal (Add to pipeline); issue a revision, which supersedes its parent when accepted
 
-**Quote lifecycle:** Auto-expire after 30 days of inactivity. Any user action resets the timer. Activity tracking = quote remains active during active projects.
+**Pipeline money:** the Quotes list shows Open Pipeline, Expected To Win, Profit On Open Quotes, Won and Win Rate (no verdict under 5 decided quotes), with Value and Margin per quote — profit is computed only over lines that have a buy price.
+
+**Quote lifecycle:** Each quote expires after the workspace's offer validity (Quote Settings; platform default when unset). Line activity extends it by the same validity.
 
 **Database:** 8 tables — `quotes`, `quote_items`, `status_tags`, `upsells`, `quote_upsells`, `timeline_steps`, `quote_timeline`, `system_settings`.
 
@@ -460,9 +466,11 @@ Full transactional and campaign email infrastructure via Resend:
 
 ---
 
-### Feature 14 — CRM (Companies & Contacts)
+### Feature 14 — CRM (Leads, Companies & Contacts)
 
-Built-in CRM for managing supplier and manufacturer relationships:
+Built-in CRM at `/crm` (tabs Pipeline, Leads, Users, Contacts, Companies, Categories):
+- Leads: enquiries kept out of Contacts until converted (`convert_crm_lead`), with quotes, an activity timeline and automatic capture from email / WhatsApp via `inquiry_received` flows
+- Users: the workspace team (invite, roles, time-limited Support access); the operator also sees every platform account
 - Company records: name, website, industry, country, Apollo.io enrichment data
 - Contact records: email (ZeroBounce validated), linked to companies
 - Records created directly from B2B manufacturer research agent
@@ -470,27 +478,18 @@ Built-in CRM for managing supplier and manufacturer relationships:
 
 ---
 
-### Feature 15 — Admin Dashboard
+### Feature 15 — Headquarters (Operator Admin)
 
-Full platform operations suite at `/admin`:
+Every operator page lives under `/admin` in one shell with one rail (`ADMIN_NAV`). `/admin` is an attention-first Overview (one ranked list of what needs a decision, then headline numbers).
 
-| Section | Purpose |
+| Area | Pages |
 |---------|---------|
-| Platform Overview | Cross-workspace analytics, user metrics, hire request funnel, rating distributions |
-| PDF Processing Monitor | Real-time job tracking with 9 checkpoint stages, error logs, retry controls |
-| Analytics | Search patterns, processing stats, AI model usage, cost tracking, agent chat quality ratings |
-| AI Monitoring | Per-model usage, cost breakdown, performance trends, Sentry error integration |
-| Knowledge Base | View/edit chunks, images, products with quality scores |
-| Agent Configurations | Manage AI agent system prompts in real-time (no deployment needed) |
-| Background Agents | Run history, logs, manual trigger, create/edit configurations |
-| User Management | Workspace members, roles, permissions |
-| Quotes | All quote requests with filtering and detail views |
-| Status Tags | Custom color-coded quote status management |
-| Upsells | Upsell library with pricing |
-| Timeline Steps | Project milestone configuration |
-| Email / Campaigns | Email domain management, template library, bulk campaign management |
-| Flows | Visual flow builder |
-| Push Notifications | Workspace-level push notification management |
+| Agents | Agent Harness (`/admin/agents` — turns, models, tools, Work & Quality, evals, failures, conversation traces), Agent Ops (`/admin/agent-ops` — cases JARVIS hands to the Stark and Veritas sub-agents, background agents, server maintenance, processes), AI Configurations (prompts, chat starters, writing rules, model pricing) |
+| Data & Pipeline | Job Queue, Ingestion Quality, Materials Data, Knowledge Base, Data Health |
+| Operations | System Health, Search Analytics, Services & Billing, Platform Overview, Approvals |
+| Platform | Modules & Plans, Master Catalog |
+
+Reference: [admin-headquarters.md](admin-headquarters.md).
 
 ---
 
@@ -505,6 +504,8 @@ A multi-tenant finance and business operations stack layered on the core AI cata
 - **Sales Portal & Marketplace** (`docs/sales-and-marketplace.md`)
 - **Multi-tenant Capabilities & Tenancy** (`docs/capabilities-and-tenancy.md`)
 - **myAADE Module** — Auto-fill business profile from Greek ΑΦΜ via ΑΑΔΕ SOAP API. Cached 90 days per company. Admin UI at `/admin/modules/myaade`.
+- **Documents & bank feed** — invoices editable until a MARK and sent to AADE on issue by default; credit-note / delivery-note drafts with record pages; customer links and automatic document emails; EN 16931 export; a Revolut / Viva / Stripe bank feed with derived line insights (`docs/finance-system.md`, `docs/banking-revolut.md`).
+- **Travel** — flight-fare search costed onto trip cards as planned lines (`docs/trip-expense-cards.md`).
 
 ---
 
@@ -603,7 +604,7 @@ All AI costs tracked in real-time via `ai_usage_logs`. The platform charges cred
 - Cloudflare Workers: static assets free and unmetered; only Worker invocations (non-static paths) count
 - Supabase: Managed PostgreSQL, storage, edge function invocations — scales with usage
 - DigitalOcean: Dedicated server for MIVAA FastAPI backend — predictable fixed monthly cost
-- Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. vision is now Anthropic-only via Claude Opus 5 tool use.
+- Modal (SLIG): Scale-to-zero endpoint for SigLIP2 (768D visual embeddings); SLIG moved off HuggingFace to Modal 2026-06-14, so HuggingFace hosts nothing. vision is now Anthropic-only via Claude Opus 5.5 tool use.
 - Modal (PaddleOCR-VL): layout + OCR backbone (GPU A10G, scale-to-zero → $0 idle, `max_containers=8`). Replaced the Surya-2 backbone 2026-06-13. Sole required runtime secret: `PADDLEOCR_MODAL_API_KEY`.
 - Variable: Anthropic, OpenAI, Voyage AI, Replicate — fully usage-based
 
@@ -651,7 +652,7 @@ This analytics layer is a significant standalone upsell — providing market int
 | Search response time | 200–800ms |
 | Concurrent query capacity | 1,000+/minute |
 | API endpoints | 170+ |
-| AI models integrated | Anthropic (Opus 5 / Sonnet 5 / Haiku 4.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, Kling, Zernio |
+| AI models integrated | Anthropic (Opus 5.5 / Sonnet 5.5 / Haiku 5.5), Voyage AI, SigLIP2, PaddleOCR-VL, OpenAI (optional), Replicate, Gemini, xAI, Kling, Zernio |
 | Edge functions deployed | 60+ |
 | Database tables | 40+ |
 
@@ -663,7 +664,7 @@ This analytics layer is a significant standalone upsell — providing market int
 Most platforms use one or two embedding types. Fusing 7 specialized vectors with dynamic per-query weight profiles requires custom ML infrastructure, tuned weight profiles per query intent, and deep integration between the vision analysis pipeline and the search layer. This compound in value as more products are added.
 
 **2. Understanding Embeddings (Novel Architecture)**
-Claude Opus 5 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. This is a proprietary architecture not seen replicated elsewhere.
+Claude Opus 5.5 (Anthropic tool use, schema-locked via `VisionAnalysis` Pydantic + `VISION_ANALYSIS_TOOL`) generates structured JSON analysis of every product image — material properties, surface characteristics, visible dimensions, finish type. The JSON is run through `serialize_vision_analysis_to_text` and embedded via Voyage AI into a 1024D "understanding" vector. This enables queries like *"find matte surfaces with slight veining, suitable for wet external areas"* — which no traditional image or keyword search can handle. This is a proprietary architecture not seen replicated elsewhere.
 
 **3. Full Vertical Integration**
 Ingestion + enrichment + search + design generation + 3D visualization + quote management + marketplace in one product. Each layer creates switching costs. A user with their catalog ingested, moodboards saved, and project quotes tracked is not going to migrate to a competitor easily.

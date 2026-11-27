@@ -69,6 +69,14 @@ Chunk types streamed to AgentHub: `trip_card_created`, `trip_expense_added`, `tr
 - Panel + dialogs: [src/modules/finance/components/TripExpensesPanel.tsx](../src/modules/finance/components/TripExpensesPanel.tsx) (`TripCardDetail`, `NewTripCardDialog`, `RequestCardDialog`, `AddExpenseDialog`).
 - Service: [src/modules/finance/services/tripExpenseService.ts](../src/modules/finance/services/tripExpenseService.ts) — `listReports / getReport / createReport / updateReport / deleteReport / addItem / updateItem / removeItem / submit / reviewItem / requestCard / listAssignees / uploadReceipt / receiptUrl / generatePdf`.
 
+### Planned flights — the `travel` add-on (#398)
+
+Finance → **Travel** (`FINANCE_TAB.travel`, hidden for the accountant) and the trip card's **Flight** button open `FlightSearchPanel` (`src/modules/travel/`), which searches Google Flights fares through the `flight-search` edge function (Bright Data). A fare goes onto a card as a PLANNED line; nothing is ever booked.
+
+- **Commitment.** `trip_expense_items.commitment` is `planned | actual`, with `estimated_amount` and a derived `variance_amount`. Totals, reimbursement and invoicing count ACTUAL lines only (`planned_amount` is separate), so an approved estimate can never pay a rep for a ticket nobody bought. "Booked it" turns an approved planned line into actual spend at the real price, back to finance with its receipt; a paid-out card refuses.
+- **Quota.** The workspace's own Bright Data token (Profile → Keys → Data & Research, `BrightDataKeyCard`), else the platform key: unlimited for the root workspace, a small free monthly allowance for a tenant, derived once by `workspace_flight_search_quota`. `claim_flight_search` dedupes the same route/dates/party/cabin for 24h and claims a slot atomically; a failed search, provider error or timeout never counts, and an unreturned search releases its slot after 30 minutes. The month is the caller's calendar month, accepted only within a day of UTC.
+- **Agent.** `search_flights` + `add_flight_to_trip_card` in the `travel` toolkit (both `moduleGate`d), a *Find a flight* quick-start and a fares card. Platform-key spend is logged to `ai_usage_logs` (`brightdata-flight-record`).
+
 ### Flow events
 
 | Event | Audience | Action URL |

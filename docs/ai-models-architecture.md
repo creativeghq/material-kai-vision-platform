@@ -11,7 +11,7 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 
 | Provider | Models Used | Primary Purpose |
 |----------|-------------|-----------------|
-| **Anthropic** | Claude Opus 5, Claude Sonnet 5, Claude Haiku 4.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
+| **Anthropic** | Claude Opus 5.5, Claude Sonnet 5.5, Claude Haiku 5.5 | Vision analysis (tool-use schema-locked), chunking, agents, validation |
 | **Voyage AI** | voyage-4-large (index) + voyage-4 (query) | Text, aspect and understanding embeddings (1024D) — one shared 4-series space, sole text embedder |
 | **Voyage AI** | voyage-context-4 | KB sections + PDF chunks (1024D) — each chunk embedded with its document in view; same 4-series space, queried with voyage-4 (KB MRR 0.840 → 0.945, 2026-10-16) |
 | **Voyage AI** | voyage-multimodal-3.5 | Page embeddings (1024D, `page_embeddings`) — a DIFFERENT space; never query it with a voyage-4 vector |
@@ -42,15 +42,15 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ DISCOVERY: Product Discovery                                            │
-│ Model: Claude Opus 5 OR GPT-5                                         │
+│ Model: Claude Opus 5.5 OR GPT-5                                         │
 │ Purpose: Identify products, count pages, map image-to-product           │
 │ Reads PaddleOCR reading-order text from the Stage 1 cache (not raw text) │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ CHUNKING (text)                                                         │
-│ Model: Claude Sonnet 5             │
-│ Setting: Settings.chunking_primary_model = 'claude-sonnet-5'          │
+│ Model: Claude Sonnet 5.5             │
+│ Setting: Settings.chunking_primary_model = 'claude-sonnet-5-5'          │
 │ Why Sonnet: chunking is a text task at the quality ceiling — Sonnet     │
 │             matches Opus output quality at lower cost;
 │             silently 404-ing for months                                 │
@@ -58,10 +58,10 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ VISION: Image Classification + Vision Analysis (per image)              │
-│ Primary: Claude Opus 5 (Anthropic tool use)                           │
+│ Primary: Claude Opus 5.5 (Anthropic tool use)                           │
 │ Validation pass: confidence < threshold OR primary failure → re-run     │
-│   on classification_validation_model (default: claude-opus-5)           │
-│   Profiles: FAST/COST_OPTIMIZED use claude-haiku-4-5 for validation     │
+│   on classification_validation_model (default: claude-opus-5-5)           │
+│   Profiles: FAST/COST_OPTIMIZED use claude-haiku-5-5 for validation     │
 │ Schema: app.models.vision_analysis.VisionAnalysis (Pydantic)            │
 │ Tool:   VISION_ANALYSIS_TOOL                                            │
 │ Why tool use: hard schema adherence — eliminates JSON regex recovery,   │
@@ -128,19 +128,19 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ SEARCH: 7-vector RAG (Claude Opus 5 + Multi-Vector)                   │
+│ SEARCH: 7-vector RAG (Claude Opus 5.5 + Multi-Vector)                   │
 │ Models:                                                                 │
 │   - Text embeddings: voyage-4-large index / voyage-4 query (1024D)      │
 │   - Visual embedding: 1× SLIG (768D) + 4× Voyage aspect (1024D)         │
 │   - Understanding: Voyage AI 1024D (from VisionAnalysis JSON)           │
-│   - Synthesis LLM: Claude Opus 5 (200K context)                       │
+│   - Synthesis LLM: Claude Opus 5.5 (200K context)                       │
 └─────────────────────────────────────────────────────────────────────────┘
                                     ↓
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ AGENTS: Agent Hub                                                    │
 │ Models Available:                                                       │
-│   - Claude Opus 5 (kai default)                                       │
-│   - Claude Haiku 4.5 (demo agent, fast responses)                       │
+│   - Claude Opus 5.5 (kai default)                                       │
+│   - Claude Haiku 5.5 (demo agent, fast responses)                       │
 │   - GPT-5 (advanced reasoning, optional)                                │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -149,13 +149,13 @@ MIVAA Platform uses AI models from **5 providers** for distinct purposes. Vision
 
 ## 🔍 Detailed Model Breakdown
 
-### 1. **Claude Opus 5 — Vision Analysis (PRIMARY)** 🎨
+### 1. **Claude Opus 5.5 — Vision Analysis (PRIMARY)** 🎨
 
 **Files**:
 - `mivaa-pdf-extractor/app/models/vision_analysis.py` — Pydantic schema (`VisionAnalysis` + `VISION_ANALYSIS_TOOL`)
 - `mivaa-pdf-extractor/app/services/real_image_analysis_service.py`
 
-The vision pipeline calls `claude-opus-5` via Anthropic tool use. The tool schema is the `VisionAnalysis` Pydantic model — Anthropic's tool-use enforcement guarantees the response matches the schema, eliminating fragile JSON regex recovery and protecting the understanding-embedding space from drift.
+The vision pipeline calls `claude-opus-5-5` via Anthropic tool use. The tool schema is the `VisionAnalysis` Pydantic model — Anthropic's tool-use enforcement guarantees the response matches the schema, eliminating fragile JSON regex recovery and protecting the understanding-embedding space from drift.
 
 **Used for**:
 - Image classification (material vs non-material)
@@ -171,9 +171,9 @@ The vision pipeline calls `claude-opus-5` via Anthropic tool use. The tool schem
 
 ---
 
-### 2. **Claude Sonnet 5 — Chunking** ✂️
+### 2. **Claude Sonnet 5.5 — Chunking** ✂️
 
-**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-5'`
+**Setting**: `Settings.chunking_primary_model = 'claude-sonnet-5-5'`
 
 Chunking is a text task at the quality ceiling — Sonnet matches Opus output quality on chunking work, so the extra Opus spend buys nothing.
 
@@ -182,7 +182,7 @@ Chunking is a text task at the quality ceiling — Sonnet matches Opus output qu
 
 ---
 
-### 3. **Claude Haiku 4.5** ⚡
+### 3. **Claude Haiku 5.5** ⚡
 
 **Files**:
 - `supabase/functions/agent-chat/index.ts` (demo agent)
@@ -297,10 +297,10 @@ The `VisionProvider.vision_provider` still validate. No code path produces new r
 | Stage | Default Model | Alternative |
 |-------|---------------|-------------|
 | Layout + Page OCR + figure boxes (Stage 1, before discovery) | PaddleOCR-VL 1.6 (Modal) | — |
-| Discovery | Claude Opus 5 | GPT-5 |
-| Chunking | Claude Sonnet 5 | — |
-| Vision (primary) | Claude Opus 5 (tool use) | — |
-| Vision (validation, low-confidence) | Claude Opus 5 (default profile) | Claude Haiku 4.5 (FAST / COST_OPTIMIZED) |
+| Discovery | Claude Opus 5.5 | GPT-5 |
+| Chunking | Claude Sonnet 5.5 | — |
+| Vision (primary) | Claude Opus 5.5 (tool use) | — |
+| Vision (validation, low-confidence) | Claude Opus 5.5 (default profile) | Claude Haiku 5.5 (FAST / COST_OPTIMIZED) |
 | Phase 3 OCR (per-image) | PaddleOCR-VL block OCR | — |
 | Visual Embeddings | SLIG (SigLIP2 base, 1×768D) | — |
 | Understanding Embedding | Voyage AI voyage-4-large (1024D) | — |
@@ -309,7 +309,7 @@ The `VisionProvider.vision_provider` still validate. No code path produces new r
 
 ### Search & Agents
 
-RAG uses the Voyage 4 series for text, aspects and understanding (1024D), SLIG 768D for visual, voyage-multimodal-3.5 for pages, and Claude Opus 5 for synthesis. The Agent Hub supports Claude Opus 5 (default), Claude Haiku 4.5 (demo), and GPT-5 (optional).
+RAG uses the Voyage 4 series for text, aspects and understanding (1024D), SLIG 768D for visual, voyage-multimodal-3.5 for pages, and Claude Opus 5.5 for synthesis. The Agent Hub supports Claude Opus 5.5 (default), Claude Haiku 5.5 (demo), and GPT-5 (optional).
 
 ---
 
@@ -322,15 +322,15 @@ These numbers are the source of truth; Doc #4's profile cost lines reference thi
 | Model | Usage | Cost |
 |-------|-------|------|
 | **PaddleOCR-VL 1.6** | Stage 1 layout + page OCR (100 pages, before discovery) | Modal GPU (scale-to-zero) |
-| **Claude Opus 5** | Product discovery (1 call) | ~$0.08 |
-| **Claude Sonnet 5** | Chunking (~500 chunks) | ~$0.10 |
-| **Claude Opus 5** | Vision analysis (50 images, tool use) | ~$0.13 |
+| **Claude Opus 5.5** | Product discovery (1 call) | ~$0.08 |
+| **Claude Sonnet 5.5** | Chunking (~500 chunks) | ~$0.10 |
+| **Claude Opus 5.5** | Vision analysis (50 images, tool use) | ~$0.13 |
 | **PaddleOCR-VL 1.6** | Phase 3 per-image OCR (text-bearing only) | Modal GPU (scale-to-zero) |
 | **SLIG** | Visual embeddings (1× per image) | endpoint |
 | **Voyage AI** | Understanding (50) + text chunks (500) | ~$0.05 |
 | **TOTAL** | Per PDF | **~$0.36** |
 
-The pre-migration documented estimate (~$0. Today's number reflects honest accounting at Opus 5's current $5/$25 pricing.
+The pre-migration documented estimate (~$0. The line items were computed at the Opus 5 rate ($5/$25); Opus 5.5 is $4/$20, so the current figure is lower. `ai_model_pricing` holds the live rates.
 
 ### Per Search Query
 
@@ -338,7 +338,7 @@ The pre-migration documented estimate (~$0. Today's number reflects honest accou
 |-------|-------|------|
 | **Voyage AI voyage-4** | Query embedding | ~$0.001 |
 | **SLIG + Voyage** | 7-way parallel search | endpoint |
-| **Claude Opus 5** | Answer synthesis | ~$0.02 |
+| **Claude Opus 5.5** | Answer synthesis | ~$0.02 |
 | **TOTAL** | Per query | **~$0.02** |
 
 ---

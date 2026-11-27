@@ -21,19 +21,22 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
 
 ## Sheet types and credit cost
 
+The cost column is `SHEET_CREDITS` in `generate-moodboard-sheet-pdf/create-sheet.ts`, mirrored by `SHEET_TYPE_CREDITS` in `moodboardSheetsService.ts`; `scope_of_works` is 1 cr.
+
 | Type | Cost | Interactive? | Inputs the agent / user must provide |
 |---|---|---|---|
-| `material_board` | 0 cr | No | `product_ids[]` (cap 8). Optional `chip_descriptions{product_id: text}` to override product description text. |
-| `color_palette` | 0 cr | No | `swatches[{hex, name, source_image_id?}]` (cap 8). |
-| `concept_board` | 0 cr | No | `layout[{image_url, caption?}]` (cap 6). |
+| `material_board` | 1 cr | No | `product_ids[]` (cap 8). Optional `chip_descriptions{product_id: text}` to override product description text. |
+| `color_palette` | 2 cr | No | `swatches[{hex, name, source_image_id?}]` (cap 8). |
+| `concept_board` | 1 cr | No | `layout[{image_url, caption?}]` (cap 6). |
 | `lighting_plan` | 3 cr | Yes | `backdrop` (`{kind: 'upload'\|'rect', image_url? OR width_mm/height_mm}`), `symbols[{id?, type, x, y, label?, product_id?}]` (normalized 0..1), `runs[{id, kind, from, to, vertices?}]`, `legend[{symbol_type, label}]`. |
 | `plumbing_plan` | 3 cr | Yes | Same shape as `lighting_plan`; symbol types are `wc / basin / bath / shower / floor_drain / water_supply / waste / water_heater / mixer`. |
 | `electrical_plan` | 3 cr | Yes | Same shape as `lighting_plan`; IEC 60617-style types `socket / socket_double / switch_1way / switch_2way / dimmer / distribution_board / data_outlet / tv_outlet / dedicated_point / junction_box / earth_point`. **Added 2026-08-04.** |
-| `annotated_render` | 3 cr | Yes | `backdrop_image_url`, `annotations[{x, y, line_endpoint_x, line_endpoint_y, label, product_id?, source: 'ai'\|'manual'\|'auto'}]`. |
-| `elevation_render_pair` | 2 cr | Yes | `elevation_image_url`, `render_image_url?`, `dimensions[{x1,y1,x2,y2,value,unit}]`, `tile_callouts[{x,y,label}]`. |
-| `ffe_schedule` | 0 cr | No | `quote_id` (preferred — pulls items from `quote_items`) OR explicit `items[{room, name, dimensions, install, delivery, qty, price?}]`. |
+| `annotated_render` | 4 cr | Yes | `backdrop_image_url`, `annotations[{x, y, line_endpoint_x, line_endpoint_y, label, product_id?, source: 'ai'\|'manual'\|'auto'}]`. |
+| `elevation_render_pair` | 3 cr | Yes | `elevation_image_url`, `render_image_url?`, `dimensions[{x1,y1,x2,y2,value,unit}]`, `tile_callouts[{x,y,label}]`. |
+| `ffe_schedule` | 1 cr | No | `quote_id` (preferred — pulls items from `quote_items`) OR explicit `items[{room, name, dimensions, install, delivery, qty, price?}]`. |
 | `room_view` | 1 cr | No (drawn in the moodboard's **Room Views** tab, not the wizard) | Saved by the browser renderer: `scene_id`, `render_image_url` (snapshotted into `sheet-assets`), `rendered_at`, `layers[]` (surface, product, pattern, joint, format — labels frozen), `pins[]` (normalised, one per surface). The PDF reuses the annotated-render layout: numbered callouts + a legend with format/pattern/joint. The Client View serves it with clickable pins. **Added 2026-11-12 (#560).** |
-| `full_deck` | 3 cr | No | `included_sheet_ids[]` in display order, `cover{title, description?, client_name?, cover_image_url?, date}`. |
+| `drawing_set` | 0 cr | No (saved from a 3D room's **Drawings**, not the wizard) | A vector PDF of the room's drawing set — plan, elevations, electrical and plumbing sheets, cut list (and the workshop assembly set) — made in the browser (svg2pdf) and stored on the project. Embedded page for page in a `full_deck` and the client-view PDF. **Added 2026-11-24 (#607).** |
+| `full_deck` | 5 cr | No | `included_sheet_ids[]` in display order, `cover{title, description?, client_name?, cover_image_url?, date}`. |
 | `area_breakdown` | 2 cr | No | Single composited one-page room spec (Zubexa-style). `AreaBreakdownData`: `{subtitle, hero_image_url, plan_image_url, elevation_image_url, finishes[], fitting_columns[], palette[], notes[]}`. Builder `buildAreaBreakdown` (`builders.ts`); renders inside `full_deck` and Client Views like any other sheet. **Added 2026-06-01.** ⚠️ Requires `ALTER TYPE moodboard_sheet_type ADD VALUE 'area_breakdown'` in the target DB before use. |
 
 **Passive vs interactive**:
@@ -107,7 +110,7 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
 2. Frontend calls `navigate('/agent-hub?agent=kai&q=Create a Material Board for moodboard <uuid>...')`.
 3. JARVIS agent loads with the seeded prompt. The system prompt addendum (applied by the second migration) tells it to call `generate_presentation_sheet` with the appropriate `sheet_type` and inputs. The agent asks the user to confirm which products to include.
 4. Agent calls `generate_presentation_sheet({moodboard_id, sheet_type: 'material_board', title, initial_data: {product_ids: [...]}})`.
-5. Tool validates the user owns the moodboard, debits 0 credits (no-op), inserts a row, calls `supabase.functions.invoke('generate-moodboard-sheet-pdf', {body: {sheet_id}})`.
+5. Tool validates the user owns the moodboard, debits the type's credits (`SHEET_CREDITS`), inserts a row, calls `supabase.functions.invoke('generate-moodboard-sheet-pdf', {body: {sheet_id}})`.
 6. Edge function fetches the sheet + moodboard + product chips (with thumbnails from `image_product_associations`), builds the PDF, uploads to storage, returns signed URL.
 7. Tool emits `sheet_pdf_ready` chunk with the URL.
 8. AgentHub creates a message with `sheetPdfData` set; renders `SheetPreviewCard` (iframe preview + download).
@@ -116,7 +119,7 @@ Shipped 2026-05-02. The 9th type (`area_breakdown`) and **Project Client Views**
 
 1. Same first 3 steps as above, but the user picks "Annotated Render Sheet" and the seeded prompt tells the agent to ask which render to annotate.
 2. Agent calls the tool with `initial_data.backdrop_image_url` and (optionally) pre-filled `annotations[]`.
-3. Tool debits 3 credits, inserts the row, emits `sheet_canvas_open`.
+3. Tool debits the type's credits, inserts the row, emits `sheet_canvas_open`.
 4. AgentHub renders `SheetCanvasCard` → `CalloutCanvas` mounted with the backdrop image and any pre-filled annotations.
 5. User drags anchor dots and label boxes, edits labels in the side list, adds new callouts by clicking on the image.
 6. User clicks **Render PDF** in the canvas.

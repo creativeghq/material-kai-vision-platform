@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Page Monitoring | MaterialsHub Documentation</title>
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<main class="content">
+  <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="apps.html">Apps &amp; Modules</a> / Page Monitoring</div>
+  <h1>Page Monitoring <span class="badge gated">Add-on</span></h1>
+  <div class="routes"><span class="badge route">/monitoring/pages</span></div>
+  <p class="lead">Some of the facts your business runs on live on somebody else's website: a supplier's payment terms or price list, a regulator's notice, a partner's API changelog, a competitor's spec sheet. Nobody tells you when they change. <strong>Page Monitoring</strong> watches those pages on a schedule you choose and shows you <strong>the exact lines that moved</strong>. You hear about changes only, never "still the same".</p>
+
+  <div class="callout"><p><strong>Where:</strong> the <strong>Page Monitoring</strong> tile in the <a href="apps.html">App Launcher</a> opens <span class="badge route">/monitoring/pages</span>. It needs the <code>page-monitoring</code> module on the workspace; without it, the page shows the unlock screen instead (see <a href="account-modules.html">Modules</a>).</p></div>
+
+  <h2>Which tool do you want?</h2>
+  <p>Three features read web pages on a schedule. What separates them is whose page it is:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Feature</th><th>Whose page</th><th>What you get</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Page Monitoring</strong></td><td>One page someone else owns.</td><td>A text diff of what changed.</td></tr>
+      <tr><td><a href="seo-websites.html"><strong>Websites</strong></a></td><td>Domains you own, crawled whole for SEO.</td><td>Articles, keywords, audits, Search Console.</td></tr>
+      <tr><td><strong>Price Monitoring</strong></td><td>Retailers selling your products.</td><td>A resolved product and a price to compare.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Watching a page</h2>
+  <p>Click <strong>Watch a page</strong> and fill in:</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Field</th><th>What to enter</th></tr></thead>
+    <tbody>
+      <tr><td><strong>What is it</strong></td><td>A plain-English name, e.g. <em>Acme Tiles — payment terms</em>. This is what the alert will be called.</td></tr>
+      <tr><td><strong>Page URL</strong></td><td>One public <code>https</code> page. A page behind a login cannot be watched.</td></tr>
+      <tr><td><strong>Kind</strong></td><td><em>Supplier Terms</em>, <em>Regulatory</em>, <em>Partner API Docs</em>, <em>Competitor</em> or <em>Other</em>.</td></tr>
+      <tr><td><strong>What counts as a change worth hearing about?</strong></td><td>Optional, e.g. <em>Payment terms, minimum order quantity or lead times changing. Ignore typos and layout.</em> Filling it in turns on the change judge, which labels each diff against what you asked for. Every change is still recorded and shown either way.</td></tr>
+      <tr><td><strong>How often</strong></td><td><em>every hour</em>, <em>every 6 hours</em>, <em>every day at 09:00</em>, <em>every Monday at 09:00</em> or <em>the 1st of every month at 09:00</em>.</td></tr>
+    </tbody>
+  </table></div>
+  <p>A baseline snapshot is taken within a minute or two; every later check is compared against the last one.</p>
+
+  <h2>The list</h2>
+  <p>Each watch shows its name and URL, <strong>Kind</strong>, how often it <strong>Runs</strong>, its <strong>Last Check</strong> and its <strong>State</strong>: <em>Awaiting First Check</em>, <em>No change</em>, <em>Changed</em> (with how many to review), <em>Check failed</em>, <em>Page Gone</em>, <em>Not scheduled</em> or <em>Paused</em>. Search by name or URL and filter by <strong>Kind</strong> and <strong>State</strong> (<em>Needs Review</em>, <em>Not running</em>, <em>Running, quiet</em>, <em>Paused</em>). A watch pointed at a page that has disappeared reads <em>Page Gone</em> rather than looking healthy.</p>
+  <p>The row menu offers <strong>View changes</strong>, <strong>Check now (1 credit)</strong>, <strong>Pause</strong> / <strong>Resume</strong> and <strong>Stop watching</strong>. <strong>Resume</strong> also relinks a watch that was saved but never started upstream.</p>
+
+  <h2>Reading a change</h2>
+  <p><strong>View changes</strong> lists the changes, kept for 90 days, each as a coloured diff: added lines in green, removed lines in red. <strong>Mark reviewed</strong> clears one from the watch's review count.</p>
+
+  <h2>Who hears about it</h2>
+  <p>A detected change raises the <strong>Watched Page Changed</strong> automation, which notifies the workspace owner. Change who it reaches, or add an email, a task or a message, in <a href="flows.html">Automations</a>.</p>
+
+  <h2>What it costs</h2>
+  <ul class="feat">
+    <li>One credit per page per check, plus one more when the change judge runs on a page that actually moved.</li>
+    <li><em>every hour</em> is 24 checks a day; <em>every day at 09:00</em> is one. Pick the slowest cadence you can live with.</li>
+    <li>A scheduled check that cannot be paid pauses the watch. A workspace can hold up to 25 active watches.</li>
+  </ul>
+</main>
+<script src="assets/nav.js"></script>
+</body>
+</html>

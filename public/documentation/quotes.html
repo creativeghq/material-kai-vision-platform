@@ -11,23 +11,40 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Quotes &amp; Requests</div>
   <h1>Quotes &amp; Requests</h1>
   <div class="routes"><span class="badge route">/quotes</span> <span class="badge route">/quotes/:id</span> <span class="badge route">/quotes/requests</span></div>
-  <p class="lead">Create, send and manage material quotes, and triage incoming requests from customers. The two tabs are detailed on their own pages below.</p>
+  <p class="lead">Create, price and send material quotes, see what your open quotes are worth, and triage incoming requests from customers. Building a single quote is covered in <a href="quotes-build.html">Build &amp; send</a>; incoming requests in <a href="quotes-requests.html">Requests</a>.</p>
 
-  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Quotes</strong>. Use the <strong>My Quotes</strong> and <strong>Requests</strong> tabs at the top.</p></div>
+  <div class="callout"><p><strong>How to open it:</strong> top navigation → <strong>Quotes</strong>. Workspace admins see extra tabs across the top: <strong>My Quotes</strong>, <strong>Customer Requests</strong>, and — for a workspace that is part of a supplier network — <strong>Network Requests</strong> and <strong>Settings</strong>.</p></div>
 
   <figure>
     <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/quotes/quotes.png" alt="My Quotes with KPIs and the quotes list">
-    <figcaption>My Quotes — KPI strip (Total, Pending, Accepted, Drafts) and the quotes list. <strong>New Quote</strong> starts one; <strong>Filter</strong> narrows by status.</figcaption>
+    <figcaption>My Quotes — the money tiles, the count strip and the quotes list. <strong>New quote</strong> starts one; <strong>Filter</strong> narrows the list.</figcaption>
   </figure>
 
-  <h2>The two areas</h2>
+  <h2>The areas</h2>
   <div class="cards">
-    <a class="card" href="quotes-build.html"><div class="ico">🧾</div><h3>Build &amp; send a quote</h3><p>The full builder — catalog vs custom products, FF&amp;E fields, Extras, Timeline, and sending/acceptance.</p></a>
-    <a class="card" href="quotes-requests.html"><div class="ico">📥</div><h3>Requests</h3><p>Incoming customer quote requests and how to convert one into a quote.</p></a>
+    <a class="card" href="quotes-build.html"><div class="ico">🧾</div><h3>Build &amp; send a quote</h3><p>The quote record page — lines, buy prices and margin, Extras, Timeline, Terms, status moves, the pipeline and the draft invoice.</p></a>
+    <a class="card" href="quotes-requests.html"><div class="ico">📥</div><h3>Requests</h3><p>Customer requests from your website and network requests from other members, and how to turn one into a quote.</p></a>
   </div>
 
   <h2>My Quotes at a glance</h2>
-  <p>The default <strong>My Quotes</strong> tab lists every quote you've created, with a KPI strip across the top — <strong>Total Quotes</strong>, <strong>Pending</strong>, <strong>Accepted</strong> and <strong>Drafts</strong>. Use <strong>New Quote</strong> to start one (see <a href="quotes-build.html">Build &amp; send</a>) and <strong>Filter</strong> to narrow by status.</p>
+  <p>The default <strong>My Quotes</strong> tab lists every quote you can see. Above the list sit two strips:</p>
+  <ul class="feat">
+    <li><strong>Money tiles</strong> — what your quotes are worth, in net value (after discount, before VAT):
+      <ul>
+        <li><strong>Open Pipeline</strong> — quotes sent or submitted and not yet expired, with the value still sitting in drafts noted underneath.</li>
+        <li><strong>Expected To Win</strong> — the open pipeline multiplied by your win rate. It reads <em>No verdict</em> until at least 5 quotes have been decided.</li>
+        <li><strong>Profit On Open Quotes</strong> — sell price minus buy price over the lines that have a buy price. Lines with no buy price are left out and their value is named, never counted at zero cost.</li>
+        <li><strong>Won</strong> — accepted quotes over the last 12 months, with the profit at the buy prices frozen when each was accepted.</li>
+        <li><strong>Win Rate</strong> — accepted ÷ (accepted + declined + expired), by value and by count.</li>
+      </ul>
+      A tile note tells you whether the figures cover your own quotes or the whole workspace. Quotes in another currency than your base currency are counted separately and named.</li>
+    <li><strong>Counts</strong> — <strong>Total Quotes</strong>, <strong>Pending</strong>, <strong>Accepted</strong> and <strong>Drafts</strong>.</li>
+  </ul>
+  <p>The list columns are <strong>Quote Name</strong>, <strong>Status</strong>, <strong>Items</strong>, <strong>Value</strong>, <strong>Margin</strong>, <strong>Created</strong>, <strong>Expires</strong> and <strong>Sent</strong>. Value and Margin appear only when you are allowed to see buy prices; a margin marked with an asterisk is computed over part of the quote because some lines have no buy price. Each row has an actions menu: <strong>Open</strong>, a <strong>Move to</strong> list of status changes, <strong>Add to pipeline</strong> and <strong>Delete</strong>.</p>
+  <p>Use <strong>New quote</strong> to start one (see <a href="quotes-build.html">Build &amp; send</a>) and <strong>Filter</strong> to narrow by status.</p>
+
+  <h2>Settings</h2>
+  <p>The <strong>Settings</strong> tab (also the <strong>Quote Settings</strong> shortcut in the App Launcher; shown to members who manage a supplier network) sets the defaults every new quote starts with — the <strong>Default Terms</strong> printed on the quote and how many days the offer is valid (<strong>Offer valid for</strong>, 1–365 days; leave it empty for the platform default) — together with the quote <strong>PDF Design</strong>. See <a href="quotes-build.html#terms">Terms &amp; validity</a>.</p>
 </main>
 <script src="assets/nav.js"></script>
 </body>

@@ -93,6 +93,13 @@ Settlement is **always** `recordInvoicePayment` (incoming) or a `payment_allocat
 `supplier_bill_id` (outgoing). Never a local `total − paid`: that would be another copy of the
 derivation CLAUDE.md's anti-regression rule #1 exists to prevent.
 
+## What each line is — insights, details, manual matches
+
+- **Full payload per leg.** The sync keeps the whole Revolut transaction per leg and resolves the leg's counterparty from Revolut's saved-counterparty list (name, IBAN/BIC, country, external / Revolut / own account), plus fee and balance after. Legs are deduped before upsert when the live and backfill windows overlap. Viva rows carry the verified read-back (payer name, email, card, issuing bank, order code, customer note, the transaction's own `insDate`); Stripe rows expand the charge (billing name, email, card, fee, net) instead of storing the description as the counterparty. Viva transfers sent from the platform write their own outgoing line on the Viva account.
+- **`bank_line_insights(uuid[])`** (DEFINER, gated per line on `is_workspace_finance_manager`) derives per line its nature (Supplier Payment, Customer Payment, Card Spend, Bank Fee, Between Own Accounts, Payout to Bank…), the CRM party (IBAN on file > Revolut counterparty > unique legal name) and ranked documents it may settle: open invoices (invoice / order / quote number quoted, amount, customer), open supplier bills (bill / PO number, amount, supplier), unbilled expense documents, and on-account booking to the matched party. Suggestions only — it never writes; each goes through the existing confirm path.
+- **Expense documents.** "Match to Expense Document…" on an outgoing line ranks received `inbound_documents` with `suggest_inbound_docs_for_bank_tx` (exact amount, merchant name folded Greek/Latin, closest amount, date) and attaches through `attach_payment_to_inbound_doc`, the same path Expenses uses. A card line books method `card`, not `bank_transfer`; Needs Review lists outgoing card spend too.
+- **UI** (`BankFeedTab`): a server-paginated table (20 per page, exact count via `TablePagination`) with date, counterparty + IBAN tail + CRM link, nature, reference, account, transaction ID, status, amount; provider / account / direction / status / date filters and transaction-ID search; a details sheet with per-provider fields and Suggested Matches. Bank notifications link `/finance?tab=bank_feed&tx=<id>`, which narrows the feed to that line.
+
 ## Sync, and the two silent-zero traps
 
 `revolut-sync` runs every 6h (pg_cron) and is also the "Sync now" path — one implementation.

@@ -94,6 +94,10 @@ Validates the framework itself (§1).
 
 The nightly cron path runs the full battery and auto-heals every check with `autoheal_enabled = true`. Auth is the shared cron gate (`x-cron-secret` **or** service-role bearer); the admin path requires a session JWT with an admin/owner role.
 
+**How a finding closes.** `healed` is kept for what a `heal_fn` actually repaired; a finding whose condition went away by itself (or whose evidence aged out) is closed by the sweep's first pass as **`cleared`**. Each open critical finding is paged to Sentry; after the report, `resolveHealedInSentry` resolves the Sentry issue of every finding healed or cleared in the last two days, matched by the exact title it was paged under. It needs `SENTRY_AUTH_TOKEN` and `SENTRY_ORG` (Platform Keys; the org is in the EU region, so the API host is `de.sentry.io`, overridable with `SENTRY_API_URL`) and logs that it is dormant without them.
+
+**Agent Ops.** A check with open findings becomes one case in `ops_cases`, which JARVIS hands to the Stark and Veritas sub-agents at `/admin/agent-ops`. Stark may apply a fix only through a heal the operator has already enabled for unattended runs; otherwise it diagnoses and leaves the case for a person. See [admin-headquarters.md](admin-headquarters.md#agent-ops-adminagent-ops).
+
 ---
 
 ## 5. When to add one

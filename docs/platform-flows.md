@@ -73,7 +73,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    - Semantic similarity (20%)
    - Recency (10%)
    ↓
-6. Optional AI re-ranking (Claude Opus 5)
+6. Optional AI re-ranking (Claude Opus 5.5)
    ↓
 7. Results displayed with:
    - Product cards
@@ -96,7 +96,7 @@ Complete guide to all user workflows and feature flows in the Material Kai Visio
    ↓
 2. Edge Function parses XML and detects fields
    ↓
-3. AI suggests field mappings (Claude Opus 5)
+3. AI suggests field mappings (Claude Opus 5.5)
    ↓
 4. User reviews and confirms mappings
    ↓
@@ -183,7 +183,7 @@ The `/designer` route no longer exists. A floor plan, room photo or render becom
 
 **Edge Function:** `agent-chat`
 **Frontend Component:** `AgentHub.tsx`
-**AI Model:** Claude Opus 5
+**AI Model:** Claude Opus 5.5
 **Documentation:** [agent-system.md](agent-system.md)
 
 ---

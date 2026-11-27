@@ -11,61 +11,58 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / Construction &amp; Contracting</div>
   <h1>Construction &amp; Contracting</h1>
   <div class="routes"><span class="badge route">/projects/:id</span></div>
-  <p class="lead">A <a href="projects.html">project</a> can now run a full <strong>construction / main-contracting</strong> workflow — drawings and RFIs, a programme with a real critical path, tenders that become subcontracts, valuations and retention, cost-value reconciliation, site diaries and snags. These aren't a separate product or a “construction mode” you switch on: they're <strong>sections of every project</strong>, surfaced by your role and finance access rather than by the project's category. This page is the map — what lives where, and where each deep guide is.</p>
+  <p class="lead">A <a href="projects.html">project</a> can run a full <strong>construction / main-contracting</strong> workflow — drawing takeoff, drawings and RFIs, a programme with a real critical path, tenders that become subcontracts, valuations and retention, cost-value reconciliation, site diaries and snags. Choose <strong>Construction Contract</strong> as the project's kind and these tools appear in its sections; a fit-out job gets the site tools without the contract ones. This page is the map — what lives where, and where each deep guide is.</p>
 
-  <div class="callout"><p><strong>Where:</strong> everything is inside a <a href="projects.html">project</a> at <span class="badge route">/projects/:id</span>. The project detail page organises its sections into <strong>seven stages</strong> on one row; the construction tools sit across the <em>Commercial</em>, <em>Delivery</em>, <em>Client</em> and <em>Review</em> stages.</p></div>
+  <div class="callout"><p><strong>Where:</strong> everything is inside a <a href="projects.html">project</a> at <span class="badge route">/projects/:id</span>, in its six stages (<a href="projects-tabs.html#stages">Overview · Design · Specification · Commercial · Delivery · Client</a>). <strong>Start from drawings</strong> on the Projects list creates a Construction Contract project and opens the takeoff.</p></div>
 
   <figure>
-    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/stages.png" alt="A project's seven-stage detail page">
-    <figcaption>A project's detail page — the seven stages on one row (Overview · Design · Specification · Commercial · Delivery · Client · Review), with the identity and the whole-project actions above them.</figcaption>
+    <img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/construction/stages.png" alt="A project's detail page">
+    <figcaption>A project's detail page — the stages on one row, with the identity and the whole-project actions above them.</figcaption>
   </figure>
 
-  <h2>The seven stages</h2>
-  <p>A project's work is grouped into seven stages, left to right — you don't have to use them in order, they just gather the sections:</p>
-  <div class="table-wrap"><table>
-    <thead><tr><th>Stage</th><th>Sections</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Overview</strong></td><td>The project summary.</td></tr>
-      <tr><td><strong>Design</strong></td><td><a href="projects-rooms.html">Rooms</a>, <a href="moodboards.html">Moodboards</a>, <a href="projects-technical-plans.html">Sheets</a>.</td></tr>
-      <tr><td><strong>Specification</strong></td><td>Products, <a href="projects-plan.html">Plan</a> (blueprint estimate), Purchases (made-to-order joinery + supplier sheet).</td></tr>
-      <tr><td><strong>Commercial</strong></td><td><a href="quotes.html">Quotes</a>, <a href="contracts.html">Contracts</a>, Billing, and <strong>Finance</strong> — the construction money chain (below).</td></tr>
-      <tr><td><strong>Delivery</strong></td><td><a href="construction-programme.html">Tasks &amp; Programme</a>, <a href="construction-site.html">Site</a>, <a href="construction-drawings.html">Drawings</a>.</td></tr>
-      <tr><td><strong>Client</strong></td><td><a href="projects-client-view.html">Client View</a>, <a href="construction-requests.html">Requests (RFIs &amp; submittals)</a>, Handover (<a href="crm-installed-base.html">warranties</a>).</td></tr>
-      <tr><td><strong>Review</strong></td><td><a href="ai-assessment.html">AI Assessment</a>, Timeline.</td></tr>
-    </tbody>
-  </table></div>
-  <div class="callout"><p><strong>A project KIND is a label, not a switch.</strong> You can tag a project with a category (Renovation, Trip, Warehouse, Real Estate, or your own) for filtering and reporting — but the category does <strong>not</strong> change which stages or tools appear. Every project has the same seven stages; what you see depends on whether you're the <strong>owner</strong> and whether you have <strong>finance access</strong>.</p></div>
+  <h2>Which projects get the construction tools</h2>
+  <p>The project's <a href="projects-tabs.html#kinds">kind</a> decides it:</p>
+  <ul class="feat">
+    <li><strong>Renovation &amp; Fit-Out</strong> — Estimate, Changes, Site and Equipment &amp; Warranties, on top of the design and commercial sections.</li>
+    <li><strong>Construction Contract</strong> — all of that plus four construction features: <strong>Drawing Takeoff</strong> (in Estimate), <strong>Tender Packages</strong> (in Purchases), <strong>Valuations &amp; Retention</strong> (in Invoicing) and <strong>Cost-Value Reconciliation</strong> (the Value and Margin columns in Costs).</li>
+  </ul>
+  <p>Any of these can be switched on or off for one project under <strong>⋯ → Sections</strong>; a section that already holds records always stays on.</p>
 
   <h2>The construction toolset — where each lives</h2>
 
-  <h3>Commercial → Finance (the money chain)</h3>
-  <p>The contracting money tools are stacked as cards inside the <strong>Finance</strong> section of the Commercial stage. They need the <strong>project owner</strong> plus <strong>finance access</strong> (the <a href="finance.html">Finance</a> module + <code>finance.manage</code>):</p>
+  <h3>Specification</h3>
   <ul class="feat">
-    <li><a href="construction-commercial.html">Bill of Quantities</a> (the priced schedule — the accepted one is the contract sum) and <strong>Takeoff</strong> from drawings that feeds it.</li>
-    <li><strong>Cost codes</strong> &amp; <strong>job cost</strong> — a trade classification and what the job has cost by code, with margin.</li>
-    <li><a href="construction-commercial.html">Variations &amp; CVR</a> — scope changes both directions and a cost-value reconciliation.</li>
-    <li><a href="construction-commercial.html">Valuations / applications for payment</a> and <strong>retention</strong> (held and released).</li>
-    <li><a href="construction-tenders.html">Tenders → subcontracts</a> — send packages out, compare bids, award (an award <em>is</em> the subcontract/PO).</li>
-    <li><strong>Labour</strong> (typed rate vs what payroll actually cost) and <strong>stock held for the job</strong>.</li>
+    <li><a href="construction-drawings.html#takeoff">Takeoff from drawings</a> — <strong>Estimate → From Drawings</strong>: read the plan PDFs and the study, confirm the quantities on the sheet, add them to a quote.</li>
+    <li><a href="projects-plan.html">Estimate from dimensions</a> — a blueprint and a few measurements give a priced plan.</li>
+  </ul>
+
+  <h3>Commercial</h3>
+  <p>See <a href="construction-commercial.html">Commercial &amp; cost control</a>. Invoicing and Costs need the owner or a manager plus finance access.</p>
+  <ul class="feat">
+    <li><strong>Quotes</strong> — what we charge, with a warning when a newer drawing revision changed a quoted quantity.</li>
+    <li><strong>Changes</strong> — the variations register, client and subcontractor, never netted.</li>
+    <li><strong>Invoicing</strong> — invoices, sales orders and <strong>applications for payment</strong> with <strong>retention</strong>.</li>
+    <li><strong>Purchases</strong> — made-to-order items, purchase orders, <a href="construction-tenders.html">tenders → subcontracts</a>, supplier bills and expenses.</li>
+    <li><strong>Costs</strong> — job cost with labour, cost codes with budget, forecast and CVR, and stock held for the job.</li>
   </ul>
 
   <h3>Delivery</h3>
   <ul class="feat">
     <li><a href="construction-programme.html">Programme</a> — a Gantt with a real critical path, float and a baseline (the <em>Schedule</em> view of Tasks).</li>
     <li><a href="construction-site.html">Site</a> — the site diary, inspection checklists and the snag/defect list (with a dictate-a-walk shortcut).</li>
-    <li><a href="construction-drawings.html">Drawings</a> — a controlled register with revisions, plus markup → RFI and printed-schedule takeoff.</li>
+    <li><a href="construction-drawings.html">Documents</a> — a controlled drawing register with revisions, and markup → RFI.</li>
+    <li><strong>Equipment &amp; Warranties</strong> — what was installed and its <a href="crm-installed-base.html">warranties and service plans</a>.</li>
   </ul>
 
-  <h3>Client &amp; Review</h3>
+  <h3>Client</h3>
   <ul class="feat">
-    <li><a href="construction-requests.html">Requests</a> — the RFI &amp; submittal register (numbered, due-dated, de-duplicated, tied to a drawing).</li>
-    <li><a href="ai-assessment.html">AI Assessment</a> — an AI health verdict of the project and a ranked plan.</li>
+    <li><a href="construction-requests.html">Requests</a> — the RFI &amp; submittal register (numbered, due-dated, de-duplicated, tied to a drawing). An invited <strong>architect</strong> or <strong>subcontractor</strong> sees only the requests they raise or are assigned, never prices (see <a href="projects-tabs.html#client">inviting guests</a>).</li>
   </ul>
 
   <h2>What the assistant can do</h2>
-  <p>The <a href="agent-hub.html">assistant</a> can <em>read</em> the commercial picture from chat — the <strong>CVR</strong>, <strong>applications</strong> (claimed / certified / retention), <strong>variations</strong>, <strong>tender status</strong> and a <strong>bid analysis</strong> that ranks bids fairly (on a comparable total, flagging unpriced lines). These are <strong>read-only</strong>: raising a variation, certifying a valuation or awarding a tender stays a human decision. The on-site tools (drawings, RFIs, snags, programme) are UI-only.</p>
+  <p>The <a href="agent-hub.html">assistant</a> can <em>read</em> the commercial picture from chat — the <strong>CVR</strong>, <strong>applications</strong> (claimed / certified / retention), <strong>variations</strong>, <strong>tender status</strong> and a <strong>bid analysis</strong> that ranks bids fairly (on a comparable total, flagging unpriced lines). These are <strong>read-only</strong>: raising a variation, certifying a valuation or awarding a tender stays a human decision. It can also run the <a href="construction-drawings.html#takeoff">drawing takeoff</a> (status and analysis; confirming printed rows behind Approve). The other on-site tools (drawing register, RFIs, snags, programme) are UI-only.</p>
 
-  <div class="callout"><p><strong>Gating in one line:</strong> the Delivery and Client site tools are owner-gated in the free Projects module; the <strong>Commercial money chain</strong> additionally needs the Finance module and <code>finance.manage</code>; <a href="ai-assessment.html">AI Assessment</a> is its own Pro add-on. There is no separate “construction” add-on to buy.</p></div>
+  <div class="callout"><p><strong>Gating in one line:</strong> the construction tools come with the project kind in the Projects module; Invoicing and Costs additionally need the Sales &amp; Finance module and <code>finance.manage</code>; <a href="ai-assessment.html">AI Assessment</a> is its own Pro add-on. There is no separate “construction” add-on to buy.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>

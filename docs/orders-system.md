@@ -29,6 +29,12 @@ suppliers, what's been delivered, and the **profit**.
 `unit_price`, `net_value`/`vat_amount`/`line_total`, `quantity_delivered`, **`update_warehouse`**
 (when false the line never touches stock counts), `sort_order`.
 
+A line's **unit** is set by the writer from `product_sale_unit(product, variant_key, workspace)`
+(a special piece with no stated unit stays blank for the operator — see
+[units-and-quantity-pricing.md](units-and-quantity-pricing.md)), and its **name** is series + chosen
+variant (`compose_line_name` / `line_name`; a write trigger on `order_items`/`invoice_items` fills it
+on drafts and keeps operator-typed text).
+
 ### Attach points (every finance/fulfilment doc links to an order)
 `orders.source_quote_id` → quotes · `invoices.order_id` · `supplier_bills.order_id` ·
 `finance_manual_entries.order_id` · `payments.order_id` · `delivery_notes.order_id` ·
@@ -45,6 +51,14 @@ becomes `accepted` (admin or public path). It creates a **sales order** (`confir
 (never blocks the accept) — a **draft pre-invoice** (`next_invoice_number`, `status='draft'`,
 `quote_id` + `order_id`) with its items. Idempotent (one order per quote). Issuing that draft later
 runs the normal "Issue invoice" path (gapless number + myDATA transmit).
+
+The operator quote page's **Create draft invoice** runs this same accept path
+(`_generate_order_from_quote_core`, the one order + pre-invoice writer) and opens the draft.
+**Accepting a revision** supersedes its parent in the same transaction
+(`_supersede_parent_on_revision_accept`): an untouched parent order is cancelled and its draft
+pre-invoice voided before the revision mints its own; a parent order that has moved (delivery,
+payment, issued invoice) is kept, no second order is minted, and `revision_order_short` is raised
+until it is amended.
 
 ### Inbox conversation → Order (approved by a human, #342)
 An order that arrives as an **email or WhatsApp conversation** is read into a proposal on

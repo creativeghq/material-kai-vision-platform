@@ -110,6 +110,9 @@
   <h3>Peppol — a foreign buyer's e-invoicing address</h3>
   <p>On a <a href="crm-companies.html">CRM company</a>, <strong>Check Peppol</strong> (beside the VAT checks) searches the public Peppol Directory for that VAT number and records the result as a badge: <em>Peppol: receives invoices</em>, <em>Peppol: listed, no invoice type</em>, or <em>Not on Peppol · date</em>. If the directory can't be reached you get an error — never a false “not listed”.</p>
 
+  <h3>EN 16931 — the European e-invoice file</h3>
+  <p>An invoice's actions menu has <strong>Download EN 16931 XML</strong>, and an issued credit note row has the same button: the document as a UBL 2.1 file in the European standard, for a buyer whose system imports one. Every amount in it is the stored figure. A document the standard cannot express — a movement document, or one with withholding, fees, stamp duty or document-level taxes — is refused with the reason.</p>
+
   <h2>How to tell it worked — the “mD” column</h2>
   <p>Back on the <strong>Invoices</strong> list, the <strong>mD</strong> column shows each document's myDATA transmission status, so you can see at a glance which invoices have been reported and which haven't.</p>
 
@@ -134,8 +137,8 @@
   <p>The QR printed on the PDF, on template-rendered documents and on POS receipts now opens the <strong>provider's filed copy</strong> of the document (the copy the provider registers with AADE), with AADE's own link only as a fallback. Emails and the in-app “verify” buttons still send people to AADE.</p>
 
   <h2>The public invoice page</h2>
-  <div class="routes"><span class="badge route">/pay/:token</span></div>
-  <p><strong>What it is —</strong> the page a customer reaches from an invoice's payment link. Besides paying, it now shows a <strong>Filed with ΑΑΔΕ (myDATA)</strong> panel — the number, <strong>MARK</strong>, <strong>UID</strong>, <strong>authentication code</strong> and issue time, a <strong>Filed copy</strong> link, a <strong>Verify at ΑΑΔΕ</strong> link and <em>“Transmitted via …”</em> — both while the invoice is payable and once it is paid.</p>
+  <div class="routes"><span class="badge route">/pay/:token</span> <span class="badge route">/d/:token</span> <span class="badge public">Public</span></div>
+  <p><strong>What it is —</strong> every finance document has a <strong>customer link</strong> — an online copy the customer opens without an account, rendered with the same template as the in-app preview. An invoice's link (<span class="badge route">/pay/:token</span>) shows the full invoice under its payment panel; a credit note, delivery note or order opens at <span class="badge route">/d/:token</span> (a delivery note shows no money, like its PDF). Copy, open or send the link on WhatsApp from the document's ⋮ menu or its <strong>Customer link</strong> panel; the document emails carry it too. Besides paying, the invoice page shows a <strong>Filed with ΑΑΔΕ (myDATA)</strong> panel — the number, <strong>MARK</strong>, <strong>UID</strong>, <strong>authentication code</strong> and issue time, a <strong>Filed copy</strong> link, a <strong>Verify at ΑΑΔΕ</strong> link and <em>“Transmitted via …”</em> — both while the invoice is payable and once it is paid.</p>
   <ul class="feat">
     <li><strong>Download PDF</strong> — every state (payable, paid, closed) offers our own PDF of that exact document. Downloads are recorded in the document's delivery trail.</li>
     <li><strong>Cancelled or credited documents</strong> — an old link no longer errors. It shows <em>Cancelled — number</em> or <em>Credited — number</em> (“reversed by a credit note, so there is nothing to pay on it”), read-only, with its filed facts and the PDF.</li>

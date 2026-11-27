@@ -52,6 +52,9 @@
   </ul>
   <div class="callout"><p><strong>To confirm —</strong> a document read from a file, not filed with AADE, shows <em>To confirm</em> in the Handled column and is never turned into an expense automatically. Check it, then <strong>Confirm document</strong> in the row menu to move it into the normal queue. Booking it as a bill uses the supplier's own invoice number.</p></div>
 
+  <h2>EN 16931 files from the supplier's provider</h2>
+  <p>Some e-invoicing providers publish a European-standard (EN 16931) copy of each document they issue. Where your supplier's provider does, the platform fetches that file and checks it against the myDATA row — supplier VAT, totals and MARK. The document preview then says <em>EN 16931 file agrees with AADE</em>, <em>EN 16931 file differs from AADE</em> (naming what differs — check both before relying on either) or <em>stored, not checked yet</em>. A fetched file is evidence only: it never books a bill, touches stock or counts as a structured document delivered to you.</p>
+
   <h2>Foreign-currency documents</h2>
   <p>A received document in a currency other than EUR is stamped with the <strong>ECB reference rate</strong> for its date (the latest working-day rate on or before it) and that rate is carried to the supplier bill. If no rate exists, it is left missing and flagged — never assumed to be 1.</p>
 

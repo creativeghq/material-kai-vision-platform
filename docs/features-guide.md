@@ -51,7 +51,7 @@ Complete reference of all platform features and capabilities.
 **3. Multi-Vector Search** ✅
 - 7-vector fusion: text (1024D, Voyage AI), visual (768D, SigLIP2), understanding (1024D, Voyage AI), color, texture, style, material (768D each, SigLIP2)
 - All vectors stored as **halfvec** (float16) — 50% storage savings, zero accuracy loss
-- Understanding embeddings enable spec-based search (dimensions, finishes, properties) from Claude Opus 5 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D. Pre;
+- Understanding embeddings enable spec-based search (dimensions, finishes, properties) from Claude Opus 5.5 vision_analysis JSON via Anthropic tool use → `serialize_vision_analysis_to_text` → Voyage AI 1024D. Pre;
 - **Query-adaptive weight profiles**: 7 profiles (product_name, color_finish, specification, texture_pattern, style_aesthetic, material_search, balanced) automatically selected based on query intent
 - GPT-4o-mini parses query → selects optimal weights → adjusts fusion scoring per search
 - Response time: <200ms
@@ -170,7 +170,8 @@ Complete reference of all platform features and capabilities.
 - Document management
 - Product management
 - Metafield management
-- Agent configurations (AI prompts)
+- AI Configurations (`/admin/ai-configs`: prompts, chat starters, writing rules, model pricing)
+- Agent Harness (`/admin/agents`) and Agent Ops (`/admin/agent-ops`) — see [admin-headquarters.md](admin-headquarters.md)
 
 **Analytics**:
 - Search analytics
@@ -386,7 +387,7 @@ Complete reference of all platform features and capabilities.
 ## 🔄 Integration Features
 
 **External Services**:
-- Anthropic (Claude Opus 5 / Haiku 4.5 + built-in web search for B2B)
+- Anthropic (Claude Opus 5.5 / Haiku 5.5 + built-in web search for B2B)
 - OpenAI (GPT-4o, GPT-4o-mini for query parsing)
 - Voyage AI (voyage-4 text + understanding embeddings)
 - Modal Endpoint — PaddleOCR-VL layout+OCR backbone (post-2026-06-13; replaced Surya-2, which had replaced Chandra v2; pytesseract + EasyOCR removed).
@@ -477,21 +478,27 @@ Complete reference of all platform features and capabilities.
 - ✅ Monitor customer acceptance of extras
 - ✅ Update project timeline progress
 - ✅ Add notes to timeline steps
+- ✅ Operator record page on `/quotes/:id` (workspace admins; others get the customer view): Status menu (`set_quote_status`), Email, Create draft invoice, More → Preview / Download PDF / Issue revision
+- ✅ Pricing tab: Buy Price per line with margin, "Find buy prices" from supplier price lists (`quote-buy-prices`), VAT rate, "PDF shows prices incl. VAT"
+- ✅ Money on the list: Open Pipeline, Expected To Win, Profit On Open Quotes, Won, Win Rate (`get_quote_pipeline_summary`); Value / Margin columns and quote P&L (`get_quote_economics`)
+- ✅ Add to pipeline (deal link), Terms tab, workspace Default Terms + offer validity, revisions supersede their parent on acceptance
+- ✅ Per-line unit of sale (`product_sale_unit`) and series + variant line names
+- ✅ Customer Requests and Network Requests tabs on `/quotes`
 
-**Management Pages**:
-- ✅ Status Tags Management (`/admin/status-tags`)
+**Management Pages** (now under `/quotes/settings/*`, workspace admins):
+- ✅ Status Tags Management (`/quotes/settings/status-tags`)
   - Create/edit/delete custom status tags
   - Color picker for tag colors
   - System vs custom tag distinction
   - 6 default system tags (pending, in_progress, quoted, accepted, rejected, expired)
 
-- ✅ Upsells Management (`/admin/upsells`)
+- ✅ Upsells Management (`/quotes/settings/upsells`, workspace-owned)
   - Create/edit/delete upsell items
   - Set pricing and descriptions
   - Active/inactive status toggle
   - Display order management
 
-- ✅ Timeline Steps Management (`/admin/timeline-steps`)
+- ✅ Timeline Steps Management (`/quotes/settings/timeline-steps`)
   - Create/edit/delete timeline steps
   - 9 default steps (Quote Accepted → Project Completed)
   - Display order management
@@ -568,16 +575,17 @@ Complete reference of all platform features and capabilities.
 
 **Documentation**: [flow-engine.md](flow-engine.md)
 
-- ✅ xyflow graph-based visual editor at `/admin/flows`
+- ✅ xyflow graph-based visual editor — operator `/flows` (platform flows), tenants `/automations` (workspace flows + Platform defaults overlay)
 - ✅ 3 node types: trigger, condition, action
 - ✅ Trigger types: manual, cron schedule, webhook, platform event
-- ✅ Condition types: if_else, switch, filter, delay
+- ✅ Condition types: if_else, switch, filter, loop, stop, delay — a delay over 25s is durable (up to 365 days, parked in `flow_run_waits`, resumed by the minute cron)
 - ✅ Action types: send_whatsapp (send_sms is a legacy alias → send_whatsapp), send_email, http_request, create_notification, send_quote, send_price_alert
 - ✅ `{{template}}` variable resolution from execution context
 - ✅ Dry-run / test mode (no actions fire)
 - ✅ Scheduled execution via `flow-scheduler-cron` (pg_cron, every minute)
 - ✅ External webhook triggers via `flow-webhook`
-- ✅ Execution logs in `flow_runs` table
+- ✅ Execution logs in `flow_runs` table (run counts on every list = runs in the last 30 days, derived)
+- ✅ Changing a tenant flow needs `workspace.manage`; every `create_notification` also pushes to the recipient's opted-in devices
 
 ---
 
@@ -596,6 +604,7 @@ Complete reference of all platform features and capabilities.
 - ✅ `social-analytics-sync` — Syncs engagement metrics from Zernio
 - ✅ `social-insights-sync` — Syncs account-level insights from Zernio
 - ✅ `factory-enrichment` — Enriches factory records via Apollo/Firecrawl/Hunter.io
+- ✅ `model-health-check`, `tech-radar`, `embedding-backfill`, `lead-conversation-sync`
 
 **Infrastructure:**
 - ✅ `background-agent-runner` edge function (universal executor)
@@ -604,7 +613,7 @@ Complete reference of all platform features and capabilities.
 - ✅ Chain triggers (child agents auto-dispatch on parent completion)
 - ✅ Delegation to Python backend for tasks >25s (`DelegateToMivaaError`)
 - ✅ Real-time logs via `agent_run_logs` Supabase subscription
-- ✅ Admin UI at `/admin/background-agents`
+- ✅ Admin UI at Agent Ops → Background Agents (`/admin/agent-ops?tab=background-agents`)
 
 ---
 
@@ -733,7 +742,7 @@ A video of a 3D room is recorded in the browser from the room itself and is free
 
 ### 26. CRM System
 
-**Purpose**: Customer relationship management — contacts, companies, platform users
+**Purpose**: Customer relationship management — leads, contacts, companies, the workspace team
 
 **Status:** ✅ Complete (Production Ready)
 
@@ -741,12 +750,13 @@ A video of a 3D room is recorded in the browser from the room itself and is free
 
 - ✅ Contact management: CRUD, tagging, notes, activity log
 - ✅ Company management: CRUD, contact associations
-- ✅ User management: role changes, workspace membership
+- ✅ Leads (`crm_leads`): list / board, quotes before a contact exists, `convert_crm_lead` to a contact (+ optional deal); capture from email / WhatsApp through `inquiry_received` flows
+- ✅ Users tab: the workspace team (`TeamPanel`) for every workspace; platform accounts for the operator
 - ✅ Contact ↔ platform user linking (`linked_user_id`)
 - ✅ Integration with messaging campaigns
 - ✅ Integration with quotes system
-- ✅ Role-based access: admin/owner = full CRUD, manager = read+write, factory = read own
-- ✅ Admin UI: `/admin/crm`, `/admin/crm/companies/:id`, `/admin/crm/contacts/:id`
+- ✅ Capability-gated (`crm.view`); see [role-access-matrix.md](role-access-matrix.md)
+- ✅ UI: `/crm`, `/crm/leads/:id`, `/crm/contacts/:id`, `/crm/companies/:id`, `/crm/users/:id`
 
 ---
 
@@ -862,6 +872,10 @@ A video of a 3D room is recorded in the browser from the room itself and is free
 - ✅ **Sales Portal & Marketplace** (`docs/sales-and-marketplace.md`)
 - ✅ **Multi-tenant Capabilities & Tenancy** (`docs/capabilities-and-tenancy.md`)
 - ✅ **myAADE Module** — Greek business registry (ΑΑΔΕ) auto-fill from ΑΦΜ via SOAP/WS-Security
+- ✅ **Document lifecycle** — invoices editable until a MARK, sent to AADE on issue by default, credit-note and delivery-note drafts with their own pages, supplier returns as 9.3 / purpose 5, customer links (`/pay/:token`, `/d/:token`), automatic document emails, EN 16931 UBL export and inbound verdicts (`docs/finance-system.md` §6, §6b)
+- ✅ **Bank feed** — Revolut / Viva / Stripe lines with nature, CRM party and ranked suggested matches (`docs/banking-revolut.md`)
+- ✅ **Reporting** — daily P&L chart, revenue pipeline + lost-revenue reports, Exclude from P&L, per-document Income–Expense Book from myDATA, VAT return by line rate (`docs/finance-system.md` §5, §5a)
+- ✅ **Travel add-on** — flight-fare search costed onto trip cards as planned lines (`docs/trip-expense-cards.md`)
 
 ---
 

@@ -11,16 +11,16 @@ code as of this writing — where the model is *not* enforced, it says so explic
 ## 1. The two "role" concepts
 
 ### a) Account role — `roles` table (`user_profiles.role_id`)
-A global, per-user value — **the access tier**, set from `/admin/crm` → Users. Set: `user`(1) · `supplier`(2) · `architect`(3) · `admin`(4) — the two tiers `role_upgrade_requests` accepts, the operator flag, and the baseline. **Nothing functional lives here.** A tier is global: true in every workspace the user belongs to. `sales` and `finance` were removed 2026-07-31 (zero users; both are workspace roles — `sales`, `accountant`). `level` is display ordering only, but it is UNIQUE (`roles_level_key`), so a renumber needs a parking pass (`SET level = level + 100`) before landing final values.
+A global, per-user value — **the access tier**, set from CRM → Users → Platform Accounts (platform operator only). Set: `user`(1) · `supplier`(2) · `architect`(3) · `admin`(4) — the two tiers `role_upgrade_requests` accepts, the operator flag, and the baseline. **Nothing functional lives here.** A tier is global: true in every workspace the user belongs to. `sales` and `finance` were removed 2026-07-31 (zero users; both are workspace roles — `sales`, `accountant`). `level` is display ordering only, but it is UNIQUE (`roles_level_key`), so a renumber needs a parking pass (`SET level = level + 100`) before landing final values.
 
 The tier only shapes the persona when the user has **no workspace role** (§2) — in practice almost never, because every signup owns a workspace.
 
 **Platform operator.** Frontend: owner/admin of the **root** workspace (`isPlatformOperator` in `WorkspaceContext`) — what `AdminGuard` checks. Edge: account tier `admin`/`super_admin` (`isPlatformOperator` in `_shared/auth.ts`, used by `authenticatePlatformOperator`). SQL: `is_platform_admin()`, same tier test. The operator holds both.
 
-Managed in **Admin → CRM → Users** (inline Role dropdown).
+Managed in **CRM → Users → Platform Accounts** (inline Account Tier dropdown, operator only).
 
 ### b) Workspace membership role — `workspace_members.role`
-Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales` · `sales_manager` · `hr` · `hr_manager` · `warehouse` · `marketing` · `employee` · `realestate_agent`. (`finance` was dropped 2026-07-31 — a duplicate of `accountant` with no `resolvePersona` branch, so a member stored with it silently resolved to `staff`.) Catalogued in [`src/auth/workspaceRoles.ts`](../src/auth/workspaceRoles.ts) and mirrored by two CHECK constraints + two RPC allowlists. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
+Per workspace: `owner` · `admin` · `member` · `client` · `accountant` · `sales` · `sales_manager` · `hr` · `hr_manager` · `warehouse` · `marketing` · `employee` · `realestate_agent` · `support` (Member capabilities on a timer, see [capabilities-and-tenancy.md](capabilities-and-tenancy.md#support-access-a-time-limited-role-with-pin-re-entry)). (`finance` was dropped 2026-07-31 — a duplicate of `accountant` with no `resolvePersona` branch, so a member stored with it silently resolved to `staff`.) Catalogued in [`src/auth/workspaceRoles.ts`](../src/auth/workspaceRoles.ts) and mirrored by two CHECK constraints + two RPC allowlists. Combined with the workspace's **marketplace rank** (`operator` / `dealer` / `architect`) and the platform-operator flag, this resolves to a single **persona**, which is what gates features.
 
 Source of truth: [`src/auth/capabilities.ts`](../src/auth/capabilities.ts).
 
@@ -56,33 +56,33 @@ The UI derives personas from it, edge functions read its Deno mirror (`npm run v
 from that file — regenerate rather than edit. The platform operator additionally holds `platform.admin`,
 `catalog.import` and `downstream.view`.
 
-| Capability | owner | admin | member | accountant | sales | sales_manager | hr | hr_manager | warehouse | marketing | employee | realestate_agent | client |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| `workspace.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |
-| `workspace.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |
-| `network.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |
-| `pricing.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |
-| `finance.manage` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |
-| `finance.operate` | ✓ | ✓ |  | ✓ |  |  |  |  |  |  |  |  |  |
-| `invoice.issue` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |
-| `crm.view` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  | ✓ |  |
-| `warehouse.manage` | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |  |  |  |  |
-| `marketplace.browse` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
-| `quotes.use` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
-| `sales.portal` |  |  |  |  | ✓ | ✓ |  |  |  |  |  |  |  |
-| `sales.team.view` |  |  |  |  |  | ✓ |  |  |  |  |  |  |  |
-| `projects.use` | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |
-| `moodboards.use` | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |
-| `agent.use` | ✓ | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  |
-| `inbox.use` | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
-| `hr.view` | ✓ | ✓ |  |  |  |  | ✓ | ✓ |  |  |  |  |  |
-| `hr.manage` | ✓ | ✓ |  |  |  |  |  | ✓ |  |  |  |  |  |
-| `hr.self` |  |  |  |  |  |  |  |  |  |  | ✓ |  |  |
-| `marketing.email` | ✓ | ✓ |  |  |  |  |  |  |  | ✓ |  |  |  |
-| `marketing.seo` | ✓ | ✓ |  |  |  |  |  |  |  | ✓ |  |  |  |
-| `realestate.view` | ✓ | ✓ |  |  |  |  |  |  |  |  |  | ✓ |  |
-| `realestate.listings.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  | ✓ |  |
-| `realestate.leads.view` | ✓ | ✓ |  |  |  |  |  |  |  |  |  | ✓ |  |
+| Capability | owner | admin | member | support | accountant | sales | sales_manager | hr | hr_manager | warehouse | marketing | employee | realestate_agent | client |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| `workspace.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |  |
+| `workspace.read` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  | ✓ |  |
+| `network.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |  |
+| `pricing.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |  |  |
+| `finance.manage` | ✓ | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |
+| `finance.operate` | ✓ | ✓ |  |  | ✓ |  |  |  |  |  |  |  |  |  |
+| `invoice.issue` | ✓ | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |
+| `crm.view` | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  | ✓ |  |
+| `warehouse.manage` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  | ✓ |  |  |  |  |
+| `marketplace.browse` | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `quotes.use` | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `sales.portal` |  |  |  |  |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `sales.team.view` |  |  |  |  |  |  | ✓ |  |  |  |  |  |  |  |
+| `projects.use` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |
+| `moodboards.use` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  |
+| `agent.use` | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |  |
+| `inbox.use` | ✓ | ✓ | ✓ | ✓ |  | ✓ | ✓ |  |  |  |  |  |  |  |
+| `hr.view` | ✓ | ✓ |  |  |  |  |  | ✓ | ✓ |  |  |  |  |  |
+| `hr.manage` | ✓ | ✓ |  |  |  |  |  |  | ✓ |  |  |  |  |  |
+| `hr.self` |  |  |  |  |  |  |  |  |  |  |  | ✓ |  |  |
+| `marketing.email` | ✓ | ✓ |  |  |  |  |  |  |  |  | ✓ |  |  |  |
+| `marketing.seo` | ✓ | ✓ | ✓ | ✓ |  |  |  |  |  |  | ✓ |  |  |  |
+| `realestate.view` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  | ✓ |  |
+| `realestate.listings.manage` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  | ✓ |  |
+| `realestate.leads.view` | ✓ | ✓ |  |  |  |  |  |  |  |  |  |  | ✓ |  |
 
 - `workspace.read` — reading the business's own data at all. `client` and `employee` are outsiders: every
   tenant row policy and every `assert_workspace_member` RPC refuses them.

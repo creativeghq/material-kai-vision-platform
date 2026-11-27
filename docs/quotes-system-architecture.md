@@ -26,11 +26,22 @@ The Quotes System is a comprehensive quote management platform that allows users
 
 #### `quotes` Table
 
-Stores core quote data. Key fields include: `id`, `user_id`, `workspace_id`, `name` (optional user-friendly name), `status` ('draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired'), `status_tag_id`, `total_items`, `notes`, `custom_request_text`, `expires_at` (defaults to 30 days), `last_activity_at`, `created_at`, `updated_at`, and `submitted_at`.
+Stores core quote data. Key fields include: `id`, `user_id`, `workspace_id`, `name` (optional user-friendly name), `status` ('draft', 'submitted', 'quoted', 'accepted', 'rejected', 'expired', 'superseded'), `status_tag_id`, `total_items`, `notes`, `custom_request_text`, `expires_at`, `last_activity_at`, `created_at`, `updated_at`, and `submitted_at`. Later additions:
+
+| Column | Meaning |
+|---|---|
+| `terms` | The quote's own terms & conditions. Stamped from `finance_settings.default_quote_terms` on insert, editable on the quote, frozen once accepted/rejected, copied onto a revision, printed after the totals in the PDF and shown on `/q/:token`. |
+| `show_prices_incl_vat` | Presentation only: the PDF prints VAT-inclusive unit prices and line totals and one TOTAL (incl. VAT), no net subtotal or VAT line. `quote_items.unit_price` stays net, so the quote→order and invoice writers are unaffected. Frozen once decided, copied onto revisions. |
+| `rejection_reason` | Optional reason given when an operator marks a quote declined via `set_quote_status`. |
+| `deal_id` | The CRM deal the quote is attached to (Add to pipeline). |
+| `superseded_at`, `superseded_by_quote_id` | Set when an accepted revision supersedes this quote (see Revisions below). |
+| `public_share_enabled`, `public_share_token`, `public_share_created_at` | The `/q/:token` link, toggled by `set_quote_public_share`. |
+
+Workspace defaults live in `finance_settings`: `default_quote_terms` and `quote_validity_days` (1–365; NULL = platform default). Line activity extends a quote by the workspace validity, not the platform default.
 
 #### `quote_items` Table
 
-Stores quote line items. Key fields include: `id`, `quote_id`, `product_id`, `quantity`, `width`, `height`, `area`, `unit`, `notes`, and `added_from` ('search', 'agent', '3d_generation', 'manual', 'product_page', 'moodboard'). A unique constraint prevents duplicate products in the same quote.
+Stores quote line items. Key fields include: `id`, `quote_id`, `product_id`, `quantity`, `width`, `height`, `area`, `unit`, `notes`, and `added_from` ('search', 'agent', '3d_generation', 'manual', 'product_page', 'moodboard'). Uniqueness is per **(quote, product, variant)**, so one quote can carry a series' field tiles and its skirting as two lines. The line's unit comes from `product_sale_unit(product, variant_key, workspace)` (see [units-and-quantity-pricing.md](units-and-quantity-pricing.md)); an unstated special piece is NULL, never m². A line name the user typed prints verbatim; otherwise the name is series + chosen variant (`_line_name_core`). The line picture is the swatch of the line's own colour.
 
 ### Status Tags System
 
@@ -42,7 +53,7 @@ Stores custom status tags. Fields include `id`, `name`, `color` (hex code), `des
 
 #### `upsells` Table
 
-Admin-managed upsell items with `id`, `name`, `description`, `price`, `is_active`, and `display_order`.
+Workspace-owned upsell items (`workspace_id`, per-command RLS) with `id`, `name`, `description`, `price`, `is_active`, and `display_order`. An operator can create one inline from a quote's Extras tab.
 
 #### `quote_upsells` Table (Junction)
 
@@ -57,6 +68,30 @@ Defines the ordered steps in the project timeline: Quote Accepted, Materials Ord
 #### `quote_timeline` Table
 
 Tracks progress for each quote through the timeline steps. The `status` field can be 'pending', 'in_progress', 'completed', or 'skipped'. Includes `notes`, `completed_at`, and a unique constraint per quote/step combination.
+
+## Operator view, status moves and money
+
+`/quotes/:id` is `QuoteDetailRoute`: it renders `QuoteDetailAdminPage` when `quote_viewer_is_operator` (admin of the quote's workspace) is true, else `QuoteDetailCustomerPage`. `/quotes/manage/:id` redirects. The operator page is a `HubRecordPage`: Status menu, Email, Create draft invoice and a More menu (Preview, Download PDF, Issue revision; Generate for end user / Submit to parent only when the workspace has a parent network node); a Details rail (customer, bill-to, project, pipeline, creator name, dates, P&L) and tabs Items / Pricing / Extras / Timeline / Activity / Analytics / Terms / Contracts.
+
+- **`set_quote_status`** is the one manual status writer: back to `draft` (also reopens a `rejected` or `expired` quote, with a fresh expiry if lapsed), `submitted`, and `rejected` with an optional reason. The freeze trigger allows `rejected → draft` only. `quoteStatusMoves()` in `QuoteStatusActions.tsx` mirrors it. "Sent to customer" (`quoted`) and "Accepted" go through the send / accept paths and are disabled with a reason while any line is unpriced.
+- **Create draft invoice** runs the accept path, i.e. the single order + pre-invoice writer `_generate_order_from_quote_core`, then opens the draft.
+- **Add to pipeline** creates a deal from the quote or attaches it to an existing one (`quotes.deal_id`).
+- **`get_quote_economics`** (DEFINER; sell-side, own-or-admin like `user_can_read_quote_costs`): per-quote net revenue (from `get_quote_totals`), cost (frozen snapshot, else live product cost, same currency only), gross profit and margin over COSTED lines, with `uncosted_revenue` and a `cost_status` stated rather than hidden.
+- **`get_quote_pipeline_summary`**: open / won / lost / draft buckets in the base currency, win rate by value and by count (`win_rate_status` gives no verdict under 5 decided quotes), expected value and profit = open × win rate. Excludes procurement, superseded and `exclude_from_pnl` quotes. The Quotes list tiles (`QuotePipelineSummaryPanel`), the list's Value / Margin columns and the quote's P&L tiles all read these two RPCs; `list_my_quotes` returns them to the agent.
+- **`quote-buy-prices`** (edge): for each line, searches the supplier price lists (`resolve_purchase_prices`); a model only CHOOSES among the candidate rows or says no match, and the server drops any row that was not a candidate. Writes nothing. A row is not offered across a unit clash, and is low confidence when its unit is unconfirmed or its grade is not standard.
+- **`generate_client_quote`** (network "Generate for end user") requires a workspace admin.
+
+### Revisions
+
+Issue revision copies a decided quote into a new draft (`revision_number`). Accepting a revision runs `_supersede_parent_on_revision_accept` in the same transaction as `tg_quote_accepted_create_order`: the parent becomes `superseded`; an untouched parent order is cancelled and its draft pre-invoice voided before the revision mints its own. A parent order that has moved (delivery, payment, issued invoice) is kept, no second order is minted, and the money card raises `revision_order_short`. Project contract value counts accepted (never superseded) quotes.
+
+### The one quote document
+
+The PDF is the server render from `generate-quote-pdf`; Preview embeds the same file and Download saves it (no client-side screenshot). Access is a read of the quote as the caller (RLS); the stored path carries a content fingerprint, so a changed quote re-renders. `quote-public-share` always asks the renderer. The document table carries 72pt product photos, wraps long names/codes, prints each line's own unit, prints a 0% VAT quote as 0%, and moves totals that would collide with the footer onto their own page. Custom item images are converted to JPEG on upload because the renderer embeds only JPEG/PNG. Guarded by `tests/unit/quotePdfSingleDocument.test.ts`.
+
+### Public quote page (`/q/:token`)
+
+`quote-public-share` returns each line's `image_url` and `unit`, plus the quote's `notes`, `terms`, `client_name` and `client_email`. `PublicQuotePage` shows line photos (links through `safeHref`), quantity with unit, Notes and Terms & Conditions, pre-fills the signer from the client, and lists the issuer's bank accounts under "Or pay by bank transfer".
 
 ## Auto-Expiration System
 
@@ -419,17 +454,16 @@ Create a Supabase Edge Function to run daily that calls the `expire_old_quotes` 
 18. ⏳ Email notifications for quote status changes
 19. ⏳ Activity log for quote history
 
-## Admin Pages
+## Routes
 
-**Quote Management**:
-- `/admin/quote-requests` - View all quote requests with filtering
-- `/admin/quotes/:id` - Full-page quote detail view
+Declared in `src/modules/quotes/index.ts` (`routes.ts` holds `QUOTES_BASE` / `QUOTES_TAB`):
 
-**Configuration**:
-- `/admin/status-tags` - Manage custom status tags
-- `/admin/upsells` - Manage upsell items
-- `/admin/timeline-steps` - Manage timeline steps
-- `/admin/system-settings` - Configure quote expiration days
+- `/quotes` — list. `?tab=customer-requests` (workspace admins; `QuoteRequestsAdmin` embedded), `?tab=requests` (Network Requests, `network.manage`), `?tab=settings` (Quote Settings, `network.manage`).
+- `/quotes/:id` — `QuoteDetailRoute` (operator or customer view); `/quotes/:id/preview` — PDF preview. Both `openToRecipient`.
+- `/quotes/manage/:id` — legacy redirect to `/quotes/:id`.
+- `/quotes/requests`, `/quotes/requests/manage` — request pages.
+- `/quotes/settings` (+ `/status-tags`, `/upsells`, `/timeline-steps`) — workspace-admin configuration. Quote Settings holds Quote Expiration (operator-only), `QuoteTermsCard` (Default Terms, Offer valid for) and PDF Design.
+- `/q/:token` — public quote page.
 
 ## API Routes
 

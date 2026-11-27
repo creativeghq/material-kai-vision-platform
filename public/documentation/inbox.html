@@ -26,7 +26,7 @@
   <p><strong>What it is —</strong> a single view that brings together the conversations your team relies on so they don't end up scattered across separate apps. <strong>Why it matters —</strong> when conversations live in one searchable, assigned place, nothing falls through the cracks and the right person always picks up the right thread. By default it shows the conversations of the workspace you're working in.</p>
 
   <h2>Layout — sidebar, list, conversation</h2>
-  <p><strong>What it is —</strong> three columns: the <strong>sidebar</strong> (what to show), the <strong>conversation list</strong>, and the <strong>open conversation</strong>. The customer's details open in a drawer from the <strong>Profile</strong> button in the conversation header. On a phone it's one column at a time, and the views become chips above the list.</p>
+  <p><strong>What it is —</strong> three columns: the <strong>sidebar</strong> (what to show), the <strong>conversation list</strong>, and the <strong>open conversation</strong>. The customer's details open in a drawer from the <strong>Profile</strong> button in the conversation header. On a phone it's one column at a time, the views become chips above the list, and a conversation opens full screen. <strong>Inbox</strong> has its own button in the desktop top bar and in the mobile bottom bar.</p>
 
   <h3>The sidebar</h3>
   <ul class="feat">
@@ -34,7 +34,6 @@
     <li><strong>Compose</strong> — starts a new conversation (see below).</li>
     <li><strong>Views</strong> — <strong>Inbox</strong> (with a count), <strong>Follow up</strong>, <strong>Unread</strong>, <strong>Starred</strong>, <strong>Drafts</strong>, <strong>Sent</strong>, <strong>Scheduled</strong> (messages waiting to go out), <strong>Search messages</strong> and <strong>Archived</strong>. A count reading <em>“120+”</em> means more pages exist.</li>
     <li><strong>Assignment — Mine / Unassigned</strong> — conversations you own, and ones nobody owns yet.</li>
-    <li><strong>Sources</strong> — the door each conversation came through: <em>Public profile</em>, <em>Lead form</em>, <em>Email</em>, <em>WhatsApp</em>, <em>Social DM</em>, <em>Social comments</em>, <em>Customer</em>, <em>Dealer</em>, <em>Team</em>, each with a count. Empty sources hide themselves.</li>
     <li><strong>Numbers</strong> — on the WhatsApp tab, when your workspace has more than one WhatsApp number: <em>Every number</em> or one number at a time. A <strong>Message templates</strong> link takes you to your approved WhatsApp templates.</li>
     <li><strong>Labels</strong> — your workspace's labels, each with the number of <em>open</em> conversations carrying it (see <a href="#labels">Labels</a>).</li>
   </ul>
@@ -43,8 +42,15 @@
   <ul class="feat">
     <li><strong>Status tabs — Open / Follow up / Done</strong> — work what's open, park what you're waiting on, close what's finished. Done is not one-way: a new message from the customer reopens it.</li>
     <li><strong>Search conversations</strong> — searches every conversation on the server (subject, preview, sender, phone and message text — never private notes), not just the page you've loaded.</li>
-    <li><strong>Filter conversations</strong> — narrow by <em>Source</em>, <em>WhatsApp number</em>, <em>Order</em> (<em>Waiting for approval</em> / <em>Approved</em> / <em>Dismissed</em>), <em>Type</em> and labels (several at once).</li>
+    <li><strong>Filter conversations</strong> — narrow by <em>Source</em> (only the sources your mailbox actually has), <em>WhatsApp number</em>, <em>Order</em> (<em>Waiting for approval</em> / <em>Approved</em> / <em>Dismissed</em>), <em>Type</em> and labels (several at once).</li>
     <li><strong>Each row</strong> shows the source, the owner (or <em>Unassigned</em>), a subject line on email, a <strong>Files</strong> chip when it holds attachments, an <strong>AI</strong> tag when the assistant is on, and when a follow-up is due. The list loads more as you scroll (or <strong>Load older conversations</strong>).</li>
+    <li><strong>Faces</strong> — an email sender's avatar is their photo when known, else their Gravatar, else their company's logo (never for personal mail domains such as Gmail or Outlook), else a generated face.</li>
+  </ul>
+  <h3>On a phone — gestures</h3>
+  <ul class="feat">
+    <li><strong>Swipe left</strong> on a conversation to delete it (it goes to Archived, where it can be restored); <strong>swipe right</strong> to mark it Done. The toast's <strong>Undo</strong> puts it back exactly as it was.</li>
+    <li><strong>Tap an avatar</strong> (or long-press a row) to start selecting. The top bar becomes a selection bar: the count, <em>Mark read</em>, <em>Done</em>/<em>Reopen</em>, <em>Delete</em>, <em>Follow up</em>, and a menu with <em>Select all</em>, <em>Assign to me</em> and labels.</li>
+    <li><strong>Pull down</strong> from the top of the list to refresh.</li>
   </ul>
   <p><strong>What it affects:</strong> views, tabs, filters and search only change what <em>you</em> see — they don't move or hide anything for teammates.</p>
   <div class="callout"><p><strong>All workspaces</strong> (top-right) is a <strong>platform-operator</strong> control that shows conversations across every workspace. Regular members always see the active workspace only — switch workspace to see another one's conversations.</p></div>
@@ -71,19 +77,20 @@
     <li><strong>Email</strong> — sent <em>from your own Inbox address</em>: To (with contact suggestions), Cc / Bcc, Subject, the message (with formatting) and several attachments.</li>
     <li><strong>WhatsApp</strong> — a <em>Phone number</em> and optional name (plus a <strong>From</strong> picker when you have more than one number). This opens the conversation without sending anything; the first message must be an approved template.</li>
   </ul>
+  <p><strong>Email from a record.</strong> The <strong>Email</strong> button on a CRM lead, contact, company or deal, on a project's Overview, in Finance → Parties and in Appointments opens this same composer here in the Inbox, addressed to that person and linked to the record — instead of your computer's mail app. Nothing is sent until you press Send.</p>
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/inbox/new-conversation.png" alt="Starting a conversation from the Inbox"><figcaption>Starting a conversation from <strong>Compose</strong>.</figcaption></figure>
 
   <h2>Reading a conversation</h2>
   <ul class="feat">
     <li><strong>It opens on the newest messages</strong>, at the bottom, 20 at a time. Scroll up (or <strong>Load earlier messages</strong>) for older ones.</li>
-    <li><strong>Email reads like mail.</strong> The subject sits on top, earlier emails fold to one line you open on click, and the latest shows the sender, To and Cc as people chips, the body as the sender formatted it, and <strong>Attachments</strong> as cards. Remote images are held back until you press <strong>Show images</strong> or <strong>Always for</strong> that sender. WhatsApp, social and team chats stay as chat bubbles.</li>
+    <li><strong>Email reads like mail.</strong> The subject sits on top, earlier emails fold to one line you open on click, and the latest shows the sender, To and Cc as people chips, the body as the sender formatted it, and <strong>Attachments</strong> as cards. Images load by default, including logos embedded in the message itself (how Outlook sends signatures). A wide newsletter is scaled to fit the screen rather than cut off. WhatsApp, social and team chats stay as chat bubbles.</li>
     <li><strong>Timeline events</strong> — assignment, Done / reopen, labels and the assistant switching on or off appear as small event cards in the thread. When the assistant hands a conversation to the team, the card says so and why, and an unowned thread offers <strong>Assign to me</strong>.</li>
     <li><strong>The message menu</strong> — <strong>Reply</strong>, <strong>React</strong>, <strong>Copy text</strong> and, under <strong>More</strong>: <strong>Forward</strong> (into another conversation you can write to), <strong>Pin to top</strong>, <strong>Star</strong>, <strong>Add text to note</strong> and <strong>Remove from this inbox</strong> (removes our copy; WhatsApp has no unsend).</li>
     <li><strong>Links are links</strong> — a pasted URL is clickable and shows a preview of the page.</li>
   </ul>
 
   <h2>Replying — the reply box</h2>
-  <p><strong>What it is —</strong> one card at the bottom of the conversation. <strong>Why it matters —</strong> everything you need to answer well (the right recipients, a signature, a ready-made answer, a later send time, a follow-up) is in the same place, and the box says in words whether you're writing to the customer or to your team.</p>
+  <p><strong>What it is —</strong> one card at the bottom of the conversation. On email on a desktop it is collapsed to a single line so the message gets the whole pane; clicking it — or <em>Reply all</em>, <em>Forward</em>, <em>Note</em>, <em>Suggest reply</em>, or a message's own Reply — opens a large reply window with the message you're answering on top and the full reply box below. Closing the window keeps the draft; sending closes it. Chats and phones keep the reply box inline. <strong>Why it matters —</strong> everything you need to answer well (the right recipients, a signature, a ready-made answer, a later send time, a follow-up) is in the same place, and the box says in words whether you're writing to the customer or to your team.</p>
   <ul class="feat">
     <li><strong>Reply / Reply all / Private note</strong> — the menu at the top-left. <em>Reply all</em> appears on email when others were copied in. A <strong>Private note</strong> turns the box amber and is seen only by your team.</li>
     <li><strong>Cc / Bcc</strong> and <strong>Track opens</strong> — on email replies (see <a href="#tracking">Open tracking</a>).</li>

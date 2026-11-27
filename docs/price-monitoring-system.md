@@ -222,7 +222,7 @@ A `CHECK (api_key_id XOR product_id)` constraint enforces routing. `uniq_tracked
 - Cross-flow: `/market-check`, `/classifier-correction`, `/promote-family-row`, `/demote-to-family`, `/tracked-queries/cron-refresh`, `/broadcast-api-announcement`
 - Legacy aliases (`/start`, `/stop`, `/check-now`, `/discover`, `/sources/{id}`, `/history/{id}`, `/status/{id}`) kept short-term, marked deprecated.
 
-**Internal cron** ([supabase/functions/monitoring-cron/index.ts](../supabase/functions/monitoring-cron/index.ts)): every hour calls `get_internal_tracked_queries_due()` (RPC) which returns rows where `api_key_id IS NULL AND product_id IS NOT NULL AND next_check_at < now()`, then POSTs to `/products/{id}/refresh` for each. External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched — they pay per call and control their own cadence.
+**Internal cron** ([supabase/functions/monitoring-cron/index.ts](../supabase/functions/monitoring-cron/index.ts)): the hourly task `price-refresh` POSTs MIVAA `/api/v1/price-monitoring/tracked-queries/cron-refresh?limit=50`. **Nothing paid runs on a schedule nobody chose:** `tracked_queries.auto_refresh` defaults to false and is the **Daily Check** switch on the monitored-products list (`setPriceAutoRefresh`); a row with it off refreshes only on **Check now**, and the list shows "On demand" instead of a next-check time. External API consumers (`api_key_id IS NOT NULL`) are intentionally NOT touched — they pay per call and control their own cadence.
 
 **Service entry points** ([mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py](../mivaa-pdf-extractor/app/services/integrations/tracked_queries_service.py)):
 

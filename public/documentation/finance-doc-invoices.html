@@ -28,9 +28,10 @@
     <li><strong>New</strong> — start a new invoice in the editor (detailed below).</li>
     <li><strong>Sync from myDATA</strong> — pulls the documents the tax authority already has on file for your business, so your own already-filed invoices appear and reconcile <em>without re-keying them</em>. Clicking it asks <strong>which period to fetch</strong> first — a preset or your own <em>From</em>/<em>To</em> dates — so the pull stays bounded to the months you care about. It only works once you've entered your myDATA inbox credentials in <a href="finance-settings.html">Finance Settings → Documents</a>.</li>
     <li><strong>Income category</strong> — opens the manager for the income category list used across the document lists, filters and reports. These same categories are also editable inline on a document header, so you can keep your books consistent without leaving the document you're working on. See <a href="finance-settings.html">Finance settings</a>.</li>
-    <li><strong>All categories filter</strong> — narrow the list to one income category.</li>
+    <li><strong>Filters</strong> — narrow the list, for example to one income category.</li>
     <li><strong>Search</strong> — by invoice number or customer when the history gets long.</li>
   </ul>
+  <p>The list is newest first — by issue day, then by legal number — and pages through long histories.</p>
 
   <h3>Columns</h3>
   <p>The columns let you read the state of each invoice at a glance — note the <strong>Due</strong> column (what's still outstanding) and <strong>mD</strong> (whether it has reached the tax authority):</p>
@@ -39,12 +40,14 @@
     <thead><tr><th>Column</th><th>What it shows</th></tr></thead>
     <tbody>
       <tr><td><strong>Number</strong></td><td>The invoice number.</td></tr>
+      <tr><td><strong>Customer</strong></td><td>Who the invoice is to.</td></tr>
       <tr><td><strong>Date</strong></td><td>The issue date.</td></tr>
       <tr><td><strong>Category</strong></td><td>The income category assigned.</td></tr>
       <tr><td><strong>Total</strong></td><td>The gross document total.</td></tr>
       <tr><td><strong>Due</strong></td><td>The amount still outstanding.</td></tr>
-      <tr><td><strong>Status</strong></td><td>The document status.</td></tr>
+      <tr><td><strong>Status</strong></td><td>The document status. A <strong>Not in P&amp;L</strong> tag marks an invoice excluded from profit totals.</td></tr>
       <tr><td><strong>mD</strong></td><td>The myDATA transmission status — whether the document has been transmitted to the tax authority (ΑΑΔΕ).</td></tr>
+      <tr><td><strong>Sent</strong></td><td>Whether the document email reached the customer.</td></tr>
     </tbody>
   </table>
   </div>
@@ -53,146 +56,122 @@
 
   <h2>The invoice detail page</h2>
   <div class="routes"><span class="badge route">/finance/invoices/:id</span></div>
-  <p><strong>What it is —</strong> the full view of a single invoice, reached by clicking any row in the Invoices tab. <strong>Why it matters —</strong> the list shows you the summary; the detail page is where you act on the document. <strong>What you can do here:</strong> see the customer, line items, taxes and totals, and the status; issue/transmit it, generate the PDF, and share a payment link so the customer can pay online.</p>
+  <p><strong>What it is —</strong> the record page of a single invoice, reached by clicking any row in the Invoices tab. The list shows you the summary; the detail page is where you act on the document. The back arrow returns to <strong>Finance → Invoices</strong>.</p>
+  <h3>Header actions</h3>
+  <ul class="feat">
+    <li><strong>Preview</strong> — the invoice as printed, on a paper-width sheet that scales down on a narrow screen.</li>
+    <li><strong>Mark Issued</strong> — on a draft: assigns the legal number and issue date and, unless automatic sending is off, transmits it to AADE.</li>
+    <li><strong>Record payment</strong> — on an issued invoice: allocate money received against it.</li>
+    <li><strong>More actions (⋮)</strong> — the same menu as the list row: <em>Edit invoice</em> (while allowed, see below), Open customer view, Copy customer link, Send via WhatsApp, Send email, Download PDF, Download EN 16931 XML, Submit to myDATA, myDATA details, Copy MARK, Card payment on terminal, Issue credit note, Link to a project, Change category, Change description, Exclude from / include in P&amp;L, Duplicate as draft, Save as template and History.</li>
+  </ul>
+  <h3>What the page shows</h3>
+  <ul class="feat">
+    <li><strong>Details</strong> — status (with a <em>With shipping</em> tag when the invoice is also the delivery note), the customer and their VAT number, document type, series, issue and due dates, establishment, payment method and note, links to the source order or quote, the <strong>Project</strong> the invoice belongs to, and the <strong>Exclude from P&amp;L</strong> switch.</li>
+    <li><strong>Fiscal record</strong> — the MARK, UID and authentication code once AADE has accepted the document, with a send button while it has none.</li>
+    <li><strong>Customer link</strong> — copy, open or send on WhatsApp the page the customer sees without an account. It is shown on drafts too, since a draft is the shareable pre-invoice.</li>
+    <li><strong>Line Items</strong> — with cost and margin where the product cost is known, and a Net / VAT / Withholding / Total footer; then <strong>Payments</strong>, <strong>Credit Notes</strong> and the <strong>Linked records</strong> panel.</li>
+  </ul>
+  <div class="callout warn"><p><strong>When AADE refuses an invoice</strong> a banner above the content gives AADE's reason. The invoice has no MARK, so fix the cause with <strong>Edit invoice</strong> and send it again under the same number. A banner also warns when a document has been awaiting transmission for more than 24 hours.</p></div>
+  <h3>Editing an issued invoice</h3>
+  <p>An invoice stays editable until myDATA returns a MARK — so a rejected or never-sent invoice can be corrected rather than voided. Editing keeps the legal number, type, series and issue date, and re-takes the stock the old lines moved. Edit is no longer offered once the invoice has a MARK, is awaiting a transmission, or has payments or credit notes against it; from then on a correction is a <a href="finance-doc-credit-notes.html">credit note</a>.</p>
+  <h3>Exclude from P&amp;L</h3>
+  <p>An invoice marked <strong>Exclude from P&amp;L</strong> stays on record and still counts for VAT, myDATA, what the customer owes and cash — it is only left out of profit, revenue and expense totals (the P&amp;L, sales reports and project P&amp;L). The flag can be set after a MARK. The same switch exists on expenses, orders, quotes and other records that reach a P&amp;L; credit notes follow the document they correct.</p>
+  <h3>Payments and other actions</h3>
   <ul class="feat">
     <li><strong>Card payment on terminal</strong> — in the actions menu of a transmitted invoice: sign for one of your registered terminals, charge the amount still due (Card or IRIS), enter the transaction id, and <strong>Terminal approved — file it</strong>.</li>
     <li><strong>Issue the 8.4</strong> — on a wholesale invoice settled on a terminal, the detail page flags the missing <strong>8.4 card receipt</strong> and issues it, linked to the invoice.</li>
     <li><strong>The QR code</strong> on the PDF opens the provider's filed copy of the document; the in-app verify links go to AADE.</li>
-    <li><strong>The payment link</strong> opens the <a href="finance-einvoicing.html">public invoice page</a>, which also shows the document's filed facts (MARK, UID, authentication code) and offers <strong>Download PDF</strong> — even after it is paid, cancelled or credited.</li>
+    <li><strong>The customer link</strong> opens the <a href="finance-einvoicing.html">public invoice page</a>, which shows the full invoice, its filed facts (MARK, UID, authentication code) and <strong>Download PDF</strong> — even after it is paid, cancelled or credited.</li>
+    <li><strong>Download EN 16931 XML</strong> — the invoice as a European-standard UBL 2.1 e-invoice file, for a buyer whose system imports one.</li>
   </ul>
 
   <h2>How to create an invoice</h2>
-  <p><strong>How to open it:</strong> from <strong>Finance → Invoices</strong>, click <strong>New</strong>. The same editor builds several document types — Sales invoice, Service invoice, Receipt, Delivery note — so pick the type at the top first; the rest of the form adapts to it. The sections below walk down the form in order. You only need a handful of fields for a basic invoice (Client, a line item, Category); the rest cover the compliance and delivery options Greek invoicing requires.</p>
+  <p><strong>How to open it:</strong> from <strong>Finance → Invoices</strong>, click <strong>New</strong>. The editor is one form laid out in rows, with a <strong>Live Preview</strong> of the printed document beside it on wide screens. You only need a handful of fields for a basic invoice (customer, a line, category); the rest cover the compliance and delivery options Greek invoicing requires. The sections below walk down the form in order.</p>
 
   <figure><img src="https://bgbavxtjlbvgplozizxu.supabase.co/storage/v1/object/public/documentation/finance/new-invoice.png" alt="New invoice editor"><figcaption>The New Invoice editor — a full myDATA-compliant document form.</figcaption></figure>
 
-  <h3>Billed to</h3>
-  <p><strong>Why it's first —</strong> the document needs a recipient before anything else. If the customer isn't in your contacts yet, you can create them without leaving the form.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Client</strong></td><td>Search your contacts/companies, or use <strong>+ Add new client</strong> to create one on the spot.</td></tr>
-    </tbody>
-  </table>
-  </div>
+  <h3>Billed To</h3>
+  <p>Search your companies and contacts, or use <strong>+ Add new client</strong> (or the <em>Add “…” as a new client</em> suggestion under what you typed) to create one on the spot. On an invoice (1.x / 2.x) the search offers only businesses — companies, and contacts with a VAT number — because AADE rejects an invoice to a buyer with no VAT number; a private individual gets a <a href="finance-doc-receipts.html">receipt</a>, where the search is unrestricted. A business customer's VAT can be checked with <strong>Validate via VIES</strong>.</p>
+  <p>In <strong>New client</strong>, a VAT number typed with a country prefix (GB…, DE…, US…) switches the country. For a country no registry covers, or when the ΑΑΔΕ / VIES lookup finds nothing, the billing address fields open so you can enter the client by hand.</p>
 
-  <h3>Invoice details</h3>
-  <p><strong>Why it matters —</strong> this block carries the legal classification and the terms. The <strong>Document type (myDATA)</strong> is what tells the tax authority what kind of document this is, and the dates/terms drive when it becomes due.</p>
+  <h3>Document</h3>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Field</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><strong>Document type (myDATA)</strong></td><td>The classification code for the document, e.g. "1.1 — Sales Invoice". Proposed from the buyer and what you sell: 1.1 / 2.1 for a business, 11.1 / 11.2 for a consumer, and for a foreign business <strong>1.2 / 2.2</strong> (EU, intra-community) or <strong>1.3 / 2.3</strong> (outside the EU, export) — with a note explaining the choice. See <a href="finance-einvoicing.html">Selling abroad</a>.</td></tr>
-      <tr><td><strong>Related document</strong></td><td>Optional myDATA MARK or related invoice number.</td></tr>
-      <tr><td><strong>Date issued</strong></td><td>The issue date of the document.</td></tr>
-      <tr><td><strong>Payment terms (days)</strong></td><td>Number of days until payment is due.</td></tr>
-      <tr><td><strong>Currency</strong></td><td>The document currency, e.g. EUR.</td></tr>
-      <tr><td><strong>Default VAT %</strong></td><td>The default VAT rate applied to lines.</td></tr>
-      <tr><td><strong>Category</strong></td><td>Income type / income category for reporting.</td></tr>
+      <tr><td><strong>Type</strong></td><td>The common document types as a choice — Sales Invoice (1.1), Service Invoice (2.1), Receipt (11.1), Delivery Note (9.3); for a consumer, Receipt, Service Receipt (11.2) and Delivery Note — with <strong>More Document Types</strong> for the rest of the myDATA list. For a foreign business it proposes <strong>1.2 / 2.2</strong> (EU, intra-community) or <strong>1.3 / 2.3</strong> (outside the EU, export) and explains the choice. See <a href="finance-einvoicing.html">Selling abroad</a>.</td></tr>
+      <tr><td><strong>Numbering Series</strong></td><td><em>Automatic</em> or a specific series; the next number is shown beneath. A type that is enabled but has no series yet is still offered — its series is created on the first document.</td></tr>
+      <tr><td><strong>Date Issued</strong></td><td>The issue date of the document.</td></tr>
+      <tr><td><strong>Related Document</strong></td><td>Optional myDATA MARK or related invoice number.</td></tr>
+      <tr><td><strong>Activity (KAD) Printed on the Document</strong></td><td>Which of your business activities prints on this invoice. Your primary KAD is the default; the list comes from <a href="finance-settings-business-identity.html">Business Identity</a>.</td></tr>
+      <tr><td><strong>Establishment</strong></td><td>The branch the document is issued from, when you have more than one.</td></tr>
     </tbody>
   </table>
   </div>
+  <div class="callout"><p><strong>Foreign buyers are invoiced at 0% VAT.</strong> When the buyer is abroad, every line is set to 0% with the regime's exemption cause (art. 29 for an export of goods, art. 33 for an intra-community supply of goods); on a service line you pick the cause. Intra-community treatment needs the buyer's VAT number. A rate you set by hand is kept.</p></div>
 
-  <h3>Global line defaults</h3>
-  <p><strong>Why it's here —</strong> rather than repeat the same VAT rate or settings on every row, set them once and they apply to all lines, saving re-entry on long documents.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Global line defaults</strong></td><td>Defaults applied to all rows.</td></tr>
-    </tbody>
-  </table>
-  </div>
+  <h3>Terms</h3>
+  <p><strong>Payment Terms (Days)</strong>, <strong>Currency</strong> (with an <strong>Exchange Rate → EUR</strong> for a foreign currency), <strong>Default VAT %</strong>, the income <strong>Category</strong>, and <strong>Paid Upfront (Cash)</strong> — which takes the cash discount set in <a href="finance-settings-pricing.html">Settings → Pricing</a> off every line and sets the terms to 0 days.</p>
 
-  <h3>Items / services</h3>
-  <p><strong>The heart of the document —</strong> the lines that make up what you're billing. Add a blank row and type it in, or pull a priced line straight from your catalogue so you don't re-key product details. The <strong>Prices include VAT</strong> toggle tells the editor how to read the figures you enter, which changes how net/VAT/gross are calculated.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Description, Qty, Price, Disc., Unit, VAT category</strong></td><td>The per-row fields for each item or service line.</td></tr>
-      <tr><td><strong>Prices include VAT</strong></td><td>Toggle for whether the entered prices are VAT-inclusive.</td></tr>
-      <tr><td><strong>Add row / Pick from products</strong></td><td>Add a blank line, or pull a line from the catalogue.</td></tr>
-    </tbody>
-  </table>
-  </div>
-  <div class="callout tip"><p><strong>Pick from products</strong> proposes a sell price using the <a href="finance-settings-pricing.html">resale pricing engine</a> — the category markup, then the customer's pricing level discount — so a catalogue cost becomes the customer's sell price automatically.</p></div>
+  <h3>Shipping</h3>
+  <p>Turn on <strong>Invoice with shipping</strong> when the invoice is also the delivery note (Τιμολόγιο – Δελτίο Αποστολής); it is filed with myDATA as one. Fill the <strong>Loading Place</strong> (<em>Use HQ details</em>) and <strong>Delivery Place</strong> (<em>Customer delivery address</em>) as street, number, postal code and city — an incomplete address is refused — plus the transport date and time, vehicle, responsible person and <strong>Purpose</strong>.</p>
+
+  <h3>Items / Services</h3>
+  <p>Each row has <strong>Description, Qty, Unit, Price, Discount €, VAT</strong>, and shows <strong>Net</strong> and <strong>Total incl. VAT</strong>. Type three or more letters in the description to find a product or service from your catalogue, with its image; picking one fills the price, the unit and the cost. For a product with variants, choose the colour and size on the row itself — changing the variant re-prices the line (unless you typed a price) and the row shows the free stock for that variant. A line discount larger than quantity × price is refused.</p>
+  <ul class="feat">
+    <li><strong>Prices include VAT</strong> — whether the prices you enter are VAT-inclusive.</li>
+    <li><strong>Row defaults</strong> — a unit, VAT category, income type and income category applied to every row.</li>
+    <li><strong>Add row</strong> — add a blank line.</li>
+    <li>Each line's details show its <strong>income classification</strong> — your choice, else the product's own codes, else the document type's default — so you see what will be filed.</li>
+  </ul>
+  <div class="callout tip"><p>A catalogue line's sell price comes from the <a href="finance-settings-pricing.html">resale pricing engine</a> — the category markup, then the customer's pricing level discount — so a catalogue cost becomes the customer's sell price automatically.</p></div>
   <div class="callout"><p><strong>Cash (paid-upfront) discount.</strong> When an invoice is created from an accepted <a href="quotes-build.html">quote</a> that carried a <em>paid-upfront (cash)</em> discount, the invoice <strong>inherits that cash-discount line</strong> — it shows as its own line in the totals so the customer sees the upfront-payment saving on the invoice too.</p></div>
 
-  <h3>Taxes</h3>
-  <p><strong>When you'd use it —</strong> certain transactions carry withholding or a digital transaction fee. Leave these blank unless they apply to your case.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Withholding tax</strong></td><td>Withholding tax applied to the document.</td></tr>
-      <tr><td><strong>Digital transaction fee</strong></td><td>Digital transaction fee applied to the document.</td></tr>
-    </tbody>
-  </table>
-  </div>
+  <h3>Withholding &amp; Fees, Charges &amp; Levies</h3>
+  <p><strong>Withholding Tax</strong> (offered on sales invoices) and the <strong>Digital Transaction Fee</strong>; then <strong>Charges &amp; Levies (Document Level)</strong> for taxes stated once on the document rather than per line. Leave these blank unless they apply.</p>
 
   <h3>Payment</h3>
-  <p><strong>Why it matters —</strong> the <strong>Payment method (myDATA)</strong> is part of what's transmitted to the tax authority, and the note gives the customer the practical detail (where/how to pay).</p>
   <div class="table-wrap">
   <table>
     <thead><tr><th>Field</th><th>What it does</th></tr></thead>
     <tbody>
-      <tr><td><strong>Payment method (myDATA)</strong></td><td>The myDATA payment method, e.g. "5 — On credit".</td></tr>
-      <tr><td><strong>Payment note</strong></td><td>IBAN, card reference, "on credit", etc.</td></tr>
+      <tr><td><strong>Payment Method (myDATA)</strong></td><td>The myDATA payment method; a new invoice starts at <em>On credit</em>.</td></tr>
+      <tr><td><strong>Payment Note</strong></td><td>IBAN, card reference, "on credit", etc.</td></tr>
       <tr><td><strong>VAT payment suspension</strong></td><td>Toggle for VAT payment suspension.</td></tr>
-      <tr><td><strong>Self-pricing</strong></td><td>Toggle for self-pricing.</td></tr>
+      <tr><td><strong>Self-billed (αυτοτιμολόγηση)</strong></td><td>The document is issued in a supplier's name, with your business as the counterpart, and booked as a purchase. Only suppliers whose self-billing agreement and ΑΦΜ authorization are recorded under <a href="finance-settings-einvoicing.html">Settings → e-Invoicing</a> are offered.</td></tr>
     </tbody>
   </table>
   </div>
 
-  <h3>Notes</h3>
-  <p><strong>When you'd use it —</strong> any free text you want printed on the document for the customer to read.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>Notes</strong></td><td>Free text shown on the invoice.</td></tr>
-    </tbody>
-  </table>
-  </div>
+  <h3>Printed on the Document</h3>
+  <p><strong>Notes</strong>, an <strong>Info Box</strong> (up to 250 characters, e.g. warranty or delivery terms), <strong>Logo</strong> (Business Logo / No Logo), <strong>Print Online Code / QR</strong> and <strong>Print Terms &amp; Comments</strong>.</p>
 
-  <h3>B2G — public-sector invoice</h3>
-  <p><strong>When you'd use it —</strong> turn this on only when you're selling to a public body, which has its own invoicing requirements.</p>
-  <div class="table-wrap">
-  <table>
-    <thead><tr><th>Field</th><th>What it does</th></tr></thead>
-    <tbody>
-      <tr><td><strong>B2G — public-sector invoice</strong></td><td>Toggle for selling to public bodies. It opens a reference block: Contract reference (ΑΔΑΜ), Buyer reference, Buyer legal registration id, Buyer identifier (ΚΗΜΔΗΣ/KAE), Budget identifier, Payment due date, a <strong>CPV code</strong> (used for lines whose product has none) and an optional <strong>Purchase order reference</strong>. Your IBAN and the delivery details are sent with it.</td></tr>
-    </tbody>
-  </table>
-  </div>
+  <h3>When Issued</h3>
+  <ul class="feat">
+    <li><strong>Send to AADE on Issue</strong> — on by default, following the workspace setting <em>Send to AADE automatically when an invoice is created</em> in <a href="finance-settings-einvoicing.html">Settings → e-Invoicing</a>. A failed send raises a notification.</li>
+    <li><strong>Send by Email on Create</strong>.</li>
+    <li><strong>Include in MYF Report</strong>.</li>
+    <li><strong>Move Stock on Issue</strong> — decrement the warehouse.</li>
+    <li><strong>Exclude from P&amp;L</strong> — see above.</li>
+  </ul>
 
-  <h3>Document &amp; delivery options (issue-time toggles)</h3>
-  <p><strong>What these do —</strong> these are the toggles that decide what happens the moment you create the document: whether it transmits, whether it moves stock, whether it's emailed, and — most importantly — whether it's issued as a legal record or saved as a draft.</p>
-  <div class="feat">
-    <ul>
-      <li><strong>Submit to myDATA on issue</strong> — transmit electronically when issued.</li>
-      <li><strong>Print online code / QR</strong>.</li>
-      <li><strong>Include in MYF report</strong>.</li>
-      <li><strong>Move stock on issue</strong> — decrement warehouse.</li>
-      <li><strong>Print terms &amp; comments</strong>.</li>
-      <li><strong>Send by email on create / Send by SMS on create</strong>.</li>
-      <li><strong>Info box (printed, ≤250 chars)</strong> — extra printed note (warranty/delivery terms).</li>
-      <li><strong>Issue now</strong> — assigns the legal number + date (otherwise saved as draft).</li>
-    </ul>
-  </div>
-  <p>When everything's right, click <strong>Preview</strong> to check the PDF, then <strong>Create invoice</strong>.</p>
+  <h3>Public Sector (B2G)</h3>
+  <p>For sales to a public body (not shown on retail documents): Contract Reference (ΑΔΑΜ), Buyer Reference, Buyer Legal Registration Id, Buyer Identifier (ΚΗΜΔΗΣ/KAE), Budget Identifier, Payment Due Date, a <strong>CPV code</strong> (used for lines whose product has none) and an optional <strong>Purchase Order Reference</strong>. Your IBAN and the delivery details are sent with it.</p>
+
+  <p>When everything's right, click <strong>Preview</strong> to check the PDF, then <strong>Create invoice</strong> — or <strong>Save draft</strong> to keep it without a legal number and issue it later from its page.</p>
 
   <div class="callout"><p><strong>The legal number.</strong> Each document type has its own numbering range, created automatically on the first document if you haven't set one up, and an invoice from a channel with its own range (e.g. a Skroutz order) uses that range. The number printed on the PDF is the one sent to myDATA. Set ranges in <a href="finance-settings-documents.html">Settings → Documents</a>; see <a href="finance-einvoicing.html">Greek e-invoicing</a>.</p></div>
 
-  <h2>"Issue now" vs. draft</h2>
-  <div class="callout warn"><p><strong>Draft vs. issued:</strong> "Issue now" assigns the official myDATA number — drafts can be edited freely; issued documents are legal records. Leave it off while you're still working on the document, and turn it on only when the document is final.</p></div>
+  <h2>Draft vs. issued</h2>
+  <div class="callout warn"><p><strong>Save draft</strong> keeps the invoice without a legal number — it can be edited freely and shared as a pre-invoice. <strong>Create invoice</strong> (or <strong>Mark Issued</strong> on a draft) assigns the legal number and date and, by default, sends it to AADE. An issued invoice can still be corrected until AADE returns a MARK; after that it is a legal record.</p></div>
+
+  <h2>Every issued document is emailed</h2>
+  <p>An issued invoice or receipt is emailed to the customer automatically, carrying its online link. Credit notes and delivery notes are emailed once AADE assigns the MARK (so the PDF carries it), and sales and purchase orders when they are confirmed. Each document is sent once; a party with no email address is skipped. The <strong>Sent</strong> column on the list shows whether it arrived.</p>
 
   <h2>Payment details on the document — IBAN, @revtag &amp; the RF code</h2>
   <p>An issued invoice (and a proforma) carries a <strong>payment block</strong> so the customer can pay by bank transfer even if they never open the online pay link. What appears there fills itself from your <a href="finance-settings-payments.html">payment setup</a>:</p>
   <ul class="feat">
-    <li><strong>IBAN</strong> — any bank account you've marked <em>show on invoice</em> prints here. If you've connected <a href="banking.html">Revolut Business</a>, your EUR pocket's IBAN is filled and shown automatically.</li>
+    <li><strong>IBAN</strong> — any bank account you've marked <em>show on invoice</em> prints here. An account added from <a href="banking.html">Revolut Business</a> prints only once you switch on <em>show on invoice</em> for it.</li>
     <li><strong>Revolut @revtag</strong> — if set, a “Revolut · @tag — instant in-app payment” line appears next to the IBANs.</li>
     <li><strong>RF bank-transfer code</strong> — if you use <a href="finance-settings-payments.html">Viva</a> with the RF method, a structured <strong>RF reference</strong> is printed next to the IBANs.</li>
   </ul>
@@ -202,13 +181,13 @@
   <p>The full happy path, end to end, from opening the tab to handing the customer a way to pay:</p>
   <ol>
     <li>Open <strong>Finance</strong> from the top navigation, then select the <strong>Invoices</strong> tab.</li>
-    <li>Start a new invoice.</li>
+    <li>Click <strong>New</strong>.</li>
     <li>Pick the customer. The VAT number is validated; for Greek customers the details can be enriched automatically from ΑΑΔΕ — this also helps avoid a rejected submission later.</li>
-    <li>Add line items — choose catalogue products or add custom lines — each with a quantity, price and VAT rate.</li>
+    <li>Add line items — type three letters to pick a catalogue product or service, or write a custom line — each with a quantity, unit, price and VAT rate.</li>
     <li>Assign an <strong>income category</strong> from the document header (categories are editable and can be managed inline) so the invoice lands in the right report bucket.</li>
     <li>Review the totals (net, VAT and gross) to confirm the figures.</li>
-    <li>Issue the invoice. On issue it is transmitted to <a href="finance-einvoicing.html">ΑΑΔΕ / myDATA</a> and appears in <a href="finance-receivables-payables.html">Receivables</a>.</li>
-    <li>Generate the PDF and share a payment link with the customer.</li>
+    <li>Click <strong>Create invoice</strong>. On issue it is transmitted to <a href="finance-einvoicing.html">ΑΑΔΕ / myDATA</a> and appears in <a href="finance-receivables-payables.html">Receivables</a>.</li>
+    <li>The customer receives it by email with its online link; you can also copy the customer link from the invoice page.</li>
   </ol>
 
   <h2>What it affects elsewhere</h2>

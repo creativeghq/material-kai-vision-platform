@@ -11,7 +11,7 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="projects.html">Projects</a> / Blueprint Library</div>
   <h1>Projects · Blueprint Library</h1>
   <div class="routes"><span class="badge route">/blueprints</span> <span class="badge route">/blueprints/:id</span> <span class="badge gated">owner</span></div>
-  <p class="lead">A <strong>Blueprint</strong> is a reusable, parametric template for estimating a job — a structured <strong>scope of works</strong> (sections and tasks) plus the <strong>measurements</strong> it needs and the <strong>formulas</strong> that turn those measurements into quantities and prices. Build a “Standard Bathroom Reno” once, and every future bathroom is a few numbers away from a full estimate. The Blueprint Library is where you create, edit and organise these templates; the <a href="projects-plan.html">Plan tab</a> is where you put them to work on a project.</p>
+  <p class="lead">A <strong>Blueprint</strong> is a reusable, parametric template for estimating a job — a structured <strong>scope of works</strong> (sections and tasks) plus the <strong>measurements</strong> it needs and the <strong>formulas</strong> that turn those measurements into quantities and prices. Build a “Standard Bathroom Reno” once, and every future bathroom is a few numbers away from a full estimate. The Blueprint Library is where you create, edit and organise these templates; a project's <a href="projects-plan.html">Estimate</a> section is where you put them to work on a project.</p>
 
   <div class="callout"><p><strong>Where:</strong> the Blueprint Library lives <strong>under Projects</strong> — open <strong>Projects</strong> and click the <strong>Blueprints</strong> button on the list page (or go to <span class="badge route">/blueprints</span>); edit one at <span class="badge route">/blueprints/:id</span>. <span class="badge gated">owner</span></p></div>
 
@@ -23,10 +23,10 @@
   <h2>The library</h2>
   <ul class="feat">
     <li><strong>Your blueprints</strong> — the templates this workspace has built; open one to edit it, or <strong>More</strong> for actions (archive, etc.).</li>
-    <li><strong>Starter blueprints</strong> — ready-made platform templates (e.g. full home renovation, bathroom reno, full repaint, kitchen refit). They're <strong>read-only</strong> — you can <strong>open one to view</strong> it, then <strong>Copy to my library</strong> to get an editable copy you tailor to how you actually price.</li>
+    <li><strong>Starter blueprints</strong> — ready-made platform templates (<em>Full Home Renovation</em>, <em>Bathroom Renovation</em>, <em>Full Repaint</em>, <em>New Kitchen</em> and <em>New Kitchen From Boards</em>). They're <strong>read-only</strong> — you can <strong>open one to view</strong> it, then <strong>Copy to my library</strong> to get an editable copy you tailor to how you actually price.</li>
     <li><strong>New blueprint</strong> — create one from scratch.</li>
   </ul>
-  <p>You don't only build blueprints here — on a project's <a href="projects-plan.html">Plan tab</a> you can <strong>Save as blueprint</strong> to turn a plan you've just built into a reusable template, which then appears in this library.</p>
+  <p>You don't only build blueprints here — in a project's <a href="projects-plan.html">Estimate</a> you can <strong>Save as blueprint</strong> to turn a plan you've just built into a reusable template, which then appears in this library.</p>
 
   <h2>What's inside a blueprint</h2>
   <p>A blueprint has a few <strong>properties</strong> and two working parts — its <strong>measurements</strong> and its <strong>scope tree</strong>.</p>
@@ -46,15 +46,23 @@
   <p>The named inputs the template asks for when it's used. Each measurement has a <strong>key</strong> (used in formulas), a <strong>label</strong>, a <strong>unit</strong>, an optional <strong>group</strong>, and a <strong>default</strong> value. <em>“These drive the parametric formulas.”</em> — e.g. a measurement keyed <code>floor_area</code> can be referenced by a task formula like <code>= floor_area * 1.1</code>.</p>
 
   <h3>The scope tree (sections &amp; tasks)</h3>
-  <p>The body of the template: <strong>sections</strong> (headings) containing <strong>tasks</strong> (the estimable lines). Each task carries the same pricing fields the plan uses — a <strong>line kind</strong> (labour / materials / both), a linked <strong>service or product</strong> for its rate, a quantity <strong>formula</strong>, a <strong>margin</strong>, and optional <strong>option-group / tier</strong> (good-better-best) and <strong>allowance</strong> flags. Because the template already carries all of this, instantiating it on a project produces a priced estimate immediately — you just supply the measurements. See <a href="projects-plan.html">Plan &amp; Estimating</a> for how those fields behave line by line.</p>
+  <p>The body of the template: <strong>sections</strong> (headings) containing <strong>tasks</strong> (the estimable lines). Each task carries the same pricing fields the plan uses — a <strong>line kind</strong> (labour / materials / both), a linked <strong>service or product</strong> for its rate, a quantity <strong>formula</strong>, a <strong>margin</strong>, and optional <strong>option-group / tier</strong> (good-better-best) and <strong>allowance</strong> flags. Because the template already carries all of this, instantiating it on a project produces a priced estimate immediately — you just supply the measurements. See <a href="projects-plan.html">Estimate</a> for how those fields behave line by line.</p>
+
+  <h2 id="boards">Kitchen blueprints — per metre or from boards</h2>
+  <p>The two kitchen starters describe a kitchen as <strong>zones</strong> (bottom units, top units, tall units, island, worktop) filled with real units, and differ in how the cabinets are priced:</p>
+  <ul class="feat">
+    <li><strong>New Kitchen</strong> — cabinets priced per running metre of each zone.</li>
+    <li><strong>New Kitchen From Boards</strong> — cabinets priced from what they are made of. Each unit is broken down into the panels a workshop cuts, and the plan carries a <strong>Cut List</strong> section: board area for carcass, fronts, back panels and plinth, and metres of edge tape. You choose a <strong>Carcass Board</strong>, <strong>Front Board</strong>, <strong>Back Panel</strong>, <strong>Plinth Board</strong> and the edge tapes; each chosen board is bought once across every zone that uses it, in whole sheets with the wastage the blueprint states (or per m²), and edge tape per metre. <strong>Cutting and Edging</strong> is priced per m² and <strong>Cabinet Assembly and Fitting</strong> per unit. A board choice left empty raises an issue on the plan rather than pricing at zero.</li>
+  </ul>
+  <p>The rates in the starter are placeholders: copy it to your library and set your own board and labour prices. A kitchen drawn in a 3D room is priced from the same blueprints — see <a href="kitchen-design.html#pricing">Kitchen Design</a>.</p>
 
   <h2>Premade sections (the section library)</h2>
-  <p><strong>What it is —</strong> reusable <strong>sections</strong> you can <strong>drop into any plan or blueprint</strong> from a library picker, rather than re-typing a common block of work each time. <strong>Why it matters —</strong> a “Demolition &amp; prep” or “Electrical first-fix” section is the same on many jobs; add it once from the library and its tasks, formulas and rates come with it. You'll find the section-library picker both in the <a href="projects-plan.html">Plan tab</a> and in the blueprint editor.</p>
+  <p><strong>What it is —</strong> reusable <strong>sections</strong> you can <strong>drop into any plan or blueprint</strong> from a library picker, rather than re-typing a common block of work each time. <strong>Why it matters —</strong> a “Demolition &amp; prep” or “Electrical first-fix” section is the same on many jobs; add it once from the library and its tasks, formulas and rates come with it. You'll find the section-library picker both in a project's <a href="projects-plan.html">Estimate</a> and in the blueprint editor.</p>
 
   <h2>The public estimator</h2>
   <p>A public, <strong>value-first</strong> version of this engine runs at <span class="badge route">/tools/project-plan</span>. It leads with a <strong>Full Home Renovation</strong> and shows the <em>whole priced scope up front</em> — <em>“Free, instant, no sign-up to try”</em> (no captcha). A visitor enters the measurements and can <strong>edit rows, add tasks, change units and drop in library sections</strong>, then <strong>Save &amp; create free account</strong> to keep the plan and import it into their workspace after sign-up. (Other project types prompt sign-up.) It's the lead-gen on-ramp to the full estimating flow; see <a href="tools.html">Tools</a>.</p>
 
-  <div class="callout tip"><p><strong>Build your library once.</strong> Copy a starter, adjust its tasks and margins to match how <em>you</em> price, save it, and from then on every similar job starts as a near-complete estimate — enter the measurements on the <a href="projects-plan.html">Plan tab</a> and you're done.</p></div>
+  <div class="callout tip"><p><strong>Build your library once.</strong> Copy a starter, adjust its tasks and margins to match how <em>you</em> price, save it, and from then on every similar job starts as a near-complete estimate — enter the measurements in the project's <a href="projects-plan.html">Estimate</a> and you're done.</p></div>
 </main>
 <script src="assets/nav.js"></script>
 </body>
