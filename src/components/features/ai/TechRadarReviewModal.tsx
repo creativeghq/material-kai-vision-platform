@@ -27,6 +27,8 @@ export type TechRadarFormState = {
     repo?: string;
     current_approach?: string;
     constraints?: string;
+    /** Opened from `track_tech_radar` it is a monitor, so the cadence arrives with it. */
+    review_interval_hours?: number;
   };
 } | null;
 
@@ -44,6 +46,9 @@ const CADENCE_OPTIONS = [
   { value: '720',  label: 'Watch Monthly' },
 ] as const;
 
+const cadenceFor = (hours?: number): string =>
+  !hours ? 'once' : hours <= 24 ? '24' : hours <= 168 ? '168' : '720';
+
 export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
   const open = !!state;
   const [title, setTitle] = useState(state?.prefill?.title || '');
@@ -51,7 +56,7 @@ export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
   const [repo, setRepo] = useState(state?.prefill?.repo || '');
   const [currentApproach, setCurrentApproach] = useState(state?.prefill?.current_approach || '');
   const [constraints, setConstraints] = useState(state?.prefill?.constraints || '');
-  const [cadence, setCadence] = useState<string>('once');
+  const [cadence, setCadence] = useState<string>(cadenceFor(state?.prefill?.review_interval_hours));
 
   useEffect(() => {
     if (state) {
@@ -60,7 +65,7 @@ export function TechRadarReviewModal({ state, onClose, onSubmit }: Props) {
       setRepo(state.prefill?.repo || '');
       setCurrentApproach(state.prefill?.current_approach || '');
       setConstraints(state.prefill?.constraints || '');
-      setCadence('once');
+      setCadence(cadenceFor(state.prefill?.review_interval_hours));
     }
   }, [state]);
 

@@ -473,7 +473,7 @@ export const createTrackTechRadarTool = (
       if (action === 'open_form') {
         onChunk?.({
           type: 'tech_radar_form_open',
-          prefill: { title, component, repo, current_approach, constraints },
+          prefill: { title, component, repo, current_approach, constraints, review_interval_hours: review_interval_hours ?? 168 },
           timestamp: Date.now(),
         });
         return JSON.stringify({ success: true, form_opened: true, message: 'Opened the Tech Radar form for the user to fill in.' });
