@@ -225,6 +225,10 @@ function buildAgentStateAnnotation() {
     reducer: (_, next) => next,
     default: () => '',
   }),
+  systemCachePrefix: Annotation<string>({
+    reducer: (_, next) => next,
+    default: () => '',
+  }),
   toolResults: Annotation<any[]>({
     reducer: (prev, next) => [...prev, ...next],
     default: () => [],
@@ -354,10 +358,15 @@ function createAgentGraph(
     // context_management, container, betas, output_format, mcp_servers) — every other
     // call option is silently dropped.
     const systemText = forcedInPrompt ? `${state.systemPrompt}\n\n${FIRST_STEP_TOOL_INSTRUCTION}` : state.systemPrompt;
+    const prefix = state.systemCachePrefix;
+    const splitAt = prefix && systemText.length > prefix.length && systemText.startsWith(prefix) ? prefix.length : 0;
     const systemMessage = new SystemMessage({
-      content: [
-        { type: 'text', text: systemText, cache_control: { type: 'ephemeral' } },
-      ],
+      content: splitAt
+        ? [
+          { type: 'text', text: systemText.slice(0, splitAt), cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: systemText.slice(splitAt), cache_control: { type: 'ephemeral' } },
+        ]
+        : [{ type: 'text', text: systemText, cache_control: { type: 'ephemeral' } }],
     });
     const history = toolSetChanged ? state.messages.map(withoutThinkingBlocks) : state.messages;
 
@@ -2064,6 +2073,16 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
     }
   }
 
+  try {
+    systemPrompt += formatSkillsForSystemPrompt(agentId);
+  } catch (skillErr) {
+    console.warn('⚠️ Could not load skills metadata:', skillErr);
+  }
+
+  // Everything above is the same on every turn and is cached across them; the clock (to the
+  // minute), recalled memories and grounding below change per turn and must stay after it.
+  const systemCachePrefix = systemPrompt;
+
   // Situational context and long-term memory are independent lookups, fetched concurrently.
   const clock = resolveTurnClock(clientTimezone);
   const [userContextRead, memoryRead] = await Promise.allSettled([
@@ -2096,14 +2115,6 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
   } catch (memError) {
     console.warn('⚠️ Could not load long-term memories:', memError);
     // Continue without memories - not critical
-  }
-
-  // 🧩 Skills: advertise available playbooks (metadata only). The agent calls
-  // `load_skill` to pull the full content on demand — progressive disclosure.
-  try {
-    systemPrompt += formatSkillsForSystemPrompt(agentId);
-  } catch (skillErr) {
-    console.warn('⚠️ Could not load skills metadata:', skillErr);
   }
 
   // Which toolkits are ALREADY bound. `load_toolkit` advertises every loadable cluster and says
@@ -3857,6 +3868,7 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
   const initialState = {
     messages: langchainMessages.filter(Boolean),
     systemPrompt,
+    systemCachePrefix,
     toolResults: [],
     collectedProducts: [],
     iteration: 0,
