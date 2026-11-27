@@ -1539,6 +1539,8 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     }
     write({ ...current, status: 'approved' });
     persistConfirmCard(messageId, current);
+    // A decided card closes so the composer has focus again; the chip keeps the outcome.
+    setActiveCanvasId((open) => (open === messageId ? null : open));
 
     pendingResumeContextRef.current = `[I approved ${items.length === 1 ? 'the action' : `all ${items.length} actions`} you proposed and they ran:\n`
       + `${results.join('\n')}\n`
@@ -1594,6 +1596,7 @@ export const AgentHub: React.FC<AgentHubProps> = ({
     const next: ConfirmData = { ...m.actionConfirmationData, status: 'declined' };
     setMessages(prev => prev.map(x => (x.id === messageId ? { ...x, actionConfirmationData: next } : x)));
     persistConfirmCard(messageId, next);
+    setActiveCanvasId((open) => (open === messageId ? null : open));
   }, [persistConfirmCard]);
 
   /**

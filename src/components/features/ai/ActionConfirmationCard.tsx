@@ -10,6 +10,9 @@ import { Button } from '@/components/core/ui/button';
 
 export type ActionConfirmationStatus = 'pending' | 'running' | 'approved' | 'declined';
 
+/** Summaries are written as plain text; markdown emphasis a tool slipped in would print literally. */
+const plain = (s: string): string => s.replace(/\*\*(.+?)\*\*|__(.+?)__/g, (_m, a, b) => a ?? b);
+
 export interface ActionConfirmationItem {
   tool: string;
   input: Record<string, unknown>;
@@ -68,7 +71,7 @@ export const ActionConfirmationCard: React.FC<Props> = ({
                         : <span className="text-muted-foreground tabular-nums">{i + 1}.</span>}
                   </span>
                   <div className="min-w-0">
-                    <p className="text-[13px] text-foreground whitespace-pre-line">{item.summary || item.title}</p>
+                    <p className="text-[13px] text-foreground whitespace-pre-line">{plain(item.summary || item.title)}</p>
                     {item.outcome && !item.outcome.ok && (
                       <p className="mt-0.5 text-xs text-destructive">{item.outcome.error || 'This one did not go through.'}</p>
                     )}
@@ -78,7 +81,7 @@ export const ActionConfirmationCard: React.FC<Props> = ({
             </ul>
           ) : (
             <>
-              <p className="mt-1 text-[13px] text-muted-foreground whitespace-pre-line">{items[0]?.summary}</p>
+              <p className="mt-1 text-[13px] text-muted-foreground whitespace-pre-line">{plain(items[0]?.summary ?? '')}</p>
               {items[0]?.outcome && !items[0].outcome.ok && (
                 <p className="mt-1 text-xs text-destructive">{items[0].outcome.error || 'This did not go through.'}</p>
               )}

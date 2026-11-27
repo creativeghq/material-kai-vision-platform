@@ -2203,9 +2203,9 @@ export const createSaveToCRMTool = (userId: string, workspaceId: string, onProgr
             title: `Save ${company.name} to your CRM?`,
             // The ROLE is on the card because it is the half the operator is most likely to want
             // changed, and it is the half that decides which lists the row shows up in.
-            summary: `Adds ${company.name}${company.website ? ` (${company.website})` : ''} as a **${roleLabel}**`
-              + `${companyType ? ` (${companyType.replace(/_/g, ' ')})` : isManufacturer ? ' (manufacturer)' : ''}${contactLine} to your CRM. `
-              + `These came from web research, so check the details are right — contact names and emails in particular.`,
+            summary: `Adds ${company.name}${company.website ? ` (${company.website})` : ''} as a ${roleLabel}`
+              + `${companyType ? ` (${companyType.replace(/_/g, ' ')})` : isManufacturer ? ' (manufacturer)' : ''}${contactLine} to your CRM.`
+              + `${contacts?.length ? ' Check the contact names and emails: they came from web research.' : ''}`,
             toolkit_id: 'crm',
             timestamp: Date.now(),
           });
