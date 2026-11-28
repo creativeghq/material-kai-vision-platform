@@ -167,6 +167,25 @@ function expenseScopePrefill(scope: NewDocScope) {
   };
 }
 
+/**
+ * The «Days» cell of the receivables / payables tables. A bare «—» on every row not yet late
+ * said nothing, so a row due later counts down («in 12d»), one due today says so, and a late
+ * one counts up in red («5d overdue»). Days are whole UTC days, as the aging buckets use.
+ */
+const DaysCell: React.FC<{ row: AgingRow }> = ({ row }) => {
+  if (row.entry_kind === 'credit') return <>—</>;
+  if (row.days_overdue > 0) return <span className="text-destructive font-medium">{row.days_overdue}d overdue</span>;
+  const due = row.due_at ?? row.effective_due_at ?? null;
+  const m = due ? /^(\d{4})-(\d{2})-(\d{2})/.exec(due) : null;
+  if (!m) return <span className="text-muted-foreground">No due date</span>;
+  const now = new Date();
+  const days = Math.round(
+    (Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) / 86_400_000,
+  );
+  if (days <= 0) return <span className="text-amber-700 dark:text-amber-400">Due today</span>;
+  return <span className="text-muted-foreground" title={`Due ${due}`}>in {days}d</span>;
+};
+
 const FinancePage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -1042,7 +1061,7 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Paid</th>
                       <th className="px-4 py-2 text-right">Due</th>
                       <th className="px-4 py-2 text-right">Due Date</th>
-                      <th className="px-4 py-2 text-right">Days Overdue</th>
+                      <th className="px-4 py-2 text-right">Days</th>
                       <th className="px-4 py-2 w-10"><span className="sr-only">Actions</span></th>
                     </tr>
                   </thead>
@@ -1131,7 +1150,7 @@ const FinancePage: React.FC = () => {
                             </OrderAgingInlineEditor>
                           ) : (r.due_at ?? '—')}
                         </td>
-                        <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
+                        <td className="px-4 py-2 text-right"><DaysCell row={r} /></td>
                         <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                           {isOrder ? (
                             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(r.id)}>
@@ -1249,7 +1268,7 @@ const FinancePage: React.FC = () => {
                       <th className="px-4 py-2 text-right">Paid</th>
                       <th className="px-4 py-2 text-right">Due</th>
                       <th className="px-4 py-2 text-right">Due Date</th>
-                      <th className="px-4 py-2 text-right">Days Overdue</th>
+                      <th className="px-4 py-2 text-right">Days</th>
                       {!isAccountant && <th className="px-4 py-2 w-24"><span className="sr-only">Actions</span></th>}
                     </tr>
                   </thead>
@@ -1327,7 +1346,7 @@ const FinancePage: React.FC = () => {
                             </OrderAgingInlineEditor>
                           ) : (r.due_at ?? '—')}
                         </td>
-                        <td className="px-4 py-2 text-right">{r.days_overdue > 0 ? `${r.days_overdue}d` : '—'}</td>
+                        <td className="px-4 py-2 text-right"><DaysCell row={r} /></td>
                         {!isAccountant && (
                           <td className="px-4 py-2 text-right" onClick={(e) => e.stopPropagation()}>
                             {isOrder ? (
