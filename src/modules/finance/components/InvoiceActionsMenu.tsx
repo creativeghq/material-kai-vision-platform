@@ -226,12 +226,20 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
     } finally { setSaving(false); }
   };
 
+  /** Whether the invoice is left out of the P&L — read when the menu opens, so the item can say
+   *  what pressing it does («Exclude from P&L» / «Include in P&L») instead of naming both. */
+  const [pnlExcluded, setPnlExcluded] = useState<boolean | null>(null);
+  const loadPnlExclusion = async () => {
+    const { data } = await supabase.from('invoices').select('exclude_from_pnl').eq('id', invoiceId).maybeSingle();
+    setPnlExcluded((data as any)?.exclude_from_pnl === true);
+  };
+
   const togglePnlExclusion = async () => {
+    if (pnlExcluded === null) return;
     try {
-      const { data, error } = await supabase.from('invoices').select('exclude_from_pnl').eq('id', invoiceId).maybeSingle();
-      if (error) throw error;
-      const next = !(data?.exclude_from_pnl === true);
+      const next = !pnlExcluded;
       await financeService.setDocumentPnlExclusion('invoice', invoiceId, next);
+      setPnlExcluded(next);
       toast({ title: next ? 'Excluded from P&L' : 'Included in P&L', description: next ? 'Still counted for VAT, myDATA and what the customer owes.' : undefined });
       onChanged?.();
     } catch (err: any) {
@@ -289,7 +297,7 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
 
   return (
     <>
-    <DropdownMenu onOpenChange={(o) => { if (o) void hydrate(); }}>
+    <DropdownMenu onOpenChange={(o) => { if (o) { void hydrate(); void loadPnlExclusion(); } }}>
       <DropdownMenuTrigger asChild>
         {record ? (
           <Button variant="outline" size="sm" aria-label="More actions">
@@ -328,7 +336,12 @@ export const InvoiceActionsMenu: React.FC<Props> = ({ invoiceId, financeBase, fi
         {!isAccountant && <DropdownMenuItem onClick={openDesc}><Pencil className="h-4 w-4 mr-2" /> Change description</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openCat}><Tag className="h-4 w-4 mr-2" /> Change category</DropdownMenuItem>}
         {!isAccountant && <DropdownMenuItem onClick={openJob}><Briefcase className="h-4 w-4 mr-2" /> Link to a project</DropdownMenuItem>}
-        {!isAccountant && <DropdownMenuItem onClick={() => void togglePnlExclusion()}><EyeOff className="h-4 w-4 mr-2" /> Exclude from / include in P&amp;L</DropdownMenuItem>}
+        {!isAccountant && (
+          <DropdownMenuItem disabled={pnlExcluded === null} onClick={() => void togglePnlExclusion()}>
+            {pnlExcluded ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+            {pnlExcluded ? 'Include in P&L' : 'Exclude from P&L'}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => void customerLink.copy()}><Copy className="h-4 w-4 mr-2" /> Copy customer link</DropdownMenuItem>
         <DropdownMenuItem onClick={() => void customerLink.open()}><ExternalLink className="h-4 w-4 mr-2" /> Open customer view</DropdownMenuItem>
         <DropdownMenuItem onClick={() => void customerLink.whatsapp()}><MessageCircle className="h-4 w-4 mr-2" /> Send via WhatsApp</DropdownMenuItem>

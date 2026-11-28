@@ -145,12 +145,22 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
   const [crmOpen, setCrmOpen] = useState(false);
 
   const { toast } = useToast();
+  /** Whether the document is left out of the P&L — read when the menu opens, so the item says
+   *  what pressing it does («Exclude from P&L» / «Include in P&L») instead of naming both. */
+  const [pnlExcluded, setPnlExcluded] = useState<boolean | null>(
+    typeof (doc as { exclude_from_pnl?: boolean | null }).exclude_from_pnl === 'boolean'
+      ? (doc as { exclude_from_pnl?: boolean }).exclude_from_pnl! : null,
+  );
+  const loadPnlExclusion = async () => {
+    const { data } = await supabase.from('inbound_documents').select('exclude_from_pnl').eq('id', doc.id).maybeSingle();
+    setPnlExcluded((data as any)?.exclude_from_pnl === true);
+  };
   const togglePnl = async () => {
+    if (pnlExcluded === null) return;
     try {
-      const { data, error } = await supabase.from('inbound_documents').select('exclude_from_pnl').eq('id', doc.id).maybeSingle();
-      if (error) throw error;
-      const next = !(data?.exclude_from_pnl === true);
+      const next = !pnlExcluded;
       await financeService.setDocumentPnlExclusion('inbound_document', doc.id, next);
+      setPnlExcluded(next);
       toast({ title: next ? 'Excluded from P&L' : 'Included in P&L', description: doc.created_supplier_bill_id ? 'The expense it was booked as follows.' : undefined });
       onChanged?.();
     } catch (err: any) {
@@ -205,7 +215,7 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
         className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void attachDocument(f); }}
       />
-      <DropdownMenu>
+      <DropdownMenu onOpenChange={(o) => { if (o) void loadPnlExclusion(); }}>
         <DropdownMenuTrigger asChild>
           <button type="button" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground" onClick={(e) => e.stopPropagation()}>
             {busy || docBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <MoreVertical className="h-4 w-4" />}
@@ -224,8 +234,9 @@ export const InboundDocActionsMenu: React.FC<Props> = ({ doc, workspaceId, busy,
           <DropdownMenuItem onClick={onPreview}>
             <Eye className="h-4 w-4 mr-2" /> Preview
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => void togglePnl()}>
-            <EyeOff className="h-4 w-4 mr-2" /> Exclude from / include in P&amp;L
+          <DropdownMenuItem disabled={pnlExcluded === null} onClick={() => void togglePnl()}>
+            {pnlExcluded ? <Eye className="h-4 w-4 mr-2" /> : <EyeOff className="h-4 w-4 mr-2" />}
+            {pnlExcluded ? 'Include in P&L' : 'Exclude from P&L'}
           </DropdownMenuItem>
           {doc.document_path && (
             <DropdownMenuItem onClick={() => void viewDocument()}>
