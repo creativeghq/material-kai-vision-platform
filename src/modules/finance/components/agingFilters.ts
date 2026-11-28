@@ -57,12 +57,13 @@ export function buildAgingFilters(
         },
         {
           key: 'entry_kind', type: 'multi', label: 'Entry Kind',
-          description: 'An issued document, or a confirmed order that is not invoiced yet.',
+          description: 'An issued document, a confirmed order not invoiced yet, or (receivables) an opening balance or credit held.',
           options: [
             { value: 'invoice', label: side === 'ar' ? 'Invoice' : 'Supplier bill' },
             { value: 'order', label: 'Order — Not Invoiced' },
-            ...(side === 'ar' ? [{ value: 'credit', label: 'Customer Credit' }] : []),
-            { value: 'manual', label: 'Manual Entry' },
+            ...(side === 'ar'
+              ? [{ value: 'opening_balance', label: 'Opening Balance' }, { value: 'credit', label: 'Customer Credit' }]
+              : [{ value: 'manual', label: 'Manual Entry' }]),
           ],
           accessor: (r: AgingRow) => r.entry_kind ?? 'invoice',
         },

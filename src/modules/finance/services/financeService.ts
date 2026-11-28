@@ -626,13 +626,12 @@ export interface AgingRow {
   effective_due_at?: string | null;
   /** True when `effective_due_at` came from payment terms rather than an operator-set date. */
   due_from_terms?: boolean;
-  /** 'invoice' = real invoice/supplier bill; 'manual' = un-invoiced receivable/payable;
-   *  'order' = a confirmed order not yet invoiced (synthesised client-side, not from the view);
-   *  'credit' = customer money held on account (synthesised client-side from unallocated inbound
-   *  payments). Amounts are POSITIVE like every other row — it is "money we hold", not money owed
-   *  to us, so aggregates must key off this kind (exclude from "owed" sums, sum separately as
-   *  credit held) rather than rely on a sign. Negative on-screen numbers are banned (operator). */
-  entry_kind?: 'invoice' | 'manual' | 'order' | 'credit';
+  /** 'invoice' = invoice/supplier bill; 'order' = confirmed, not invoiced; 'opening_balance' =
+   *  carried-over balance; 'credit' = money we HOLD for a customer, positive and never in "owed" sums. */
+  entry_kind?: 'invoice' | 'manual' | 'order' | 'credit' | 'opening_balance';
+  /** The party the row belongs to (receivables rows from `get_receivables_aging`). */
+  party_type?: 'company' | 'contact' | null;
+  party_id?: string | null;
   /** Free-text label for manual entries (null for invoices/bills). */
   description?: string | null;
   /** Resolved counterparty (supplier/customer) display name, for search + display. */
@@ -3067,12 +3066,40 @@ const _financeServiceCore = {
 
   // -------- Aggregated reports --------
 
-  async getArAging(workspaceId?: string): Promise<AgingRow[]> {
-    let q = supabase.from('vw_ar_aging').select('*').order('days_overdue', { ascending: false });
-    if (workspaceId) q = q.eq('workspace_id', workspaceId);
-    const { data, error } = await q;
+  /** Open customer items + credit held, derived in SQL from the party ledger (Parties reads the same). */
+  async getReceivablesAging(workspaceId: string): Promise<AgingRow[]> {
+    const { data, error } = await supabase.rpc('get_receivables_aging', { p_workspace_id: workspaceId });
     if (error) throw error;
-    return (data ?? []) as AgingRow[];
+    return (data ?? []).map((r): AgingRow => ({
+      id: r.id,
+      workspace_id: workspaceId,
+      entry_kind: r.entry_kind as AgingRow['entry_kind'],
+      party_type: r.party_type as AgingRow['party_type'],
+      party_id: r.party_id,
+      party_name: r.party_name,
+      internal_number: r.doc_number ?? undefined,
+      description: r.doc_number,
+      currency: r.currency,
+      total: Number(r.total),
+      amount_paid: Number(r.amount_paid),
+      amount_due: Number(r.amount_due),
+      due_at: r.due_at,
+      effective_due_at: r.effective_due_at,
+      due_from_terms: r.due_from_terms,
+      issued_at: r.issued_at,
+      status: r.status,
+      age_bucket: r.age_bucket as AgeBucket,
+      days_overdue: r.days_overdue,
+      category_id: r.category_id,
+      category_name: r.category_name,
+    }));
+  },
+
+  /** Money in / out across every payment, one row per currency — never summed across them. */
+  async getCashTotals(workspaceId: string): Promise<Array<{ currency: string; money_in: number; money_out: number; net: number }>> {
+    const { data, error } = await supabase.rpc('get_cash_totals', { p_workspace_id: workspaceId });
+    if (error) throw error;
+    return (data ?? []).map((r) => ({ currency: r.currency, money_in: Number(r.money_in), money_out: Number(r.money_out), net: Number(r.net) }));
   },
 
   async getApAging(workspaceId?: string): Promise<AgingRow[]> {
@@ -3184,18 +3211,27 @@ const _financeServiceCore = {
     totals: Array<{ currency: string; total: number }>;
     rows: Array<{ payment_id: string; paid_at: string; amount: number; unallocated: number; currency: string; reference: string | null; credit_number: string | null; order_id: string | null; order_number: string | null; party_name: string | null }>;
   }> {
-    const { data: pays } = await supabase.from('payments')
-      .select('id, amount, currency, paid_at, reference, credit_number, order_id, counterparty_company_id, counterparty_contact_id')
-      .eq('workspace_id', workspaceId).eq('direction', 'in')
-      .order('paid_at', { ascending: false }).limit(500);
-    const payments = (pays ?? []) as Array<{ id: string; amount: number; currency: string; paid_at: string; reference: string | null; credit_number: string | null; order_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null }>;
+    type Pay = { id: string; amount: number; currency: string; paid_at: string; reference: string | null; credit_number: string | null; order_id: string | null; counterparty_company_id: string | null; counterparty_contact_id: string | null };
+    // Every inbound payment, paged: a cap here silently dropped an old unmatched deposit.
+    const PAGE = 1000;
+    const payments: Pay[] = [];
+    for (let from = 0; ; from += PAGE) {
+      const { data: pays, error } = await supabase.from('payments')
+        .select('id, amount, currency, paid_at, reference, credit_number, order_id, counterparty_company_id, counterparty_contact_id')
+        .eq('workspace_id', workspaceId).eq('direction', 'in')
+        .order('paid_at', { ascending: false }).order('id')
+        .range(from, from + PAGE - 1);
+      if (error) throw error;
+      payments.push(...((pays ?? []) as Pay[]));
+      if ((pays ?? []).length < PAGE) break;
+    }
     if (payments.length === 0) return { total: 0, currency: 'EUR', totals: [], rows: [] };
     const ids = payments.map((p) => p.id);
 
-    // Remainder per payment, from the one SQL derivation. This used to sum `amount_doc_currency`
-    // with no fallback, so an older allocation row with that column NULL counted as zero settled
-    // and inflated the deposit shown here.
-    const remainders = await financeService.paymentRemainders(ids);
+    const remainders = new Map<string, PaymentRemainder>();
+    for (let i = 0; i < ids.length; i += 500) {
+      for (const [k, v] of await financeService.paymentRemainders(ids.slice(i, i + 500))) remainders.set(k, v);
+    }
 
     // Order numbers + party names in batch.
     const orderIds = [...new Set(payments.map((p) => p.order_id).filter(Boolean))] as string[];

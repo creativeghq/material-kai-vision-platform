@@ -97,7 +97,8 @@ async function buildVariables(supabase: any, workspaceId: string): Promise<Recor
   const next90 = new Date(today.getTime() + 90 * 86400_000);
 
   const [arAging, apAging, cashFlow, monthPnl, topAr, topAp, planned, followUps, worklist] = await Promise.all([
-    supabase.from('vw_ar_aging').select('age_bucket, amount_due').eq('workspace_id', workspaceId),
+    // The same derivation Finance → Receivables shows (party ledger, credit notes and payments on account netted).
+    supabase.rpc('_receivables_aging_core', { p_workspace_id: workspaceId }),
     supabase.from('vw_ap_aging').select('age_bucket, amount_due').eq('workspace_id', workspaceId),
     supabase.from('vw_cash_flow_forecast').select('expected_date, direction, amount').eq('workspace_id', workspaceId).lte('expected_date', fmt(next90)),
     supabase.from('vw_monthly_pnl').select('period_month, revenue_net, gross_margin').eq('workspace_id', workspaceId).gte('period_month', fmt(monthStart)),
@@ -113,7 +114,10 @@ async function buildVariables(supabase: any, workspaceId: string): Promise<Recor
   ]);
 
   // Aggregates
-  const arRows = (arAging.data ?? []) as Array<{ age_bucket: string; amount_due: number }>;
+  if (arAging.error) throw new Error(`receivables aging failed: ${arAging.error.message}`);
+  // Credit rows are money we HOLD for a customer, never part of what is owed.
+  const arRows = ((arAging.data ?? []) as Array<{ entry_kind: string; age_bucket: string; amount_due: number }>)
+    .filter((r) => r.entry_kind !== 'credit');
   const apRows = (apAging.data ?? []) as Array<{ age_bucket: string; amount_due: number }>;
   const arOutstanding = arRows.reduce((acc, r) => acc + Number(r.amount_due || 0), 0);
   const apOutstanding = apRows.reduce((acc, r) => acc + Number(r.amount_due || 0), 0);
@@ -274,7 +278,13 @@ async function dispatchDigest(
 ): Promise<{ ok: boolean; delivered: number; attempted: number; errors: string[] }> {
   if (recipients.length === 0) return { ok: false, delivered: 0, attempted: 0, errors: ['no recipients'] };
 
-  const variables = await buildVariables(supabase, workspaceId);
+  let variables: Record<string, string>;
+  try {
+    variables = await buildVariables(supabase, workspaceId);
+  } catch (err) {
+    // A digest with a figure we could not read is not sent; the other workspaces still are.
+    return { ok: false, delivered: 0, attempted: 0, errors: [err instanceof Error ? err.message : String(err)] };
+  }
 
   let delivered = 0;
   const errors: string[] = [];

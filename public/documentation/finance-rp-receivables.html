@@ -11,15 +11,16 @@
   <div class="breadcrumb"><a href="index.html">Docs</a> / <a href="finance.html">Finance</a> / <a href="finance-receivables-payables.html">Receivables &amp; Payables</a> / Receivables</div>
   <h1>Receivables &amp; Payables · Receivables</h1>
   <div class="routes"><span class="badge route">/finance</span> <span class="badge gated">finance.manage</span></div>
-  <p class="lead">Receivables is the "who owes <em>you</em>" ledger. It lists everything customers owe — open invoices <em>plus</em> un-invoiced receivables like deposits, advances and fees — and lays them out by how overdue they are, so you can see at a glance who hasn't paid and decide who to chase first. Each row tells you the customer, the originating document, the amount, and how late it is.</p>
+  <p class="lead">Receivables is the "who owes <em>you</em>" ledger. It lists what customers still owe — open invoices, confirmed orders not yet invoiced, and opening balances carried over from before you used the platform — and lays them out by how overdue they are, so you can see at a glance who hasn't paid and decide who to chase first. Each row tells you the customer, the originating document, the amount, and how late it is.</p>
 
   <h2>Where it is</h2>
   <p>Top navigation → <strong>Finance</strong> → the <strong>Receivables</strong> tab. The tab label carries a live count so you can see how many items are outstanding without opening it.</p>
 
   <h2>What's on the screen</h2>
-  <p>From top to bottom: the aging buckets, then the toolbar, then the list.</p>
+  <p>From top to bottom: the owed total, the aging buckets, then the toolbar, then the list.</p>
   <ul class="feat">
-    <li><strong>Aging buckets</strong> — five tiles across the top, each showing a € total and an invoice count: <strong>Current</strong>, <strong>0–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong> and <strong>90+ days</strong>. The further right, the more overdue the money — <em>90+ days</em> is your most at-risk debt. Click a bucket to focus the list on just those rows.</li>
+    <li><strong>Still owed to us — right now</strong> — the total customers owe today. If you hold money for a customer beyond everything they owe, it is shown underneath as customer credit, never subtracted from another customer's debt.</li>
+    <li><strong>Aging buckets</strong> — five tiles across the top, each showing a € total and how many rows (invoices, orders and opening balances) fall in it: <strong>Current</strong>, <strong>0–30 days</strong>, <strong>31–60 days</strong>, <strong>61–90 days</strong> and <strong>90+ days</strong>. The further right, the more overdue the money — <em>90+ days</em> is your most at-risk debt. Click a bucket to focus the list on just those rows.</li>
     <li><strong>Toolbar</strong> — a <strong>New invoice</strong> button, an <strong>All categories</strong> filter, and a search box ("Search customer / number…").</li>
     <li><strong>The list</strong> — one row per outstanding item, with the working columns described below.</li>
   </ul>
@@ -34,7 +35,7 @@
         <tr><td>Category</td><td>Income/receivable category.</td></tr>
         <tr><td>Bucket</td><td>Aging bucket (Current, 0–30, 31–60, 61–90, 90+).</td></tr>
         <tr><td>Total</td><td>Total amount of the receivable.</td></tr>
-        <tr><td>Paid</td><td>Amount paid so far.</td></tr>
+        <tr><td>Paid</td><td>How much of it is already covered — payments allocated to it, credit notes, and money the customer paid on account, which is applied to their oldest debt first.</td></tr>
         <tr><td>Due</td><td>Amount still outstanding.</td></tr>
         <tr><td>Due date</td><td>When payment is due.</td></tr>
         <tr><td>Days overdue</td><td>How many days past the due date.</td></tr>
@@ -52,12 +53,14 @@
   </ol>
 
   <h2>Where receivables come from</h2>
-  <p>Receivables are <strong>derived from real documents</strong> — there's no separate “virtual” receivable to keep in step by hand. A row appears here whenever a customer owes money: an issued <a href="finance-doc-invoices.html">invoice</a> with an amount still due, or an <a href="finance-doc-orders.html">order</a> that's been delivered/invoiced and not yet paid. To create one, raise the underlying document:</p>
+  <p>Receivables are <strong>derived from real documents</strong> — there's no separate “virtual” receivable to keep in step by hand. A row appears here whenever a customer owes money: an issued <a href="finance-doc-invoices.html">invoice</a> with an amount still due, a confirmed <a href="finance-doc-orders.html">order</a> that has not been invoiced yet (delivered or not — a draft order only once a deposit has been taken on it), or an opening balance set on the customer's ledger. An order with no expected payment date ages from its order date plus your default payment terms, marked <em>· terms</em>. To create one, raise the underlying document:</p>
   <ol>
     <li>To raise a brand-new invoice directly from here, use <strong>New invoice</strong> on the toolbar.</li>
     <li>Or raise it from the deal: <strong>Create invoice</strong> on an <a href="finance-doc-orders.html">order</a>, or <strong>Issue invoice</strong> on an accepted <a href="quotes-build.html">quote</a>.</li>
   </ol>
   <div class="callout"><p><strong>Changed in 2026-06:</strong> the old “Add receivable” for an un-invoiced amount has been removed — receivables now always trace to a real invoice or order, so the tab can't drift out of sync with your documents.</p></div>
+  <h2>Customer credit</h2>
+  <p>When a customer has paid more than everything they owe — a deposit before an order is confirmed, or an overpayment — the surplus shows as a green <strong>Customer credit</strong> row. It is money you hold for them, not money they owe, so it is totalled separately and never counted in the owed figure. Click it to open the customer's ledger. A payment on account from a customer who also has open invoices is not shown as credit: it reduces their oldest open debt first, exactly as on their ledger in <strong>Finance → Customers &amp; Suppliers</strong> and on their statement, so Receivables and the ledger always show the same balance.</p>
   <div class="callout"><p><strong>Invoicing an accepted quote:</strong> to turn an <strong>accepted quote</strong> into an invoice, use <strong>Issue invoice</strong> on the quote page — that's what creates the invoice that then appears here. The Receivables tab is where the invoice <em>lands</em>, not where you raise it from a quote.</p></div>
 
   <div class="callout tip"><p><strong>Worked example — building this week's collections list.</strong> Open <strong>Receivables</strong> → click the <strong>90+ days</strong> bucket to see only the oldest debt → use the <strong>search box</strong> or <strong>All categories</strong> filter to group the calls you want to make → open each row to reach its source document and act. As each customer pays, the row's <em>Due</em> falls and it drops out of the 90+ bucket, so next week's list is shorter.</p></div>

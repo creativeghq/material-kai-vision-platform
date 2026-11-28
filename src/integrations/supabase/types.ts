@@ -37729,6 +37729,15 @@ export type Database = {
           total: number
         }[]
       }
+      get_cash_totals: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          currency: string
+          money_in: number
+          money_out: number
+          net: number
+        }[]
+      }
       get_payment_remainders: {
         Args: { p_payment_ids?: string[] }
         Returns: {
@@ -37990,6 +37999,30 @@ export type Database = {
           taxable_base: number
           vat_amount: number
           vat_rate: number
+        }[]
+      }
+      get_receivables_aging: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          age_bucket: string
+          amount_due: number
+          amount_paid: number
+          category_id: string | null
+          category_name: string | null
+          currency: string
+          days_overdue: number
+          doc_number: string | null
+          due_at: string | null
+          due_from_terms: boolean
+          effective_due_at: string | null
+          entry_kind: string
+          id: string
+          issued_at: string | null
+          party_id: string
+          party_name: string | null
+          party_type: string
+          status: string
+          total: number
         }[]
       }
       get_related_products: {

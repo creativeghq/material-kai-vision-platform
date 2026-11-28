@@ -2,32 +2,16 @@
 import { financeService, type AgeBucket, type AgingRow } from './financeService';
 import { ordersService } from './ordersService';
 
-export type DepositsOnAccount = Awaited<ReturnType<typeof financeService.getDepositsOnAccount>>;
-
 export interface AgingLedger {
-  /** Receivables: sales invoices + uninvoiced sales orders + credit held for customers. */
+  /** Receivables from `get_receivables_aging`: open invoices, un-invoiced orders, opening balances, credit held. */
   ar: AgingRow[];
   /** Payables: supplier bills + uninvoiced purchase orders. */
   ap: AgingRow[];
-  /** Customer money on account, kept separately — it is held, not owed. */
-  deposits: DepositsOnAccount;
-  /**
-   * True when the uninvoiced-orders overlay failed. Both sides then UNDER-report, which looks
-   * exactly like "there is less outstanding" — the one reading an operator must never be handed
-   * by accident. Surfaced by every caller, never swallowed.
-   */
+  /** True when the purchase-orders overlay failed, so payables UNDER-report. Always surfaced. */
   overlayFailed: boolean;
 }
 
-/**
- * Bucket an un-invoiced order's expected payment date.
- *
- * The invoice aging view computes `CURRENT_DATE - due_at` in the DB session timezone (UTC on
- * Supabase). We MUST match that reference or an order and an invoice with the same date can
- * disagree by a day near midnight — so both "today" and the due date are compared as UTC calendar
- * days. This is the one place in the app where UTC is the CORRECT reference rather than the
- * `todayLocalISO()` bug: it is not a date of record, it is a comparison against a UTC-derived one.
- */
+/** Bucket an un-invoiced purchase order in UTC days, as `vw_ap_aging` does with CURRENT_DATE. */
 function agingFromExpected(expected: string | null, todayUtcMs: number): { age_bucket: AgeBucket; days_overdue: number } {
   if (!expected) return { age_bucket: 'no_due_date', days_overdue: 0 };
   const [y, m, d] = expected.split('-').map(Number);
@@ -38,15 +22,11 @@ function agingFromExpected(expected: string | null, todayUtcMs: number): { age_b
 }
 
 export async function loadAgingLedger(workspaceId: string): Promise<AgingLedger> {
-  const [arRows, apRows] = await Promise.all([
-    financeService.getArAging(workspaceId),
+  const [ar, apRows] = await Promise.all([
+    financeService.getReceivablesAging(workspaceId),
     financeService.getApAging(workspaceId),
   ]);
 
-  // Cash + documents only: receivables/payables are issued invoices / supplier bills, plus
-  // confirmed-but-not-yet-invoiced orders (real order-derived money). Manual "virtual" AR/AP
-  // entries are intentionally excluded everywhere now.
-  let ar = arRows.filter((r) => r.entry_kind !== 'manual');
   let ap = apRows.filter((r) => r.entry_kind !== 'manual');
   let overlayFailed = false;
 
@@ -54,17 +34,14 @@ export async function loadAgingLedger(workspaceId: string): Promise<AgingLedger>
     const uninvoiced = await ordersService.listUninvoicedOutstanding({ workspaceId });
     const nowUtc = new Date();
     const todayUtcMs = Date.UTC(nowUtc.getUTCFullYear(), nowUtc.getUTCMonth(), nowUtc.getUTCDate());
-    const toAgingRow = (o: typeof uninvoiced[number]): AgingRow => ({
+    ap = [...ap, ...uninvoiced.filter((o) => o.order_type === 'purchase').map((o): AgingRow => ({
       id: o.id,
       workspace_id: workspaceId,
       total: o.total,
       amount_paid: o.settled,
       amount_due: o.outstanding,
-      // The ORDER's currency, not the workspace base. A synthesised row that guesses EUR is
-      // exactly how a USD order's outstanding got summed into the euro bucket totals.
       currency: o.currency,
-      // `due_at` stays the operator-set date (often null) so the inline editor on the Finance
-      // page opens empty and never persists a date nobody typed; the derived one drives aging.
+      // Operator-set date only, so the inline editor never persists a date nobody typed.
       due_at: o.expected_payment_date,
       effective_due_at: o.due_date,
       due_from_terms: o.due_from_terms,
@@ -72,58 +49,21 @@ export async function loadAgingLedger(workspaceId: string): Promise<AgingLedger>
       status: o.status,
       ...agingFromExpected(o.due_date, todayUtcMs),
       entry_kind: 'order',
-      // Bare number only — the row already says "Order, not invoiced" next to it, so the word
-      // "Order" in front of the number just read as "Order ORD-2026-0001".
       description: o.order_number ?? o.id.slice(0, 8),
       party_name: o.party_name,
       category_id: o.category_id,
       category_name: o.category_name,
-    });
-    ar = [...ar, ...uninvoiced.filter((o) => o.order_type === 'sales').map(toAgingRow)];
-    ap = [...ap, ...uninvoiced.filter((o) => o.order_type === 'purchase').map(toAgingRow)];
+    }))];
   } catch (overlayErr) {
     overlayFailed = true;
-    console.error('[agingLedger] uninvoiced-orders overlay failed — AR/AP under-report:', overlayErr);
+    console.error('[agingLedger] uninvoiced purchase-orders overlay failed — AP under-reports:', overlayErr);
   }
 
-  // Customer money held on account (unallocated inbound payments) lives in the receivables list
-  // so the operator sees it next to what that customer owes — but it carries POSITIVE amounts and
-  // is aggregated separately (creditHeld), never summed into "owed" totals as a negative row.
-  // Per operator (2026-08-04): negative numbers on this page are banned; a credit is presented as
-  // "money we hold", and the netting happens in labelled aggregate lines, not in row signs.
-  const deposits = await financeService.getDepositsOnAccount(workspaceId)
-    .catch(() => ({ total: 0, currency: 'EUR', totals: [], rows: [] }) as DepositsOnAccount);
-  ar = [...ar, ...deposits.rows.map((d): AgingRow => ({
-    id: d.payment_id,
-    workspace_id: workspaceId,
-    total: d.unallocated,
-    amount_paid: 0,
-    amount_due: d.unallocated, // positive — aggregates key off entry_kind, not the sign
-    // The DEPOSIT's currency. A credit may only net against same-currency receivables — netting
-    // a USD deposit against a EUR invoice is not a discount, it is a wrong number.
-    currency: d.currency,
-    due_at: null,
-    issued_at: d.paid_at,
-    status: 'credit',
-    age_bucket: 'no_due_date',
-    days_overdue: 0,
-    entry_kind: 'credit',
-    description: d.credit_number ? `Credit ${d.credit_number}` : 'Credit on account',
-    party_name: d.party_name,
-    category_id: null,
-    category_name: null,
-    order_id: d.order_id,
-    order_number: d.order_number,
-    credit_number: d.credit_number,
-  }))];
-
-  // Sort each side by how overdue it is (most overdue first) so aging orders interleave with
-  // invoices instead of always sitting below them. 'no_due_date' (unaged) sinks to the bottom.
   const byOverdue = (a: AgingRow, b: AgingRow) => (b.days_overdue || 0) - (a.days_overdue || 0);
   ar.sort(byOverdue);
   ap.sort(byOverdue);
 
-  return { ar, ap, deposits, overlayFailed };
+  return { ar, ap, overlayFailed };
 }
 
 /** Which currency a set of aging rows may honestly be totalled in, and whether it is mixed. */
@@ -155,13 +95,8 @@ export interface AgingSummary {
 }
 
 /**
- * A row is past due when it has aged out of `current` — never by re-comparing dates here.
- *
- * The buckets are the derivation: `vw_ar_aging` computes them in SQL for invoices and
- * `loadAgingLedger` computes them the same way for un-invoiced orders. Re-deriving "overdue" from
- * `due_at` would disagree with both, because an un-invoiced order ages against its terms-derived
- * date while `due_at` stays null. Exported so the "Past due" list filter selects EXACTLY the rows
- * this counts — the figure and the list it links to are one set.
+ * A row is past due once it has aged out of `current` — never by re-comparing dates here: the
+ * buckets come from SQL (and the purchase-order overlay), and the "Past due" filter uses this too.
  */
 export const isAgingRowOverdue = (r: AgingRow): boolean =>
   r.entry_kind !== 'credit' && r.age_bucket !== 'current' && r.age_bucket !== 'paid' && r.age_bucket !== 'no_due_date';

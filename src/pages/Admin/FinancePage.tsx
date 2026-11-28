@@ -223,9 +223,8 @@ const FinancePage: React.FC = () => {
   const [pnl, setPnl] = useState<PnlRow[]>([]);
   const [cashFlow, setCashFlow] = useState<CashFlowRow[]>([]);
   const [recentInvoices, setRecentInvoices] = useState<Invoice[]>([]);
-  const [cashPosition, setCashPosition] = useState(0); // money in bank = Σ payments in − out
-  const [cashIn, setCashIn] = useState(0);   // Σ payments in  — money actually received
-  const [cashOut, setCashOut] = useState(0); // Σ payments out — money actually paid
+  // Σ payments in − out, one row per currency (largest first) — never summed across currencies.
+  const [cashTotals, setCashTotals] = useState<Array<{ currency: string; money_in: number; money_out: number; net: number }>>([]);
   const [bankBalances, setBankBalances] = useState<BankAccountBalance[]>([]);
   // Money received but not yet invoiced (deposits / on-account) — cash held, not yet revenue.
   const [deposits, setDeposits] = useState<Awaited<ReturnType<typeof financeService.getDepositsOnAccount>>>({ total: 0, currency: 'EUR', totals: [], rows: [] });
@@ -453,8 +452,9 @@ const FinancePage: React.FC = () => {
       // "what is still owed": the aging views, plus confirmed-but-uninvoiced orders, plus the
       // customer credit we hold. The dashboard's Finance block reads the same function, which is
       // what stops the tile and this tab reporting different money.
-      const [ledger, queue, pnlRows, cashRows, invoices, cats] = await Promise.all([
+      const [ledger, depositRows, queue, pnlRows, cashRows, invoices, cats] = await Promise.all([
         loadAgingLedger(wsId),
+        financeService.getDepositsOnAccount(wsId),
         financeService.getFollowUpQueue(wsId),
         financeService.getMonthlyPnl(wsId, 12),
         financeService.getCashFlowForecast(wsId, 90),
@@ -464,7 +464,7 @@ const FinancePage: React.FC = () => {
       // NOT swallowed: when the uninvoiced-orders overlay fails, every AR/AP figure on this page
       // is an UNDER-report rather than a smaller true number.
       setOverlayFailed(ledger.overlayFailed);
-      setDeposits(ledger.deposits);
+      setDeposits(depositRows);
       setAr(ledger.ar);
       setAp(ledger.ap);
       // First finance use with no categories → seed the standard set (idempotent, once per ws).
@@ -481,13 +481,7 @@ const FinancePage: React.FC = () => {
       setPnl(pnlRows);
       setCashFlow(cashRows);
       setRecentInvoices(invoices);
-      // Cash in bank — actual money in/out across all payments (not planned).
-      const { data: pays } = await supabase.from('payments').select('direction, amount').eq('workspace_id', wsId);
-      const moneyIn = (pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'in' ? Number(p.amount) : 0), 0);
-      const moneyOut = (pays ?? []).reduce((a: number, p: any) => a + (p.direction === 'out' ? Number(p.amount) : 0), 0);
-      setCashIn(Math.round(moneyIn * 100) / 100);
-      setCashOut(Math.round(moneyOut * 100) / 100);
-      setCashPosition(Math.round((moneyIn - moneyOut) * 100) / 100);
+      setCashTotals(await financeService.getCashTotals(wsId));
       // Per-account balances (where the money actually sits).
       setBankBalances(await financeService.getBankAccountBalances(wsId).catch(() => [] as BankAccountBalance[]));
     } catch (err: any) {
@@ -512,8 +506,7 @@ const FinancePage: React.FC = () => {
     const monthMargin = Number(lastMonth?.gross_margin ?? 0);
     const monthMarginPct = lastMonth?.gross_margin_pct ?? null;
     // Invoiced AR only ages (uninvoiced orders have no due date) → DSO is over invoiced receivables.
-    // Credit rows (money on account) are not invoices, so they stay out of the DSO base.
-    const invoicedAr = ar.filter((r) => r.entry_kind !== 'order' && r.entry_kind !== 'credit').reduce((acc, r) => acc + (r.amount_due || 0), 0);
+    const invoicedAr = ar.filter((r) => r.entry_kind === 'invoice').reduce((acc, r) => acc + (r.amount_due || 0), 0);
     // True DSO = AR ÷ trailing-12-mo revenue × 365. Null when there's no revenue to divide by.
     const annualRevenue = pnl.reduce((acc, p) => acc + Number(p.revenue_net ?? 0), 0);
     const dso = annualRevenue > 0 ? Math.round((invoicedAr / annualRevenue) * 365) : null;
@@ -534,16 +527,6 @@ const FinancePage: React.FC = () => {
   // amount_due across rows, which only means something when the rows share a currency.
   const arMoney = useMemo(() => aggregateCurrency(ar), [ar]);
   const apMoney = useMemo(() => aggregateCurrency(ap), [ap]);
-
-  // What we actually made on what we sold, over the loaded P&L window. Revenue is what was sold
-  // (issued invoices + confirmed sales orders not yet invoiced), NOT cash received — a paid order
-  // and a still-owed one both count once, when sold. Cash movement is the "Money received" card.
-  const profit = useMemo(() => {
-    const revenue = pnl.reduce((a, p) => a + Number(p.revenue_net ?? 0), 0);
-    const cogs = pnl.reduce((a, p) => a + Number(p.cogs ?? 0), 0);
-    const margin = pnl.reduce((a, p) => a + Number(p.gross_margin ?? 0), 0);
-    return { revenue, cogs, margin, pct: revenue > 0 ? Math.round((1000 * margin) / revenue) / 10 : null };
-  }, [pnl]);
 
   const incomeCats = useMemo(() => categories.filter((c) => c.kind === 'income' || c.kind === 'both'), [categories]);
   const expenseCats = useMemo(() => categories.filter((c) => c.kind === 'expense' || c.kind === 'both'), [categories]);
@@ -711,9 +694,11 @@ const FinancePage: React.FC = () => {
               <KpiCard
                 icon={BanknoteIcon}
                 label="Cash in Bank"
-                value={formatMoney(cashPosition)}
-                accent={cashPosition < 0 ? 'destructive' : 'default'}
-                subtext={deposits.total > 0 ? `incl. ${formatMoney(deposits.total)} not yet invoiced` : 'Payments in − out'}
+                value={formatMoney(cashTotals[0]?.net ?? 0, cashTotals[0]?.currency)}
+                accent={(cashTotals[0]?.net ?? 0) < 0 ? 'destructive' : 'default'}
+                subtext={cashTotals.length > 1
+                  ? `+ ${cashTotals.slice(1).map((c) => formatMoney(c.net, c.currency)).join(' + ')} in other currencies`
+                  : deposits.total > 0 ? `incl. ${formatMoney(deposits.total, deposits.currency)} not yet invoiced` : 'Payments in − out'}
               />
               <KpiCard
                 icon={ArrowDownCircle}
@@ -817,7 +802,7 @@ const FinancePage: React.FC = () => {
             {dashView === 'flow' && (<>
             {/* AR / AP buckets side-by-side */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} credit={deposits.total} money={arMoney} />
+              <BucketSummary title="Receivables by age" buckets={arBuckets} viewLink="ar" expected={arExpected} credit={kpis.creditHeld} money={arMoney} />
               <BucketSummary title="Payables by age" buckets={apBuckets} viewLink="ap" expected={apExpected} money={apMoney} />
             </div>
 
@@ -978,37 +963,16 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── RECEIVABLES ─────────── */}
           <TabsContent value="ar" className="space-y-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              <MoneySummaryCard
-                label="Money Received — All Time"
-                value={formatMoney(cashIn)}
-                sub={`${formatMoney(cashOut)} paid out · ${formatMoney(cashPosition)} net in bank`}
-              />
-              <MoneySummaryCard
-                label="Still owed to us — right now"
-                value={formatMoney(kpis.arOutstanding, arMoney.currency)}
-                sub={kpis.creditHeld > 0
-                  ? `we hold ${formatMoney(kpis.creditHeld, arMoney.currency)} of customer credit for their next orders`
-                  : 'across all open receivables'}
-              />
-              <MoneySummaryCard
-                label="Gross Profit — Last 12 Months"
-                value={formatMoney(profit.margin)}
-                sub={profit.pct !== null
-                  ? `${formatMoney(profit.revenue)} sold − ${formatMoney(profit.cogs)} cost · ${profit.pct}%`
-                  : 'nothing sold yet'}
-                accent={profit.margin < 0 ? 'destructive' : 'default'}
-              />
-            </div>
+            <MoneySummaryCard
+              label="Still Owed to Us — Right Now"
+              value={formatMoney(kpis.arOutstanding, arMoney.currency)}
+              sub={kpis.creditHeld > 0
+                ? `we hold ${formatMoney(kpis.creditHeld, arMoney.currency)} of customer credit for their next orders`
+                : 'open invoices, un-invoiced orders and opening balances, net of credit notes and payments on account'}
+            />
 
-            {(overlayFailed || arMoney.mixed) && (
+            {arMoney.mixed && (
               <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
-                {overlayFailed && (
-                  <div>
-                    Confirmed orders that are not yet invoiced could not be loaded, so the totals
-                    below are <strong>lower than the real position</strong>. Reload to try again.
-                  </div>
-                )}
                 {arMoney.mixed && (
                   <div>
                     These rows span more than one currency. Totals are shown in {arMoney.currency} and
@@ -1082,17 +1046,17 @@ const FinancePage: React.FC = () => {
                     {paginate(arFiltered, arPage).map((r) => {
                       const isOrder = r.entry_kind === 'order';
                       const isCredit = r.entry_kind === 'credit';
-                      // Every receivable belongs to a user — clicking it opens that document:
-                      // an order → the specific order; a credit → the order it came from (if any);
-                      // an invoice → the invoice page.
+                      const isOpening = r.entry_kind === 'opening_balance';
+                      const partyHref = r.party_id ? `${financeBase}?tab=parties&party=${r.party_type}:${r.party_id}` : null;
+                      // A credit or opening balance belongs to the party, so it opens the party's ledger.
                       const onRowClick = isOrder
                         ? () => openOrder(r.id)
-                        : isCredit
-                          ? (r.order_id ? () => openOrder(r.order_id!) : undefined)
+                        : isCredit || isOpening
+                          ? (partyHref ? () => navigate(partyHref) : undefined)
                           : () => navigate(`${financeBase}/invoices/${r.id}`);
                       return (
                       <tr
-                        key={r.id}
+                        key={`${r.entry_kind}:${r.id}:${r.currency}`}
                         className={`border-b border-border/30 hover:bg-muted/30 ${onRowClick ? 'cursor-pointer' : ''}`}
                         // Row onClick is a MOUSE CONVENIENCE only — the keyboard/AT path is the button on the
                         // primary cell. A <tr> cannot be made focusable correctly: tabIndex + role="button" on a
@@ -1106,10 +1070,9 @@ const FinancePage: React.FC = () => {
                               <span className="text-[10px] text-muted-foreground">· Order, not invoiced</span>
                             </span>
                           ) : isCredit ? (
-                            <span className="flex items-center gap-2">
-                              <span className="text-xs">{r.credit_number ?? r.description}</span>
-                              <span className="text-[10px] text-muted-foreground" title="Money of theirs we hold — it covers their next order, or is refunded">· Customer credit</span>
-                            </span>
+                            <span className="text-xs" title="Money of theirs we hold, beyond everything they owe — it covers their next order, or is refunded">Customer credit</span>
+                          ) : isOpening ? (
+                            <span className="text-xs" title="The balance carried over when this customer's ledger was started">Opening balance</span>
                           ) : (
                             <span className="font-mono text-xs">{r.internal_number}</span>
                           )}
@@ -1149,10 +1112,10 @@ const FinancePage: React.FC = () => {
                             <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(r.id)}>
                               <ShoppingCart className="h-3.5 w-3.5 mr-1" /> Open order
                             </Button>
-                          ) : isCredit ? (
-                            r.order_id ? (
-                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openOrder(r.order_id!)}>
-                                <ShoppingCart className="h-3.5 w-3.5 mr-1" /> {r.order_number ?? 'Open order'}
+                          ) : isCredit || isOpening ? (
+                            partyHref ? (
+                              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => navigate(partyHref)}>
+                                Open ledger
                               </Button>
                             ) : <span className="text-xs text-muted-foreground">—</span>
                           ) : (
@@ -1168,8 +1131,6 @@ const FinancePage: React.FC = () => {
                 <TablePagination page={arPage} total={arFiltered.length} onPageChange={setArPage} label="receivables" />
               </CardContent>
             </Card>
-            {/* Customer credit (money held on account) is a positively-signed row in the list
-                above — aggregates key off entry_kind === 'credit', never off a negative amount. */}
           </TabsContent>
 
           {/* ─────────── PAYABLES ─────────── */}
