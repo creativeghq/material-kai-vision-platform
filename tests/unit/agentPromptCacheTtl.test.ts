@@ -37,3 +37,16 @@ describe('a toolkit guide travels with its toolkit', () => {
     expect(shape).toMatch(/NEVER_SHAPED = new Set\(\[[\s\S]*'guidance'/);
   });
 });
+
+describe('a lean specialist binds its home clusters and names the rest', () => {
+  it('Pepper binds only its home clusters up front', () => {
+    expect(agentChat).toMatch(/SPECIALIST_HOME_CLUSTERS[^=]*= \{\s*'product-business': \[/);
+    expect(agentChat).toMatch(/CURATED_SPECIALISTS\.has\(agentId\) && !homeClusters/);
+  });
+
+  it('the unbound clusters are listed with their tools, inside the cached prefix', () => {
+    const hint = agentChat.indexOf('[TOOLKITS ON DEMAND]');
+    expect(hint).toBeGreaterThan(-1);
+    expect(hint).toBeLessThan(agentChat.indexOf('const systemCachePrefix = systemPrompt;'));
+  });
+});

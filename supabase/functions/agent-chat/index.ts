@@ -1949,11 +1949,18 @@ async function executeAgent(
     for (const t of TOOLKIT_CLUSTERS['core']?.tool_ids ?? []) if (t !== 'find_records') toolkitToolIds.delete(t);
   }
 
-  // Curated specialists bind their WHOLE toolkit by default — the point of a
-  // specialist is that its focused kit is ready without a load_toolkit hop. The
-  // generalist (kai) stays lean (core + load_toolkit) to keep context small.
+  // Curated specialists bind their WHOLE kit; kai binds core + load_toolkit. A specialist with HOME
+  // clusters binds those up front and loads the rest on demand (it then stays on the conversation
+  // via `toolkit_loaded`) — every bound tool is re-sent each call, and Pepper's kit was 31k tokens.
   const CURATED_SPECIALISTS = new Set(['erp', 'product-business', 'marketing', 'social-media', 'property-advisor']);
-  const baseTools = CURATED_SPECIALISTS.has(agentId)
+  const SPECIALIST_HOME_CLUSTERS: Record<string, string[]> = {
+    'product-business': ['b2b', 'knowledge-graph', 'crm'],
+  };
+  const homeClusters = SPECIALIST_HOME_CLUSTERS[agentId];
+  if (homeClusters) {
+    for (const c of homeClusters) for (const t of TOOLKIT_CLUSTERS[c]?.tool_ids ?? []) toolkitToolIds.add(t);
+  }
+  const baseTools = CURATED_SPECIALISTS.has(agentId) && !homeClusters
     ? [...config.tools]
     : config.tools.filter((t) => toolkitToolIds.has(t));
   for (const m of BOUND_META_TOOLS) if (!baseTools.includes(m)) baseTools.push(m);
@@ -2095,6 +2102,22 @@ ${await loadPrompt(supabase, 'tool', 'approval_card', autoApprove ? 'auto' : 'ma
       activeToolkitIds.filter((id) => !TOOLKIT_CLUSTERS[id]?.alwaysOn).map(toolkitGuide),
     );
     for (const g of guides) if (g) systemPrompt += `\n\n${g}`;
+  }
+
+  // load_toolkit's menu is ids only; without the tool names the agent answers without them.
+  if (homeClusters && !forCustomer) {
+    const mayAdmin = userRole === 'admin' || userRole === 'owner';
+    const deferred = Object.entries(TOOLKIT_CLUSTERS)
+      .filter(([id, def]) => !activeToolkitIds.includes(id)
+        && (mayAdmin || !def.adminOnly)
+        && (!def.capability || roleHasCapability(userRole, def.capability as Capability[])))
+      .map(([id, def]) => [id, def.tool_ids.filter((t) => agentPermittedToolIds.has(t) && !boundToolIds.has(t))] as const)
+      .filter(([, ids]) => ids.length > 0);
+    if (deferred.length > 0) {
+      systemPrompt += '\n\n[TOOLKITS ON DEMAND] These are yours but not bound yet. When the request needs one, '
+        + 'call load_toolkit with its id first, then the tool, in the same turn:\n'
+        + deferred.map(([id, ids]) => `- ${id}: ${ids.join(', ')}`).join('\n');
+    }
   }
 
   try {
