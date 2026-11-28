@@ -1955,6 +1955,12 @@ async function executeAgent(
   const CURATED_SPECIALISTS = new Set(['erp', 'product-business', 'marketing', 'social-media', 'property-advisor']);
   const SPECIALIST_HOME_CLUSTERS: Record<string, string[]> = {
     'product-business': ['b2b', 'knowledge-graph', 'crm'],
+    erp: ['quotes', 'expenses', 'finance', 'stock', 'crm', 'projects', 'contracts', 'admin-misc'],
+    marketing: ['seo-research', 'seo-domain', 'seo-article', 'seo-pages', 'ai-visibility'],
+    'social-media': ['social', 'inbox', 'messaging', 'reviews'],
+    'property-advisor': ['real-estate', 'real-estate-assessment', 'appointments'],
+    // Not curated: home ADDS generation, since nearly every turn of its loaded it on demand.
+    'interior-designer': ['generation'],
   };
   const homeClusters = SPECIALIST_HOME_CLUSTERS[agentId];
   if (homeClusters) {
