@@ -978,14 +978,7 @@ const FinancePage: React.FC = () => {
 
           {/* ─────────── RECEIVABLES ─────────── */}
           <TabsContent value="ar" className="space-y-4">
-            {/* The buckets below answer "who owes us and how late". These three answer the money
-                question operators actually open this tab with: what came in, what is still out,
-                and what we made on it. */}
             <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-              {/* Each tile names its own WINDOW. The three cover all-time cash, a right-now
-                  snapshot and the last 12 months of trading — three different questions sitting in
-                  one row, which invites a subtraction across them that means nothing. Every figure
-                  was already correct; only the periods were unstated. */}
               <MoneySummaryCard
                 label="Money Received — All Time"
                 value={formatMoney(cashIn)}
